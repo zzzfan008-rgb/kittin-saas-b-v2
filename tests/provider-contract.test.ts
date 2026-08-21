@@ -66,7 +66,7 @@ async function imageDataUrl(
   return `data:${mime};base64,${buffer.toString("base64")}`;
 }
 
-async function halfEditableMask(width: number, height: number): Promise<string> {
+async function halfEditableMask(width: number, height: number, compressionLevel?: number): Promise<string> {
   const pixels = Buffer.alloc(width * height * 4);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -77,7 +77,10 @@ async function halfEditableMask(width: number, height: number): Promise<string> 
       pixels[offset + 3] = x < width / 2 ? 0 : 255;
     }
   }
-  const buffer = await sharp(pixels, { raw: { width, height, channels: 4 } }).png().toBuffer();
+  const image = sharp(pixels, { raw: { width, height, channels: 4 } });
+  const buffer = compressionLevel === undefined
+    ? await image.png().toBuffer()
+    : await image.png({ compressionLevel }).toBuffer();
   return `data:image/png;base64,${buffer.toString("base64")}`;
 }
 
@@ -227,12 +230,45 @@ async function main(): Promise<void> {
         );
         assert.equal(calls, 0);
 
+        const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
+        await assert.rejects(
+          () => apiyiProviders["gpt-image-2"].edit({
+            prompt: "局部改红", referenceImages: [blue], mask: jpegMask, modelOptions: {},
+          }),
+          /蒙版必须是 PNG/,
+        );
+        assert.equal(calls, 0);
+
         const opaqueMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 });
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].edit({
             prompt: "局部改红", referenceImages: [blue], mask: opaqueMask, modelOptions: {},
           }),
           /Alpha 通道/,
+        );
+        assert.equal(calls, 0);
+
+        const wrongSizeMask = await halfEditableMask(2, 2);
+        await assert.rejects(
+          () => apiyiProviders["gpt-image-2"].edit({
+            prompt: "局部改红", referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
+          }),
+          /蒙版尺寸必须与原图完全一致/,
+        );
+        assert.equal(calls, 0);
+
+        const oversizedMask = await halfEditableMask(1024, 1024, 0);
+        const maskContract = getImageModelContract("gpt-image-2").edit.mask;
+        assert.ok(maskContract);
+        assert.ok(
+          Buffer.from(oversizedMask.split(",")[1], "base64").length > maskContract.maxBytes,
+          "fixture 必须超过蒙版字节上限",
+        );
+        await assert.rejects(
+          () => apiyiProviders["gpt-image-2"].edit({
+            prompt: "局部改红", referenceImages: [blue], mask: oversizedMask, modelOptions: {},
+          }),
+          /image too large/,
         );
         assert.equal(calls, 0);
 

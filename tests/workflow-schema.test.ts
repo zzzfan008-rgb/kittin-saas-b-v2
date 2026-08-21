@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import sharp from "sharp";
 import { writeJsonAtomicSync } from "../server/lib/atomicJson";
 import {
   assertUrlAllowed,
@@ -18,12 +19,76 @@ import {
 } from "../server/lib/imageValidation";
 import { validateAndMigrateFlow, WorkflowValidationError } from "../server/lib/workflowSchema";
 import { ensureBuiltinTemplates } from "../server/routes/templates";
+import { getImageModelContract, MASK_REDRAW_MODEL_ID } from "../src/types/imageModels";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
   "base64",
 );
 const PNG_DATA_URL = `data:image/png;base64,${PNG.toString("base64")}`;
+const MASK_CONTRACT = getImageModelContract(MASK_REDRAW_MODEL_ID).edit.mask;
+
+if (!MASK_CONTRACT) throw new Error("gpt-image-2 mask contract missing");
+
+async function halfEditablePng(
+  width: number,
+  height: number,
+  uncompressed = false,
+): Promise<{ buffer: Buffer; dataUrl: string }> {
+  const pixels = Buffer.alloc(width * height * 4, 255);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width / 2; x += 1) {
+      pixels[(y * width + x) * 4 + 3] = 0;
+    }
+  }
+  const image = sharp(pixels, { raw: { width, height, channels: 4 } });
+  const buffer = uncompressed
+    ? await image.png({ compressionLevel: 0 }).toBuffer()
+    : await image.png().toBuffer();
+  return { buffer, dataUrl: `data:image/png;base64,${buffer.toString("base64")}` };
+}
+
+function imageInputFlow(imageUrl: string) {
+  return {
+    schemaVersion: 2,
+    nodes: [{
+      id: "source",
+      type: "image-input",
+      position: { x: 0, y: 0 },
+      data: {
+        kind: "image-input",
+        label: "原图",
+        status: "idle",
+        imageRole: "reference",
+        imageUrl,
+      },
+    }],
+    edges: [],
+  };
+}
+
+function maskFlow(mask: string, maskSourceRef = PNG_DATA_URL, prompt = "局部改色") {
+  return {
+    schemaVersion: 2,
+    nodes: [{
+      id: "mask",
+      type: "mask-redraw",
+      position: { x: 0, y: 0 },
+      data: {
+        kind: "mask-redraw",
+        label: "局部重绘",
+        status: "idle",
+        prompt,
+        mask,
+        maskSourceRef,
+        outputImages: [],
+        modelId: MASK_REDRAW_MODEL_ID,
+        modelOptions: {},
+      },
+    }],
+    edges: [],
+  };
+}
 
 let passed = 0;
 async function test(name: string, run: () => unknown | Promise<unknown>) {
@@ -131,6 +196,53 @@ async function main() {
     assert.throws(() => validateAndMigrateFlow(flow), /imageUrl/);
   });
 
+  await test("大于文本上限但小于图片字节上限的 dataURL 可用于通用图片与蒙版", async () => {
+    const largePng = await halfEditablePng(128, 128, true);
+    assert.ok(largePng.dataUrl.length > 20_000, "fixture 必须超过普通文本上限");
+    assert.ok(largePng.buffer.length < MASK_CONTRACT.maxBytes, "fixture 必须低于蒙版字节上限");
+
+    const imageFlow = validateAndMigrateFlow(imageInputFlow(largePng.dataUrl));
+    assert.equal(imageFlow.nodes[0].data.kind, "image-input");
+    if (imageFlow.nodes[0].data.kind !== "image-input") throw new Error("unexpected node kind");
+    assert.equal(imageFlow.nodes[0].data.imageUrl, largePng.dataUrl);
+
+    const redrawFlow = validateAndMigrateFlow(maskFlow(largePng.dataUrl, largePng.dataUrl));
+    assert.equal(redrawFlow.nodes[0].data.kind, "mask-redraw");
+    if (redrawFlow.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+    assert.equal(redrawFlow.nodes[0].data.mask, largePng.dataUrl);
+    assert.equal(redrawFlow.nodes[0].data.maskSourceRef, largePng.dataUrl);
+  });
+
+  await test("蒙版 schema 按契约拒绝非 PNG 与解码后超过 4MiB 的 dataURL", async () => {
+    const jpeg = await sharp({
+      create: { width: 4, height: 2, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    }).jpeg().toBuffer();
+    assert.throws(
+      () => validateAndMigrateFlow(maskFlow(`data:image/jpeg;base64,${jpeg.toString("base64")}`)),
+      /dataURL MIME must be one of: image\/png/,
+    );
+
+    const oversized = await halfEditablePng(1024, 1024, true);
+    assert.ok(oversized.buffer.length > MASK_CONTRACT.maxBytes, "fixture 必须超过蒙版字节上限");
+    assert.throws(() => validateAndMigrateFlow(maskFlow(oversized.dataUrl)), /image too large/);
+
+    for (const nonInlineMask of ["/api/files/mask.png", "https://example.com/mask.png"]) {
+      assert.throws(
+        () => validateAndMigrateFlow(maskFlow(nonInlineMask)),
+        /mask: must be an inline PNG dataURL/,
+      );
+    }
+  });
+
+  await test("普通文本与非 dataURL 图片引用仍保留 20,000 字符上限", () => {
+    const promptFlow = legacyAiFlow();
+    promptFlow.nodes[0].data.prompt = "x".repeat(20_001);
+    assert.throws(() => validateAndMigrateFlow(promptFlow), /prompt: must be at most 20000 characters/);
+
+    const longUrl = `https://example.com/${"x".repeat(20_001)}`;
+    assert.throws(() => validateAndMigrateFlow(imageInputFlow(longUrl)), /imageUrl: must be at most 20000 characters/);
+  });
+
   await test("干净检出也可迁移旧项目，并校验仓库内置模板", () => {
     // 不依赖被 .gitignore 排除的 data/projects；旧项目夹具必须由测试自己提供。
     const legacyProject = {
@@ -206,6 +318,7 @@ async function main() {
     const parsed = validateImageDataUrl(PNG_DATA_URL);
     assert.equal(parsed.mime, "image/png");
     assert.deepEqual(parsed.buffer, PNG);
+    assert.deepEqual(validateImageDataUrl(PNG_DATA_URL, PNG.length).buffer, PNG);
     assert.throws(() => validateImageDataUrl(`data:image/jpeg;base64,${PNG.toString("base64")}`), /mismatch/);
     assert.throws(() => validateImageDataUrl("data:image/png;base64,abc$"), ImageValidationError);
     assert.throws(() => validateImageDataUrl(PNG_DATA_URL, PNG.length - 1), /too large/);

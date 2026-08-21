@@ -14,6 +14,7 @@ import {
   DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
   defaultImageModelOptions,
+  getImageModelContract,
   imageModelOptionsError,
   isImageModelId,
   isModelAllowedForNode,
@@ -41,8 +42,14 @@ const IMAGE_SIZES = ["2K", "4K"] as const;
 const MAX_NODES = 500;
 const MAX_EDGES = 2_000;
 const MAX_TEXT_LENGTH = 20_000;
+const MAX_IMAGE_REFERENCE_LENGTH = 20_000;
 const MAX_IMAGE_REFS = 100;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const MASK_DATA_URL_CONTRACT = (() => {
+  const contract = getImageModelContract(MASK_REDRAW_MODEL_ID).edit.mask;
+  if (!contract) throw new Error(`${MASK_REDRAW_MODEL_ID} 缺少蒙版契约`);
+  return contract;
+})();
 
 export class WorkflowValidationError extends Error {
   constructor(message: string) {
@@ -73,15 +80,29 @@ function optionalString(value: unknown, path: string): string | undefined {
   return value === undefined ? undefined : stringValue(value, path);
 }
 
-function imageReference(value: unknown, path: string): string {
-  const ref = stringValue(value, path, { nonEmpty: true });
+interface ImageReferenceOptions {
+  maxDataUrlBytes?: number;
+  allowedDataUrlMimes?: readonly string[];
+}
+
+function imageReference(value: unknown, path: string, opts?: ImageReferenceOptions): string {
+  if (typeof value !== "string") fail(path, "must be a string");
+  if (value.trim().length === 0) fail(path, "must not be empty");
+  const ref = value;
   if (ref.startsWith("data:")) {
+    let mime = "";
     try {
-      validateImageDataUrl(ref);
+      mime = validateImageDataUrl(ref, opts?.maxDataUrlBytes).mime;
     } catch (error) {
       fail(path, error instanceof Error ? error.message : "invalid image dataURL");
     }
+    if (opts?.allowedDataUrlMimes && !opts.allowedDataUrlMimes.includes(mime)) {
+      fail(path, `dataURL MIME must be one of: ${opts.allowedDataUrlMimes.join(", ")}`);
+    }
     return ref;
+  }
+  if (ref.length > MAX_IMAGE_REFERENCE_LENGTH) {
+    fail(path, `must be at most ${MAX_IMAGE_REFERENCE_LENGTH} characters`);
   }
   const isRemote = /^https?:\/\//i.test(ref);
   if (!isLocalImageReference(ref) && !isRemote) {
@@ -92,6 +113,17 @@ function imageReference(value: unknown, path: string): string {
 
 function optionalImageReference(value: unknown, path: string): string | undefined {
   return value === undefined ? undefined : imageReference(value, path);
+}
+
+function optionalMaskReference(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") fail(path, "must be a string");
+  // MaskEditor 持久化内联 PNG；其它引用无法在同步 schema 阶段验证 MIME 与解码字节数。
+  if (!value.startsWith("data:")) fail(path, "must be an inline PNG dataURL");
+  return imageReference(value, path, {
+    maxDataUrlBytes: MASK_DATA_URL_CONTRACT.maxBytes,
+    allowedDataUrlMimes: MASK_DATA_URL_CONTRACT.mimeTypes,
+  });
 }
 
 function finiteNumber(value: unknown, path: string): number {
@@ -228,7 +260,7 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
       break;
     case "mask-redraw":
       stringValue(raw.prompt, `${path}.prompt`);
-      optionalImageReference(raw.mask, `${path}.mask`);
+      optionalMaskReference(raw.mask, `${path}.mask`);
       optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
       imageReferenceArray(raw.outputImages, `${path}.outputImages`);
       break;
