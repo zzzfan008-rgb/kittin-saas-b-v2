@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { maskRedrawReadiness } from "../src/lib/maskRedraw";
 import type { Edge } from "@xyflow/react";
-import { applyRunEventToTab, useFlowStore, type FlowNode } from "../src/store/flowStore";
+import {
+  applyRunEventToTab,
+  selectNodeInputImages,
+  useFlowStore,
+  type FlowNode,
+} from "../src/store/flowStore";
 
 let passed = 0;
 
@@ -206,6 +212,81 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
   );
   assert.ok(source.includes("const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);"));
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
+});
+
+await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点击", () => {
+  const sourceRef = "/api/files/mask-source";
+  useFlowStore.getState().openFlowTab({
+    projectId: "mask-readiness-project",
+    projectName: "蒙版按钮测试",
+    nodes: [
+      {
+        id: "mask-source",
+        type: "image-input",
+        position: { x: 0, y: 0 },
+        data: {
+          kind: "image-input",
+          label: "蒙版原图",
+          status: "success",
+          imageRole: "default",
+          imageUrl: sourceRef,
+        },
+      },
+      {
+        id: "mask-node",
+        type: "mask-redraw",
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "mask-redraw",
+          label: "蒙版局部重绘",
+          status: "idle",
+          modelId: "gpt-image-2",
+          modelOptions: {},
+          prompt: "",
+          outputImages: [],
+        },
+      },
+    ],
+    edges: [{ id: "mask-edge", source: "mask-source", target: "mask-node" }],
+  });
+
+  const source = selectNodeInputImages(useFlowStore.getState(), "mask-node")[0];
+  assert.equal(source, sourceRef);
+  const beforeSave = maskRedrawReadiness({ source, prompt: "" });
+  assert.equal(beforeSave.canOpenRunAction, false);
+
+  useFlowStore.getState().updateNodeData("mask-node", {
+    mask: "data:image/png;base64,bWFzaw==",
+    maskSourceRef: source,
+  });
+  const savedNode = useFlowStore.getState().nodes.find((node) => node.id === "mask-node");
+  assert.equal(savedNode?.data.kind, "mask-redraw");
+  if (savedNode?.data.kind !== "mask-redraw") throw new Error("蒙版节点丢失");
+  const afterSave = maskRedrawReadiness({
+    source,
+    mask: savedNode.data.mask,
+    maskSourceRef: savedNode.data.maskSourceRef,
+    prompt: savedNode.data.prompt,
+  });
+  assert.equal(afterSave.hasCurrentMask, true);
+  assert.equal(afterSave.canOpenRunAction, true, "保存蒙版后按钮不应再因提示词为空而保持 disabled");
+  assert.equal(afterSave.canSubmit, false, "提示词仍应在点击动作时单独校验");
+
+  const afterPrompt = maskRedrawReadiness({
+    source,
+    mask: "data:image/png;base64,bWFzaw==",
+    maskSourceRef: source,
+    prompt: "将选中区域改成银色拉链",
+  });
+  assert.equal(afterPrompt.canSubmit, true);
+
+  const staleMask = maskRedrawReadiness({
+    source: "/api/files/new-source",
+    mask: "data:image/png;base64,bWFzaw==",
+    maskSourceRef: source,
+    prompt: "将选中区域改成银色拉链",
+  });
+  assert.equal(staleMask.canOpenRunAction, false, "原图变化后旧蒙版仍必须禁用");
 });
 
 await test("窄屏侧栏使用抽屉且顶栏不再依赖绝对居中", () => {

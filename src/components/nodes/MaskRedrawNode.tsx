@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { selectNodeInputImages, useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type MaskRedrawNodeData } from "@/types/workflow";
@@ -6,16 +6,34 @@ import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { MaskEditor } from "./MaskEditor";
 import { thumbnailImageUrl } from "@/lib/images";
+import { maskRedrawReadiness } from "@/lib/maskRedraw";
 
 export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedrawNodeData>>) {
   const [editing, setEditing] = useState(false);
+  const [promptRequired, setPromptRequired] = useState(false);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
   const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
-  const staleMask = Boolean(data.mask && source && data.maskSourceRef !== source);
-  const canRun = Boolean(source && data.mask && !staleMask && data.prompt.trim());
+  const readiness = maskRedrawReadiness({
+    source,
+    mask: data.mask,
+    maskSourceRef: data.maskSourceRef,
+    prompt: data.prompt,
+  });
+  const staleMask = Boolean(data.mask && source && !readiness.hasCurrentMask);
+
+  const run = () => {
+    if (!readiness.canSubmit) {
+      setPromptRequired(true);
+      promptRef.current?.focus();
+      return;
+    }
+    setPromptRequired(false);
+    void runNode(id);
+  };
 
   return (
     <>
@@ -39,12 +57,24 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         <label className="block space-y-1">
           <span className="text-[10px] text-neutral-500">修改说明</span>
           <textarea
+            ref={promptRef}
             value={data.prompt}
-            onChange={(event) => updateNodeData(id, { prompt: event.target.value })}
+            onChange={(event) => {
+              const prompt = event.target.value;
+              updateNodeData(id, { prompt });
+              if (prompt.trim()) setPromptRequired(false);
+            }}
             rows={4}
             placeholder="如：将选中区域改成银色金属拉链"
-            className={`${inputClass} resize-none`}
+            aria-invalid={promptRequired}
+            aria-describedby={promptRequired ? `${id}-prompt-required` : undefined}
+            className={`${inputClass} resize-none ${promptRequired ? "border-red-500" : ""}`}
           />
+          {promptRequired && (
+            <span id={`${id}-prompt-required`} className="block text-[10px] text-red-400">
+              请先填写需要如何修改选中区域
+            </span>
+          )}
         </label>
         <button
           type="button"
@@ -57,10 +87,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         {staleMask && <p className="text-[10px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
         <RunButton
           status={data.status}
-          onClick={() => void runNode(id)}
+          onClick={run}
           onCancel={() => void cancelNodeRun(id)}
           label="局部重绘"
-          disabled={!canRun}
+          disabled={!readiness.canOpenRunAction}
         />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
