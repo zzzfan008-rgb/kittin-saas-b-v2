@@ -44,10 +44,31 @@ function readAsDataURL(file: File): Promise<string> {
   });
 }
 
+export function ImageFileInput({
+  label,
+  onFile,
+}: {
+  label: string;
+  onFile: (file: File | undefined) => void;
+}) {
+  return (
+    <input
+      type="file"
+      accept="image/*"
+      multiple={false}
+      aria-label={label}
+      className="nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+      onChange={(event) => {
+        onFile(event.target.files?.[0]);
+        event.target.value = "";
+      }}
+    />
+  );
+}
+
 export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInputNodeData>>) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
   const openViewer = useFlowStore((s) => s.openViewer);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -102,6 +123,13 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
     return () => document.removeEventListener("paste", onPaste);
   }, [selected, handleFile]);
 
+  const fileInput = (
+    <ImageFileInput
+      label={data.imageUrl ? "重新上传图片" : "上传图片"}
+      onFile={(file) => void handleFile(file)}
+    />
+  );
+
   return (
     <>
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
@@ -124,9 +152,6 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           </div>
         ) : (
           <div
-            role="button"
-            tabIndex={0}
-            onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -137,13 +162,16 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag cursor-pointer rounded-md border border-dashed bg-[#0f0f0f] py-6 text-center text-[10px] leading-relaxed transition-colors ${
+            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[#0f0f0f] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
               dragOver
                 ? "border-gold bg-gold/5 text-gold"
                 : "border-[#2a2a2a] text-neutral-500 hover:border-neutral-500"
             }`}
           >
-            {uploading ? "素材处理中…" : "每个上传节点仅支持 1 张图\n点击 / 拖拽 / 选中后 Ctrl+V"}
+            {fileInput}
+            <span className="pointer-events-none whitespace-pre-line">
+              {uploading ? "素材处理中…" : "每个上传节点仅支持 1 张图\n点击 / 拖拽 / 选中后 Ctrl+V"}
+            </span>
           </div>
         )}
         {!data.imageUrl && (
@@ -155,26 +183,12 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
             从素材库选择
           </button>
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple={false}
-          className="hidden"
-          onChange={(e) => {
-            void handleFile(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
         {data.imageUrl && (
           <div className="nodrag flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-neutral-500 hover:text-neutral-200"
-            >
-              重新上传
-            </button>
+            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[#262626] py-1 text-center text-[10px] text-neutral-400 hover:border-neutral-500 hover:text-neutral-200 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
+              {fileInput}
+              <span className="pointer-events-none">重新上传</span>
+            </div>
             <button
               type="button"
               onClick={openAssetPicker}
