@@ -1,10 +1,11 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
+import { createLatestMaskLoadGuard } from "@/lib/maskUpload";
 
 interface MaskEditorProps {
   source: string;
   initialMask?: string;
-  onSave: (mask: string) => void;
+  onSave: (mask: string) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -18,6 +19,9 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const savingRef = useRef(false);
+  const loadGuardRef = useRef(createLatestMaskLoadGuard());
+  const snapshotLoadGuardRef = useRef(createLatestMaskLoadGuard());
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<BrushMode>("edit");
   const [brushSize, setBrushSize] = useState(80);
@@ -44,8 +48,10 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   const loadMaskSnapshot = (snapshot: string) => {
     const mask = maskRef.current;
     if (!mask) return;
+    const isCurrentLoad = snapshotLoadGuardRef.current.begin();
     const image = new Image();
     image.onload = () => {
+      if (!isCurrentLoad()) return;
       const context = mask.getContext("2d");
       if (!context) return;
       context.globalCompositeOperation = "source-over";
@@ -70,6 +76,9 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     const mask = maskRef.current;
     const overlay = overlayRef.current;
     if (!image || !mask || !overlay || !image.naturalWidth || !image.naturalHeight) return;
+    snapshotLoadGuardRef.current.invalidate();
+    const isCurrentLoad = loadGuardRef.current.begin();
+    setReady(false);
     mask.width = image.naturalWidth;
     mask.height = image.naturalHeight;
     overlay.width = image.naturalWidth;
@@ -81,6 +90,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     if (initialMask) {
       const existing = new Image();
       existing.onload = () => {
+        if (!isCurrentLoad()) return;
         if (existing.naturalWidth !== mask.width || existing.naturalHeight !== mask.height) {
           setError("已保存蒙版与当前原图尺寸不一致，请重新绘制");
           renderOverlay();
@@ -93,6 +103,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
         setReady(true);
       };
       existing.onerror = () => {
+        if (!isCurrentLoad()) return;
         setError("无法读取已保存蒙版，请重新绘制");
         renderOverlay();
         setReady(true);
@@ -103,6 +114,24 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     renderOverlay();
     setReady(true);
   };
+
+  useLayoutEffect(() => {
+    // 同一组件实例可能因上游 Run 完成而收到新 source；先使旧 Image 回调失效。
+    loadGuardRef.current.invalidate();
+    snapshotLoadGuardRef.current.invalidate();
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    setReady(false);
+    setError(null);
+    setUndoStack([]);
+    setRedoStack([]);
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth && image.naturalHeight) initializeCanvases();
+    return () => {
+      loadGuardRef.current.invalidate();
+      snapshotLoadGuardRef.current.invalidate();
+    };
+  }, [source, initialMask]);
 
   const pointForEvent = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = overlayRef.current!;
@@ -120,6 +149,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     const maskContext = mask.getContext("2d");
     const overlayContext = overlay.getContext("2d");
     if (!maskContext || !overlayContext) return;
+    snapshotLoadGuardRef.current.invalidate();
     for (const [context, target] of [[maskContext, "mask"], [overlayContext, "overlay"]] as const) {
       context.save();
       context.lineCap = "round";
@@ -138,7 +168,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!ready) return;
+    if (!ready || savingRef.current) return;
+    snapshotLoadGuardRef.current.invalidate();
     pushUndo();
     drawingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -148,7 +179,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const continueDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!drawingRef.current || !lastPointRef.current) return;
+    if (savingRef.current || !drawingRef.current || !lastPointRef.current) return;
     const point = pointForEvent(event);
     drawSegment(lastPointRef.current, point);
     lastPointRef.current = point;
@@ -160,6 +191,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const clearMask = () => {
+    if (savingRef.current) return;
+    snapshotLoadGuardRef.current.invalidate();
     const mask = maskRef.current;
     if (!mask) return;
     pushUndo();
@@ -172,6 +205,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const invertMask = () => {
+    if (savingRef.current) return;
+    snapshotLoadGuardRef.current.invalidate();
     const mask = maskRef.current;
     if (!mask) return;
     pushUndo();
@@ -191,6 +226,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const undo = () => {
+    if (savingRef.current) return;
     const snapshot = undoStack.at(-1);
     if (!snapshot) return;
     const current = captureMask();
@@ -200,6 +236,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   const redo = () => {
+    if (savingRef.current) return;
     const snapshot = redoStack.at(-1);
     if (!snapshot) return;
     const current = captureMask();
@@ -210,7 +247,9 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
 
   const save = async () => {
     const mask = maskRef.current;
-    if (!mask) return;
+    if (!mask || savingRef.current) return;
+    snapshotLoadGuardRef.current.invalidate();
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -224,10 +263,11 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
         reader.onerror = () => reject(new Error("蒙版读取失败"));
         reader.readAsDataURL(blob);
       });
-      onSave(dataUrl);
+      await onSave(dataUrl);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -238,11 +278,11 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
         <strong className="text-sm font-medium text-neutral-100">蒙版局部重绘</strong>
         <span className="text-[10px] text-neutral-500">GPT Image 2</span>
         <div className="ml-auto flex items-center gap-1.5">
-          <ToolbarButton label="撤销" disabled={!undoStack.length} onClick={undo} />
-          <ToolbarButton label="重做" disabled={!redoStack.length} onClick={redo} />
-          <ToolbarButton label="清空" onClick={clearMask} />
-          <ToolbarButton label="反选" onClick={invertMask} />
-          <button type="button" onClick={onClose} className="ml-2 rounded-md border border-[#333] px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500">
+          <ToolbarButton label="撤销" disabled={saving || !undoStack.length} onClick={undo} />
+          <ToolbarButton label="重做" disabled={saving || !redoStack.length} onClick={redo} />
+          <ToolbarButton label="清空" disabled={saving} onClick={clearMask} />
+          <ToolbarButton label="反选" disabled={saving} onClick={invertMask} />
+          <button type="button" onClick={onClose} disabled={saving} className="ml-2 rounded-md border border-[#333] px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500 disabled:opacity-40">
             关闭
           </button>
         </div>
@@ -265,7 +305,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
             onPointerMove={continueDrawing}
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
-            className={`absolute inset-0 h-full w-full touch-none ${ready ? "cursor-crosshair" : "cursor-wait"}`}
+            aria-disabled={saving}
+            className={`absolute inset-0 h-full w-full touch-none ${ready && !saving ? "cursor-crosshair" : "cursor-wait"} ${saving ? "pointer-events-none" : ""}`}
           />
           <canvas ref={maskRef} className="hidden" />
         </div>
@@ -273,15 +314,16 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
 
       <footer className="flex min-h-16 shrink-0 items-center gap-4 border-t border-[#262626] px-4 py-2">
         <div className="flex rounded-md border border-[#333] p-0.5">
-          <ModeButton active={mode === "edit"} label="涂抹修改区" onClick={() => setMode("edit")} />
-          <ModeButton active={mode === "preserve"} label="恢复保留区" onClick={() => setMode("preserve")} />
+          <ModeButton active={mode === "edit"} label="涂抹修改区" disabled={saving} onClick={() => setMode("edit")} />
+          <ModeButton active={mode === "preserve"} label="恢复保留区" disabled={saving} onClick={() => setMode("preserve")} />
         </div>
         <label className="flex min-w-56 items-center gap-2 text-[10px] text-neutral-500">
           笔刷 {brushSize}px
           <input
             type="range" min={8} max={300} step={4} value={brushSize}
             onChange={(event) => setBrushSize(Number(event.target.value))}
-            className="accent-[#C9A66B]"
+            disabled={saving}
+            className="accent-[#C9A66B] disabled:opacity-40"
           />
         </label>
         {error && <p className="min-w-0 flex-1 truncate text-[10px] text-red-400" title={error}>{error}</p>}
@@ -307,9 +349,9 @@ function ToolbarButton({ label, onClick, disabled = false }: { label: string; on
   );
 }
 
-function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function ModeButton({ active, label, onClick, disabled = false }: { active: boolean; label: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded px-3 py-1.5 text-[10px] ${active ? "bg-gold text-ink" : "text-neutral-400 hover:text-neutral-200"}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`rounded px-3 py-1.5 text-[10px] disabled:opacity-40 ${active ? "bg-gold text-ink" : "text-neutral-400 hover:text-neutral-200"}`}>
       {label}
     </button>
   );

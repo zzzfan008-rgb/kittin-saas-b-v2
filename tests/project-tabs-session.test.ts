@@ -6,12 +6,21 @@ interface MemoryStorage {
   removeItem(key: string): void;
 }
 
-function memoryStorage(initial: Record<string, string> = {}, onSet?: (key: string) => void): MemoryStorage {
+function memoryStorage(
+  initial: Record<string, string> = {},
+  onSet?: (key: string) => void,
+  shouldFail?: (key: string, value: string) => boolean,
+): MemoryStorage {
   const values = new Map(Object.entries(initial));
   return {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => {
       onSet?.(key);
+      if (shouldFail?.(key, value)) {
+        const error = new Error("quota exceeded");
+        error.name = "QuotaExceededError";
+        throw error;
+      }
       values.set(key, value);
     },
     removeItem: (key) => values.delete(key),
@@ -86,9 +95,11 @@ const storedRecentResults = [
 ];
 
 let sessionWrites = 0;
+let failSessionWrites = false;
 const sessionStorage = memoryStorage(
   { [sessionKey]: JSON.stringify(storedSession) },
   (key) => { if (key === sessionKey) sessionWrites += 1; },
+  (key) => key === sessionKey && failSessionWrites,
 );
 const localStorage = memoryStorage({ [recentKey]: JSON.stringify(storedRecentResults) });
 Object.assign(globalThis, { window: { sessionStorage, localStorage } });
@@ -98,6 +109,7 @@ const {
   discardActiveTabSession,
   normalizeTabSessionValue,
   reconcileRunHistory,
+  retryTabSessionPersistence,
   TAB_SESSION_SCHEMA_VERSION,
   useFlowStore,
 } = await import("../src/store/flowStore");
@@ -344,6 +356,58 @@ try {
 }
 console.log("  ✓ 20 个八图终态叠加 180 个活动任务时仍保留完整活动门禁");
 
+useFlowStore.getState().openFlowTab({
+  projectId: "quota-project",
+  projectName: "容量恢复项目",
+  nodes: [{
+    id: "quota-source",
+    type: "image-input",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "image-input", label: "原图", status: "idle", imageRole: "default",
+      imageUrl: "/api/files/quota-source.png",
+    },
+  }, {
+    id: "quota-mask",
+    type: "mask-redraw",
+    position: { x: 300, y: 0 },
+    data: {
+      kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改色",
+      modelId: "gpt-image-2", modelOptions: {}, outputImages: [],
+      mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
+    },
+  }],
+  edges: [{ id: "quota-edge", source: "quota-source", target: "quota-mask" }],
+});
+assert.match(sessionStorage.getItem(sessionKey) ?? "", /old-mask\.png/);
+failSessionWrites = true;
+const oversizedInlineMask = `data:image/png;base64,${"x".repeat(300_000)}`;
+useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
+assert.equal(sessionStorage.getItem(sessionKey), null, "写失败后必须移除旧快照，不能刷新恢复旧蒙版");
+assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
+
+failSessionWrites = false;
+useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/old-mask.png" });
+assert.match(
+  sessionStorage.getItem(sessionKey) ?? "",
+  /old-mask\.png/,
+  "失败后撤销回旧成功指纹也必须重新写入已被移除的 session key",
+);
+assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
+
+failSessionWrites = true;
+useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
+assert.equal(sessionStorage.getItem(sessionKey), null);
+failSessionWrites = false;
+assert.equal(retryTabSessionPersistence(), true, "同一份未变化快照必须能够显式重试");
+assert.match(sessionStorage.getItem(sessionKey) ?? "", /data:image\/png;base64/);
+assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
+useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/latest-mask.png" });
+const compactSession = sessionStorage.getItem(sessionKey) ?? "";
+assert.match(compactSession, /latest-mask\.png/);
+assert.doesNotMatch(compactSession, /data:image\/png;base64/);
+console.log("  ✓ 容量写失败废弃旧快照并允许同内容重试，短蒙版 URL 可恢复持久化");
+
 sessionStorage.setItem(sessionKey, JSON.stringify({
   activeTabId: "bad-tab",
   tabs: [
@@ -360,4 +424,4 @@ assert.equal(recovered.activeTabId, "good-tab");
 assert.deepEqual(recovered.tabs.map((tab) => tab.id), ["good-tab"]);
 console.log("  ✓ 错误恢复只清除当前损坏页签并保留其他页签");
 
-console.log("\n通过 8 项");
+console.log("\n通过 9 项");

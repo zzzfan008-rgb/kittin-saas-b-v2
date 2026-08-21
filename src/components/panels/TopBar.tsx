@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import { retryTabSessionPersistence, useFlowStore } from "@/store/flowStore";
 import { THEMES, useTheme } from "@/lib/theme";
 import { AccountMenu } from "./AccountMenu";
 
@@ -233,6 +233,7 @@ export function TopBar() {
   const dirty = useFlowStore((s) => s.dirty);
   const readOnly = useFlowStore((s) => s.readOnly);
   const saveProject = useFlowStore((s) => s.saveProject);
+  const tabSessionPersistenceError = useFlowStore((s) => s.tabSessionPersistenceError);
 
   return (
     <header className="gc-panel relative z-40 flex h-11 min-w-0 shrink-0 items-center gap-1.5 border-b border-[#262626] bg-[#141414] px-2 sm:gap-3 sm:px-4">
@@ -246,6 +247,16 @@ export function TopBar() {
         placeholder="项目名称"
       />
       {dirty && <span className="shrink-0 text-[10px] text-gold" title="有未保存修改">●</span>}
+      {tabSessionPersistenceError && (
+        <button
+          type="button"
+          onClick={retryTabSessionPersistence}
+          className="shrink-0 rounded border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
+          title={tabSessionPersistenceError}
+        >
+          本地恢复失败 · 重试
+        </button>
+      )}
       {readOnly && (
         <span className="shrink-0 rounded border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
           <span className="sm:hidden">只读</span>

@@ -29,6 +29,7 @@ export async function assertImageReferencesAccessible(
   value: unknown,
   userId: string,
   client?: PoolClient,
+  options?: { fileLock?: "share" | "update" },
 ): Promise<void> {
   const ids = [...collectLocalImageIds(value)];
   if (ids.length === 0) return;
@@ -46,13 +47,16 @@ export async function assertImageReferencesAccessible(
       .filter((row) => row.scope === "global" || row.scope === "shared")
       .map((row) => row.image),
   );
+  // 项目保存随后会修改蒙版文件元数据，必须从一开始就按相同 id 顺序取得强锁；
+  // 不能先 SHARE 再逐行升级，否则不同项目的交叉引用会形成锁升级死锁。
+  const fileLock = options?.fileLock === "update" ? "FOR UPDATE" : "FOR SHARE";
   const rows = await query<{ id: string; owner_id: string | null }>(`
     SELECT f.id, f.owner_id
     FROM files f
     WHERE f.id = ANY($1::text[])
       AND f.deleted_at IS NULL
     ORDER BY f.id
-    FOR SHARE
+    ${fileLock}
   `, [ids], client);
   if (rows.length !== ids.length) {
     throw new ImageReferenceAccessError();

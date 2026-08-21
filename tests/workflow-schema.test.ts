@@ -226,10 +226,15 @@ async function main() {
     assert.ok(oversized.buffer.length > MASK_CONTRACT.maxBytes, "fixture 必须超过蒙版字节上限");
     assert.throws(() => validateAndMigrateFlow(maskFlow(oversized.dataUrl)), /image too large/);
 
-    for (const nonInlineMask of ["/api/files/mask.png", "https://example.com/mask.png"]) {
+    const localMask = validateAndMigrateFlow(maskFlow("/api/files/mask.png"));
+    assert.equal(localMask.nodes[0].data.kind, "mask-redraw");
+    if (localMask.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+    assert.equal(localMask.nodes[0].data.mask, "/api/files/mask.png");
+
+    for (const invalidMask of ["/api/files/mask.jpg", "https://example.com/mask.png"]) {
       assert.throws(
-        () => validateAndMigrateFlow(maskFlow(nonInlineMask)),
-        /mask: must be an inline PNG dataURL/,
+        () => validateAndMigrateFlow(maskFlow(invalidMask)),
+        /mask: must be an inline PNG dataURL or local \/api\/files\/\*\.png reference/,
       );
     }
   });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -16,9 +16,10 @@ process.env.INITIAL_ADMIN_ACCOUNT_ID = "normalization-admin";
 process.env.INITIAL_ADMIN_PASSWORD = "Initial1234";
 
 await resetPostgresTestDatabase();
-const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
+const { closeDatabaseForTests, db, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { filesRouter } = await import("../server/routes/files");
-const { uploadsDir } = await import("../server/lib/fileStore");
+const { projectsRouter, purgeExpiredProjects } = await import("../server/routes/projects");
+const { normalizeImageRef, uploadsDir } = await import("../server/lib/fileStore");
 const { executeStep, resolveImageRefs } = await import("../server/engine/runner");
 const { validateImageDataUrl } = await import("../server/lib/imageValidation");
 const {
@@ -34,8 +35,33 @@ async function test(name: string, fn: () => void | Promise<void>): Promise<void>
   console.log(`  ✓ ${name}`);
 }
 
+async function waitForDatabaseCondition(
+  description: string,
+  condition: () => Promise<boolean>,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`等待数据库条件超时：${description}`);
+}
+
 function dataUrl(mime: string, buffer: Buffer): string {
   return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
+async function editableMask(width: number, height: number): Promise<Buffer> {
+  const pixels = Buffer.alloc(width * height * 4, 255);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      pixels[(y * width + x) * 4 + 3] = x < Math.floor(width / 2) ? 0 : 255;
+    }
+  }
+  return sharp(pixels, { raw: { width, height, channels: 4 } })
+    .png({ compressionLevel: 0 })
+    .toBuffer();
 }
 
 async function startFilesServer(ownerId: string) {
@@ -49,6 +75,7 @@ async function startFilesServer(ownerId: string) {
     next();
   });
   app.use("/api/files", filesRouter);
+  app.use("/api/projects", projectsRouter);
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
     server.once("listening", resolve);
@@ -182,6 +209,253 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       mime_type: body.mimeType, width: body.width, height: body.height,
       byte_length: body.byteLength, normalized: true,
     });
+
+    const maskBuffer = await editableMask(96, 64);
+    const maskDataUrl = dataUrl("image/png", maskBuffer);
+    const uploadMask = async (
+      value: string,
+      binding: { projectId?: string; nodeId?: string; sourceRef?: string } = {},
+    ) => fetch(`${server.baseUrl}/api/files/mask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dataUrl: value,
+        sourceRef: binding.sourceRef ?? body.url,
+        projectId: binding.projectId ?? "mask-project",
+        nodeId: binding.nodeId ?? "mask-node",
+      }),
+    });
+    const acceptedMask = await uploadMask(maskDataUrl);
+    assert.equal(acceptedMask.status, 200);
+    const maskBody = await acceptedMask.json() as {
+      id: string; url: string; mimeType: string; width: number; height: number;
+      byteLength: number; preserved: boolean;
+    };
+    assert.equal(maskBody.preserved, true);
+    assert.equal(maskBody.mimeType, "image/png");
+    assert.deepEqual([maskBody.width, maskBody.height], [96, 64]);
+    const storedMask = fs.readFileSync(path.join(uploadsDir(), maskBody.id));
+    assert.deepEqual(storedMask, maskBuffer, "蒙版不得缩放、重编码或改写 Alpha");
+    assert.equal(
+      createHash("sha256").update(storedMask).digest("hex"),
+      createHash("sha256").update(maskBuffer).digest("hex"),
+    );
+    assert.deepEqual(
+      validateImageDataUrl(await normalizeImageRef(maskBody.url)).buffer,
+      maskBuffer,
+      "Worker 解引用后交给 Provider 的蒙版仍须保持原始 PNG 字节",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT owner_id, source_type, project_id, node_id, mime_type,
+             width, height, byte_length, normalized, purge_after IS NOT NULL AS expiring
+      FROM files WHERE id = $1
+    `, [maskBody.id]), {
+      owner_id: admin.id,
+      source_type: "mask-draft",
+      project_id: "mask-project",
+      node_id: "mask-node",
+      mime_type: "image/png",
+      width: 96,
+      height: 64,
+      byte_length: maskBuffer.byteLength,
+      normalized: false,
+      expiring: true,
+    });
+
+    const jpegMask = await sharp(maskBuffer).flatten().jpeg().toBuffer();
+    const wrongSizeMask = await editableMask(48, 32);
+    const opaqueMask = await sharp({
+      create: { width: 96, height: 64, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+    }).png().toBuffer();
+    const transparentMask = await sharp({
+      create: { width: 96, height: 64, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } },
+    }).png().toBuffer();
+    const oversizedMask = await editableMask(1024, 1024);
+    assert.ok(oversizedMask.byteLength > 4 * 1024 * 1024, "超限蒙版夹具必须大于 4MiB");
+    for (const rejectedMask of [
+      dataUrl("image/jpeg", jpegMask),
+      dataUrl("image/png", wrongSizeMask),
+      dataUrl("image/png", opaqueMask),
+      dataUrl("image/png", transparentMask),
+      dataUrl("image/png", oversizedMask),
+    ]) {
+      const beforeRejectedFiles = fs.readdirSync(uploadsDir()).sort();
+      const beforeRejectedRows = (await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count;
+      const rejectedMaskResponse = await uploadMask(rejectedMask);
+      assert.equal(rejectedMaskResponse.status, 400);
+      assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeRejectedFiles);
+      assert.equal((await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count, beforeRejectedRows);
+    }
+    const beforeUnauthorizedMaskFiles = fs.readdirSync(uploadsDir()).sort();
+    const unauthorizedMask = await fetch(`${server.baseUrl}/api/files/mask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-owner": "missing" },
+      body: JSON.stringify({
+        dataUrl: maskDataUrl,
+        sourceRef: body.url,
+        projectId: "mask-project",
+        nodeId: "mask-node",
+      }),
+    });
+    assert.equal(unauthorizedMask.status, 403);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnauthorizedMaskFiles);
+
+    const beforeOwnerFailureFiles = fs.readdirSync(uploadsDir()).sort();
+    const beforeOwnerFailureRows = (await queryOne<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM files",
+    ))?.count;
+    const ownerBlocker = await db().connect();
+    let ownerFailureRequest: Promise<Response> | undefined;
+    try {
+      await ownerBlocker.query("BEGIN");
+      await ownerBlocker.query("SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE", [admin.id]);
+      ownerFailureRequest = uploadMask(maskDataUrl);
+      await waitForDatabaseCondition("蒙版已落盘并等待 owner 锁", async () => (
+        fs.readdirSync(uploadsDir()).length > beforeOwnerFailureFiles.length
+      ));
+      await ownerBlocker.query("UPDATE users SET active = 0 WHERE id = $1", [admin.id]);
+      await ownerBlocker.query("COMMIT");
+      const ownerFailure = await ownerFailureRequest;
+      assert.equal(ownerFailure.status, 409, await ownerFailure.text());
+      assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeOwnerFailureFiles);
+      assert.equal((await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count, beforeOwnerFailureRows);
+    } finally {
+      try { await ownerBlocker.query("ROLLBACK"); } catch { /* transaction already ended */ }
+      ownerBlocker.release();
+      await query("UPDATE users SET active = 1 WHERE id = $1", [admin.id]);
+      await ownerFailureRequest?.catch(() => undefined);
+    }
+
+    const beforeDatabaseFailureFiles = fs.readdirSync(uploadsDir()).sort();
+    const beforeDatabaseFailureRows = (await queryOne<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM files",
+    ))?.count;
+    await query(`
+      ALTER TABLE files
+      ADD CONSTRAINT files_test_reject_mask_draft
+      CHECK (source_type <> 'mask-draft') NOT VALID
+    `);
+    try {
+      const databaseFailure = await uploadMask(maskDataUrl);
+      assert.equal(databaseFailure.status, 500, await databaseFailure.text());
+      assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeDatabaseFailureFiles);
+      assert.equal((await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count, beforeDatabaseFailureRows);
+    } finally {
+      await query("ALTER TABLE files DROP CONSTRAINT IF EXISTS files_test_reject_mask_draft");
+    }
+
+    const maskFlow = (mask: string, maskNodeId = "mask-node") => ({
+      schemaVersion: 2,
+      nodes: [{
+        id: "source-node",
+        type: "image-input",
+        position: { x: 0, y: 0 },
+        data: { kind: "image-input", label: "原图", status: "idle", imageRole: "default", imageUrl: body.url },
+      }, {
+        id: maskNodeId,
+        type: "mask-redraw",
+        position: { x: 300, y: 0 },
+        data: {
+          kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改成银色",
+          modelId: "gpt-image-2", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
+        },
+      }],
+      edges: [{ id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId }],
+    });
+    const saveMaskProject = async (
+      mask: string,
+      projectId = "mask-project",
+      maskNodeId = "mask-node",
+    ) => fetch(`${server.baseUrl}/api/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: projectId, name: "蒙版项目", flow: maskFlow(mask, maskNodeId) }),
+    });
+    assert.equal((await saveMaskProject(maskBody.url, "other-mask-project")).status, 403);
+    assert.equal((await saveMaskProject(maskBody.url)).status, 200);
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT source_type, purge_after FROM files WHERE id = $1
+    `, [maskBody.id]), { source_type: "mask", purge_after: null });
+
+    const secondMaskResponse = await uploadMask(maskDataUrl);
+    assert.equal(secondMaskResponse.status, 200);
+    const secondMaskBody = await secondMaskResponse.json() as { id: string; url: string };
+    const wrongNodeSave = await saveMaskProject(secondMaskBody.url, "mask-project", "wrong-mask-node");
+    assert.equal(wrongNodeSave.status, 403, await wrongNodeSave.text());
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT source_type, purge_after IS NOT NULL AS expiring
+      FROM files WHERE id = $1
+    `, [secondMaskBody.id]), { source_type: "mask-draft", expiring: true });
+    const projectAfterWrongNode = await queryOne<{ flow_json: string }>(
+      "SELECT flow_json FROM projects WHERE id = 'mask-project'",
+    );
+    assert.equal(
+      (JSON.parse(projectAfterWrongNode?.flow_json ?? "{}") as { nodes?: Array<{ data?: { mask?: string } }> })
+        .nodes?.some((node) => node.data?.mask === maskBody.url),
+      true,
+      "错 node_id 的认领失败必须回滚项目与已有蒙版",
+    );
+
+    const fileShareBlocker = await db().connect();
+    let blockedSave: Promise<Response> | undefined;
+    try {
+      await fileShareBlocker.query("BEGIN");
+      await fileShareBlocker.query("SELECT id FROM files WHERE id = $1 FOR SHARE", [body.id]);
+      blockedSave = saveMaskProject(secondMaskBody.url);
+      await waitForDatabaseCondition("项目保存直接等待文件强锁", async () => {
+        const waiting = await queryOne<{ count: number }>(`
+          SELECT COUNT(*)::int AS count
+          FROM pg_stat_activity
+          WHERE wait_event_type = 'Lock'
+            AND query LIKE '%SELECT f.id, f.owner_id%'
+        `);
+        return (waiting?.count ?? 0) > 0;
+      });
+      await fileShareBlocker.query("COMMIT");
+      assert.equal((await blockedSave).status, 200);
+    } finally {
+      try { await fileShareBlocker.query("ROLLBACK"); } catch { /* transaction already ended */ }
+      fileShareBlocker.release();
+      await blockedSave?.catch(() => undefined);
+    }
+    assert.equal((await queryOne<{ expiring: boolean }>(`
+      SELECT purge_after IS NOT NULL AS expiring FROM files WHERE id = $1
+    `, [maskBody.id]))?.expiring, true, "被替换的旧蒙版必须进入延迟回收");
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT source_type, purge_after FROM files WHERE id = $1
+    `, [secondMaskBody.id]), { source_type: "mask", purge_after: null });
+    await query("UPDATE files SET purge_after = $1 WHERE id = $2", [
+      new Date(Date.now() - 1_000).toISOString(), maskBody.id,
+    ]);
+    await query(`
+      INSERT INTO generation_runs (
+        id, owner_id, project_id, node_id, node_label, kind,
+        requested_count, status, started_at, plan_json, run_type, updated_at
+      ) VALUES ($1, $2, 'mask-project', 'mask-node', '局部重绘', 'mask-redraw',
+        1, 'queued', $3, $4, 'workflow', $3)
+    `, [
+      "active-mask-retention-run", admin.id, Date.now(),
+      JSON.stringify({ steps: [{ nodeId: "mask-node", params: { mask: maskBody.url } }] }),
+    ]);
+    await purgeExpiredProjects();
+    assert.equal(fs.existsSync(path.join(uploadsDir(), maskBody.id)), true);
+    assert.ok(await queryOne("SELECT id FROM files WHERE id = $1", [maskBody.id]));
+    await query(`
+      UPDATE generation_runs
+      SET status = 'failed', finished_at = $1, updated_at = $1
+      WHERE id = 'active-mask-retention-run'
+    `, [Date.now()]);
+    await purgeExpiredProjects();
+    assert.equal(fs.existsSync(path.join(uploadsDir(), maskBody.id)), false);
+    assert.equal(await queryOne("SELECT id FROM files WHERE id = $1", [maskBody.id]), undefined);
 
     const beforeFiles = fs.readdirSync(uploadsDir()).sort();
     const ownerUnavailable = await fetch(`${server.baseUrl}/api/files`, {

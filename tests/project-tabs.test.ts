@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { maskRedrawReadiness } from "../src/lib/maskRedraw";
+import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
 import type { Edge } from "@xyflow/react";
 import {
   applyRunEventToTab,
+  beginMaskWork,
   selectNodeInputImages,
   useFlowStore,
   type FlowNode,
@@ -592,6 +594,77 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     prompt: "将选中区域改成银色拉链",
   });
   assert.equal(staleMask.canOpenRunAction, false, "原图变化后旧蒙版仍必须禁用");
+});
+
+await test("蒙版编辑与上传分别持有离页保护，释放操作幂等", () => {
+  assert.equal(useFlowStore.getState().pendingMaskWorkCount, 0);
+  const releaseEditor = beginMaskWork();
+  const releaseUpload = beginMaskWork();
+  assert.equal(useFlowStore.getState().pendingMaskWorkCount, 2);
+  assert.equal(shouldWarnBeforeWorkspaceUnload({
+    hasDirtyTabs: false,
+    tabSessionPersistenceError: null,
+    pendingMaskWorkCount: useFlowStore.getState().pendingMaskWorkCount,
+  }), true, "尚未写入节点的蒙版工作也必须阻止静默离页");
+
+  releaseEditor();
+  assert.equal(useFlowStore.getState().pendingMaskWorkCount, 1, "编辑器卸载不能清除仍在进行的上传 pending");
+  releaseEditor();
+  assert.equal(useFlowStore.getState().pendingMaskWorkCount, 1, "重复 cleanup 不得重复递减");
+  releaseUpload();
+  assert.equal(useFlowStore.getState().pendingMaskWorkCount, 0);
+
+  assert.equal(shouldWarnBeforeWorkspaceUnload({
+    hasDirtyTabs: true,
+    tabSessionPersistenceError: "quota",
+    pendingMaskWorkCount: 0,
+  }), true);
+  assert.equal(shouldWarnBeforeWorkspaceUnload({
+    hasDirtyTabs: true,
+    tabSessionPersistenceError: null,
+    pendingMaskWorkCount: 0,
+  }), false, "会话快照正常时普通 dirty 页签仍可刷新恢复");
+});
+
+await test("蒙版异步保存接线冻结编辑、校验最新原图并保持失败界面", () => {
+  const editorSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
+    "utf8",
+  );
+  const redrawSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    "utf8",
+  );
+  const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const authSource = fs.readFileSync(new URL("../src/auth/AuthContext.tsx", import.meta.url), "utf8");
+  const topBarSource = fs.readFileSync(
+    new URL("../src/components/panels/TopBar.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(editorSource, /if \(!ready \|\| savingRef\.current\) return/);
+  assert.match(editorSource, /onClick=\{onClose\} disabled=\{saving\}/);
+  assert.match(editorSource, /aria-disabled=\{saving\}/);
+  assert.match(editorSource, /loadGuardRef\.current\.invalidate\(\)/);
+  assert.match(editorSource, /if \(!isCurrentLoad\(\)\) return/);
+  assert.match(editorSource, /const snapshotLoadGuardRef = useRef\(createLatestMaskLoadGuard\(\)\)/);
+  assert.match(editorSource, /const isCurrentLoad = snapshotLoadGuardRef\.current\.begin\(\)/);
+  assert.ok(
+    (editorSource.match(/snapshotLoadGuardRef\.current\.invalidate\(\)/g) ?? []).length >= 6,
+    "source 切换、初始化、绘制、清空、反选与保存都必须废弃旧历史加载",
+  );
+  assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
+  assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
+  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== source/);
+  assert.match(redrawSource, /updateNodeDataInTab\(tabId, id, \{ mask: url, maskSourceRef: source/);
+  assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
+  assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
+  assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);
+  assert.match(appSource, /pendingMaskWorkCount > 0\) return/);
+  assert.match(authSource, /const authenticatedUserId = useRef<string \| null>\(null\)/);
+  assert.match(authSource, /shouldReloadForAuthenticatedUserTransition\(\s*authenticatedUserId\.current/);
+  assert.match(authSource, /suppressWorkspaceUnloadWarning\(\);\s*window\.location\.reload\(\)/);
+  assert.match(topBarSource, /onClick=\{retryTabSessionPersistence\}/);
 });
 
 await test("窄屏侧栏使用抽屉且顶栏不再依赖绝对居中", () => {

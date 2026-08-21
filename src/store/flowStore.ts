@@ -110,6 +110,10 @@ interface FlowState {
   dirty: boolean;
   /** 每次整体载入画布递增，用来隔离旧文档的异步响应。 */
   documentEpoch: number;
+  /** 浏览器会话草稿未能持久化；非空时刷新可能丢失尚未保存的修改。 */
+  tabSessionPersistenceError: string | null;
+  /** 仅内存：打开的蒙版编辑器与尚未结束的蒙版上传总数。 */
+  pendingMaskWorkCount: number;
 
   switchTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
@@ -525,11 +529,18 @@ const RECENT_STORAGE_KEY = "garment-canvas-recent-results";
 const TAB_SESSION_STORAGE_KEY = "garment-canvas-project-tabs";
 export const TAB_SESSION_SCHEMA_VERSION = 1 as const;
 
-interface PersistedTabSession {
+export interface PersistedTabSession {
   schemaVersion: typeof TAB_SESSION_SCHEMA_VERSION;
   tabs: ProjectTab[];
   activeTabId: string;
 }
+
+export interface TabSessionWriteResult {
+  ok: boolean;
+  error?: string;
+}
+
+const TAB_SESSION_WRITE_ERROR = "本地草稿未写入浏览器，请先保存项目或重新保存大蒙版；刷新会丢失本页修改";
 
 const NODE_KINDS = new Set<NodeKind>(Object.keys(NODE_SPECS) as NodeKind[]);
 const NODE_STATUSES = new Set<NodeRunStatus>([
@@ -745,7 +756,26 @@ function loadTabSession(): { tabs: ProjectTab[]; activeTabId: string } | undefin
   }
 }
 
-function persistTabSession(state: FlowState): void {
+export function writeTabSessionSnapshot(
+  storage: Pick<Storage, "setItem" | "removeItem">,
+  value: PersistedTabSession,
+): TabSessionWriteResult {
+  try {
+    storage.setItem(TAB_SESSION_STORAGE_KEY, JSON.stringify(value));
+    return { ok: true };
+  } catch (error) {
+    // setItem 失败会保留同 key 的旧值；必须废弃它，不能让刷新恢复成旧画布。
+    try { storage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
+    return {
+      ok: false,
+      error: error instanceof Error && error.name !== "QuotaExceededError"
+        ? `${TAB_SESSION_WRITE_ERROR}（${error.message}）`
+        : TAB_SESSION_WRITE_ERROR,
+    };
+  }
+}
+
+function persistTabSession(state: FlowState): TabSessionWriteResult {
   try {
     const current = snapshotActiveTab(state);
     const normalized = normalizeTabSessionValue({
@@ -753,13 +783,14 @@ function persistTabSession(state: FlowState): void {
       tabs: replaceTab(state.tabs, current),
       activeTabId: state.activeTabId,
     });
-    if (!normalized) return;
-    window.sessionStorage.setItem(
-      TAB_SESSION_STORAGE_KEY,
-      JSON.stringify(normalized),
-    );
-  } catch {
-    // 浏览器会话存储不可用或容量不足时退化为仅本次页面生命周期可用。
+    if (!normalized) return { ok: false, error: TAB_SESSION_WRITE_ERROR };
+    return writeTabSessionSnapshot(window.sessionStorage, normalized);
+  } catch (error) {
+    try { window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
+    return {
+      ok: false,
+      error: error instanceof Error ? `${TAB_SESSION_WRITE_ERROR}（${error.message}）` : TAB_SESSION_WRITE_ERROR,
+    };
   }
 }
 
@@ -1354,9 +1385,11 @@ export const useFlowStore = create<FlowState>()(
         tabs: restored?.tabs ?? [initialTab],
         activeTabId: initialTab.id,
         ...activeFields(initialTab),
-      // 服务端历史在登录成功后注入；不能从浏览器本地缓存恢复其他账号的记录。
-      recentResults: [],
-      viewer: null,
+        tabSessionPersistenceError: null,
+        pendingMaskWorkCount: 0,
+        // 服务端历史在登录成功后注入；不能从浏览器本地缓存恢复其他账号的记录。
+        recentResults: [],
+        viewer: null,
 
       switchTab: (tabId) => {
         const state = get();
@@ -1939,21 +1972,74 @@ export const useFlowStore = create<FlowState>()(
   ),
 );
 
+/**
+ * 登记不会进入项目快照的蒙版临时工作。返回值可重复调用，确保 React effect
+ * cleanup 与异步 finally 竞态时不会把计数减成负数。
+ */
+export function beginMaskWork(): () => void {
+  useFlowStore.setState((state) => ({
+    pendingMaskWorkCount: state.pendingMaskWorkCount + 1,
+  }));
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    useFlowStore.setState((state) => ({
+      pendingMaskWorkCount: Math.max(0, state.pendingMaskWorkCount - 1),
+    }));
+  };
+}
+
+let retryTabSessionPersistenceImpl = (): boolean => false;
+
+/** 用户显式重试当前完整页签快照；返回本次是否成功写入浏览器会话。 */
+export function retryTabSessionPersistence(): boolean {
+  return retryTabSessionPersistenceImpl();
+}
+
 if (typeof window !== "undefined") {
   let lastTabSessionJson = "";
+  const sessionFingerprint = (state: FlowState): string => {
+    try {
+      const current = snapshotActiveTab(state);
+      return JSON.stringify({
+        tabs: replaceTab(state.tabs, current),
+        activeTabId: state.activeTabId,
+      });
+    } catch {
+      return "";
+    }
+  };
+  const publishPersistenceResult = (result: TabSessionWriteResult): void => {
+    // 写失败时旧 key 已被移除；旧成功指纹也必须失效，否则用户撤销回那份
+    // 恰好相同的状态时会被误判为“已经写过”，导致 session 仍为空。
+    if (!result.ok) lastTabSessionJson = "";
+    const nextError = result.ok ? null : result.error ?? TAB_SESSION_WRITE_ERROR;
+    if (useFlowStore.getState().tabSessionPersistenceError !== nextError) {
+      useFlowStore.setState({ tabSessionPersistenceError: nextError });
+    }
+  };
+  retryTabSessionPersistenceImpl = () => {
+    const state = useFlowStore.getState();
+    const sessionJson = sessionFingerprint(state);
+    const result = persistTabSession(state);
+    if (result.ok) lastTabSessionJson = sessionJson;
+    publishPersistenceResult(result);
+    return result.ok;
+  };
   useFlowStore.subscribe((state, previousState) => {
     // 活动画布变化会由下一个订阅先同步进 tabs；历史/SSE/viewer 等全局状态无需序列化项目。
     if (state.tabs === previousState.tabs && state.activeTabId === previousState.activeTabId) return;
-    const current = snapshotActiveTab(state);
-    const sessionJson = JSON.stringify({
-      tabs: replaceTab(state.tabs, current),
-      activeTabId: state.activeTabId,
-    });
-    if (sessionJson === lastTabSessionJson) return;
-    lastTabSessionJson = sessionJson;
-    persistTabSession(state);
+    const sessionJson = sessionFingerprint(state);
+    if (sessionJson && sessionJson === lastTabSessionJson) return;
+    const result = persistTabSession(state);
+    if (result.ok) lastTabSessionJson = sessionJson;
+    publishPersistenceResult(result);
   });
-  persistTabSession(useFlowStore.getState());
+  const initialState = useFlowStore.getState();
+  const initialResult = persistTabSession(initialState);
+  if (initialResult.ok) lastTabSessionJson = sessionFingerprint(initialState);
+  publishPersistenceResult(initialResult);
 
   // 当前页签内容持续同步进 tabs，保证非激活页签始终是完整快照。
   let lastActiveSnapshot = snapshotActiveTab(useFlowStore.getState());
@@ -2072,7 +2158,10 @@ export function selectResultImages(state: FlowState, nodeId: string): string[] {
 }
 
 /** 按连线顺序读取节点当前可见的上游图片，蒙版编辑器以第一张作为原图。 */
-export function selectNodeInputImages(state: FlowState, nodeId: string): string[] {
+export function selectNodeInputImages(
+  state: Pick<FlowState, "nodes" | "edges">,
+  nodeId: string,
+): string[] {
   const urls: string[] = [];
   for (const edge of state.edges) {
     if (edge.target !== nodeId) continue;

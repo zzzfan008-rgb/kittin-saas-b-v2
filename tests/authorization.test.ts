@@ -24,7 +24,7 @@ const { runPlanRouter } = await import("../server/routes/runPlan");
 const { generateRouter } = await import("../server/routes/generate");
 const { assetsRouter } = await import("../server/routes/assets");
 const { filesRouter } = await import("../server/routes/files");
-const { projectsRouter } = await import("../server/routes/projects");
+const { projectsRouter, purgeExpiredProjects } = await import("../server/routes/projects");
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
 
@@ -296,6 +296,20 @@ await test("所有鉴权图片禁止缓存，撤回共享后立即恢复访问�
   }
 });
 
+await test("没有 files 元数据的物理孤儿文件拒绝所有账号读取", async () => {
+  const orphanId = "purge-failed-orphan.png";
+  fs.writeFileSync(
+    path.join(uploadsDir(), orphanId),
+    Buffer.from(PNG_DATA_URL.slice(PNG_DATA_URL.indexOf(",") + 1), "base64"),
+  );
+  assert.equal(await queryOne("SELECT id FROM files WHERE id = $1", [orphanId]), undefined);
+  for (const actor of ["owner", "other", "admin"] as const) {
+    assert.equal((await request(`/files/${orphanId}`, actor)).status, 403);
+    assert.equal((await request(`/files/${orphanId}/thumbnail`, actor)).status, 403);
+  }
+  deleteStoredImage(orphanId);
+});
+
 await test("管理员创建通用素材时解除底层文件的个人归属", async () => {
   const upload = await request("/files", "admin", {
     method: "POST",
@@ -320,6 +334,97 @@ await test("管理员创建通用素材时解除底层文件的个人归属", as
     ),
     { owner_id: null, deleted_at: null, purge_after: null },
   );
+});
+
+await test("已有文件创建素材持共享锁，使并发 TTL 清理等待并保留刚提交的引用", async () => {
+  const fileId = "asset-purge-race.png";
+  const advisoryKey = 2_608_210_317;
+  fs.writeFileSync(
+    path.join(uploadsDir(), fileId),
+    Buffer.from(PNG_DATA_URL.slice(PNG_DATA_URL.indexOf(",") + 1), "base64"),
+  );
+  await query(`
+    INSERT INTO files (
+      id, owner_id, source_type, mime_type, created_at, purge_after
+    ) VALUES ($1, $2, 'upload', 'image/png', $3, $4)
+  `, [fileId, users.owner.id, now, new Date(Date.now() - 1_000).toISOString()]);
+  await query(`
+    CREATE OR REPLACE FUNCTION test_block_asset_insert() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+    BEGIN
+      PERFORM pg_advisory_xact_lock(${advisoryKey});
+      RETURN NEW;
+    END;
+    $$;
+    CREATE TRIGGER test_block_asset_insert_trigger
+    BEFORE INSERT ON assets
+    FOR EACH ROW WHEN (NEW.name = '并发回收素材')
+    EXECUTE FUNCTION test_block_asset_insert();
+  `);
+
+  const blocker = await db().connect();
+  let createRequest: Promise<Response> | undefined;
+  let purgeRequest: Promise<void> | undefined;
+  let createdAssetId: string | undefined;
+  try {
+    await blocker.query("SELECT pg_advisory_lock($1)", [advisoryKey]);
+    createRequest = request("/assets", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "并发回收素材",
+        category: "reference",
+        scope: "private",
+        image: `/api/files/${fileId}`,
+      }),
+    });
+    await waitForDatabaseCondition("素材 INSERT 已在触发器等待", async () => {
+      const waiting = await queryOne<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock'
+          AND query LIKE '%INSERT INTO assets%'
+      `);
+      return (waiting?.count ?? 0) > 0;
+    });
+
+    purgeRequest = purgeExpiredProjects();
+    await waitForDatabaseCondition("TTL 清理在已授权文件共享锁处等待", async () => {
+      const waiting = await queryOne<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock'
+          AND query LIKE '%SELECT f.id%'
+          AND query LIKE '%FOR UPDATE OF f%'
+      `);
+      return (waiting?.count ?? 0) > 0;
+    });
+
+    assert.equal((await blocker.query<{ unlocked: boolean }>(
+      "SELECT pg_advisory_unlock($1) AS unlocked",
+      [advisoryKey],
+    )).rows[0]?.unlocked, true);
+    const createResponse = await createRequest;
+    const createBody = await createResponse.json() as { id?: string; error?: string };
+    assert.equal(createResponse.status, 201, createBody.error);
+    assert.ok(createBody.id);
+    createdAssetId = createBody.id;
+    await purgeRequest;
+
+    assert.ok(await queryOne("SELECT id FROM files WHERE id = $1", [fileId]));
+    assert.ok(fs.existsSync(path.join(uploadsDir(), fileId)));
+    assert.deepEqual(
+      await queryOne<{ image: string }>("SELECT image FROM assets WHERE id = $1", [createdAssetId]),
+      { image: `/api/files/${fileId}` },
+    );
+  } finally {
+    try { await blocker.query("SELECT pg_advisory_unlock($1)", [advisoryKey]); } catch { /* best effort */ }
+    blocker.release();
+    await createRequest?.catch(() => undefined);
+    await purgeRequest?.catch(() => undefined);
+    await query("DROP TRIGGER IF EXISTS test_block_asset_insert_trigger ON assets");
+    await query("DROP FUNCTION IF EXISTS test_block_asset_insert()");
+    await query("DELETE FROM assets WHERE id = $1 OR name = '并发回收素材'", [createdAssetId ?? ""]);
+    await query("DELETE FROM files WHERE id = $1", [fileId]);
+    deleteStoredImage(fileId);
+  }
 });
 
 await query(`

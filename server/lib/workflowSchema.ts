@@ -118,12 +118,16 @@ function optionalImageReference(value: unknown, path: string): string | undefine
 function optionalMaskReference(value: unknown, path: string): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== "string") fail(path, "must be a string");
-  // MaskEditor 持久化内联 PNG；其它引用无法在同步 schema 阶段验证 MIME 与解码字节数。
-  if (!value.startsWith("data:")) fail(path, "must be an inline PNG dataURL");
-  return imageReference(value, path, {
-    maxDataUrlBytes: MASK_DATA_URL_CONTRACT.maxBytes,
-    allowedDataUrlMimes: MASK_DATA_URL_CONTRACT.mimeTypes,
-  });
+  if (value.startsWith("data:")) {
+    return imageReference(value, path, {
+      maxDataUrlBytes: MASK_DATA_URL_CONTRACT.maxBytes,
+      allowedDataUrlMimes: MASK_DATA_URL_CONTRACT.mimeTypes,
+    });
+  }
+  if (!isLocalImageReference(value) || !value.toLowerCase().endsWith(".png")) {
+    fail(path, "must be an inline PNG dataURL or local /api/files/*.png reference");
+  }
+  return imageReference(value, path);
 }
 
 function finiteNumber(value: unknown, path: string): number {

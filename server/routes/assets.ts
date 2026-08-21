@@ -116,15 +116,23 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
           saved.height, saved.byteLength, createdAt,
         ]);
       } else {
-        const access = await queryOne<{ owner_id: string | null; shared: boolean }>(`
-          SELECT f.owner_id,
-            EXISTS(
-              SELECT 1 FROM assets a
-              WHERE a.image = $1 AND a.deleted_at IS NULL AND a.scope IN ('global','shared')
-            ) AS shared
-          FROM files f WHERE f.id = $2
-        `, [imageUrl, path.basename(imageUrl)], client);
-        if (!access || (access.owner_id !== null && access.owner_id !== user.id && user.role !== "admin" && !access.shared)) {
+        // 已有本地文件的授权按 assets → files 顺序持锁。共享来源在新素材提交前
+        // 不能被撤回，文件也不能在校验与 INSERT 之间被 TTL 清理。
+        const supportingAsset = await queryOne<{ id: string }>(`
+          SELECT id FROM assets
+          WHERE image = $1 AND deleted_at IS NULL AND scope IN ('global','shared')
+          ORDER BY id
+          LIMIT 1
+          FOR SHARE
+        `, [imageUrl], client);
+        const shared = supportingAsset !== undefined;
+        const fileLock = finalScope === "global" ? "FOR UPDATE" : "FOR SHARE";
+        const access = await queryOne<{ owner_id: string | null }>(`
+          SELECT owner_id FROM files
+          WHERE id = $1 AND deleted_at IS NULL
+          ${fileLock}
+        `, [path.basename(imageUrl)], client);
+        if (!access || (access.owner_id !== null && access.owner_id !== user.id && user.role !== "admin" && !shared)) {
           return "missing" as const;
         }
       }

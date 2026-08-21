@@ -11,6 +11,7 @@ import {
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
 import { lockActiveOwner } from "../lib/ownerMutation";
+import { isLocalImageReference } from "../lib/imageValidation";
 import type { PersistedWorkflow } from "../../src/types/workflow";
 
 export const projectsRouter = Router();
@@ -23,6 +24,13 @@ interface ProjectRow {
   flow_json: string;
   updated_at: string;
 }
+
+interface ProjectMaskFileRef {
+  fileId: string;
+  nodeId: string;
+}
+
+const RETIRED_MASK_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 function imageRefs(value: unknown, output = new Set<string>()): Set<string> {
   if (typeof value === "string" && value.startsWith("/api/files/")) output.add(value);
@@ -55,6 +63,73 @@ async function syncAssetRefs(
   }
 }
 
+function projectMaskFileRefs(flow: PersistedWorkflow): ProjectMaskFileRef[] {
+  return flow.nodes.flatMap((node) => {
+    if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return [];
+    if (!isLocalImageReference(node.data.mask)) return [];
+    return [{
+      fileId: node.data.mask.slice("/api/files/".length),
+      nodeId: node.id,
+    }];
+  });
+}
+
+/** 认领当前蒙版文件，并让同项目已替换的旧蒙版进入延迟回收。 */
+async function syncMaskFiles(
+  client: PoolClient,
+  projectId: string,
+  ownerId: string,
+  flow: PersistedWorkflow,
+  now: Date,
+): Promise<void> {
+  const refs = projectMaskFileRefs(flow);
+  const ids = [...new Set(refs.map((ref) => ref.fileId))];
+  const rows = ids.length === 0
+    ? []
+    : (await client.query<{
+        id: string;
+        owner_id: string | null;
+        source_type: string;
+        project_id: string | null;
+        node_id: string | null;
+        mime_type: string | null;
+      }>(`
+        SELECT id, owner_id, source_type, project_id, node_id, mime_type
+        FROM files
+        WHERE id = ANY($1::text[]) AND deleted_at IS NULL
+        ORDER BY id
+        FOR UPDATE
+      `, [ids])).rows;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const ref of refs) {
+    const row = byId.get(ref.fileId);
+    if (
+      !row || row.owner_id !== ownerId ||
+      (row.source_type !== "mask-draft" && row.source_type !== "mask") ||
+      row.project_id !== projectId || row.node_id !== ref.nodeId ||
+      row.mime_type !== "image/png"
+    ) {
+      throw new ImageReferenceAccessError("蒙版文件与当前项目或节点不匹配，请重新保存蒙版");
+    }
+  }
+
+  const retireAt = new Date(now.getTime() + RETIRED_MASK_RETENTION_MS).toISOString();
+  await client.query(`
+    UPDATE files
+    SET purge_after = COALESCE(purge_after, $3)
+    WHERE owner_id = $1 AND project_id = $2
+      AND source_type IN ('mask-draft', 'mask')
+      AND NOT (id = ANY($4::text[]))
+  `, [ownerId, projectId, retireAt, ids]);
+  if (ids.length > 0) {
+    await client.query(`
+      UPDATE files
+      SET source_type = 'mask', purge_after = NULL
+      WHERE owner_id = $1 AND project_id = $2 AND id = ANY($3::text[])
+    `, [ownerId, projectId, ids]);
+  }
+}
+
 export async function purgeExpiredProjects(): Promise<void> {
   const now = new Date().toISOString();
   const expiredFileIds = await transaction(async (client) => {
@@ -69,16 +144,44 @@ export async function purgeExpiredProjects(): Promise<void> {
       WHERE purge_after IS NOT NULL AND purge_after <= $1
         AND NOT EXISTS (SELECT 1 FROM project_asset_refs r WHERE r.asset_id = assets.id)
     `, [now]);
-    const files = await client.query<{ id: string }>(
-      `DELETE FROM files
-       WHERE purge_after IS NOT NULL AND purge_after <= $1
-         AND NOT EXISTS (
-           SELECT 1 FROM assets a
-           WHERE a.image = '/api/files/' || files.id
-         )
-       RETURNING id`,
-      [now],
-    );
+    // 先锁定有限的过期候选，再检查 durable run。入队按 files → run 写入；这里沿用
+    // 相同顺序，保证若入队先持有文件共享锁，等待后执行的 DELETE 能看到新提交的 run。
+    const candidates = await client.query<{ id: string }>(`
+      SELECT f.id
+      FROM files f
+      WHERE f.purge_after IS NOT NULL AND f.purge_after <= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM assets a
+          WHERE a.image = '/api/files/' || f.id
+        )
+      ORDER BY f.id
+      FOR UPDATE OF f
+    `, [now]);
+    const candidateIds = candidates.rows.map((row) => row.id);
+    const files = candidateIds.length === 0
+      ? { rows: [] as Array<{ id: string }> }
+      : await client.query<{ id: string }>(`
+          DELETE FROM files f
+          WHERE f.id = ANY($2::text[])
+            AND f.purge_after IS NOT NULL AND f.purge_after <= $1
+            AND NOT EXISTS (
+              SELECT 1 FROM assets a
+              WHERE a.image = '/api/files/' || f.id
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM generation_runs r
+              WHERE r.deleted_at IS NULL
+                AND r.plan_json IS NOT NULL
+                AND r.status IN ('queued','running','retry_wait','cancel_requested')
+                AND jsonb_path_exists(
+                  r.plan_json::jsonb,
+                  '$.** ? (@ == $ref)',
+                  jsonb_build_object('ref', '/api/files/' || f.id)
+                )
+            )
+          RETURNING f.id
+        `, [now, candidateIds]);
     await client.query("DELETE FROM projects WHERE purge_after IS NOT NULL AND purge_after <= $1", [now]);
     return files.rows.map((row) => row.id);
   });
@@ -109,7 +212,8 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
       );
       if (existing?.owner_id !== undefined && existing.owner_id !== user.id) return "forbidden" as const;
       if (existing?.deleted_at) return "deleted" as const;
-      await assertImageReferencesAccessible(normalized, user.id, client);
+      await assertImageReferencesAccessible(normalized, user.id, client, { fileLock: "update" });
+      await syncMaskFiles(client, projectId, user.id, normalized, new Date(now));
       const result = await client.query(`
         INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
         VALUES ($1, $2, $3, $4, $5, $5)

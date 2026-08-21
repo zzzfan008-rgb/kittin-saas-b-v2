@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   deleteStoredImage, ensureThumbnail, isSupportedImageFile, mimeOfFile,
-  saveNormalizedUploadDataUrl, uploadsDir,
+  normalizeImageRef, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
 } from "../lib/fileStore";
 import { ProviderError } from "../providers/base";
 import { ImageValidationError } from "../lib/imageValidation";
@@ -16,8 +16,17 @@ import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne, transaction } from "../lib/database";
 import { lockActiveOwner } from "../lib/ownerMutation";
+import {
+  assertImageReferencesAccessible,
+  ImageReferenceAccessError,
+} from "../lib/imageReferenceAccess";
+import { validateMaskForSource } from "../lib/maskProcessing";
 
 export const filesRouter = Router();
+
+const SAFE_PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const SAFE_NODE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const MASK_DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 
 type FileAccess = "public" | "private" | "denied";
 
@@ -28,8 +37,9 @@ async function canAccessFile(id: string, req: Parameters<typeof requestUser>[0])
       EXISTS(SELECT 1 FROM assets a WHERE a.image = $1 AND a.deleted_at IS NULL AND a.scope IN ('global','shared')) AS shared
     FROM files f WHERE f.id = $2
   `, [`/api/files/${id}`, id]);
-  // 无数据库记录的旧文件继续允许读取，但不允许公共缓存。
-  if (!access) return "private";
+  // SQLite/旧版本导入会补 files 元数据；没有记录的物理文件只能是未完成写入或
+  // 回收失败留下的孤儿，不能绕过账号 ACL 继续读取。
+  if (!access) return "denied";
   if (access.owner_id === null || access.shared) return "public";
   if (access.owner_id === user.id || user.role === "admin") return "private";
   return "denied";
@@ -80,6 +90,87 @@ filesRouter.post("/", asyncHandler(async (req, res) => {
     } else {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
+  }
+}));
+
+/**
+ * 蒙版必须保持原始像素尺寸与 Alpha，不能走普通素材的缩放/重编码流程。
+ * 新文件先以有期限的 draft 保存；项目成功保存后会认领当前引用并清除期限。
+ */
+filesRouter.post("/mask", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { dataUrl, sourceRef, projectId, nodeId } = req.body as {
+    dataUrl?: string;
+    sourceRef?: string;
+    projectId?: string;
+    nodeId?: string;
+  };
+  if (
+    typeof dataUrl !== "string" || !dataUrl ||
+    typeof sourceRef !== "string" || !sourceRef ||
+    typeof projectId !== "string" || !SAFE_PROJECT_ID.test(projectId) ||
+    typeof nodeId !== "string" || !SAFE_NODE_ID.test(nodeId)
+  ) {
+    res.status(400).json({ error: "dataUrl, sourceRef, projectId and nodeId are required" });
+    return;
+  }
+
+  let saved: { id: string; url: string } | undefined;
+  let committed = false;
+  try {
+    // normalizeImageRef 会直接读本地文件；必须先按当前账号做一次访问检查。
+    await assertImageReferencesAccessible(sourceRef, user.id);
+    const sourceDataUrl = await normalizeImageRef(sourceRef);
+    const pair = await validateMaskForSource(sourceDataUrl, dataUrl);
+    const storedMask = saveDataUrl(dataUrl);
+    saved = storedMask;
+    try {
+      const registered = await transaction(async (client) => {
+        if (!await lockActiveOwner(client, user.id)) return false;
+        // 在登记事务内重查，防止共享素材在解码期间被撤销。
+        await assertImageReferencesAccessible(sourceRef, user.id, client);
+        const now = new Date();
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, project_id, node_id,
+            mime_type, width, height, byte_length, normalized,
+            created_at, purge_after
+          ) VALUES ($1, $2, 'mask-draft', $3, $4, 'image/png', $5, $6, $7, FALSE, $8, $9)
+        `, [
+          storedMask.id, user.id, projectId, nodeId,
+          pair.width, pair.height, pair.maskBuffer.byteLength,
+          now.toISOString(), new Date(now.getTime() + MASK_DRAFT_RETENTION_MS).toISOString(),
+        ]);
+        return true;
+      });
+      if (!registered) {
+        deleteStoredImage(storedMask.id);
+        saved = undefined;
+        res.status(409).json({ error: "账号已停用或删除，不能继续保存蒙版" });
+        return;
+      }
+      committed = true;
+    } catch (error) {
+      deleteStoredImage(storedMask.id);
+      saved = undefined;
+      throw error;
+    }
+    res.json({
+      ...storedMask,
+      mimeType: "image/png",
+      width: pair.width,
+      height: pair.height,
+      byteLength: pair.maskBuffer.byteLength,
+      preserved: true,
+    });
+  } catch (error) {
+    if (saved && !committed) deleteStoredImage(saved.id);
+    const status = error instanceof ImageReferenceAccessError
+      ? 403
+      : error instanceof ProviderError || error instanceof ImageValidationError
+        ? 400
+        : 500;
+    res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
   }
 }));
 
