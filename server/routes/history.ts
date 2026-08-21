@@ -3,6 +3,7 @@ import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne } from "../lib/database";
 import { thumbnailUrlForImage } from "../lib/fileStore";
+import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 
 export const historyRouter = Router();
 
@@ -95,6 +96,7 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     return ({
     id: (row.output_id as string | null) ?? (row.id as string),
     runId: row.id,
+    clientRequestId: row.client_request_id,
     image: (row.image as string | null) ?? "",
     thumbnail: row.image ? thumbnailUrlForImage(row.image as string) : "",
     nodeId: row.node_id,
@@ -125,6 +127,57 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
       ? encodeCursor({ before, startedAt: lastRun.started_at, runId: lastRun.id })
       : null,
     hasMore,
+  });
+}));
+
+/** 首屏恢复必须使用完整活动集；有限分页的“缺席”不能证明某个 Run 已结束。 */
+historyRouter.get("/active", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const rows = await query<Record<string, unknown>>(`
+    SELECT
+      r.id, r.client_request_id, r.node_id, r.node_label, r.kind,
+      r.project_id, r.project_name, r.owner_id, r.prompt, r.model,
+      r.requested_count, r.successful_count, r.provider_requests,
+      r.started_at, r.status, r.error,
+      u.display_name AS owner_name
+    FROM generation_runs r
+    JOIN users u ON u.id = r.owner_id
+    WHERE r.owner_id = $1
+      AND r.deleted_at IS NULL
+      AND r.plan_json IS NOT NULL
+      AND r.status IN ('queued','running','retry_wait','cancel_requested')
+    ORDER BY r.started_at DESC, r.id DESC
+    LIMIT $2
+  `, [user.id, ACTIVE_RUN_LIMIT + 1]);
+  if (rows.length > ACTIVE_RUN_LIMIT) {
+    res.status(409).json({ error: "活动任务过多，暂时禁止创建新任务，请联系管理员处理" });
+    return;
+  }
+  res.json({
+    records: rows.map((row) => ({
+      id: row.id,
+      runId: row.id,
+      clientRequestId: row.client_request_id,
+      image: "",
+      thumbnail: "",
+      nodeId: row.node_id,
+      nodeLabel: row.node_label,
+      kind: row.kind,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      prompt: row.prompt,
+      model: row.model,
+      requestedCount: row.requested_count,
+      successfulCount: row.successful_count,
+      providerRequests: row.provider_requests,
+      startedAt: row.started_at,
+      status: row.status,
+      error: row.error,
+    })),
+    nextCursor: null,
+    hasMore: false,
   });
 }));
 

@@ -6,6 +6,10 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne, transaction } from "../lib/database";
 import { deleteStoredImage } from "../lib/fileStore";
 import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflowSchema";
+import {
+  assertImageReferencesAccessible,
+  ImageReferenceAccessError,
+} from "../lib/imageReferenceAccess";
 import type { PersistedWorkflow } from "../../src/types/workflow";
 
 export const projectsRouter = Router();
@@ -96,12 +100,14 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
     const projectId = id || nanoid(10);
     const now = new Date().toISOString();
     const saved = await transaction(async (client) => {
-      const existing = await queryOne<{ owner_id: string }>(
-        "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+      const existing = await queryOne<{ owner_id: string; deleted_at: string | null }>(
+        "SELECT owner_id, deleted_at FROM projects WHERE id = $1 FOR UPDATE",
         [projectId],
         client,
       );
-      if (existing && existing.owner_id !== user.id) return false;
+      if (existing?.owner_id !== undefined && existing.owner_id !== user.id) return "forbidden" as const;
+      if (existing?.deleted_at) return "deleted" as const;
+      await assertImageReferencesAccessible(normalized, user.id, client);
       const result = await client.query(`
         INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
         VALUES ($1, $2, $3, $4, $5, $5)
@@ -110,17 +116,21 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
           WHERE projects.owner_id = excluded.owner_id
         RETURNING id
       `, [projectId, user.id, name.trim(), JSON.stringify(normalized), now]);
-      if (result.rowCount !== 1) return false;
+      if (result.rowCount !== 1) return "forbidden" as const;
       await syncAssetRefs(client, projectId, user.id, normalized);
-      return true;
+      return "saved" as const;
     });
-    if (!saved) {
+    if (saved === "forbidden") {
       res.status(403).json({ error: "管理员只能查看其他用户项目，不能修改" });
+      return;
+    }
+    if (saved === "deleted") {
+      res.status(409).json({ error: "项目已在回收站中，请先恢复项目再保存" });
       return;
     }
     res.json({ ok: true, id: projectId });
   } catch (error) {
-    res.status(error instanceof WorkflowValidationError ? 400 : 500)
+    res.status(error instanceof WorkflowValidationError ? 400 : error instanceof ImageReferenceAccessError ? 403 : 500)
       .json({ error: error instanceof Error ? error.message : String(error) });
   }
 }));

@@ -15,6 +15,7 @@ import {
 import { asyncHandler } from "../lib/asyncHandler";
 import { db, query, queryOne, transaction } from "../lib/database";
 import { hashPassword, validatePassword, verifyPassword } from "../lib/password";
+import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 
 export const authRouter = Router();
 
@@ -197,6 +198,10 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     res.status(400).json({ error: "必须选择数据接收用户，或明确将数据放入 15 天回收站" });
     return;
   }
+  if (transferToUserId === req.params.id) {
+    res.status(400).json({ error: "不能把账号数据转移给自身" });
+    return;
+  }
   const source = await queryOne<{ id: string }>("SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL", [req.params.id]);
   if (!source) {
     res.status(404).json({ error: "用户不存在" });
@@ -215,11 +220,78 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const purgeAfter = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString();
-  await transaction(async (client) => {
+  const outcome = await transaction(async (client) => {
+    // 所有新生成任务先持有 owner 用户共享锁；账号变更按 id 稳定取得排他锁，
+    // 保证请求要么先完整入队并随后被转移/回收，要么在账号变更后被拒绝。
+    const userIds = transferToUserId
+      ? [req.params.id, transferToUserId]
+      : [req.params.id];
+    const lockedUsers = (await client.query<{ id: string; active: number; deleted_at: string | null }>(`
+      SELECT id, active, deleted_at FROM users
+      WHERE id = ANY($1::text[])
+      ORDER BY id
+      FOR NO KEY UPDATE
+    `, [userIds])).rows;
+    const lockedSource = lockedUsers.find((row) => row.id === req.params.id);
+    if (!lockedSource || lockedSource.deleted_at !== null) {
+      return { status: "source_changed" as const };
+    }
     if (transferToUserId) {
-      for (const table of ["projects", "assets", "files", "generation_runs", "usage_events"] as const) {
+      const lockedTarget = lockedUsers.find((row) => row.id === transferToUserId);
+      if (!lockedTarget || lockedTarget.active !== 1 || lockedTarget.deleted_at !== null) {
+        return { status: "target_changed" as const };
+      }
+      const activeRuns = (await client.query<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM generation_runs
+        WHERE owner_id = ANY($1::text[])
+          AND deleted_at IS NULL
+          AND plan_json IS NOT NULL
+          AND status IN ('queued','running','retry_wait','cancel_requested')
+      `, [[req.params.id, transferToUserId]])).rows[0]?.count ?? 0;
+      if (activeRuns > ACTIVE_RUN_LIMIT) {
+        return { status: "active_limit" as const };
+      }
+    } else {
+      const activeRuns = (await client.query<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM generation_runs
+        WHERE owner_id = $1
+          AND deleted_at IS NULL
+          AND plan_json IS NOT NULL
+          AND status IN ('queued','running','retry_wait','cancel_requested')
+      `, [req.params.id])).rows[0]?.count ?? 0;
+      if (activeRuns > 0) return { status: "active_runs" as const };
+    }
+    if (transferToUserId) {
+      for (const table of ["projects", "assets"] as const) {
         await client.query(`UPDATE ${table} SET owner_id = $1 WHERE owner_id = $2`, [transferToUserId, req.params.id]);
       }
+      // 源/目标用户排他锁已隔离新 Run；这里只按行更新，避免与 Worker 的
+      // generation_runs 行锁形成表锁升级死锁。
+      await client.query(`
+        UPDATE generation_runs source
+        SET client_request_id = NULL, request_fingerprint = NULL
+        WHERE source.owner_id = $2
+          AND source.client_request_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM generation_runs target
+            WHERE target.owner_id = $1
+              AND target.client_request_id = source.client_request_id
+          )
+      `, [transferToUserId, req.params.id]);
+      await client.query(
+        "UPDATE generation_runs SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id],
+      );
+      await client.query(
+        "UPDATE usage_events SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id],
+      );
+      // Worker 按 run → files/usage 的顺序提交结果。先等待并转移 Run，再扫
+      // 结果表，才能包含它在等待期间刚登记的文件和消耗记录。
+      await client.query(
+        "UPDATE files SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id],
+      );
     } else {
       await client.query(
         "UPDATE projects SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL",
@@ -229,7 +301,7 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
         "UPDATE assets SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL",
         [nowIso, purgeAfter, req.params.id],
       );
-      for (const table of ["files", "generation_runs", "usage_events"] as const) {
+      for (const table of ["generation_runs", "usage_events", "files"] as const) {
         await client.query(
           `UPDATE ${table} SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL`,
           [nowIso, purgeAfter, req.params.id],
@@ -238,6 +310,23 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     }
     await client.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
     await client.query("UPDATE users SET active = 0, deleted_at = $1, updated_at = $1 WHERE id = $2", [nowIso, req.params.id]);
+    return { status: "ok" as const };
   });
+  if (outcome.status === "source_changed") {
+    res.status(404).json({ error: "用户不存在或状态已变化，请刷新后重试" });
+    return;
+  }
+  if (outcome.status === "target_changed") {
+    res.status(409).json({ error: "数据接收用户状态已变化，请刷新后重试" });
+    return;
+  }
+  if (outcome.status === "active_limit") {
+    res.status(409).json({ error: `数据转移后活动任务将超过 ${ACTIVE_RUN_LIMIT} 条，请等待任务结束后再试` });
+    return;
+  }
+  if (outcome.status === "active_runs") {
+    res.status(409).json({ error: "账号仍有生成任务，请先等待任务结束或取消任务后再删除" });
+    return;
+  }
   res.json({ ok: true, purgeAfter: transferToUserId ? null : purgeAfter });
 }));

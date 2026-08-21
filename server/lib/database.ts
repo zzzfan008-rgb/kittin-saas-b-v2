@@ -492,6 +492,29 @@ async function migrate(): Promise<void> {
       );
     }
 
+    if (!applied.has(10)) {
+      await client.query(`
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS client_request_id TEXT;
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS request_fingerprint TEXT;
+        ALTER TABLE generation_runs
+          DROP CONSTRAINT IF EXISTS generation_runs_client_request_pair_check;
+        ALTER TABLE generation_runs
+          ADD CONSTRAINT generation_runs_client_request_pair_check CHECK (
+            (client_request_id IS NULL AND request_fingerprint IS NULL) OR
+            (client_request_id IS NOT NULL AND request_fingerprint IS NOT NULL)
+          );
+        CREATE UNIQUE INDEX IF NOT EXISTS generation_runs_owner_client_request_unique
+          ON generation_runs(owner_id, client_request_id)
+          WHERE client_request_id IS NOT NULL;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (10, $1, $2)",
+        ["generation_run_request_idempotency", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

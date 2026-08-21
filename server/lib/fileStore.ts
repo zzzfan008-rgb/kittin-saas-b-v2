@@ -14,7 +14,12 @@ import sharp from "sharp";
 import { config } from "../config";
 import { toDataUrl } from "../providers/base";
 import { withImageProcessingSlot } from "./imageProcessingLimit";
-import { MAX_IMAGE_BYTES, detectImageMime, validateImageDataUrl } from "./imageValidation";
+import {
+  MAX_IMAGE_BYTES,
+  detectImageMime,
+  isLocalImageReference,
+  validateImageDataUrl,
+} from "./imageValidation";
 import { normalizeUploadImageDataUrl } from "./uploadImageNormalization";
 
 const MAX_THUMBNAIL_INPUT_PIXELS = 40_000_000;
@@ -159,6 +164,7 @@ export async function saveNormalizedUploadDataUrl(dataUrl: string): Promise<Save
 /** /api/files/:id 读取为 dataURL；非文件引用（已是 dataURL 或 http URL）原样返回 */
 export function resolveToDataUrl(ref: string): string {
   if (!ref.startsWith("/api/files/")) return ref;
+  if (!isLocalImageReference(ref)) throw new Error("invalid local image reference");
   const id = path.basename(ref);
   const filePath = path.join(uploadsDir(), id);
   if (!fs.existsSync(filePath)) {
@@ -426,7 +432,10 @@ export async function normalizeImageRef(ref: string): Promise<string> {
 
 /** 结果图片归一化并落盘为 /api/files/:id（项目 JSON 中不保存 dataURL 或第三方临时 URL） */
 export async function persistImageRef(ref: string): Promise<string> {
-  if (ref.startsWith("/api/files/")) return ref;
+  if (ref.startsWith("/api/files/")) {
+    if (!isLocalImageReference(ref)) throw new Error("invalid local image reference");
+    return ref;
+  }
   const dataUrl = await normalizeImageRef(ref);
   return saveDataUrl(dataUrl).url;
 }

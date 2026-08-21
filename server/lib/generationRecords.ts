@@ -5,6 +5,8 @@ import { deleteStoredImage } from "./fileStore";
 
 export interface GenerationRecordContext {
   userId: string;
+  /** 客户端对一次付费提交生成的稳定请求号；持久队列据此跨 HTTP 重试去重。 */
+  clientRequestId?: string;
   projectId?: string;
   projectName?: string;
   nodeId: string;

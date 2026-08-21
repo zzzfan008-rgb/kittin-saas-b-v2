@@ -1,24 +1,35 @@
 /**
  * 工作流执行：
- *   POST /api/run-plan            { nodes, edges, onlyNodeId?, includeDownstream? } → 202 { runId, status }
+ *   POST /api/run-plan            { clientRequestId, projectId, nodes, edges, onlyNodeId?, includeDownstream? }
+ *                                   → 202 { runId, status }
  *                                   （事务入队后立即返回，由 PostgreSQL Worker 执行）
  *   GET  /api/run-plan/:id/events SSE 事件流（含重放，事件见 engine/runner.ts RunEvent）
  */
 import { Router, type Request, type Response } from "express";
+import { isDeepStrictEqual } from "node:util";
 import { WORKFLOW_SCHEMA_VERSION } from "../../src/types/workflow";
 import { assertPlanInputs, buildExecutionPlan, DagError } from "../engine/dag";
 import { getRunForUser, type RunEvent } from "../engine/runner";
 import {
+  ActiveRunLimitError,
+  assertGenerationOwnerActive,
   cancelDurableRun,
+  CLIENT_REQUEST_ID_PATTERN,
   DURABLE_RUN_EVENT_BATCH_SIZE,
-  enqueueGenerationRun,
+  enqueueGenerationRunInTransaction,
+  GenerationOwnerUnavailableError,
+  GenerationRequestConflictError,
   getDurableRunForUser,
   readDurableRunEvents,
 } from "../engine/runQueue";
 import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflowSchema";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
-import { queryOne } from "../lib/database";
+import { queryOne, transaction } from "../lib/database";
+import {
+  assertImageReferencesAccessible,
+  ImageReferenceAccessError,
+} from "../lib/imageReferenceAccess";
 
 export const runPlanRouter = Router();
 
@@ -33,13 +44,13 @@ export function requestedCountForStep(kind: string, params: Record<string, unkno
 }
 
 runPlanRouter.post("/", asyncHandler(async (req, res) => {
-  const { nodes, edges, onlyNodeId, includeDownstream, projectId, projectName } = req.body as {
+  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId } = req.body as {
     nodes?: unknown[];
     edges?: unknown[];
     onlyNodeId?: string;
     includeDownstream?: boolean;
     projectId?: string;
-    projectName?: string;
+    clientRequestId?: string;
   };
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     res.status(400).json({ error: "nodes and edges arrays are required" });
@@ -53,58 +64,87 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "includeDownstream must be a boolean" });
     return;
   }
+  if (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+  if (typeof clientRequestId !== "string" || !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    res.status(400).json({ error: "clientRequestId is required" });
+    return;
+  }
   try {
-    // 执行与项目/模板持久化共用同一份运行时 schema，拒绝损坏或旧版漂移数据。
-    const flow = validateAndMigrateFlow({
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      nodes,
-      edges,
-    });
-    const plan = buildExecutionPlan(flow.nodes, flow.edges, {
-      onlyNodeId,
-      // 点击单节点默认只执行自己，避免无意触发整条下游产生额外费用。
-      includeDownstream: includeDownstream ?? false,
-    });
-    if (plan.steps.length === 0) {
-      res.status(400).json({ error: "workflow contains no executable nodes" });
-      return;
-    }
-    assertPlanInputs(plan, flow.edges);
-    const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
-    const targetNode = flow.nodes.find((node) => node.id === targetStep.nodeId);
-    const params = targetStep.params;
-    const requestedCount = requestedCountForStep(targetStep.kind, params);
     const user = requestUser(req);
-    if (typeof projectId === "string") {
-      const project = await queryOne<{ owner_id: string }>(
-        "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
-        [projectId],
-      );
-      if (!project) {
-        res.status(404).json({ error: "项目不存在或已删除" });
-        return;
-      }
-      if (project && project.owner_id !== user.id) {
-        res.status(403).json({ error: "管理员只能查看其他用户项目，不能运行或修改" });
-        return;
-      }
-    }
-    const run = await enqueueGenerationRun(plan, user.id, {
-      userId: user.id,
-      projectId: typeof projectId === "string" ? projectId : undefined,
-      projectName: typeof projectName === "string" ? projectName : undefined,
-      nodeId: targetStep.nodeId,
-      nodeLabel: targetNode?.data.label ?? targetStep.kind,
-      kind: targetStep.kind,
-      prompt: typeof params.prompt === "string" ? params.prompt : undefined,
-      parameters: params,
-      referenceImages: targetStep.inputImages,
-      requestedCount,
+    const outcome = await transaction(async (client) => {
+      // 与账号转移/删除统一 user → project → assets → files → run 的锁顺序。
+      await assertGenerationOwnerActive(client, user.id);
+      // 与入队处于同一事务并持有共享锁，避免项目/素材在授权后、入队前被并发替换。
+      const project = await queryOne<{ owner_id: string; name: string; flow_json: string }>(`
+        SELECT owner_id, name, flow_json FROM projects
+        WHERE id = $1 AND deleted_at IS NULL
+        FOR SHARE
+      `, [projectId], client);
+      if (!project) return { status: "not_found" as const };
+      if (project.owner_id !== user.id) return { status: "forbidden" as const };
+
+      // 执行语义必须与刚保存的项目一致；实际入队始终使用数据库中的计划与项目名称。
+      const submittedFlow = validateAndMigrateFlow({
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes,
+        edges,
+      });
+      const flow = validateAndMigrateFlow(JSON.parse(project.flow_json));
+      const planOptions = {
+        onlyNodeId,
+        includeDownstream: includeDownstream ?? false,
+      };
+      const submittedPlan = buildExecutionPlan(submittedFlow.nodes, submittedFlow.edges, planOptions);
+      const plan = buildExecutionPlan(flow.nodes, flow.edges, planOptions);
+      if (!isDeepStrictEqual(submittedPlan, plan)) return { status: "conflict" as const };
+      // 点击单节点默认只执行自己，避免无意触发整条下游产生额外费用。
+      if (plan.steps.length === 0) return { status: "empty" as const };
+      assertPlanInputs(plan, flow.edges);
+      await assertImageReferencesAccessible(plan, user.id, client);
+      const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
+      const targetNode = flow.nodes.find((node) => node.id === targetStep.nodeId);
+      const params = targetStep.params;
+      const requestedCount = requestedCountForStep(targetStep.kind, params);
+      const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
+        userId: user.id,
+        clientRequestId,
+        projectId,
+        projectName: project.name,
+        nodeId: targetStep.nodeId,
+        nodeLabel: targetNode?.data.label ?? targetStep.kind,
+        kind: targetStep.kind,
+        prompt: typeof params.prompt === "string" ? params.prompt : undefined,
+        parameters: params,
+        referenceImages: targetStep.inputImages,
+        requestedCount,
+      });
+      return { status: "queued" as const, runId: run.id };
     });
-    res.status(202).json({ runId: run.id, status: "queued" });
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "项目不存在或已删除" });
+    } else if (outcome.status === "forbidden") {
+      res.status(403).json({ error: "管理员只能查看其他用户项目，不能运行或修改" });
+    } else if (outcome.status === "conflict") {
+      res.status(409).json({ error: "画布尚未保存或已在其他位置更新，请保存后重试" });
+    } else if (outcome.status === "empty") {
+      res.status(400).json({ error: "workflow contains no executable nodes" });
+    } else {
+      res.status(202).json({ runId: outcome.runId, status: "queued" });
+    }
   } catch (err) {
     if (err instanceof DagError || err instanceof WorkflowValidationError) {
       res.status(400).json({ error: err.message });
+    } else if (err instanceof ImageReferenceAccessError) {
+      res.status(403).json({ error: err.message });
+    } else if (err instanceof GenerationRequestConflictError) {
+      res.status(409).json({ error: err.message });
+    } else if (err instanceof ActiveRunLimitError) {
+      res.status(409).json({ error: err.message });
+    } else if (err instanceof GenerationOwnerUnavailableError) {
+      res.status(409).json({ error: err.message });
     } else {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }

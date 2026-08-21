@@ -15,7 +15,7 @@ process.env.INITIAL_ADMIN_ACCOUNT_ID = "test-admin";
 process.env.INITIAL_ADMIN_PASSWORD = "Initial1234";
 
 await resetPostgresTestDatabase();
-const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
+const { closeDatabaseForTests, db, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { authenticateRequest, authenticatedUser, createSession, SESSION_COOKIE } = await import("../server/lib/auth");
 const { authRouter } = await import("../server/routes/auth");
 const { purgeExpiredProjects } = await import("../server/routes/projects");
@@ -161,6 +161,312 @@ await test("同一账号并发登录均正常响应且最终仅保留一个有�
     assert.equal(count?.count, 1);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+await test("账号数据转移会化解重复付费请求号而不触发唯一键冲突", async () => {
+  const sourceId = "transfer-source";
+  const targetId = "transfer-target";
+  const createdAt = new Date().toISOString();
+  await query("UPDATE users SET must_change_password = 0 WHERE id = $1", [admin.id]);
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES
+      ($1, 'transfer-source', '转出账号', 'user', 'test-only', 1, $3, $3),
+      ($2, 'transfer-target', '接收账号', 'user', 'test-only', 1, $3, $3)
+  `, [sourceId, targetId, createdAt]);
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
+      client_request_id, request_fingerprint
+    ) VALUES
+      ('transfer-source-run', $1, 'source-node', '源任务', 'ai-modify', 1, 'failed', 1,
+       'shared-transfer-request', 'source-fingerprint'),
+      ('transfer-target-run', $2, 'target-node', '目标任务', 'ai-modify', 1, 'failed', 2,
+       'shared-transfer-request', 'target-fingerprint')
+  `, [sourceId, targetId]);
+
+  const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/users/${sourceId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${SESSION_COOKIE}=${adminSession.token}`,
+      },
+      body: JSON.stringify({ transferToUserId: targetId }),
+    });
+    assert.equal(response.status, 200, await response.text());
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+
+  const rows = await query<{
+    id: string;
+    owner_id: string;
+    client_request_id: string | null;
+    request_fingerprint: string | null;
+  }>(`
+    SELECT id, owner_id, client_request_id, request_fingerprint
+    FROM generation_runs WHERE id IN ('transfer-source-run', 'transfer-target-run')
+    ORDER BY id
+  `);
+  assert.deepEqual(rows, [
+    {
+      id: "transfer-source-run",
+      owner_id: targetId,
+      client_request_id: null,
+      request_fingerprint: null,
+    },
+    {
+      id: "transfer-target-run",
+      owner_id: targetId,
+      client_request_id: "shared-transfer-request",
+      request_fingerprint: "target-fingerprint",
+    },
+  ]);
+});
+
+await test("账号转移不会合并出超过安全恢复上限的活动任务", async () => {
+  const sourceId = "transfer-capacity-source";
+  const targetId = "transfer-capacity-target";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES
+      ($1, $1, '容量转出账号', 'user', 'test-only', 1, $3, $3),
+      ($2, $2, '容量接收账号', 'user', 'test-only', 1, $3, $3)
+  `, [sourceId, targetId, createdAt]);
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
+    )
+    SELECT 'transfer-capacity-source-' || index, $1, 'source-node-' || index,
+      '源活动任务', 'ai-modify', 1, 'queued', index, '{"steps":[]}'
+    FROM generate_series(1, 91) AS index
+    UNION ALL
+    SELECT 'transfer-capacity-target-' || index, $2, 'target-node-' || index,
+      '目标活动任务', 'ai-modify', 1, 'running', 1000 + index, '{"steps":[]}'
+    FROM generate_series(1, 90) AS index
+  `, [sourceId, targetId]);
+
+  const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/users/${sourceId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${SESSION_COOKIE}=${adminSession.token}`,
+      },
+      body: JSON.stringify({ transferToUserId: targetId }),
+    });
+    const body = await response.text();
+    assert.equal(response.status, 409, body);
+    assert.match(body, /活动任务.*180/);
+    assert.deepEqual(await queryOne<{ active: number; deleted_at: string | null }>(`
+      SELECT active, deleted_at FROM users WHERE id = $1
+    `, [sourceId]), { active: 1, deleted_at: null });
+    assert.equal((await queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_runs WHERE owner_id = $1
+    `, [sourceId]))?.count, 91);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await query("DELETE FROM generation_runs WHERE owner_id = ANY($1::text[])", [[sourceId, targetId]]);
+    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[sourceId, targetId]]);
+  }
+});
+
+await test("仍有活动生成任务的账号不能直接删除", async () => {
+  const userId = "delete-active-user";
+  const runId = "delete-active-run";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES ($1, $1, '活动任务账号', 'user', 'test-only', 1, $2, $2)
+  `, [userId, createdAt]);
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
+    ) VALUES ($1, $2, 'active-node', '活动任务', 'ai-modify', 1, 'queued', 1, '{"steps":[]}')
+  `, [runId, userId]);
+
+  const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/users/${userId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${SESSION_COOKIE}=${adminSession.token}`,
+      },
+      body: JSON.stringify({ deleteData: true }),
+    });
+    const body = await response.text();
+    assert.equal(response.status, 409, body);
+    assert.match(body, /生成任务.*结束|取消任务/);
+    assert.deepEqual(await queryOne<{ active: number; deleted_at: string | null }>(`
+      SELECT active, deleted_at FROM users WHERE id = $1
+    `, [userId]), { active: 1, deleted_at: null });
+    assert.equal((await queryOne<{ deleted_at: string | null }>(`
+      SELECT deleted_at FROM generation_runs WHERE id = $1
+    `, [runId]))?.deleted_at, null);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+    await query("DELETE FROM users WHERE id = $1", [userId]);
+  }
+});
+
+await test("升级遗留且没有执行计划的 queued 记录不会永久阻止账号删除", async () => {
+  const userId = "delete-legacy-queued-user";
+  const runId = "delete-legacy-queued-run";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES ($1, $1, '旧队列账号', 'user', 'test-only', 1, $2, $2)
+  `, [userId, createdAt]);
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at
+    ) VALUES ($1, $2, 'legacy-node', '旧队列任务', 'ai-modify', 1, 'queued', 1)
+  `, [runId, userId]);
+
+  const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/users/${userId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${SESSION_COOKIE}=${adminSession.token}`,
+      },
+      body: JSON.stringify({ deleteData: true }),
+    });
+    assert.equal(response.status, 200, await response.text());
+    assert.ok((await queryOne<{ deleted_at: string | null }>(`
+      SELECT deleted_at FROM generation_runs WHERE id = $1
+    `, [runId]))?.deleted_at);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+    await query("DELETE FROM users WHERE id = $1", [userId]);
+  }
+});
+
+await test("账号转移等待 Worker 行锁时不会触发表锁升级死锁", async () => {
+  const sourceId = "transfer-worker-source";
+  const targetId = "transfer-worker-target";
+  const runId = "transfer-worker-run";
+  const fileId = "transfer-worker-file.png";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES
+      ($1, $1, 'Worker 转出账号', 'user', 'test-only', 1, $3, $3),
+      ($2, $2, 'Worker 接收账号', 'user', 'test-only', 1, $3, $3)
+  `, [sourceId, targetId, createdAt]);
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
+    ) VALUES ($1, $2, 'worker-node', 'Worker 任务', 'ai-modify', 1, 'queued', 1, '{"steps":[]}')
+  `, [runId, sourceId]);
+
+  const worker = await db().connect();
+  const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  let transferResponse: Promise<Response> | undefined;
+  try {
+    await worker.query("BEGIN");
+    await worker.query("SELECT id FROM generation_runs WHERE id = $1 FOR UPDATE", [runId]);
+    const address = server.address() as AddressInfo;
+    transferResponse = fetch(`http://127.0.0.1:${address.port}/api/auth/users/${sourceId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        cookie: `${SESSION_COOKIE}=${adminSession.token}`,
+      },
+      body: JSON.stringify({ transferToUserId: targetId }),
+    });
+
+    const deadline = Date.now() + 3_000;
+    let transferIsWaiting = false;
+    while (Date.now() < deadline) {
+      transferIsWaiting = Boolean(await queryOne(`
+        SELECT 1 FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock'
+          AND query LIKE '%UPDATE generation_runs SET owner_id%'
+      `));
+      if (transferIsWaiting) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(transferIsWaiting, true, "账号转移应等待 Worker 持有的 Run 行锁");
+
+    // Worker 已持有行锁后仍应能取得 UPDATE 所需表锁；旧的表级转移锁会在这里形成死锁环。
+    await worker.query("UPDATE generation_runs SET status = 'running' WHERE id = $1", [runId]);
+    // 文件 owner 外键会对 users 取 KEY SHARE；账号事务必须使用兼容的
+    // NO KEY UPDATE 用户锁，否则这里会与它等待中的 Run 行锁形成死锁。
+    await worker.query(`
+      INSERT INTO files (id, owner_id, source_type, run_id, created_at)
+      VALUES ($1, $2, 'generated', $3, $4)
+    `, [fileId, sourceId, runId, createdAt]);
+    await worker.query("COMMIT");
+    const response = await transferResponse;
+    assert.equal(response.status, 200, await response.text());
+    assert.deepEqual(await queryOne<{ owner_id: string; status: string }>(`
+      SELECT owner_id, status FROM generation_runs WHERE id = $1
+    `, [runId]), { owner_id: targetId, status: "running" });
+    assert.equal((await queryOne<{ owner_id: string }>(`
+      SELECT owner_id FROM files WHERE id = $1
+    `, [fileId]))?.owner_id, targetId, "等待期间新登记的文件也必须被转移");
+  } finally {
+    await worker.query("ROLLBACK").catch(() => undefined);
+    worker.release();
+    if (transferResponse) await transferResponse.catch(() => undefined);
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await query("DELETE FROM files WHERE id = $1", [fileId]);
+    await query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[sourceId, targetId]]);
   }
 });
 

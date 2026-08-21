@@ -6,10 +6,12 @@ import {
   applyRunEventToRecentResults,
   appendSavedAsset,
   createQueuedResultCards,
+  isLatestTrackedRun,
   mergeRecentResults,
   normalizeRunEvent,
   requestedResultCount,
   resumeRecentResults,
+  trimRecentResults,
   useFlowStore,
   type RecentResult,
   type RunEvent,
@@ -186,6 +188,63 @@ test("首次历史响应与请求期间新增的乐观记录合并且按 id 去�
     mergeRecentResults([optimistic], [serverRecord, optimistic]),
     [optimistic, serverRecord],
   );
+});
+
+test("结果裁剪始终保留全部活动 Run，并只淘汰旧终态", () => {
+  const active = Array.from({ length: 120 }, (_, index): RecentResult => ({
+    ...queued,
+    id: `active-${index}`,
+    runId: `run-${index}`,
+    nodeId: `node-${index}`,
+    startedAt: 10_000 - index,
+    status: "running",
+  }));
+  const terminal = Array.from({ length: 40 }, (_, index): RecentResult => ({
+    ...queued,
+    id: `terminal-${index}`,
+    runId: `terminal-run-${index}`,
+    nodeId: `terminal-node-${index}`,
+    startedAt: 5_000 - index,
+    finishedAt: 6_000 - index,
+    status: "success",
+    image: `/api/files/terminal-${index}.png`,
+  }));
+
+  const trimmed = trimRecentResults([...active, ...terminal], 100);
+  assert.equal(trimmed.length, 120, "活动记录可以安全突破纯展示上限");
+  assert.ok(trimmed.every((record) => record.status === "running"));
+
+  const afterTerminal = applyRunEventToRecentResults(trimmed, "active-0", {
+    type: "node-status",
+    nodeId: "node-0",
+    status: "success",
+    images: ["/api/files/active-0.png"],
+    finishedAt: 20_000,
+  });
+  assert.equal(
+    afterTerminal.filter((record) => record.status === "running").length,
+    119,
+  );
+  assert.ok(afterTerminal.some((record) => record.runId === "run-119"));
+});
+
+test("同一节点的旧 Run 不得覆盖更新 Run 的画布状态", () => {
+  const newer: RecentResult = {
+    ...queued,
+    id: "same-node-newer",
+    runId: "same-node-newer-run",
+    startedAt: 2_000,
+    status: "running",
+  };
+  const older: RecentResult = {
+    ...queued,
+    id: "same-node-older",
+    runId: "same-node-older-run",
+    startedAt: 1_000,
+    status: "retry_wait",
+  };
+  assert.equal(isLatestTrackedRun([newer, older], newer), true);
+  assert.equal(isLatestTrackedRun([newer, older], older), false);
 });
 
 test("并发保存素材按最新状态追加且保持幂等", () => {
@@ -452,7 +511,8 @@ try {
   MockEventSource.instances[3].emit({ type: "done", seq: 1 }, "1");
   await waitFor(() => MockEventSource.instances[3].closed, "缺少终态时连接未关闭");
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
-  assert.equal(useFlowStore.getState().recentResults[0].status, "error");
+  assert.equal(useFlowStore.getState().recentResults[0].status, "retry_wait");
+  assert.match(useFlowStore.getState().recentResults[0].error ?? "", /勿重复提交/);
 
   useFlowStore.setState({ recentResults: [{ ...resumable, id: "out-of-order", status: "running" }] });
   resumeRecentResults([{ ...resumable, id: "out-of-order", status: "running" }]);

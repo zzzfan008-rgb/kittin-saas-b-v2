@@ -18,6 +18,7 @@ const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await imp
 const { createRun } = await import("../server/engine/runner");
 const { buildExecutionPlan } = await import("../server/engine/dag");
 const { runPlanRouter } = await import("../server/routes/runPlan");
+const { generateRouter } = await import("../server/routes/generate");
 const { assetsRouter } = await import("../server/routes/assets");
 const { filesRouter } = await import("../server/routes/files");
 const { projectsRouter } = await import("../server/routes/projects");
@@ -49,6 +50,8 @@ const users: Record<string, AuthUser> = {
 };
 
 let passed = 0;
+const PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 async function test(name: string, fn: () => void | Promise<void>) {
   await fn();
   passed += 1;
@@ -74,6 +77,66 @@ function flow(images: string[] = []) {
   };
 }
 
+function generationFlow(prompt: string) {
+  return {
+    schemaVersion: 2,
+    nodes: [{
+      id: "generate",
+      type: "sketch-to-render",
+      position: { x: 0, y: 0 },
+      data: {
+        kind: "sketch-to-render",
+        label: "生成效果图",
+        status: "idle",
+        modelId: "gemini-3.1-flash-image",
+        modelOptions: { aspectRatio: "1:1", imageSize: "1K" },
+        prompt,
+        aspectRatio: "1:1",
+        batchSize: 1,
+        outputImages: [],
+      },
+    }],
+    edges: [],
+  };
+}
+
+function editFlow(imageUrl: string) {
+  return {
+    schemaVersion: 2,
+    nodes: [
+      {
+        id: "source",
+        type: "image-input",
+        position: { x: 0, y: 0 },
+        data: {
+          kind: "image-input",
+          label: "原图",
+          status: "idle",
+          imageRole: "default",
+          imageUrl,
+        },
+      },
+      {
+        id: "edit",
+        type: "ai-modify",
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "ai-modify",
+          label: "改款",
+          status: "idle",
+          modelId: "gpt-image-2-vip",
+          modelOptions: { size: "2048x2048" },
+          prompt: "改成短袖",
+          aspectRatio: "1:1",
+          batchSize: 1,
+          outputImages: [],
+        },
+      },
+    ],
+    edges: [{ id: "source-edit", source: "source", target: "edit" }],
+  };
+}
+
 await initializeDatabase();
 const now = new Date().toISOString();
 for (const user of Object.values(users)) {
@@ -95,6 +158,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/run-plan", runPlanRouter);
+app.use("/generate", generateRouter);
 app.use("/assets", assetsRouter);
 app.use("/files", filesRouter);
 app.use("/projects", projectsRouter);
@@ -118,6 +182,24 @@ function request(pathname: string, user: keyof typeof users, init: RequestInit =
       ...init.headers,
     },
   });
+}
+
+function directGenerateBody(referenceImage: string, projectId?: string, clientRequestId = "direct-request") {
+  return {
+    clientRequestId,
+    modelId: "gpt-image-2-vip",
+    kind: "ai-modify",
+    projectId,
+    projectName: "客户端伪造名称",
+    nodeId: "direct-edit",
+    request: {
+      prompt: "改成短袖",
+      aspectRatio: "1:1",
+      batchSize: 1,
+      referenceImages: [referenceImage],
+      modelOptions: { size: "2048x2048" },
+    },
+  };
 }
 
 console.log("运行任务与素材引用授权回归测试");
@@ -223,10 +305,18 @@ await test("管理员创建通用素材时解除底层文件的个人归属", as
 });
 
 await query(`
+  INSERT INTO files (id, owner_id, source_type, created_at)
+  VALUES
+    ('shared.png', $1, 'legacy', $3),
+    ('private.png', $2, 'legacy', $3),
+    ('own-private.png', $1, 'legacy', $3)
+`, [users.owner.id, users.other.id, now]);
+await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
   VALUES
     ('shared-asset', $1, 'shared', '共享素材', 'reference', '/api/files/shared.png', $3),
-    ('other-private', $2, 'private', '他人私有素材', 'reference', '/api/files/private.png', $3)
+    ('other-private', $2, 'private', '他人私有素材', 'reference', '/api/files/private.png', $3),
+    ('own-private', $1, 'private', '本人私有素材', 'reference', '/api/files/own-private.png', $3)
 `, [users.owner.id, users.other.id, now]);
 await query(`
   INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
@@ -311,9 +401,320 @@ await test("不存在或已删除的 projectId 不能污染运行历史元数据
       }],
       edges: [],
       projectId: "missing-project",
+      clientRequestId: "missing-project-request",
     }),
   });
   assert.equal(response.status, 404);
+});
+
+await test("运行必须绑定项目，且他人与管理员都不能运行项目所有者的画布", async () => {
+  const withoutProject = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({ ...flow(), clientRequestId: "missing-project-binding" }),
+  });
+  assert.equal(withoutProject.status, 400, await withoutProject.text());
+
+  const withoutRequestId = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({ ...flow(), projectId: "owner-project" }),
+  });
+  assert.equal(withoutRequestId.status, 400, await withoutRequestId.text());
+
+  for (const actor of ["other", "admin"] as const) {
+    const denied = await request("/run-plan", actor, {
+      method: "POST",
+      body: JSON.stringify({
+        ...flow(), projectId: "owner-project", clientRequestId: `forbidden-${actor}-request`,
+      }),
+    });
+    assert.equal(denied.status, 403, `${actor}: ${await denied.text()}`);
+  }
+});
+
+await test("同 ID 项目不能被其他账号覆盖", async () => {
+  const denied = await request("/projects", "other", {
+    method: "POST",
+    body: JSON.stringify({ id: "owner-project", name: "恶意覆盖", flow: generationFlow("恶意覆盖") }),
+  });
+  assert.equal(denied.status, 403, await denied.text());
+  const row = await queryOne<{ owner_id: string; name: string; flow_json: string }>(
+    "SELECT owner_id, name, flow_json FROM projects WHERE id = 'owner-project'",
+  );
+  assert.equal(row?.owner_id, users.owner.id);
+  assert.equal(row?.name, "Owner Project");
+  assert.deepEqual(JSON.parse(row?.flow_json ?? "{}"), flow());
+});
+
+await test("运行只接受当前已保存画布，且项目名称以服务端为准", async () => {
+  const savedFlow = generationFlow("已保存提示词");
+  const save = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "run-persisted-project",
+      name: "服务端项目名",
+      flow: savedFlow,
+    }),
+  });
+  assert.equal(save.status, 200, await save.text());
+
+  const forged = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...generationFlow("未保存的篡改提示词"),
+      onlyNodeId: "generate",
+      projectId: "run-persisted-project",
+      projectName: "伪造项目名",
+      clientRequestId: "forged-persisted-plan",
+    }),
+  });
+  assert.equal(forged.status, 409, await forged.text());
+
+  const queuedClientFlow = structuredClone(savedFlow);
+  queuedClientFlow.nodes[0].position = { x: 999, y: 999 };
+  queuedClientFlow.nodes[0].data.label = "客户端瞬态标签";
+  queuedClientFlow.nodes[0].data.status = "queued";
+  const accepted = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...queuedClientFlow,
+      onlyNodeId: "generate",
+      projectId: "run-persisted-project",
+      projectName: "伪造项目名",
+      clientRequestId: "accepted-persisted-plan",
+    }),
+  });
+  const payload = await accepted.json() as { runId?: string; error?: string };
+  assert.equal(accepted.status, 202, payload.error);
+  const row = await queryOne<{ project_name: string; parameters_json: string }>(
+    "SELECT project_name, parameters_json FROM generation_runs WHERE id = $1",
+    [payload.runId],
+  );
+  assert.equal(row?.project_name, "服务端项目名");
+  assert.equal((JSON.parse(row?.parameters_json ?? "{}") as { prompt?: string }).prompt, "已保存提示词");
+
+  const replay = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...queuedClientFlow,
+      onlyNodeId: "generate",
+      projectId: "run-persisted-project",
+      clientRequestId: "accepted-persisted-plan",
+    }),
+  });
+  const replayPayload = await replay.json() as { runId?: string; error?: string };
+  assert.equal(replay.status, 202, replayPayload.error);
+  assert.equal(replayPayload.runId, payload.runId);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE owner_id = $1 AND client_request_id = 'accepted-persisted-plan'
+  `, [users.owner.id]))?.count, 1);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs WHERE run_id = $1
+  `, [payload.runId]))?.count, 1);
+
+  const changedSavedFlow = generationFlow("后来保存的提示词");
+  const changedSave = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "run-persisted-project",
+      name: "服务端项目名",
+      flow: changedSavedFlow,
+    }),
+  });
+  assert.equal(changedSave.status, 200, await changedSave.text());
+  const semanticDrift = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...changedSavedFlow,
+      onlyNodeId: "generate",
+      projectId: "run-persisted-project",
+      clientRequestId: "accepted-persisted-plan",
+    }),
+  });
+  assert.equal(semanticDrift.status, 409, await semanticDrift.text());
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE owner_id = $1 AND client_request_id = 'accepted-persisted-plan'
+  `, [users.owner.id]))?.count, 1);
+});
+
+await test("项目保存与运行都拒绝引用他人的私有文件", async () => {
+  await query(`
+    INSERT INTO files (id, owner_id, source_type, created_at)
+    VALUES ('other-secret.png', $1, 'upload', $2)
+  `, [users.other.id, now]);
+  const unsafeFlow = editFlow("/api/files/other-secret.png");
+  const deniedSave = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: "unsafe-save-project", name: "越权项目", flow: unsafeFlow }),
+  });
+  assert.equal(deniedSave.status, 403, await deniedSave.text());
+  assert.equal(await queryOne("SELECT id FROM projects WHERE id = 'unsafe-save-project'"), undefined);
+
+  await query(`
+    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+    VALUES ('legacy-unsafe-project', $1, '历史越权项目', $2, $3, $3)
+  `, [users.owner.id, JSON.stringify(unsafeFlow), now]);
+  const deniedRun = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...unsafeFlow,
+      onlyNodeId: "edit",
+      projectId: "legacy-unsafe-project",
+      clientRequestId: "legacy-unsafe-request",
+    }),
+  });
+  assert.equal(deniedRun.status, 403, await deniedRun.text());
+});
+
+await test("不存在或已软删除的本地文件不能进入项目或运行队列", async () => {
+  const missingFlow = editFlow("/api/files/missing-image.png");
+  const missingSave = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: "missing-file-project", name: "缺失文件", flow: missingFlow }),
+  });
+  assert.equal(missingSave.status, 403, await missingSave.text());
+
+  await query(`
+    INSERT INTO files (id, owner_id, source_type, created_at, deleted_at, purge_after)
+    VALUES ('deleted-image.png', $1, 'upload', $2, $2, $3)
+  `, [users.owner.id, now, new Date(Date.now() + 86_400_000).toISOString()]);
+  const deletedFlow = editFlow("/api/files/deleted-image.png");
+  const deletedSave = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: "deleted-file-project", name: "已删文件", flow: deletedFlow }),
+  });
+  assert.equal(deletedSave.status, 403, await deletedSave.text());
+
+  for (const [projectId, projectFlow] of [
+    ["legacy-missing-file", missingFlow],
+    ["legacy-deleted-file", deletedFlow],
+  ] as const) {
+    await query(`
+      INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+      VALUES ($1, $2, '历史项目', $3, $4, $4)
+    `, [projectId, users.owner.id, JSON.stringify(projectFlow), now]);
+    const response = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        ...projectFlow,
+        onlyNodeId: "edit",
+        projectId,
+        clientRequestId: `${projectId}-request`,
+      }),
+    });
+    assert.equal(response.status, 403, await response.text());
+  }
+});
+
+await test("直连生成复用项目与文件授权，且不信任客户端项目名称", async () => {
+  const before = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  const missingRequestIdBody = directGenerateBody(PNG_DATA_URL);
+  delete (missingRequestIdBody as { clientRequestId?: string }).clientRequestId;
+  const missingRequestId = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(missingRequestIdBody),
+  });
+  assert.equal(missingRequestId.status, 400, await missingRequestId.text());
+
+  const accepted = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(directGenerateBody(
+      PNG_DATA_URL,
+      "run-persisted-project",
+      "direct-project-request",
+    )),
+  });
+  const acceptedBody = await accepted.json() as { runId?: string; error?: string };
+  assert.equal(accepted.status, 202, acceptedBody.error);
+  const stored = await queryOne<{ project_id: string; project_name: string; owner_id: string }>(
+    "SELECT project_id, project_name, owner_id FROM generation_runs WHERE id = $1",
+    [acceptedBody.runId],
+  );
+  assert.deepEqual(stored, {
+    project_id: "run-persisted-project",
+    project_name: "服务端项目名",
+    owner_id: users.owner.id,
+  });
+  const replay = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(directGenerateBody(
+      PNG_DATA_URL,
+      "run-persisted-project",
+      "direct-project-request",
+    )),
+  });
+  const replayBody = await replay.json() as { runId?: string; error?: string };
+  assert.equal(replay.status, 202, replayBody.error);
+  assert.equal(replayBody.runId, acceptedBody.runId);
+  const changedBody = directGenerateBody(
+    PNG_DATA_URL,
+    "run-persisted-project",
+    "direct-project-request",
+  );
+  changedBody.request.prompt = "同请求号的另一份语义";
+  const conflict = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(changedBody),
+  });
+  assert.equal(conflict.status, 409, await conflict.text());
+
+  const otherProject = await request("/generate", "other", {
+    method: "POST",
+    body: JSON.stringify(directGenerateBody(
+      PNG_DATA_URL,
+      "run-persisted-project",
+      "direct-forbidden-project",
+    )),
+  });
+  assert.equal(otherProject.status, 403, await otherProject.text());
+
+  for (const [index, ref] of [
+    "/api/files/other-secret.png",
+    "/api/files/nested/other-secret.png",
+    "/api/files/missing-image.png",
+    "/api/files/deleted-image.png",
+  ].entries()) {
+    const denied = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(directGenerateBody(ref, undefined, `direct-denied-${index}`)),
+    });
+    assert.equal(denied.status, 403, `${ref}: ${await denied.text()}`);
+  }
+
+  const shared = await request("/generate", "other", {
+    method: "POST",
+    body: JSON.stringify(directGenerateBody(
+      "/api/files/shared.png",
+      undefined,
+      "direct-shared-request",
+    )),
+  });
+  assert.equal(shared.status, 202, await shared.text());
+  const after = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  assert.equal(after, before + 2, "只有项目内合法请求与共享图片请求可以入队");
+});
+
+await test("回收站项目不能被同 ID 保存请求隐式复活", async () => {
+  await query(`
+    INSERT INTO projects (
+      id, owner_id, name, flow_json, updated_at, created_at, deleted_at, purge_after
+    ) VALUES ('deleted-save-project', $1, '已删除项目', $2, $3, $3, $3, $4)
+  `, [users.owner.id, JSON.stringify(flow()), now, new Date(Date.now() + 86_400_000).toISOString()]);
+  const response = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: "deleted-save-project", name: "不应复活", flow: flow() }),
+  });
+  assert.equal(response.status, 409, await response.text());
+  const row = await queryOne<{ name: string; deleted_at: string | null }>(
+    "SELECT name, deleted_at FROM projects WHERE id = 'deleted-save-project'",
+  );
+  assert.equal(row?.name, "已删除项目");
+  assert.ok(row?.deleted_at);
 });
 
 await test("项目保存按最终画布原子同步可访问素材引用", async () => {
@@ -322,7 +723,7 @@ await test("项目保存按最终画布原子同步可访问素材引用", async
     body: JSON.stringify({
       id: "owner-project",
       name: "Owner Project",
-      flow: flow(["/api/files/shared.png", "/api/files/private.png"]),
+      flow: flow(["/api/files/shared.png", "/api/files/own-private.png"]),
     }),
   });
   assert.equal(save.status, 200, await save.text());
@@ -330,7 +731,7 @@ await test("项目保存按最终画布原子同步可访问素材引用", async
     "SELECT asset_id FROM project_asset_refs WHERE project_id = $1 ORDER BY asset_id",
     ["owner-project"],
   );
-  assert.deepEqual(refs, [{ asset_id: "shared-asset" }]);
+  assert.deepEqual(refs, [{ asset_id: "own-private" }, { asset_id: "shared-asset" }]);
 
   const clear = await request("/projects", "owner", {
     method: "POST",
@@ -366,10 +767,93 @@ await test("删除他人的历史记录统一返回 404，不泄露记录是否�
 });
 
 interface HistoryPage {
-  records: Array<{ id: string; runId: string }>;
+  records: Array<{
+    id: string;
+    runId: string;
+    clientRequestId?: string;
+    status?: string;
+    parameters?: unknown;
+    referenceImages?: unknown;
+  }>;
   nextCursor: string | null;
   hasMore: boolean;
 }
+
+await test("活动任务使用独立完整集合，不会被最近历史的 20 条分页截断", async () => {
+  const ids = ["old-active-run"];
+  try {
+    await query(`
+      INSERT INTO generation_runs (
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
+        plan_json, client_request_id, request_fingerprint
+      ) VALUES (
+        'old-active-run', $1, 'old-active-node', '旧活动任务', 'ai-modify', 1, 'running', 90000,
+        '{"steps":[]}', 'old-active-request', 'old-active-fingerprint'
+      )
+    `, [users.owner.id]);
+    for (let index = 0; index < 25; index += 1) {
+      const id = `newer-terminal-${index}`;
+      ids.push(id);
+      await query(`
+        INSERT INTO generation_runs (
+          id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
+          finished_at, plan_json
+        ) VALUES ($1, $2, 'terminal-node', '新终态', 'ai-modify', 1, 'failed', $3, $3, '{"steps":[]}')
+      `, [id, users.owner.id, 100000 + index]);
+    }
+
+    const recent = await request("/history?limit=20&before=200000", "owner");
+    assert.equal(recent.status, 200);
+    const recentPage = await recent.json() as HistoryPage;
+    assert.equal(recentPage.records.some((record) => record.runId === "old-active-run"), false);
+
+    const active = await request("/history/active", "owner");
+    const activePage = await active.json() as HistoryPage;
+    assert.equal(active.status, 200, JSON.stringify(activePage));
+    const oldActive = activePage.records.find((record) => record.runId === "old-active-run");
+    assert.equal(oldActive?.status, "running");
+    assert.equal(oldActive?.clientRequestId, "old-active-request");
+    assert.equal(oldActive?.parameters, undefined, "活动恢复接口不得回传大参数体");
+    assert.equal(oldActive?.referenceImages, undefined, "活动恢复接口不得回传参考图数组");
+    assert.equal(activePage.hasMore, false);
+  } finally {
+    await query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [ids]);
+  }
+});
+
+await test("活动任务超过安全恢复上限时接口 fail-closed", async () => {
+  try {
+    await query(`
+      INSERT INTO generation_runs (
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
+      )
+      SELECT
+        'active-overflow-' || index, $1, 'active-overflow-node-' || index,
+        '活动任务上限', 'ai-modify', 1, 'running', 300000 + index, '{"steps":[]}'
+      FROM generate_series(1, 181) AS index
+    `, [users.owner.id]);
+    const response = await request("/history/active", "owner");
+    assert.equal(response.status, 409, await response.text());
+    const enqueue = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        ...generationFlow("后来保存的提示词"),
+        onlyNodeId: "generate",
+        projectId: "run-persisted-project",
+        clientRequestId: "active-overflow-new-request",
+      }),
+    });
+    const enqueueBody = await enqueue.text();
+    assert.equal(enqueue.status, 409, enqueueBody);
+    assert.match(enqueueBody, /活动任务.*上限/);
+    assert.equal(
+      await queryOne("SELECT id FROM generation_runs WHERE client_request_id = 'active-overflow-new-request'"),
+      undefined,
+    );
+  } finally {
+    await query("DELETE FROM generation_runs WHERE id LIKE 'active-overflow-%'");
+  }
+});
 
 await test("历史分页固定在首次快照，期间新增记录不会推移游标造成缺口", async () => {
   for (const [id, startedAt] of [["snapshot-3", 3_000], ["snapshot-2", 2_000], ["snapshot-1", 1_000]] as const) {

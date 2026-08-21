@@ -1,4 +1,5 @@
 import os from "node:os";
+import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { nanoid } from "nanoid";
 import type { ExecutionPlan, NodeExecution } from "../../src/types/workflow";
@@ -11,6 +12,7 @@ import {
   type PersistedImageReceipt,
 } from "../lib/fileStore";
 import type { GenerationRecordContext } from "../lib/generationRecords";
+import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 import { getProvider } from "../providers";
 import {
   ProviderError,
@@ -41,6 +43,41 @@ const DEFAULT_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 const CANCELLED_AFTER_START_WARNING = "取消请求未能中止已经开始的上游调用，结果已按实际返回保存";
 const OUTCOME_UNKNOWN_GUIDANCE = "请先核对 API易消耗记录；确认未扣费后，再手动重新提交任务";
 export const DURABLE_RUN_EVENT_BATCH_SIZE = 500;
+export const CLIENT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+export { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
+
+export class GenerationRequestConflictError extends Error {
+  constructor() {
+    super("clientRequestId 已用于另一份生成请求，请重新提交");
+    this.name = "GenerationRequestConflictError";
+  }
+}
+
+export class ActiveRunLimitError extends Error {
+  constructor() {
+    super(`活动任务已达到 ${ACTIVE_RUN_LIMIT} 条上限，请等待现有任务结束后再试`);
+    this.name = "ActiveRunLimitError";
+  }
+}
+
+export class GenerationOwnerUnavailableError extends Error {
+  constructor() {
+    super("账号已停用或删除，不能创建新的生成任务");
+    this.name = "GenerationOwnerUnavailableError";
+  }
+}
+
+export async function assertGenerationOwnerActive(
+  client: PoolClient,
+  ownerId: string,
+): Promise<void> {
+  const owner = (await client.query<{ active: number; deleted_at: string | null }>(`
+    SELECT active, deleted_at FROM users WHERE id = $1 FOR SHARE
+  `, [ownerId])).rows[0];
+  if (!owner || owner.active !== 1 || owner.deleted_at !== null) {
+    throw new GenerationOwnerUnavailableError();
+  }
+}
 
 interface DurableRunRow {
   id: string;
@@ -109,7 +146,8 @@ function isTerminalRunStatus(status: string): boolean {
 
 async function lockRun(client: PoolClient, runId: string): Promise<DurableRunRow | undefined> {
   return (await client.query<DurableRunRow>(
-    "SELECT id, owner_id, project_id, node_id, status, target_step_id, started_at, finished_at FROM generation_runs WHERE id = $1 FOR UPDATE",
+    `SELECT id, owner_id, project_id, node_id, status, target_step_id, started_at, finished_at
+     FROM generation_runs WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
     [runId],
   )).rows[0];
 }
@@ -135,7 +173,8 @@ export async function appendRunEvent(
   return sequenced;
 }
 
-export async function enqueueGenerationRun(
+async function insertGenerationRun(
+  client: PoolClient,
   plan: ExecutionPlan,
   ownerId: string,
   context: GenerationRecordContext,
@@ -143,6 +182,11 @@ export async function enqueueGenerationRun(
 ): Promise<{ id: string }> {
   if (!ownerId.trim() || context.userId !== ownerId) throw new Error("run owner is invalid");
   if (plan.steps.length === 0) throw new Error("execution plan has no steps");
+  await assertGenerationOwnerActive(client, ownerId);
+  const clientRequestId = context.clientRequestId?.trim() || undefined;
+  if (clientRequestId && !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    throw new Error("clientRequestId must contain only letters, digits, underscore or hyphen");
+  }
   const runId = nanoid(10);
   const createdAt = Date.now();
   const requestedTargetIndex = plan.steps.findIndex((step) => step.nodeId === context.nodeId);
@@ -151,44 +195,116 @@ export async function enqueueGenerationRun(
   const targetStep = plan.steps[targetIndex] ?? plan.steps.at(-1)!;
   const targetStepId = stepIds[targetIndex] ?? stepIds.at(-1)!;
   const initialModel = isImageModelId(targetStep.params.modelId) ? targetStep.params.modelId : null;
+  const planJson = JSON.stringify(plan);
+  const requestFingerprint = clientRequestId
+    ? createHash("sha256")
+      .update(JSON.stringify({
+        runType,
+        projectId: context.projectId ?? null,
+        nodeId: context.nodeId,
+      }))
+      .update("\0")
+      .update(planJson)
+      .digest("hex")
+    : null;
 
-  await transaction(async (client) => {
-    await client.query(`
+  // 同一用户的新任务串行通过容量门禁；幂等重放先返回旧 Run，不占新名额。
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`generation-run-owner:${ownerId}`],
+  );
+  if (clientRequestId) {
+    const existing = (await client.query<{ id: string; request_fingerprint: string | null }>(`
+      SELECT id, request_fingerprint FROM generation_runs
+      WHERE owner_id = $1 AND client_request_id = $2
+    `, [ownerId, clientRequestId])).rows[0];
+    if (existing) {
+      if (existing.request_fingerprint !== requestFingerprint) {
+        throw new GenerationRequestConflictError();
+      }
+      return { id: existing.id };
+    }
+  }
+  const activeCount = (await client.query<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE owner_id = $1
+      AND deleted_at IS NULL
+      AND plan_json IS NOT NULL
+      AND status IN ('queued','running','retry_wait','cancel_requested')
+  `, [ownerId])).rows[0]?.count ?? 0;
+  if (activeCount >= ACTIVE_RUN_LIMIT) throw new ActiveRunLimitError();
+
+  const inserted = await client.query<{ id: string }>(`
       INSERT INTO generation_runs (
         id, owner_id, project_id, project_name, node_id, node_label, kind, prompt,
         parameters_json, reference_images_json, model, requested_count, status,
-        started_at, plan_json, target_step_id, run_type, updated_at
+        started_at, plan_json, target_step_id, run_type, updated_at,
+        client_request_id, request_fingerprint
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'queued',
-        $13, $14, $15, $16, $13
+        $13, $14, $15, $16, $13, $17, $18
       )
+      ON CONFLICT (owner_id, client_request_id)
+        WHERE client_request_id IS NOT NULL
+      DO NOTHING
+      RETURNING id
     `, [
       runId, ownerId, context.projectId ?? null, context.projectName ?? null,
       context.nodeId, context.nodeLabel, context.kind, context.prompt ?? null,
       JSON.stringify(context.parameters ?? {}), JSON.stringify(context.referenceImages ?? targetStep.inputImages ?? []),
-      initialModel, context.requestedCount, createdAt, JSON.stringify(plan), targetStepId, runType,
+      initialModel, context.requestedCount, createdAt, planJson, targetStepId, runType,
+      clientRequestId ?? null, requestFingerprint,
     ]);
 
-    for (const [index, step] of plan.steps.entries()) {
-      const stepId = stepIds[index];
-      const model = isImageModelId(step.params.modelId) ? step.params.modelId : null;
-      await client.query(`
+  if (inserted.rowCount === 0) {
+    const existing = (await client.query<{ id: string; request_fingerprint: string | null }>(`
+      SELECT id, request_fingerprint FROM generation_runs
+      WHERE owner_id = $1 AND client_request_id = $2
+    `, [ownerId, clientRequestId])).rows[0];
+    if (!existing || existing.request_fingerprint !== requestFingerprint) {
+      throw new GenerationRequestConflictError();
+    }
+    return { id: existing.id };
+  }
+
+  for (const [index, step] of plan.steps.entries()) {
+    const stepId = stepIds[index];
+    const model = isImageModelId(step.params.modelId) ? step.params.modelId : null;
+    await client.query(`
         INSERT INTO generation_run_steps (
           id, run_id, step_index, node_id, kind, step_json, status, model
         ) VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7)
       `, [stepId, runId, index, step.nodeId, step.kind, JSON.stringify(step), model]);
-      await client.query(`
+    await client.query(`
         INSERT INTO generation_jobs (
           id, run_id, step_id, idempotency_key, status, retry_count, available_at,
           run_started_at, step_index, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, 'queued', 0, $5, $5, $6, $5, $5)
       `, [nanoid(12), runId, stepId, `${runId}:${stepId}`, createdAt, index]);
-      await appendRunEvent(client, runId, {
-        type: "node-status", nodeId: step.nodeId, status: "queued", startedAt: createdAt,
-      }, createdAt);
-    }
-  });
+    await appendRunEvent(client, runId, {
+      type: "node-status", nodeId: step.nodeId, status: "queued", startedAt: createdAt,
+    }, createdAt);
+  }
   return { id: runId };
+}
+
+export async function enqueueGenerationRunInTransaction(
+  client: PoolClient,
+  plan: ExecutionPlan,
+  ownerId: string,
+  context: GenerationRecordContext,
+  runType: "workflow" | "direct" = "workflow",
+): Promise<{ id: string }> {
+  return insertGenerationRun(client, plan, ownerId, context, runType);
+}
+
+export async function enqueueGenerationRun(
+  plan: ExecutionPlan,
+  ownerId: string,
+  context: GenerationRecordContext,
+  runType: "workflow" | "direct" = "workflow",
+): Promise<{ id: string }> {
+  return transaction((client) => insertGenerationRun(client, plan, ownerId, context, runType));
 }
 
 export const CLAIM_NEXT_JOB_SQL = `
@@ -199,6 +315,7 @@ export const CLAIM_NEXT_JOB_SQL = `
   JOIN generation_runs r ON r.id = j.run_id
   WHERE j.status IN ('queued','retry_wait')
     AND j.available_at <= $1
+    AND r.deleted_at IS NULL
     AND r.status IN ('queued','running','retry_wait')
     AND NOT EXISTS (
       SELECT 1 FROM generation_jobs previous
@@ -268,8 +385,12 @@ async function markAttemptStarted(
   leaseMs: number,
 ): Promise<void> {
   await transaction(async (client) => {
-    const row = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(
-      "SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE",
+    const row = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(`
+      SELECT j.status, j.worker_id FROM generation_jobs j
+      JOIN generation_runs r ON r.id = j.run_id
+      WHERE j.id = $1 AND r.deleted_at IS NULL
+      FOR UPDATE OF j
+    `,
       [job.id],
     )).rows[0];
     if (!row || row.worker_id !== workerId) throw new Error("generation job lease was lost");
@@ -286,8 +407,11 @@ async function markAttemptStarted(
 }
 
 async function assertJobOwnedForCompletion(job: ClaimedJob, workerId: string): Promise<void> {
-  const row = await queryOne<{ status: DurableRunStatus; worker_id: string | null }>(
-    "SELECT status, worker_id FROM generation_jobs WHERE id = $1",
+  const row = await queryOne<{ status: DurableRunStatus; worker_id: string | null }>(`
+    SELECT j.status, j.worker_id FROM generation_jobs j
+    JOIN generation_runs r ON r.id = j.run_id
+    WHERE j.id = $1 AND r.deleted_at IS NULL
+  `,
     [job.id],
   );
   if (
@@ -618,7 +742,8 @@ async function handleJobError(
       SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
-      JOIN generation_runs r ON r.id = j.run_id WHERE j.id = $1 FOR UPDATE OF j
+      JOIN generation_runs r ON r.id = j.run_id
+      WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
     `, [job.id])).rows[0];
     if (!row || (row.worker_id !== workerId && row.status !== "cancel_requested")) return;
     if (error instanceof CancelledBeforeProviderCall) {
@@ -679,7 +804,9 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
       JOIN generation_runs r ON r.id = j.run_id
-      WHERE j.status IN ('running','cancel_requested') AND j.lease_expires_at < $1
+      WHERE j.status IN ('running','cancel_requested')
+        AND j.lease_expires_at < $1
+        AND r.deleted_at IS NULL
       ORDER BY j.lease_expires_at ASC FOR UPDATE OF j SKIP LOCKED LIMIT 50
     `, [now])).rows;
     for (const row of rows) {

@@ -257,7 +257,7 @@ export interface Asset {
 }
 
 // ---------- API 契约（前端 ↔ Express）----------
-// POST /api/generate   { providerId, request: ImageGenRequest } → ImageGenResult
+// POST /api/generate   { clientRequestId, providerId, request: ImageGenRequest } → 202 { runId, status }
 // POST /api/files      { dataUrl } → { id, url }
 // GET  /api/files/:id  读取图片
 // POST /api/projects   保存项目 { id, name, flow } → { ok }

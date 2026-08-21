@@ -30,6 +30,7 @@ assert.deepEqual(versions, [
   { version: 7, name: "provider_output_size_metadata" },
   { version: 8, name: "normalized_upload_metadata" },
   { version: 9, name: "generation_queue_concurrency_hardening" },
+  { version: 10, name: "generation_run_request_idempotency" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -91,6 +92,32 @@ assert.deepEqual(queueIndexes.map((row) => row.indexname), [
 ]);
 assert.match(queueIndexes.find((row) => row.indexname === "generation_jobs_ready_order_idx")?.indexdef ?? "", /available_at, run_started_at, step_index, id/);
 console.log("  ✓ 队列排序列、可用时间索引与原子事件序号列已建立");
+const requestIdColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'generation_runs'
+    AND column_name IN ('client_request_id','request_fingerprint')
+  ORDER BY column_name
+`);
+assert.deepEqual(requestIdColumns, [
+  { column_name: "client_request_id" },
+  { column_name: "request_fingerprint" },
+]);
+const requestIdIndex = await queryOne<{ indexdef: string }>(`
+  SELECT indexdef FROM pg_indexes
+  WHERE schemaname = 'public'
+    AND indexname = 'generation_runs_owner_client_request_unique'
+`);
+assert.match(requestIdIndex?.indexdef ?? "", /UNIQUE INDEX/);
+assert.match(requestIdIndex?.indexdef ?? "", /owner_id, client_request_id/);
+assert.match(requestIdIndex?.indexdef ?? "", /client_request_id IS NOT NULL/);
+const requestIdPairConstraint = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conname = 'generation_runs_client_request_pair_check'
+`);
+assert.match(requestIdPairConstraint?.definition ?? "", /client_request_id IS NULL/);
+assert.match(requestIdPairConstraint?.definition ?? "", /request_fingerprint IS NOT NULL/);
+console.log("  ✓ 付费生成请求号与用户级唯一索引已建立");
 const sizeColumns = await query<{ table_name: string; column_name: string }>(`
   SELECT table_name, column_name FROM information_schema.columns
   WHERE table_schema = 'public' AND (

@@ -46,6 +46,8 @@ export interface RecentResult {
   projectName?: string;
   /** 后端运行 ID，用于页面刷新后恢复仍在执行的任务。 */
   runId?: string;
+  /** 付费提交请求号；用于响应丢失后与服务端历史精确对账。 */
+  clientRequestId?: string;
   prompt?: string;
   model?: string;
   startedAt: number;
@@ -139,7 +141,8 @@ interface FlowState {
   setNodeStatus: (id: string, status: NodeRunStatus, error?: string) => void;
   runNode: (id: string) => Promise<void>;
   cancelNodeRun: (id: string) => Promise<void>;
-  saveProject: () => Promise<void>;
+  /** 保存当前页签；返回服务端是否确认持久化成功。 */
+  saveProject: () => Promise<boolean>;
   /**
    * 整组载入画布（打开项目 / 从模板新建）：
    * 替换 nodes/edges 并重置选择、对比、查看器与撤销历史。
@@ -158,12 +161,112 @@ interface FlowState {
 }
 
 interface TabSaveQueue {
-  promise: Promise<void>;
+  promise: Promise<SaveTabResult>;
   queued: boolean;
+}
+
+interface SaveTabResult {
+  ok: boolean;
+  error?: string;
+}
+
+interface RunPreparation {
+  cancelled: boolean;
+}
+
+class AmbiguousRunSubmissionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AmbiguousRunSubmissionError";
+  }
 }
 
 /** 每个页签独立串行保存；切页不会使旧页签的保存响应失效。 */
 const saveQueueByTab = new Map<string, TabSaveQueue>();
+
+/** 节点处于“保存项目、尚未创建后端 Run”的短暂阶段时，用于去重并支持本地取消。 */
+const runPreparations = new Map<string, RunPreparation>();
+
+/** 传输结果未知时保留原请求号；再次点击只会确认/复用同一后端 Run。 */
+const AMBIGUOUS_RUN_STORAGE_KEY = "garment-canvas-ambiguous-run-requests";
+
+function loadAmbiguousRunRequestIds(): Map<string, string> {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(AMBIGUOUS_RUN_STORAGE_KEY) ?? "[]") as unknown;
+    if (!Array.isArray(parsed)) return new Map();
+    return new Map(parsed.filter(
+      (entry): entry is [string, string] =>
+        Array.isArray(entry) && entry.length === 2 &&
+        typeof entry[0] === "string" && typeof entry[1] === "string",
+    ));
+  } catch {
+    return new Map();
+  }
+}
+
+const ambiguousRunRequestIds = loadAmbiguousRunRequestIds();
+
+function persistAmbiguousRunRequestIds(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      AMBIGUOUS_RUN_STORAGE_KEY,
+      JSON.stringify([...ambiguousRunRequestIds]),
+    );
+  } catch {
+    // 会话存储不可用时仍保留当前进程内的幂等请求号。
+  }
+}
+
+function rememberAmbiguousRunRequest(key: string, clientRequestId: string): void {
+  ambiguousRunRequestIds.set(key, clientRequestId);
+  persistAmbiguousRunRequestIds();
+}
+
+function clearAmbiguousRunRequest(key: string): void {
+  if (!ambiguousRunRequestIds.delete(key)) return;
+  persistAmbiguousRunRequestIds();
+}
+
+function runPreparationKey(tabId: string, nodeId: string): string {
+  return JSON.stringify([tabId, nodeId]);
+}
+
+function runSubmissionKey(projectId: string, nodeId: string): string {
+  return JSON.stringify([projectId, nodeId]);
+}
+
+function latestActiveRecordsByNode(
+  records: RecentResult[],
+  projectId: string,
+): Map<string, RecentResult> {
+  const result = new Map<string, RecentResult>();
+  for (const record of records) {
+    if (record.projectId !== projectId || !isNodeRunActive(record.status) || !record.runId) continue;
+    const existing = result.get(record.nodeId);
+    if (!existing || existing.startedAt < record.startedAt) result.set(record.nodeId, record);
+  }
+  return result;
+}
+
+/** 同一节点存在历史并发 Run 时，只有最新一次 Run 可以回写画布状态。 */
+export function isLatestTrackedRun(
+  records: RecentResult[],
+  candidate: Pick<RecentResult, "projectId" | "nodeId" | "runId" | "startedAt">,
+): boolean {
+  if (!candidate.projectId || !candidate.runId) return false;
+  let latest: RecentResult | undefined;
+  for (const record of records) {
+    if (
+      record.projectId !== candidate.projectId ||
+      record.nodeId !== candidate.nodeId ||
+      !record.runId
+    ) continue;
+    if (!latest || latest.startedAt < record.startedAt) latest = record;
+  }
+  return latest?.runId === candidate.runId;
+}
 
 /** 历史分页可能重叠；同一后端 Run 同一时刻只允许一条恢复连接。 */
 const resumingRecentRunIds = new Set<string>();
@@ -994,7 +1097,28 @@ export function applyRunEventToRecentResults(
     }
     next.push(record);
   }
-  return next.slice(0, 100);
+  return trimRecentResults(next);
+}
+
+/**
+ * 最近结果是展示列表，也是活动 Run 的付费去重门禁。裁剪时可以丢旧终态，
+ * 但绝不能丢仍在后端执行的记录；活动记录超过展示上限时宁可临时扩容。
+ */
+export function trimRecentResults(
+  records: RecentResult[],
+  limit = 200,
+): RecentResult[] {
+  const activeCount = records.reduce(
+    (count, record) => count + (isNodeRunActive(record.status) ? 1 : 0),
+    0,
+  );
+  let terminalBudget = Math.max(0, limit - activeCount);
+  return records.filter((record) => {
+    if (isNodeRunActive(record.status)) return true;
+    if (terminalBudget <= 0) return false;
+    terminalBudget -= 1;
+    return true;
+  });
 }
 
 /** 合并服务器历史与请求期间新增的本地记录；同 id 以服务器终态为准。 */
@@ -1005,10 +1129,63 @@ export function mergeRecentResults(
 ): RecentResult[] {
   const incomingById = new Map(incoming.map((record) => [record.id, record]));
   const currentIds = new Set(current.map((record) => record.id));
-  return [
+  return trimRecentResults([
     ...current.map((record) => incomingById.get(record.id) ?? record),
     ...incoming.filter((record) => !currentIds.has(record.id)),
-  ].slice(0, limit);
+  ], limit);
+}
+
+/**
+ * 首屏历史确认后，用服务端仍在运行的记录恢复节点；会话里没有后端 Run 的
+ * queued/running 属于刷新中断的孤儿状态，必须解除，避免页签永久卡死。
+ */
+export function reconcileRunHistory(records: RecentResult[]): void {
+  const activeByNode = new Map<string, RecentResult>();
+  const confirmedActiveRunIds = new Set<string>();
+  const uniqueRecordsById = new Map<string, RecentResult>();
+  for (const record of records) {
+    uniqueRecordsById.set(record.id, record);
+    if (record.projectId && record.clientRequestId) {
+      const requestKey = runSubmissionKey(record.projectId, record.nodeId);
+      if (ambiguousRunRequestIds.get(requestKey) === record.clientRequestId) {
+        clearAmbiguousRunRequest(requestKey);
+      }
+    }
+    if (!record.projectId || !isNodeRunActive(record.status) || !record.runId) continue;
+    confirmedActiveRunIds.add(record.runId);
+    const key = `${record.projectId}\u0000${record.nodeId}`;
+    const existing = activeByNode.get(key);
+    if (!existing || existing.startedAt < record.startedAt) activeByNode.set(key, record);
+  }
+  useFlowStore.setState((state) => {
+    const syncedTabs = replaceTab(state.tabs, snapshotActiveTab(state));
+    const tabs = syncedTabs.map((tab) => ({
+      ...tab,
+      nodes: tab.nodes.map((node) => {
+        const active = activeByNode.get(`${tab.projectId}\u0000${node.id}`);
+        if (active) {
+          return {
+            ...node,
+            data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
+          };
+        }
+        if (!isNodeRunActive(node.data.status)) return node;
+        const data = { ...node.data, status: "idle" as const } as WorkflowNodeData;
+        delete data.error;
+        return { ...node, data };
+      }),
+    }));
+    const activeTab = tabs.find((tab) => tab.id === state.activeTabId) ?? tabs[0];
+    const retainedResults = state.recentResults.filter((record) =>
+      !isNodeRunActive(record.status) ||
+      (Boolean(record.runId) && confirmedActiveRunIds.has(record.runId!)),
+    );
+    return {
+      tabs,
+      ...(activeTab ? activeFields(activeTab) : {}),
+      recentResults: mergeRecentResults(retainedResults, [...uniqueRecordsById.values()]),
+    };
+  });
 }
 
 export function appendSavedAsset(current: string[] | undefined, url: string): string[] {
@@ -1102,10 +1279,81 @@ export const useFlowStore = create<FlowState>()(
       const restored = typeof window === "undefined" ? undefined : loadTabSession();
       const initialTab =
         restored?.tabs.find((tab) => tab.id === restored.activeTabId) ?? newTab();
+      const saveTab = async (tabId: string): Promise<SaveTabResult> => {
+        const firstSnapshot = documentForTab(get(), tabId);
+        if (!firstSnapshot || firstSnapshot.readOnly) {
+          return { ok: false, error: "项目不存在或当前页签为只读" };
+        }
+
+        const existing = saveQueueByTab.get(tabId);
+        if (existing) {
+          existing.queued = true;
+          return existing.promise;
+        }
+
+        const queue: TabSaveQueue = { promise: Promise.resolve({ ok: false }), queued: false };
+        queue.promise = (async () => {
+          let saved = false;
+          do {
+            queue.queued = false;
+            const snapshot = documentForTab(get(), tabId);
+            if (!snapshot || snapshot.readOnly) {
+              return { ok: false, error: "项目不存在或当前页签为只读" };
+            }
+            patchTab(set, tabId, { saveState: "saving" });
+            try {
+              const res = await fetch("/api/projects", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  id: snapshot.projectId,
+                  name: snapshot.projectName,
+                  flow: {
+                    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+                    nodes: snapshot.nodes,
+                    edges: snapshot.edges,
+                  },
+                }),
+              });
+              if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(responseErrorMessage(res.status, body));
+              }
+              saved = true;
+              patchTab(set, tabId, (latest) => {
+                const clean = latest.revision === snapshot.revision;
+                if (!clean) queue.queued = true;
+                return {
+                  savedRevision: Math.max(latest.savedRevision, snapshot.revision),
+                  dirty: !clean,
+                  saveState: clean ? "saved" : "saving",
+                };
+              });
+            } catch (error) {
+              queue.queued = false;
+              patchTab(set, tabId, (latest) => ({
+                saveState: "error",
+                dirty: latest.revision !== latest.savedRevision,
+              }));
+              return {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              };
+            }
+          } while (queue.queued);
+          return { ok: saved };
+        })();
+        saveQueueByTab.set(tabId, queue);
+        try {
+          return await queue.promise;
+        } finally {
+          if (saveQueueByTab.get(tabId) === queue) saveQueueByTab.delete(tabId);
+        }
+      };
       return ({
-      tabs: restored?.tabs ?? [initialTab],
-      activeTabId: initialTab.id,
-      ...activeFields(initialTab),
+        tabs: restored?.tabs ?? [initialTab],
+        activeTabId: initialTab.id,
+        ...activeFields(initialTab),
       // 服务端历史在登录成功后注入；不能从浏览器本地缓存恢复其他账号的记录。
       recentResults: [],
       viewer: null,
@@ -1153,16 +1401,32 @@ export const useFlowStore = create<FlowState>()(
         const state = get();
         const current = snapshotActiveTab(state);
         const syncedTabs = replaceTab(state.tabs, current);
-        const existing = syncedTabs.find((tab) => tab.projectId === projectId);
+        const applyActiveHistory = (inputNodes: FlowNode[]) => {
+          const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);
+          return inputNodes.map((node) => {
+            const active = activeByNode.get(node.id);
+            return active
+              ? {
+                ...node,
+                data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
+              }
+              : node;
+          });
+        };
+        const found = syncedTabs.find((tab) => tab.projectId === projectId);
+        const existing = found ? { ...found, nodes: applyActiveHistory(found.nodes) } : undefined;
         if (existing) {
+          const tabs = replaceTab(syncedTabs, existing);
           set({
-            tabs: syncedTabs,
+            tabs,
             activeTabId: existing.id,
             ...activeFields(existing),
             viewer: null,
           });
         } else {
-          const tab = newTab({ projectId, projectName, nodes, edges, markDirty, readOnly });
+          const tab = newTab({
+            projectId, projectName, nodes: applyActiveHistory(nodes), edges, markDirty, readOnly,
+          });
           set({
             tabs: [...syncedTabs, tab],
             activeTabId: tab.id,
@@ -1300,19 +1564,35 @@ export const useFlowStore = create<FlowState>()(
         const initialState = get();
         if (initialState.readOnly) return;
         const node = initialState.nodes.find((n) => n.id === id);
-        if (!node || isNodeRunActive(node.data.status)) return;
+        if (
+          !node ||
+          isNodeRunActive(node.data.status) ||
+          initialState.recentResults.some((record) =>
+            record.projectId === initialState.projectId &&
+            record.nodeId === id &&
+            isNodeRunActive(record.status) &&
+            Boolean(record.runId),
+          )
+        ) return;
         const kind = node.data.kind;
         const spec = NODE_SPECS[kind];
         if (!spec.providerId) return;
 
-        const nodesSnapshot = initialState.nodes;
-        const edgesSnapshot = initialState.edges;
         const tabId = initialState.activeTabId;
+        const preparationKey = runPreparationKey(tabId, id);
+        const submissionKey = runSubmissionKey(initialState.projectId, id);
+        if (runPreparations.has(preparationKey)) return;
+        const preparation: RunPreparation = { cancelled: false };
+        runPreparations.set(preparationKey, preparation);
         const localStartedAt = Date.now();
         const recordId = nanoid(8);
+        const ambiguousClientRequestId = ambiguousRunRequestIds.get(submissionKey);
+        const clientRequestId = ambiguousClientRequestId ?? nanoid(16);
+        const retryingAmbiguousSubmission = ambiguousClientRequestId !== undefined;
         const requestedCount = requestedResultCount(node.data);
         const releaseNonUndoableRun = beginNonUndoableRun(`run:${id}`);
         let terminalRecorded = false;
+        let knownRunId: string | undefined;
 
         // 先记录用户的这次生成操作，再请求后端；即使请求失败或页面刷新也不会丢记录。
         const initialRecord: RecentResult = {
@@ -1326,14 +1606,15 @@ export const useFlowStore = create<FlowState>()(
           prompt: recordPrompt(node.data),
           startedAt: localStartedAt,
           status: "queued",
+          clientRequestId,
           requestedCount,
         };
         const queuedRecords = createQueuedResultCards(initialRecord, requestedCount);
         set({
-          recentResults: [
+          recentResults: trimRecentResults([
             ...queuedRecords,
             ...initialState.recentResults,
-          ].slice(0, 100),
+          ]),
           selectedResultId: recordId,
         });
 
@@ -1345,33 +1626,122 @@ export const useFlowStore = create<FlowState>()(
                 : candidate,
             ),
           );
-          const response = await fetch("/api/run-plan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              nodes: nodesSnapshot,
-              edges: edgesSnapshot,
-              onlyNodeId: id,
-              includeDownstream: false,
-              projectId: initialState.projectId,
-              projectName: initialState.projectName,
-            }),
-          });
-          const payload = (await response.json().catch(() => ({}))) as {
-            runId?: string;
-            error?: string;
-          };
+          // 付费动作严格绑定点击时的不可变快照；保存期间发生编辑时服务端会以 409 拒绝旧快照。
+          const submissionSnapshot = documentForTab(get(), tabId);
+          if (!submissionSnapshot) throw new Error("项目或节点已关闭，未调用生图服务");
+          const saveResult = await saveTab(tabId);
+          if (preparation.cancelled) {
+            const event: NodeStatusRunEvent = {
+              type: "node-status",
+              nodeId: id,
+              status: "cancelled",
+              error: "已在调用生图服务前取消",
+              startedAt: localStartedAt,
+              finishedAt: Date.now(),
+            };
+            set((state) => ({
+              recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
+            }));
+            updateTabFromRunEvent(set, tabId, id, event);
+            terminalRecorded = true;
+            return;
+          }
+          if (!saveResult.ok) {
+            throw new Error(`项目保存失败，未调用生图服务：${saveResult.error ?? "未知错误"}`);
+          }
+          if (!submissionSnapshot.nodes.some((candidate) => candidate.id === id)) {
+            throw new Error("项目或节点已关闭，未调用生图服务");
+          }
+          let response: Response;
+          try {
+            response = await fetch("/api/run-plan", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nodes: submissionSnapshot.nodes,
+                edges: submissionSnapshot.edges,
+                onlyNodeId: id,
+                includeDownstream: false,
+                projectId: submissionSnapshot.projectId,
+                clientRequestId,
+              }),
+            });
+          } catch (error) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new AmbiguousRunSubmissionError(`生成请求已发出，但响应未送达：${message}`);
+          }
+          let payload: { runId?: string; error?: string };
+          try {
+            payload = await response.json() as { runId?: string; error?: string };
+          } catch {
+            if (response.ok) {
+              rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+              throw new AmbiguousRunSubmissionError("生成服务已接收请求，但返回内容无法确认");
+            }
+            payload = {};
+          }
+          if (
+            !response.ok &&
+            (response.status === 408 || (response.status === 409 && retryingAmbiguousSubmission))
+          ) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError(
+              `生成服务返回 HTTP ${response.status}，旧请求可能已创建任务但当前参数已变化`,
+            );
+          }
+          if (!response.ok && response.status < 500) clearAmbiguousRunRequest(submissionKey);
+          if (!response.ok && response.status >= 500) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError(
+              `生成服务返回 HTTP ${response.status}，无法确认是否已创建任务`,
+            );
+          }
+          if (response.ok && !payload.runId) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError("生成服务已接收请求，但未返回可确认的运行编号");
+          }
           if (!response.ok || !payload.runId) {
             throw new Error(responseErrorMessage(response.status, payload));
           }
+          clearAmbiguousRunRequest(submissionKey);
+          knownRunId = payload.runId;
 
           set((state) => ({
             recentResults: state.recentResults.map((record) =>
               record.id === recordId || record.id.startsWith(`${recordId}:pending:`)
                 ? { ...record, runId: payload.runId }
-                : record,
+              : record,
             ),
           }));
+          if (preparation.cancelled) {
+            try {
+              const cancelResponse = await fetch(
+                `/api/run-plan/${encodeURIComponent(payload.runId)}/cancel`,
+                { method: "POST" },
+              );
+              if (!cancelResponse.ok) {
+                const body = await cancelResponse.json().catch(() => ({}));
+                throw new Error(responseErrorMessage(cancelResponse.status, body));
+              }
+            } catch (cancelError) {
+              const message = cancelError instanceof Error ? cancelError.message : String(cancelError);
+              const event: NodeStatusRunEvent = {
+                type: "node-status",
+                nodeId: id,
+                status: "cancel_requested",
+                error: `取消请求失败：${message}；任务状态将继续同步`,
+                startedAt: localStartedAt,
+              };
+              set((state) => ({
+                recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
+              }));
+              updateTabFromRunEvent(set, tabId, id, event);
+            }
+          }
+          if (runPreparations.get(preparationKey) === preparation) {
+            runPreparations.delete(preparationKey);
+          }
 
           const runStatus = await fetch(`/api/run-plan/${encodeURIComponent(payload.runId)}`);
           if (!runStatus.ok) {
@@ -1393,13 +1763,21 @@ export const useFlowStore = create<FlowState>()(
         } catch (err) {
           if (!terminalRecorded) {
             const message = err instanceof Error ? err.message : String(err);
-            const event: RunEvent = {
+            const status: "cancel_requested" | "retry_wait" | "outcome_unknown" | "error" = knownRunId
+              ? preparation.cancelled ? "cancel_requested" : "retry_wait"
+              : err instanceof AmbiguousRunSubmissionError ? "outcome_unknown" : "error";
+            const safeMessage = knownRunId
+              ? `运行 ${knownRunId} 已创建，但状态同步中断：${message}；请刷新页面继续同步，勿重复提交`
+              : err instanceof AmbiguousRunSubmissionError
+                ? `${message}；再次点击会使用同一请求号安全确认，请勿新建重复任务`
+                : message;
+            const event: NodeStatusRunEvent = {
                 type: "node-status",
                 nodeId: id,
-                status: "error",
-                error: message,
+                status,
+                error: safeMessage,
                 startedAt: localStartedAt,
-                finishedAt: Date.now(),
+                ...(isNodeRunTerminal(status) ? { finishedAt: Date.now() } : {}),
               };
             set((state) => ({
               recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
@@ -1407,6 +1785,9 @@ export const useFlowStore = create<FlowState>()(
             updateTabFromRunEvent(set, tabId, id, event);
           }
         } finally {
+          if (runPreparations.get(preparationKey) === preparation) {
+            runPreparations.delete(preparationKey);
+          }
           releaseNonUndoableRun();
         }
       },
@@ -1416,76 +1797,40 @@ export const useFlowStore = create<FlowState>()(
         const active = state.recentResults.find((record) =>
           record.nodeId === id &&
           record.projectId === state.projectId &&
-          Boolean(record.runId) &&
           isNodeRunActive(record.status),
         );
-        if (!active?.runId) return;
-        const response = await fetch(`/api/run-plan/${encodeURIComponent(active.runId)}/cancel`, { method: "POST" });
-        if (!response.ok) {
+        if (!active?.runId) {
+          const preparation = runPreparations.get(runPreparationKey(state.activeTabId, id));
+          if (!active || !preparation || preparation.cancelled) return;
+          preparation.cancelled = true;
+          const event: NodeStatusRunEvent = {
+            type: "node-status",
+            nodeId: id,
+            status: "cancel_requested",
+            startedAt: active.startedAt,
+          };
+          set((current) => ({
+            recentResults: applyRunEventToRecentResults(current.recentResults, active.id, event),
+          }));
+          updateTabFromRunEvent(set, state.activeTabId, id, event);
+          return;
+        }
+        try {
+          const response = await fetch(`/api/run-plan/${encodeURIComponent(active.runId)}/cancel`, { method: "POST" });
+          if (response.ok) return;
           const body = await response.json().catch(() => ({}));
-          const message = responseErrorMessage(response.status, body);
+          throw new Error(responseErrorMessage(response.status, body));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
           updateTabNodes(set, state.activeTabId, (nodes) => nodes.map((node) =>
-            node.id === id ? { ...node, data: { ...node.data, error: `取消失败：${message}` } } : node,
+            node.id === id
+              ? { ...node, data: { ...node.data, error: `取消结果未知：${message}；任务状态将继续同步` } }
+              : node,
           ));
         }
       },
 
-      saveProject: async () => {
-        if (get().readOnly) return;
-        const tabId = get().activeTabId;
-        const existing = saveQueueByTab.get(tabId);
-        if (existing) {
-          existing.queued = true;
-          return existing.promise;
-        }
-
-        const queue: TabSaveQueue = { promise: Promise.resolve(), queued: false };
-        queue.promise = (async () => {
-          do {
-            queue.queued = false;
-            const snapshot = documentForTab(get(), tabId);
-            if (!snapshot) return;
-            patchTab(set, tabId, { saveState: "saving" });
-            try {
-              const res = await fetch("/api/projects", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  id: snapshot.projectId,
-                  name: snapshot.projectName,
-                  flow: {
-                    schemaVersion: WORKFLOW_SCHEMA_VERSION,
-                    nodes: snapshot.nodes,
-                    edges: snapshot.edges,
-                  },
-                }),
-              });
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              patchTab(set, tabId, (latest) => {
-                const clean = latest.revision === snapshot.revision;
-                if (!clean) queue.queued = true;
-                return {
-                  savedRevision: Math.max(latest.savedRevision, snapshot.revision),
-                  dirty: !clean,
-                  saveState: clean ? "saved" : "saving",
-                };
-              });
-            } catch {
-              queue.queued = false;
-              patchTab(set, tabId, (latest) => ({
-                saveState: "error",
-                dirty: latest.revision !== latest.savedRevision,
-              }));
-            }
-          } while (queue.queued);
-        })();
-        saveQueueByTab.set(tabId, queue);
-        try {
-          await queue.promise;
-        } finally {
-          if (saveQueueByTab.get(tabId) === queue) saveQueueByTab.delete(tabId);
-        }
-      },
+      saveProject: async () => (await saveTab(get().activeTabId)).ok,
 
       undo: () => {
         const before = useFlowStore.getState();
@@ -1552,12 +1897,21 @@ export const useFlowStore = create<FlowState>()(
 
       loadFlow: ({ projectId, projectName, nodes, edges, markDirty = false }) => {
         const state = get();
+        const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);
         const tab: ProjectTab = {
           ...snapshotActiveTab(state),
           projectId,
           projectName,
           readOnly: false,
-          nodes,
+          nodes: nodes.map((node) => {
+            const active = activeByNode.get(node.id);
+            return active
+              ? {
+                ...node,
+                data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
+              }
+              : node;
+          }),
           edges,
           selectedNodeId: null,
           selectedResultId: null,
@@ -1659,7 +2013,7 @@ export function resumeRecentResults(records: RecentResult[]): void {
           const tabId = useFlowStore
             .getState()
             .tabs.find((tab) => tab.projectId === record.projectId)?.id;
-          if (tabId && event.status) {
+          if (tabId && event.status && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
             updateTabFromRunEvent(useFlowStore.setState, tabId, record.nodeId, event);
           }
           if (isNodeRunTerminal(event.status)) terminalRecorded = true;
@@ -1667,27 +2021,26 @@ export function resumeRecentResults(records: RecentResult[]): void {
       } catch (error) {
         if (terminalRecorded) return;
         const message = error instanceof Error ? error.message : String(error);
+        const recoveryMessage = `运行 ${runId} 的状态同步中断：${message}；请稍后重试同步，勿重复提交`;
         useFlowStore.setState((state) => ({
           recentResults: applyRunEventToRecentResults(state.recentResults, record.id, {
             type: "node-status",
             nodeId: record.nodeId,
-            status: "error",
-            error: message,
+            status: "retry_wait",
+            error: recoveryMessage,
             startedAt: record.startedAt,
-            finishedAt: Date.now(),
           }),
         }));
         const tabId = useFlowStore
           .getState()
           .tabs.find((tab) => tab.projectId === record.projectId)?.id;
-        if (tabId) {
+        if (tabId && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
           updateTabFromRunEvent(useFlowStore.setState, tabId, record.nodeId, {
             type: "node-status",
             nodeId: record.nodeId,
-            status: "error",
-            error: message,
+            status: "retry_wait",
+            error: recoveryMessage,
             startedAt: record.startedAt,
-            finishedAt: Date.now(),
           });
         }
       } finally {

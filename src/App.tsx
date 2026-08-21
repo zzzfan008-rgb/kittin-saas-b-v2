@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
-  mergeRecentResults, resumeRecentResults, useFlowStore, type FlowNode, type RecentResult,
+  reconcileRunHistory, resumeRecentResults, trimRecentResults, useFlowStore, type FlowNode, type RecentResult,
 } from "@/store/flowStore";
 import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
@@ -124,6 +124,8 @@ function Workspace() {
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [initialHistoryState, setInitialHistoryState] = useState<"loading" | "ready" | "error">("loading");
+  const [initialHistoryAttempt, setInitialHistoryAttempt] = useState(0);
   const historyPageSize = 20;
   const historyBefore = useRef(Date.now()).current;
 
@@ -142,25 +144,33 @@ function Workspace() {
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/history?limit=${historyPageSize}&offset=0&before=${historyBefore}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json();
+    setInitialHistoryState("loading");
+    Promise.all([
+      fetch(`/api/history?limit=${historyPageSize}&offset=0&before=${historyBefore}`),
+      fetch("/api/history/active"),
+    ])
+      .then(async ([historyResponse, activeResponse]) => {
+        if (!historyResponse.ok) throw new Error(`历史记录 HTTP ${historyResponse.status}`);
+        if (!activeResponse.ok) throw new Error(`活动任务 HTTP ${activeResponse.status}`);
+        return [await historyResponse.json(), await activeResponse.json()] as const;
       })
-      .then((value) => {
+      .then(([historyValue, activeValue]) => {
         if (active) {
-          const page = parseHistoryPage(value);
-          useFlowStore.setState((state) => ({
-            recentResults: mergeRecentResults(state.recentResults, page.records),
-          }));
-          resumeRecentResults(page.records);
+          const page = parseHistoryPage(historyValue);
+          const activePage = parseHistoryPage(activeValue);
+          // 完整活动集必须放在前且不得预先裁剪；终态输出仅影响最近结果展示。
+          reconcileRunHistory([...activePage.records, ...page.records]);
+          resumeRecentResults(activePage.records);
           setHistoryCursor(page.nextCursor);
           setHistoryHasMore(page.hasMore);
+          setInitialHistoryState("ready");
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setInitialHistoryState("error");
+      });
     return () => { active = false; };
-  }, []);
+  }, [historyBefore, initialHistoryAttempt]);
 
   const loadMoreHistory = useCallback(async () => {
     if (historyLoading || !historyHasMore || !historyCursor) return;
@@ -173,10 +183,10 @@ function Workspace() {
       useFlowStore.setState((state) => {
         const existingIds = new Set(state.recentResults.map((record) => record.id));
         return {
-          recentResults: [
+          recentResults: trimRecentResults([
             ...state.recentResults,
             ...page.records.filter((record) => !existingIds.has(record.id)),
-          ].slice(0, 200) as never,
+          ]) as never,
         };
       });
       resumeRecentResults(page.records);
@@ -190,7 +200,25 @@ function Workspace() {
   }, [historyCursor, historyHasMore, historyLoading]);
 
   return (
-    <div className="gc-app-shell flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
+    <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
+      {initialHistoryState !== "ready" && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#101214]/95 px-6 text-center">
+          {initialHistoryState === "loading" ? (
+            <p className="text-xs text-neutral-400">正在确认运行历史，确认完成前暂停新的生成任务…</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-amber-300">运行历史加载失败。为避免重复计费，暂时禁止新的生成任务。</p>
+              <button
+                type="button"
+                onClick={() => setInitialHistoryAttempt((value) => value + 1)}
+                className="rounded border border-gold/60 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
+              >
+                重试同步
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <TopBar />
       <ProjectTabs />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">

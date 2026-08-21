@@ -218,6 +218,10 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
   assert.equal(Math.max(preparedMetadata.width ?? 0, preparedMetadata.height ?? 0), UPLOAD_MAX_LONG_EDGE);
   assert.ok(preparedImage.buffer.byteLength <= UPLOAD_TARGET_BYTES);
   assert.deepEqual(fs.readFileSync(path.join(uploadsDir(), legacyId)), legacyBuffer, "运行时适配不能改写原素材");
+  await assert.rejects(
+    () => resolveImageRefs([`/api/files/nested/${legacyId}`]),
+    /invalid local image reference/,
+  );
 
   let paidCalls = 0;
   let receivedReference = "";

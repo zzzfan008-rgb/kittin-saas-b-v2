@@ -1,5 +1,5 @@
 /**
- * POST /api/generate  { modelId, kind?, request: ImageGenRequest } → 202 { runId, status }
+ * POST /api/generate  { clientRequestId, modelId, kind?, request: ImageGenRequest, projectId? } → 202 { runId, status }
  * 请求事务入队后立即返回，由 PostgreSQL Worker 根据参考图选择生成或编辑。
  */
 import { Router } from "express";
@@ -13,7 +13,19 @@ import { postProcessGeneratedOutputImages } from "../engine/runner";
 import { EXACT_ASPECT_DIMENSIONS } from "../lib/imagePostProcessing";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
-import { enqueueGenerationRun } from "../engine/runQueue";
+import {
+  ActiveRunLimitError,
+  assertGenerationOwnerActive,
+  CLIENT_REQUEST_ID_PATTERN,
+  enqueueGenerationRunInTransaction,
+  GenerationOwnerUnavailableError,
+  GenerationRequestConflictError,
+} from "../engine/runQueue";
+import { queryOne, transaction } from "../lib/database";
+import {
+  assertImageReferencesAccessible,
+  ImageReferenceAccessError,
+} from "../lib/imageReferenceAccess";
 import {
   defaultImageModelOptions,
   imageModelOptionsError,
@@ -77,10 +89,12 @@ export function postProcessDirectGenerateImages(
 }
 
 generateRouter.post("/", asyncHandler(async (req, res) => {
-  const { providerId, modelId: requestedModelId, request, projectId, projectName, nodeId, nodeLabel, kind } = req.body as {
+  const {
+    providerId, modelId: requestedModelId, request, projectId, nodeId, nodeLabel, kind, clientRequestId,
+  } = req.body as {
     providerId?: string; modelId?: string;
     request?: ImageGenRequest;
-    projectId?: string; projectName?: string; nodeId?: string; nodeLabel?: string; kind?: string;
+    projectId?: string; nodeId?: string; nodeLabel?: string; kind?: string; clientRequestId?: string;
   };
   const modelId = requestedModelId ?? providerId;
   if (!modelId || !request?.prompt) {
@@ -120,11 +134,19 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     res.status(400).json({ error: `request.modelOptions ${optionsError}` });
     return;
   }
+  if (projectId !== undefined && (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(projectId))) {
+    res.status(400).json({ error: "projectId must contain only letters, digits, underscore or hyphen" });
+    return;
+  }
+  if (typeof clientRequestId !== "string" || !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    res.status(400).json({ error: "clientRequestId is required" });
+    return;
+  }
   const requestedCount = Math.max(1, Math.min(8, Number(request.batchSize) || 1));
   const user = requestUser(req);
   const resolvedNodeId = nodeId ?? "direct-generate";
   const resolvedRequest: ImageGenRequest = { ...request, modelOptions };
-  const run = await enqueueGenerationRun({
+  const plan = {
     steps: [{
       nodeId: resolvedNodeId,
       kind: resolvedKind,
@@ -135,17 +157,62 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
         ...(resolvedKind === "mask-redraw" ? { maskSourceRef } : {}),
       },
     }],
-  }, user.id, {
-    userId: user.id,
-    projectId,
-    projectName,
-    nodeId: resolvedNodeId,
-    nodeLabel: nodeLabel ?? "直接生成",
-    kind: resolvedKind,
-    prompt: request.prompt,
-    parameters: { ...request, modelId, modelOptions } as unknown as Record<string, unknown>,
-    referenceImages: request.referenceImages,
-    requestedCount,
-  }, "direct");
-  res.status(202).json({ runId: run.id, status: "queued" });
+  };
+  try {
+    const outcome = await transaction(async (client) => {
+      // 与账号转移/删除统一 user → project → assets → files → run 的锁顺序。
+      await assertGenerationOwnerActive(client, user.id);
+      let serverProjectName: string | undefined;
+      if (projectId) {
+        const project = await queryOne<{ owner_id: string; name: string }>(`
+          SELECT owner_id, name FROM projects
+          WHERE id = $1 AND deleted_at IS NULL
+          FOR SHARE
+        `, [projectId], client);
+        if (!project) return { status: "not_found" as const };
+        if (project.owner_id !== user.id) return { status: "forbidden" as const };
+        serverProjectName = project.name;
+      }
+      await assertImageReferencesAccessible(plan, user.id, client);
+      const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
+        userId: user.id,
+        clientRequestId,
+        projectId,
+        projectName: serverProjectName,
+        nodeId: resolvedNodeId,
+        nodeLabel: nodeLabel ?? "直接生成",
+        kind: resolvedKind,
+        prompt: request.prompt,
+        parameters: { ...request, modelId, modelOptions } as unknown as Record<string, unknown>,
+        referenceImages: request.referenceImages,
+        requestedCount,
+      }, "direct");
+      return { status: "queued" as const, runId: run.id };
+    });
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "项目不存在或已删除" });
+    } else if (outcome.status === "forbidden") {
+      res.status(403).json({ error: "无权把直接生成任务写入此项目" });
+    } else {
+      res.status(202).json({ runId: outcome.runId, status: "queued" });
+    }
+  } catch (error) {
+    if (error instanceof ImageReferenceAccessError) {
+      res.status(403).json({ error: error.message });
+      return;
+    }
+    if (error instanceof GenerationRequestConflictError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ActiveRunLimitError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof GenerationOwnerUnavailableError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 }));

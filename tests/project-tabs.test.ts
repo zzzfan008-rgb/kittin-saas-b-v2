@@ -182,6 +182,311 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
   }
 });
 
+await test("新建项目首次生成会先保存同一份项目，再提交运行", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("first-run-ai", "首次生成"));
+  const projectId = useFlowStore.getState().projectId;
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    requests.push({ url, body });
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在付费调用前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    await useFlowStore.getState().runNode("first-run-ai");
+    assert.deepEqual(requests.map((request) => request.url), ["/api/projects", "/api/run-plan"]);
+
+    const saveBody = requests[0].body as {
+      id: string;
+      flow: { nodes: FlowNode[]; edges: Edge[] };
+    };
+    const runBody = requests[1].body as {
+      projectId: string;
+      nodes: FlowNode[];
+      edges: Edge[];
+    };
+    assert.equal(saveBody.id, projectId);
+    assert.equal(runBody.projectId, projectId);
+    assert.deepEqual(runBody.nodes, saveBody.flow.nodes);
+    assert.deepEqual(runBody.edges, saveBody.flow.edges);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("项目保存失败时显示错误且绝不提交生成", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("blocked-first-run", "保存失败生成"));
+  const requests: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    requests.push(String(input));
+    return Response.json({ error: "保存服务暂不可用" }, { status: 503 });
+  };
+
+  try {
+    await useFlowStore.getState().runNode("blocked-first-run");
+    assert.deepEqual(requests, ["/api/projects"]);
+    const failedNode = useFlowStore.getState().nodes.find((node) => node.id === "blocked-first-run");
+    assert.equal(failedNode?.data.status, "error");
+    assert.match(failedNode?.data.error ?? "", /项目保存失败.*未调用生图服务.*保存服务暂不可用/);
+    const result = useFlowStore.getState().recentResults.find(
+      (record) => record.nodeId === "blocked-first-run",
+    );
+    assert.equal(result?.status, "error");
+    assert.match(result?.error ?? "", /项目保存失败.*未调用生图服务.*保存服务暂不可用/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("保存等待期间的编辑不会悄悄改变已点击的付费请求", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("snapshot-run", "快照生成"));
+  const projectResolvers: Array<(response: Response) => void> = [];
+  const runBodies: Array<{ nodes: FlowNode[] }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = String(input);
+    if (url === "/api/projects") {
+      return new Promise<Response>((resolve) => projectResolvers.push(resolve));
+    }
+    if (url === "/api/run-plan") {
+      runBodies.push(JSON.parse(String(init?.body ?? "{}")) as { nodes: FlowNode[] });
+      return Promise.resolve(Response.json(
+        { error: "画布尚未保存或已在其他位置更新，请保存后重试" },
+        { status: 409 },
+      ));
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    const running = useFlowStore.getState().runNode("snapshot-run");
+    assert.equal(projectResolvers.length, 1);
+    useFlowStore.getState().updateNodeData("snapshot-run", { prompt: "保存期间的新提示词" });
+    projectResolvers[0](Response.json({ ok: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(projectResolvers.length, 2, "保存队列应先持久化保存期间的编辑");
+    projectResolvers[1](Response.json({ ok: true }));
+    await running;
+
+    assert.equal(runBodies.length, 1);
+    const submitted = runBodies[0].nodes.find((node) => node.id === "snapshot-run");
+    assert.equal(submitted?.data.kind, "ai-modify");
+    assert.equal(submitted?.data.kind === "ai-modify" ? submitted.data.prompt : undefined, "修改衣领");
+    assert.match(
+      useFlowStore.getState().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
+      /画布尚未保存或已在其他位置更新/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("保存预检期间取消会阻止生成请求", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("cancel-preflight", "预检取消"));
+  const requests: string[] = [];
+  let resolveSave: ((response: Response) => void) | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url !== "/api/projects") throw new Error(`取消后不应请求：${url}`);
+    return new Promise<Response>((resolve) => { resolveSave = resolve; });
+  };
+
+  try {
+    const running = useFlowStore.getState().runNode("cancel-preflight");
+    assert.equal(requests.length, 1);
+    await useFlowStore.getState().cancelNodeRun("cancel-preflight");
+    assert.equal(
+      useFlowStore.getState().nodes.find((node) => node.id === "cancel-preflight")?.data.status,
+      "cancel_requested",
+    );
+    resolveSave?.(Response.json({ ok: true }));
+    await running;
+    assert.deepEqual(requests, ["/api/projects"]);
+    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "cancel-preflight");
+    assert.equal(node?.data.status, "cancelled");
+    assert.match(node?.data.error ?? "", /调用生图服务前取消/);
+    const result = useFlowStore.getState().recentResults.find(
+      (record) => record.nodeId === "cancel-preflight",
+    );
+    assert.equal(result?.status, "cancelled");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("运行请求已发出但尚未返回 runId 时取消，收到 runId 后立即补发后端取消", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("cancel-run-response", "响应窗口取消"));
+  const requests: string[] = [];
+  let resolveRun: ((response: Response) => void) | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === "/api/projects") return Promise.resolve(Response.json({ ok: true }));
+    if (url === "/api/run-plan") {
+      return new Promise<Response>((resolve) => { resolveRun = resolve; });
+    }
+    if (url === "/api/run-plan/cancel-response-run/cancel") {
+      return Promise.resolve(Response.json({ status: "cancelled", finished: true }));
+    }
+    if (url === "/api/run-plan/cancel-response-run") {
+      return Promise.resolve(Response.json({ error: "测试终止状态同步" }, { status: 404 }));
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    const running = useFlowStore.getState().runNode("cancel-run-response");
+    for (let index = 0; index < 5 && !resolveRun; index += 1) await Promise.resolve();
+    assert.ok(resolveRun, "应已发出运行请求并等待 runId");
+    await useFlowStore.getState().cancelNodeRun("cancel-run-response");
+    resolveRun(Response.json({ runId: "cancel-response-run", status: "queued" }, { status: 202 }));
+    await running;
+    assert.ok(
+      requests.includes("/api/run-plan/cancel-response-run/cancel"),
+      "runId 返回后必须把等待中的取消送到后端",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("网络或网关响应不确定时复用同一请求号，已知 runId 后禁止重复付费", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("idempotent-run", "幂等生成"));
+  const clientRequestIds: string[] = [];
+  let submissions = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      submissions += 1;
+      const body = JSON.parse(String(init?.body ?? "{}")) as { clientRequestId?: string };
+      assert.ok(body.clientRequestId);
+      clientRequestIds.push(body.clientRequestId);
+      if (submissions === 1) throw new TypeError("响应连接已断开");
+      if (submissions === 2) {
+        return Response.json({ error: "网关暂不可用" }, { status: 503 });
+      }
+      return Response.json({ runId: "idempotent-server-run", status: "queued" }, { status: 202 });
+    }
+    if (url === "/api/run-plan/idempotent-server-run") {
+      return Response.json({ error: "状态服务暂不可用" }, { status: 503 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    await useFlowStore.getState().runNode("idempotent-run");
+    const uncertain = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    assert.equal(uncertain?.data.status, "outcome_unknown");
+    assert.match(uncertain?.data.error ?? "", /同一请求号安全确认/);
+
+    await useFlowStore.getState().runNode("idempotent-run");
+    assert.deepEqual(clientRequestIds.length, 2);
+    assert.equal(clientRequestIds[1], clientRequestIds[0]);
+    const gatewayUnknown = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    assert.equal(gatewayUnknown?.data.status, "outcome_unknown");
+
+    await useFlowStore.getState().runNode("idempotent-run");
+    assert.equal(clientRequestIds[2], clientRequestIds[0]);
+    const recovering = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    assert.equal(recovering?.data.status, "retry_wait");
+    assert.match(recovering?.data.error ?? "", /勿重复提交/);
+
+    await useFlowStore.getState().runNode("idempotent-run");
+    assert.equal(submissions, 3, "已有 runId 但跟踪失败时必须继续阻止新的付费提交");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("丢失响应后即使参数变化收到 409，也持续复用原付费请求号", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("ambiguous-conflict", "歧义冲突"));
+  const clientRequestIds: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { clientRequestId?: string };
+      assert.ok(body.clientRequestId);
+      clientRequestIds.push(body.clientRequestId);
+      if (clientRequestIds.length === 1) throw new TypeError("首次响应丢失");
+      return Response.json(
+        { error: "clientRequestId 已用于另一份生成请求，请重新提交" },
+        { status: 409 },
+      );
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    await useFlowStore.getState().runNode("ambiguous-conflict");
+    useFlowStore.getState().updateNodeData("ambiguous-conflict", { prompt: "响应丢失后的新提示词" });
+    await useFlowStore.getState().runNode("ambiguous-conflict");
+    await useFlowStore.getState().runNode("ambiguous-conflict");
+    assert.equal(clientRequestIds.length, 3);
+    assert.deepEqual(new Set(clientRequestIds).size, 1, "409 后不得换新请求号再次付费");
+    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "ambiguous-conflict");
+    assert.equal(node?.data.status, "outcome_unknown");
+    assert.match(node?.data.error ?? "", /旧请求可能已创建任务/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("取消请求断网不会产生未处理异常或把原任务误判为已取消", async () => {
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().addExistingNode(aiNode("cancel-network", "取消断网"));
+  useFlowStore.getState().setNodeStatus("cancel-network", "running");
+  const state = useFlowStore.getState();
+  useFlowStore.setState({
+    recentResults: [{
+      id: "cancel-network-record",
+      image: "",
+      nodeId: "cancel-network",
+      nodeLabel: "取消断网",
+      kind: "ai-modify",
+      projectId: state.projectId,
+      projectName: state.projectName,
+      runId: "cancel-network-run",
+      startedAt: Date.now(),
+      status: "running",
+    }],
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError("取消连接中断");
+  };
+
+  try {
+    await useFlowStore.getState().cancelNodeRun("cancel-network");
+    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "cancel-network");
+    assert.equal(node?.data.status, "running");
+    assert.match(node?.data.error ?? "", /取消结果未知.*继续同步/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 await test("React Flow 初始化尺寸不会移动节点或标记项目未保存", () => {
   useFlowStore.getState().openFlowTab({
     projectId: "dimension-init-project",

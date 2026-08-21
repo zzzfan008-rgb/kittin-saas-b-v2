@@ -147,6 +147,154 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
   assert.deepEqual(replay?.map((event) => event.seq), allEvents.slice(2).map((event) => event.seq));
 });
 
+await test("同一付费请求号并发重试只创建一个 run，语义漂移返回冲突", async () => {
+  const nodeId = `request-idempotency-${++sequence}`;
+  const clientRequestId = `client-request-${sequence}`;
+  const plan = { steps: [step(nodeId)] };
+  const runContext = { ...context(nodeId), clientRequestId };
+  let runId: string | undefined;
+  try {
+    const [first, second] = await Promise.all([
+      queue.enqueueGenerationRun(plan, owner.id, runContext),
+      queue.enqueueGenerationRun(plan, owner.id, runContext),
+    ]);
+    runId = first.id;
+    assert.equal(second.id, first.id);
+    assert.equal((await database.queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_runs
+      WHERE owner_id = $1 AND client_request_id = $2
+    `, [owner.id, clientRequestId]))?.count, 1);
+    assert.equal((await database.queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_jobs WHERE run_id = $1
+    `, [first.id]))?.count, 1);
+
+    const changed = step(nodeId);
+    changed.params = { ...changed.params, prompt: "另一份付费语义" };
+    await assert.rejects(
+      queue.enqueueGenerationRun({ steps: [changed] }, owner.id, runContext),
+      queue.GenerationRequestConflictError,
+    );
+  } finally {
+    if (runId) await database.query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+  }
+});
+
+await test("停用账号即使持有旧会话上下文也不能新建付费任务", async () => {
+  const userId = `inactive-owner-${++sequence}`;
+  const nodeId = `inactive-owner-node-${sequence}`;
+  const createdAt = new Date().toISOString();
+  await database.query(`
+    INSERT INTO users (
+      id, account_id, display_name, role, password_hash, active, created_at, updated_at
+    ) VALUES ($1, $1, '已停用账号', 'user', 'test-only', 0, $2, $2)
+  `, [userId, createdAt]);
+  try {
+    await assert.rejects(
+      queue.enqueueGenerationRun(
+        { steps: [step(nodeId)] },
+        userId,
+        { ...context(nodeId), userId, clientRequestId: `inactive-request-${sequence}` },
+      ),
+      queue.GenerationOwnerUnavailableError,
+    );
+    assert.equal((await database.queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_runs WHERE owner_id = $1
+    `, [userId]))?.count, 0);
+  } finally {
+    await database.query("DELETE FROM users WHERE id = $1", [userId]);
+  }
+});
+
+await test("没有执行计划的历史 queued 行不占活动任务容量", async () => {
+  const prefix = `legacy-active-${++sequence}-`;
+  const nodeId = `legacy-capacity-node-${sequence}`;
+  let runId: string | undefined;
+  try {
+    await database.query(`
+      INSERT INTO generation_runs (
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at
+      )
+      SELECT $1 || index, $2, 'legacy-node-' || index, '历史任务',
+        'ai-modify', 1, 'queued', index
+      FROM generate_series(1, 180) AS index
+    `, [prefix, owner.id]);
+    const run = await queue.enqueueGenerationRun(
+      { steps: [step(nodeId)] },
+      owner.id,
+      { ...context(nodeId), clientRequestId: `legacy-capacity-request-${sequence}` },
+    );
+    runId = run.id;
+    assert.ok(runId);
+  } finally {
+    await database.query("DELETE FROM generation_runs WHERE id LIKE $1", [`${prefix}%`]);
+    if (runId) await database.query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+  }
+});
+
+await test("179 条活动任务下两个不同请求并发入队时只接受一个", async () => {
+  const testId = ++sequence;
+  const prefix = `capacity-race-${testId}-`;
+  const acceptedRunIds: string[] = [];
+  try {
+    await database.query(`
+      INSERT INTO generation_runs (
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
+      )
+      SELECT $1 || index, $2, 'capacity-node-' || index, '容量任务',
+        'ai-modify', 1, 'queued', index, '{"steps":[]}'
+      FROM generate_series(1, 179) AS index
+    `, [prefix, owner.id]);
+    const outcomes = await Promise.allSettled(["a", "b"].map((suffix) => {
+      const nodeId = `capacity-race-node-${testId}-${suffix}`;
+      return queue.enqueueGenerationRun(
+        { steps: [step(nodeId)] },
+        owner.id,
+        { ...context(nodeId), clientRequestId: `capacity-race-request-${testId}-${suffix}` },
+      );
+    }));
+    const fulfilled = outcomes.filter(
+      (outcome): outcome is PromiseFulfilledResult<{ id: string }> => outcome.status === "fulfilled",
+    );
+    const rejected = outcomes.filter(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+    );
+    acceptedRunIds.push(...fulfilled.map((outcome) => outcome.value.id));
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.ok(rejected[0].reason instanceof queue.ActiveRunLimitError);
+    assert.equal((await database.queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_runs
+      WHERE owner_id = $1
+        AND deleted_at IS NULL
+        AND plan_json IS NOT NULL
+        AND status IN ('queued','running','retry_wait','cancel_requested')
+    `, [owner.id]))?.count, 180);
+  } finally {
+    await database.query("DELETE FROM generation_runs WHERE id LIKE $1", [`${prefix}%`]);
+    if (acceptedRunIds.length > 0) {
+      await database.query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [acceptedRunIds]);
+    }
+  }
+});
+
+await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上游", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const runId = await enqueueSingle("soft-deleted");
+  try {
+    await database.query(`
+      UPDATE generation_runs SET deleted_at = $1, purge_after = $1 WHERE id = $2
+    `, [new Date().toISOString(), runId]);
+    assert.equal(await queue.processNextGenerationJob("worker-soft-deleted", {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), false);
+    assert.equal(fake.calls(), 0);
+  } finally {
+    await database.query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+  }
+});
+
 await test("retry_wait 在 available_at 前不可领取，到期后才对 Worker 可见", async () => {
   const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
   const runId = await enqueueSingle("available-at");
@@ -600,6 +748,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        clientRequestId: "direct-mask-request",
         modelId: "gpt-image-2",
         kind: "mask-redraw",
         nodeId: "direct-mask-test",
