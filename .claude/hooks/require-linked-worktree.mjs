@@ -37,8 +37,10 @@ export function containsSensitivePath(value) {
     /(^|[\\/\s"'=])\.env\.example(?=$|[\\/\s"'])/gi,
     "$1",
   );
+  const envGlobCanMatchPrivateFile = /(?:^|[\\/\s"'=*?{}\[\]])\.(?:[*?{\[]|e(?:[*?{\[]|n[*?{\[]))/i;
   return (
     /(?:^|[\\/\s"'=*?{}\[\]])\.env(?:[.\\/\s"'*?{}\[\]]|$)/i.test(withoutPublicExample) ||
+    envGlobCanMatchPrivateFile.test(withoutPublicExample) ||
     /(?:^|[\\/*?{}\[\]])\.secrets(?:[\\/*?{}\[\]]|$)/i.test(value)
   );
 }
@@ -177,9 +179,10 @@ async function main() {
   if (linked === null) deny("Claude could not verify that the current directory is a linked git worktree.");
 
   if (writeTools.has(toolName)) {
-    if (!linked) deny("The primary worktree is audit-only. Restart with: claude --worktree <task-name>");
     const targetInput = toolInput.file_path ?? toolInput.notebook_path;
     if (typeof targetInput !== "string" || !targetInput) deny("A write tool call without a target path is blocked.");
+
+    if (!linked) deny("The primary worktree is audit-only. Restart with: claude --worktree <task-name>");
     const root = gitPath(cwd, "--show-toplevel");
     const target = resolve(cwd, targetInput);
     if (!root || !isPathInsideRoot(root, target)) {

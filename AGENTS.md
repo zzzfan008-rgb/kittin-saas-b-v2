@@ -76,7 +76,7 @@ This project is indexed by GitNexus as **garment-canvas** (7300 symbols, 15964 r
 
 - Claude may edit only inside a linked worktree created for its task. A read-only audit may run in the primary worktree, but it must not change files there.
 - The project hook enforces a conservative Bash allowlist in the primary worktree. If it blocks a command, use Read/Grep/GitNexus or restart in a linked worktree; do not bypass or disable the hook.
-- Treat the hook as a defense against accidental agent actions, not an adversarial security sandbox. Shell indirection and child processes cannot be completely classified from a command string; use an OS-level sandbox or read-only mount when running untrusted agents.
+- Treat the hook as a defense against accidental agent actions, not an adversarial security sandbox. Its worktree path check covers `Write`, `Edit`, and `NotebookEdit`, not paths reached by Bash subprocesses; Bash started in a linked worktree can still address another checkout by absolute path. Shell indirection and child processes cannot be completely classified from a command string; use an OS-level sandbox or read-only mount when running untrusted agents.
 - Claude may create local commits on its worktree branch. It must never push, create a PR, merge, rebase, cherry-pick, force-reset, or clean the repository.
 - Worktrees share the primary checkout's `node_modules` for speed. Never run dependency installation or update commands from Claude; report lockfile or dependency changes for Codex to handle in an isolated dependency workflow.
 - Codex reviews `BASE_COMMIT..CLAUDE_COMMIT`, reruns impact analysis and tests, and decides whether to adopt, rewrite, or reject each change. Never cherry-pick a Claude commit without reviewing its diff and evidence.
