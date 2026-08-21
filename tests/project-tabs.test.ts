@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { maskRedrawReadiness } from "../src/lib/maskRedraw";
 import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
+import { imageModelAspectRatioPatch } from "../src/types/imageModels";
 import type { Edge } from "@xyflow/react";
 import {
   applyRunEventToTab,
@@ -48,6 +49,17 @@ function aiNode(id: string, label: string): FlowNode {
       outputImages: ["/api/files/previous.png"],
     },
   };
+}
+
+function assertNodeModelSelection(
+  nodes: FlowNode[],
+  nodeId: string,
+  expected: { modelId: string; modelOptions: Record<string, unknown> },
+): void {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  assert.ok(node, `找不到节点 ${nodeId}`);
+  assert.equal(node.data.modelId, expected.modelId);
+  assert.deepEqual(node.data.modelOptions, expected.modelOptions);
 }
 
 console.log("项目多页签状态测试");
@@ -220,6 +232,139 @@ await test("新建项目首次生成会先保存同一份项目，再提交运�
     assert.deepEqual(runBody.edges, saveBody.flow.edges);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保真", async () => {
+  const generationNode = aiNode("model-invariant-ai", "Gemini 保真节点");
+  generationNode.data.status = "idle";
+  if (generationNode.data.kind !== "ai-modify") throw new Error("测试生成节点类型错误");
+  generationNode.data.outputImages = [];
+  useFlowStore.getState().openFlowTab({
+    projectId: "model-invariant-project",
+    projectName: "模型保真项目",
+    nodes: [imageNode("model-invariant-upload", "异步上传"), generationNode],
+    edges: [{ id: "model-invariant-edge", source: "model-invariant-upload", target: generationNode.id }],
+  });
+  const invariantTabId = useFlowStore.getState().activeTabId;
+  const expected = {
+    modelId: "gemini-3.1-flash-image",
+    modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
+  };
+
+  useFlowStore.getState().updateNodeData(generationNode.id, expected);
+  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+
+  await Promise.resolve().then(() => {
+    useFlowStore.getState().updateNodeDataInTab(invariantTabId, "model-invariant-upload", {
+      status: "success",
+      imageUrl: "/api/files/model-invariant-upload.png",
+    });
+  });
+  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+
+  useFlowStore.getState().addExistingNode({
+    id: "model-invariant-mask",
+    type: "mask-redraw",
+    position: { x: 320, y: 240 },
+    data: {
+      kind: "mask-redraw",
+      label: "蒙版局部重绘",
+      status: "idle",
+      prompt: "仅替换被选中区域",
+      modelId: "gpt-image-2",
+      modelOptions: {},
+      outputImages: [],
+    },
+  });
+  useFlowStore.getState().onConnect({
+    source: "model-invariant-upload",
+    target: "model-invariant-mask",
+    sourceHandle: null,
+    targetHandle: null,
+  });
+  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+
+  useFlowStore.getState().openFlowTab({
+    projectId: "model-invariant-other-project",
+    projectName: "切换目标项目",
+    nodes: [imageNode("model-invariant-other-upload", "另一页")],
+    edges: [],
+  });
+  const storedInvariantTab = useFlowStore.getState().tabs.find((tab) => tab.id === invariantTabId);
+  assert.ok(storedInvariantTab);
+  assertNodeModelSelection(storedInvariantTab.nodes, generationNode.id, expected);
+  useFlowStore.getState().switchTab(invariantTabId);
+  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    requests.push({ url, body });
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在 Provider 调用前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    await useFlowStore.getState().runNode(generationNode.id);
+    assert.deepEqual(requests.map((request) => request.url), ["/api/projects", "/api/run-plan"]);
+    assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+
+    const savedFlow = (requests[0].body as { flow: { nodes: FlowNode[] } }).flow;
+    const runNodes = (requests[1].body as { nodes: FlowNode[] }).nodes;
+    assertNodeModelSelection(savedFlow.nodes, generationNode.id, expected);
+    assertNodeModelSelection(runNodes, generationNode.id, expected);
+    assert.deepEqual(
+      runNodes.find((node) => node.id === generationNode.id),
+      savedFlow.nodes.find((node) => node.id === generationNode.id),
+      "/projects 与 /run-plan 必须提交同一个目标节点快照",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", () => {
+  assert.deepEqual(
+    imageModelAspectRatioPatch(
+      "gemini-3.1-flash-image",
+      { aspectRatio: "3:4", imageSize: "2K" },
+      "16:9",
+    ),
+    {
+      aspectRatio: "16:9",
+      modelOptions: { aspectRatio: "16:9", imageSize: "2K" },
+    },
+  );
+
+  const inspectorSource = fs.readFileSync(
+    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  const aiModifySource = fs.readFileSync(
+    new URL("../src/components/nodes/AiModifyNode.tsx", import.meta.url),
+    "utf8",
+  );
+  const sketchSource = fs.readFileSync(
+    new URL("../src/components/nodes/SketchToRenderNode.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    inspectorSource,
+    /imageModelAspectRatioPatch\(selectedModelId, selectedModelOptions, e\.target\.value\)/,
+    "Inspector 修改画幅时必须同步业务比例与 provider modelOptions",
+  );
+  for (const source of [aiModifySource, sketchSource]) {
+    assert.match(
+      source,
+      /imageModelAspectRatioPatch\(data\.modelId, data\.modelOptions, e\.target\.value\)/,
+      "节点内画幅入口也必须复用同一 provider 参数补丁",
+    );
   }
 });
 

@@ -177,6 +177,59 @@ assert.equal(migrated.tabs[0].saveState, "idle");
 assert.equal(migrated.tabs[0].dirty, true);
 console.log("  ✓ 旧会话逐节点补齐必需字段，并隔离坏节点和悬空边");
 
+const generalModelPairs = [
+  { modelId: "gpt-image-2-vip", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
+  {
+    modelId: "gemini-3.1-flash-image",
+    modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
+    aspectRatio: "16:9",
+  },
+  {
+    modelId: "flux-2-pro",
+    modelOptions: { width: 2048, height: 1152, outputFormat: "png" },
+    aspectRatio: "16:9",
+  },
+  { modelId: "seedream-5-0-260128", modelOptions: { size: "3K" }, aspectRatio: "1:1" },
+  {
+    modelId: "grok-imagine-image",
+    modelOptions: { aspectRatio: "4:3", resolution: "1k" },
+    aspectRatio: "4:3",
+  },
+] as const;
+const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
+  activeTabId: "model-pairs-tab",
+  tabs: [{
+    id: "model-pairs-tab",
+    projectId: "model-pairs-project",
+    projectName: "通用模型恢复",
+    nodes: generalModelPairs.map((pair, index) => ({
+      id: `model-pair-${index}`,
+      type: "ai-modify",
+      position: { x: index * 80, y: 0 },
+      data: {
+        kind: "ai-modify",
+        label: pair.modelId,
+        status: "idle",
+        prompt: "保留模型参数",
+        aspectRatio: pair.aspectRatio,
+        batchSize: 1,
+        outputImages: [],
+        modelId: pair.modelId,
+        modelOptions: pair.modelOptions,
+      },
+    })),
+    edges: [],
+  }],
+})))!;
+assert.ok(restoredModels);
+for (const [index, pair] of generalModelPairs.entries()) {
+  const restoredNode = restoredModels.tabs[0].nodes.find((node) => node.id === `model-pair-${index}`);
+  assert.ok(restoredNode, pair.modelId);
+  assert.equal(restoredNode.data.modelId, pair.modelId);
+  assert.deepEqual(restoredNode.data.modelOptions, pair.modelOptions);
+}
+console.log("  ✓ 五个通用模型的合法 modelId/modelOptions 会话恢复保真");
+
 assert.deepEqual(state.recentResults, [], "登录后的历史必须以服务器为准，不能泄露上一账号的 localStorage");
 const writesBeforeHistory = sessionWrites;
 useFlowStore.setState({ recentResults: storedRecentResults as never });
@@ -424,4 +477,4 @@ assert.equal(recovered.activeTabId, "good-tab");
 assert.deepEqual(recovered.tabs.map((tab) => tab.id), ["good-tab"]);
 console.log("  ✓ 错误恢复只清除当前损坏页签并保留其他页签");
 
-console.log("\n通过 9 项");
+console.log("\n通过 10 项");

@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { useFlowStore } from "@/store/flowStore";
 import { BATCH_SIZES, isNodeRunActive, type SketchToRenderNodeData } from "@/types/workflow";
-import { imageModelOptionsForAspectRatio } from "@/types/imageModels";
+import { imageModelAspectRatioPatch } from "@/types/imageModels";
 import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
@@ -37,13 +37,10 @@ export function SketchToRenderNode({
             <span className="text-[10px] text-neutral-500">画幅比例</span>
             <select
               value={data.aspectRatio}
-              onChange={(e) => {
-                const aspectRatio = e.target.value;
-                updateNodeData(id, {
-                  aspectRatio,
-                  modelOptions: imageModelOptionsForAspectRatio(data.modelId ?? "gpt-image-2-vip", data.modelOptions, aspectRatio),
-                });
-              }}
+              onChange={(e) => updateNodeData(
+                id,
+                imageModelAspectRatioPatch(data.modelId, data.modelOptions, e.target.value),
+              )}
               className={inputClass}
             >
               {ASPECT_RATIOS.map((r) => (

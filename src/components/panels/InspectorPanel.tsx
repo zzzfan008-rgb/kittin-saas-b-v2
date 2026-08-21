@@ -3,7 +3,12 @@ import { NODE_SPECS, isNodeRunActive, type ImageInputNodeData } from "@/types/wo
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
 import { thumbnailImageUrl } from "@/lib/images";
-import { isImageModelId, type GenerationImageModelId, type ImageModelOptions } from "@/types/imageModels";
+import {
+  imageModelAspectRatioPatch,
+  isImageModelId,
+  type GenerationImageModelId,
+  type ImageModelOptions,
+} from "@/types/imageModels";
 
 function PropertyEditor({ nodeId }: { nodeId: string }) {
   const node = useFlowStore((s) => s.nodes.find((n) => n.id === nodeId));
@@ -48,13 +53,16 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         </label>
       )}
 
-      {d.kind === "sketch-to-render" && (
+      {(d.kind === "sketch-to-render" || d.kind === "ai-modify") && (
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1">
             <span className="text-[10px] text-neutral-500">画幅比例</span>
             <select
               value={d.aspectRatio}
-              onChange={(e) => updateNodeData(nodeId, { aspectRatio: e.target.value })}
+              onChange={(e) => updateNodeData(
+                nodeId,
+                imageModelAspectRatioPatch(selectedModelId, selectedModelOptions, e.target.value),
+              )}
               className={inputClass}
             >
               {["1:1", "3:4", "4:3", "9:16", "16:9"].map((r) => (

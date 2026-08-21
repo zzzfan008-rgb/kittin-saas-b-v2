@@ -239,6 +239,18 @@ export function imageModelOptionsForAspectRatio(
   }
 }
 
+export function imageModelAspectRatioPatch(
+  modelId: ImageModelId | undefined,
+  current: ImageModelOptions | undefined,
+  aspectRatio: string,
+): { aspectRatio: string; modelOptions: ImageModelOptions } {
+  const resolvedModelId = modelId ?? DEFAULT_GENERATION_MODEL_ID;
+  return {
+    aspectRatio,
+    modelOptions: imageModelOptionsForAspectRatio(resolvedModelId, current, aspectRatio),
+  };
+}
+
 export function imageModelOptionsError(modelId: ImageModelId, value: unknown): string | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "must be an object";
   const raw = value as Record<string, unknown>;

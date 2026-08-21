@@ -130,6 +130,23 @@ async function main() {
     assert.deepEqual(second, first);
   });
 
+  await test("v2 显式合法模型与参数不得被默认值替换", () => {
+    const flow = { ...legacyAiFlow(), schemaVersion: 2 };
+    Object.assign(flow.nodes[0].data, {
+      aspectRatio: "16:9",
+      batchSize: 1,
+      modelId: "gemini-3.1-flash-image",
+      modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
+    });
+
+    const normalized = validateAndMigrateFlow(flow);
+    const data = normalized.nodes[0].data;
+    assert.equal(data.kind, "ai-modify");
+    if (data.kind !== "ai-modify") throw new Error("unexpected node kind");
+    assert.equal(data.modelId, "gemini-3.1-flash-image");
+    assert.deepEqual(data.modelOptions, { aspectRatio: "16:9", imageSize: "4K" });
+  });
+
   await test("拒绝未知版本、kind/type 不符、非法批量与悬空边", () => {
     assert.throws(() => validateAndMigrateFlow({ ...legacyAiFlow(), schemaVersion: 99 }), WorkflowValidationError);
     const mismatch = legacyAiFlow();
