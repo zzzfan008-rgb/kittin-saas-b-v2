@@ -14,9 +14,12 @@ process.env.INITIAL_ADMIN_ACCOUNT_ID = "authorization-admin";
 process.env.INITIAL_ADMIN_PASSWORD = "Initial1234";
 
 await resetPostgresTestDatabase();
-const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
+const { closeDatabaseForTests, db, initializeDatabase, query, queryOne } = await import("../server/lib/database");
+const { deleteStoredImage, uploadsDir } = await import("../server/lib/fileStore");
+const { createSession, SESSION_COOKIE } = await import("../server/lib/auth");
 const { createRun } = await import("../server/engine/runner");
 const { buildExecutionPlan } = await import("../server/engine/dag");
+const { authRouter } = await import("../server/routes/auth");
 const { runPlanRouter } = await import("../server/routes/runPlan");
 const { generateRouter } = await import("../server/routes/generate");
 const { assetsRouter } = await import("../server/routes/assets");
@@ -145,6 +148,7 @@ for (const user of Object.values(users)) {
     VALUES ($1, $2, $3, $4, 'test-only', 1, $5, $5)
   `, [user.id, user.accountId, user.displayName, user.role, now]);
 }
+const adminSession = await createSession(users.admin.id, { markExistingAsReplaced: false });
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -157,6 +161,7 @@ app.use((req, res, next) => {
   (req as AuthenticatedRequest).authUser = user;
   next();
 });
+app.use("/auth", authRouter);
 app.use("/run-plan", runPlanRouter);
 app.use("/generate", generateRouter);
 app.use("/assets", assetsRouter);
@@ -182,6 +187,19 @@ function request(pathname: string, user: keyof typeof users, init: RequestInit =
       ...init.headers,
     },
   });
+}
+
+async function waitForDatabaseCondition(
+  description: string,
+  condition: () => Promise<boolean>,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`等待数据库条件超时：${description}`);
 }
 
 function directGenerateBody(referenceImage: string, projectId?: string, clientRequestId = "direct-request") {
@@ -752,18 +770,282 @@ await test("素材删除与项目引用写入使用互斥行锁避免 TOCTOU", (
   assert.match(projectsSource, /FROM assets[\s\S]*FOR KEY SHARE/);
 });
 
-await test("删除他人的历史记录统一返回 404，不泄露记录是否存在", async () => {
+await test("项目写入先持 owner 锁时，真实账号转移等待并接收刚提交的数据", async () => {
+  const sourceKey = "lockTransferSource";
+  const targetKey = "lockTransferTarget";
+  const source: AuthUser = {
+    id: "owner-lock-transfer-source", accountId: sourceKey, displayName: "锁转移来源",
+    role: "user", mustChangePassword: false,
+  };
+  const target: AuthUser = {
+    id: "owner-lock-transfer-target", accountId: targetKey, displayName: "锁转移目标",
+    role: "user", mustChangePassword: false,
+  };
+  users[sourceKey] = source;
+  users[targetKey] = target;
+  const projectId = "owner-lock-order-project";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES
+      ($1, $2, $3, 'user', 'test-only', 1, $7, $7),
+      ($4, $5, $6, 'user', 'test-only', 1, $7, $7)
+  `, [source.id, source.accountId, source.displayName, target.id, target.accountId, target.displayName, createdAt]);
+  await query(`
+    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+    VALUES ($1, $2, '锁顺序旧名称', $3, $4, $4)
+  `, [projectId, source.id, JSON.stringify(flow()), createdAt]);
+  const projectBlocker = await db().connect();
+  let projectBlockerOpen = false;
+  let savePromise: Promise<Response> | undefined;
+  let transferPromise: Promise<Response> | undefined;
+  try {
+    await projectBlocker.query("BEGIN");
+    projectBlockerOpen = true;
+    const blockerPid = (await projectBlocker.query<{ pid: number }>(
+      "SELECT pg_backend_pid() AS pid",
+    )).rows[0].pid;
+    await projectBlocker.query("SELECT id FROM projects WHERE id = $1 FOR UPDATE", [projectId]);
+
+    savePromise = request("/projects", sourceKey, {
+      method: "POST",
+      body: JSON.stringify({ id: projectId, name: "锁顺序新名称", flow: flow() }),
+    });
+    let saveBackendPid = 0;
+    await waitForDatabaseCondition("项目保存已在 owner guard 后等待项目行锁", async () => {
+      const row = await queryOne<{ pid: number }>(`
+        SELECT activity.pid FROM pg_stat_activity activity
+        WHERE $1::int = ANY(pg_blocking_pids(activity.pid))
+          AND activity.query LIKE '%SELECT owner_id, deleted_at FROM projects%'
+        LIMIT 1
+      `, [blockerPid]);
+      saveBackendPid = row?.pid ?? 0;
+      return saveBackendPid > 0;
+    });
+
+    transferPromise = request(`/auth/users/${source.id}`, "admin", {
+      method: "DELETE",
+      headers: { cookie: `${SESSION_COOKIE}=${adminSession.token}` },
+      body: JSON.stringify({ transferToUserId: target.id }),
+    });
+    await waitForDatabaseCondition("真实账号转移等待项目保存持有的用户共享锁", async () => {
+      const row = await queryOne<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM pg_stat_activity activity
+        WHERE $1::int = ANY(pg_blocking_pids(activity.pid))
+          AND activity.query LIKE '%SELECT id, active, deleted_at FROM users%FOR NO KEY UPDATE%'
+      `, [saveBackendPid]);
+      return (row?.count ?? 0) >= 1;
+    });
+
+    await projectBlocker.query("COMMIT");
+    projectBlockerOpen = false;
+    const [saveResponse, transferResponse] = await Promise.all([savePromise, transferPromise]);
+    assert.equal(saveResponse.status, 200, await saveResponse.text());
+    assert.equal(transferResponse.status, 200, await transferResponse.text());
+    assert.deepEqual(await queryOne<{ owner_id: string; name: string }>(`
+      SELECT owner_id, name FROM projects WHERE id = $1
+    `, [projectId]), { owner_id: target.id, name: "锁顺序新名称" });
+    const transferredSource = await queryOne<{ active: number; deleted_at: string | null }>(`
+      SELECT active, deleted_at FROM users WHERE id = $1
+    `, [source.id]);
+    assert.equal(transferredSource?.active, 0);
+    assert.ok(transferredSource?.deleted_at);
+  } finally {
+    if (projectBlockerOpen) await projectBlocker.query("ROLLBACK");
+    if (savePromise || transferPromise) {
+      await Promise.allSettled([savePromise, transferPromise].filter(Boolean) as Promise<Response>[]);
+    }
+    projectBlocker.release();
+    await query("DELETE FROM project_asset_refs WHERE project_id = $1", [projectId]);
+    await query("DELETE FROM projects WHERE id = $1", [projectId]);
+    await query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [[source.id, target.id]]);
+    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[source.id, target.id]]);
+    delete users[sourceKey];
+    delete users[targetKey];
+  }
+});
+
+await test("真实账号删除先持 owner 锁时，全部并发写入等待后拒绝并补偿文件", async () => {
+  const sourceKey = "lockDeleteSource";
+  const source: AuthUser = {
+    id: "owner-lock-delete-source", accountId: sourceKey, displayName: "锁删除来源",
+    role: "user", mustChangePassword: false,
+  };
+  users[sourceKey] = source;
+  const patchAssetId = "owner-lock-patch-asset";
+  const restoreAssetId = "owner-lock-restore-asset";
+  const existingFileId = "owner-lock-existing.png";
+  const runId = "owner-lock-history-run";
+  const outputId = "owner-lock-history-output";
+  const blockerProjectId = "owner-lock-existing-project";
+  const projectId = "owner-lock-blocked-project";
+  const createdAt = new Date().toISOString();
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES ($1, $2, $3, 'user', 'test-only', 1, $4, $4)
+  `, [source.id, source.accountId, source.displayName, createdAt]);
+  await query(`
+    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+    VALUES ($1, $2, '账号删除锁项目', $3, $4, $4)
+  `, [blockerProjectId, source.id, JSON.stringify(flow()), createdAt]);
+  await query(`
+    INSERT INTO files (id, owner_id, source_type, created_at)
+    VALUES ($1, $2, 'upload', $3)
+  `, [existingFileId, source.id, createdAt]);
+  await query(`
+    INSERT INTO assets (
+      id, owner_id, scope, name, category, image, created_at, deleted_at, purge_after
+    ) VALUES
+      ($1, $3, 'private', '锁前名称', 'reference', '/api/files/lock-patch.png', $4, NULL, NULL),
+      ($2, $3, 'private', '回收站素材', 'reference', '/api/files/lock-restore.png', $4, $4, $4)
+  `, [patchAssetId, restoreAssetId, source.id, createdAt]);
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-    ) VALUES ('history-other-run', $1, 'node', '节点', 'ai-modify', 1, 'error', 1, 2)
-  `, [users.other.id]);
+    ) VALUES ($1, $2, 'history-node', '历史节点', 'ai-modify', 1, 'failed', 1, 2)
+  `, [runId, source.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
-    VALUES ('history-other-output', 'history-other-run', '', 'error', '失败', 2)
+    VALUES ($1, $2, '', 'error', '失败', 2)
+  `, [outputId, runId]);
+  const beforeStored = new Set(fs.readdirSync(uploadsDir()));
+  const lifecycleBlocker = await db().connect();
+  let lifecycleBlockerOpen = false;
+  let deletePromise: Promise<Response> | undefined;
+  let responsesPromise: Promise<Response[]> | undefined;
+  try {
+    await lifecycleBlocker.query("BEGIN");
+    lifecycleBlockerOpen = true;
+    const blockerPid = (await lifecycleBlocker.query<{ pid: number }>(
+      "SELECT pg_backend_pid() AS pid",
+    )).rows[0].pid;
+    await lifecycleBlocker.query(
+      "SELECT id FROM projects WHERE id = $1 FOR UPDATE",
+      [blockerProjectId],
+    );
+
+    deletePromise = request(`/auth/users/${source.id}`, "admin", {
+      method: "DELETE",
+      headers: { cookie: `${SESSION_COOKIE}=${adminSession.token}` },
+      body: JSON.stringify({ deleteData: true }),
+    });
+    let lifecyclePid = 0;
+    await waitForDatabaseCondition("真实账号删除已持用户锁并等待项目扫描", async () => {
+      const row = await queryOne<{ pid: number }>(`
+        SELECT activity.pid FROM pg_stat_activity activity
+        WHERE $1::int = ANY(pg_blocking_pids(activity.pid))
+          AND activity.query LIKE '%UPDATE projects SET deleted_at%'
+        LIMIT 1
+      `, [blockerPid]);
+      lifecyclePid = row?.pid ?? 0;
+      return lifecyclePid > 0;
+    });
+
+    responsesPromise = Promise.all([
+      request("/projects", sourceKey, {
+        method: "POST",
+        body: JSON.stringify({ id: projectId, name: "被阻止项目", flow: flow() }),
+      }),
+      request("/files", sourceKey, {
+        method: "POST",
+        body: JSON.stringify({ dataUrl: PNG_DATA_URL }),
+      }),
+      request("/assets", sourceKey, {
+        method: "POST",
+        body: JSON.stringify({
+          name: "被阻止素材", category: "reference", scope: "private", image: PNG_DATA_URL,
+        }),
+      }),
+      request(`/assets/${patchAssetId}`, sourceKey, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "不应写入的新名称" }),
+      }),
+      request(`/assets/${restoreAssetId}/restore`, sourceKey, { method: "POST" }),
+      request(`/history/${outputId}`, sourceKey, { method: "DELETE" }),
+    ]);
+    await waitForDatabaseCondition("六类 owner 写请求均等待真实账号删除锁", async () => {
+      const row = await queryOne<{ count: number }>(`
+        SELECT COUNT(*)::int AS count FROM pg_stat_activity activity
+        WHERE $1::int = ANY(pg_blocking_pids(activity.pid))
+          AND activity.query LIKE '%SELECT active, deleted_at FROM users%FOR SHARE%'
+      `, [lifecyclePid]);
+      return (row?.count ?? 0) >= 6;
+    });
+
+    await lifecycleBlocker.query("COMMIT");
+    lifecycleBlockerOpen = false;
+    const [deleteResponse, responses] = await Promise.all([deletePromise, responsesPromise]);
+    assert.equal(deleteResponse.status, 200, await deleteResponse.text());
+    assert.deepEqual(responses.map((response) => response.status), [409, 409, 409, 409, 409, 409]);
+
+    assert.equal(await queryOne("SELECT id FROM projects WHERE id = $1", [projectId]), undefined);
+    assert.equal(await queryOne("SELECT id FROM assets WHERE name = '被阻止素材'"), undefined);
+    for (const [table, id] of [
+      ["projects", blockerProjectId],
+      ["files", existingFileId],
+      ["assets", patchAssetId],
+      ["assets", restoreAssetId],
+      ["generation_runs", runId],
+    ] as const) {
+      assert.ok((await queryOne<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM ${table} WHERE id = $1`,
+        [id],
+      ))?.deleted_at, `${table}/${id} 应进入回收期`);
+    }
+    assert.equal((await queryOne<{ name: string }>(
+      "SELECT name FROM assets WHERE id = $1",
+      [patchAssetId],
+    ))?.name, "锁前名称");
+    assert.ok(await queryOne("SELECT id FROM generation_outputs WHERE id = $1", [outputId]));
+    assert.deepEqual(new Set(fs.readdirSync(uploadsDir())), beforeStored);
+  } finally {
+    if (lifecycleBlockerOpen) await lifecycleBlocker.query("ROLLBACK");
+    if (deletePromise || responsesPromise) {
+      await Promise.allSettled([deletePromise, responsesPromise].filter(Boolean) as Promise<unknown>[]);
+    }
+    lifecycleBlocker.release();
+    await query("DELETE FROM generation_outputs WHERE run_id = $1", [runId]);
+    await query("DELETE FROM generation_jobs WHERE run_id = $1", [runId]);
+    await query("DELETE FROM generation_run_steps WHERE run_id = $1", [runId]);
+    await query("DELETE FROM usage_events WHERE run_id = $1", [runId]);
+    await query("DELETE FROM generation_runs WHERE id = $1", [runId]);
+    await query("DELETE FROM project_asset_refs WHERE project_id = ANY($1::text[])", [
+      [projectId, blockerProjectId],
+    ]);
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[projectId, blockerProjectId]]);
+    await query("DELETE FROM assets WHERE id = ANY($1::text[]) OR name = '被阻止素材'", [
+      [patchAssetId, restoreAssetId],
+    ]);
+    await query("DELETE FROM files WHERE id = $1", [existingFileId]);
+    await query("DELETE FROM sessions WHERE user_id = $1", [source.id]);
+    await query("DELETE FROM users WHERE id = $1", [source.id]);
+    delete users[sourceKey];
+    const leakedFiles = fs.readdirSync(uploadsDir()).filter((id) => !beforeStored.has(id));
+    if (leakedFiles.length > 0) {
+      await query("DELETE FROM files WHERE id = ANY($1::text[])", [leakedFiles]);
+      leakedFiles.forEach(deleteStoredImage);
+    }
+  }
+});
+
+await test("历史记录只有所有者能删除，其他人与不存在记录统一返回 404", async () => {
+  await query(`
+    INSERT INTO generation_runs (
+      id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
+    ) VALUES
+      ('history-other-run', $1, 'node', '节点', 'ai-modify', 1, 'error', 1, 2),
+      ('history-owner-run', $2, 'node', '节点', 'ai-modify', 1, 'error', 1, 2)
+  `, [users.other.id, users.owner.id]);
+  await query(`
+    INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
+    VALUES
+      ('history-other-output', 'history-other-run', '', 'error', '失败', 2),
+      ('history-owner-output', 'history-owner-run', '', 'error', '失败', 2)
   `);
   assert.equal((await request("/history/history-other-output", "owner", { method: "DELETE" })).status, 404);
   assert.equal((await request("/history/missing-output", "owner", { method: "DELETE" })).status, 404);
+  assert.equal((await request("/history/history-owner-output", "owner", { method: "DELETE" })).status, 200);
+  assert.equal(await queryOne("SELECT id FROM generation_outputs WHERE id = 'history-owner-output'"), undefined);
 });
 
 interface HistoryPage {

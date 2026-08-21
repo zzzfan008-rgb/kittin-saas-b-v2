@@ -13,6 +13,7 @@ import {
 } from "../lib/fileStore";
 import type { GenerationRecordContext } from "../lib/generationRecords";
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
+import { lockActiveOwner } from "../lib/ownerMutation";
 import { getProvider } from "../providers";
 import {
   ProviderError,
@@ -71,10 +72,7 @@ export async function assertGenerationOwnerActive(
   client: PoolClient,
   ownerId: string,
 ): Promise<void> {
-  const owner = (await client.query<{ active: number; deleted_at: string | null }>(`
-    SELECT active, deleted_at FROM users WHERE id = $1 FOR SHARE
-  `, [ownerId])).rows[0];
-  if (!owner || owner.active !== 1 || owner.deleted_at !== null) {
+  if (!await lockActiveOwner(client, ownerId)) {
     throw new GenerationOwnerUnavailableError();
   }
 }

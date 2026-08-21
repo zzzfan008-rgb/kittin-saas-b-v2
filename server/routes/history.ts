@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
-import { query, queryOne } from "../lib/database";
+import { query, queryOne, transaction } from "../lib/database";
 import { thumbnailUrlForImage } from "../lib/fileStore";
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
+import { lockActiveOwner } from "../lib/ownerMutation";
 
 export const historyRouter = Router();
 
@@ -184,14 +185,25 @@ historyRouter.get("/active", asyncHandler(async (req, res) => {
 
 historyRouter.delete("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne<{ owner_id: string; run_id: string }>(`
-    SELECT r.owner_id, r.id AS run_id FROM generation_outputs o
-    JOIN generation_runs r ON r.id = o.run_id WHERE o.id = $1 AND r.owner_id = $2
-  `, [req.params.id, user.id]);
-  if (!row) {
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
+    const row = await queryOne<{ run_id: string }>(`
+      SELECT r.id AS run_id FROM generation_outputs o
+      JOIN generation_runs r ON r.id = o.run_id
+      WHERE o.id = $1 AND r.owner_id = $2 AND r.deleted_at IS NULL
+      FOR UPDATE OF r, o
+    `, [req.params.id, user.id], client);
+    if (!row) return "missing" as const;
+    await client.query("DELETE FROM generation_outputs WHERE id = $1", [req.params.id]);
+    return "deleted" as const;
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能继续删除历史记录" });
+    return;
+  }
+  if (result === "missing") {
     res.status(404).json({ error: "记录不存在" });
     return;
   }
-  await query("DELETE FROM generation_outputs WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 }));

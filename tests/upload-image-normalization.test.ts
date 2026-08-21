@@ -184,12 +184,12 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     });
 
     const beforeFiles = fs.readdirSync(uploadsDir()).sort();
-    const databaseFailure = await fetch(`${server.baseUrl}/api/files`, {
+    const ownerUnavailable = await fetch(`${server.baseUrl}/api/files`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-test-owner": "missing" },
       body: JSON.stringify({ dataUrl: dataUrl("image/webp", source) }),
     });
-    assert.equal(databaseFailure.status, 500);
+    assert.equal(ownerUnavailable.status, 409);
     assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeFiles);
   } finally {
     await server.close();

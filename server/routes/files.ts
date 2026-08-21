@@ -14,7 +14,8 @@ import { ProviderError } from "../providers/base";
 import { ImageValidationError } from "../lib/imageValidation";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
-import { query, queryOne } from "../lib/database";
+import { query, queryOne, transaction } from "../lib/database";
+import { lockActiveOwner } from "../lib/ownerMutation";
 
 export const filesRouter = Router();
 
@@ -42,6 +43,7 @@ function setFileCacheHeaders(res: Response): void {
 }
 
 filesRouter.post("/", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
   const { dataUrl } = req.body as { dataUrl?: string };
   if (!dataUrl) {
     res.status(400).json({ error: "dataUrl is required" });
@@ -50,14 +52,23 @@ filesRouter.post("/", asyncHandler(async (req, res) => {
   try {
     const saved = await saveNormalizedUploadDataUrl(dataUrl);
     try {
-      await query(`
-        INSERT INTO files (
-          id, owner_id, source_type, mime_type, width, height, byte_length, normalized, created_at
-        ) VALUES ($1, $2, 'upload', $3, $4, $5, $6, TRUE, $7)
-      `, [
-        saved.id, requestUser(req).id, saved.mimeType, saved.width, saved.height,
-        saved.byteLength, new Date().toISOString(),
-      ]);
+      const registered = await transaction(async (client) => {
+        if (!await lockActiveOwner(client, user.id)) return false;
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, mime_type, width, height, byte_length, normalized, created_at
+          ) VALUES ($1, $2, 'upload', $3, $4, $5, $6, TRUE, $7)
+        `, [
+          saved.id, user.id, saved.mimeType, saved.width, saved.height,
+          saved.byteLength, new Date().toISOString(),
+        ]);
+        return true;
+      });
+      if (!registered) {
+        deleteStoredImage(saved.id);
+        res.status(409).json({ error: "账号已停用或删除，不能继续上传文件" });
+        return;
+      }
     } catch (error) {
       deleteStoredImage(saved.id);
       throw error;

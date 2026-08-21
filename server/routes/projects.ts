@@ -10,6 +10,7 @@ import {
   assertImageReferencesAccessible,
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
+import { lockActiveOwner } from "../lib/ownerMutation";
 import type { PersistedWorkflow } from "../../src/types/workflow";
 
 export const projectsRouter = Router();
@@ -100,6 +101,7 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
     const projectId = id || nanoid(10);
     const now = new Date().toISOString();
     const saved = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
       const existing = await queryOne<{ owner_id: string; deleted_at: string | null }>(
         "SELECT owner_id, deleted_at FROM projects WHERE id = $1 FOR UPDATE",
         [projectId],
@@ -126,6 +128,10 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
     }
     if (saved === "deleted") {
       res.status(409).json({ error: "项目已在回收站中，请先恢复项目再保存" });
+      return;
+    }
+    if (saved === "owner_unavailable") {
+      res.status(409).json({ error: "账号已停用或删除，不能继续保存项目" });
       return;
     }
     res.json({ ok: true, id: projectId });

@@ -6,6 +6,7 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne, transaction } from "../lib/database";
 import { deleteStoredImage, saveNormalizedUploadDataUrl, thumbnailUrlForImage } from "../lib/fileStore";
 import { ImageValidationError, isLocalImageReference } from "../lib/imageValidation";
+import { lockActiveOwner } from "../lib/ownerMutation";
 import type { Asset } from "../../src/types/workflow";
 
 export const assetsRouter = Router();
@@ -91,6 +92,7 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
     return;
   }
   let saved: Awaited<ReturnType<typeof saveNormalizedUploadDataUrl>> | undefined;
+  let committed = false;
   try {
     if (sourceNote !== undefined && (typeof sourceNote !== "string" || sourceNote.length > 2_000)) {
       throw new ImageValidationError("sourceNote must be a string of at most 2000 characters");
@@ -102,6 +104,7 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
     const id = nanoid(10);
     const createdAt = new Date().toISOString();
     const created = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
       if (saved) {
         await client.query(`
           INSERT INTO files (
@@ -122,7 +125,7 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
           FROM files f WHERE f.id = $2
         `, [imageUrl, path.basename(imageUrl)], client);
         if (!access || (access.owner_id !== null && access.owner_id !== user.id && user.role !== "admin" && !access.shared)) {
-          return false;
+          return "missing" as const;
         }
       }
       if (finalScope === "global") {
@@ -134,16 +137,21 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
         INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [id, finalScope === "global" ? null : user.id, finalScope, name.trim(), category, imageUrl, sourceNote ?? null, createdAt]);
-      return true;
+      return "created" as const;
     });
-    if (!created) {
+    if (created !== "created") {
       if (saved) deleteStoredImage(saved.id);
+      if (created === "owner_unavailable") {
+        res.status(409).json({ error: "账号已停用或删除，不能继续创建素材" });
+        return;
+      }
       res.status(404).json({ error: "image file not found" });
       return;
     }
+    committed = true;
     res.status(201).json({ ok: true, id });
   } catch (error) {
-    if (saved) deleteStoredImage(saved.id);
+    if (saved && !committed) deleteStoredImage(saved.id);
     res.status(error instanceof ImageValidationError ? 400 : 500)
       .json({ error: error instanceof Error ? error.message : String(error) });
   }
@@ -151,19 +159,6 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
 
 assetsRouter.patch("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne<{ owner_id: string | null; scope: "global" | "private" | "shared" }>(
-    "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL",
-    [req.params.id],
-  );
-  if (!row) {
-    res.status(404).json({ error: "asset not found" });
-    return;
-  }
-  const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
-  if (!canManage) {
-    res.status(403).json({ error: "无权修改此素材" });
-    return;
-  }
   const { name, scope } = req.body as { name?: string; scope?: "global" | "private" | "shared" };
   if (name !== undefined && (typeof name !== "string" || !name.trim() || name.length > 200)) {
     res.status(400).json({ error: "素材名称无效" });
@@ -173,10 +168,35 @@ assetsRouter.patch("/:id", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "只有管理员可以设置通用素材" });
     return;
   }
-  const nextScope = scope ?? row.scope;
-  await query("UPDATE assets SET name = COALESCE($1, name), scope = $2, owner_id = $3 WHERE id = $4", [
-    name?.trim() ?? null, nextScope, nextScope === "global" ? null : (row.owner_id ?? user.id), req.params.id,
-  ]);
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
+    const row = await queryOne<{ owner_id: string | null; scope: "global" | "private" | "shared" }>(
+      "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+      [req.params.id],
+      client,
+    );
+    if (!row) return "missing" as const;
+    const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
+    if (!canManage) return "forbidden" as const;
+    const nextScope = scope ?? row.scope;
+    await client.query(
+      "UPDATE assets SET name = COALESCE($1, name), scope = $2, owner_id = $3 WHERE id = $4",
+      [name?.trim() ?? null, nextScope, nextScope === "global" ? null : (row.owner_id ?? user.id), req.params.id],
+    );
+    return "updated" as const;
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能继续修改素材" });
+    return;
+  }
+  if (result === "missing") {
+    res.status(404).json({ error: "asset not found" });
+    return;
+  }
+  if (result === "forbidden") {
+    res.status(403).json({ error: "无权修改此素材" });
+    return;
+  }
   res.json({ ok: true });
 }));
 
@@ -188,25 +208,30 @@ assetsRouter.post("/:id/references", asyncHandler(async (req, res) => {
     return;
   }
   const linked = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
     const project = await queryOne<{ id: string }>(`
       SELECT id FROM projects
       WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
       FOR UPDATE
     `, [projectId, user.id], client);
-    if (!project) return false;
+    if (!project) return "missing" as const;
     const asset = await queryOne<{ id: string }>(`
       SELECT id FROM assets WHERE id = $1 AND deleted_at IS NULL
         AND (scope IN ('global','shared') OR owner_id = $2)
       FOR KEY SHARE
     `, [req.params.id, user.id], client);
-    if (!asset) return false;
+    if (!asset) return "missing" as const;
     await client.query(`
       INSERT INTO project_asset_refs (project_id, asset_id, created_at) VALUES ($1, $2, $3)
       ON CONFLICT (project_id, asset_id) DO NOTHING
     `, [projectId, req.params.id, new Date().toISOString()]);
-    return true;
+    return "linked" as const;
   });
-  if (!linked) {
+  if (linked === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能继续关联素材" });
+    return;
+  }
+  if (linked === "missing") {
     // 统一 404，避免泄露项目或私有素材是否存在。
     res.status(404).json({ error: "project or asset not found" });
     return;
@@ -217,6 +242,7 @@ assetsRouter.post("/:id/references", asyncHandler(async (req, res) => {
 assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
   const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
     const row = await queryOne<{ owner_id: string | null; scope: "global" | "private" | "shared" }>(
       "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
       [req.params.id],
@@ -242,6 +268,10 @@ assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "asset not found" });
     return;
   }
+  if (result.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能继续删除素材" });
+    return;
+  }
   if (result.status === "forbidden") {
     res.status(403).json({ error: "无权删除此素材" });
     return;
@@ -255,19 +285,30 @@ assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
 
 assetsRouter.post("/:id/restore", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne<{ owner_id: string | null; scope: "global" | "private" | "shared" }>(
-    "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NOT NULL",
-    [req.params.id],
-  );
-  if (!row) {
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable" as const;
+    const row = await queryOne<{ owner_id: string | null; scope: "global" | "private" | "shared" }>(
+      "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NOT NULL FOR UPDATE",
+      [req.params.id],
+      client,
+    );
+    if (!row) return "missing" as const;
+    const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
+    if (!canManage) return "forbidden" as const;
+    await client.query("UPDATE assets SET deleted_at = NULL, purge_after = NULL WHERE id = $1", [req.params.id]);
+    return "restored" as const;
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能继续恢复素材" });
+    return;
+  }
+  if (result === "missing") {
     res.status(404).json({ error: "回收站中没有此素材" });
     return;
   }
-  const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
-  if (!canManage) {
+  if (result === "forbidden") {
     res.status(403).json({ error: "无权恢复此素材" });
     return;
   }
-  await query("UPDATE assets SET deleted_at = NULL, purge_after = NULL WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 }));
