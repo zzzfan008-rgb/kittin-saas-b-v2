@@ -779,6 +779,27 @@ interface HistoryPage {
   hasMore: boolean;
 }
 
+await test("普通历史不会把无执行计划的旧活动状态恢复成正在运行", async () => {
+  const runIds = ["legacy-planless-active", "legacy-planless-terminal"];
+  try {
+    await query(`
+      INSERT INTO generation_runs (
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
+      ) VALUES
+        ($1, $3, 'legacy-active-node', '旧活动任务', 'ai-modify', 1, 'queued', 95000, NULL),
+        ($2, $3, 'legacy-terminal-node', '旧终态任务', 'ai-modify', 1, 'failed', 94000, 94001)
+    `, [runIds[0], runIds[1], users.owner.id]);
+
+    const response = await request("/history?limit=20&before=100000", "owner");
+    assert.equal(response.status, 200);
+    const page = await response.json() as HistoryPage;
+    assert.equal(page.records.some((record) => record.runId === runIds[0]), false);
+    assert.equal(page.records.some((record) => record.runId === runIds[1]), true);
+  } finally {
+    await query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [runIds]);
+  }
+});
+
 await test("活动任务使用独立完整集合，不会被最近历史的 20 条分页截断", async () => {
   const ids = ["old-active-run"];
   try {
@@ -898,9 +919,10 @@ await test("运行任务完成并展开为多条输出时不会令下一页漏�
   ] as const) {
     await query(`
       INSERT INTO generation_runs (
-        id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 2, $3, $4, $4)
-    `, [id, users.owner.id, status, startedAt]);
+        id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at,
+        plan_json
+      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 2, $3, $4, $4, $5)
+    `, [id, users.owner.id, status, startedAt, status === "running" ? '{"steps":[]}' : null]);
     if (status === "error") {
       await query(`
         INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)

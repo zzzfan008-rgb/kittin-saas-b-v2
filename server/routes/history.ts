@@ -69,7 +69,8 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
         OR (r.started_at = $3 AND r.id < $4)
       )
       AND (
-        r.status IN ('queued','running','retry_wait','cancel_requested','cancelled','outcome_unknown','failed','succeeded')
+        (r.plan_json IS NOT NULL AND r.status IN ('queued','running','retry_wait','cancel_requested'))
+        OR r.status IN ('cancelled','outcome_unknown','failed','succeeded')
         OR EXISTS (SELECT 1 FROM generation_outputs output WHERE output.run_id = r.id)
       )
     ORDER BY r.started_at DESC, r.id DESC
