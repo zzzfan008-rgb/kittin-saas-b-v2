@@ -10,6 +10,7 @@ export interface AuthChangeMessage {
 const SESSION_END_NOTICE_KEY = "garment-canvas-session-end-reason";
 const WORKSPACE_OWNER_KEY = "garment-canvas-workspace-owner-id";
 const PROJECT_TABS_KEY = "garment-canvas-project-tabs";
+const AMBIGUOUS_RUN_REQUESTS_KEY = "garment-canvas-ambiguous-run-requests";
 const RECENT_RESULTS_KEY = "garment-canvas-recent-results";
 export const AUTH_CHANGE_STORAGE_KEY = "garment-canvas-auth-change";
 let authChangeSequence = 0;
@@ -134,10 +135,12 @@ export function clearLocalWorkspace(
   sessionStorage: Pick<Storage, "removeItem">,
   localStorage: Pick<Storage, "removeItem">,
 ): void {
-  try {
-    sessionStorage.removeItem(PROJECT_TABS_KEY);
-  } catch {
-    // 浏览器禁用存储时忽略；页面重载仍会终止内存中的工作区任务。
+  for (const key of [PROJECT_TABS_KEY, AMBIGUOUS_RUN_REQUESTS_KEY]) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      // 单个 key 清理失败不能阻止继续清理其它账号绑定状态。
+    }
   }
   try {
     localStorage.removeItem(RECENT_RESULTS_KEY);
@@ -158,13 +161,25 @@ export function bindWorkspaceToAuthenticatedUser(
   const owner = readWorkspaceOwner(sessionStorage);
   if (owner === userId) return "preserved";
   const tabCache = storageValue(sessionStorage, PROJECT_TABS_KEY);
+  const ambiguousRunCache = storageValue(sessionStorage, AMBIGUOUS_RUN_REQUESTS_KEY);
   const recentCache = storageValue(localStorage, RECENT_RESULTS_KEY);
   clearLocalWorkspace(sessionStorage, localStorage);
   const ownerBound = writeWorkspaceOwner(sessionStorage, userId);
   // 只有确实加载过旧缓存时才需要重载来丢弃其内存副本；存储整体不可用时
   // flowStore 同样无法恢复旧缓存，不能因无法写 owner 而进入无限重载。
-  if (tabCache.value !== null || recentCache.value !== null) return "cleared";
+  if (tabCache.value !== null || ambiguousRunCache.value !== null || recentCache.value !== null) return "cleared";
   return ownerBound ? "preserved" : "unavailable";
+}
+
+export function shouldReloadForAuthenticatedUserTransition(
+  currentAuthenticatedUserId: string | null,
+  nextAuthenticatedUserId: string,
+  workspace: "preserved" | "cleared" | "unavailable",
+): boolean {
+  // 存储完全不可用时无法通过 owner key 识别切号，但当前内存工作区仍属于旧账号。
+  return workspace === "cleared" || (
+    currentAuthenticatedUserId !== null && currentAuthenticatedUserId !== nextAuthenticatedUserId
+  );
 }
 
 /**

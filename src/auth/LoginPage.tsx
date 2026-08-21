@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth, type CurrentUser } from "./AuthContext";
 import { broadcastAuthChange, prepareWorkspaceForLogin } from "./session";
+import { suppressWorkspaceUnloadWarning } from "@/lib/workspaceUnload";
 
 export function LoginPage() {
   const [accountId, setAccountId] = useState("");
@@ -24,6 +25,7 @@ export function LoginPage() {
       // 同账号恢复本机草稿；只有切换到不同账号时才清除旧画布。
       prepareWorkspaceForLogin(window.sessionStorage, window.localStorage, body.user.id);
       broadcastAuthChange(window.localStorage, "login", body.user.id);
+      suppressWorkspaceUnloadWarning();
       window.location.reload();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -107,6 +109,7 @@ export function ChangePasswordPage() {
       if (!response.ok) throw new Error(body.error ?? "修改密码失败");
       if (!user) throw new Error("登录状态已失效");
       broadcastAuthChange(window.localStorage, "auth-changed", user.id);
+      suppressWorkspaceUnloadWarning();
       window.location.reload();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));

@@ -13,6 +13,7 @@ import {
   rememberSessionEndNotice,
   sessionEndReasonFromCode,
   sessionRefreshFailureAction,
+  shouldReloadForAuthenticatedUserTransition,
 } from "../src/auth/session";
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -63,9 +64,26 @@ clearLocalWorkspace(
 );
 assert.deepEqual(removed, [
   "session:garment-canvas-project-tabs",
+  "session:garment-canvas-ambiguous-run-requests",
   "local:garment-canvas-recent-results",
 ]);
-console.log("  ✓ 需要切换账号时可定向清理项目页签与本地记录");
+console.log("  ✓ 需要切换账号时可定向清理项目页签、未决付费请求号与本地记录");
+
+const cleanupAttempts: string[] = [];
+clearLocalWorkspace({
+  removeItem: (key) => {
+    cleanupAttempts.push(`session:${key}`);
+    if (key === "garment-canvas-project-tabs") throw new Error("storage failure");
+  },
+}, {
+  removeItem: (key) => cleanupAttempts.push(`local:${key}`),
+});
+assert.deepEqual(cleanupAttempts, [
+  "session:garment-canvas-project-tabs",
+  "session:garment-canvas-ambiguous-run-requests",
+  "local:garment-canvas-recent-results",
+]);
+console.log("  ✓ 单个缓存键清理失败不阻断其它跨账号状态清理");
 
 const sameAccountSession = memoryStorage({
   "garment-canvas-workspace-owner-id": "user-a",
@@ -83,10 +101,12 @@ console.log("  ✓ 同一账号重新登录保留未保存画布");
 const switchedSession = memoryStorage({
   "garment-canvas-workspace-owner-id": "user-a",
   "garment-canvas-project-tabs": "draft-a",
+  "garment-canvas-ambiguous-run-requests": "request-a",
 });
 const switchedLocal = memoryStorage({ "garment-canvas-recent-results": "history-a" });
 assert.equal(prepareWorkspaceForLogin(switchedSession, switchedLocal, "user-b"), "cleared");
 assert.equal(switchedSession.has("garment-canvas-project-tabs"), false);
+assert.equal(switchedSession.has("garment-canvas-ambiguous-run-requests"), false);
 assert.equal(switchedLocal.has("garment-canvas-recent-results"), false);
 assert.equal(readWorkspaceOwner(switchedSession), "user-b");
 console.log("  ✓ 切换到不同账号时清除旧画布并更新归属");
@@ -102,16 +122,30 @@ assert.equal(unownedLoginLocal.has("garment-canvas-recent-results"), false);
 assert.equal(readWorkspaceOwner(unownedLoginSession), "user-a");
 console.log("  ✓ 显式登录不会暴露无法证明归属的旧草稿");
 
-const legacySession = memoryStorage({ "garment-canvas-project-tabs": "legacy-draft" });
+const legacySession = memoryStorage({
+  "garment-canvas-project-tabs": "legacy-draft",
+  "garment-canvas-ambiguous-run-requests": "legacy-request",
+});
 const legacyLocal = memoryStorage({ "garment-canvas-recent-results": "legacy-history" });
 assert.equal(
   bindWorkspaceToAuthenticatedUser(legacySession, legacyLocal, "user-a"),
   "cleared",
 );
 assert.equal(legacySession.has("garment-canvas-project-tabs"), false);
+assert.equal(legacySession.has("garment-canvas-ambiguous-run-requests"), false);
 assert.equal(legacyLocal.has("garment-canvas-recent-results"), false);
 assert.equal(readWorkspaceOwner(legacySession), "user-a");
 console.log("  ✓ 无 owner 的旧缓存按不可信数据清理后再绑定当前账号");
+
+const ambiguousOnlySession = memoryStorage({
+  "garment-canvas-ambiguous-run-requests": "unknown-owner-request",
+});
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(ambiguousOnlySession, memoryStorage(), "user-a"),
+  "cleared",
+);
+assert.equal(ambiguousOnlySession.has("garment-canvas-ambiguous-run-requests"), false);
+console.log("  ✓ 仅残留未决付费请求号时也会重载以清除旧账号内存状态");
 
 const sameAccountOtherTab = memoryStorage({
   "garment-canvas-workspace-owner-id": "user-a",
@@ -187,3 +221,27 @@ assert.equal(
   "unavailable",
 );
 console.log("  ✓ 浏览器存储不可用时不会返回 cleared 触发无限重载");
+
+let authenticatedUserId: string | null = null;
+assert.equal(
+  shouldReloadForAuthenticatedUserTransition(authenticatedUserId, "user-a", "unavailable"),
+  false,
+  "首次加载且没有旧内存账号时无需重载",
+);
+authenticatedUserId = "user-a";
+assert.equal(
+  shouldReloadForAuthenticatedUserTransition(authenticatedUserId, "user-a", "unavailable"),
+  false,
+  "同账号轮询不应在存储不可用时无限重载",
+);
+assert.equal(
+  shouldReloadForAuthenticatedUserTransition(authenticatedUserId, "user-b", "unavailable"),
+  true,
+  "A 的内存工作区遇到 B 的 cookie 时必须重载隔离",
+);
+assert.equal(
+  shouldReloadForAuthenticatedUserTransition(null, "user-b", "cleared"),
+  true,
+  "已清理旧缓存时仍须重载丢弃模块初始化时恢复的内存画布",
+);
+console.log("  ✓ 存储完全不可用时仍以当前已认证 userId 阻断 A→B 内存画布复用");

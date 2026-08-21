@@ -8,8 +8,10 @@ import {
   readSessionEndNotice,
   rememberSessionEndNotice,
   sessionRefreshFailureAction,
+  shouldReloadForAuthenticatedUserTransition,
   type SessionEndReason,
 } from "./session";
+import { suppressWorkspaceUnloadWarning } from "@/lib/workspaceUnload";
 
 export interface CurrentUser {
   id: string;
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(restoredSessionEndReason);
   const refreshSequence = useRef(0);
   const sessionEnded = useRef(restoredSessionEndReason !== null);
+  const authenticatedUserId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (sessionEnded.current) return;
@@ -50,14 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const action = sessionRefreshFailureAction(response.status, body.code);
           if (action === "end-replaced") {
             sessionEnded.current = true;
+            authenticatedUserId.current = null;
             rememberSessionEndNotice(window.sessionStorage, "replaced");
             broadcastAuthChange(window.localStorage, "auth-changed");
             setSessionEndReason("replaced");
             setUser(null);
             // 整页重载会立即终止工作区和运行中的连接；不删除未保存草稿。
+            suppressWorkspaceUnloadWarning();
             window.location.reload();
           } else if (action === "clear-user") {
             sessionEnded.current = true;
+            authenticatedUserId.current = null;
             setUser(null);
           }
         }
@@ -70,12 +76,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.localStorage,
           body.user.id,
         );
-        if (workspace === "cleared") {
-          // 共享 cookie 的其他页签可能已切换账号；重载后才能丢弃旧账号的内存画布。
+        if (shouldReloadForAuthenticatedUserTransition(
+          authenticatedUserId.current,
+          body.user.id,
+          workspace,
+        )) {
+          // 共享 cookie 可能已切换账号；即使存储不可用，也必须重载丢弃旧账号内存画布。
+          authenticatedUserId.current = null;
+          sessionEnded.current = true;
+          refreshSequence.current += 1;
           setUser(null);
+          setLoading(true);
+          suppressWorkspaceUnloadWarning();
           window.location.reload();
           return;
         }
+        authenticatedUserId.current = body.user.id;
         setUser(body.user);
       }
     } catch {
@@ -103,10 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Cookie 在同源页签间共享：先使当前工作区进入终态，再立即重载并重新绑定 owner。
       refreshSequence.current += 1;
       sessionEnded.current = true;
+      authenticatedUserId.current = null;
       clearSessionEndNotice(window.sessionStorage);
       setUser(null);
       setSessionEndReason(null);
       setLoading(true);
+      suppressWorkspaceUnloadWarning();
       window.location.reload();
     };
     window.addEventListener("storage", onStorage);
@@ -117,9 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     refreshSequence.current += 1;
     sessionEnded.current = true;
+    authenticatedUserId.current = null;
     clearSessionEndNotice(window.sessionStorage);
     broadcastAuthChange(window.localStorage, "logout");
     // 保留按账号绑定的本机草稿；下次登录不同账号时再安全清理。
+    suppressWorkspaceUnloadWarning();
     window.location.reload();
   }, []);
 
@@ -127,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSessionEndNotice(window.sessionStorage);
     // replaced cookie 留待下次成功登录自然覆盖，避免旧 /me 响应误删其他页签的新 cookie。
     setSessionEndReason(null);
+    authenticatedUserId.current = null;
     setUser(null);
     setLoading(false);
   }, []);
