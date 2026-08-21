@@ -1,0 +1,45 @@
+# Dependencies
+node_modules
+
+# Local agent worktrees
+.claude/worktrees/
+
+# Build and release outputs
+releases/
+*.tsbuildinfo
+
+# Data & secrets
+.env
+.env.local
+.secrets/
+*.pem
+*.key
+
+# Runtime data (built-in templates remain versioned)
+data/uploads/
+data/thumbnails/
+data/projects/
+data/assets/
+data/templates/user/
+data/quarantine/
+data/*.db
+data/*.db-*
+data/*.dump
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/
+
+# Test and local demo outputs
+test-*.png
+test-*.jpg
+shot-*.png
+button-animation-demos.html
