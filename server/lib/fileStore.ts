@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import http from "node:http";
@@ -428,4 +429,73 @@ export async function persistImageRef(ref: string): Promise<string> {
   if (ref.startsWith("/api/files/")) return ref;
   const dataUrl = await normalizeImageRef(ref);
   return saveDataUrl(dataUrl).url;
+}
+
+export interface PersistedImageReceipt {
+  id: string;
+  url: string;
+  created: boolean;
+}
+
+function sha256(value: string | Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function createStoredImage(id: string, buffer: Buffer): boolean {
+  const filePath = path.join(uploadsDir(), id);
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(filePath, "wx", 0o600);
+    fs.writeFileSync(fd, buffer);
+    fs.fsyncSync(fd);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    if (fd !== undefined) {
+      try { fs.rmSync(filePath, { force: true }); } catch { /* best-effort cleanup */ }
+    }
+    throw error;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function storedImageMatches(id: string, buffer: Buffer): boolean {
+  try {
+    return fs.readFileSync(path.join(uploadsDir(), id)).equals(buffer);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 队列结果使用稳定幂等键落盘。相同键和相同内容复用文件；内容变化时使用内容摘要后缀，
+ * 避免覆盖旧结果。created 仅表示本次调用实际创建了文件，供事务失败补偿清理。
+ */
+export async function persistImageRefWithReceipt(
+  ref: string,
+  idempotencyKey: string,
+): Promise<PersistedImageReceipt> {
+  if (ref.startsWith("/api/files/")) {
+    return { id: path.basename(ref), url: ref, created: false };
+  }
+  if (!idempotencyKey.trim()) throw new Error("image persistence idempotency key is required");
+
+  const dataUrl = await normalizeImageRef(ref);
+  const { mime, buffer } = validateImageDataUrl(dataUrl);
+  const ext = MIME_EXT[mime];
+  const keyDigest = sha256(idempotencyKey).slice(0, 24);
+  const contentDigest = sha256(buffer).slice(0, 16);
+  const base = `generated-${keyDigest}`;
+  const candidates = [`${base}.${ext}`, `${base}-${contentDigest}.${ext}`];
+
+  for (const id of candidates) {
+    if (createStoredImage(id, buffer)) return { id, url: `/api/files/${id}`, created: true };
+    if (storedImageMatches(id, buffer)) return { id, url: `/api/files/${id}`, created: false };
+  }
+
+  for (;;) {
+    const id = `${base}-${contentDigest}-${nanoid(6)}.${ext}`;
+    if (createStoredImage(id, buffer)) return { id, url: `/api/files/${id}`, created: true };
+  }
 }

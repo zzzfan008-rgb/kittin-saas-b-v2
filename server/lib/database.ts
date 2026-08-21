@@ -446,6 +446,52 @@ async function migrate(): Promise<void> {
       );
     }
 
+    if (!applied.has(9)) {
+      await client.query(`
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS next_event_seq INTEGER NOT NULL DEFAULT 0;
+        UPDATE generation_runs run
+        SET next_event_seq = events.max_seq
+        FROM (
+          SELECT run_id, MAX(seq)::int AS max_seq
+          FROM generation_run_events
+          GROUP BY run_id
+        ) events
+        WHERE run.id = events.run_id
+          AND run.next_event_seq < events.max_seq;
+
+        ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS run_started_at BIGINT;
+        ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS step_index INTEGER;
+        UPDATE generation_jobs job
+        SET run_started_at = run.started_at,
+            step_index = step.step_index
+        FROM generation_runs run, generation_run_steps step
+        WHERE job.run_id = run.id
+          AND job.step_id = step.id
+          AND (job.run_started_at IS NULL OR job.step_index IS NULL);
+        ALTER TABLE generation_jobs ALTER COLUMN run_started_at SET NOT NULL;
+        ALTER TABLE generation_jobs ALTER COLUMN step_index SET NOT NULL;
+
+        ALTER TABLE generation_jobs
+          DROP CONSTRAINT IF EXISTS generation_jobs_retry_count_check;
+        ALTER TABLE generation_jobs
+          ADD CONSTRAINT generation_jobs_retry_count_check
+          CHECK (retry_count BETWEEN 0 AND 3);
+
+        CREATE INDEX IF NOT EXISTS generation_jobs_status_available_idx
+          ON generation_jobs(status, available_at);
+        CREATE INDEX IF NOT EXISTS generation_jobs_ready_order_idx
+          ON generation_jobs(available_at, run_started_at, step_index, id)
+          WHERE status IN ('queued','retry_wait');
+        CREATE INDEX IF NOT EXISTS generation_jobs_prerequisite_idx
+          ON generation_jobs(run_id, step_index, status);
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9, $1, $2)",
+        ["generation_queue_concurrency_hardening", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

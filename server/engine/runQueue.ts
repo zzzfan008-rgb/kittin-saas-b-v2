@@ -1,11 +1,15 @@
 import os from "node:os";
-import path from "node:path";
 import type { PoolClient } from "pg";
 import { nanoid } from "nanoid";
 import type { ExecutionPlan, NodeExecution } from "../../src/types/workflow";
 import { isImageModelId } from "../../src/types/imageModels";
+import { config } from "../config";
 import { db, query, queryOne, transaction } from "../lib/database";
-import { persistImageRef } from "../lib/fileStore";
+import {
+  deleteStoredImage,
+  persistImageRefWithReceipt,
+  type PersistedImageReceipt,
+} from "../lib/fileStore";
 import type { GenerationRecordContext } from "../lib/generationRecords";
 import { getProvider } from "../providers";
 import {
@@ -33,9 +37,9 @@ const TERMINAL_RUN_STATUSES = new Set<DurableRunStatus>([
 ]);
 const DEFAULT_LEASE_MS = 45_000;
 const DEFAULT_HEARTBEAT_MS = 10_000;
-const DEFAULT_POLL_MS = 750;
-const DEFAULT_RETRY_DELAYS_MS = [5_000, 15_000] as const;
+const DEFAULT_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 const CANCELLED_AFTER_START_WARNING = "取消请求未能中止已经开始的上游调用，结果已按实际返回保存";
+const OUTCOME_UNKNOWN_GUIDANCE = "请先核对 API易消耗记录；确认未扣费后，再手动重新提交任务";
 export const DURABLE_RUN_EVENT_BATCH_SIZE = 500;
 
 interface DurableRunRow {
@@ -84,7 +88,7 @@ export interface ProcessGenerationJobOptions {
   heartbeatMs?: number;
 }
 
-class CancelledBeforeProviderCall extends Error {
+export class CancelledBeforeProviderCall extends Error {
   constructor() {
     super("任务已在上游调用开始前取消");
     this.name = "CancelledBeforeProviderCall";
@@ -110,17 +114,20 @@ async function lockRun(client: PoolClient, runId: string): Promise<DurableRunRow
   )).rows[0];
 }
 
-async function appendRunEvent(
+export async function appendRunEvent(
   client: PoolClient,
   runId: string,
   event: RunEvent,
   createdAt: number,
 ): Promise<RunEvent> {
   const seqRow = (await client.query<{ seq: number }>(`
-    SELECT COALESCE(MAX(seq), 0)::int + 1 AS seq
-    FROM generation_run_events WHERE run_id = $1
+    UPDATE generation_runs
+    SET next_event_seq = next_event_seq + 1
+    WHERE id = $1
+    RETURNING next_event_seq::int AS seq
   `, [runId])).rows[0];
-  const sequenced = { ...event, seq: seqRow?.seq ?? 1 } as RunEvent;
+  if (!seqRow) throw new Error("generation run disappeared while appending an event");
+  const sequenced = { ...event, seq: seqRow.seq } as RunEvent;
   await client.query(`
     INSERT INTO generation_run_events (run_id, seq, payload_json, created_at)
     VALUES ($1, $2, $3, $4)
@@ -172,9 +179,10 @@ export async function enqueueGenerationRun(
       `, [stepId, runId, index, step.nodeId, step.kind, JSON.stringify(step), model]);
       await client.query(`
         INSERT INTO generation_jobs (
-          id, run_id, step_id, idempotency_key, status, retry_count, available_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 'queued', 0, $5, $5, $5)
-      `, [nanoid(12), runId, stepId, `${runId}:${stepId}`, createdAt]);
+          id, run_id, step_id, idempotency_key, status, retry_count, available_at,
+          run_started_at, step_index, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'queued', 0, $5, $5, $6, $5, $5)
+      `, [nanoid(12), runId, stepId, `${runId}:${stepId}`, createdAt, index]);
       await appendRunEvent(client, runId, {
         type: "node-status", nodeId: step.nodeId, status: "queued", startedAt: createdAt,
       }, createdAt);
@@ -183,31 +191,33 @@ export async function enqueueGenerationRun(
   return { id: runId };
 }
 
-async function claimNextJob(
+export const CLAIM_NEXT_JOB_SQL = `
+  SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
+    s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
+  FROM generation_jobs j
+  JOIN generation_run_steps s ON s.id = j.step_id
+  JOIN generation_runs r ON r.id = j.run_id
+  WHERE j.status IN ('queued','retry_wait')
+    AND j.available_at <= $1
+    AND r.status IN ('queued','running','retry_wait')
+    AND NOT EXISTS (
+      SELECT 1 FROM generation_jobs previous
+      WHERE previous.run_id = j.run_id
+        AND previous.step_index < j.step_index
+        AND previous.status <> 'succeeded'
+    )
+  ORDER BY j.available_at, j.run_started_at, j.step_index, j.id
+  FOR UPDATE OF j SKIP LOCKED
+  LIMIT 1
+`;
+
+export async function claimNextJob(
   workerId: string,
   now: number,
   leaseMs: number,
 ): Promise<ClaimedJob | undefined> {
   return transaction(async (client) => {
-    const row = (await client.query<JobLockRow>(`
-      SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
-        s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
-      FROM generation_jobs j
-      JOIN generation_run_steps s ON s.id = j.step_id
-      JOIN generation_runs r ON r.id = j.run_id
-      WHERE j.status IN ('queued','retry_wait')
-        AND j.available_at <= $1
-        AND r.status IN ('queued','running','retry_wait')
-        AND NOT EXISTS (
-          SELECT 1 FROM generation_run_steps previous
-          WHERE previous.run_id = s.run_id
-            AND previous.step_index < s.step_index
-            AND previous.status <> 'succeeded'
-        )
-      ORDER BY j.available_at, r.started_at, s.step_index
-      FOR UPDATE OF j SKIP LOCKED
-      LIMIT 1
-    `, [now])).rows[0];
+    const row = (await client.query<JobLockRow>(CLAIM_NEXT_JOB_SQL, [now])).rows[0];
     if (!row) return undefined;
     const run = await lockRun(client, row.run_id);
     if (!run || isTerminalRunStatus(run.status) || run.status === "cancel_requested") return undefined;
@@ -275,10 +285,60 @@ async function markAttemptStarted(
   });
 }
 
-async function persistStepImages(images: string[]): Promise<string[]> {
-  const persisted: string[] = [];
-  for (const image of images) persisted.push(await persistImageRef(image));
-  return persisted;
+async function assertJobOwnedForCompletion(job: ClaimedJob, workerId: string): Promise<void> {
+  const row = await queryOne<{ status: DurableRunStatus; worker_id: string | null }>(
+    "SELECT status, worker_id FROM generation_jobs WHERE id = $1",
+    [job.id],
+  );
+  if (
+    !row ||
+    row.worker_id !== workerId ||
+    (row.status !== "running" && row.status !== "cancel_requested")
+  ) {
+    throw new Error("generation job lease was lost before image persistence");
+  }
+}
+
+async function persistStepImages(
+  images: string[],
+  job: ClaimedJob,
+): Promise<PersistedImageReceipt[]> {
+  const persisted: PersistedImageReceipt[] = [];
+  try {
+    for (const [index, image] of images.entries()) {
+      persisted.push(await persistImageRefWithReceipt(image, `${job.runId}:${job.stepId}:${index}`));
+    }
+    return persisted;
+  } catch (error) {
+    for (const receipt of persisted) {
+      if (receipt.created) deleteStoredImage(receipt.id);
+    }
+    throw error;
+  }
+}
+
+async function compensatePersistedImages(
+  persisted: PersistedImageReceipt[],
+  job: ClaimedJob,
+  workerId: string,
+): Promise<void> {
+  const owner = await queryOne<{ status: DurableRunStatus; worker_id: string | null }>(
+    "SELECT status, worker_id FROM generation_jobs WHERE id = $1",
+    [job.id],
+  ).catch(() => undefined);
+  if (
+    owner &&
+    owner.worker_id !== workerId &&
+    (owner.status === "running" || owner.status === "cancel_requested")
+  ) {
+    return;
+  }
+  for (const receipt of persisted) {
+    if (!receipt.created) continue;
+    const registered = await queryOne<{ id: string }>("SELECT id FROM files WHERE id = $1", [receipt.id])
+      .catch(() => ({ id: receipt.id }));
+    if (!registered) deleteStoredImage(receipt.id);
+  }
 }
 
 async function finalizeSuccessfulRun(
@@ -374,15 +434,22 @@ async function completeJobSuccess(
   job: ClaimedJob,
   workerId: string,
   result: StepResult,
-  persistedImages: string[],
+  persistedImages: PersistedImageReceipt[],
   finishedAt: number,
 ): Promise<void> {
+  const imageUrls = persistedImages.map((image) => image.url);
   await transaction(async (client) => {
     const locked = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(
       "SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE",
       [job.id],
     )).rows[0];
-    if (!locked || locked.worker_id !== workerId) throw new Error("generation job lease was lost before completion");
+    if (
+      !locked ||
+      locked.worker_id !== workerId ||
+      (locked.status !== "running" && locked.status !== "cancel_requested")
+    ) {
+      throw new Error("generation job lease was lost before completion");
+    }
     const run = await lockRun(client, job.runId);
     if (!run) throw new Error("generation run disappeared");
     const cancellationWarning = locked.status === "cancel_requested" ? CANCELLED_AFTER_START_WARNING : undefined;
@@ -396,23 +463,23 @@ async function completeJobSuccess(
         error = $6, finished_at = $7
       WHERE id = $8
     `, [
-      result.model ?? null, JSON.stringify(persistedImages), JSON.stringify(result.prompts ?? []),
+      result.model ?? null, JSON.stringify(imageUrls), JSON.stringify(result.prompts ?? []),
       JSON.stringify(result.providerOutputSizes ?? []), JSON.stringify(result.failures ?? []),
       cancellationWarning ?? null, finishedAt, job.stepId,
     ]);
     for (const image of persistedImages) {
-      if (!image.startsWith("/api/files/")) continue;
+      if (!image.url.startsWith("/api/files/")) continue;
       await client.query(`
         INSERT INTO files (id, owner_id, source_type, project_id, node_id, run_id, created_at)
         VALUES ($1, $2, 'generated', $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING
-      `, [path.basename(image), run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
+      `, [image.id, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
     }
     const partialWarning = result.failures?.length ? `${result.failures.length} 个生成任务失败` : undefined;
     await appendRunEvent(client, run.id, {
       type: "node-status",
       nodeId: job.nodeId,
       status: "success",
-      images: persistedImages,
+      images: imageUrls,
       model: result.model,
       prompts: result.prompts,
       providerOutputSizes: result.providerOutputSizes,
@@ -467,6 +534,10 @@ function isRetryableProviderError(error: unknown): error is ProviderError {
     error.status === 429 ||
     (error.status === 503 && error.category === "gateway_unavailable")
   );
+}
+
+function outcomeUnknownMessage(message: string): string {
+  return message.includes("API易消耗记录") ? message : `${message}；${OUTCOME_UNKNOWN_GUIDANCE}`;
 }
 
 async function terminateRun(
@@ -555,19 +626,24 @@ async function handleJobError(
       return;
     }
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
-      await terminateRun(client, row, "outcome_unknown", message, now);
+      await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now);
       return;
     }
     if (row.status === "cancel_requested") {
       await terminateRun(client, row, "cancelled", "用户取消了任务，系统未继续重试", now);
       return;
     }
-    if (isRetryableProviderError(error) && row.retry_count < 2) {
+    const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+    const maxRetries = Math.min(retryDelays.length, DEFAULT_RETRY_DELAYS_MS.length);
+    if (isRetryableProviderError(error) && row.retry_count < maxRetries) {
       const retryNumber = row.retry_count + 1;
-      const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
-      const baseDelay = retryDelays[Math.min(row.retry_count, retryDelays.length - 1)] ?? DEFAULT_RETRY_DELAYS_MS[1];
+      const baseDelay = retryDelays[row.retry_count] ?? DEFAULT_RETRY_DELAYS_MS[row.retry_count];
       const jitter = Math.floor((options.random?.() ?? Math.random()) * 1_000);
       const availableAt = now + Math.max(0, baseDelay) + jitter;
+      console.warn("[generation-job-retry]", JSON.stringify({
+        runId: row.run_id, nodeId: row.node_id, retryCount: retryNumber,
+        delayMs: Math.max(0, baseDelay) + jitter, exhausted: false,
+      }));
       await lockRun(client, row.run_id);
       await client.query(`
         UPDATE generation_jobs SET status = 'retry_wait', retry_count = $1, available_at = $2,
@@ -585,6 +661,12 @@ async function handleJobError(
         startedAt: row.step_started_at ?? job.startedAt,
       }, now);
       return;
+    }
+    if (isRetryableProviderError(error)) {
+      console.warn("[generation-job-retry]", JSON.stringify({
+        runId: row.run_id, nodeId: row.node_id, retryCount: row.retry_count,
+        delayMs: null, exhausted: true,
+      }));
     }
     await terminateRun(client, row, "failed", message, now);
   });
@@ -604,7 +686,7 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
       if (row.attempt_started_at !== null) {
         await terminateRun(
           client, row, "outcome_unknown",
-          "Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试", now,
+          outcomeUnknownMessage("Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试"), now,
         );
         continue;
       }
@@ -661,8 +743,14 @@ export async function processNextGenerationJob(
         },
       },
     );
-    const persistedImages = await persistStepImages(result.images);
-    await completeJobSuccess(job, workerId, result, persistedImages, options.now?.() ?? Date.now());
+    await assertJobOwnedForCompletion(job, workerId);
+    const persistedImages = await persistStepImages(result.images, job);
+    try {
+      await completeJobSuccess(job, workerId, result, persistedImages, options.now?.() ?? Date.now());
+    } catch (error) {
+      await compensatePersistedImages(persistedImages, job, workerId);
+      throw error;
+    }
   } catch (error) {
     await handleJobError(job, workerId, error, options);
   } finally {
@@ -688,7 +776,8 @@ export function startGenerationWorker(): () => void {
       busy = false;
     }
   };
-  const timer = setInterval(() => void tick(), DEFAULT_POLL_MS);
+  const pollMs = config.generationWorkerPollMs();
+  const timer = setInterval(() => void tick(), pollMs);
   timer.unref();
   void tick();
   return () => {

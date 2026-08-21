@@ -21,6 +21,7 @@ process.env.INITIAL_ADMIN_PASSWORD = "Initial1234";
 await resetPostgresTestDatabase();
 const database = await import("../server/lib/database");
 const queue = await import("../server/engine/runQueue");
+const fileStore = await import("../server/lib/fileStore");
 const { generateRouter } = await import("../server/routes/generate");
 const { streamDurableRunEvents } = await import("../server/routes/runPlan");
 await database.initializeDatabase();
@@ -102,6 +103,16 @@ async function runRow(runId: string) {
   );
 }
 
+interface ExplainPlanNode {
+  "Node Type": string;
+  "Sort Method"?: string;
+  Plans?: ExplainPlanNode[];
+}
+
+function flattenPlan(node: ExplainPlanNode): ExplainPlanNode[] {
+  return [node, ...(node.Plans ?? []).flatMap(flattenPlan)];
+}
+
 console.log("PostgreSQL 持久生成队列测试");
 
 await test("入队立即返回且数据库重连后 queued 任务仍可执行并重放事件", async () => {
@@ -136,32 +147,105 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
   assert.deepEqual(replay?.map((event) => event.seq), allEvents.slice(2).map((event) => event.seq));
 });
 
-await test("明确 429 最多自动重放两次并保留三次真实请求计数", async () => {
+await test("retry_wait 在 available_at 前不可领取，到期后才对 Worker 可见", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const runId = await enqueueSingle("available-at");
+  const availableAt = tick(10_000);
+  await database.query(
+    "UPDATE generation_jobs SET status = 'retry_wait', available_at = $1 WHERE run_id = $2",
+    [availableAt, runId],
+  );
+  await database.query("UPDATE generation_run_steps SET status = 'retry_wait' WHERE run_id = $1", [runId]);
+  await database.query("UPDATE generation_runs SET status = 'retry_wait' WHERE id = $1", [runId]);
+
+  assert.equal(await queue.processNextGenerationJob("worker-not-yet-available", {
+    resolveProvider: fake.resolveProvider, now: () => availableAt - 1, random: () => 0,
+  }), false);
+  assert.equal(fake.calls(), 0);
+  assert.equal((await runRow(runId))?.status, "retry_wait");
+
+  assert.equal(await queue.processNextGenerationJob("worker-now-available", {
+    resolveProvider: fake.resolveProvider, now: () => availableAt, random: () => 0,
+  }), true);
+  assert.equal(fake.calls(), 1);
+  assert.equal((await runRow(runId))?.status, "succeeded");
+});
+
+await test("队列结果文件按稳定键幂等落盘", async () => {
+  const key = `file-idempotency-${sequence += 1}`;
+  const first = await fileStore.persistImageRefWithReceipt(PNG_DATA_URL, key);
+  const second = await fileStore.persistImageRefWithReceipt(PNG_DATA_URL, key);
+  try {
+    assert.equal(first.created, true);
+    assert.equal(second.created, false);
+    assert.equal(second.id, first.id);
+    assert.equal(second.url, first.url);
+    assert.equal(fs.readdirSync(fileStore.uploadsDir()).filter((id) => id === first.id).length, 1);
+  } finally {
+    fileStore.deleteStoredImage(first.id);
+  }
+});
+
+await test("成功事务回滚会补偿删除本次新建的结果文件", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const runId = await enqueueSingle("rollback-file");
+  const before = new Set(fs.readdirSync(fileStore.uploadsDir()));
+  await database.query(`
+    CREATE OR REPLACE FUNCTION reject_test_generation_success() RETURNS trigger AS $$
+    BEGIN
+      IF NEW.status = 'succeeded' AND NEW.node_id LIKE 'rollback-file-%' THEN
+        RAISE EXCEPTION 'forced completion rollback';
+      END IF;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    CREATE TRIGGER reject_test_generation_success_trigger
+      BEFORE UPDATE ON generation_run_steps
+      FOR EACH ROW EXECUTE FUNCTION reject_test_generation_success();
+  `);
+  try {
+    const now = tick();
+    assert.equal(await queue.processNextGenerationJob("worker-rollback-file", {
+      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0,
+    }), true);
+  } finally {
+    await database.query("DROP TRIGGER IF EXISTS reject_test_generation_success_trigger ON generation_run_steps");
+    await database.query("DROP FUNCTION IF EXISTS reject_test_generation_success()");
+  }
+  assert.equal(fake.calls(), 1);
+  assert.equal((await runRow(runId))?.status, "failed");
+  assert.equal((await database.queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM files WHERE run_id = $1", [runId],
+  ))?.count, 0);
+  assert.deepEqual(fs.readdirSync(fileStore.uploadsDir()).filter((id) => !before.has(id)), []);
+});
+
+await test("明确 429 最多自动重放三次并保留四次真实请求计数", async () => {
   const fake = resolver(() => {
     throw new ProviderError("AI 服务当前繁忙，请稍后重试", 429, "stub", "rate_limited");
   });
   const runId = await enqueueSingle("rate-limit");
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     const now = tick();
     assert.equal(await queue.processNextGenerationJob("worker-429", {
-      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
+      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0, 0],
     }), true);
   }
-  assert.equal(fake.calls(), 3);
+  assert.equal(fake.calls(), 4);
   assert.deepEqual(await runRow(runId), {
-    status: "failed", error: "AI 服务当前繁忙，请稍后重试", provider_requests: 3, successful_count: 0,
+    status: "failed", error: "AI 服务当前繁忙，请稍后重试", provider_requests: 4, successful_count: 0,
   });
   const job = await database.queryOne<{ retry_count: number; status: string }>(
     "SELECT retry_count, status FROM generation_jobs WHERE run_id = $1", [runId],
   );
-  assert.deepEqual(job, { retry_count: 2, status: "failed" });
+  assert.deepEqual(job, { retry_count: 3, status: "failed" });
   const now = tick();
   assert.equal(await queue.processNextGenerationJob("worker-429", {
-    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
+    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0, 0],
   }), false);
 });
 
-await test("确认临时的 503 最多重放两次，第三次成功后请求数仍准确", async () => {
+await test("确认临时的 503 连续两次失败后第三次成功且请求数准确", async () => {
   const fake = resolver((_request, call) => {
     if (call <= 2) {
       throw new ProviderError("AI 服务暂时不可用，请稍后重试", 503, "stub", "gateway_unavailable");
@@ -172,13 +256,45 @@ await test("确认临时的 503 最多重放两次，第三次成功后请求数
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const now = tick();
     assert.equal(await queue.processNextGenerationJob("worker-503", {
-      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
+      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0, 0],
     }), true);
   }
   assert.equal(fake.calls(), 3);
   assert.deepEqual(await runRow(runId), {
     status: "succeeded", error: null, provider_requests: 3, successful_count: 1,
   });
+});
+
+await test("连续三次 503 按 5/30/120 秒退避，第 4 次失败后终止", async () => {
+  const fake = resolver(() => {
+    throw new ProviderError("AI 服务暂时不可用，请稍后重试", 503, "stub", "gateway_unavailable");
+  });
+  const runId = await enqueueSingle("persistent-503");
+  const expectedDelays = [5_000, 30_000, 120_000];
+  let attemptNow = tick();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    assert.equal(await queue.processNextGenerationJob("worker-persistent-503", {
+      resolveProvider: fake.resolveProvider, now: () => attemptNow, random: () => 0,
+    }), true);
+    if (attempt < expectedDelays.length) {
+      const job = await database.queryOne<{ retry_count: number; status: string; available_at: number }>(
+        "SELECT retry_count, status, available_at FROM generation_jobs WHERE run_id = $1", [runId],
+      );
+      assert.deepEqual({ retry_count: job?.retry_count, status: job?.status }, {
+        retry_count: attempt + 1, status: "retry_wait",
+      });
+      assert.equal((job?.available_at ?? 0) - attemptNow, expectedDelays[attempt]);
+      attemptNow = job!.available_at;
+    }
+  }
+  clock = Math.max(clock, attemptNow);
+  assert.equal(fake.calls(), 4);
+  assert.deepEqual(await runRow(runId), {
+    status: "failed", error: "AI 服务暂时不可用，请稍后重试", provider_requests: 4, successful_count: 0,
+  });
+  assert.deepEqual(await database.queryOne<{ retry_count: number; status: string }>(
+    "SELECT retry_count, status FROM generation_jobs WHERE run_id = $1", [runId],
+  ), { retry_count: 3, status: "failed" });
 });
 
 await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放", async () => {
@@ -196,8 +312,11 @@ await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放
     resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
   }), true);
   assert.equal(fake.calls(), 1);
-  assert.equal((await runRow(runId))?.status, "outcome_unknown");
-  assert.equal((await runRow(runId))?.provider_requests, 1);
+  const unknown = await runRow(runId);
+  assert.equal(unknown?.status, "outcome_unknown");
+  assert.equal(unknown?.provider_requests, 1);
+  assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
+  assert.match(unknown?.error ?? "", /确认未扣费后.*手动重新提交/);
   now = tick();
   assert.equal(await queue.processNextGenerationJob("worker-unknown", {
     resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
@@ -256,8 +375,10 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   `, [unknownRunId]);
   await database.query("UPDATE generation_runs SET status = 'running' WHERE id = $1", [unknownRunId]);
   assert.equal(await queue.recoverExpiredGenerationJobs(unknownExpiry), 1);
-  assert.equal((await runRow(unknownRunId))?.status, "outcome_unknown");
-  assert.equal((await runRow(unknownRunId))?.provider_requests, 1);
+  const unknown = await runRow(unknownRunId);
+  assert.equal(unknown?.status, "outcome_unknown");
+  assert.equal(unknown?.provider_requests, 1);
+  assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
 });
 
 await test("queued 任务可直接取消且不会调用上游", async () => {
@@ -270,6 +391,37 @@ await test("queued 任务可直接取消且不会调用上游", async () => {
   }), false);
   assert.equal(fake.calls(), 0);
   assert.equal((await runRow(runId))?.status, "cancelled");
+});
+
+await test("Provider 校验阶段取消会在实际调用前终止", async () => {
+  const runId = await enqueueSingle("cancel-during-validation");
+  let calls = 0;
+  const provider: AIProvider = {
+    id: "gpt-image-2-vip",
+    async validate() {
+      assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), {
+        status: "cancel_requested", finished: false,
+      });
+    },
+    async generate() {
+      calls += 1;
+      return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
+    },
+    async edit() {
+      calls += 1;
+      return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
+    },
+  };
+  assert.equal(new queue.CancelledBeforeProviderCall().message, "任务已在上游调用开始前取消");
+  const now = tick();
+  assert.equal(await queue.processNextGenerationJob("worker-cancel-validation", {
+    resolveProvider: () => provider, now: () => now, random: () => 0,
+  }), true);
+  assert.equal(calls, 0);
+  assert.deepEqual(await runRow(runId), {
+    status: "cancelled", error: "任务已在上游调用开始前取消",
+    provider_requests: 0, successful_count: 0,
+  });
 });
 
 await test("取消事务先等待 job 锁，再获取 run 锁，避免与 Worker 完成路径死锁", async () => {
@@ -289,6 +441,39 @@ await test("取消事务先等待 job 锁，再获取 run 锁，避免与 Worker
     await blocker.query("ROLLBACK").catch(() => undefined);
     blocker.release();
   }
+});
+
+await test("同一 run 的并发事件通过原子序号严格递增且无缺口", async () => {
+  const runId = await enqueueSingle("concurrent-events");
+  const first = await database.db().connect();
+  const second = await database.db().connect();
+  let secondAppend: Promise<unknown> | undefined;
+  try {
+    await first.query("BEGIN");
+    await second.query("BEGIN");
+    const firstEvent = await queue.appendRunEvent(first, runId, {
+      type: "node-status", nodeId: "concurrent-events-a", status: "queued",
+    }, tick());
+    let secondSettled = false;
+    secondAppend = queue.appendRunEvent(second, runId, {
+      type: "node-status", nodeId: "concurrent-events-b", status: "queued",
+    }, tick()).then((event) => { secondSettled = true; return event; });
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    assert.equal(secondSettled, false, "第二个事务应等待同一 run 的序号分配锁");
+    await first.query("COMMIT");
+    const secondEvent = await secondAppend as { seq?: number };
+    await second.query("COMMIT");
+    assert.deepEqual([firstEvent.seq, secondEvent.seq], [2, 3]);
+  } finally {
+    await first.query("ROLLBACK").catch(() => undefined);
+    await second.query("ROLLBACK").catch(() => undefined);
+    await secondAppend?.catch(() => undefined);
+    first.release();
+    second.release();
+  }
+  const events = await queue.readDurableRunEvents(runId, owner.id, 0);
+  assert.deepEqual(events?.map((event) => event.seq), [1, 2, 3]);
+  assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), { status: "cancelled", finished: true });
 });
 
 await test("目标步骤调用开始后的取消请求保留真实成功结果并记录警告", async () => {
@@ -440,6 +625,51 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     assert.deepEqual(await queue.cancelDurableRun(body.runId, owner.id), { status: "cancelled", finished: true });
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+await test("500 个 job 的领取计划无 Sort 且 claimNextJob P95 小于 50ms", async () => {
+  const runIds: string[] = [];
+  for (let runIndex = 0; runIndex < 100; runIndex += 1) {
+    sequence += 1;
+    const nodes = Array.from({ length: 5 }, (_value, stepIndex) => "perf-" + sequence + "-" + stepIndex);
+    const steps = nodes.map((nodeId, stepIndex) => step(
+      nodeId,
+      stepIndex === 0 ? undefined : [{ nodeId: nodes[stepIndex - 1], images: [] }],
+    ));
+    const run = await queue.enqueueGenerationRun({ steps }, owner.id, context(nodes.at(-1)!));
+    runIds.push(run.id);
+  }
+  try {
+    assert.equal((await database.queryOne<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM generation_jobs WHERE run_id = ANY($1::text[])", [runIds],
+    ))?.count, 500);
+    await database.query("ANALYZE generation_jobs, generation_run_steps, generation_runs");
+    const benchmarkNow = tick(10_000);
+    const explain = await database.query<{ "QUERY PLAN": Array<{ Plan: ExplainPlanNode }> }>(
+      "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + queue.CLAIM_NEXT_JOB_SQL,
+      [benchmarkNow],
+    );
+    const root = explain[0]?.["QUERY PLAN"]?.[0]?.Plan;
+    assert.ok(root);
+    const sortNodes = flattenPlan(root).filter((node) => node["Node Type"].includes("Sort"));
+    assert.deepEqual(sortNodes.map((node) => ({
+      nodeType: node["Node Type"], sortMethod: node["Sort Method"] ?? null,
+    })), []);
+
+    const durations: number[] = [];
+    for (let index = 0; index < 20; index += 1) {
+      const started = process.hrtime.bigint();
+      const claimed = await queue.claimNextJob("perf-worker-" + index, benchmarkNow, 60_000);
+      durations.push(Number(process.hrtime.bigint() - started) / 1_000_000);
+      assert.ok(claimed && runIds.includes(claimed.runId));
+    }
+    durations.sort((left, right) => left - right);
+    const p95 = durations[Math.ceil(durations.length * 0.95) - 1];
+    assert.ok(p95 < 50, "claimNextJob P95 " + p95.toFixed(2) + "ms exceeds 50ms");
+    console.log("    claimNextJob P95 " + p95.toFixed(2) + "ms");
+  } finally {
+    await database.query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [runIds]);
   }
 });
 

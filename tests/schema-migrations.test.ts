@@ -29,6 +29,7 @@ assert.deepEqual(versions, [
   { version: 6, name: "durable_generation_queue" },
   { version: 7, name: "provider_output_size_metadata" },
   { version: 8, name: "normalized_upload_metadata" },
+  { version: 9, name: "generation_queue_concurrency_hardening" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -57,10 +58,39 @@ const retryConstraint = await queryOne<{ definition: string }>(`
     AND contype = 'c'
     AND pg_get_constraintdef(oid) LIKE '%retry_count%'
 `);
-assert.match(retryConstraint?.definition ?? "", /retry_count.*(?:0|2)/);
+assert.match(retryConstraint?.definition ?? "", /retry_count.*(?:0|3)/);
 assert.match(retryConstraint?.definition ?? "", />= 0/);
-assert.match(retryConstraint?.definition ?? "", /<= 2/);
-console.log("  ✓ 持久队列表、状态约束与最多两次重试约束已建立");
+assert.match(retryConstraint?.definition ?? "", /<= 3/);
+console.log("  ✓ 持久队列表、状态约束与最多三次重试约束已建立");
+const queueHardeningColumns = await query<{ table_name: string; column_name: string }>(`
+  SELECT table_name, column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND (
+    (table_name = 'generation_runs' AND column_name = 'next_event_seq') OR
+    (table_name = 'generation_jobs' AND column_name IN ('run_started_at','step_index'))
+  )
+  ORDER BY table_name, column_name
+`);
+assert.deepEqual(queueHardeningColumns, [
+  { table_name: "generation_jobs", column_name: "run_started_at" },
+  { table_name: "generation_jobs", column_name: "step_index" },
+  { table_name: "generation_runs", column_name: "next_event_seq" },
+]);
+const queueIndexes = await query<{ indexname: string; indexdef: string }>(`
+  SELECT indexname, indexdef FROM pg_indexes
+  WHERE schemaname = 'public' AND indexname IN (
+    'generation_jobs_status_available_idx',
+    'generation_jobs_ready_order_idx',
+    'generation_jobs_prerequisite_idx'
+  )
+  ORDER BY indexname
+`);
+assert.deepEqual(queueIndexes.map((row) => row.indexname), [
+  "generation_jobs_prerequisite_idx",
+  "generation_jobs_ready_order_idx",
+  "generation_jobs_status_available_idx",
+]);
+assert.match(queueIndexes.find((row) => row.indexname === "generation_jobs_ready_order_idx")?.indexdef ?? "", /available_at, run_started_at, step_index, id/);
+console.log("  ✓ 队列排序列、可用时间索引与原子事件序号列已建立");
 const sizeColumns = await query<{ table_name: string; column_name: string }>(`
   SELECT table_name, column_name FROM information_schema.columns
   WHERE table_schema = 'public' AND (

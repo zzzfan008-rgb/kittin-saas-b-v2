@@ -6,7 +6,7 @@
     "upstreamMode": "synchronous",
     "businessQueue": "postgresql",
     "retryableHttpStatuses": [429, 503],
-    "maxAutomaticRetries": 2,
+    "maxAutomaticRetries": 3,
     "ambiguousTransportFailure": "outcome_unknown",
     "persistTemporaryUrlsImmediately": true
   },

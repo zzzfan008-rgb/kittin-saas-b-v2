@@ -53,6 +53,10 @@ export const config = {
   databaseUser: () => process.env.PGUSER?.trim() || process.env.POSTGRES_USER?.trim() || "garment_canvas",
   databasePassword: () => process.env.PGPASSWORD ?? process.env.POSTGRES_PASSWORD ?? "",
   databasePoolSize: () => Math.max(1, Math.min(50, Number(process.env.DATABASE_POOL_SIZE) || 10)),
+  generationWorkerPollMs: () => {
+    const value = Number(process.env.GENERATION_WORKER_POLL_MS ?? 2_000);
+    return Number.isFinite(value) ? Math.max(100, Math.min(60_000, value)) : 2_000;
+  },
   sqliteImportPath: () => path.resolve(config.dataDir(), process.env.SQLITE_IMPORT_FILE ?? "garment-canvas.db"),
   initialAdminAccountId: () => process.env.INITIAL_ADMIN_ACCOUNT_ID?.trim() ?? "",
   initialAdminPassword: () => process.env.INITIAL_ADMIN_PASSWORD ?? "",
