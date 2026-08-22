@@ -55,7 +55,7 @@ export function CompareOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-xs">
       <div className="flex items-center justify-between px-6 py-4">
         <span className="text-xs font-medium tracking-widest text-neutral-400">
           对比 {items.length} 张

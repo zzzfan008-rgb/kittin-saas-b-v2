@@ -80,7 +80,7 @@ export function TemplatesDock() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className={`pointer-events-auto flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[11px] font-medium shadow-lg shadow-black/40 backdrop-blur transition-colors ${
+          className={`pointer-events-auto flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[11px] font-medium shadow-lg shadow-black/40 backdrop-blur-sm transition-colors ${
             open
               ? "border-gold bg-[#1a1a1a] text-gold"
               : "border-[#333] bg-[#141414]/90 text-neutral-300 hover:border-gold/60 hover:text-gold"
@@ -122,7 +122,7 @@ export function TemplatesDock() {
                 <button
                   type="button"
                   onClick={() => void load()}
-                  className="mt-2 rounded border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+                  className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
                 >
                   重试
                 </button>
@@ -148,10 +148,10 @@ export function TemplatesDock() {
                           loading="lazy"
                           decoding="async"
                           alt={tpl.name}
-                          className="aspect-[16/9] w-full object-cover"
+                          className="aspect-video w-full object-cover"
                         />
                       ) : (
-                        <WorkflowMini flow={tpl.flow} className="aspect-[16/9] w-full" />
+                        <WorkflowMini flow={tpl.flow} className="aspect-video w-full" />
                       )}
                     </button>
                     <div className="flex flex-1 flex-col gap-1 p-2.5">
@@ -160,7 +160,7 @@ export function TemplatesDock() {
                           {tpl.name}
                         </span>
                         {tpl.builtIn && (
-                          <span className="shrink-0 rounded border border-gold/40 px-1 py-px text-[8px] text-gold">
+                          <span className="shrink-0 rounded-sm border border-gold/40 px-1 py-px text-[8px] text-gold">
                             内置
                           </span>
                         )}
@@ -174,7 +174,7 @@ export function TemplatesDock() {
                         <button
                           type="button"
                           onClick={() => applyTemplate(tpl)}
-                          className="flex-1 rounded border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold"
+                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold"
                         >
                           从模板新建
                         </button>
@@ -182,7 +182,7 @@ export function TemplatesDock() {
                           <button
                             type="button"
                             onClick={() => void removeTemplate(tpl)}
-                            className="rounded border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400"
+                            className="rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400"
                           >
                             删除
                           </button>
@@ -253,7 +253,7 @@ function SaveTemplateForm({ onClose, onSaved }: { onClose: () => void; onSaved: 
             onChange={(e) => setName(e.target.value)}
             placeholder="如：草图→改款→放大 标准流"
             autoFocus
-            className="w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-none"
+            className="w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden"
           />
         </label>
         <label className="block space-y-1">
@@ -263,7 +263,7 @@ function SaveTemplateForm({ onClose, onSaved }: { onClose: () => void; onSaved: 
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="这个模板适用于什么场景"
-            className="w-full resize-none rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-none"
+            className="w-full resize-none rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden"
           />
         </label>
         {error && <p className="text-[10px] text-red-400">{error}</p>}

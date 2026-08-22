@@ -56,10 +56,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <img
             src={thumbnailImageUrl(source)}
             alt="蒙版原图"
-            className="aspect-[4/3] w-full rounded-md border border-[#262626] object-contain"
+            className="aspect-4/3 w-full rounded-md border border-[#262626] object-contain"
           />
         ) : (
-          <div className="flex aspect-[4/3] items-center justify-center rounded-md border border-dashed border-[#333] text-[10px] text-neutral-600">
+          <div className="flex aspect-4/3 items-center justify-center rounded-md border border-dashed border-[#333] text-[10px] text-neutral-600">
             连接需要局部修改的图片
           </div>
         )}

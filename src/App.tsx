@@ -226,7 +226,7 @@ function Workspace() {
   return (
     <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
       {initialHistoryState !== "ready" && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#101214]/95 px-6 text-center">
+        <div className="absolute inset-0 z-100 flex items-center justify-center bg-[#101214]/95 px-6 text-center">
           {initialHistoryState === "loading" ? (
             <p className="text-xs text-neutral-400">正在确认运行历史，确认完成前暂停新的生成任务…</p>
           ) : (
@@ -235,7 +235,7 @@ function Workspace() {
               <button
                 type="button"
                 onClick={() => setInitialHistoryAttempt((value) => value + 1)}
-                className="rounded border border-gold/60 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
+                className="rounded-sm border border-gold/60 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
               >
                 重试同步
               </button>

@@ -122,7 +122,7 @@ export function AssetPickerOverlay() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs"
       onClick={() => setTarget(null)}
     >
       <div
@@ -134,7 +134,7 @@ export function AssetPickerOverlay() {
           <button
             type="button"
             onClick={() => setTarget(null)}
-            className="rounded border border-[#262626] px-2 py-1 text-[10px] text-neutral-500 hover:border-gold/50 hover:text-gold"
+            className="rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-500 hover:border-gold/50 hover:text-gold"
           >
             关闭
           </button>
@@ -147,7 +147,7 @@ export function AssetPickerOverlay() {
                 key={key}
                 type="button"
                 onClick={() => setCategory(key)}
-                className={`rounded border px-2 py-1 text-[10px] transition-colors ${
+                className={`rounded-sm border px-2 py-1 text-[10px] transition-colors ${
                   category === key
                     ? "border-gold/60 text-gold"
                     : "border-[#262626] text-neutral-500 hover:text-neutral-300"
@@ -162,7 +162,7 @@ export function AssetPickerOverlay() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索素材名称"
-            className="ml-auto w-44 rounded border border-[#262626] bg-[#0f0f0f] px-2 py-1 text-[10px] text-neutral-200 placeholder:text-neutral-600 focus:border-gold/60 focus:outline-none"
+            className="ml-auto w-44 rounded-sm border border-[#262626] bg-[#0f0f0f] px-2 py-1 text-[10px] text-neutral-200 placeholder:text-neutral-600 focus:border-gold/60 focus:outline-hidden"
           />
         </div>
 
@@ -173,7 +173,7 @@ export function AssetPickerOverlay() {
               <button
                 type="button"
                 onClick={() => void load(0)}
-                className="mt-2 rounded border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+                className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
               >
                 重试
               </button>

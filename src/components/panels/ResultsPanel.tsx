@@ -54,7 +54,7 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
                   window.dispatchEvent(new CustomEvent(OPEN_COMPARE_EVENT));
                 }
               }}
-              className="rounded border border-gold/60 bg-gold/10 px-2 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
+              className="rounded-sm border border-gold/60 bg-gold/10 px-2 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
             >
               对比 {compareIds.length} 张
             </span>
@@ -159,7 +159,7 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
                   type="button"
                   onClick={onLoadMore}
                   disabled={loadingMore}
-                  className={`${resultCardClass} rounded-md border border-dashed border-[var(--gc-border)] text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:opacity-50`}
+                  className={`${resultCardClass} rounded-md border border-dashed border-(--gc-border) text-[10px] text-(--gc-text-muted) hover:border-(--gc-accent) hover:text-(--gc-accent) disabled:opacity-50`}
                 >
                   {loadingMore ? "加载中…" : "加载更多"}
                 </button>

@@ -108,7 +108,7 @@ export function FabricRecolorNode({
                 type="button"
                 onClick={() => toggleColor(hex)}
                 title={`${nameOfColor(hex)} ${hex} · 点击移除`}
-                className="flex items-center gap-1 rounded-sm border border-[#333] bg-[#161616] px-1 py-0.5 text-[9px] text-neutral-300 hover:border-red-400/60"
+                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[9px] text-neutral-300 hover:border-red-400/60"
               >
                 <span
                   className="h-2.5 w-2.5 rounded-[2px]"
@@ -128,10 +128,10 @@ export function FabricRecolorNode({
                 key={cat.id}
                 type="button"
                 onClick={() => setCategoryId(cat.id)}
-                className={`rounded-sm border px-1 py-1 text-[10px] transition-colors ${
+                className={`rounded-xs border px-1 py-1 text-[10px] transition-colors ${
                   cat.id === categoryId
-                    ? "border-[#C9A66B] bg-[#C9A66B]/15 text-[#C9A66B]"
-                    : "border-[#333] text-neutral-400 hover:border-[#C9A66B]/40"
+                    ? "border-gold bg-gold/15 text-gold"
+                    : "border-[#333] text-neutral-400 hover:border-gold/40"
                 }`}
               >
                 {cat.label}
@@ -163,16 +163,16 @@ export function FabricRecolorNode({
                     className="flex flex-col items-center gap-0.5"
                   >
                     <span
-                      className={`h-5 w-full rounded-sm border transition-transform hover:scale-105 ${
+                      className={`h-5 w-full rounded-xs border transition-transform hover:scale-105 ${
                         active
-                          ? "border-[#C9A66B] ring-1 ring-[#C9A66B]"
+                          ? "border-gold ring-1 ring-[#C9A66B]"
                           : "border-white/15"
                       }`}
                       style={{ backgroundColor: c.hex }}
                     />
                     <span
                       className={`w-full truncate text-center text-[8px] leading-tight ${
-                        active ? "text-[#C9A66B]" : "text-neutral-500"
+                        active ? "text-gold" : "text-neutral-500"
                       }`}
                     >
                       {c.name}
@@ -190,7 +190,7 @@ export function FabricRecolorNode({
                 type="color"
                 value={isValidHex(hexInput) ? normalizeHex(hexInput) : "#C9A66B"}
                 onChange={(e) => setHexInput(e.target.value)}
-                className="h-6 w-7 cursor-pointer rounded-sm border border-[#333] bg-transparent p-0"
+                className="h-6 w-7 cursor-pointer rounded-xs border border-[#333] bg-transparent p-0"
                 title="自定义取色"
               />
               <input
@@ -198,13 +198,13 @@ export function FabricRecolorNode({
                 onChange={(e) => setHexInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
                 placeholder="#RRGGBB"
-                className="h-6 flex-1 rounded-sm border border-[#333] bg-[#0f0f0f] px-1.5 font-mono text-[10px] text-neutral-200 outline-none focus:border-[#C9A66B]/60"
+                className="h-6 flex-1 rounded-xs border border-[#333] bg-[#0f0f0f] px-1.5 font-mono text-[10px] text-neutral-200 outline-hidden focus:border-gold/60"
               />
               <button
                 type="button"
                 onClick={addCustomHex}
                 disabled={!isValidHex(hexInput)}
-                className="h-6 rounded-sm border border-[#333] px-2 text-[10px] text-neutral-300 hover:border-[#C9A66B]/60 disabled:opacity-40"
+                className="h-6 rounded-xs border border-[#333] px-2 text-[10px] text-neutral-300 hover:border-gold/60 disabled:opacity-40"
               >
                 添加
               </button>

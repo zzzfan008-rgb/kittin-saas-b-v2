@@ -75,7 +75,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
               if (e.key === "Enter") commit();
               if (e.key === "Escape") setEditing(false);
             }}
-            className="nodrag min-w-0 flex-1 rounded border border-gold bg-[#0f0f0f] px-1.5 py-0.5 text-xs text-neutral-200 focus:outline-none"
+            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[#0f0f0f] px-1.5 py-0.5 text-xs text-neutral-200 focus:outline-hidden"
           />
         ) : (
           <span
@@ -151,4 +151,4 @@ export function Developing() {
 }
 
 export const inputClass =
-  "nodrag w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-none";
+  "nodrag w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden";

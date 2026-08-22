@@ -243,7 +243,7 @@ export function TopBar() {
       <input
         value={projectName}
         onChange={(e) => setProjectName(e.target.value)}
-        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-none sm:w-44 sm:flex-none sm:px-2 lg:w-56"
+        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-hidden sm:w-44 sm:flex-none sm:px-2 lg:w-56"
         placeholder="项目名称"
       />
       {dirty && <span className="shrink-0 text-[10px] text-gold" title="有未保存修改">●</span>}
@@ -251,14 +251,14 @@ export function TopBar() {
         <button
           type="button"
           onClick={retryTabSessionPersistence}
-          className="shrink-0 rounded border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
+          className="shrink-0 rounded-sm border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
           title={tabSessionPersistenceError}
         >
           本地恢复失败 · 重试
         </button>
       )}
       {readOnly && (
-        <span className="shrink-0 rounded border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
+        <span className="shrink-0 rounded-sm border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
           <span className="sm:hidden">只读</span>
           <span className="hidden sm:inline">管理员只读</span>
         </span>
