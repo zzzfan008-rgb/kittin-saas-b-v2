@@ -812,17 +812,22 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(topBarSource, /onClick=\{retryTabSessionPersistence\}/);
 });
 
-await test("窄屏侧栏使用抽屉且顶栏不再依赖绝对居中", () => {
+await test("窄屏侧栏使用可访问 Sheet 且顶栏不再依赖绝对居中", () => {
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const topBarSource = fs.readFileSync(
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
     "utf8",
   );
+  const shellSource = fs.readFileSync(
+    new URL("../src/components/workbench/WorkbenchShell.tsx", import.meta.url),
+    "utf8",
+  );
 
-  assert.match(appSource, /type MobilePanel = "library" | "inspector" | null/);
-  assert.match(appSource, /invisible -translate-x-full/);
-  assert.match(appSource, /invisible translate-x-full/);
-  assert.match(appSource, /md:static md:visible md:translate-x-0/);
+  assert.match(appSource, /<WorkbenchShell[\s\S]*workspaceKey=\{activeTabId\}/);
+  assert.match(shellSource, /useMediaQuery\(DESKTOP_QUERY\)/);
+  assert.match(shellSource, /<MobileSheet[\s\S]*mobilePanel === "library"/);
+  assert.match(shellSource, /<MobileSheet[\s\S]*mobilePanel === "inspector"/);
+  assert.match(shellSource, /aria-controls=\{(?:LIBRARY|INSPECTOR)_PANEL_ID\}/);
   assert.match(topBarSource, /min-w-0 flex-1/);
   assert.doesNotMatch(topBarSource, /absolute left-1\/2/);
 });

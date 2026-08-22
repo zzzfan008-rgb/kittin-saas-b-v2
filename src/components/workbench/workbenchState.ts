@@ -1,0 +1,44 @@
+export type MobileWorkbenchPanel = "library" | "inspector" | null;
+
+export interface WorkbenchUiState {
+  libraryOpen: boolean;
+  inspectorOpen: boolean;
+  mobilePanel: MobileWorkbenchPanel;
+}
+
+export type WorkbenchUiAction =
+  | { type: "toggle-library" }
+  | { type: "toggle-inspector" }
+  | { type: "open-mobile"; panel: Exclude<MobileWorkbenchPanel, null> }
+  | { type: "close-mobile" };
+
+export const INITIAL_WORKBENCH_UI_STATE: WorkbenchUiState = {
+  libraryOpen: false,
+  // 保留原工作台“属性始终可见”的首屏习惯，同时允许用户一键收起。
+  inspectorOpen: true,
+  mobilePanel: null,
+};
+
+/**
+ * 工作台外壳的纯 UI 状态。不保存项目、节点或运行数据，
+ * 避免面板开合污染工作流的撤销和持久化链路。
+ */
+export function workbenchUiReducer(
+  state: WorkbenchUiState,
+  action: WorkbenchUiAction,
+): WorkbenchUiState {
+  switch (action.type) {
+    case "toggle-library":
+      return { ...state, libraryOpen: !state.libraryOpen };
+    case "toggle-inspector":
+      return { ...state, inspectorOpen: !state.inspectorOpen };
+    case "open-mobile":
+      return state.mobilePanel === action.panel
+        ? state
+        : { ...state, mobilePanel: action.panel };
+    case "close-mobile":
+      return state.mobilePanel === null ? state : { ...state, mobilePanel: null };
+    default:
+      return state;
+  }
+}

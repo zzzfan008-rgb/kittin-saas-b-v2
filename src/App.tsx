@@ -14,6 +14,7 @@ import { TemplatesDock } from "@/components/panels/TemplatesDock";
 import { CompareOverlay } from "@/components/CompareOverlay";
 import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
+import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { useAuth } from "@/auth/AuthContext";
 import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
 import {
@@ -29,8 +30,6 @@ interface HistoryPage {
   nextCursor: string | null;
   hasMore: boolean;
 }
-
-type MobilePanel = "library" | "inspector" | null;
 
 function parseHistoryPage(value: unknown): HistoryPage {
   if (!value || typeof value !== "object") throw new Error("历史记录格式无效");
@@ -63,6 +62,8 @@ function useGlobalShortcuts() {
         void saveProject();
         return;
       }
+      // Sheet 内的画布编辑快捷键不能穿透；保存仍沿用全局项目保存。
+      if (target?.closest('[data-workbench-shortcuts="block"]')) return;
       if (inTextField) return;
 
       if (key === "z" && e.shiftKey) {
@@ -129,7 +130,6 @@ function Workspace() {
   const hasDirtyTabs = useFlowStore((state) => state.dirty || state.tabs.some((tab) => tab.dirty));
   const tabSessionPersistenceError = useFlowStore((state) => state.tabSessionPersistenceError);
   const pendingMaskWorkCount = useFlowStore((state) => state.pendingMaskWorkCount);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -137,10 +137,6 @@ function Workspace() {
   const [initialHistoryAttempt, setInitialHistoryAttempt] = useState(0);
   const historyPageSize = 20;
   const historyBefore = useRef(Date.now()).current;
-
-  useEffect(() => {
-    setMobilePanel(null);
-  }, [activeTabId]);
 
   useEffect(() => {
     if (!shouldWarnBeforeWorkspaceUnload({
@@ -156,15 +152,6 @@ function Workspace() {
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [hasDirtyTabs, pendingMaskWorkCount, tabSessionPersistenceError]);
-
-  useEffect(() => {
-    if (!mobilePanel) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobilePanel(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobilePanel]);
 
   useEffect(() => {
     let active = true;
@@ -245,84 +232,23 @@ function Workspace() {
       )}
       <TopBar />
       <ProjectTabs />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="gc-panel flex h-10 shrink-0 items-center border-b border-[#262626] bg-[#141414] px-2 md:hidden">
-          <button
-            type="button"
-            aria-controls="mobile-library-panel"
-            aria-expanded={mobilePanel === "library"}
-            onClick={() => setMobilePanel((current) => current === "library" ? null : "library")}
-            className={`rounded-md border px-3 py-1.5 text-[10px] font-medium transition-colors ${
-              mobilePanel === "library"
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-[#333] text-neutral-300"
-            }`}
-          >
-            节点 / 素材
-          </button>
-          <span className="min-w-0 flex-1 truncate px-3 text-center text-[10px] text-neutral-600">
-            画布
-          </span>
-          <button
-            type="button"
-            aria-controls="mobile-inspector-panel"
-            aria-expanded={mobilePanel === "inspector"}
-            onClick={() => setMobilePanel((current) => current === "inspector" ? null : "inspector")}
-            className={`rounded-md border px-3 py-1.5 text-[10px] font-medium transition-colors ${
-              mobilePanel === "inspector"
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-[#333] text-neutral-300"
-            }`}
-          >
-            属性
-          </button>
+      <WorkbenchShell
+        workspaceKey={activeTabId}
+        library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
+        inspector={<InspectorPanel className="h-full w-full border-l-0" />}
+      >
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <TemplatesDock />
+          <ReactFlowProvider key={activeTabId}>
+            <CanvasFlow />
+          </ReactFlowProvider>
+          <ResultsPanel
+            hasMore={historyHasMore}
+            loadingMore={historyLoading}
+            onLoadMore={() => void loadMoreHistory()}
+          />
         </div>
-
-        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          {mobilePanel && (
-            <button
-              type="button"
-              aria-label="关闭侧栏"
-              onClick={() => setMobilePanel(null)}
-              className="absolute inset-0 z-20 bg-black/60 md:hidden"
-            />
-          )}
-
-          <div
-            id="mobile-library-panel"
-            className={`absolute inset-y-0 left-0 z-30 flex transition-transform duration-200 md:static md:visible md:translate-x-0 ${
-              mobilePanel === "library"
-                ? "visible translate-x-0"
-                : "invisible -translate-x-full"
-            }`}
-          >
-            <NodeLibraryPanel />
-          </div>
-
-          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-            <TemplatesDock />
-            <ReactFlowProvider key={activeTabId}>
-              <CanvasFlow />
-            </ReactFlowProvider>
-            <ResultsPanel
-              hasMore={historyHasMore}
-              loadingMore={historyLoading}
-              onLoadMore={() => void loadMoreHistory()}
-            />
-          </div>
-
-          <div
-            id="mobile-inspector-panel"
-            className={`absolute inset-y-0 right-0 z-30 flex transition-transform duration-200 md:static md:visible md:translate-x-0 ${
-              mobilePanel === "inspector"
-                ? "visible translate-x-0"
-                : "invisible translate-x-full"
-            }`}
-          >
-            <InspectorPanel />
-          </div>
-        </div>
-      </div>
+      </WorkbenchShell>
       <CompareOverlay />
       <ImageViewer />
       <AssetPickerOverlay />

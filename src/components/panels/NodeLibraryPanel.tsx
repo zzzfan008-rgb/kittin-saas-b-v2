@@ -3,6 +3,7 @@ import { NODE_SPECS, type Asset, type NodeKind } from "@/types/workflow";
 import { useFlowStore } from "@/store/flowStore";
 import { DND_MIME } from "../CanvasFlow";
 import { thumbnailImageUrl } from "@/lib/images";
+import { cn } from "@/lib/utils";
 
 const KIND_ORDER: NodeKind[] = [
   "image-input",
@@ -18,11 +19,16 @@ const KIND_ORDER: NodeKind[] = [
 
 type Tab = "nodes" | "assets";
 
-export function NodeLibraryPanel() {
+export function NodeLibraryPanel({ className }: { className?: string }) {
   const [tab, setTab] = useState<Tab>("nodes");
 
   return (
-    <aside className="gc-panel flex w-52 shrink-0 flex-col border-r border-[#262626] bg-[#141414]">
+    <aside
+      className={cn(
+        "gc-panel flex w-52 shrink-0 flex-col border-r border-[#262626] bg-[#141414]",
+        className,
+      )}
+    >
       <div className="flex border-b border-[#262626]">
         {(
           [

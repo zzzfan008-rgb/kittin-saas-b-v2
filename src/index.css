@@ -1,4 +1,7 @@
 @import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@custom-variant dark (&:is([data-theme="current"] *));
 @source "../index.html";
 @source "./";
 
@@ -309,6 +312,7 @@ body {
   --gc-text-muted: #8b9198;
   --gc-border: #2b2e32;
   --gc-accent: #9a7333;
+  --gc-primary-foreground: #0a0a0a;
   --gc-node-main: #f1f2f4;
   --gc-node-header: #ffffff;
   --gc-node-inner: #f8f9fa;
@@ -334,6 +338,7 @@ body {
   --gc-text-muted: #696d73;
   --gc-border: #d5d2cc;
   --gc-accent: #dc7397;
+  --gc-primary-foreground: #1d1d1f;
   --gc-node-main: #34373b;
   --gc-node-header: #3f4247;
   --gc-node-inner: #4b4f55;
@@ -359,6 +364,7 @@ body {
   --gc-text-muted: #48677e;
   --gc-border: #a9bfa2;
   --gc-accent: #173b63;
+  --gc-primary-foreground: #f8fafc;
   --gc-node-main: #adc8dc;
   --gc-node-header: #bed3e3;
   --gc-node-inner: #d0e0eb;
@@ -512,4 +518,35 @@ body {
     0 4px 8px rgba(0, 0, 0, 0.38),
     inset -2px -3px 4px color-mix(in srgb, var(--gc-handle-dark) 48%, transparent),
     inset 2px 2px 3px color-mix(in srgb, var(--gc-handle-highlight) 72%, transparent) !important;
+}
+
+/* shadcn/Base UI 直接桥接到现有 data-theme 语义，不引入第二套主题状态。 */
+@theme inline {
+  --font-heading: inherit;
+  --color-background: var(--gc-shell);
+  --color-foreground: var(--gc-text);
+  --color-card: var(--gc-panel);
+  --color-card-foreground: var(--gc-text);
+  --color-popover: var(--gc-panel);
+  --color-popover-foreground: var(--gc-text);
+  --color-primary: var(--gc-accent);
+  --color-primary-foreground: var(--gc-primary-foreground);
+  --color-secondary: var(--gc-control);
+  --color-secondary-foreground: var(--gc-text);
+  --color-muted: var(--gc-control);
+  --color-muted-foreground: var(--gc-text-muted);
+  --color-accent: var(--gc-panel-hover);
+  --color-accent-foreground: var(--gc-text);
+  --color-destructive: #dc2626;
+  --color-border: var(--gc-border);
+  --color-input: var(--gc-border);
+  --color-ring: var(--gc-accent);
+  --color-sidebar: var(--gc-panel);
+  --color-sidebar-foreground: var(--gc-text);
+  --color-sidebar-primary: var(--gc-accent);
+  --color-sidebar-primary-foreground: var(--gc-primary-foreground);
+  --color-sidebar-accent: var(--gc-panel-hover);
+  --color-sidebar-accent-foreground: var(--gc-text);
+  --color-sidebar-border: var(--gc-border);
+  --color-sidebar-ring: var(--gc-accent);
 }
