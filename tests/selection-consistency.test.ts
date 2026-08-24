@@ -168,8 +168,31 @@ test("画布空白 canonical command 会清除节点 IDs、primary 与 React Flo
     new URL("../src/components/CanvasFlow.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(canvasSource, /onPaneClick=\{\(\) => setSelectedNodeIds\(\[\]\)\}/);
-  assert.match(canvasSource, /onNodesChange=\{onNodesChange\}/);
+  assert.match(
+    canvasSource,
+    /useFlowStore\(\s*\(s\)\s*=>\s*s\.onNodesChange\s*\)/,
+    "CanvasFlow 必须读取 canonical store onNodesChange action",
+  );
+  assert.match(
+    canvasSource,
+    /filterCancelledDragPositionChanges\(\s*dragTransactionRef\s*,\s*changes\s*\)/,
+    "wrapper 必须先过滤已取消手势的晚到位置帧",
+  );
+  assert.match(
+    canvasSource,
+    /onNodesChange\(\s*filtered\s*\)/,
+    "wrapper 必须将过滤结果委托给 canonical store action",
+  );
+  assert.match(
+    canvasSource,
+    /onNodesChange\s*=\s*\{\s*handleNodesChange\s*\}/,
+    "ReactFlow 必须接入过滤 wrapper",
+  );
+  assert.match(
+    canvasSource,
+    /onPaneClick\s*=\s*\{\s*\(\)\s*=>\s*setSelectedNodeIds\(\s*\[\s*\]\s*\)\s*\}/,
+    "点击画布空白处必须通过 canonical selection action 清空选择",
+  );
 });
 
 test("画布空白 canonical command 会清除结果选择但保留 compareIds", () => {

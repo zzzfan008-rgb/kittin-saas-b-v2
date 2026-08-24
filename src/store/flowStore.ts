@@ -188,9 +188,23 @@ type DocumentMutation =
   | ((state: FlowState) => Partial<FlowState>);
 
 export type HistoryTransactionToken = symbol;
+type HistoryTransactionOutcome = "ended" | "cancelled";
+type HistoryTransactionSettledCallback = (
+  outcome: HistoryTransactionOutcome,
+  token: HistoryTransactionToken,
+) => void;
+
+interface DeferredHistoryTransactionAction {
+  runOnCancel: boolean;
+  requireActiveTab: boolean;
+  run: () => void;
+  discard?: () => void;
+}
 
 interface ActiveHistoryTransaction {
   tokens: Set<HistoryTransactionToken>;
+  onSettledByToken: Map<HistoryTransactionToken, HistoryTransactionSettledCallback>;
+  deferredActions: DeferredHistoryTransactionAction[];
   tabId: string;
   before: FlowTemporalState;
   positionBeforeByNodeId: Map<string, { x: number; y: number }>;
@@ -213,7 +227,8 @@ const temporalHistoryByTab = new Map<string, TabTemporalHistory>();
 
 interface TabSaveQueue {
   promise: Promise<SaveTabResult>;
-  queued: boolean;
+  /** 用户在当前 attempt 未完成时再次明确发起保存的世代号。 */
+  explicitRetryGeneration: number;
 }
 
 interface SaveTabResult {
@@ -573,12 +588,17 @@ export function commitDocumentMutation(mutation: DocumentMutation): boolean {
 }
 
 /** 开始一组实时可见、但只在结束时写入一次历史与 revision 的文档事务。 */
-export function beginHistoryTransaction(label = "document-transaction"): HistoryTransactionToken {
+export function beginHistoryTransaction(
+  label = "document-transaction",
+  onSettled?: HistoryTransactionSettledCallback,
+): HistoryTransactionToken {
   const token = Symbol(label);
   const state = useFlowStore.getState();
   if (!activeHistoryTransaction || activeHistoryTransaction.tabId !== state.activeTabId) {
     activeHistoryTransaction = {
       tokens: new Set(),
+      onSettledByToken: new Map(),
+      deferredActions: [],
       tabId: state.activeTabId,
       before: { projectName: state.projectName, nodes: state.nodes, edges: state.edges },
       positionBeforeByNodeId: new Map(),
@@ -586,15 +606,109 @@ export function beginHistoryTransaction(label = "document-transaction"): History
     };
   }
   activeHistoryTransaction.tokens.add(token);
+  if (onSettled) activeHistoryTransaction.onSettledByToken.set(token, onSettled);
   return token;
 }
 
-/** 结束事务；返回是否产生了一次净文档提交。 */
-export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
-  const transaction = activeHistoryTransaction;
-  if (!transaction || !transaction.tokens.delete(token)) return false;
-  if (transaction.tokens.size > 0) return false;
+function notifyHistoryTransactionSettled(
+  callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>,
+  outcome: HistoryTransactionOutcome,
+): void {
+  for (const [token, callback] of callbacks) {
+    try {
+      callback(outcome, token);
+    } catch {
+      // Settlement cleanup must not make the document command fail.
+    }
+  }
+}
 
+interface HistoryTransactionCompletion {
+  tabId: string;
+  callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>;
+  actions: DeferredHistoryTransactionAction[];
+}
+
+function detachHistoryTransaction(
+  transaction: ActiveHistoryTransaction,
+  callbacks = [...transaction.onSettledByToken.entries()],
+): HistoryTransactionCompletion {
+  const completion: HistoryTransactionCompletion = {
+    tabId: transaction.tabId,
+    callbacks,
+    actions: [...transaction.deferredActions],
+  };
+  if (activeHistoryTransaction === transaction) activeHistoryTransaction = null;
+  transaction.tokens.clear();
+  transaction.onSettledByToken.clear();
+  transaction.deferredActions.length = 0;
+  return completion;
+}
+
+function finishHistoryTransactionCompletion(
+  completion: HistoryTransactionCompletion,
+  outcome: HistoryTransactionOutcome,
+): void {
+  notifyHistoryTransactionSettled(completion.callbacks, outcome);
+  if (completion.actions.length === 0) return;
+  queueMicrotask(() => {
+    for (const action of completion.actions) {
+      const allowed =
+        (outcome === "ended" || action.runOnCancel) &&
+        (!action.requireActiveTab || useFlowStore.getState().activeTabId === completion.tabId);
+      if (!allowed) {
+        action.discard?.();
+        continue;
+      }
+      try {
+        action.run();
+      } catch {
+        // One deferred command must not prevent later commands from settling.
+        action.discard?.();
+      }
+    }
+  });
+}
+
+function waitForHistoryTransactionSettlement(tabId: string): Promise<void> | null {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || transaction.tabId !== tabId) return null;
+  return new Promise((resolve) => {
+    transaction.deferredActions.push({
+      runOnCancel: true,
+      requireActiveTab: false,
+      run: () => {
+        const nextSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (nextSettlement) void nextSettlement.then(resolve);
+        else resolve();
+      },
+      discard: resolve,
+    });
+  });
+}
+
+function deferHistoryCommandUntilSettlement(command: "undo" | "redo"): boolean {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || transaction.tabId !== useFlowStore.getState().activeTabId) return false;
+  const tabId = transaction.tabId;
+  transaction.deferredActions.push({
+    runOnCancel: false,
+    requireActiveTab: true,
+    // Promise resolvers for save/run naturally schedule their continuations as
+    // microtasks. Queue history commands the same way so the single action list
+    // preserves the user's Save→Undo and Undo→Save registration order.
+    run: () => queueMicrotask(() => {
+      if (useFlowStore.getState().activeTabId !== tabId) return;
+      useFlowStore.getState()[command]();
+    }),
+  });
+  return true;
+}
+
+function commitHistoryTransaction(
+  transaction: ActiveHistoryTransaction,
+  callbacks?: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>,
+): boolean {
   let state = useFlowStore.getState();
   const settledNodes = state.nodes.map((node) => (
     node.dragging ? { ...node, dragging: false } : node
@@ -604,8 +718,9 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
     state = useFlowStore.getState();
   }
   if (!transaction.documentChanged || transaction.tabId !== state.activeTabId) {
-    activeHistoryTransaction = null;
+    const completion = detachHistoryTransaction(transaction, callbacks);
     flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "ended");
     return false;
   }
   const current: FlowTemporalState = {
@@ -615,15 +730,16 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
   };
   const temporalChanged = !sameTemporalDocument(transaction.before, current);
   if (!temporalChanged) {
-    activeHistoryTransaction = null;
+    const completion = detachHistoryTransaction(transaction, callbacks);
     flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "ended");
     return false;
   }
 
   recordHistoryEntry(transaction.before, current);
   // Keep session persistence suppressed until the final coordinates and their
   // revision/dirty metadata can be observed in the same completed transaction.
-  activeHistoryTransaction = null;
+  const completion = detachHistoryTransaction(transaction, callbacks);
   runWithoutHistory(() => {
     useFlowStore.setState((latest) => ({
       revision: latest.revision + 1,
@@ -632,7 +748,24 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
     }));
   });
   flushDeferredTabSessionPersistence();
+  finishHistoryTransactionCompletion(completion, "ended");
   return true;
+}
+
+/** 结束调用方持有的事务 token；返回是否产生了一次净文档提交。 */
+export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || !transaction.tokens.delete(token)) return false;
+  const callback = transaction.onSettledByToken.get(token);
+  transaction.onSettledByToken.delete(token);
+  const callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]> = callback
+    ? [[token, callback]]
+    : [];
+  if (transaction.tokens.size > 0) {
+    notifyHistoryTransactionSettled(callbacks, "ended");
+    return false;
+  }
+  return commitHistoryTransaction(transaction, callbacks);
 }
 
 function cancelHistoryTransaction(): void {
@@ -641,8 +774,9 @@ function cancelHistoryTransaction(): void {
 
   const state = useFlowStore.getState();
   if (transaction.tabId !== state.activeTabId) {
-    activeHistoryTransaction = null;
+    const completion = detachHistoryTransaction(transaction);
     flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "cancelled");
     return;
   }
 
@@ -671,8 +805,9 @@ function cancelHistoryTransaction(): void {
       projectName: transaction.before.projectName,
     });
   });
-  activeHistoryTransaction = null;
+  const completion = detachHistoryTransaction(transaction);
   flushDeferredTabSessionPersistence();
+  finishHistoryTransactionCompletion(completion, "cancelled");
 }
 
 /**
@@ -1827,6 +1962,19 @@ export const useFlowStore = create<FlowState>()(
       const initialTab =
         restored?.tabs.find((tab) => tab.id === restored.activeTabId) ?? newTab();
       const saveTab = async (tabId: string): Promise<SaveTabResult> => {
+        // Register an explicit retry before joining the transaction barrier. A
+        // failed response may already be ahead of this save in the settlement
+        // FIFO and must still observe the user's later retry intent.
+        const existingBeforeSettlement = saveQueueByTab.get(tabId);
+        if (existingBeforeSettlement) {
+          existingBeforeSettlement.explicitRetryGeneration += 1;
+          const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+          if (pendingSettlement) await pendingSettlement;
+          return existingBeforeSettlement.promise;
+        }
+
+        const initialSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (initialSettlement) await initialSettlement;
         const firstSnapshot = documentForTab(get(), tabId);
         if (!firstSnapshot || firstSnapshot.readOnly) {
           return { ok: false, error: "项目不存在或当前页签为只读" };
@@ -1834,15 +1982,19 @@ export const useFlowStore = create<FlowState>()(
 
         const existing = saveQueueByTab.get(tabId);
         if (existing) {
-          existing.queued = true;
+          existing.explicitRetryGeneration += 1;
           return existing.promise;
         }
 
-        const queue: TabSaveQueue = { promise: Promise.resolve({ ok: false }), queued: false };
+        const queue: TabSaveQueue = {
+          promise: Promise.resolve({ ok: false }),
+          explicitRetryGeneration: 0,
+        };
         queue.promise = (async () => {
-          let saved = false;
-          do {
-            queue.queued = false;
+          while (true) {
+            const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+            if (pendingSettlement) await pendingSettlement;
+            const attemptGeneration = queue.explicitRetryGeneration;
             const snapshot = documentForTab(get(), tabId);
             if (!snapshot || snapshot.readOnly) {
               return { ok: false, error: "项目不存在或当前页签为只读" };
@@ -1866,18 +2018,23 @@ export const useFlowStore = create<FlowState>()(
                 const body = await res.json().catch(() => ({}));
                 throw new Error(responseErrorMessage(res.status, body));
               }
-              saved = true;
+              const responseSettlement = waitForHistoryTransactionSettlement(tabId);
+              if (responseSettlement) await responseSettlement;
+              let needsRevisionFollowup = false;
               patchTab(set, tabId, (latest) => {
                 const clean = latest.revision === snapshot.revision;
-                if (!clean) queue.queued = true;
+                needsRevisionFollowup = !clean;
                 return {
                   savedRevision: Math.max(latest.savedRevision, snapshot.revision),
                   dirty: !clean,
                   saveState: clean ? "saved" : "saving",
                 };
               });
+              if (!needsRevisionFollowup) return { ok: true };
             } catch (error) {
-              queue.queued = false;
+              const failureSettlement = waitForHistoryTransactionSettlement(tabId);
+              if (failureSettlement) await failureSettlement;
+              if (queue.explicitRetryGeneration > attemptGeneration) continue;
               patchTab(set, tabId, (latest) => ({
                 saveState: "error",
                 dirty: latest.revision !== latest.savedRevision,
@@ -1887,8 +2044,7 @@ export const useFlowStore = create<FlowState>()(
                 error: error instanceof Error ? error.message : String(error),
               };
             }
-          } while (queue.queued);
-          return { ok: saved };
+          }
         })();
         saveQueueByTab.set(tabId, queue);
         try {
@@ -1934,7 +2090,7 @@ export const useFlowStore = create<FlowState>()(
         if (closingTab.nodes.some((node) => isNodeRunActive(node.data.status))) {
           return;
         }
-        cancelHistoryTransaction();
+        if (tabId === initialState.activeTabId) cancelHistoryTransaction();
         const state = get();
         const current = snapshotActiveTab(state);
         const syncedTabs = replaceTab(state.tabs, current);
@@ -2212,7 +2368,12 @@ export const useFlowStore = create<FlowState>()(
       runNode: async (id) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
         if (getGenerationSafetyBlockReason()) return;
+        const tabId = get().activeTabId;
+        const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (pendingSettlement) await pendingSettlement;
+        if (getGenerationSafetyBlockReason()) return;
         const initialState = get();
+        if (initialState.activeTabId !== tabId) return;
         if (initialState.readOnly) return;
         const node = initialState.nodes.find((n) => n.id === id);
         if (
@@ -2229,7 +2390,6 @@ export const useFlowStore = create<FlowState>()(
         const spec = NODE_SPECS[kind];
         if (!spec.providerId) return;
 
-        const tabId = initialState.activeTabId;
         const preparationKey = runPreparationKey(tabId, id);
         const submissionKey = runSubmissionKey(initialState.projectId, id);
         if (runPreparations.has(preparationKey)) return;
@@ -2486,9 +2646,15 @@ export const useFlowStore = create<FlowState>()(
         }
       },
 
-      saveProject: async () => (await saveTab(get().activeTabId)).ok,
+      saveProject: async () => {
+        // Capture the invoking tab before awaiting a real dragStop/cancel. A tab
+        // switch must save the rolled-back source tab, never the new active tab.
+        const tabId = get().activeTabId;
+        return (await saveTab(tabId)).ok;
+      },
 
       undo: () => {
+        if (deferHistoryCommandUntilSettlement("undo")) return;
         const temporalStore = useFlowStore.temporal.getState();
         if (temporalStore.pastStates.length === 0) return;
         const before = useFlowStore.getState();
@@ -2525,6 +2691,7 @@ export const useFlowStore = create<FlowState>()(
         }
       },
       redo: () => {
+        if (deferHistoryCommandUntilSettlement("redo")) return;
         const temporalStore = useFlowStore.temporal.getState();
         if (temporalStore.futureStates.length === 0) return;
         const before = useFlowStore.getState();

@@ -6,7 +6,9 @@ import { imageModelAspectRatioPatch } from "../src/types/imageModels";
 import type { Edge } from "@xyflow/react";
 import {
   applyRunEventToTab,
+  beginHistoryTransaction,
   beginMaskWork,
+  endHistoryTransaction,
   selectNodeInputImages,
   useFlowStore,
   type FlowNode,
@@ -51,6 +53,19 @@ function aiNode(id: string, label: string): FlowNode {
       outputImages: ["/api/files/previous.png"],
     },
   };
+}
+
+function moveNode(nodeId: string, x: number, dragging = true): void {
+  useFlowStore.getState().onNodesChange([{
+    id: nodeId,
+    type: "position",
+    position: { x, y: 24 },
+    dragging,
+  }]);
+}
+
+async function flushCommandMicrotasks(turns = 8): Promise<void> {
+  for (let index = 0; index < turns; index += 1) await Promise.resolve();
 }
 
 function assertNodeModelSelection(
@@ -240,13 +255,333 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
 
     const latestPayload = JSON.parse(requests[1].body) as { name: string };
     assert.equal(latestPayload.name, "保存期间的新名称");
+    const duplicateSameSnapshot = useFlowStore.getState().saveProject();
+    assert.equal(requests.length, 2, "同快照的显式重复保存应由当前请求覆盖");
     requests[1].resolve(Response.json({ ok: true }));
-    await Promise.all([firstSave, secondSave]);
+    await Promise.all([firstSave, secondSave, duplicateSameSnapshot]);
+    await flushCommandMicrotasks();
+    assert.equal(requests.length, 2, "当前快照成功后不得为重复点击发第三次请求");
 
     const after = useFlowStore.getState();
     assert.equal(after.dirty, false);
     assert.equal(after.saveState, "saved");
     assert.equal(after.savedRevision, after.revision);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("保存失败响应落在拖拽中时，等待结束后再标记最终 dirty 版本", async () => {
+  const node = aiNode("drag-save-failure", "拖拽保存失败");
+  useFlowStore.getState().openFlowTab({
+    projectId: "drag-save-failure-project",
+    projectName: "拖拽保存失败",
+    nodes: [node],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+  const before = useFlowStore.getState();
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    let saveSettled = false;
+    const saving = useFlowStore.getState().saveProject().finally(() => {
+      saveSettled = true;
+    });
+    assert.equal(requests.length, 1);
+    const transaction = beginHistoryTransaction("drag-save-failure");
+    moveNode(node.id, 64);
+    requests[0].resolve(Response.json({ error: "测试失败" }, { status: 503 }));
+    await flushCommandMicrotasks();
+    assert.equal(saveSettled, false, "失败响应不得在拖拽中提前改写元数据");
+    assert.equal(useFlowStore.getState().saveState, "saving");
+
+    moveNode(node.id, 160);
+    assert.equal(endHistoryTransaction(transaction), true);
+    assert.equal(await saving, false);
+    const after = useFlowStore.getState();
+    assert.deepEqual(after.nodes[0].position, { x: 160, y: 24 });
+    assert.notEqual(after.nodes[0].dragging, true);
+    assert.equal(after.revision, before.revision + 1);
+    assert.equal(after.savedRevision, before.savedRevision);
+    assert.equal(after.dirty, true);
+    assert.equal(after.saveState, "error");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("净零拖拽保存等待结束后只写入起点快照", async () => {
+  const node = aiNode("net-zero-drag-save", "净零拖拽保存");
+  node.position = { x: 0, y: 24 };
+  useFlowStore.getState().openFlowTab({
+    projectId: "net-zero-drag-save-project",
+    projectName: "净零拖拽保存",
+    nodes: [node],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+  const before = useFlowStore.getState();
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    const transaction = beginHistoryTransaction("net-zero-drag-save");
+    moveNode(node.id, 80);
+    const saving = useFlowStore.getState().saveProject();
+    moveNode(node.id, 0, false);
+    assert.equal(requests.length, 0);
+    assert.equal(endHistoryTransaction(transaction), false);
+    await flushCommandMicrotasks();
+
+    assert.equal(requests.length, 1);
+    const payload = JSON.parse(requests[0].body) as { flow: { nodes: FlowNode[] } };
+    assert.deepEqual(payload.flow.nodes[0].position, { x: 0, y: 24 });
+    assert.notEqual(payload.flow.nodes[0].dragging, true);
+    requests[0].resolve(Response.json({ ok: true }));
+    assert.equal(await saving, true);
+
+    const after = useFlowStore.getState();
+    assert.equal(after.revision, before.revision);
+    assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+    assert.equal(after.dirty, false);
+    assert.equal(after.saveState, "saved");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("失败响应先等待拖拽时，后到的显式保存会重试一次且不多发", async () => {
+  const node = aiNode("queued-drag-save", "排队拖拽保存");
+  useFlowStore.getState().openFlowTab({
+    projectId: "queued-drag-save-project",
+    projectName: "排队拖拽保存",
+    nodes: [node],
+    edges: [],
+  });
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    let firstSettled = false;
+    const firstSave = useFlowStore.getState().saveProject().finally(() => {
+      firstSettled = true;
+    });
+    assert.equal(requests.length, 1);
+    const transaction = beginHistoryTransaction("queued-drag-save");
+    moveNode(node.id, 64);
+
+    requests[0].resolve(Response.json({ error: "首次保存失败" }, { status: 503 }));
+    await flushCommandMicrotasks();
+    assert.equal(firstSettled, false, "失败响应已先登记 settlement waiter");
+    assert.equal(useFlowStore.getState().saveState, "saving");
+
+    const secondSave = useFlowStore.getState().saveProject();
+    assert.equal(requests.length, 1, "显式重试不得发送拖拽中间帧");
+
+    moveNode(node.id, 128);
+    assert.equal(endHistoryTransaction(transaction), true);
+    await flushCommandMicrotasks(12);
+    assert.equal(requests.length, 2);
+    const latestPayload = JSON.parse(requests[1].body) as { flow: { nodes: FlowNode[] } };
+    assert.deepEqual(latestPayload.flow.nodes[0].position, { x: 128, y: 24 });
+    assert.notEqual(latestPayload.flow.nodes[0].dragging, true);
+
+    requests[1].resolve(Response.json({ ok: true }));
+    await Promise.all([firstSave, secondSave]);
+    await flushCommandMicrotasks();
+    assert.equal(requests.length, 2, "第二次成功已覆盖显式重试，不得发第三次请求");
+    const after = useFlowStore.getState();
+    assert.equal(after.dirty, false);
+    assert.equal(after.saveState, "saved");
+    assert.equal(after.savedRevision, after.revision);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("切页取消拖拽后，保存继续定向写入源页签回滚快照", async () => {
+  const sourceNode = aiNode("switch-drag-save-source", "切页保存源节点");
+  useFlowStore.getState().openFlowTab({
+    projectId: "switch-drag-save-source-project",
+    projectName: "切页保存源页签",
+    nodes: [sourceNode],
+    edges: [],
+  });
+  const sourceTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().openFlowTab({
+    projectId: "switch-drag-save-target-project",
+    projectName: "切页保存目标页签",
+    nodes: [aiNode("switch-drag-save-target", "切页保存目标节点")],
+    edges: [],
+  });
+  const targetTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().switchTab(sourceTabId);
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    const transaction = beginHistoryTransaction("switch-drag-save");
+    moveNode(sourceNode.id, 180);
+    const saving = useFlowStore.getState().saveProject();
+    assert.equal(requests.length, 0);
+    useFlowStore.getState().switchTab(targetTabId);
+    await flushCommandMicrotasks();
+
+    assert.equal(endHistoryTransaction(transaction), false);
+    assert.equal(requests.length, 1);
+    const payload = JSON.parse(requests[0].body) as {
+      id: string;
+      flow: { nodes: FlowNode[] };
+    };
+    assert.equal(payload.id, "switch-drag-save-source-project");
+    assert.deepEqual(payload.flow.nodes[0].position, { x: 320, y: 0 });
+    assert.notEqual(payload.flow.nodes[0].dragging, true);
+
+    requests[0].resolve(Response.json({ ok: true }));
+    assert.equal(await saving, true);
+    const sourceTab = useFlowStore.getState().tabs.find((tab) => tab.id === sourceTabId);
+    assert.equal(sourceTab?.dirty, false);
+    assert.equal(sourceTab?.saveState, "saved");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("关闭活动页签会取消拖拽与待执行保存", async () => {
+  const sourceNode = aiNode("close-active-drag-save", "关闭活动页签");
+  useFlowStore.getState().openFlowTab({
+    projectId: "close-active-drag-save-project",
+    projectName: "关闭活动页签",
+    nodes: [sourceNode],
+    edges: [],
+  });
+  const sourceTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().openFlowTab({
+    projectId: "close-active-fallback-project",
+    projectName: "关闭后目标",
+    nodes: [aiNode("close-active-fallback", "关闭后目标")],
+    edges: [],
+  });
+  const fallbackTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().switchTab(sourceTabId);
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return Response.json({ ok: true });
+  };
+
+  try {
+    const transaction = beginHistoryTransaction("close-active-drag-save");
+    moveNode(sourceNode.id, 640);
+    const saving = useFlowStore.getState().saveProject();
+    useFlowStore.getState().closeTab(sourceTabId);
+    await flushCommandMicrotasks();
+
+    assert.equal(await saving, false);
+    assert.equal(requestCount, 0);
+    assert.equal(endHistoryTransaction(transaction), false);
+    assert.equal(useFlowStore.getState().tabs.some((tab) => tab.id === sourceTabId), false);
+    assert.equal(useFlowStore.getState().activeTabId, fallbackTabId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("Undo→Save 会先撤销拖拽，再保存撤销后快照", async () => {
+  const node = aiNode("undo-then-save", "Undo 后保存");
+  useFlowStore.getState().openFlowTab({
+    projectId: "undo-then-save-project",
+    projectName: "Undo 后保存",
+    nodes: [node],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    const transaction = beginHistoryTransaction("undo-then-save");
+    moveNode(node.id, 500);
+    useFlowStore.getState().undo();
+    const saving = useFlowStore.getState().saveProject();
+    assert.equal(requests.length, 0);
+
+    assert.equal(endHistoryTransaction(transaction), true);
+    await flushCommandMicrotasks(12);
+    assert.equal(requests.length, 1);
+    const payload = JSON.parse(requests[0].body) as { flow: { nodes: FlowNode[] } };
+    assert.deepEqual(payload.flow.nodes[0].position, { x: 320, y: 0 });
+    assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 320, y: 0 });
+    assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
+
+    requests[0].resolve(Response.json({ ok: true }));
+    assert.equal(await saving, true);
+    assert.equal(useFlowStore.getState().dirty, false);
+    assert.equal(useFlowStore.getState().saveState, "saved");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("Save→Undo 先发送拖拽终点，再排队补写撤销快照", async () => {
+  const node = aiNode("save-then-undo", "保存后 Undo");
+  useFlowStore.getState().openFlowTab({
+    projectId: "save-then-undo-project",
+    projectName: "保存后 Undo",
+    nodes: [node],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+  const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
+    requests.push({ body: String(init?.body ?? ""), resolve });
+  });
+
+  try {
+    const transaction = beginHistoryTransaction("save-then-undo");
+    moveNode(node.id, 500);
+    const saving = useFlowStore.getState().saveProject();
+    useFlowStore.getState().undo();
+    assert.equal(requests.length, 0);
+
+    assert.equal(endHistoryTransaction(transaction), true);
+    await flushCommandMicrotasks(12);
+    assert.equal(requests.length, 1);
+    const firstPayload = JSON.parse(requests[0].body) as { flow: { nodes: FlowNode[] } };
+    assert.deepEqual(firstPayload.flow.nodes[0].position, { x: 500, y: 24 });
+    assert.notEqual(firstPayload.flow.nodes[0].dragging, true);
+    assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 320, y: 0 });
+
+    requests[0].resolve(Response.json({ ok: true }));
+    await flushCommandMicrotasks(12);
+    assert.equal(requests.length, 2, "Undo 改变 revision 后应补写最新快照");
+    const secondPayload = JSON.parse(requests[1].body) as { flow: { nodes: FlowNode[] } };
+    assert.deepEqual(secondPayload.flow.nodes[0].position, { x: 320, y: 0 });
+
+    requests[1].resolve(Response.json({ ok: true }));
+    assert.equal(await saving, true);
+    assert.equal(useFlowStore.getState().dirty, false);
+    assert.equal(useFlowStore.getState().saveState, "saved");
+    assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -286,6 +621,48 @@ await test("新建项目首次生成会先保存同一份项目，再提交运�
     assert.equal(runBody.projectId, projectId);
     assert.deepEqual(runBody.nodes, saveBody.flow.nodes);
     assert.deepEqual(runBody.edges, saveBody.flow.edges);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("runNode 等待拖拽结束后向保存与运行提交同一最终快照", async () => {
+  const node = aiNode("drag-run-node", "拖拽后运行");
+  useFlowStore.getState().openFlowTab({
+    projectId: "drag-run-project",
+    projectName: "拖拽后运行",
+    nodes: [node],
+    edges: [],
+  });
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    requests.push({ url, body });
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在付费调用前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    const transaction = beginHistoryTransaction("drag-before-run");
+    moveNode(node.id, 384);
+    const running = useFlowStore.getState().runNode(node.id);
+    assert.equal(requests.length, 0, "运行不得读取拖拽中间帧");
+
+    moveNode(node.id, 544);
+    assert.equal(endHistoryTransaction(transaction), true);
+    await running;
+
+    assert.deepEqual(requests.map((request) => request.url), ["/api/projects", "/api/run-plan"]);
+    const savedNodes = (requests[0].body as { flow: { nodes: FlowNode[] } }).flow.nodes;
+    const runNodes = (requests[1].body as { nodes: FlowNode[] }).nodes;
+    assert.deepEqual(savedNodes[0].position, { x: 544, y: 24 });
+    assert.notEqual(savedNodes[0].dragging, true);
+    assert.deepEqual(runNodes, savedNodes);
   } finally {
     globalThis.fetch = originalFetch;
   }

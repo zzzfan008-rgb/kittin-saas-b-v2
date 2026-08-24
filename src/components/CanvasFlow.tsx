@@ -4,11 +4,13 @@ import {
   MiniMap,
   Controls,
   useReactFlow,
+  type NodeChange,
 } from "@xyflow/react";
 import {
   beginHistoryTransaction,
   endHistoryTransaction,
   useFlowStore,
+  type FlowNode,
   type HistoryTransactionToken,
 } from "@/store/flowStore";
 import { DotWaveBackground } from "./DotWaveBackground";
@@ -23,17 +25,59 @@ const edgeTypes = { pulse: PulseEdge };
 
 interface DragHistoryTransactionRef {
   current: HistoryTransactionToken | null;
+  /** Native drag gesture identity; event.timeStamp is monotonic within the page. */
+  startedAt: number | null;
+}
+
+const cancelledDragPositionRefs = new WeakSet<DragHistoryTransactionRef>();
+
+/**
+ * A tab/load transition can cancel a drag before React Flow emits dragStop.
+ * Ignore only late position frames from that old gesture; selection changes
+ * remain live, and the suppression ends at the gesture boundary.
+ */
+export function filterCancelledDragPositionChanges(
+  ref: DragHistoryTransactionRef,
+  changes: NodeChange<FlowNode>[],
+): NodeChange<FlowNode>[] {
+  return cancelledDragPositionRefs.has(ref)
+    ? changes.filter((change) => change.type !== "position")
+    : changes;
 }
 
 /**
  * 拖拽被浏览器中断时提交最后可见位置，保留一次可撤销的用户操作。
  * 页签/项目转换的取消与回滚仍由 flowStore 在转换前处理。
  */
-export function finishDragHistoryTransaction(ref: DragHistoryTransactionRef): boolean {
+export function finishDragHistoryTransaction(
+  ref: DragHistoryTransactionRef,
+  stoppedAt?: number,
+): boolean {
+  if (stoppedAt !== undefined && ref.startedAt !== null && stoppedAt < ref.startedAt) {
+    return false;
+  }
   const token = ref.current;
+  cancelledDragPositionRefs.delete(ref);
+  ref.startedAt = null;
   if (!token) return false;
   ref.current = null;
   return endHistoryTransaction(token);
+}
+
+/** 开始拖拽并让 store 侧的保存/撤销/切页命令能够同步清除本地 token。 */
+export function beginDragHistoryTransaction(
+  ref: DragHistoryTransactionRef,
+  startedAt: number,
+): void {
+  if (ref.startedAt !== null && startedAt < ref.startedAt) return;
+  finishDragHistoryTransaction(ref, startedAt);
+  cancelledDragPositionRefs.delete(ref);
+  ref.startedAt = startedAt;
+  ref.current = beginHistoryTransaction("node-drag", (outcome, settledToken) => {
+    if (ref.current !== settledToken) return;
+    ref.current = null;
+    if (outcome === "cancelled") cancelledDragPositionRefs.add(ref);
+  });
 }
 
 /** 统一收束 blur、pointercancel 与组件卸载造成的拖拽中断。 */
@@ -41,14 +85,17 @@ export function registerDragInterruptionHandlers(
   ref: DragHistoryTransactionRef,
   target: Pick<EventTarget, "addEventListener" | "removeEventListener">,
 ): () => void {
-  const finish = () => {
+  const finishOnBlur = () => {
     finishDragHistoryTransaction(ref);
   };
-  target.addEventListener("blur", finish);
-  target.addEventListener("pointercancel", finish);
+  const finishOnPointerCancel = (event: Event) => {
+    finishDragHistoryTransaction(ref, event.timeStamp);
+  };
+  target.addEventListener("blur", finishOnBlur);
+  target.addEventListener("pointercancel", finishOnPointerCancel);
   return () => {
-    target.removeEventListener("blur", finish);
-    target.removeEventListener("pointercancel", finish);
+    target.removeEventListener("blur", finishOnBlur);
+    target.removeEventListener("pointercancel", finishOnPointerCancel);
     finishDragHistoryTransaction(ref);
   };
 }
@@ -73,7 +120,10 @@ export function CanvasFlow() {
   const { screenToFlowPosition } = useReactFlow();
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
-  const dragTransactionRef = useRef<HistoryTransactionToken | null>(null);
+  const dragTransactionRef = useRef<DragHistoryTransactionRef>({
+    current: null,
+    startedAt: null,
+  }).current;
 
   useEffect(
     () => registerDragInterruptionHandlers(dragTransactionRef, window),
@@ -90,6 +140,14 @@ export function CanvasFlow() {
     [addNode, screenToFlowPosition, readOnly],
   );
 
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<FlowNode>[]) => {
+      const filtered = filterCancelledDragPositionChanges(dragTransactionRef, changes);
+      if (filtered.length > 0) onNodesChange(filtered);
+    },
+    [onNodesChange],
+  );
+
   return (
     <div className="min-h-0 flex-1">
       <ReactFlow
@@ -97,7 +155,7 @@ export function CanvasFlow() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         isValidConnection={isValidConnection}
@@ -106,13 +164,12 @@ export function CanvasFlow() {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
         }}
-        onNodeDragStart={() => {
+        onNodeDragStart={(event) => {
           if (readOnly) return;
-          finishDragHistoryTransaction(dragTransactionRef);
-          dragTransactionRef.current = beginHistoryTransaction("node-drag");
+          beginDragHistoryTransaction(dragTransactionRef, event.timeStamp);
         }}
-        onNodeDragStop={() => {
-          finishDragHistoryTransaction(dragTransactionRef);
+        onNodeDragStop={(event) => {
+          finishDragHistoryTransaction(dragTransactionRef, event.timeStamp);
         }}
         onPaneClick={() => setSelectedNodeIds([])}
         deleteKeyCode={readOnly ? null : ["Delete", "Backspace"]}

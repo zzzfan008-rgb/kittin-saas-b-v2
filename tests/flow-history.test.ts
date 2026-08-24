@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { registerDragInterruptionHandlers } from "../src/components/CanvasFlow";
+import {
+  beginDragHistoryTransaction,
+  filterCancelledDragPositionChanges,
+  finishDragHistoryTransaction,
+  registerDragInterruptionHandlers,
+} from "../src/components/CanvasFlow";
 import {
   applyRunEventToTab,
   beginHistoryTransaction,
@@ -123,6 +128,40 @@ await test("一次节点拖拽只形成一条记录并一次撤销到起点", ()
   assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 96, y: 16 });
 });
 
+await test("拖拽中的 undo 与 redo 会在自然结束后真正执行", async () => {
+  const { nodeId } = resetDocument(aiNode("deferred-history-commands"));
+  const transaction = beginHistoryTransaction("deferred-undo-redo");
+  useFlowStore.getState().onNodesChange([{
+    id: nodeId,
+    type: "position",
+    position: { x: 112, y: 28 },
+    dragging: true,
+  }]);
+
+  useFlowStore.getState().undo();
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 112, y: 28 });
+
+  assert.equal(endHistoryTransaction(transaction), true);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
+
+  const redoTransaction = beginHistoryTransaction("deferred-redo");
+  useFlowStore.getState().redo();
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
+  assert.equal(endHistoryTransaction(redoTransaction), false);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 112, y: 28 });
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
+  assert.equal(useFlowStore.temporal.getState().futureStates.length, 0);
+});
+
 await test("拖拽位置检测不会序列化共享的大型节点数据", () => {
   const { nodeId } = resetDocument(aiNode("large-mask-drag"));
   const data = useFlowStore.getState().nodes[0].data as WorkflowNodeData & {
@@ -162,6 +201,7 @@ await test("blur、pointercancel 与卸载都会提交最后可见拖拽位置",
     const beforeRevision = useFlowStore.getState().revision;
     const transactionRef = {
       current: beginHistoryTransaction(`node-drag-${reason}`),
+      startedAt: null,
     };
     const target = new EventTarget();
     const cleanup = registerDragInterruptionHandlers(transactionRef, target);
@@ -257,6 +297,132 @@ await test("切换页签会回滚尚未结束的拖拽事务", () => {
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
 
   useFlowStore.getState().switchTab(firstTabId);
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
+});
+
+await test("切页取消会丢弃排队的 undo/redo 命令", async () => {
+  const { tabId: firstTabId, nodeId } = resetDocument(aiNode("cancelled-history-commands"));
+  useFlowStore.getState().updateNodeData(nodeId, { prompt: "保留这次修改" });
+  useFlowStore.getState().openFlowTab({
+    projectId: "cancelled-history-command-target",
+    projectName: "切页目标",
+    nodes: [aiNode("cancelled-history-command-target-node")],
+    edges: [],
+  });
+  const secondTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().switchTab(firstTabId);
+
+  const transaction = beginHistoryTransaction("cancel-deferred-undo-redo");
+  useFlowStore.getState().onNodesChange([{
+    id: nodeId,
+    type: "position",
+    position: { x: 160, y: 40 },
+    dragging: true,
+  }]);
+  useFlowStore.getState().undo();
+  useFlowStore.getState().redo();
+  useFlowStore.getState().switchTab(secondTabId);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(endHistoryTransaction(transaction), false);
+  useFlowStore.getState().switchTab(firstTabId);
+  const data = useFlowStore.getState().nodes[0].data;
+  assert.equal(data.kind === "ai-modify" ? data.prompt : "", "保留这次修改");
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
+});
+
+await test("关闭后台页签不会取消前台拖拽事务", () => {
+  const { tabId: firstTabId, nodeId } = resetDocument(aiNode("close-background-drag"));
+  useFlowStore.getState().openFlowTab({
+    projectId: "close-background-tab",
+    projectName: "待关闭后台页签",
+    nodes: [aiNode("close-background-node")],
+    edges: [],
+  });
+  const backgroundTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().switchTab(firstTabId);
+  useFlowStore.temporal.getState().clear();
+  const beforeRevision = useFlowStore.getState().revision;
+
+  const transaction = beginHistoryTransaction("close-background-during-drag");
+  useFlowStore.getState().onNodesChange([{
+    id: nodeId,
+    type: "position",
+    position: { x: 88, y: 22 },
+    dragging: true,
+  }]);
+  useFlowStore.getState().closeTab(backgroundTabId);
+
+  assert.equal(useFlowStore.getState().activeTabId, firstTabId);
+  assert.equal(useFlowStore.getState().tabs.some((tab) => tab.id === backgroundTabId), false);
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 88, y: 22 });
+  assert.equal(endHistoryTransaction(transaction), true);
+  assert.equal(useFlowStore.getState().revision, beforeRevision + 1);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
+});
+
+await test("取消后的旧 stop 不会结束新手势，新拖拽仍只产生一条历史", () => {
+  const sharedNodeId = "late-position-shared-node";
+  const { tabId: firstTabId } = resetDocument(aiNode(sharedNodeId));
+  useFlowStore.getState().openFlowTab({
+    projectId: "late-position-second-project",
+    projectName: "晚到帧目标",
+    nodes: [aiNode(sharedNodeId)],
+    edges: [],
+  });
+  const secondTabId = useFlowStore.getState().activeTabId;
+  useFlowStore.getState().switchTab(firstTabId);
+  const transactionRef = { current: null, startedAt: null };
+
+  beginDragHistoryTransaction(transactionRef, 100);
+  useFlowStore.getState().onNodesChange([{
+    id: sharedNodeId,
+    type: "position",
+    position: { x: 180, y: 64 },
+    dragging: true,
+  }]);
+  useFlowStore.getState().switchTab(secondTabId);
+  assert.equal(transactionRef.current, null);
+
+  const filtered = filterCancelledDragPositionChanges(transactionRef, [
+    {
+      id: sharedNodeId,
+      type: "position",
+      position: { x: 999, y: 999 },
+      dragging: true,
+    },
+    { id: sharedNodeId, type: "select", selected: true },
+  ]);
+  useFlowStore.getState().onNodesChange(filtered);
+  assert.equal(filtered.length, 1, "只保留非 position 变化");
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
+  assert.equal(useFlowStore.getState().nodes[0].selected, true);
+
+  beginDragHistoryTransaction(transactionRef, 200);
+  const newToken = transactionRef.current;
+  assert.ok(newToken);
+  assert.equal(
+    finishDragHistoryTransaction(transactionRef, 150),
+    false,
+    "旧手势的晚到 stop 不得结束新 token",
+  );
+  assert.equal(transactionRef.current, newToken);
+
+  for (const [x, y] of [[40, 12], [72, 20], [104, 28]] as const) {
+    const nextGesture = filterCancelledDragPositionChanges(transactionRef, [{
+      id: sharedNodeId,
+      type: "position",
+      position: { x, y },
+      dragging: true,
+    }]);
+    assert.equal(nextGesture.length, 1, "新手势开始后必须解除 quarantine");
+    useFlowStore.getState().onNodesChange(nextGesture);
+  }
+  assert.equal(finishDragHistoryTransaction(transactionRef, 250), true);
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 104, y: 28 });
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
+  useFlowStore.getState().undo();
   assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 0, y: 0 });
 });
 
