@@ -1,22 +1,16 @@
-export type MobileWorkbenchPanel = "library" | "inspector" | null;
-
 export interface WorkbenchUiState {
   libraryOpen: boolean;
   inspectorOpen: boolean;
-  mobilePanel: MobileWorkbenchPanel;
 }
 
 export type WorkbenchUiAction =
   | { type: "toggle-library" }
-  | { type: "toggle-inspector" }
-  | { type: "open-mobile"; panel: Exclude<MobileWorkbenchPanel, null> }
-  | { type: "close-mobile" };
+  | { type: "toggle-inspector" };
 
 export const INITIAL_WORKBENCH_UI_STATE: WorkbenchUiState = {
   libraryOpen: false,
   // 首屏优先保留画布空间，需要属性或结果时再展开上下文 Dock。
   inspectorOpen: false,
-  mobilePanel: null,
 };
 
 /**
@@ -32,12 +26,6 @@ export function workbenchUiReducer(
       return { ...state, libraryOpen: !state.libraryOpen };
     case "toggle-inspector":
       return { ...state, inspectorOpen: !state.inspectorOpen };
-    case "open-mobile":
-      return state.mobilePanel === action.panel
-        ? state
-        : { ...state, mobilePanel: action.panel };
-    case "close-mobile":
-      return state.mobilePanel === null ? state : { ...state, mobilePanel: null };
     default:
       return state;
   }

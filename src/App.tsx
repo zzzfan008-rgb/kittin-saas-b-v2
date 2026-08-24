@@ -62,8 +62,6 @@ function useGlobalShortcuts() {
         void saveProject();
         return;
       }
-      // Sheet 内的画布编辑快捷键不能穿透；保存仍沿用全局项目保存。
-      if (target?.closest('[data-workbench-shortcuts="block"]')) return;
       if (inTextField) return;
 
       if (key === "z" && e.shiftKey) {
@@ -250,7 +248,6 @@ function Workspace() {
         </div>
       )}
       <WorkbenchShell
-        workspaceKey={activeTabId}
         library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
         inspector={(
           <ContextPanel

@@ -5,6 +5,8 @@ node_modules
 .claude/worktrees/
 
 # Build and release outputs
+/dist/
+/dist-server/
 releases/
 *.tsbuildinfo
 

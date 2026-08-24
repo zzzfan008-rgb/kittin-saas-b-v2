@@ -941,7 +941,7 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(topBarSource, /onClick=\{retryTabSessionPersistence\}/);
 });
 
-await test("窄屏侧栏使用可访问 Sheet 且顶栏不再依赖绝对居中", () => {
+await test("桌面工作台使用稳定 Dock 且顶栏不再依赖绝对居中", () => {
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const topBarSource = fs.readFileSync(
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
@@ -952,11 +952,15 @@ await test("窄屏侧栏使用可访问 Sheet 且顶栏不再依赖绝对居中"
     "utf8",
   );
 
-  assert.match(appSource, /<WorkbenchShell[\s\S]*workspaceKey=\{activeTabId\}/);
-  assert.match(shellSource, /useMediaQuery\(DESKTOP_QUERY\)/);
-  assert.match(shellSource, /<MobileSheet[\s\S]*mobilePanel === "library"/);
-  assert.match(shellSource, /<MobileSheet[\s\S]*mobilePanel === "inspector"/);
-  assert.match(shellSource, /aria-controls=\{(?:LIBRARY|INSPECTOR)_PANEL_ID\}/);
+  assert.match(appSource, /<WorkbenchShell[\s\S]*library=\{<NodeLibraryPanel/);
+  assert.equal((shellSource.match(/\{children\}/g) ?? []).length, 1);
+  assert.equal((shellSource.match(/\{library\}/g) ?? []).length, 1);
+  assert.equal((shellSource.match(/\{inspector\}/g) ?? []).length, 1);
+  assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|mobilePanel/);
+  assert.match(shellSource, /aria-controls=\{controls\}/);
+  assert.match(shellSource, /controls=\{LIBRARY_PANEL_ID\}/);
+  assert.match(shellSource, /controls=\{INSPECTOR_PANEL_ID\}/);
+  assert.match(shellSource, /transition-\[width,visibility\]/);
   assert.match(topBarSource, /min-w-0 flex-1/);
   assert.doesNotMatch(topBarSource, /absolute left-1\/2/);
 });

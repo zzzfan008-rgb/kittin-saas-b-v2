@@ -1,18 +1,9 @@
-import { useEffect, useReducer, useRef, type ReactNode, type RefObject } from "react";
+import { useReducer, type ReactNode } from "react";
 import {
   LibraryBigIcon,
   SlidersHorizontalIcon,
-  XIcon,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -24,15 +15,11 @@ import {
   INITIAL_WORKBENCH_UI_STATE,
   workbenchUiReducer,
 } from "./workbenchState";
-import { useMediaQuery } from "./useMediaQuery";
 
-const DESKTOP_QUERY = "(min-width: 1024px)";
 const LIBRARY_PANEL_ID = "workbench-library-panel";
 const INSPECTOR_PANEL_ID = "workbench-inspector-panel";
 
 interface WorkbenchShellProps {
-  /** 项目切换时只关闭移动端遮挡画布的 Sheet，不重建画布。 */
-  workspaceKey: string;
   library: ReactNode;
   inspector: ReactNode;
   children: ReactNode;
@@ -70,87 +57,19 @@ function RailButton({ label, controls, active, side, onClick, icon }: RailButton
   );
 }
 
-interface MobileSheetProps {
-  open: boolean;
-  isDesktop: boolean;
-  side: "left" | "right";
-  panelId: string;
-  title: string;
-  description: string;
-  portalContainer: RefObject<HTMLDivElement | null>;
-  onClose: () => void;
-  children: ReactNode;
-}
-
-function MobileSheet({
-  open,
-  isDesktop,
-  side,
-  panelId,
-  title,
-  description,
-  portalContainer,
-  onClose,
-  children,
-}: MobileSheetProps) {
-  return (
-    <Sheet
-      open={open}
-      modal={!isDesktop}
-      disablePointerDismissal={isDesktop}
-      onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}
-    >
-      <SheetContent
-        id={panelId}
-        data-workbench-shortcuts="block"
-        side={side}
-        showCloseButton={false}
-        portalProps={{ container: portalContainer, keepMounted: true, className: "contents" }}
-        overlayClassName="lg:hidden"
-        className="w-[min(22rem,calc(100vw-2rem))] gap-0 border-[var(--gc-border)] bg-[var(--gc-panel)] p-0 text-[var(--gc-text)] sm:max-w-none lg:static lg:inset-auto lg:h-full lg:w-full lg:max-w-none lg:translate-x-0 lg:border-0 lg:shadow-none lg:transition-none"
-      >
-        <SheetHeader className="flex-row items-center gap-3 border-b border-[var(--gc-border)] px-3 py-2 lg:hidden">
-          <div className="min-w-0 flex-1">
-            <SheetTitle className="text-sm text-[var(--gc-text)]">{title}</SheetTitle>
-            <SheetDescription className="sr-only">{description}</SheetDescription>
-          </div>
-          <SheetClose
-            type="button"
-            aria-label={`关闭${title}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "icon-sm" }),
-              "text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]",
-            )}
-          >
-            <XIcon aria-hidden="true" />
-          </SheetClose>
-        </SheetHeader>
-        <div className="flex min-h-0 flex-1">{children}</div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
 /**
- * 工作台外壳始终保持同一棵中心内容树。断点变化只改变两侧面板的
- * 呈现方式（桌面 Dock / 移动 Sheet），不重建 React Flow 及其业务子树。
+ * 桌面工作台始终保持同一棵中心内容树。两侧 Dock 仅通过占位宽度
+ * 开合，不覆盖画布，也不重建 React Flow 或面板业务子树。
  */
-export function WorkbenchShell({ workspaceKey, library, inspector, children }: WorkbenchShellProps) {
+export function WorkbenchShell({ library, inspector, children }: WorkbenchShellProps) {
   const [state, dispatch] = useReducer(workbenchUiReducer, INITIAL_WORKBENCH_UI_STATE);
-  const isDesktop = useMediaQuery(DESKTOP_QUERY);
-  const libraryPortalHost = useRef<HTMLDivElement>(null);
-  const inspectorPortalHost = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    dispatch({ type: "close-mobile" });
-  }, [workspaceKey, isDesktop]);
 
   return (
     <TooltipProvider delay={250}>
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <nav
           aria-label="工作台左侧工具"
-          className="gc-panel relative z-40 hidden w-12 shrink-0 flex-col items-center border-r border-[var(--gc-border)] bg-[var(--gc-panel)] py-2 lg:flex"
+          className="gc-panel relative z-40 flex w-12 shrink-0 flex-col items-center border-r border-[var(--gc-border)] bg-[var(--gc-panel)] py-2"
         >
           <RailButton
             label="节点 / 素材"
@@ -162,67 +81,45 @@ export function WorkbenchShell({ workspaceKey, library, inspector, children }: W
           />
         </nav>
 
-        <div
-          ref={libraryPortalHost}
-          aria-hidden={isDesktop && !state.libraryOpen}
-          inert={isDesktop && !state.libraryOpen}
+        <aside
+          id={LIBRARY_PANEL_ID}
+          aria-label="节点 / 素材"
+          aria-hidden={!state.libraryOpen}
+          inert={!state.libraryOpen}
           className={cn(
-            "gc-panel relative z-50 w-0 shrink-0 bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none lg:z-30 lg:flex lg:overflow-hidden",
+            "gc-panel relative z-30 flex w-0 shrink-0 overflow-hidden bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none",
             state.libraryOpen
-              ? "lg:visible lg:w-60 lg:border-r lg:border-[var(--gc-border)]"
-              : "lg:invisible lg:w-0 lg:border-r-0",
+              ? "visible w-60 border-r border-[var(--gc-border)]"
+              : "invisible w-0 border-r-0",
           )}
-        />
+        >
+          <div className="flex h-full min-h-0 w-60 shrink-0">{library}</div>
+        </aside>
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="gc-panel flex h-11 shrink-0 items-center border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-2 lg:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-controls={LIBRARY_PANEL_ID}
-              aria-expanded={state.mobilePanel === "library"}
-              onClick={() => dispatch({ type: "open-mobile", panel: "library" })}
-              className="border-[var(--gc-border)] bg-[var(--gc-control)] text-[10px] text-[var(--gc-text)]"
-            >
-              节点 / 素材
-            </Button>
-            <span className="min-w-0 flex-1 truncate px-3 text-center text-[10px] text-[var(--gc-text-muted)]">
-              画布
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-controls={INSPECTOR_PANEL_ID}
-              aria-expanded={state.mobilePanel === "inspector"}
-              onClick={() => dispatch({ type: "open-mobile", panel: "inspector" })}
-              className="border-[var(--gc-border)] bg-[var(--gc-control)] text-[10px] text-[var(--gc-text)]"
-            >
-              属性 / 结果
-            </Button>
-          </div>
-
           <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
             {children}
           </div>
         </div>
 
-        <div
-          ref={inspectorPortalHost}
-          aria-hidden={isDesktop && !state.inspectorOpen}
-          inert={isDesktop && !state.inspectorOpen}
+        <aside
+          id={INSPECTOR_PANEL_ID}
+          aria-label="属性 / 结果"
+          aria-hidden={!state.inspectorOpen}
+          inert={!state.inspectorOpen}
           className={cn(
-            "gc-panel relative z-50 w-0 shrink-0 bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none lg:z-30 lg:flex lg:overflow-hidden",
+            "gc-panel relative z-30 flex w-0 shrink-0 overflow-hidden bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none",
             state.inspectorOpen
-              ? "lg:visible lg:w-80 lg:border-l lg:border-[var(--gc-border)]"
-              : "lg:invisible lg:w-0 lg:border-l-0",
+              ? "visible w-80 border-l border-[var(--gc-border)]"
+              : "invisible w-0 border-l-0",
           )}
-        />
+        >
+          <div className="flex h-full min-h-0 w-80 shrink-0">{inspector}</div>
+        </aside>
 
         <nav
           aria-label="工作台右侧工具"
-          className="gc-panel relative z-40 hidden w-12 shrink-0 flex-col items-center border-l border-[var(--gc-border)] bg-[var(--gc-panel)] py-2 lg:flex"
+          className="gc-panel relative z-40 flex w-12 shrink-0 flex-col items-center border-l border-[var(--gc-border)] bg-[var(--gc-panel)] py-2"
         >
           <RailButton
             label="属性 / 结果"
@@ -233,37 +130,6 @@ export function WorkbenchShell({ workspaceKey, library, inspector, children }: W
             icon={<SlidersHorizontalIcon aria-hidden="true" />}
           />
         </nav>
-
-        <MobileSheet
-          open={isDesktop ? state.libraryOpen : state.mobilePanel === "library"}
-          isDesktop={isDesktop}
-          side="left"
-          panelId={LIBRARY_PANEL_ID}
-          title="节点 / 素材"
-          description="向画布添加节点或选择素材"
-          portalContainer={libraryPortalHost}
-          onClose={() => {
-            if (isDesktop && state.libraryOpen) dispatch({ type: "toggle-library" });
-            else dispatch({ type: "close-mobile" });
-          }}
-        >
-          {library}
-        </MobileSheet>
-        <MobileSheet
-          open={isDesktop ? state.inspectorOpen : state.mobilePanel === "inspector"}
-          isDesktop={isDesktop}
-          side="right"
-          panelId={INSPECTOR_PANEL_ID}
-          title="属性 / 结果"
-          description="查看所选节点属性、生成结果与运行记录"
-          portalContainer={inspectorPortalHost}
-          onClose={() => {
-            if (isDesktop && state.inspectorOpen) dispatch({ type: "toggle-inspector" });
-            else dispatch({ type: "close-mobile" });
-          }}
-        >
-          {inspector}
-        </MobileSheet>
       </div>
     </TooltipProvider>
   );
