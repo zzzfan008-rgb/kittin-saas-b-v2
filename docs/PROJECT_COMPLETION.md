@@ -27,7 +27,7 @@
 
 | 阶段 | 状态 | 交付范围 | PR | CI | Cloud Review |
 | --- | --- | --- | --- | --- | --- |
-| A 状态正确性与撤销事务 | 待审查 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | 待创建 | 本地门禁通过 | 待运行 |
+| A 状态正确性与撤销事务 | 待审查 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [首轮 CI 通过](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32741408695)；最终头部待运行 | [首轮审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009287091) 的可行动 P2 已修；最终头部待复审 |
 | B 文档与持久化边界 | 未开始 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | — | — | — |
 | C 首次生成黄金路径 | 未开始 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | — | — | — |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
@@ -50,7 +50,7 @@
 - [x] recentResults 裁剪、删除和同步后原子清理失效的 selectedResultId / compareIds。
 - [x] Inspector、复制、删除与 Result 对比作用于同一选择对象。
 
-Phase A 本地行为证据：`flow-history` 14/14、`selection-consistency` 9/9、`project-tabs` 27/27、`project-tabs-session` 全部场景、`recent-results` 20/20；Playwright 在 1024 / 1280 / 1440 三个桌面项目共 11/11 通过。最终状态仍须经过阶段 PR 的 GitHub CI 与 Codex Cloud Review 后才能改为“已完成”。
+Phase A 本地行为证据：`flow-history` 15/15、`selection-consistency` 9/9、`project-tabs` 27/27、`project-tabs-session` 全部场景、`recent-results` 20/20；Playwright 在 1024 / 1280 / 1440 三个桌面项目共 11/11 通过。最终状态仍须经过阶段 PR 的 GitHub CI 与 Codex Cloud Review 后才能改为“已完成”。
 
 ### B. 文档与持久化边界
 
@@ -118,12 +118,12 @@ Phase A 本地行为证据：`flow-history` 14/14、`selection-consistency` 9/9�
 | `npm run check` | 通过 | lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过 |
 | `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
 | production browser smoke | 待实现 | Phase E |
-| `npm run build` | 通过 | Web + server；主 JS 728.10 kB / gzip 232.27 kB，既有 >500 kB 警告留待 Phase F |
+| `npm run build` | 通过 | Web + server；主 JS 728.46 kB / gzip 232.42 kB，既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
-| GitNexus `detect_changes` | 已执行 | critical：119 changed / 49 affected / 13 changed files；风险来自 FlowState、页签快照和运行回写枢纽，已由历史、选择、页签、Results、会话与三档 E2E 覆盖 |
-| GitHub CI | 基线通过 | 后续各阶段记录独立 URL |
-| Codex Cloud Review | 待运行 | 每个阶段修复 P0/P1 与可行动 P2 |
+| GitNexus `detect_changes` | 已执行 | Phase A 主批次为 critical：119 changed / 49 affected / 13 files；Cloud P2 修复增量为 medium：2 changed / 5 affected / 3 files。风险来自 FlowState、页签快照和运行回写枢纽，已由历史、选择、页签、Results、会话与三档 E2E 覆盖 |
+| GitHub CI | Phase A 首轮通过 | [Actions 32741408695](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32741408695)；修复后最终头部待运行 |
+| Codex Cloud Review | 首轮 P2 已修 | [Review 5009287091](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009287091)；修复后最终头部待复审 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
 
 ## 已知风险与决策日志
@@ -137,6 +137,7 @@ Phase A 本地行为证据：`flow-history` 14/14、`selection-consistency` 9/9�
 | 2026-08-24 | shadcn/Base UI 使用边界 | 用户确认可结合仓库使用；优先复用现有 UI primitives 承担通用弹层、Tabs、Tooltip 与焦点管理，继续由 `data-theme` / `--gc-*` 和业务 Store 掌管主题与状态。 |
 | 2026-08-24 | Phase A 每页签撤销历史 | zundo 继续挂载活动文档，非活动页签使用进程内 past/future 栈换入换出；历史不跨刷新持久化，项目文档与会话恢复仍由 Phase B 收敛。 |
 | 2026-08-24 | 中断拖拽瞬态 | blur、pointercancel、卸载均提交最后可见位置并清除 `dragging`；历史 Undo→Redo 与会话恢复都不得重新引入永久拖拽态。 |
+| 2026-08-24 | 大型节点拖拽性能 | Cloud 首轮 P2 指出每帧序列化完整 mask payload；改为字段级相等性与共享值短路，并以 `toJSON` 探针保证位置检测不触发大型 data 序列化。 |
 
 ## 更新规则
 

@@ -334,17 +334,59 @@ export function runWithoutHistory<T>(run: () => T): T {
   }
 }
 
-function documentNodeValue(node: FlowNode): unknown {
-  const {
-    selected: _selected,
-    dragging: _dragging,
-    measured: _measured,
-    width: _width,
-    height: _height,
-    ...documentNode
-  } = node;
-  const { status: _status, error: _error, ...documentData } = node.data;
-  return { ...documentNode, data: documentData };
+const TRANSIENT_NODE_KEYS = new Set([
+  "selected",
+  "dragging",
+  "measured",
+  "width",
+  "height",
+]);
+
+const DOCUMENT_NODE_SHELL_EXCLUDED_KEYS = new Set([
+  ...TRANSIENT_NODE_KEYS,
+  "id",
+  "type",
+  "position",
+  "data",
+]);
+
+const RUNTIME_NODE_DATA_KEYS = new Set(["status", "error"]);
+
+function sameRecordValues(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  excludedKeys: ReadonlySet<string>,
+): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if (excludedKeys.has(key)) continue;
+    const leftValue = left[key];
+    const rightValue = right[key];
+    if (Object.is(leftValue, rightValue)) continue;
+    if (JSON.stringify(leftValue) !== JSON.stringify(rightValue)) return false;
+  }
+  return true;
+}
+
+function sameDocumentNode(left: FlowNode, right: FlowNode): boolean {
+  if (left === right) return true;
+  if (
+    left.id !== right.id ||
+    left.type !== right.type ||
+    left.position.x !== right.position.x ||
+    left.position.y !== right.position.y
+  ) return false;
+  if (!sameRecordValues(
+    left as unknown as Record<string, unknown>,
+    right as unknown as Record<string, unknown>,
+    DOCUMENT_NODE_SHELL_EXCLUDED_KEYS,
+  )) return false;
+  if (left.data === right.data) return true;
+  return sameRecordValues(
+    left.data as unknown as Record<string, unknown>,
+    right.data as unknown as Record<string, unknown>,
+    RUNTIME_NODE_DATA_KEYS,
+  );
 }
 
 function documentEdgeValue(edge: Edge): unknown {
@@ -356,10 +398,7 @@ function sameDocumentNodes(left: FlowNode[], right: FlowNode[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index += 1) {
-    if (left[index] === right[index]) continue;
-    if (JSON.stringify(documentNodeValue(left[index])) !== JSON.stringify(documentNodeValue(right[index]))) {
-      return false;
-    }
+    if (!sameDocumentNode(left[index], right[index])) return false;
   }
   return true;
 }

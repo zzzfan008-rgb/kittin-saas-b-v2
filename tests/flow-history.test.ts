@@ -8,6 +8,7 @@ import {
   useFlowStore,
   type FlowNode,
 } from "../src/store/flowStore";
+import type { WorkflowNodeData } from "../src/types/workflow";
 
 let passed = 0;
 
@@ -120,6 +121,35 @@ await test("一次节点拖拽只形成一条记录并一次撤销到起点", ()
 
   useFlowStore.getState().redo();
   assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 96, y: 16 });
+});
+
+await test("拖拽位置检测不会序列化共享的大型节点数据", () => {
+  const { nodeId } = resetDocument(aiNode("large-mask-drag"));
+  const data = useFlowStore.getState().nodes[0].data as WorkflowNodeData & {
+    toJSON?: () => unknown;
+  };
+  let serializationCount = 0;
+  Object.defineProperty(data, "toJSON", {
+    configurable: true,
+    enumerable: true,
+    value: () => {
+      serializationCount += 1;
+      return { mask: "should-not-be-serialized-during-drag" };
+    },
+  });
+
+  const transaction = beginHistoryTransaction("large-mask-node-drag");
+  useFlowStore.getState().onNodesChange([{
+    id: nodeId,
+    type: "position",
+    position: { x: 80, y: 40 },
+    dragging: true,
+  }]);
+  endHistoryTransaction(transaction);
+
+  assert.equal(serializationCount, 0);
+  assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 80, y: 40 });
+  delete data.toJSON;
 });
 
 await test("blur、pointercancel 与卸载都会提交最后可见拖拽位置", () => {
