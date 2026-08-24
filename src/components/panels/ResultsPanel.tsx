@@ -29,7 +29,10 @@ export function ResultsPanel({
   const resultCardClass = "aspect-square min-w-0 w-full";
 
   return (
-    <section className={cn("gc-panel flex min-h-0 flex-col bg-[#141414]", className)}>
+    <section
+      aria-label="最近生成"
+      className={cn("gc-panel flex min-h-0 flex-col bg-[#141414]", className)}
+    >
       <div className="flex min-w-0 items-center gap-2 border-b border-[#262626] px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-500">
           最近生成

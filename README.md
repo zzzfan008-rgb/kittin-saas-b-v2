@@ -38,6 +38,17 @@ Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
 `npm run test` 会自动启动隔离的临时 PostgreSQL 容器，运行全部回归后删除测试容器和卷；
 测试数据不会污染正式数据。
 
+桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
+请求。首次运行先安装 Chromium，然后执行：
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+该套件覆盖项目支持下限 1024×768，以及主要视觉宽度 1280×720 与 1440×900；
+不包含移动端适配测试。
+
 ## 非 Docker 构建与启动
 
 ```bash

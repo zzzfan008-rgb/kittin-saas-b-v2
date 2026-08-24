@@ -56,6 +56,7 @@ export function CanvasFlow() {
   return (
     <div className="min-h-0 flex-1">
       <ReactFlow
+        aria-label="工作流画布"
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}

@@ -41,6 +41,9 @@ tmp/
 temp/
 
 # Test and local demo outputs
+.playwright/
+playwright-report/
+test-results/
 test-*.png
 test-*.jpg
 shot-*.png

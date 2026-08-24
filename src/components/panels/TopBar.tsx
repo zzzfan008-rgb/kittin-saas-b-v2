@@ -148,11 +148,19 @@ function ProjectPicker() {
 }
 
 /** 主题切换：胶囊触发 + 悬浮下拉窗口 */
+const THEME_PICKER_ID = "theme-picker-options";
+
 function ThemeSwitcher() {
   const [theme, switchTheme] = useTheme();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const current = THEMES.find((t) => t.id === theme) ?? THEMES[0];
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -160,7 +168,9 @@ function ThemeSwitcher() {
       if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
+        closeAndRestoreFocus();
+      }
     };
     window.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey);
@@ -171,10 +181,21 @@ function ThemeSwitcher() {
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) {
+          setOpen(false);
+        }
+      }}
+    >
       <button
+        ref={triggerRef}
         type="button"
         aria-label={`切换主题，当前为${current.label}`}
+        aria-controls={THEME_PICKER_ID}
+        aria-expanded={open}
         title={`切换主题，当前为${current.label}`}
         onClick={() => setOpen((v) => !v)}
         className={`flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border px-0 text-[10px] transition-colors sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 ${
@@ -192,14 +213,14 @@ function ThemeSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60">
+        <div id={THEME_PICKER_ID} className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60">
           {THEMES.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => {
                 switchTheme(t.id);
-                setOpen(false);
+                closeAndRestoreFocus();
               }}
               className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors ${
                 theme === t.id ? "bg-gold/10" : "hover:bg-[#222]"
