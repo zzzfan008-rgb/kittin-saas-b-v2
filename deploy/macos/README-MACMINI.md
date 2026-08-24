@@ -3,7 +3,7 @@
 ## 系统要求
 
 - macOS 13 或更高版本。
-- Node.js 22.0.0 或更高版本。
+- Node.js 22.20.0 或更高版本。
 - Docker Desktop（必须已启动），数据库由本机 Docker 内置 PostgreSQL 18 提供。
 - `universal-online` 包支持 Apple Silicon 与 Intel，首次安装需要访问 npm registry 和 Docker Hub。
 - `darwin-*-offline` 包已附带生产依赖和 PostgreSQL 镜像，仅用于打包时对应的 Mac 架构。
