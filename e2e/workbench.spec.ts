@@ -60,6 +60,80 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
 });
 
+test("node drag is one undo transaction and selection stays canonical", async ({ page }) => {
+  const modifier = process.platform === "darwin" ? "Meta" : "Control";
+  const nodes = page.locator(".react-flow__node");
+  const selectedNodes = page.locator(".react-flow__node.selected");
+  const node = nodes.first();
+  const nodeHeader = node.locator(".gc-node-header");
+  const pane = page.locator(".react-flow__pane");
+
+  await expect(node).toBeVisible();
+  await expect(nodeHeader).toBeVisible();
+
+  // React Flow 的 .selected 投影必须与 store 的 canonical selection 同步。
+  await nodeHeader.click();
+  await expect(node).toHaveClass(/\bselected\b/);
+  await expect(selectedNodes).toHaveCount(1);
+
+  // Clipboard and Inspector share the same derived primary selection. The pasted
+  // node becomes the sole selection, and one undo removes the whole paste action.
+  await page.keyboard.press(`${modifier}+c`);
+  await page.keyboard.press(`${modifier}+v`);
+  await expect(nodes).toHaveCount(2);
+  await expect(selectedNodes).toHaveCount(1);
+  await page.keyboard.press(`${modifier}+z`);
+  await expect(nodes).toHaveCount(1);
+  await expect(selectedNodes).toHaveCount(0);
+  await nodeHeader.click();
+  await expect(selectedNodes).toHaveCount(1);
+
+  const paneBox = await pane.boundingBox();
+  if (!paneBox) throw new Error("React Flow pane is missing");
+  await page.mouse.click(paneBox.x + paneBox.width - 80, paneBox.y + 80);
+  await expect(selectedNodes).toHaveCount(0);
+
+  const start = await node.boundingBox();
+  const startTransform = await node.evaluate((element) => (element as HTMLElement).style.transform);
+  const handle = await nodeHeader.boundingBox();
+  if (!start || !handle) throw new Error("Initial workflow node is missing");
+  const dragDelta = { x: 160, y: 90 };
+  const pointer = {
+    x: handle.x + Math.min(24, handle.width / 2),
+    y: handle.y + handle.height / 2,
+  };
+
+  await page.mouse.move(pointer.x, pointer.y);
+  await page.mouse.down();
+  await page.mouse.move(pointer.x + dragDelta.x, pointer.y + dragDelta.y, { steps: 12 });
+  await page.mouse.up();
+
+  // React Flow 会先跨过内部拖拽阈值，最终位移无需等于指针位移，但必须明显移动。
+  await expect.poll(async () => {
+    const box = await node.boundingBox();
+    return box ? Math.round(box.x - start.x) : 0;
+  }).toBeGreaterThan(100);
+  await expect.poll(async () => {
+    const box = await node.boundingBox();
+    return box ? Math.round(box.y - start.y) : 0;
+  }).toBeGreaterThan(50);
+  const end = await node.boundingBox();
+  if (!end) throw new Error("Dragged workflow node is missing");
+  const endTransform = await node.evaluate((element) => (element as HTMLElement).style.transform);
+  expect(endTransform).not.toBe(startTransform);
+
+  // 尽管鼠标产生多个 position change，一次撤销必须完整返回拖拽前位置。
+  await page.keyboard.press(`${modifier}+z`);
+  await expect.poll(
+    () => node.evaluate((element) => (element as HTMLElement).style.transform),
+  ).toBe(startTransform);
+
+  await page.keyboard.press(`${modifier}+Shift+z`);
+  await expect.poll(
+    () => node.evaluate((element) => (element as HTMLElement).style.transform),
+  ).toBe(endTransform);
+});
+
 test("docks preserve canvas identity, geometry, focus, and results", async ({ page }, testInfo) => {
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Desktop viewport is required");
@@ -179,7 +253,13 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await expectWidth(canvas, viewport.width - 336);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "节点库" })).toBeFocused();
+  const sessionBeforeDomFocus = await page.evaluate(() => (
+    window.sessionStorage.getItem("garment-canvas-project-tabs")
+  ));
   await leftToggle.focus();
+  await expect.poll(() => page.evaluate(() => (
+    window.sessionStorage.getItem("garment-canvas-project-tabs")
+  ))).toBe(sessionBeforeDomFocus);
 
   await rightToggle.click();
   await expectInert(rightPanel, false);

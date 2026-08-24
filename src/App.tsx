@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
-  reconcileRunHistory, resumeRecentResults, trimRecentResults, useFlowStore, type FlowNode, type RecentResult,
+  reconcileRunHistory,
+  recentResultsPatch,
+  resumeRecentResults,
+  selectPrimarySelectedNodeId,
+  trimRecentResults,
+  useFlowStore,
+  type FlowNode,
+  type RecentResult,
 } from "@/store/flowStore";
 import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
@@ -72,7 +79,9 @@ function useGlobalShortcuts() {
         undo();
       } else if (key === "c") {
         // 复制选中节点（不带连线，避免悬空边）
-        const { nodes, selectedNodeId } = useFlowStore.getState();
+        const state = useFlowStore.getState();
+        const { nodes } = state;
+        const selectedNodeId = selectPrimarySelectedNodeId(state);
         const node = nodes.find((n) => n.id === selectedNodeId);
         if (node) {
           nodeClipboard = {
@@ -89,7 +98,7 @@ function useGlobalShortcuts() {
         data.status = "idle";
         data.error = undefined;
         const anchor =
-          nodes.find((n) => n.id === useFlowStore.getState().selectedNodeId) ??
+          nodes.find((n) => n.id === selectPrimarySelectedNodeId(useFlowStore.getState())) ??
           nodes[nodes.length - 1];
         const position = anchor
           ? { x: anchor.position.x + 40, y: anchor.position.y + 40 }
@@ -205,12 +214,10 @@ function Workspace() {
       const page = parseHistoryPage(await response.json());
       useFlowStore.setState((state) => {
         const existingIds = new Set(state.recentResults.map((record) => record.id));
-        return {
-          recentResults: trimRecentResults([
-            ...state.recentResults,
-            ...page.records.filter((record) => !existingIds.has(record.id)),
-          ]) as never,
-        };
+        return recentResultsPatch(state, trimRecentResults([
+          ...state.recentResults,
+          ...page.records.filter((record) => !existingIds.has(record.id)),
+        ]) as never);
       });
       resumeRecentResults(page.records);
       setHistoryCursor(page.nextCursor);

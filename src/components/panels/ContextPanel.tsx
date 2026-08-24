@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Tabs } from "@base-ui/react/tabs";
 import { HistoryIcon, SlidersHorizontalIcon } from "lucide-react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectPrimarySelectedNodeId, useFlowStore } from "@/store/flowStore";
 import { cn } from "@/lib/utils";
 import { InspectorPanel } from "./InspectorPanel";
 import { ResultsPanel } from "./ResultsPanel";
@@ -25,7 +25,7 @@ export function ContextPanel({
   onLoadMore,
   className,
 }: ContextPanelProps) {
-  const selectedNodeId = useFlowStore((state) => state.selectedNodeId);
+  const selectedNodeId = useFlowStore(selectPrimarySelectedNodeId);
   const selectedResultId = useFlowStore((state) => state.selectedResultId);
   const [activeTab, setActiveTab] = useState<ContextTab>(
     selectedResultId ? "results" : "properties",

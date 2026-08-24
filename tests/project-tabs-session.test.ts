@@ -28,6 +28,46 @@ function memoryStorage(
   };
 }
 
+function storedSelectionNode(id: string, selected?: boolean) {
+  return {
+    id,
+    type: "image-input",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "image-input",
+      label: id,
+      status: "idle",
+      imageRole: "default",
+    },
+    ...(selected === undefined ? {} : { selected }),
+  };
+}
+
+function storedSelectionTab(
+  id: string,
+  nodes: ReturnType<typeof storedSelectionNode>[],
+  selection: {
+    selectedNodeIds?: unknown;
+    selectedNodeId?: unknown;
+  } = {},
+) {
+  return {
+    id,
+    projectId: `project-${id}`,
+    projectName: `项目 ${id}`,
+    nodes,
+    edges: [],
+    selectedResultId: null,
+    compareIds: [],
+    saveState: "idle",
+    revision: 0,
+    savedRevision: 0,
+    dirty: false,
+    documentEpoch: 0,
+    ...selection,
+  };
+}
+
 const sessionKey = "garment-canvas-project-tabs";
 const recentKey = "garment-canvas-recent-results";
 const restoredEdge = { id: "edge-a-b", source: "node-a", target: "node-b" };
@@ -135,6 +175,128 @@ assert.deepEqual(persisted.tabs[0].edges, [restoredEdge]);
 assert.equal(persisted.tabs[0].saveState, "idle");
 assert.equal((persisted as typeof storedSession & { schemaVersion: number }).schemaVersion, TAB_SESSION_SCHEMA_VERSION);
 console.log("  ✓ 初始化持久化不会再次覆盖恢复后的连线或保存状态");
+
+const migratedLegacySelection = normalizeTabSessionValue({
+  activeTabId: "legacy-selection-tab",
+  tabs: [storedSelectionTab(
+    "legacy-selection-tab",
+    [storedSelectionNode("legacy-node-a"), storedSelectionNode("legacy-node-b")],
+    { selectedNodeId: "legacy-node-b" },
+  )],
+});
+assert.ok(migratedLegacySelection);
+assert.deepEqual(migratedLegacySelection.tabs[0].selectedNodeIds, ["legacy-node-b"]);
+assert.equal(migratedLegacySelection.tabs[0].selectedNodeId, "legacy-node-b");
+assert.deepEqual(
+  migratedLegacySelection.tabs[0].nodes.map((node) => [node.id, Boolean(node.selected)]),
+  [["legacy-node-a", false], ["legacy-node-b", true]],
+);
+console.log("  ✓ 旧 selectedNodeId 会迁移为 canonical selectedNodeIds");
+
+const filteredInvalidSelection = normalizeTabSessionValue({
+  activeTabId: "invalid-selection-tab",
+  tabs: [storedSelectionTab(
+    "invalid-selection-tab",
+    [storedSelectionNode("valid-node-a"), storedSelectionNode("valid-node-b")],
+    { selectedNodeIds: ["missing-node", "valid-node-b"] },
+  )],
+});
+assert.ok(filteredInvalidSelection);
+assert.deepEqual(filteredInvalidSelection.tabs[0].selectedNodeIds, ["valid-node-b"]);
+assert.equal(filteredInvalidSelection.tabs[0].selectedNodeId, "valid-node-b");
+assert.deepEqual(
+  filteredInvalidSelection.tabs[0].nodes.map((node) => [node.id, Boolean(node.selected)]),
+  [["valid-node-a", false], ["valid-node-b", true]],
+);
+console.log("  ✓ canonical selectedNodeIds 会过滤当前页签不存在的节点");
+
+const canonicalSelectionWins = normalizeTabSessionValue({
+  activeTabId: "canonical-selection-tab",
+  tabs: [storedSelectionTab(
+    "canonical-selection-tab",
+    [storedSelectionNode("raw-selected-node", true), storedSelectionNode("canonical-node", false)],
+    {
+      selectedNodeIds: ["canonical-node"],
+      selectedNodeId: "raw-selected-node",
+    },
+  )],
+});
+assert.ok(canonicalSelectionWins);
+assert.deepEqual(canonicalSelectionWins.tabs[0].selectedNodeIds, ["canonical-node"]);
+assert.equal(canonicalSelectionWins.tabs[0].selectedNodeId, "canonical-node");
+assert.deepEqual(
+  canonicalSelectionWins.tabs[0].nodes.map((node) => [node.id, Boolean(node.selected)]),
+  [["raw-selected-node", false], ["canonical-node", true]],
+);
+console.log("  ✓ canonical selectedNodeIds 覆盖旧 selectedNodeId 与原始 node.selected");
+
+const transientDraggingIsDiscarded = normalizeTabSessionValue({
+  activeTabId: "dragging-session-tab",
+  tabs: [storedSelectionTab(
+    "dragging-session-tab",
+    [{ ...storedSelectionNode("dragging-node"), dragging: true }],
+  )],
+});
+assert.ok(transientDraggingIsDiscarded);
+assert.equal(transientDraggingIsDiscarded.tabs[0].nodes[0].dragging, undefined);
+console.log("  ✓ 会话恢复丢弃中断拖拽遗留的 dragging 瞬态");
+
+const isolatedTabSelections = normalizeTabSessionValue({
+  activeTabId: "selection-tab-b",
+  tabs: [
+    storedSelectionTab(
+      "selection-tab-a",
+      [storedSelectionNode("tab-a-node-1", true), storedSelectionNode("tab-a-node-2", false)],
+      { selectedNodeIds: ["tab-a-node-2"] },
+    ),
+    storedSelectionTab(
+      "selection-tab-b",
+      [storedSelectionNode("tab-b-node-1", false), storedSelectionNode("tab-b-node-2", true)],
+      { selectedNodeIds: ["tab-b-node-1"] },
+    ),
+  ],
+});
+assert.ok(isolatedTabSelections);
+assert.equal(isolatedTabSelections.activeTabId, "selection-tab-b");
+assert.deepEqual(
+  isolatedTabSelections.tabs.map((tab) => ({
+    id: tab.id,
+    selectedNodeIds: tab.selectedNodeIds,
+    selectedNodeId: tab.selectedNodeId,
+    selectedFlags: tab.nodes.map((node) => [node.id, Boolean(node.selected)]),
+  })),
+  [
+    {
+      id: "selection-tab-a",
+      selectedNodeIds: ["tab-a-node-2"],
+      selectedNodeId: "tab-a-node-2",
+      selectedFlags: [["tab-a-node-1", false], ["tab-a-node-2", true]],
+    },
+    {
+      id: "selection-tab-b",
+      selectedNodeIds: ["tab-b-node-1"],
+      selectedNodeId: "tab-b-node-1",
+      selectedFlags: [["tab-b-node-1", true], ["tab-b-node-2", false]],
+    },
+  ],
+);
+console.log("  ✓ canonical 节点选择按页签隔离恢复且不会串页");
+
+const clearedResultReferences = normalizeTabSessionValue({
+  activeTabId: "stale-result-reference-tab",
+  tabs: [{
+    ...storedSelectionTab(
+      "stale-result-reference-tab",
+      [storedSelectionNode("reference-node")],
+    ),
+    selectedResultId: "result-from-previous-session",
+    compareIds: ["result-from-previous-session", "another-stale-result"],
+  }],
+});
+assert.ok(clearedResultReferences);
+assert.equal(clearedResultReferences.tabs[0].selectedResultId, null);
+assert.deepEqual(clearedResultReferences.tabs[0].compareIds, []);
+console.log("  ✓ 会话不恢复尚未通过当前账号服务器历史确认的结果引用");
 
 const migrated = normalizeTabSessionValue({
   activeTabId: "legacy-tab",
