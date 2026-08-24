@@ -1,4 +1,8 @@
 import type { Locator } from "@playwright/test";
+import {
+  WORKFLOW_SCHEMA_VERSION,
+  type WorkflowTemplate,
+} from "../src/types/workflow";
 import { expect, test } from "./fixtures";
 
 interface Rect {
@@ -9,6 +13,16 @@ interface Rect {
   width: number;
   height: number;
 }
+
+const TEMPLATE_FIXTURES = Array.from({ length: 3 }, (_, index) => ({
+  schemaVersion: WORKFLOW_SCHEMA_VERSION,
+  id: `e2e-template-${index + 1}`,
+  name: `E2E 模板 ${index + 1}`,
+  description: "用于验证模板面板在桌面 Dock 组合下的响应式网格",
+  builtIn: true,
+  createdAt: "2026-08-24T00:00:00.000Z",
+  flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] },
+})) satisfies WorkflowTemplate[];
 
 async function rect(locator: Locator): Promise<Rect> {
   return locator.evaluate((element) => {
@@ -179,6 +193,144 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   expect(Math.abs(canvasRect.right - rightPanelRect.left)).toBeLessThanOrEqual(1);
   expectInside(await rect(page.locator(".react-flow__controls")), canvasRect);
   expectInside(await rect(page.locator(".react-flow__minimap")), canvasRect);
+
+  // 模板浮层必须按双 Dock 后的中心宽度收缩，不能被画布容器裁切。
+  const releaseTemplateSaves: Array<() => void> = [];
+  const templateSaveGates = Array.from({ length: 3 }, () => new Promise<void>((resolve) => {
+    releaseTemplateSaves.push(resolve);
+  }));
+  let resolveFailedOldRequest: (() => void) | undefined;
+  const failedOldRequestHandled = new Promise<void>((resolve) => {
+    resolveFailedOldRequest = resolve;
+  });
+  let templateSaveRequestIndex = 0;
+  await page.route("**/api/templates", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ json: TEMPLATE_FIXTURES });
+      return;
+    }
+    if (route.request().method() === "POST") {
+      const requestIndex = templateSaveRequestIndex++;
+      await templateSaveGates[requestIndex];
+      if (requestIndex === 1) {
+        await route.abort("failed");
+        resolveFailedOldRequest?.();
+        return;
+      }
+      await route.fulfill({ status: 201, json: TEMPLATE_FIXTURES[0] });
+      return;
+    }
+    await route.fallback();
+  });
+  const templatesToggle = page.getByRole("button", { name: /模板库/ });
+  await templatesToggle.click();
+  await expect(templatesToggle).toHaveAttribute("aria-expanded", "true");
+  const templatesPanel = page.getByRole("region", { name: "工作流模板" });
+  await expect(templatesPanel).toBeVisible();
+  const templateCards = templatesPanel.getByTitle("从模板新建");
+  await expect(templateCards).toHaveCount(TEMPLATE_FIXTURES.length);
+  await expect(templateCards.first()).toBeVisible();
+  const expectedTemplatesWidth = Math.min(660, canvasRect.width - 16);
+  await expect.poll(async () => (
+    Math.abs((await rect(templatesPanel)).width - expectedTemplatesWidth)
+  )).toBeLessThanOrEqual(1);
+  const templatesPanelRect = await rect(templatesPanel);
+  expectInside(templatesPanelRect, canvasRect);
+  expect(templatesPanelRect.left).toBeGreaterThanOrEqual(canvasRect.left + 7);
+  expect(templatesPanelRect.right).toBeLessThanOrEqual(canvasRect.right - 7);
+  const templatesScroller = templatesPanel.locator('[data-slot="templates-scroll-area"]');
+  expect(await templatesScroller.evaluate(
+    (element) => element.scrollWidth <= element.clientWidth + 1,
+  )).toBe(true);
+  const templateGrid = templatesPanel.locator('[data-slot="templates-grid"]');
+  const expectedTemplateColumns = viewport.width === 1024 ? 2 : 3;
+  expect(await templateGrid.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(" ").length,
+  )).toBe(expectedTemplateColumns);
+  await testInfo.attach(`desktop-${viewport.width}-both-docks-template`, {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  const closeTemplates = templatesPanel.getByRole("button", { name: "关闭 Esc" });
+  await closeTemplates.focus();
+  await page.keyboard.press("Escape");
+  await expect(templatesToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(templatesPanel).toHaveCount(0);
+  await expect(templatesToggle).toBeFocused();
+
+  await templatesToggle.click();
+  await expect(templateCards).toHaveCount(TEMPLATE_FIXTURES.length);
+  const saveTemplateButton = templatesPanel.getByRole("button", { name: "当前画布存为模板" });
+  await saveTemplateButton.click();
+  const saveTemplateDialog = page.getByRole("dialog", { name: "存为模板" });
+  await expect(saveTemplateDialog).toBeVisible();
+  const saveTemplateName = saveTemplateDialog.getByRole("textbox", { name: "名称" });
+  const submitTemplate = saveTemplateDialog.getByRole("button", { name: /^保存/ });
+  await expect(saveTemplateName).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(submitTemplate).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(saveTemplateName).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(saveTemplateDialog).toHaveCount(0);
+  await expect(templatesPanel).toBeVisible();
+  await expect(saveTemplateButton).toBeFocused();
+
+  // 已关闭会话的延迟响应不得关闭或改写后来重新打开的表单。
+  await saveTemplateButton.click();
+  await saveTemplateName.fill("旧会话模板");
+  const oldSaveResponse = page.waitForResponse((response) => (
+    response.request().method() === "POST" &&
+    response.request().postData()?.includes("旧会话模板") === true
+  ));
+  await submitTemplate.click();
+  await expect(submitTemplate).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(saveTemplateDialog).toHaveCount(0);
+  await saveTemplateButton.click();
+  await expect(saveTemplateName).toHaveValue("");
+  await saveTemplateName.fill("新会话模板");
+  releaseTemplateSaves[0]();
+  await oldSaveResponse;
+  await expect(saveTemplateDialog).toBeVisible();
+  await expect(saveTemplateName).toHaveValue("新会话模板");
+  await expect(submitTemplate).toBeEnabled();
+  await expect(saveTemplateDialog.locator(".text-red-400")).toHaveCount(0);
+
+  // 旧网络异常的 catch/finally 也不能污染仍在提交的新会话。
+  await saveTemplateName.fill("失败旧会话");
+  const failedOldSaveRequest = page.waitForRequest((request) => (
+    request.method() === "POST" && request.postData()?.includes("失败旧会话") === true
+  ));
+  await submitTemplate.click();
+  await failedOldSaveRequest;
+  await expect(submitTemplate).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(saveTemplateDialog).toHaveCount(0);
+  await saveTemplateButton.click();
+  await saveTemplateName.fill("并发新会话");
+  const currentSaveResponse = page.waitForResponse((response) => (
+    response.request().method() === "POST" &&
+    response.request().postData()?.includes("并发新会话") === true
+  ));
+  await submitTemplate.click();
+  await expect(submitTemplate).toBeDisabled();
+  releaseTemplateSaves[1]();
+  await failedOldRequestHandled;
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  await expect(saveTemplateDialog).toBeVisible();
+  await expect(saveTemplateName).toHaveValue("并发新会话");
+  await expect(submitTemplate).toBeDisabled();
+  await expect(saveTemplateDialog.locator(".text-red-400")).toHaveCount(0);
+  releaseTemplateSaves[2]();
+  await currentSaveResponse;
+  await expect(saveTemplateDialog).toHaveCount(0);
+  await expect(saveTemplateButton).toBeFocused();
+  await templatesPanel.getByRole("button", { name: "关闭 Esc" }).click();
+  await expect(templatesPanel).toHaveCount(0);
+  await expect(templatesToggle).toBeFocused();
 
   await resultsScroller.locator("[data-e2e-scroll-filler='true']").evaluate((element) => element.remove());
   await page.mouse.move(canvasRect.left + canvasRect.width / 2, canvasRect.top + 20);
