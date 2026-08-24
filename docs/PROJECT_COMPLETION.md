@@ -23,11 +23,11 @@
 
 ## 阶段进度
 
-状态约定：`未开始`、`进行中`、`待审查`、`已完成`、`阻塞`。
+状态约定：`未开始`、`进行中`、`待审查`、`待用户确认`、`已完成`、`阻塞`。
 
 | 阶段 | 状态 | 交付范围 | PR | CI | Cloud Review |
 | --- | --- | --- | --- | --- | --- |
-| A 状态正确性与撤销事务 | 待审查 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [首轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32741408695)、[第二轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32743144415)与[第三轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32746760748)通过；最终头部待运行 | [首轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009287091)、[第二轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009538247)与[第三轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009866546)可行动 P2 均已修；最终头部待复审 |
+| A 状态正确性与撤销事务 | 待用户确认 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [首轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32741408695)、[第二轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32743144415)、[第三轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32746760748)与[实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32753871165)通过 | [首轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009287091)、[第二轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009538247)与[第三轮](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009866546)可行动 P2 均已修；[实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398654472) P0/P1/P2 均为 0 |
 | B 文档与持久化边界 | 未开始 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | — | — | — |
 | C 首次生成黄金路径 | 未开始 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | — | — | — |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
@@ -50,7 +50,7 @@
 - [x] recentResults 裁剪、删除和同步后原子清理失效的 selectedResultId / compareIds。
 - [x] Inspector、复制、删除与 Result 对比作用于同一选择对象。
 
-Phase A 本地行为证据：`flow-history` 19/19、`selection-consistency` 11/11、`project-tabs` 35/35、`project-tabs-session` 12/12、`recent-results` 20/20；Playwright 在 1024 / 1280 / 1440 三个桌面项目共 11/11 通过。最终状态仍须经过阶段 PR 最终头部的 GitHub CI 与 Codex Cloud Review 后才能改为“已完成”。
+Phase A 本地行为证据：`flow-history` 19/19、`selection-consistency` 11/11、`project-tabs` 35/35、`project-tabs-session` 12/12、`recent-results` 20/20；Playwright 在 1024 / 1280 / 1440 三个桌面项目共 11/11 通过。实现终态 `45e1dd8c2a757ed93bdac24b345bcf7787a5b98a` 的 GitHub CI 与 Codex Cloud Review 均已通过；阶段等待用户明确确认合并，合并及 main CI 成功后改为“已完成”。
 
 ### B. 文档与持久化边界
 
@@ -122,8 +122,8 @@ Phase A 本地行为证据：`flow-history` 19/19、`selection-consistency` 11/1
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
 | GitNexus `detect_changes` | 已执行 | 2026-08-25 最终未提交差异为 critical：59 changed / 36 affected / 6 files。风险集中在 CanvasFlow→历史事务、会话 flush、页签切换和运行入口；已由历史 19/19、页签 35/35、选择 11/11、会话 12/12、Results 20/20 与三档 E2E 覆盖 |
-| GitHub CI | Phase A 三轮通过 | [Actions 32741408695](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32741408695)、[Actions 32743144415](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32743144415)、[Actions 32746760748](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32746760748)；最终修复头部待运行 |
-| Codex Cloud Review | 三轮可行动 P2 已修 | [Review 5009287091](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009287091)、[Review 5009538247](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009538247)、[Review 5009866546](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#pullrequestreview-5009866546)；最终修复头部待复审 |
+| GitHub CI | Phase A 实现终态通过 | [Actions 32753871165](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32753871165) 精确对应 `45e1dd8c2a757ed93bdac24b345bcf7787a5b98a`；依赖、checks、Chromium 桌面回归、生产构建与报告上传全部成功 |
+| Codex Cloud Review | Phase A 实现终态通过 | [完成记录 5398654472](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398654472) 精确审查 `45e1dd8c2a757ed93bdac24b345bcf7787a5b98a`；P0/P1/P2 均为 0，无新增行内意见 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
 
 ## 已知风险与决策日志
