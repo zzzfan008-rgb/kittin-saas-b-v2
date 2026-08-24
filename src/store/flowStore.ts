@@ -200,6 +200,7 @@ interface ActiveHistoryTransaction {
 let historySuppressionDepth = 0;
 let activeHistoryTransaction: ActiveHistoryTransaction | null = null;
 let recordHistoryEntry: (pastState: FlowTemporalState, currentState: FlowTemporalState) => void = () => undefined;
+let flushDeferredTabSessionPersistence = (): void => undefined;
 const DOCUMENT_HISTORY_LIMIT = 50;
 
 interface TabTemporalHistory {
@@ -593,7 +594,6 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
   const transaction = activeHistoryTransaction;
   if (!transaction || !transaction.tokens.delete(token)) return false;
   if (transaction.tokens.size > 0) return false;
-  activeHistoryTransaction = null;
 
   let state = useFlowStore.getState();
   const settledNodes = state.nodes.map((node) => (
@@ -603,16 +603,27 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
     runWithoutHistory(() => useFlowStore.setState({ nodes: settledNodes }));
     state = useFlowStore.getState();
   }
-  if (!transaction.documentChanged || transaction.tabId !== state.activeTabId) return false;
+  if (!transaction.documentChanged || transaction.tabId !== state.activeTabId) {
+    activeHistoryTransaction = null;
+    flushDeferredTabSessionPersistence();
+    return false;
+  }
   const current: FlowTemporalState = {
     projectName: state.projectName,
     nodes: state.nodes,
     edges: state.edges,
   };
   const temporalChanged = !sameTemporalDocument(transaction.before, current);
-  if (!temporalChanged) return false;
+  if (!temporalChanged) {
+    activeHistoryTransaction = null;
+    flushDeferredTabSessionPersistence();
+    return false;
+  }
 
   recordHistoryEntry(transaction.before, current);
+  // Keep session persistence suppressed until the final coordinates and their
+  // revision/dirty metadata can be observed in the same completed transaction.
+  activeHistoryTransaction = null;
   runWithoutHistory(() => {
     useFlowStore.setState((latest) => ({
       revision: latest.revision + 1,
@@ -620,16 +631,20 @@ export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
       saveState: latest.saveState === "saving" ? "saving" : "idle",
     }));
   });
+  flushDeferredTabSessionPersistence();
   return true;
 }
 
 function cancelHistoryTransaction(): void {
   const transaction = activeHistoryTransaction;
-  activeHistoryTransaction = null;
   if (!transaction) return;
 
   const state = useFlowStore.getState();
-  if (transaction.tabId !== state.activeTabId) return;
+  if (transaction.tabId !== state.activeTabId) {
+    activeHistoryTransaction = null;
+    flushDeferredTabSessionPersistence();
+    return;
+  }
 
   // A tab/load transition can invalidate a drag before React Flow emits dragStop.
   // Restore the document snapshot so an intermediate position is never persisted
@@ -656,6 +671,8 @@ function cancelHistoryTransaction(): void {
       projectName: transaction.before.projectName,
     });
   });
+  activeHistoryTransaction = null;
+  flushDeferredTabSessionPersistence();
 }
 
 /**
@@ -2643,6 +2660,7 @@ export function retryTabSessionPersistence(): boolean {
 
 if (typeof window !== "undefined") {
   let lastTabSessionJson = "";
+  let tabSessionPersistenceDeferred = false;
   const sessionFingerprint = (state: FlowState): string => {
     try {
       const current = snapshotActiveTab(state);
@@ -2663,8 +2681,24 @@ if (typeof window !== "undefined") {
       useFlowStore.setState({ tabSessionPersistenceError: nextError });
     }
   };
+  flushDeferredTabSessionPersistence = () => {
+    if (!tabSessionPersistenceDeferred || activeHistoryTransaction) return;
+    tabSessionPersistenceDeferred = false;
+    const state = useFlowStore.getState();
+    const sessionJson = sessionFingerprint(state);
+    if (sessionJson && sessionJson === lastTabSessionJson) return;
+    const result = persistTabSession(state);
+    if (result.ok) lastTabSessionJson = sessionJson;
+    publishPersistenceResult(result);
+  };
   retryTabSessionPersistenceImpl = () => {
     const state = useFlowStore.getState();
+    // An explicit retry must not turn an in-flight drag frame into a durable,
+    // apparently clean snapshot. The completed transaction will trigger a write.
+    if (activeHistoryTransaction?.tabId === state.activeTabId) {
+      tabSessionPersistenceDeferred = true;
+      return false;
+    }
     const sessionJson = sessionFingerprint(state);
     const result = persistTabSession(state);
     if (result.ok) lastTabSessionJson = sessionJson;
@@ -2672,6 +2706,13 @@ if (typeof window !== "undefined") {
     return result.ok;
   };
   useFlowStore.subscribe((state, previousState) => {
+    // Drag frames are live UI state until endHistoryTransaction commits their
+    // final coordinates together with revision/dirty. Preserve the last durable
+    // snapshot so a crash/refresh during the drag restores the pre-drag document.
+    if (activeHistoryTransaction?.tabId === state.activeTabId) {
+      tabSessionPersistenceDeferred = true;
+      return;
+    }
     // 活动画布变化会由下一个订阅先同步进 tabs；历史/SSE/viewer 等全局状态无需序列化项目。
     if (state.tabs === previousState.tabs && state.activeTabId === previousState.activeTabId) return;
     const sessionJson = sessionFingerprint(state);

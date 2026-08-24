@@ -147,7 +147,10 @@ Object.assign(globalThis, { window: { sessionStorage, localStorage } });
 
 const {
   applyRunEventToRecentResults,
+  applyRunEventToTab,
+  beginHistoryTransaction,
   discardActiveTabSession,
+  endHistoryTransaction,
   normalizeTabSessionValue,
   reconcileRunHistory,
   retryTabSessionPersistence,
@@ -627,6 +630,221 @@ assert.match(compactSession, /latest-mask\.png/);
 assert.doesNotMatch(compactSession, /data:image\/png;base64/);
 console.log("  ✓ 容量写失败废弃旧快照并允许同内容重试，短蒙版 URL 可恢复持久化");
 
+useFlowStore.getState().loadFlow({
+  projectId: "drag-session-project",
+  projectName: "拖拽会话项目",
+  nodes: [{
+    id: "drag-session-node",
+    type: "image-input",
+    position: { x: 0, y: 0 },
+    data: { kind: "image-input", label: "拖拽节点", status: "idle", imageRole: "default" },
+  }],
+  edges: [],
+});
+const durableBeforeDrag = sessionStorage.getItem(sessionKey);
+const writesBeforeDrag = sessionWrites;
+const dragTransaction = beginHistoryTransaction("session-crash-contract");
+useFlowStore.getState().onNodesChange([{
+  id: "drag-session-node",
+  type: "position",
+  position: { x: 180, y: 72 },
+  dragging: true,
+}]);
+assert.equal(sessionWrites, writesBeforeDrag, "未提交拖拽帧不得写入 session");
+assert.equal(
+  sessionStorage.getItem(sessionKey),
+  durableBeforeDrag,
+  "崩溃或刷新必须恢复拖拽前的 durable snapshot",
+);
+assert.equal(retryTabSessionPersistence(), false, "事务中显式重试也不得固化中间帧");
+assert.equal(sessionStorage.getItem(sessionKey), durableBeforeDrag);
+
+assert.equal(endHistoryTransaction(dragTransaction), true);
+const durableAfterDrag = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
+  tabs: Array<{
+    projectId: string;
+    nodes: Array<{ id: string; position: { x: number; y: number } }>;
+    revision: number;
+    dirty: boolean;
+  }>;
+};
+const committedDragTab = durableAfterDrag.tabs.find((tab) => tab.projectId === "drag-session-project");
+assert.deepEqual(
+  committedDragTab?.nodes.find((node) => node.id === "drag-session-node")?.position,
+  { x: 180, y: 72 },
+);
+assert.equal(committedDragTab?.revision, 1);
+assert.equal(committedDragTab?.dirty, true);
+
+useFlowStore.getState().loadFlow({
+  projectId: "drag-session-no-move-success",
+  projectName: "无位移成功项目",
+  nodes: [{
+    id: "drag-session-no-move-node",
+    type: "ai-modify",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "ai-modify",
+      label: "无位移生成节点",
+      status: "idle",
+      prompt: "生成成功",
+      aspectRatio: "1:1",
+      batchSize: 1,
+      outputImages: ["/api/files/before-no-move.png"],
+    },
+  }],
+  edges: [],
+});
+const noMoveTabId = useFlowStore.getState().activeTabId;
+const durableBeforeNoMoveSuccess = sessionStorage.getItem(sessionKey);
+const writesBeforeNoMoveSuccess = sessionWrites;
+const noMoveTransaction = beginHistoryTransaction("session-no-move-success");
+applyRunEventToTab(noMoveTabId, "drag-session-no-move-node", {
+  type: "node-status",
+  nodeId: "drag-session-no-move-node",
+  status: "success",
+  images: ["/api/files/no-move-success.png"],
+});
+assert.equal(sessionWrites, writesBeforeNoMoveSuccess, "无位移事务中的 success 必须延迟落盘");
+assert.equal(sessionStorage.getItem(sessionKey), durableBeforeNoMoveSuccess);
+assert.equal(endHistoryTransaction(noMoveTransaction), false);
+const durableAfterNoMoveSuccess = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
+  tabs: Array<{
+    projectId: string;
+    nodes: Array<{ id: string; data: { outputImages?: string[] } }>;
+    revision: number;
+    dirty: boolean;
+  }>;
+};
+const noMoveSuccessTab = durableAfterNoMoveSuccess.tabs.find(
+  (tab) => tab.projectId === "drag-session-no-move-success",
+);
+assert.deepEqual(
+  noMoveSuccessTab?.nodes.find((node) => node.id === "drag-session-no-move-node")?.data.outputImages,
+  ["/api/files/no-move-success.png"],
+);
+assert.equal(noMoveSuccessTab?.revision, 1);
+assert.equal(noMoveSuccessTab?.dirty, true);
+
+useFlowStore.getState().loadFlow({
+  projectId: "drag-session-net-zero-success",
+  projectName: "净零位移成功项目",
+  nodes: [{
+    id: "drag-session-net-zero-node",
+    type: "ai-modify",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "ai-modify",
+      label: "净零位移生成节点",
+      status: "idle",
+      prompt: "生成成功",
+      aspectRatio: "1:1",
+      batchSize: 1,
+      outputImages: ["/api/files/before-net-zero.png"],
+    },
+  }],
+  edges: [],
+});
+const netZeroTabId = useFlowStore.getState().activeTabId;
+const durableBeforeNetZeroSuccess = sessionStorage.getItem(sessionKey);
+const writesBeforeNetZeroSuccess = sessionWrites;
+const netZeroTransaction = beginHistoryTransaction("session-net-zero-success");
+useFlowStore.getState().onNodesChange([{
+  id: "drag-session-net-zero-node",
+  type: "position",
+  position: { x: 160, y: 64 },
+  dragging: true,
+}]);
+applyRunEventToTab(netZeroTabId, "drag-session-net-zero-node", {
+  type: "node-status",
+  nodeId: "drag-session-net-zero-node",
+  status: "success",
+  images: ["/api/files/net-zero-success.png"],
+});
+useFlowStore.getState().onNodesChange([{
+  id: "drag-session-net-zero-node",
+  type: "position",
+  position: { x: 0, y: 0 },
+  dragging: false,
+}]);
+assert.equal(sessionWrites, writesBeforeNetZeroSuccess, "净零位移事务中的 success 必须延迟落盘");
+assert.equal(sessionStorage.getItem(sessionKey), durableBeforeNetZeroSuccess);
+assert.equal(endHistoryTransaction(netZeroTransaction), false);
+const durableAfterNetZeroSuccess = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
+  tabs: Array<{
+    projectId: string;
+    nodes: Array<{
+      id: string;
+      position: { x: number; y: number };
+      data: { outputImages?: string[] };
+    }>;
+    revision: number;
+    dirty: boolean;
+  }>;
+};
+const netZeroSuccessTab = durableAfterNetZeroSuccess.tabs.find(
+  (tab) => tab.projectId === "drag-session-net-zero-success",
+);
+const durableNetZeroNode = netZeroSuccessTab?.nodes.find(
+  (node) => node.id === "drag-session-net-zero-node",
+);
+assert.deepEqual(durableNetZeroNode?.position, { x: 0, y: 0 });
+assert.deepEqual(durableNetZeroNode?.data.outputImages, ["/api/files/net-zero-success.png"]);
+assert.equal(netZeroSuccessTab?.revision, 1);
+assert.equal(netZeroSuccessTab?.dirty, true);
+console.log("  ✓ 无位移与净零位移事务结束后补写期间完成的 success 输出");
+
+useFlowStore.getState().loadFlow({
+  projectId: "drag-session-project",
+  projectName: "拖拽会话项目",
+  nodes: [{
+    id: "drag-session-node",
+    type: "image-input",
+    position: { x: 0, y: 0 },
+    data: { kind: "image-input", label: "拖拽节点", status: "idle", imageRole: "default" },
+  }],
+  edges: [],
+});
+const firstDragTabId = useFlowStore.getState().activeTabId;
+useFlowStore.getState().openFlowTab({
+  projectId: "drag-session-switch-target",
+  projectName: "切换目标",
+  nodes: [{
+    id: "drag-session-target-node",
+    type: "image-input",
+    position: { x: 0, y: 0 },
+    data: { kind: "image-input", label: "目标节点", status: "idle", imageRole: "default" },
+  }],
+  edges: [],
+});
+const secondDragTabId = useFlowStore.getState().activeTabId;
+useFlowStore.getState().switchTab(firstDragTabId);
+const cancelledDrag = beginHistoryTransaction("session-switch-cancel");
+useFlowStore.getState().onNodesChange([{
+  id: "drag-session-node",
+  type: "position",
+  position: { x: 240, y: 96 },
+  dragging: true,
+}]);
+useFlowStore.getState().switchTab(secondDragTabId);
+assert.equal(endHistoryTransaction(cancelledDrag), false);
+const durableAfterSwitch = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
+  tabs: Array<{
+    projectId: string;
+    nodes: Array<{ id: string; position: { x: number; y: number } }>;
+    revision: number;
+    dirty: boolean;
+  }>;
+};
+const cancelledDragTab = durableAfterSwitch.tabs.find((tab) => tab.projectId === "drag-session-project");
+assert.deepEqual(
+  cancelledDragTab?.nodes.find((node) => node.id === "drag-session-node")?.position,
+  { x: 0, y: 0 },
+);
+assert.equal(cancelledDragTab?.revision, 0);
+assert.equal(cancelledDragTab?.dirty, false);
+console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切页取消恢复 durable snapshot");
+
 sessionStorage.setItem(sessionKey, JSON.stringify({
   activeTabId: "bad-tab",
   tabs: [
@@ -643,4 +861,4 @@ assert.equal(recovered.activeTabId, "good-tab");
 assert.deepEqual(recovered.tabs.map((tab) => tab.id), ["good-tab"]);
 console.log("  ✓ 错误恢复只清除当前损坏页签并保留其他页签");
 
-console.log("\n通过 10 项");
+console.log("\n通过 12 项");

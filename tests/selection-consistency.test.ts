@@ -143,6 +143,57 @@ test("选择结果会清空全部节点选择且不写文档历史", () => {
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
 });
 
+test("画布空白 canonical command 会清除节点 IDs、primary 与 React Flow flags", () => {
+  reset();
+  useFlowStore.getState().setSelectedNodeIds(["a", "b"]);
+
+  const selected = useFlowStore.getState();
+  assert.deepEqual(selected.selectedNodeIds, ["a", "b"]);
+  assert.equal(selectPrimarySelectedNodeId(selected), "b");
+  assert.equal(selected.selectedNodeId, "b");
+  assert.deepEqual(selectedFlags(), [["a", true], ["b", true]]);
+  const beforeRevision = useFlowStore.getState().revision;
+
+  useFlowStore.getState().setSelectedNodeIds([]);
+
+  const state = useFlowStore.getState();
+  assert.deepEqual(state.selectedNodeIds, []);
+  assert.equal(selectPrimarySelectedNodeId(state), null);
+  assert.equal(state.selectedNodeId, null);
+  assert.deepEqual(selectedFlags(), [["a", false], ["b", false]]);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.equal(state.revision, beforeRevision);
+
+  const canvasSource = fs.readFileSync(
+    new URL("../src/components/CanvasFlow.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(canvasSource, /onPaneClick=\{\(\) => setSelectedNodeIds\(\[\]\)\}/);
+  assert.match(canvasSource, /onNodesChange=\{onNodesChange\}/);
+});
+
+test("画布空白 canonical command 会清除结果选择但保留 compareIds", () => {
+  reset();
+  const selectedResult = result("pane-selected-result");
+  const comparedResult = result("pane-compared-result");
+  useFlowStore.setState((state) => recentResultsPatch(state, [selectedResult, comparedResult]));
+  useFlowStore.getState().toggleCompareId(comparedResult.id);
+  useFlowStore.getState().setSelectedResultId(selectedResult.id);
+
+  const selected = useFlowStore.getState();
+  assert.equal(selected.selectedResultId, selectedResult.id);
+  assert.deepEqual(selected.compareIds, [comparedResult.id]);
+  const beforeRevision = selected.revision;
+
+  useFlowStore.getState().setSelectedNodeIds([]);
+
+  const state = useFlowStore.getState();
+  assert.equal(state.selectedResultId, null);
+  assert.deepEqual(state.compareIds, [comparedResult.id]);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.equal(state.revision, beforeRevision);
+});
+
 test("历史同步、裁剪与删除原子清理失效结果引用", () => {
   reset();
   const keep = result("keep");

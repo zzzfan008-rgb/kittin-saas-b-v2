@@ -68,6 +68,7 @@ export function CanvasFlow() {
   const onConnect = useFlowStore((s) => s.onConnect);
   const isValidConnection = useFlowStore((s) => s.isValidConnection);
   const addNode = useFlowStore((s) => s.addNode);
+  const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
   const readOnly = useFlowStore((s) => s.readOnly);
   const { screenToFlowPosition } = useReactFlow();
   const [theme] = useTheme();
@@ -113,6 +114,7 @@ export function CanvasFlow() {
         onNodeDragStop={() => {
           finishDragHistoryTransaction(dragTransactionRef);
         }}
+        onPaneClick={() => setSelectedNodeIds([])}
         deleteKeyCode={readOnly ? null : ["Delete", "Backspace"]}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
