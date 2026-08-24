@@ -21,7 +21,7 @@ SQLite 文件会保留，便于回退核对。
 
 ## 本地开发
 
-要求 Node.js 20.9.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
+要求 Node.js 22.0.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
 
 ```bash
 docker compose up -d postgres --wait

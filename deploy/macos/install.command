@@ -44,7 +44,7 @@ if [[ -f "$SOURCE_DIR/FILE-SHA256SUMS.txt" ]]; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  print -u2 "Node.js 20.9.0+ is required. Install it first from https://nodejs.org/"
+  print -u2 "Node.js 22.0.0+ is required. Install it first from https://nodejs.org/"
   exit 1
 fi
 
@@ -53,9 +53,9 @@ if [[ "$NODE_PATH" != /* ]]; then
   print -u2 "Node.js executable must resolve to an absolute path; found: $NODE_PATH"
   exit 1
 fi
-NODE_SUPPORTED="$("$NODE_PATH" -p 'const [major, minor] = process.versions.node.split(".").map(Number); major > 20 || (major === 20 && minor >= 9) ? "yes" : "no"')"
+NODE_SUPPORTED="$("$NODE_PATH" -p 'Number(process.versions.node.split(".")[0]) >= 22 ? "yes" : "no"')"
 if [[ "$NODE_SUPPORTED" != "yes" ]]; then
-  print -u2 "Node.js 20.9.0+ is required; found $("$NODE_PATH" -v)."
+  print -u2 "Node.js 22.0.0+ is required; found $("$NODE_PATH" -v)."
   exit 1
 fi
 
