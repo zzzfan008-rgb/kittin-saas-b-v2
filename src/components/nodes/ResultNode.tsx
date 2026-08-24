@@ -101,7 +101,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
         <button
           type="button"
           onClick={() => void onChoose()}
-          className="nodrag ml-auto shrink-0 rounded border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
+          className="nodrag ml-auto shrink-0 rounded-sm border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
         >
           选择文件夹
         </button>
@@ -109,7 +109,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
           <button
             type="button"
             onClick={() => void clearDirectory()}
-            className="nodrag shrink-0 rounded border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
+            className="nodrag shrink-0 rounded-sm border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
           >
             清除
           </button>

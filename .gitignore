@@ -5,6 +5,8 @@ node_modules
 .claude/worktrees/
 
 # Build and release outputs
+/dist/
+/dist-server/
 releases/
 *.tsbuildinfo
 
@@ -39,6 +41,9 @@ tmp/
 temp/
 
 # Test and local demo outputs
+.playwright/
+playwright-report/
+test-results/
 test-*.png
 test-*.jpg
 shot-*.png

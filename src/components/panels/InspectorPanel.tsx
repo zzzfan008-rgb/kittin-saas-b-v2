@@ -3,6 +3,7 @@ import { NODE_SPECS, isNodeRunActive, type ImageInputNodeData } from "@/types/wo
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
 import { thumbnailImageUrl } from "@/lib/images";
+import { cn } from "@/lib/utils";
 import {
   imageModelAspectRatioPatch,
   isImageModelId,
@@ -227,23 +228,40 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
   );
 }
 
-export function InspectorPanel() {
+interface InspectorPanelProps {
+  className?: string;
+  view?: "auto" | "properties" | "result";
+}
+
+export function InspectorPanel({ className, view = "auto" }: InspectorPanelProps) {
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
   const selectedResultId = useFlowStore((s) => s.selectedResultId);
+  const showResult = view === "result" || (view === "auto" && Boolean(selectedResultId));
 
   return (
-    <aside className="gc-panel flex w-64 shrink-0 flex-col border-l border-[#262626] bg-[#141414]">
+    <aside
+      className={cn(
+        "gc-panel flex w-64 shrink-0 flex-col border-l border-[#262626] bg-[#141414]",
+        className,
+      )}
+    >
       <div className="border-b border-[#262626] px-3 py-2.5 text-[10px] font-medium uppercase tracking-widest text-neutral-500">
-        {selectedResultId ? "生成记录" : "属性"}
+        {showResult ? "生成记录" : "属性"}
       </div>
       <div className="flex-1 overflow-y-auto p-3">
-        {selectedResultId ? (
-          <ResultRecordDetail resultId={selectedResultId} />
+        {showResult ? (
+          selectedResultId ? (
+            <ResultRecordDetail resultId={selectedResultId} />
+          ) : (
+            <p className="py-4 text-center text-[10px] text-neutral-600">
+              选择上方结果查看完整运行记录
+            </p>
+          )
         ) : selectedNodeId ? (
           <PropertyEditor nodeId={selectedNodeId} />
         ) : (
           <p className="py-4 text-center text-[10px] text-neutral-600">
-            点击画布节点查看属性，或点击底部「最近生成」查看运行记录
+            点击画布节点查看属性
           </p>
         )}
       </div>

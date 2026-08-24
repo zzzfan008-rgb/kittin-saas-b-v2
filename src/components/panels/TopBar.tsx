@@ -148,11 +148,19 @@ function ProjectPicker() {
 }
 
 /** 主题切换：胶囊触发 + 悬浮下拉窗口 */
+const THEME_PICKER_ID = "theme-picker-options";
+
 function ThemeSwitcher() {
   const [theme, switchTheme] = useTheme();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const current = THEMES.find((t) => t.id === theme) ?? THEMES[0];
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -160,7 +168,9 @@ function ThemeSwitcher() {
       if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
+        closeAndRestoreFocus();
+      }
     };
     window.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey);
@@ -171,10 +181,21 @@ function ThemeSwitcher() {
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) {
+          setOpen(false);
+        }
+      }}
+    >
       <button
+        ref={triggerRef}
         type="button"
         aria-label={`切换主题，当前为${current.label}`}
+        aria-controls={THEME_PICKER_ID}
+        aria-expanded={open}
         title={`切换主题，当前为${current.label}`}
         onClick={() => setOpen((v) => !v)}
         className={`flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border px-0 text-[10px] transition-colors sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 ${
@@ -192,14 +213,14 @@ function ThemeSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60">
+        <div id={THEME_PICKER_ID} className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60">
           {THEMES.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => {
                 switchTheme(t.id);
-                setOpen(false);
+                closeAndRestoreFocus();
               }}
               className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors ${
                 theme === t.id ? "bg-gold/10" : "hover:bg-[#222]"
@@ -243,7 +264,7 @@ export function TopBar() {
       <input
         value={projectName}
         onChange={(e) => setProjectName(e.target.value)}
-        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-none sm:w-44 sm:flex-none sm:px-2 lg:w-56"
+        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-hidden sm:w-44 sm:flex-none sm:px-2 lg:w-56"
         placeholder="项目名称"
       />
       {dirty && <span className="shrink-0 text-[10px] text-gold" title="有未保存修改">●</span>}
@@ -251,14 +272,14 @@ export function TopBar() {
         <button
           type="button"
           onClick={retryTabSessionPersistence}
-          className="shrink-0 rounded border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
+          className="shrink-0 rounded-sm border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
           title={tabSessionPersistenceError}
         >
           本地恢复失败 · 重试
         </button>
       )}
       {readOnly && (
-        <span className="shrink-0 rounded border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
+        <span className="shrink-0 rounded-sm border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
           <span className="sm:hidden">只读</span>
           <span className="hidden sm:inline">管理员只读</span>
         </span>

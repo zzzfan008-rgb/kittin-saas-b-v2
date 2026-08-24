@@ -273,7 +273,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#0b0b0b]">
+    <div className="fixed inset-0 z-100 flex flex-col bg-[#0b0b0b]">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#262626] px-4">
         <strong className="text-sm font-medium text-neutral-100">蒙版局部重绘</strong>
         <span className="text-[10px] text-neutral-500">GPT Image 2</span>
@@ -323,7 +323,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
             type="range" min={8} max={300} step={4} value={brushSize}
             onChange={(event) => setBrushSize(Number(event.target.value))}
             disabled={saving}
-            className="accent-[#C9A66B] disabled:opacity-40"
+            className="accent-gold disabled:opacity-40"
           />
         </label>
         {error && <p className="min-w-0 flex-1 truncate text-[10px] text-red-400" title={error}>{error}</p>}
@@ -351,7 +351,7 @@ function ToolbarButton({ label, onClick, disabled = false }: { label: string; on
 
 function ModeButton({ active, label, onClick, disabled = false }: { active: boolean; label: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`rounded px-3 py-1.5 text-[10px] disabled:opacity-40 ${active ? "bg-gold text-ink" : "text-neutral-400 hover:text-neutral-200"}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`rounded-sm px-3 py-1.5 text-[10px] disabled:opacity-40 ${active ? "bg-gold text-ink" : "text-neutral-400 hover:text-neutral-200"}`}>
       {label}
     </button>
   );

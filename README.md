@@ -21,7 +21,7 @@ SQLite 文件会保留，便于回退核对。
 
 ## 本地开发
 
-要求 Node.js 20.9.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
+要求 Node.js 22.20.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
 
 ```bash
 docker compose up -d postgres --wait
@@ -31,9 +31,23 @@ npm run dev
 
 前端开发服务器默认为 `http://localhost:5173`，API 默认为
 `http://localhost:3001`，本机 Node 通过 `POSTGRES_HOST_PORT`（默认 54329）连接容器。
+Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
+会同时将后端与前端代理切换到 3002。如需转发到独立地址，可在私有
+`.env` 中显式设置 `API_PROXY_TARGET=http://localhost:3002`，该值优先于 `PORT`。
 
 `npm run test` 会自动启动隔离的临时 PostgreSQL 容器，运行全部回归后删除测试容器和卷；
 测试数据不会污染正式数据。
+
+桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
+请求。首次运行先安装 Chromium，然后执行：
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+该套件覆盖项目支持下限 1024×768，以及主要视觉宽度 1280×720 与 1440×900；
+不包含移动端适配测试。
 
 ## 非 Docker 构建与启动
 

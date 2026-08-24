@@ -3,6 +3,7 @@ import { NODE_SPECS, type Asset, type NodeKind } from "@/types/workflow";
 import { useFlowStore } from "@/store/flowStore";
 import { DND_MIME } from "../CanvasFlow";
 import { thumbnailImageUrl } from "@/lib/images";
+import { cn } from "@/lib/utils";
 
 const KIND_ORDER: NodeKind[] = [
   "image-input",
@@ -18,11 +19,16 @@ const KIND_ORDER: NodeKind[] = [
 
 type Tab = "nodes" | "assets";
 
-export function NodeLibraryPanel() {
+export function NodeLibraryPanel({ className }: { className?: string }) {
   const [tab, setTab] = useState<Tab>("nodes");
 
   return (
-    <aside className="gc-panel flex w-52 shrink-0 flex-col border-r border-[#262626] bg-[#141414]">
+    <aside
+      className={cn(
+        "gc-panel flex w-52 shrink-0 flex-col border-r border-[#262626] bg-[#141414]",
+        className,
+      )}
+    >
       <div className="flex border-b border-[#262626]">
         {(
           [
@@ -123,13 +129,9 @@ function AssetList() {
 
   /** 点击素材：在最左侧节点左边新增一个 image-input 节点并灌入图片 */
   const addToCanvas = (asset: Asset) => {
-    const { nodes, addNode, updateNodeData } = useFlowStore.getState();
+    const { nodes, addAssetNode } = useFlowStore.getState();
     const minX = Math.min(0, ...nodes.map((n) => n.position.x));
-    addNode("image-input", { x: minX - 320, y: nodes.length * 40 });
-    const newId = useFlowStore.getState().selectedNodeId;
-    if (newId) {
-      updateNodeData(newId, { imageUrl: asset.image, status: "success", label: asset.name });
-    }
+    addAssetNode(asset, { x: minX - 320, y: nodes.length * 40 });
     // 引用关系由项目保存时根据最终画布统一同步；未保存项目不提前占用素材。
   };
 
@@ -166,7 +168,7 @@ function AssetList() {
         <button
           type="button"
           onClick={() => void load(0)}
-          className="mt-2 rounded border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+          className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
         >
           重试
         </button>
@@ -206,7 +208,7 @@ function AssetList() {
             </button>
             <div className="mt-1.5 flex items-center gap-1.5">
               <span className="truncate text-xs font-medium text-neutral-200">{asset.name}</span>
-              <span className={`shrink-0 rounded border px-1 py-px text-[9px] ${cat.className}`}>
+              <span className={`shrink-0 rounded-sm border px-1 py-px text-[9px] ${cat.className}`}>
                 {cat.label}
               </span>
               <span className="shrink-0 text-[9px] text-neutral-600">
@@ -220,19 +222,19 @@ function AssetList() {
               <button
                 type="button"
                 onClick={() => addToCanvas(asset)}
-                className="flex-1 rounded border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold"
+                className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold"
               >
                 添加到画布
               </button>
               {asset.canManage && asset.scope !== "global" && (
                 <button type="button" onClick={() => void toggleShare(asset)}
-                  className="rounded border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 hover:text-gold">
+                  className="rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 hover:text-gold">
                   {asset.scope === "shared" ? "取消共享" : "共享"}
                 </button>
               )}
               {asset.canManage && (
                 <button type="button" onClick={() => void removeAsset(asset)}
-                  className="rounded border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400">
+                  className="rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400">
                   删除
                 </button>
               )}
@@ -245,7 +247,7 @@ function AssetList() {
           type="button"
           onClick={() => void load(assets.length)}
           disabled={loading}
-          className="w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:opacity-50"
+          className="w-full rounded-md border border-dashed border-(--gc-border) px-3 py-2 text-[10px] text-(--gc-text-muted) hover:border-(--gc-accent) hover:text-(--gc-accent) disabled:opacity-50"
         >
           {loading ? "加载中…" : "加载更多素材"}
         </button>

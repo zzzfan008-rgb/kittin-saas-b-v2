@@ -16,6 +16,7 @@ import {
   WORKFLOW_SCHEMA_VERSION,
   isNodeRunActive,
   isNodeRunTerminal,
+  type Asset,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
@@ -29,6 +30,7 @@ import {
   isModelAllowedForNode,
   normalizeImageModelOptions,
 } from "@/types/imageModels";
+import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 
 export type FlowNode = Node<WorkflowNodeData>;
 
@@ -138,6 +140,11 @@ interface FlowState {
   onConnect: (conn: Connection) => void;
   isValidConnection: (conn: Connection | Edge) => boolean;
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void;
+  /** 将素材以已完成的图片输入节点原子加入画布，一次撤销即可完整移除。 */
+  addAssetNode: (
+    asset: Pick<Asset, "name" | "image">,
+    position: { x: number; y: number },
+  ) => string | null;
   /** 复制/粘贴等调用方已有完整节点时，仍通过此入口维护 revision/dirty。 */
   addExistingNode: (node: FlowNode) => void;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
@@ -386,6 +393,12 @@ function nodeOutputImages(data: WorkflowNodeData): string[] {
   if (data.kind === "image-input") return data.imageUrl ? [data.imageUrl] : [];
   if (data.kind === "result") return [];
   return data.outputImages ?? [];
+}
+
+function retainSelectedNodeId(nodes: FlowNode[], selectedNodeId: string | null): string | null {
+  return selectedNodeId && nodes.some((node) => node.id === selectedNodeId)
+    ? selectedNodeId
+    : null;
 }
 
 function makeStarterNode(): FlowNode {
@@ -1503,14 +1516,19 @@ export const useFlowStore = create<FlowState>()(
       closeViewer: () => set({ viewer: null }),
 
       onNodesChange: (changes) => {
-        const allowed = get().readOnly ? changes.filter((change) => change.type === "select" || change.type === "dimensions") : changes;
-        const nodes = applyNodeChanges(allowed, get().nodes);
-        if (nodes === get().nodes) return;
+        const state = get();
+        const allowed = state.readOnly ? changes.filter((change) => change.type === "select" || change.type === "dimensions") : changes;
+        const nodes = applyNodeChanges(allowed, state.nodes);
+        if (nodes === state.nodes) return;
+        const selectedNodeId = retainSelectedNodeId(nodes, state.selectedNodeId);
+        const patch = selectedNodeId === state.selectedNodeId
+          ? { nodes }
+          : { nodes, selectedNodeId };
         const changesDocument = allowed.some(
           (change) => change.type !== "select" && change.type !== "dimensions",
         );
-        if (changesDocument) markDocumentChanged(set, { nodes });
-        else withoutTemporalTracking(() => set({ nodes }));
+        if (changesDocument) markDocumentChanged(set, patch);
+        else withoutTemporalTracking(() => set(patch));
       },
       onEdgesChange: (changes) => {
         const allowed = get().readOnly ? changes.filter((change) => change.type === "select") : changes;
@@ -1549,6 +1567,29 @@ export const useFlowStore = create<FlowState>()(
           data: defaultNodeData(kind),
         };
         markDocumentChanged(set, { nodes: [...get().nodes, node], selectedNodeId: node.id });
+      },
+
+      addAssetNode: (asset, position) => {
+        const state = get();
+        if (state.readOnly) return null;
+        const id = nanoid(8);
+        const node: FlowNode = {
+          id,
+          type: "image-input",
+          position,
+          data: {
+            ...defaultNodeData("image-input"),
+            label: asset.name,
+            status: "success",
+            imageUrl: asset.image,
+          } as ImageInputNodeData,
+        };
+        markDocumentChanged(set, {
+          nodes: [...state.nodes, node],
+          selectedNodeId: id,
+          selectedResultId: null,
+        });
+        return id;
       },
 
       addExistingNode: (node) => {
@@ -1594,6 +1635,8 @@ export const useFlowStore = create<FlowState>()(
         })(),
 
       runNode: async (id) => {
+        // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
+        if (getGenerationSafetyBlockReason()) return;
         const initialState = get();
         if (initialState.readOnly) return;
         const node = initialState.nodes.find((n) => n.id === id);
@@ -1648,7 +1691,6 @@ export const useFlowStore = create<FlowState>()(
             ...queuedRecords,
             ...initialState.recentResults,
           ]),
-          selectedResultId: recordId,
         });
 
         try {
@@ -1876,13 +1918,15 @@ export const useFlowStore = create<FlowState>()(
         const wasTracking = temporalStore.isTracking;
         if (wasTracking) temporalStore.pause();
         try {
+          const nodes = after.nodes.map((node) => {
+            const runtime = runtimeById.get(node.id);
+            return runtime
+              ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
+              : node;
+          });
           useFlowStore.setState({
-            nodes: after.nodes.map((node) => {
-              const runtime = runtimeById.get(node.id);
-              return runtime
-                ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
-                : node;
-            }),
+            nodes,
+            selectedNodeId: retainSelectedNodeId(nodes, after.selectedNodeId),
           });
         } finally {
           if (wasTracking) temporalStore.resume();
@@ -1907,13 +1951,15 @@ export const useFlowStore = create<FlowState>()(
         const wasTracking = temporalStore.isTracking;
         if (wasTracking) temporalStore.pause();
         try {
+          const nodes = after.nodes.map((node) => {
+            const runtime = runtimeById.get(node.id);
+            return runtime
+              ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
+              : node;
+          });
           useFlowStore.setState({
-            nodes: after.nodes.map((node) => {
-              const runtime = runtimeById.get(node.id);
-              return runtime
-                ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
-                : node;
-            }),
+            nodes,
+            selectedNodeId: retainSelectedNodeId(nodes, after.selectedNodeId),
           });
         } finally {
           if (wasTracking) temporalStore.resume();

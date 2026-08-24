@@ -48,25 +48,25 @@ export function AccountMenu() {
       <button type="button" onClick={() => setOpen((value) => !value)}
         aria-label={`账户菜单：${user.displayName}`}
         title={`账户菜单：${user.displayName}`}
-        className="flex h-8 w-8 items-center justify-center gap-2 rounded-full border border-[var(--gc-border)] px-0 text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] sm:h-auto sm:w-auto sm:px-3 sm:py-1.5">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--gc-accent)] text-[9px] font-semibold text-white">
+        className="flex h-8 w-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-0 text-[10px] text-(--gc-text-muted) hover:border-(--gc-accent) sm:h-auto sm:w-auto sm:px-3 sm:py-1.5">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[9px] font-semibold text-white">
           {user.displayName.slice(0, 1)}
         </span>
         <span className="hidden sm:inline">{user.displayName}</span>
       </button>
       {open && (
-        <div className="fixed right-2 top-12 z-50 w-44 rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)] p-1.5 shadow-xl sm:absolute sm:right-0 sm:top-full sm:mt-1.5">
-          <button className="w-full rounded px-2.5 py-2 text-left text-[11px] hover:bg-[var(--gc-panel-hover)]"
+        <div className="fixed right-2 top-12 z-50 w-44 rounded-lg border border-(--gc-border) bg-(--gc-panel) p-1.5 shadow-xl sm:absolute sm:right-0 sm:top-full sm:mt-1.5">
+          <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
             onClick={() => { setPanel("usage"); setOpen(false); }}>消耗记录</button>
           {user.role === "admin" && (
             <>
-              <button className="w-full rounded px-2.5 py-2 text-left text-[11px] hover:bg-[var(--gc-panel-hover)]"
+              <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
                 onClick={() => { setPanel("users"); setOpen(false); }}>用户管理</button>
-              <button className="w-full rounded px-2.5 py-2 text-left text-[11px] hover:bg-[var(--gc-panel-hover)]"
+              <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
                 onClick={() => { setPanel("diagnostics"); setOpen(false); }}>AI 服务诊断</button>
             </>
           )}
-          <button className="w-full rounded px-2.5 py-2 text-left text-[11px] text-red-400 hover:bg-red-950/20"
+          <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] text-red-400 hover:bg-red-950/20"
             onClick={() => void logout()}>退出登录</button>
         </div>
       )}
@@ -192,50 +192,50 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-6" onClick={onClose}>
-      <section className="flex h-[70vh] w-full max-w-4xl flex-col rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] shadow-2xl"
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/70 p-6" onClick={onClose}>
+      <section className="flex h-[70vh] w-full max-w-4xl flex-col rounded-xl border border-(--gc-border) bg-(--gc-panel) shadow-2xl"
         onClick={(event) => event.stopPropagation()}>
-        <header className="flex items-center border-b border-[var(--gc-border)] px-5 py-3">
-          <button onClick={() => setTab("usage")} className={`px-3 py-1.5 text-xs ${tab === "usage" ? "text-[var(--gc-accent)]" : "text-[var(--gc-text-muted)]"}`}>消耗记录</button>
-          {user?.role === "admin" && <button onClick={() => setTab("users")} className={`px-3 py-1.5 text-xs ${tab === "users" ? "text-[var(--gc-accent)]" : "text-[var(--gc-text-muted)]"}`}>用户管理</button>}
-          {user?.role === "admin" && <button onClick={() => setTab("diagnostics")} className={`px-3 py-1.5 text-xs ${tab === "diagnostics" ? "text-[var(--gc-accent)]" : "text-[var(--gc-text-muted)]"}`}>AI 服务诊断</button>}
-          <button onClick={onClose} className="ml-auto text-sm text-[var(--gc-text-muted)]">✕</button>
+        <header className="flex items-center border-b border-(--gc-border) px-5 py-3">
+          <button onClick={() => setTab("usage")} className={`px-3 py-1.5 text-xs ${tab === "usage" ? "text-(--gc-accent)" : "text-(--gc-text-muted)"}`}>消耗记录</button>
+          {user?.role === "admin" && <button onClick={() => setTab("users")} className={`px-3 py-1.5 text-xs ${tab === "users" ? "text-(--gc-accent)" : "text-(--gc-text-muted)"}`}>用户管理</button>}
+          {user?.role === "admin" && <button onClick={() => setTab("diagnostics")} className={`px-3 py-1.5 text-xs ${tab === "diagnostics" ? "text-(--gc-accent)" : "text-(--gc-text-muted)"}`}>AI 服务诊断</button>}
+          <button onClick={onClose} className="ml-auto text-sm text-(--gc-text-muted)">✕</button>
         </header>
-        {error && <p className="mx-5 mt-3 rounded bg-red-950/20 px-3 py-2 text-xs text-red-400">{error}</p>}
+        {error && <p className="mx-5 mt-3 rounded-sm bg-red-950/20 px-3 py-2 text-xs text-red-400">{error}</p>}
         {tab === "usage" ? (
           <div className="flex min-h-0 flex-1 flex-col p-5">
             <div className="mb-3 flex gap-2">
               {user?.role === "admin" && (
-                <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)} className="rounded border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-xs">
+                <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)} className="rounded-sm border border-(--gc-border) bg-(--gc-control) px-2 py-1 text-xs">
                   <option value="all">全部用户</option>
                   {users.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.accountId}</option>)}
                 </select>
               )}
-              <button onClick={exportUsage} className="ml-auto rounded bg-[var(--gc-accent)] px-3 py-1.5 text-xs text-white">导出 CSV</button>
+              <button onClick={exportUsage} className="ml-auto rounded-sm bg-(--gc-accent) px-3 py-1.5 text-xs text-white">导出 CSV</button>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto rounded border border-[var(--gc-border)]">
+            <div className="min-h-0 flex-1 overflow-auto rounded-sm border border-(--gc-border)">
               <table className="w-full text-left text-[11px]">
-                <thead className="sticky top-0 bg-[var(--gc-panel)] text-[var(--gc-text-muted)]"><tr><th className="p-2">时间</th><th>用户</th><th>模型</th><th>成功图片</th><th>请求数</th><th>耗时</th></tr></thead>
-                <tbody>{usage.map((item) => <tr key={item.id} className="border-t border-[var(--gc-border)]"><td className="p-2">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td>{item.displayName}</td><td>{item.model ?? "—"}</td><td>{item.successfulCount}</td><td>{item.providerRequests}</td><td>{(item.durationMs / 1000).toFixed(1)}s</td></tr>)}</tbody>
+                <thead className="sticky top-0 bg-(--gc-panel) text-(--gc-text-muted)"><tr><th className="p-2">时间</th><th>用户</th><th>模型</th><th>成功图片</th><th>请求数</th><th>耗时</th></tr></thead>
+                <tbody>{usage.map((item) => <tr key={item.id} className="border-t border-(--gc-border)"><td className="p-2">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td>{item.displayName}</td><td>{item.model ?? "—"}</td><td>{item.successfulCount}</td><td>{item.providerRequests}</td><td>{(item.durationMs / 1000).toFixed(1)}s</td></tr>)}</tbody>
               </table>
             </div>
           </div>
         ) : tab === "users" ? (
           <div className="min-h-0 flex-1 overflow-auto p-5">
-            <button onClick={() => void createUser()} className="mb-3 rounded bg-[var(--gc-accent)] px-3 py-1.5 text-xs text-white">创建用户</button>
-            <div className="space-y-2">{users.map((item) => <div key={item.id} className="flex items-center rounded border border-[var(--gc-border)] p-3 text-xs"><span className="min-w-0 flex-1"><strong>{item.displayName}</strong><span className="ml-2 text-[var(--gc-text-muted)]">{item.accountId} · {item.role === "admin" ? "管理员" : "用户"}</span></span><button onClick={() => void resetPassword(item)} className="mr-2 rounded border border-[var(--gc-border)] px-2 py-1">重置密码</button><button disabled={item.id === user?.id} onClick={() => void toggleUser(item)} className={`mr-2 rounded px-2 py-1 ${item.active ? "bg-red-950/30 text-red-400" : "bg-emerald-950/30 text-emerald-400"}`}>{item.active ? "停用" : "启用"}</button>{item.id !== user?.id && <button onClick={() => void deleteUser(item)} className="rounded border border-red-900/50 px-2 py-1 text-red-400">删除</button>}</div>)}</div>
+            <button onClick={() => void createUser()} className="mb-3 rounded-sm bg-(--gc-accent) px-3 py-1.5 text-xs text-white">创建用户</button>
+            <div className="space-y-2">{users.map((item) => <div key={item.id} className="flex items-center rounded-sm border border-(--gc-border) p-3 text-xs"><span className="min-w-0 flex-1"><strong>{item.displayName}</strong><span className="ml-2 text-(--gc-text-muted)">{item.accountId} · {item.role === "admin" ? "管理员" : "用户"}</span></span><button onClick={() => void resetPassword(item)} className="mr-2 rounded-sm border border-(--gc-border) px-2 py-1">重置密码</button><button disabled={item.id === user?.id} onClick={() => void toggleUser(item)} className={`mr-2 rounded-sm px-2 py-1 ${item.active ? "bg-red-950/30 text-red-400" : "bg-emerald-950/30 text-emerald-400"}`}>{item.active ? "停用" : "启用"}</button>{item.id !== user?.id && <button onClick={() => void deleteUser(item)} className="rounded-sm border border-red-900/50 px-2 py-1 text-red-400">删除</button>}</div>)}</div>
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto p-5">
-            <p className="mb-4 text-xs text-[var(--gc-text-muted)]">
+            <p className="mb-4 text-xs text-(--gc-text-muted)">
               网关：{diagnostics?.gateway ?? "读取中…"}。配置状态来自本地 API易契约；文生图与改图检查会各发起一次真实 AI 请求，可能产生少量消耗。
             </p>
             <div className="space-y-3">
               {diagnostics?.providers.map((provider) => (
-                <section key={provider.providerId} className="rounded-lg border border-[var(--gc-border)] p-4 text-xs">
+                <section key={provider.providerId} className="rounded-lg border border-(--gc-border) p-4 text-xs">
                   <div className="mb-2 flex items-center gap-2">
                     <strong>{provider.label}</strong>
-                    <span className="text-[var(--gc-text-muted)]">
+                    <span className="text-(--gc-text-muted)">
                       {provider.model} · {provider.channel === "official" ? "官转" : "Codex 官逆"}
                     </span>
                     <span className={provider.configured ? "ml-auto text-emerald-400" : "ml-auto text-red-400"}>
@@ -246,7 +246,7 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
                     <p className="mb-3 text-[11px] text-red-400">{provider.error}</p>
                   )}
                   {provider.capabilities && (
-                    <p className="mb-3 text-[11px] text-[var(--gc-text-muted)]">
+                    <p className="mb-3 text-[11px] text-(--gc-text-muted)">
                       文生图：{provider.capabilities.supportsGeneration ? "支持" : "不支持"}
                       ；参考图编辑：{provider.capabilities.supportsEdit ? `支持，最多 ${provider.capabilities.maxReferenceImages} 张` : "不支持"}
                       ；单次最多 {provider.capabilities.maxImagesPerRequest} 张；超时 {Math.round(provider.capabilities.timeoutMs / 1000)} 秒
@@ -259,7 +259,7 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
                       return (
                         <button key={mode} disabled={!provider.configured || probing !== null}
                           onClick={() => void runProbe(provider.providerId, mode)}
-                          className="rounded border border-[var(--gc-border)] px-2.5 py-1.5 disabled:opacity-40">
+                          className="rounded-sm border border-(--gc-border) px-2.5 py-1.5 disabled:opacity-40">
                           {probing === key ? "检查中…" : label}
                           {probeResults[key] ? ` · ${probeResults[key]}` : ""}
                         </button>

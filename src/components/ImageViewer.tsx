@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
+import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 2;
@@ -15,6 +16,7 @@ export function ImageViewer() {
   const selectedResultId = useFlowStore((s) => s.selectedResultId);
   const record = useFlowStore((s) => s.recentResults.find((item) => item.id === selectedResultId));
   const closeViewer = useFlowStore((s) => s.closeViewer);
+  const generationSafetyBlockReason = useGenerationSafetyBlockReason();
   const [scale, setScale] = useState(1);
   const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -70,7 +72,7 @@ export function ImageViewer() {
   };
 
   const runAgain = () => {
-    if (!record) return;
+    if (!record || generationSafetyBlockReason) return;
     const store = useFlowStore.getState();
     const tab = store.tabs.find((item) => item.projectId === record.projectId);
     if (!tab || !tab.nodes.some((node) => node.id === record.nodeId)) return;
@@ -120,14 +122,24 @@ export function ImageViewer() {
             ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
           ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-neutral-500">{label}</dt><dd className="text-right text-neutral-300">{value}</dd></div>)}
         </dl>
-        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-white">复制提示词</button></div>}
-        {record?.referenceImages && record.referenceImages.length > 0 && <div className="mt-4"><p className="text-[10px] text-neutral-500">参考图 · {record.referenceImages.length} 张</p><div className="mt-2 grid grid-cols-4 gap-2">{record.referenceImages.map((image, index) => <img key={`${image}-${index}`} src={thumbnailImageUrl(image)} alt={`参考图 ${index + 1}`} loading="lazy" decoding="async" className="aspect-square w-full rounded border border-[#333] object-cover" />)}</div></div>}
+        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-white">复制提示词</button></div>}
+        {record?.referenceImages && record.referenceImages.length > 0 && <div className="mt-4"><p className="text-[10px] text-neutral-500">参考图 · {record.referenceImages.length} 张</p><div className="mt-2 grid grid-cols-4 gap-2">{record.referenceImages.map((image, index) => <img key={`${image}-${index}`} src={thumbnailImageUrl(image)} alt={`参考图 ${index + 1}`} loading="lazy" decoding="async" className="aspect-square w-full rounded-sm border border-[#333] object-cover" />)}</div></div>}
         {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[#2b2b2b] p-3 text-[10px] text-neutral-400"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
         <div className="mt-5 flex flex-wrap gap-2">
-          <a href={viewer.url} download className="rounded bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
-          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
-          {record && <button type="button" onClick={runAgain} className="rounded border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300">重新生成</button>}
+          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
+          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
+          {record && (
+            <button
+              type="button"
+              onClick={runAgain}
+              disabled={Boolean(generationSafetyBlockReason)}
+              title={generationSafetyBlockReason ?? undefined}
+              className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
+            </button>
+          )}
         </div>
       </aside>
     </div>

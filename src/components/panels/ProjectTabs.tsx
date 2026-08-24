@@ -67,7 +67,7 @@ export function ProjectTabs() {
               onClick={() => requestClose(tab)}
               aria-label={`关闭 ${tab.projectName}`}
               title="关闭页签"
-              className="ml-1 rounded px-1 text-[13px] leading-5 text-neutral-600 hover:bg-white/5 hover:text-neutral-300"
+              className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-neutral-600 hover:bg-white/5 hover:text-neutral-300"
             >
               ×
             </button>

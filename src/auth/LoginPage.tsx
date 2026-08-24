@@ -45,14 +45,14 @@ export function LoginPage() {
         <label className="block space-y-1.5">
           <span className="text-xs text-neutral-400">账号</span>
           <input autoFocus value={accountId} onChange={(e) => setAccountId(e.target.value)}
-            autoComplete="username" className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-none focus:border-[#9A7333]" />
+            autoComplete="username" className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-hidden focus:border-[#9A7333]" />
         </label>
         <label className="mt-4 block space-y-1.5">
           <span className="text-xs text-neutral-400">密码</span>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password" className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-none focus:border-[#9A7333]" />
+            autoComplete="current-password" className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-hidden focus:border-[#9A7333]" />
         </label>
-        {error && <p className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</p>}
+        {error && <p role="alert" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</p>}
         <button type="submit" disabled={submitting || !accountId || !password}
           className="mt-5 w-full rounded-lg bg-[#9A7333] py-2.5 text-sm font-medium text-white hover:bg-[#ae8440] disabled:opacity-50">
           {submitting ? "登录中…" : "登录"}
@@ -131,7 +131,7 @@ export function ChangePasswordPage() {
           <label key={label as string} className="mt-4 block space-y-1.5">
             <span className="text-xs text-neutral-400">{label as string}</span>
             <input type="password" value={value as string} onChange={(e) => (setter as (v: string) => void)(e.target.value)}
-              autoComplete={auto as string} className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-none focus:border-[#9A7333]" />
+              autoComplete={auto as string} className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-hidden focus:border-[#9A7333]" />
           </label>
         ))}
         {error && <p className="mt-3 text-xs text-red-400">{error}</p>}

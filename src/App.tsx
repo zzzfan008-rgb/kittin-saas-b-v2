@@ -8,12 +8,13 @@ import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
 import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
-import { InspectorPanel } from "@/components/panels/InspectorPanel";
-import { ResultsPanel } from "@/components/panels/ResultsPanel";
+import { ContextPanel } from "@/components/panels/ContextPanel";
 import { TemplatesDock } from "@/components/panels/TemplatesDock";
 import { CompareOverlay } from "@/components/CompareOverlay";
 import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
+import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
+import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useAuth } from "@/auth/AuthContext";
 import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
 import {
@@ -29,8 +30,6 @@ interface HistoryPage {
   nextCursor: string | null;
   hasMore: boolean;
 }
-
-type MobilePanel = "library" | "inspector" | null;
 
 function parseHistoryPage(value: unknown): HistoryPage {
   if (!value || typeof value !== "object") throw new Error("历史记录格式无效");
@@ -129,7 +128,6 @@ function Workspace() {
   const hasDirtyTabs = useFlowStore((state) => state.dirty || state.tabs.some((tab) => tab.dirty));
   const tabSessionPersistenceError = useFlowStore((state) => state.tabSessionPersistenceError);
   const pendingMaskWorkCount = useFlowStore((state) => state.pendingMaskWorkCount);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -139,8 +137,18 @@ function Workspace() {
   const historyBefore = useRef(Date.now()).current;
 
   useEffect(() => {
-    setMobilePanel(null);
-  }, [activeTabId]);
+    setGenerationSafetyBlockReason(
+      initialHistoryState === "ready"
+        ? null
+        : initialHistoryState === "loading"
+          ? "正在确认运行历史，完成前暂停新的生成任务"
+          : "运行历史同步失败，为避免重复计费，新的生成任务已暂停",
+    );
+  }, [initialHistoryState]);
+
+  useEffect(() => () => {
+    setGenerationSafetyBlockReason("正在确认运行历史，完成前暂停新的生成任务");
+  }, []);
 
   useEffect(() => {
     if (!shouldWarnBeforeWorkspaceUnload({
@@ -156,15 +164,6 @@ function Workspace() {
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [hasDirtyTabs, pendingMaskWorkCount, tabSessionPersistenceError]);
-
-  useEffect(() => {
-    if (!mobilePanel) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobilePanel(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobilePanel]);
 
   useEffect(() => {
     let active = true;
@@ -225,104 +224,46 @@ function Workspace() {
 
   return (
     <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
+      <TopBar />
+      <ProjectTabs />
       {initialHistoryState !== "ready" && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[#101214]/95 px-6 text-center">
-          {initialHistoryState === "loading" ? (
-            <p className="text-xs text-neutral-400">正在确认运行历史，确认完成前暂停新的生成任务…</p>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-amber-300">运行历史加载失败。为避免重复计费，暂时禁止新的生成任务。</p>
-              <button
-                type="button"
-                onClick={() => setInitialHistoryAttempt((value) => value + 1)}
-                className="rounded border border-gold/60 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
-              >
-                重试同步
-              </button>
-            </div>
+        <div
+          role={initialHistoryState === "error" ? "alert" : "status"}
+          className="gc-panel flex min-h-9 shrink-0 items-center justify-center gap-3 border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 py-1.5 text-center"
+        >
+          <p className={`text-[10px] ${initialHistoryState === "error" ? "text-amber-300" : "text-[var(--gc-text-muted)]"}`}>
+            {initialHistoryState === "loading"
+              ? "正在确认运行历史；画布仍可查看和编辑，新的生成任务暂不可用。"
+              : "运行历史同步失败；画布仍可编辑和保存，为避免重复计费，新的生成任务已暂停。"}
+          </p>
+          {initialHistoryState === "error" && (
+            <button
+              type="button"
+              onClick={() => setInitialHistoryAttempt((value) => value + 1)}
+              className="shrink-0 rounded-sm border border-gold/60 px-2 py-1 text-[10px] text-gold hover:bg-gold/10"
+            >
+              重试同步
+            </button>
           )}
         </div>
       )}
-      <TopBar />
-      <ProjectTabs />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="gc-panel flex h-10 shrink-0 items-center border-b border-[#262626] bg-[#141414] px-2 md:hidden">
-          <button
-            type="button"
-            aria-controls="mobile-library-panel"
-            aria-expanded={mobilePanel === "library"}
-            onClick={() => setMobilePanel((current) => current === "library" ? null : "library")}
-            className={`rounded-md border px-3 py-1.5 text-[10px] font-medium transition-colors ${
-              mobilePanel === "library"
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-[#333] text-neutral-300"
-            }`}
-          >
-            节点 / 素材
-          </button>
-          <span className="min-w-0 flex-1 truncate px-3 text-center text-[10px] text-neutral-600">
-            画布
-          </span>
-          <button
-            type="button"
-            aria-controls="mobile-inspector-panel"
-            aria-expanded={mobilePanel === "inspector"}
-            onClick={() => setMobilePanel((current) => current === "inspector" ? null : "inspector")}
-            className={`rounded-md border px-3 py-1.5 text-[10px] font-medium transition-colors ${
-              mobilePanel === "inspector"
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-[#333] text-neutral-300"
-            }`}
-          >
-            属性
-          </button>
+      <WorkbenchShell
+        library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
+        inspector={(
+          <ContextPanel
+            hasMore={historyHasMore}
+            loadingMore={historyLoading}
+            onLoadMore={() => void loadMoreHistory()}
+          />
+        )}
+      >
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <TemplatesDock />
+          <ReactFlowProvider key={activeTabId}>
+            <CanvasFlow />
+          </ReactFlowProvider>
         </div>
-
-        <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          {mobilePanel && (
-            <button
-              type="button"
-              aria-label="关闭侧栏"
-              onClick={() => setMobilePanel(null)}
-              className="absolute inset-0 z-20 bg-black/60 md:hidden"
-            />
-          )}
-
-          <div
-            id="mobile-library-panel"
-            className={`absolute inset-y-0 left-0 z-30 flex transition-transform duration-200 md:static md:visible md:translate-x-0 ${
-              mobilePanel === "library"
-                ? "visible translate-x-0"
-                : "invisible -translate-x-full"
-            }`}
-          >
-            <NodeLibraryPanel />
-          </div>
-
-          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-            <TemplatesDock />
-            <ReactFlowProvider key={activeTabId}>
-              <CanvasFlow />
-            </ReactFlowProvider>
-            <ResultsPanel
-              hasMore={historyHasMore}
-              loadingMore={historyLoading}
-              onLoadMore={() => void loadMoreHistory()}
-            />
-          </div>
-
-          <div
-            id="mobile-inspector-panel"
-            className={`absolute inset-y-0 right-0 z-30 flex transition-transform duration-200 md:static md:visible md:translate-x-0 ${
-              mobilePanel === "inspector"
-                ? "visible translate-x-0"
-                : "invisible translate-x-full"
-            }`}
-          >
-            <InspectorPanel />
-          </div>
-        </div>
-      </div>
+      </WorkbenchShell>
       <CompareOverlay />
       <ImageViewer />
       <AssetPickerOverlay />
