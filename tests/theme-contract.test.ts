@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { applyTheme, getTheme, THEMES } from "../src/lib/theme";
+import {
+  applyTheme,
+  getAppliedTheme,
+  getTheme,
+  subscribeTheme,
+  THEMES,
+} from "../src/lib/theme";
 
 type StorageStub = Pick<Storage, "getItem" | "setItem">;
 
@@ -85,7 +91,14 @@ try {
   assert.equal(browser.dataset.theme, "eye");
   assert.equal(browser.values.get("garment-canvas-theme"), "eye");
 
-  console.log("  ✓ URL、本地偏好、旧值迁移与 data-theme 写入保持一致");
+  const observedThemes: string[] = [];
+  const unsubscribe = subscribeTheme(() => observedThemes.push(getAppliedTheme()));
+  applyTheme("white");
+  applyTheme("white");
+  unsubscribe();
+  assert.deepEqual(observedThemes, ["white"], "所有 useTheme 消费者应共享同一订阅状态且重复写入幂等");
+
+  console.log("  ✓ URL、本地偏好、旧值迁移、data-theme 写入与跨消费者同步保持一致");
 } finally {
   restoreGlobal("window", originalWindow);
   restoreGlobal("document", originalDocument);

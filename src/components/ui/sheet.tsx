@@ -38,6 +38,8 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
 
 function SheetContent({
   className,
+  overlayClassName,
+  portalProps,
   children,
   side = "right",
   showCloseButton = true,
@@ -45,10 +47,12 @@ function SheetContent({
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  overlayClassName?: string
+  portalProps?: SheetPrimitive.Portal.Props
 }) {
   return (
-    <SheetPortal>
-      <SheetOverlay />
+    <SheetPortal {...portalProps}>
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         data-side={side}

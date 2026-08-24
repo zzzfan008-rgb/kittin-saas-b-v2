@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 
 interface MemoryStorage {
   getItem(key: string): string | null;
@@ -113,6 +114,9 @@ const {
   TAB_SESSION_SCHEMA_VERSION,
   useFlowStore,
 } = await import("../src/store/flowStore");
+
+// 本文件模拟的是历史已经完成对账后的会话恢复路径。
+setGenerationSafetyBlockReason(null);
 const state = useFlowStore.getState();
 
 console.log("项目页签会话恢复测试");

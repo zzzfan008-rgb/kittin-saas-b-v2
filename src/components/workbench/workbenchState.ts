@@ -14,8 +14,8 @@ export type WorkbenchUiAction =
 
 export const INITIAL_WORKBENCH_UI_STATE: WorkbenchUiState = {
   libraryOpen: false,
-  // 保留原工作台“属性始终可见”的首屏习惯，同时允许用户一键收起。
-  inspectorOpen: true,
+  // 首屏优先保留画布空间，需要属性或结果时再展开上下文 Dock。
+  inspectorOpen: false,
   mobilePanel: null,
 };
 

@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { useFlowStore } from "@/store/flowStore";
 import { OPEN_COMPARE_EVENT } from "@/components/CompareOverlay";
 import { thumbnailImageUrl } from "@/lib/images";
+import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
 
@@ -9,10 +9,16 @@ interface ResultsPanelProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  className?: string;
 }
 
-/** 底部结果面板（可折叠）：最近生成 + 运行记录一体，点击条目右侧显示详情 */
-export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore }: ResultsPanelProps) {
+/** 右侧上下文 Dock 中的跨项目结果与运行记录。 */
+export function ResultsPanel({
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
+  className,
+}: ResultsPanelProps) {
   // 生成历史是跨项目的全局记录；即使项目页签未恢复，也必须能在刷新后找回。
   const recentResults = useFlowStore((s) => s.recentResults);
   const selectedResultId = useFlowStore((s) => s.selectedResultId);
@@ -20,58 +26,37 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
   const compareIds = useFlowStore((s) => s.compareIds);
   const toggleCompareId = useFlowStore((s) => s.toggleCompareId);
   const openViewer = useFlowStore((s) => s.openViewer);
-  const [collapsed, setCollapsed] = useState(false);
-  const resultCardClass = "h-20 w-20 sm:h-24 sm:w-24";
+  const resultCardClass = "aspect-square min-w-0 w-full";
 
   return (
-    <div className="gc-panel shrink-0 border-t border-[#262626] bg-[#141414]">
-      <button
-        type="button"
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex min-w-0 w-full items-center gap-2 px-3 py-2 text-left sm:px-4"
-      >
-        <span
-          className={`inline-block text-[10px] text-neutral-500 transition-transform ${collapsed ? "" : "rotate-90"}`}
-        >
-          ▶
-        </span>
+    <section className={cn("gc-panel flex min-h-0 flex-col bg-[#141414]", className)}>
+      <div className="flex min-w-0 items-center gap-2 border-b border-[#262626] px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-500">
           最近生成
         </span>
         <span className="text-[10px] text-neutral-600">{recentResults.length} 条</span>
         <span className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
           {compareIds.length >= 2 && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 window.dispatchEvent(new CustomEvent(OPEN_COMPARE_EVENT));
               }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.stopPropagation();
-                  window.dispatchEvent(new CustomEvent(OPEN_COMPARE_EVENT));
-                }
-              }}
               className="rounded-sm border border-gold/60 bg-gold/10 px-2 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
             >
               对比 {compareIds.length} 张
-            </span>
+            </button>
           )}
-          <span className="hidden text-[9px] text-neutral-700 sm:inline">
-            点击状态卡看记录 · 成功图可查看/对比
-          </span>
         </span>
-      </button>
-      {!collapsed && (
-        <div className="max-h-40 overflow-y-auto px-3 pb-3 sm:px-4">
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {recentResults.length === 0 ? (
             <p className="py-3 text-center text-[10px] text-neutral-600">
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {recentResults.map((r) =>
                 isNodeRunActive(r.status) ? (
                   <button
@@ -131,7 +116,7 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
                         });
                       }
                     }}
-                    className={`group relative overflow-hidden rounded-md border bg-[#0f0f0f] ${
+                    className={`group relative ${resultCardClass} overflow-hidden rounded-md border bg-[#0f0f0f] ${
                       compareIds.includes(r.id)
                         ? "border-gold ring-2 ring-gold/70"
                         : selectedResultId === r.id
@@ -144,7 +129,7 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
                       alt={r.nodeLabel}
                       loading="lazy"
                       decoding="async"
-                      className={`${resultCardClass} object-cover transition-transform group-hover:scale-105`}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />
                     {compareIds.includes(r.id) && (
                       <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[9px] font-bold text-ink">
@@ -166,8 +151,7 @@ export function ResultsPanel({ hasMore = false, loadingMore = false, onLoadMore 
               )}
             </div>
           )}
-        </div>
-      )}
-    </div>
+      </div>
+    </section>
   );
 }

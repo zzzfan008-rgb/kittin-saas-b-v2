@@ -1,7 +1,7 @@
 // server/index.ts
 import express2 from "express";
 import fs8 from "node:fs";
-import path10 from "node:path";
+import path9 from "node:path";
 
 // server/config.ts
 import fs from "node:fs";
@@ -45,6 +45,10 @@ var config = {
   databaseUser: () => process.env.PGUSER?.trim() || process.env.POSTGRES_USER?.trim() || "garment_canvas",
   databasePassword: () => process.env.PGPASSWORD ?? process.env.POSTGRES_PASSWORD ?? "",
   databasePoolSize: () => Math.max(1, Math.min(50, Number(process.env.DATABASE_POOL_SIZE) || 10)),
+  generationWorkerPollMs: () => {
+    const value = Number(process.env.GENERATION_WORKER_POLL_MS ?? 2e3);
+    return Number.isFinite(value) ? Math.max(100, Math.min(6e4, value)) : 2e3;
+  },
   sqliteImportPath: () => path.resolve(config.dataDir(), process.env.SQLITE_IMPORT_FILE ?? "garment-canvas.db"),
   initialAdminAccountId: () => process.env.INITIAL_ADMIN_ACCOUNT_ID?.trim() ?? "",
   initialAdminPassword: () => process.env.INITIAL_ADMIN_PASSWORD ?? "",
@@ -161,7 +165,7 @@ var model_contracts_default = {
     upstreamMode: "synchronous",
     businessQueue: "postgresql",
     retryableHttpStatuses: [429, 503],
-    maxAutomaticRetries: 2,
+    maxAutomaticRetries: 3,
     ambiguousTransportFailure: "outcome_unknown",
     persistTemporaryUrlsImmediately: true
   },
@@ -875,12 +879,12 @@ function appendImages(form, refs, modelId) {
 function upstreamModelId(modelId) {
   return getImageModelContract(modelId).upstreamModelId;
 }
-function resolveContractPath(path11, modelId) {
-  return path11.replace("{model}", encodeURIComponent(upstreamModelId(modelId)));
+function resolveContractPath(path10, modelId) {
+  return path10.replace("{model}", encodeURIComponent(upstreamModelId(modelId)));
 }
-async function fetchApiyi(modelId, path11, initFactory) {
+async function fetchApiyi(modelId, path10, initFactory) {
   const timeout = getImageModelContract(modelId).timeoutMs;
-  return fetchWithRetry(`${config.apiyiBaseUrl()}${resolveContractPath(path11, modelId)}`, initFactory, {
+  return fetchWithRetry(`${config.apiyiBaseUrl()}${resolveContractPath(path10, modelId)}`, initFactory, {
     providerId: modelId,
     timeoutMs: config.aiTimeoutMs(timeout),
     maxRetries: 0
@@ -1328,6 +1332,7 @@ async function generateExactImages(provider, request, requestedCount, options = 
 // server/lib/fileStore.ts
 import fs2 from "node:fs";
 import path2 from "node:path";
+import { createHash } from "node:crypto";
 import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import http from "node:http";
@@ -1591,6 +1596,7 @@ async function saveNormalizedUploadDataUrl(dataUrl) {
 }
 function resolveToDataUrl(ref) {
   if (!ref.startsWith("/api/files/")) return ref;
+  if (!isLocalImageReference(ref)) throw new Error("invalid local image reference");
   const id = path2.basename(ref);
   const filePath = path2.join(uploadsDir(), id);
   if (!fs2.existsSync(filePath)) {
@@ -1816,10 +1822,57 @@ async function normalizeImageRef(ref) {
   }
   throw new Error(`unsupported image reference: ${ref.slice(0, 80)}`);
 }
-async function persistImageRef(ref) {
-  if (ref.startsWith("/api/files/")) return ref;
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+function createStoredImage(id, buffer) {
+  const filePath = path2.join(uploadsDir(), id);
+  let fd;
+  try {
+    fd = fs2.openSync(filePath, "wx", 384);
+    fs2.writeFileSync(fd, buffer);
+    fs2.fsyncSync(fd);
+    return true;
+  } catch (error) {
+    if (error.code === "EEXIST") return false;
+    if (fd !== void 0) {
+      try {
+        fs2.rmSync(filePath, { force: true });
+      } catch {
+      }
+    }
+    throw error;
+  } finally {
+    if (fd !== void 0) fs2.closeSync(fd);
+  }
+}
+function storedImageMatches(id, buffer) {
+  try {
+    return fs2.readFileSync(path2.join(uploadsDir(), id)).equals(buffer);
+  } catch {
+    return false;
+  }
+}
+async function persistImageRefWithReceipt(ref, idempotencyKey) {
+  if (ref.startsWith("/api/files/")) {
+    return { id: path2.basename(ref), url: ref, created: false };
+  }
+  if (!idempotencyKey.trim()) throw new Error("image persistence idempotency key is required");
   const dataUrl = await normalizeImageRef(ref);
-  return saveDataUrl(dataUrl).url;
+  const { mime, buffer } = validateImageDataUrl(dataUrl);
+  const ext = MIME_EXT[mime];
+  const keyDigest = sha256(idempotencyKey).slice(0, 24);
+  const contentDigest = sha256(buffer).slice(0, 16);
+  const base = `generated-${keyDigest}`;
+  const candidates = [`${base}.${ext}`, `${base}-${contentDigest}.${ext}`];
+  for (const id of candidates) {
+    if (createStoredImage(id, buffer)) return { id, url: `/api/files/${id}`, created: true };
+    if (storedImageMatches(id, buffer)) return { id, url: `/api/files/${id}`, created: false };
+  }
+  for (; ; ) {
+    const id = `${base}-${contentDigest}-${nanoid(6)}.${ext}`;
+    if (createStoredImage(id, buffer)) return { id, url: `/api/files/${id}`, created: true };
+  }
 }
 
 // server/lib/database.ts
@@ -2310,6 +2363,73 @@ async function migrate() {
         ["normalized_upload_metadata", (/* @__PURE__ */ new Date()).toISOString()]
       );
     }
+    if (!applied.has(9)) {
+      await client.query(`
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS next_event_seq INTEGER NOT NULL DEFAULT 0;
+        UPDATE generation_runs run
+        SET next_event_seq = events.max_seq
+        FROM (
+          SELECT run_id, MAX(seq)::int AS max_seq
+          FROM generation_run_events
+          GROUP BY run_id
+        ) events
+        WHERE run.id = events.run_id
+          AND run.next_event_seq < events.max_seq;
+
+        ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS run_started_at BIGINT;
+        ALTER TABLE generation_jobs ADD COLUMN IF NOT EXISTS step_index INTEGER;
+        UPDATE generation_jobs job
+        SET run_started_at = run.started_at,
+            step_index = step.step_index
+        FROM generation_runs run, generation_run_steps step
+        WHERE job.run_id = run.id
+          AND job.step_id = step.id
+          AND (job.run_started_at IS NULL OR job.step_index IS NULL);
+        ALTER TABLE generation_jobs ALTER COLUMN run_started_at SET NOT NULL;
+        ALTER TABLE generation_jobs ALTER COLUMN step_index SET NOT NULL;
+
+        ALTER TABLE generation_jobs
+          DROP CONSTRAINT IF EXISTS generation_jobs_retry_count_check;
+        ALTER TABLE generation_jobs
+          ADD CONSTRAINT generation_jobs_retry_count_check
+          CHECK (retry_count BETWEEN 0 AND 3);
+
+        CREATE INDEX IF NOT EXISTS generation_jobs_status_available_idx
+          ON generation_jobs(status, available_at);
+        CREATE INDEX IF NOT EXISTS generation_jobs_ready_order_idx
+          ON generation_jobs(available_at, run_started_at, step_index, id)
+          WHERE status IN ('queued','retry_wait');
+        CREATE INDEX IF NOT EXISTS generation_jobs_prerequisite_idx
+          ON generation_jobs(run_id, step_index, status);
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (9, $1, $2)",
+        ["generation_queue_concurrency_hardening", (/* @__PURE__ */ new Date()).toISOString()]
+      );
+    }
+    if (!applied.has(10)) {
+      await client.query(`
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS client_request_id TEXT;
+        ALTER TABLE generation_runs
+          ADD COLUMN IF NOT EXISTS request_fingerprint TEXT;
+        ALTER TABLE generation_runs
+          DROP CONSTRAINT IF EXISTS generation_runs_client_request_pair_check;
+        ALTER TABLE generation_runs
+          ADD CONSTRAINT generation_runs_client_request_pair_check CHECK (
+            (client_request_id IS NULL AND request_fingerprint IS NULL) OR
+            (client_request_id IS NOT NULL AND request_fingerprint IS NOT NULL)
+          );
+        CREATE UNIQUE INDEX IF NOT EXISTS generation_runs_owner_client_request_unique
+          ON generation_runs(owner_id, client_request_id)
+          WHERE client_request_id IS NOT NULL;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (10, $1, $2)",
+        ["generation_run_request_idempotency", (/* @__PURE__ */ new Date()).toISOString()]
+      );
+    }
     return imported;
   });
   if (importedRows !== void 0) {
@@ -2729,11 +2849,11 @@ async function resolveImageRefs(refs) {
 }
 
 // server/lib/auth.ts
-import { createHash, randomBytes as randomBytes2 } from "node:crypto";
+import { createHash as createHash2, randomBytes as randomBytes2 } from "node:crypto";
 var SESSION_COOKIE = "gc_session";
 var SESSION_DAYS = 30;
 function sessionHash(token) {
-  return createHash("sha256").update(token).digest("hex");
+  return createHash2("sha256").update(token).digest("hex");
 }
 function cookieValue(req, name) {
   const raw = req.headers.cookie;
@@ -2868,8 +2988,21 @@ function asyncHandler(handler) {
 
 // server/engine/runQueue.ts
 import os from "node:os";
-import path3 from "node:path";
+import { createHash as createHash3 } from "node:crypto";
 import { nanoid as nanoid5 } from "nanoid";
+
+// server/lib/generationLimits.ts
+var ACTIVE_RUN_LIMIT = 180;
+
+// server/lib/ownerMutation.ts
+async function lockActiveOwner(client, ownerId) {
+  const owner = (await client.query(`
+    SELECT active, deleted_at FROM users WHERE id = $1 FOR SHARE
+  `, [ownerId])).rows[0];
+  return Boolean(owner && owner.active === 1 && owner.deleted_at === null);
+}
+
+// server/engine/runQueue.ts
 var TERMINAL_RUN_STATUSES = /* @__PURE__ */ new Set([
   "cancelled",
   "succeeded",
@@ -2878,10 +3011,34 @@ var TERMINAL_RUN_STATUSES = /* @__PURE__ */ new Set([
 ]);
 var DEFAULT_LEASE_MS = 45e3;
 var DEFAULT_HEARTBEAT_MS = 1e4;
-var DEFAULT_POLL_MS = 750;
-var DEFAULT_RETRY_DELAYS_MS = [5e3, 15e3];
+var DEFAULT_RETRY_DELAYS_MS = [5e3, 3e4, 12e4];
 var CANCELLED_AFTER_START_WARNING = "\u53D6\u6D88\u8BF7\u6C42\u672A\u80FD\u4E2D\u6B62\u5DF2\u7ECF\u5F00\u59CB\u7684\u4E0A\u6E38\u8C03\u7528\uFF0C\u7ED3\u679C\u5DF2\u6309\u5B9E\u9645\u8FD4\u56DE\u4FDD\u5B58";
+var OUTCOME_UNKNOWN_GUIDANCE = "\u8BF7\u5148\u6838\u5BF9 API\u6613\u6D88\u8017\u8BB0\u5F55\uFF1B\u786E\u8BA4\u672A\u6263\u8D39\u540E\uFF0C\u518D\u624B\u52A8\u91CD\u65B0\u63D0\u4EA4\u4EFB\u52A1";
 var DURABLE_RUN_EVENT_BATCH_SIZE = 500;
+var CLIENT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+var GenerationRequestConflictError = class extends Error {
+  constructor() {
+    super("clientRequestId \u5DF2\u7528\u4E8E\u53E6\u4E00\u4EFD\u751F\u6210\u8BF7\u6C42\uFF0C\u8BF7\u91CD\u65B0\u63D0\u4EA4");
+    this.name = "GenerationRequestConflictError";
+  }
+};
+var ActiveRunLimitError = class extends Error {
+  constructor() {
+    super(`\u6D3B\u52A8\u4EFB\u52A1\u5DF2\u8FBE\u5230 ${ACTIVE_RUN_LIMIT} \u6761\u4E0A\u9650\uFF0C\u8BF7\u7B49\u5F85\u73B0\u6709\u4EFB\u52A1\u7ED3\u675F\u540E\u518D\u8BD5`);
+    this.name = "ActiveRunLimitError";
+  }
+};
+var GenerationOwnerUnavailableError = class extends Error {
+  constructor() {
+    super("\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u521B\u5EFA\u65B0\u7684\u751F\u6210\u4EFB\u52A1");
+    this.name = "GenerationOwnerUnavailableError";
+  }
+};
+async function assertGenerationOwnerActive(client, ownerId) {
+  if (!await lockActiveOwner(client, ownerId)) {
+    throw new GenerationOwnerUnavailableError();
+  }
+}
 var CancelledBeforeProviderCall = class extends Error {
   constructor() {
     super("\u4EFB\u52A1\u5DF2\u5728\u4E0A\u6E38\u8C03\u7528\u5F00\u59CB\u524D\u53D6\u6D88");
@@ -2900,25 +3057,34 @@ function isTerminalRunStatus(status) {
 }
 async function lockRun(client, runId) {
   return (await client.query(
-    "SELECT id, owner_id, project_id, node_id, status, target_step_id, started_at, finished_at FROM generation_runs WHERE id = $1 FOR UPDATE",
+    `SELECT id, owner_id, project_id, node_id, status, target_step_id, started_at, finished_at
+     FROM generation_runs WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
     [runId]
   )).rows[0];
 }
 async function appendRunEvent(client, runId, event, createdAt) {
   const seqRow = (await client.query(`
-    SELECT COALESCE(MAX(seq), 0)::int + 1 AS seq
-    FROM generation_run_events WHERE run_id = $1
+    UPDATE generation_runs
+    SET next_event_seq = next_event_seq + 1
+    WHERE id = $1
+    RETURNING next_event_seq::int AS seq
   `, [runId])).rows[0];
-  const sequenced = { ...event, seq: seqRow?.seq ?? 1 };
+  if (!seqRow) throw new Error("generation run disappeared while appending an event");
+  const sequenced = { ...event, seq: seqRow.seq };
   await client.query(`
     INSERT INTO generation_run_events (run_id, seq, payload_json, created_at)
     VALUES ($1, $2, $3, $4)
   `, [runId, sequenced.seq, JSON.stringify(sequenced), createdAt]);
   return sequenced;
 }
-async function enqueueGenerationRun(plan, ownerId, context, runType = "workflow") {
+async function insertGenerationRun(client, plan, ownerId, context, runType = "workflow") {
   if (!ownerId.trim() || context.userId !== ownerId) throw new Error("run owner is invalid");
   if (plan.steps.length === 0) throw new Error("execution plan has no steps");
+  await assertGenerationOwnerActive(client, ownerId);
+  const clientRequestId = context.clientRequestId?.trim() || void 0;
+  if (clientRequestId && !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    throw new Error("clientRequestId must contain only letters, digits, underscore or hyphen");
+  }
   const runId = nanoid5(10);
   const createdAt = Date.now();
   const requestedTargetIndex = plan.steps.findIndex((step) => step.nodeId === context.nodeId);
@@ -2927,78 +3093,129 @@ async function enqueueGenerationRun(plan, ownerId, context, runType = "workflow"
   const targetStep = plan.steps[targetIndex] ?? plan.steps.at(-1);
   const targetStepId = stepIds[targetIndex] ?? stepIds.at(-1);
   const initialModel = isImageModelId(targetStep.params.modelId) ? targetStep.params.modelId : null;
-  await transaction(async (client) => {
-    await client.query(`
+  const planJson = JSON.stringify(plan);
+  const requestFingerprint = clientRequestId ? createHash3("sha256").update(JSON.stringify({
+    runType,
+    projectId: context.projectId ?? null,
+    nodeId: context.nodeId
+  })).update("\0").update(planJson).digest("hex") : null;
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+    [`generation-run-owner:${ownerId}`]
+  );
+  if (clientRequestId) {
+    const existing = (await client.query(`
+      SELECT id, request_fingerprint FROM generation_runs
+      WHERE owner_id = $1 AND client_request_id = $2
+    `, [ownerId, clientRequestId])).rows[0];
+    if (existing) {
+      if (existing.request_fingerprint !== requestFingerprint) {
+        throw new GenerationRequestConflictError();
+      }
+      return { id: existing.id };
+    }
+  }
+  const activeCount = (await client.query(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE owner_id = $1
+      AND deleted_at IS NULL
+      AND plan_json IS NOT NULL
+      AND status IN ('queued','running','retry_wait','cancel_requested')
+  `, [ownerId])).rows[0]?.count ?? 0;
+  if (activeCount >= ACTIVE_RUN_LIMIT) throw new ActiveRunLimitError();
+  const inserted = await client.query(`
       INSERT INTO generation_runs (
         id, owner_id, project_id, project_name, node_id, node_label, kind, prompt,
         parameters_json, reference_images_json, model, requested_count, status,
-        started_at, plan_json, target_step_id, run_type, updated_at
+        started_at, plan_json, target_step_id, run_type, updated_at,
+        client_request_id, request_fingerprint
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'queued',
-        $13, $14, $15, $16, $13
+        $13, $14, $15, $16, $13, $17, $18
       )
+      ON CONFLICT (owner_id, client_request_id)
+        WHERE client_request_id IS NOT NULL
+      DO NOTHING
+      RETURNING id
     `, [
-      runId,
-      ownerId,
-      context.projectId ?? null,
-      context.projectName ?? null,
-      context.nodeId,
-      context.nodeLabel,
-      context.kind,
-      context.prompt ?? null,
-      JSON.stringify(context.parameters ?? {}),
-      JSON.stringify(context.referenceImages ?? targetStep.inputImages ?? []),
-      initialModel,
-      context.requestedCount,
-      createdAt,
-      JSON.stringify(plan),
-      targetStepId,
-      runType
-    ]);
-    for (const [index, step] of plan.steps.entries()) {
-      const stepId = stepIds[index];
-      const model = isImageModelId(step.params.modelId) ? step.params.modelId : null;
-      await client.query(`
+    runId,
+    ownerId,
+    context.projectId ?? null,
+    context.projectName ?? null,
+    context.nodeId,
+    context.nodeLabel,
+    context.kind,
+    context.prompt ?? null,
+    JSON.stringify(context.parameters ?? {}),
+    JSON.stringify(context.referenceImages ?? targetStep.inputImages ?? []),
+    initialModel,
+    context.requestedCount,
+    createdAt,
+    planJson,
+    targetStepId,
+    runType,
+    clientRequestId ?? null,
+    requestFingerprint
+  ]);
+  if (inserted.rowCount === 0) {
+    const existing = (await client.query(`
+      SELECT id, request_fingerprint FROM generation_runs
+      WHERE owner_id = $1 AND client_request_id = $2
+    `, [ownerId, clientRequestId])).rows[0];
+    if (!existing || existing.request_fingerprint !== requestFingerprint) {
+      throw new GenerationRequestConflictError();
+    }
+    return { id: existing.id };
+  }
+  for (const [index, step] of plan.steps.entries()) {
+    const stepId = stepIds[index];
+    const model = isImageModelId(step.params.modelId) ? step.params.modelId : null;
+    await client.query(`
         INSERT INTO generation_run_steps (
           id, run_id, step_index, node_id, kind, step_json, status, model
         ) VALUES ($1, $2, $3, $4, $5, $6, 'queued', $7)
       `, [stepId, runId, index, step.nodeId, step.kind, JSON.stringify(step), model]);
-      await client.query(`
+    await client.query(`
         INSERT INTO generation_jobs (
-          id, run_id, step_id, idempotency_key, status, retry_count, available_at, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 'queued', 0, $5, $5, $5)
-      `, [nanoid5(12), runId, stepId, `${runId}:${stepId}`, createdAt]);
-      await appendRunEvent(client, runId, {
-        type: "node-status",
-        nodeId: step.nodeId,
-        status: "queued",
-        startedAt: createdAt
-      }, createdAt);
-    }
-  });
+          id, run_id, step_id, idempotency_key, status, retry_count, available_at,
+          run_started_at, step_index, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'queued', 0, $5, $5, $6, $5, $5)
+      `, [nanoid5(12), runId, stepId, `${runId}:${stepId}`, createdAt, index]);
+    await appendRunEvent(client, runId, {
+      type: "node-status",
+      nodeId: step.nodeId,
+      status: "queued",
+      startedAt: createdAt
+    }, createdAt);
+  }
   return { id: runId };
 }
+async function enqueueGenerationRunInTransaction(client, plan, ownerId, context, runType = "workflow") {
+  return insertGenerationRun(client, plan, ownerId, context, runType);
+}
+var CLAIM_NEXT_JOB_SQL = `
+  SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
+    s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
+  FROM generation_jobs j
+  JOIN generation_run_steps s ON s.id = j.step_id
+  JOIN generation_runs r ON r.id = j.run_id
+  WHERE j.status IN ('queued','retry_wait')
+    AND j.available_at <= $1
+    AND r.deleted_at IS NULL
+    AND r.status IN ('queued','running','retry_wait')
+    AND NOT EXISTS (
+      SELECT 1 FROM generation_jobs previous
+      WHERE previous.run_id = j.run_id
+        AND previous.step_index < j.step_index
+        AND previous.status <> 'succeeded'
+    )
+  ORDER BY j.available_at, j.run_started_at, j.step_index, j.id
+  FOR UPDATE OF j SKIP LOCKED
+  LIMIT 1
+`;
 async function claimNextJob(workerId, now, leaseMs) {
   return transaction(async (client) => {
-    const row = (await client.query(`
-      SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
-        s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
-      FROM generation_jobs j
-      JOIN generation_run_steps s ON s.id = j.step_id
-      JOIN generation_runs r ON r.id = j.run_id
-      WHERE j.status IN ('queued','retry_wait')
-        AND j.available_at <= $1
-        AND r.status IN ('queued','running','retry_wait')
-        AND NOT EXISTS (
-          SELECT 1 FROM generation_run_steps previous
-          WHERE previous.run_id = s.run_id
-            AND previous.step_index < s.step_index
-            AND previous.status <> 'succeeded'
-        )
-      ORDER BY j.available_at, r.started_at, s.step_index
-      FOR UPDATE OF j SKIP LOCKED
-      LIMIT 1
-    `, [now])).rows[0];
+    const row = (await client.query(CLAIM_NEXT_JOB_SQL, [now])).rows[0];
     if (!row) return void 0;
     const run = await lockRun(client, row.run_id);
     if (!run || isTerminalRunStatus(run.status) || run.status === "cancel_requested") return void 0;
@@ -3046,7 +3263,12 @@ async function inputImagesForStep(runId, step) {
 async function markAttemptStarted(job, workerId, now, leaseMs) {
   await transaction(async (client) => {
     const row = (await client.query(
-      "SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE",
+      `
+      SELECT j.status, j.worker_id FROM generation_jobs j
+      JOIN generation_runs r ON r.id = j.run_id
+      WHERE j.id = $1 AND r.deleted_at IS NULL
+      FOR UPDATE OF j
+    `,
       [job.id]
     )).rows[0];
     if (!row || row.worker_id !== workerId) throw new Error("generation job lease was lost");
@@ -3061,10 +3283,46 @@ async function markAttemptStarted(job, workerId, now, leaseMs) {
     `, [job.stepId]);
   });
 }
-async function persistStepImages(images) {
+async function assertJobOwnedForCompletion(job, workerId) {
+  const row = await queryOne(
+    `
+    SELECT j.status, j.worker_id FROM generation_jobs j
+    JOIN generation_runs r ON r.id = j.run_id
+    WHERE j.id = $1 AND r.deleted_at IS NULL
+  `,
+    [job.id]
+  );
+  if (!row || row.worker_id !== workerId || row.status !== "running" && row.status !== "cancel_requested") {
+    throw new Error("generation job lease was lost before image persistence");
+  }
+}
+async function persistStepImages(images, job) {
   const persisted = [];
-  for (const image of images) persisted.push(await persistImageRef(image));
-  return persisted;
+  try {
+    for (const [index, image] of images.entries()) {
+      persisted.push(await persistImageRefWithReceipt(image, `${job.runId}:${job.stepId}:${index}`));
+    }
+    return persisted;
+  } catch (error) {
+    for (const receipt of persisted) {
+      if (receipt.created) deleteStoredImage(receipt.id);
+    }
+    throw error;
+  }
+}
+async function compensatePersistedImages(persisted, job, workerId) {
+  const owner = await queryOne(
+    "SELECT status, worker_id FROM generation_jobs WHERE id = $1",
+    [job.id]
+  ).catch(() => void 0);
+  if (owner && owner.worker_id !== workerId && (owner.status === "running" || owner.status === "cancel_requested")) {
+    return;
+  }
+  for (const receipt of persisted) {
+    if (!receipt.created) continue;
+    const registered = await queryOne("SELECT id FROM files WHERE id = $1", [receipt.id]).catch(() => ({ id: receipt.id }));
+    if (!registered) deleteStoredImage(receipt.id);
+  }
 }
 async function finalizeSuccessfulRun(client, run, finishedAt, cancellationWarning) {
   const target = run.target_step_id ? (await client.query(`
@@ -3154,12 +3412,15 @@ async function finalizeCancelledTargetRun(client, run, targetNodeId, message, fi
   await appendRunEvent(client, run.id, { type: "done" }, finishedAt);
 }
 async function completeJobSuccess(job, workerId, result, persistedImages, finishedAt) {
+  const imageUrls = persistedImages.map((image) => image.url);
   await transaction(async (client) => {
     const locked = (await client.query(
       "SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE",
       [job.id]
     )).rows[0];
-    if (!locked || locked.worker_id !== workerId) throw new Error("generation job lease was lost before completion");
+    if (!locked || locked.worker_id !== workerId || locked.status !== "running" && locked.status !== "cancel_requested") {
+      throw new Error("generation job lease was lost before completion");
+    }
     const run = await lockRun(client, job.runId);
     if (!run) throw new Error("generation run disappeared");
     const cancellationWarning = locked.status === "cancel_requested" ? CANCELLED_AFTER_START_WARNING : void 0;
@@ -3174,7 +3435,7 @@ async function completeJobSuccess(job, workerId, result, persistedImages, finish
       WHERE id = $8
     `, [
       result.model ?? null,
-      JSON.stringify(persistedImages),
+      JSON.stringify(imageUrls),
       JSON.stringify(result.prompts ?? []),
       JSON.stringify(result.providerOutputSizes ?? []),
       JSON.stringify(result.failures ?? []),
@@ -3183,18 +3444,18 @@ async function completeJobSuccess(job, workerId, result, persistedImages, finish
       job.stepId
     ]);
     for (const image of persistedImages) {
-      if (!image.startsWith("/api/files/")) continue;
+      if (!image.url.startsWith("/api/files/")) continue;
       await client.query(`
         INSERT INTO files (id, owner_id, source_type, project_id, node_id, run_id, created_at)
         VALUES ($1, $2, 'generated', $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING
-      `, [path3.basename(image), run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
+      `, [image.id, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
     }
     const partialWarning = result.failures?.length ? `${result.failures.length} \u4E2A\u751F\u6210\u4EFB\u52A1\u5931\u8D25` : void 0;
     await appendRunEvent(client, run.id, {
       type: "node-status",
       nodeId: job.nodeId,
       status: "success",
-      images: persistedImages,
+      images: imageUrls,
       model: result.model,
       prompts: result.prompts,
       providerOutputSizes: result.providerOutputSizes,
@@ -3241,6 +3502,9 @@ async function completeJobSuccess(job, workerId, result, persistedImages, finish
 }
 function isRetryableProviderError(error) {
   return error instanceof ProviderError && (error.status === 429 || error.status === 503 && error.category === "gateway_unavailable");
+}
+function outcomeUnknownMessage(message) {
+  return message.includes("API\u6613\u6D88\u8017\u8BB0\u5F55") ? message : `${message}\uFF1B${OUTCOME_UNKNOWN_GUIDANCE}`;
 }
 async function terminateRun(client, row, status, message, finishedAt) {
   const run = await lockRun(client, row.run_id);
@@ -3316,7 +3580,8 @@ async function handleJobError(job, workerId, error, options) {
       SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
-      JOIN generation_runs r ON r.id = j.run_id WHERE j.id = $1 FOR UPDATE OF j
+      JOIN generation_runs r ON r.id = j.run_id
+      WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
     `, [job.id])).rows[0];
     if (!row || row.worker_id !== workerId && row.status !== "cancel_requested") return;
     if (error instanceof CancelledBeforeProviderCall) {
@@ -3324,19 +3589,27 @@ async function handleJobError(job, workerId, error, options) {
       return;
     }
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
-      await terminateRun(client, row, "outcome_unknown", message, now);
+      await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now);
       return;
     }
     if (row.status === "cancel_requested") {
       await terminateRun(client, row, "cancelled", "\u7528\u6237\u53D6\u6D88\u4E86\u4EFB\u52A1\uFF0C\u7CFB\u7EDF\u672A\u7EE7\u7EED\u91CD\u8BD5", now);
       return;
     }
-    if (isRetryableProviderError(error) && row.retry_count < 2) {
+    const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+    const maxRetries = Math.min(retryDelays.length, DEFAULT_RETRY_DELAYS_MS.length);
+    if (isRetryableProviderError(error) && row.retry_count < maxRetries) {
       const retryNumber = row.retry_count + 1;
-      const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
-      const baseDelay = retryDelays[Math.min(row.retry_count, retryDelays.length - 1)] ?? DEFAULT_RETRY_DELAYS_MS[1];
+      const baseDelay = retryDelays[row.retry_count] ?? DEFAULT_RETRY_DELAYS_MS[row.retry_count];
       const jitter = Math.floor((options.random?.() ?? Math.random()) * 1e3);
       const availableAt = now + Math.max(0, baseDelay) + jitter;
+      console.warn("[generation-job-retry]", JSON.stringify({
+        runId: row.run_id,
+        nodeId: row.node_id,
+        retryCount: retryNumber,
+        delayMs: Math.max(0, baseDelay) + jitter,
+        exhausted: false
+      }));
       await lockRun(client, row.run_id);
       await client.query(`
         UPDATE generation_jobs SET status = 'retry_wait', retry_count = $1, available_at = $2,
@@ -3360,6 +3633,15 @@ async function handleJobError(job, workerId, error, options) {
       }, now);
       return;
     }
+    if (isRetryableProviderError(error)) {
+      console.warn("[generation-job-retry]", JSON.stringify({
+        runId: row.run_id,
+        nodeId: row.node_id,
+        retryCount: row.retry_count,
+        delayMs: null,
+        exhausted: true
+      }));
+    }
     await terminateRun(client, row, "failed", message, now);
   });
 }
@@ -3370,7 +3652,9 @@ async function recoverExpiredGenerationJobs(now = Date.now()) {
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at, r.target_step_id
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
       JOIN generation_runs r ON r.id = j.run_id
-      WHERE j.status IN ('running','cancel_requested') AND j.lease_expires_at < $1
+      WHERE j.status IN ('running','cancel_requested')
+        AND j.lease_expires_at < $1
+        AND r.deleted_at IS NULL
       ORDER BY j.lease_expires_at ASC FOR UPDATE OF j SKIP LOCKED LIMIT 50
     `, [now])).rows;
     for (const row of rows) {
@@ -3379,7 +3663,7 @@ async function recoverExpiredGenerationJobs(now = Date.now()) {
           client,
           row,
           "outcome_unknown",
-          "Worker \u5728\u4E0A\u6E38\u8C03\u7528\u5F00\u59CB\u540E\u4E2D\u65AD\uFF0C\u7ED3\u679C\u53EF\u80FD\u5DF2\u7ECF\u751F\u6210\uFF1B\u7CFB\u7EDF\u4E0D\u4F1A\u81EA\u52A8\u91CD\u8BD5",
+          outcomeUnknownMessage("Worker \u5728\u4E0A\u6E38\u8C03\u7528\u5F00\u59CB\u540E\u4E2D\u65AD\uFF0C\u7ED3\u679C\u53EF\u80FD\u5DF2\u7ECF\u751F\u6210\uFF1B\u7CFB\u7EDF\u4E0D\u4F1A\u81EA\u52A8\u91CD\u8BD5"),
           now
         );
         continue;
@@ -3435,8 +3719,14 @@ async function processNextGenerationJob(workerId, options = {}) {
         }
       }
     );
-    const persistedImages = await persistStepImages(result.images);
-    await completeJobSuccess(job, workerId, result, persistedImages, options.now?.() ?? Date.now());
+    await assertJobOwnedForCompletion(job, workerId);
+    const persistedImages = await persistStepImages(result.images, job);
+    try {
+      await completeJobSuccess(job, workerId, result, persistedImages, options.now?.() ?? Date.now());
+    } catch (error) {
+      await compensatePersistedImages(persistedImages, job, workerId);
+      throw error;
+    }
   } catch (error) {
     await handleJobError(job, workerId, error, options);
   } finally {
@@ -3460,7 +3750,8 @@ function startGenerationWorker() {
       busy = false;
     }
   };
-  const timer = setInterval(() => void tick(), DEFAULT_POLL_MS);
+  const pollMs = config.generationWorkerPollMs();
+  const timer = setInterval(() => void tick(), pollMs);
   timer.unref();
   void tick();
   return () => {
@@ -3570,6 +3861,55 @@ async function cancelDurableRun(runId, ownerId) {
   });
 }
 
+// server/lib/imageReferenceAccess.ts
+var ImageReferenceAccessError = class extends Error {
+  constructor(message = "\u753B\u5E03\u5305\u542B\u65E0\u6743\u8BBF\u95EE\u7684\u56FE\u7247\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u56FE\u7247\u540E\u518D\u8BD5") {
+    super(message);
+    this.name = "ImageReferenceAccessError";
+  }
+};
+function collectLocalImageIds(value, output = /* @__PURE__ */ new Set()) {
+  if (typeof value === "string" && value.startsWith("/api/files/")) {
+    if (!isLocalImageReference(value)) throw new ImageReferenceAccessError("\u672C\u5730\u56FE\u7247\u5F15\u7528\u683C\u5F0F\u65E0\u6548");
+    output.add(value.slice("/api/files/".length));
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => collectLocalImageIds(item, output));
+  } else if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectLocalImageIds(item, output));
+  }
+  return output;
+}
+async function assertImageReferencesAccessible(value, userId, client, options) {
+  const ids = [...collectLocalImageIds(value)];
+  if (ids.length === 0) return;
+  const refs = ids.map((id) => `/api/files/${id}`);
+  const referencedAssets = await query(`
+    SELECT id, image, scope FROM assets
+    WHERE image = ANY($1::text[])
+      AND deleted_at IS NULL
+    ORDER BY id
+    FOR SHARE
+  `, [refs], client);
+  const sharedRefs = new Set(
+    referencedAssets.filter((row) => row.scope === "global" || row.scope === "shared").map((row) => row.image)
+  );
+  const fileLock = options?.fileLock === "update" ? "FOR UPDATE" : "FOR SHARE";
+  const rows = await query(`
+    SELECT f.id, f.owner_id
+    FROM files f
+    WHERE f.id = ANY($1::text[])
+      AND f.deleted_at IS NULL
+    ORDER BY f.id
+    ${fileLock}
+  `, [ids], client);
+  if (rows.length !== ids.length) {
+    throw new ImageReferenceAccessError();
+  }
+  if (rows.some((row) => row.owner_id !== null && row.owner_id !== userId && !sharedRefs.has(`/api/files/${row.id}`))) {
+    throw new ImageReferenceAccessError();
+  }
+}
+
 // server/routes/generate.ts
 var generateRouter = Router();
 function isDirectGenerateKind(value) {
@@ -3595,7 +3935,16 @@ function validateDirectGenerateRequest(kind, request) {
   return { ok: true, kind };
 }
 generateRouter.post("/", asyncHandler(async (req, res) => {
-  const { providerId, modelId: requestedModelId, request, projectId, projectName, nodeId, nodeLabel, kind } = req.body;
+  const {
+    providerId,
+    modelId: requestedModelId,
+    request,
+    projectId,
+    nodeId,
+    nodeLabel,
+    kind,
+    clientRequestId
+  } = req.body;
   const modelId = requestedModelId ?? providerId;
   if (!modelId || !request?.prompt) {
     res.status(400).json({ error: "modelId and request.prompt are required" });
@@ -3631,11 +3980,19 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     res.status(400).json({ error: `request.modelOptions ${optionsError}` });
     return;
   }
+  if (projectId !== void 0 && (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(projectId))) {
+    res.status(400).json({ error: "projectId must contain only letters, digits, underscore or hyphen" });
+    return;
+  }
+  if (typeof clientRequestId !== "string" || !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    res.status(400).json({ error: "clientRequestId is required" });
+    return;
+  }
   const requestedCount = Math.max(1, Math.min(8, Number(request.batchSize) || 1));
   const user = requestUser(req);
   const resolvedNodeId = nodeId ?? "direct-generate";
   const resolvedRequest = { ...request, modelOptions };
-  const run = await enqueueGenerationRun({
+  const plan = {
     steps: [{
       nodeId: resolvedNodeId,
       kind: resolvedKind,
@@ -3646,23 +4003,68 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
         ...resolvedKind === "mask-redraw" ? { maskSourceRef } : {}
       }
     }]
-  }, user.id, {
-    userId: user.id,
-    projectId,
-    projectName,
-    nodeId: resolvedNodeId,
-    nodeLabel: nodeLabel ?? "\u76F4\u63A5\u751F\u6210",
-    kind: resolvedKind,
-    prompt: request.prompt,
-    parameters: { ...request, modelId, modelOptions },
-    referenceImages: request.referenceImages,
-    requestedCount
-  }, "direct");
-  res.status(202).json({ runId: run.id, status: "queued" });
+  };
+  try {
+    const outcome = await transaction(async (client) => {
+      await assertGenerationOwnerActive(client, user.id);
+      let serverProjectName;
+      if (projectId) {
+        const project = await queryOne(`
+          SELECT owner_id, name FROM projects
+          WHERE id = $1 AND deleted_at IS NULL
+          FOR SHARE
+        `, [projectId], client);
+        if (!project) return { status: "not_found" };
+        if (project.owner_id !== user.id) return { status: "forbidden" };
+        serverProjectName = project.name;
+      }
+      await assertImageReferencesAccessible(plan, user.id, client);
+      const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
+        userId: user.id,
+        clientRequestId,
+        projectId,
+        projectName: serverProjectName,
+        nodeId: resolvedNodeId,
+        nodeLabel: nodeLabel ?? "\u76F4\u63A5\u751F\u6210",
+        kind: resolvedKind,
+        prompt: request.prompt,
+        parameters: { ...request, modelId, modelOptions },
+        referenceImages: request.referenceImages,
+        requestedCount
+      }, "direct");
+      return { status: "queued", runId: run.id };
+    });
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "\u9879\u76EE\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664" });
+    } else if (outcome.status === "forbidden") {
+      res.status(403).json({ error: "\u65E0\u6743\u628A\u76F4\u63A5\u751F\u6210\u4EFB\u52A1\u5199\u5165\u6B64\u9879\u76EE" });
+    } else {
+      res.status(202).json({ runId: outcome.runId, status: "queued" });
+    }
+  } catch (error) {
+    if (error instanceof ImageReferenceAccessError) {
+      res.status(403).json({ error: error.message });
+      return;
+    }
+    if (error instanceof GenerationRequestConflictError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ActiveRunLimitError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof GenerationOwnerUnavailableError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 }));
 
 // server/routes/runPlan.ts
 import { Router as Router2 } from "express";
+import { isDeepStrictEqual } from "node:util";
 
 // server/engine/dag.ts
 var DagError = class extends Error {
@@ -3883,68 +4285,97 @@ var IMAGE_SIZES = ["2K", "4K"];
 var MAX_NODES = 500;
 var MAX_EDGES = 2e3;
 var MAX_TEXT_LENGTH = 2e4;
+var MAX_IMAGE_REFERENCE_LENGTH = 2e4;
 var MAX_IMAGE_REFS = 100;
 var SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+var MASK_DATA_URL_CONTRACT = (() => {
+  const contract = getImageModelContract(MASK_REDRAW_MODEL_ID).edit.mask;
+  if (!contract) throw new Error(`${MASK_REDRAW_MODEL_ID} \u7F3A\u5C11\u8499\u7248\u5951\u7EA6`);
+  return contract;
+})();
 var WorkflowValidationError = class extends Error {
   constructor(message) {
     super(message);
     this.name = "WorkflowValidationError";
   }
 };
-function fail(path11, message) {
-  throw new WorkflowValidationError(`${path11}: ${message}`);
+function fail(path10, message) {
+  throw new WorkflowValidationError(`${path10}: ${message}`);
 }
-function record2(value, path11) {
+function record2(value, path10) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    fail(path11, "must be an object");
+    fail(path10, "must be an object");
   }
   return value;
 }
-function stringValue(value, path11, opts) {
-  if (typeof value !== "string") fail(path11, "must be a string");
-  if (opts?.nonEmpty && value.trim().length === 0) fail(path11, "must not be empty");
-  if (value.length > MAX_TEXT_LENGTH) fail(path11, `must be at most ${MAX_TEXT_LENGTH} characters`);
+function stringValue(value, path10, opts) {
+  if (typeof value !== "string") fail(path10, "must be a string");
+  if (opts?.nonEmpty && value.trim().length === 0) fail(path10, "must not be empty");
+  if (value.length > MAX_TEXT_LENGTH) fail(path10, `must be at most ${MAX_TEXT_LENGTH} characters`);
   return value;
 }
-function optionalString(value, path11) {
-  return value === void 0 ? void 0 : stringValue(value, path11);
+function optionalString(value, path10) {
+  return value === void 0 ? void 0 : stringValue(value, path10);
 }
-function imageReference(value, path11) {
-  const ref = stringValue(value, path11, { nonEmpty: true });
+function imageReference(value, path10, opts) {
+  if (typeof value !== "string") fail(path10, "must be a string");
+  if (value.trim().length === 0) fail(path10, "must not be empty");
+  const ref = value;
   if (ref.startsWith("data:")) {
+    let mime = "";
     try {
-      validateImageDataUrl(ref);
+      mime = validateImageDataUrl(ref, opts?.maxDataUrlBytes).mime;
     } catch (error) {
-      fail(path11, error instanceof Error ? error.message : "invalid image dataURL");
+      fail(path10, error instanceof Error ? error.message : "invalid image dataURL");
+    }
+    if (opts?.allowedDataUrlMimes && !opts.allowedDataUrlMimes.includes(mime)) {
+      fail(path10, `dataURL MIME must be one of: ${opts.allowedDataUrlMimes.join(", ")}`);
     }
     return ref;
   }
+  if (ref.length > MAX_IMAGE_REFERENCE_LENGTH) {
+    fail(path10, `must be at most ${MAX_IMAGE_REFERENCE_LENGTH} characters`);
+  }
   const isRemote = /^https?:\/\//i.test(ref);
   if (!isLocalImageReference(ref) && !isRemote) {
-    fail(path11, "must be an image dataURL, local /api/files reference, or http(s) URL");
+    fail(path10, "must be an image dataURL, local /api/files reference, or http(s) URL");
   }
   return ref;
 }
-function optionalImageReference(value, path11) {
-  return value === void 0 ? void 0 : imageReference(value, path11);
+function optionalImageReference(value, path10) {
+  return value === void 0 ? void 0 : imageReference(value, path10);
 }
-function finiteNumber(value, path11) {
-  if (typeof value !== "number" || !Number.isFinite(value)) fail(path11, "must be a finite number");
+function optionalMaskReference(value, path10) {
+  if (value === void 0) return void 0;
+  if (typeof value !== "string") fail(path10, "must be a string");
+  if (value.startsWith("data:")) {
+    return imageReference(value, path10, {
+      maxDataUrlBytes: MASK_DATA_URL_CONTRACT.maxBytes,
+      allowedDataUrlMimes: MASK_DATA_URL_CONTRACT.mimeTypes
+    });
+  }
+  if (!isLocalImageReference(value) || !value.toLowerCase().endsWith(".png")) {
+    fail(path10, "must be an inline PNG dataURL or local /api/files/*.png reference");
+  }
+  return imageReference(value, path10);
+}
+function finiteNumber(value, path10) {
+  if (typeof value !== "number" || !Number.isFinite(value)) fail(path10, "must be a finite number");
   return value;
 }
-function oneOf(value, allowed, path11) {
-  if (!allowed.includes(value)) fail(path11, `must be one of: ${allowed.join(", ")}`);
+function oneOf(value, allowed, path10) {
+  if (!allowed.includes(value)) fail(path10, `must be one of: ${allowed.join(", ")}`);
   return value;
 }
-function stringArray(value, path11, max = MAX_IMAGE_REFS) {
-  if (!Array.isArray(value)) fail(path11, "must be an array");
-  if (value.length > max) fail(path11, `must contain at most ${max} items`);
-  return value.map((item, index) => stringValue(item, `${path11}[${index}]`, { nonEmpty: true }));
+function stringArray(value, path10, max = MAX_IMAGE_REFS) {
+  if (!Array.isArray(value)) fail(path10, "must be an array");
+  if (value.length > max) fail(path10, `must contain at most ${max} items`);
+  return value.map((item, index) => stringValue(item, `${path10}[${index}]`, { nonEmpty: true }));
 }
-function imageReferenceArray(value, path11, max = MAX_IMAGE_REFS) {
-  if (!Array.isArray(value)) fail(path11, "must be an array");
-  if (value.length > max) fail(path11, `must contain at most ${max} items`);
-  return value.map((item, index) => imageReference(item, `${path11}[${index}]`));
+function imageReferenceArray(value, path10, max = MAX_IMAGE_REFS) {
+  if (!Array.isArray(value)) fail(path10, "must be an array");
+  if (value.length > max) fail(path10, `must contain at most ${max} items`);
+  return value.map((item, index) => imageReference(item, `${path10}[${index}]`));
 }
 function migratedModelFields(kind, raw, preferredAspectRatio = "1:1") {
   const requested = isImageModelId(raw.modelId) && isModelAllowedForNode(raw.modelId, kind) ? raw.modelId : kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
@@ -3995,103 +4426,103 @@ function migrateNodeData(kind, raw) {
       return { images: [], ...raw };
   }
 }
-function validateModelSelection(kind, raw, path11) {
+function validateModelSelection(kind, raw, path10) {
   if (!NODE_SPECS[kind].providerId) return;
-  if (!isImageModelId(raw.modelId)) fail(`${path11}.modelId`, "must be a supported API\u6613 image model");
+  if (!isImageModelId(raw.modelId)) fail(`${path10}.modelId`, "must be a supported API\u6613 image model");
   if (!isModelAllowedForNode(raw.modelId, kind)) {
-    fail(`${path11}.modelId`, `${raw.modelId} is not allowed for ${kind}`);
+    fail(`${path10}.modelId`, `${raw.modelId} is not allowed for ${kind}`);
   }
   const optionsError = imageModelOptionsError(raw.modelId, raw.modelOptions);
-  if (optionsError) fail(`${path11}.modelOptions`, optionsError);
+  if (optionsError) fail(`${path10}.modelOptions`, optionsError);
 }
-function validateData(kind, rawValue, path11) {
-  const input = record2(rawValue, path11);
+function validateData(kind, rawValue, path10) {
+  const input = record2(rawValue, path10);
   const runtimeStatus = input.status;
   const raw = runtimeStatus !== "idle" && runtimeStatus !== "success" ? { ...input, status: "idle", error: void 0 } : input;
-  if (raw.kind !== kind) fail(`${path11}.kind`, `must equal node type ${kind}`);
-  stringValue(raw.label, `${path11}.label`, { nonEmpty: true });
-  oneOf(raw.status, STATUSES, `${path11}.status`);
-  optionalString(raw.error, `${path11}.error`);
-  validateModelSelection(kind, raw, path11);
+  if (raw.kind !== kind) fail(`${path10}.kind`, `must equal node type ${kind}`);
+  stringValue(raw.label, `${path10}.label`, { nonEmpty: true });
+  oneOf(raw.status, STATUSES, `${path10}.status`);
+  optionalString(raw.error, `${path10}.error`);
+  validateModelSelection(kind, raw, path10);
   switch (kind) {
     case "image-input":
-      oneOf(raw.imageRole, IMAGE_ROLES, `${path11}.imageRole`);
-      optionalImageReference(raw.imageUrl, `${path11}.imageUrl`);
+      oneOf(raw.imageRole, IMAGE_ROLES, `${path10}.imageRole`);
+      optionalImageReference(raw.imageUrl, `${path10}.imageUrl`);
       break;
     case "sketch-to-render":
     case "ai-modify":
-      stringValue(raw.prompt, `${path11}.prompt`);
-      oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path11}.aspectRatio`);
-      oneOf(raw.batchSize, BATCH_SIZES, `${path11}.batchSize`);
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
+      stringValue(raw.prompt, `${path10}.prompt`);
+      oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path10}.aspectRatio`);
+      oneOf(raw.batchSize, BATCH_SIZES, `${path10}.batchSize`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
       break;
     case "fabric-recolor": {
-      const colors = stringArray(raw.colors, `${path11}.colors`, 8);
+      const colors = stringArray(raw.colors, `${path10}.colors`, 8);
       for (let i = 0; i < colors.length; i++) {
-        if (!/^#[0-9a-fA-F]{6}$/.test(colors[i])) fail(`${path11}.colors[${i}]`, "must be #RRGGBB");
+        if (!/^#[0-9a-fA-F]{6}$/.test(colors[i])) fail(`${path10}.colors[${i}]`, "must be #RRGGBB");
       }
-      stringValue(raw.prompt, `${path11}.prompt`);
-      optionalImageReference(raw.fabricImageUrl, `${path11}.fabricImageUrl`);
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
+      stringValue(raw.prompt, `${path10}.prompt`);
+      optionalImageReference(raw.fabricImageUrl, `${path10}.fabricImageUrl`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
       break;
     }
     case "upscale":
-      oneOf(raw.imageSize, IMAGE_SIZES, `${path11}.imageSize`);
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
+      oneOf(raw.imageSize, IMAGE_SIZES, `${path10}.imageSize`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
       break;
     case "print-extract":
-      stringValue(raw.prompt, `${path11}.prompt`);
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
-      imageReferenceArray(raw.savedAsAssets, `${path11}.savedAsAssets`);
+      stringValue(raw.prompt, `${path10}.prompt`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
+      imageReferenceArray(raw.savedAsAssets, `${path10}.savedAsAssets`);
       break;
     case "print-mutate":
-      stringValue(raw.prompt, `${path11}.prompt`);
+      stringValue(raw.prompt, `${path10}.prompt`);
       if (!Number.isInteger(raw.count) || raw.count < 1 || raw.count > 8) {
-        fail(`${path11}.count`, "must be an integer from 1 to 8");
+        fail(`${path10}.count`, "must be an integer from 1 to 8");
       }
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
       break;
     case "mask-redraw":
-      stringValue(raw.prompt, `${path11}.prompt`);
-      optionalImageReference(raw.mask, `${path11}.mask`);
-      optionalImageReference(raw.maskSourceRef, `${path11}.maskSourceRef`);
-      imageReferenceArray(raw.outputImages, `${path11}.outputImages`);
+      stringValue(raw.prompt, `${path10}.prompt`);
+      optionalMaskReference(raw.mask, `${path10}.mask`);
+      optionalImageReference(raw.maskSourceRef, `${path10}.maskSourceRef`);
+      imageReferenceArray(raw.outputImages, `${path10}.outputImages`);
       break;
     case "result":
-      imageReferenceArray(raw.images, `${path11}.images`);
-      optionalString(raw.note, `${path11}.note`);
+      imageReferenceArray(raw.images, `${path10}.images`);
+      optionalString(raw.note, `${path10}.note`);
       break;
   }
   return raw;
 }
 function validateNode(value, index, migrateLegacy) {
-  const path11 = `flow.nodes[${index}]`;
-  const raw = record2(value, path11);
-  const id = stringValue(raw.id, `${path11}.id`, { nonEmpty: true });
-  if (!SAFE_ID.test(id)) fail(`${path11}.id`, "must contain only letters, digits, underscore or hyphen");
-  const type = oneOf(raw.type, NODE_KINDS, `${path11}.type`);
-  const position = record2(raw.position, `${path11}.position`);
-  finiteNumber(position.x, `${path11}.position.x`);
-  finiteNumber(position.y, `${path11}.position.y`);
-  const initialData = record2(raw.data, `${path11}.data`);
+  const path10 = `flow.nodes[${index}]`;
+  const raw = record2(value, path10);
+  const id = stringValue(raw.id, `${path10}.id`, { nonEmpty: true });
+  if (!SAFE_ID.test(id)) fail(`${path10}.id`, "must contain only letters, digits, underscore or hyphen");
+  const type = oneOf(raw.type, NODE_KINDS, `${path10}.type`);
+  const position = record2(raw.position, `${path10}.position`);
+  finiteNumber(position.x, `${path10}.position.x`);
+  finiteNumber(position.y, `${path10}.position.y`);
+  const initialData = record2(raw.data, `${path10}.data`);
   const data = validateData(
     type,
     migrateLegacy ? migrateNodeData(type, initialData) : initialData,
-    `${path11}.data`
+    `${path10}.data`
   );
   return { ...raw, id, type, position: { ...position, x: position.x, y: position.y }, data };
 }
 function validateEdge(value, index) {
-  const path11 = `flow.edges[${index}]`;
-  const raw = record2(value, path11);
-  const id = stringValue(raw.id, `${path11}.id`, { nonEmpty: true });
-  const source = stringValue(raw.source, `${path11}.source`, { nonEmpty: true });
-  const target = stringValue(raw.target, `${path11}.target`, { nonEmpty: true });
-  if (!SAFE_ID.test(id)) fail(`${path11}.id`, "must contain only letters, digits, underscore or hyphen");
-  if (!SAFE_ID.test(source)) fail(`${path11}.source`, "must be a valid node id");
-  if (!SAFE_ID.test(target)) fail(`${path11}.target`, "must be a valid node id");
-  if (raw.sourceHandle !== void 0 && raw.sourceHandle !== null) stringValue(raw.sourceHandle, `${path11}.sourceHandle`);
-  if (raw.targetHandle !== void 0 && raw.targetHandle !== null) stringValue(raw.targetHandle, `${path11}.targetHandle`);
+  const path10 = `flow.edges[${index}]`;
+  const raw = record2(value, path10);
+  const id = stringValue(raw.id, `${path10}.id`, { nonEmpty: true });
+  const source = stringValue(raw.source, `${path10}.source`, { nonEmpty: true });
+  const target = stringValue(raw.target, `${path10}.target`, { nonEmpty: true });
+  if (!SAFE_ID.test(id)) fail(`${path10}.id`, "must contain only letters, digits, underscore or hyphen");
+  if (!SAFE_ID.test(source)) fail(`${path10}.source`, "must be a valid node id");
+  if (!SAFE_ID.test(target)) fail(`${path10}.target`, "must be a valid node id");
+  if (raw.sourceHandle !== void 0 && raw.sourceHandle !== null) stringValue(raw.sourceHandle, `${path10}.sourceHandle`);
+  if (raw.targetHandle !== void 0 && raw.targetHandle !== null) stringValue(raw.targetHandle, `${path10}.targetHandle`);
   return { ...raw, id, source, target };
 }
 function validateAndMigrateFlow(value) {
@@ -4140,7 +4571,7 @@ function requestedCountForStep(kind, params) {
   return kind === "fabric-recolor" ? Math.max(1, Array.isArray(params.colors) ? params.colors.length : 1) : kind === "print-mutate" ? Math.max(1, Math.min(8, Number(params.count) || 4)) : kind === "sketch-to-render" || kind === "ai-modify" ? Math.max(1, Math.min(8, Number(params.batchSize) || 1)) : 1;
 }
 runPlanRouter.post("/", asyncHandler(async (req, res) => {
-  const { nodes, edges, onlyNodeId, includeDownstream, projectId, projectName } = req.body;
+  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId } = req.body;
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     res.status(400).json({ error: "nodes and edges arrays are required" });
     return;
@@ -4153,57 +4584,82 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "includeDownstream must be a boolean" });
     return;
   }
+  if (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+  if (typeof clientRequestId !== "string" || !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+    res.status(400).json({ error: "clientRequestId is required" });
+    return;
+  }
   try {
-    const flow = validateAndMigrateFlow({
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      nodes,
-      edges
-    });
-    const plan = buildExecutionPlan(flow.nodes, flow.edges, {
-      onlyNodeId,
-      // 点击单节点默认只执行自己，避免无意触发整条下游产生额外费用。
-      includeDownstream: includeDownstream ?? false
-    });
-    if (plan.steps.length === 0) {
-      res.status(400).json({ error: "workflow contains no executable nodes" });
-      return;
-    }
-    assertPlanInputs(plan, flow.edges);
-    const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
-    const targetNode = flow.nodes.find((node) => node.id === targetStep.nodeId);
-    const params = targetStep.params;
-    const requestedCount = requestedCountForStep(targetStep.kind, params);
     const user = requestUser(req);
-    if (typeof projectId === "string") {
-      const project = await queryOne(
-        "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
-        [projectId]
-      );
-      if (!project) {
-        res.status(404).json({ error: "\u9879\u76EE\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664" });
-        return;
-      }
-      if (project && project.owner_id !== user.id) {
-        res.status(403).json({ error: "\u7BA1\u7406\u5458\u53EA\u80FD\u67E5\u770B\u5176\u4ED6\u7528\u6237\u9879\u76EE\uFF0C\u4E0D\u80FD\u8FD0\u884C\u6216\u4FEE\u6539" });
-        return;
-      }
-    }
-    const run = await enqueueGenerationRun(plan, user.id, {
-      userId: user.id,
-      projectId: typeof projectId === "string" ? projectId : void 0,
-      projectName: typeof projectName === "string" ? projectName : void 0,
-      nodeId: targetStep.nodeId,
-      nodeLabel: targetNode?.data.label ?? targetStep.kind,
-      kind: targetStep.kind,
-      prompt: typeof params.prompt === "string" ? params.prompt : void 0,
-      parameters: params,
-      referenceImages: targetStep.inputImages,
-      requestedCount
+    const outcome = await transaction(async (client) => {
+      await assertGenerationOwnerActive(client, user.id);
+      const project = await queryOne(`
+        SELECT owner_id, name, flow_json FROM projects
+        WHERE id = $1 AND deleted_at IS NULL
+        FOR SHARE
+      `, [projectId], client);
+      if (!project) return { status: "not_found" };
+      if (project.owner_id !== user.id) return { status: "forbidden" };
+      const submittedFlow = validateAndMigrateFlow({
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes,
+        edges
+      });
+      const flow = validateAndMigrateFlow(JSON.parse(project.flow_json));
+      const planOptions = {
+        onlyNodeId,
+        includeDownstream: includeDownstream ?? false
+      };
+      const submittedPlan = buildExecutionPlan(submittedFlow.nodes, submittedFlow.edges, planOptions);
+      const plan = buildExecutionPlan(flow.nodes, flow.edges, planOptions);
+      if (!isDeepStrictEqual(submittedPlan, plan)) return { status: "conflict" };
+      if (plan.steps.length === 0) return { status: "empty" };
+      assertPlanInputs(plan, flow.edges);
+      await assertImageReferencesAccessible(plan, user.id, client);
+      const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
+      const targetNode = flow.nodes.find((node) => node.id === targetStep.nodeId);
+      const params = targetStep.params;
+      const requestedCount = requestedCountForStep(targetStep.kind, params);
+      const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
+        userId: user.id,
+        clientRequestId,
+        projectId,
+        projectName: project.name,
+        nodeId: targetStep.nodeId,
+        nodeLabel: targetNode?.data.label ?? targetStep.kind,
+        kind: targetStep.kind,
+        prompt: typeof params.prompt === "string" ? params.prompt : void 0,
+        parameters: params,
+        referenceImages: targetStep.inputImages,
+        requestedCount
+      });
+      return { status: "queued", runId: run.id };
     });
-    res.status(202).json({ runId: run.id, status: "queued" });
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "\u9879\u76EE\u4E0D\u5B58\u5728\u6216\u5DF2\u5220\u9664" });
+    } else if (outcome.status === "forbidden") {
+      res.status(403).json({ error: "\u7BA1\u7406\u5458\u53EA\u80FD\u67E5\u770B\u5176\u4ED6\u7528\u6237\u9879\u76EE\uFF0C\u4E0D\u80FD\u8FD0\u884C\u6216\u4FEE\u6539" });
+    } else if (outcome.status === "conflict") {
+      res.status(409).json({ error: "\u753B\u5E03\u5C1A\u672A\u4FDD\u5B58\u6216\u5DF2\u5728\u5176\u4ED6\u4F4D\u7F6E\u66F4\u65B0\uFF0C\u8BF7\u4FDD\u5B58\u540E\u91CD\u8BD5" });
+    } else if (outcome.status === "empty") {
+      res.status(400).json({ error: "workflow contains no executable nodes" });
+    } else {
+      res.status(202).json({ runId: outcome.runId, status: "queued" });
+    }
   } catch (err) {
     if (err instanceof DagError || err instanceof WorkflowValidationError) {
       res.status(400).json({ error: err.message });
+    } else if (err instanceof ImageReferenceAccessError) {
+      res.status(403).json({ error: err.message });
+    } else if (err instanceof GenerationRequestConflictError) {
+      res.status(409).json({ error: err.message });
+    } else if (err instanceof ActiveRunLimitError) {
+      res.status(409).json({ error: err.message });
+    } else if (err instanceof GenerationOwnerUnavailableError) {
+      res.status(409).json({ error: err.message });
     } else {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
@@ -4346,8 +4802,11 @@ runPlanRouter.get("/:id", asyncHandler(async (req, res) => {
 // server/routes/files.ts
 import { Router as Router3 } from "express";
 import fs4 from "node:fs";
-import path4 from "node:path";
+import path3 from "node:path";
 var filesRouter = Router3();
+var SAFE_PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+var SAFE_NODE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+var MASK_DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1e3;
 async function canAccessFile(id, req) {
   const user = requestUser(req);
   const access = await queryOne(`
@@ -4355,7 +4814,7 @@ async function canAccessFile(id, req) {
       EXISTS(SELECT 1 FROM assets a WHERE a.image = $1 AND a.deleted_at IS NULL AND a.scope IN ('global','shared')) AS shared
     FROM files f WHERE f.id = $2
   `, [`/api/files/${id}`, id]);
-  if (!access) return "private";
+  if (!access) return "denied";
   if (access.owner_id === null || access.shared) return "public";
   if (access.owner_id === user.id || user.role === "admin") return "private";
   return "denied";
@@ -4365,6 +4824,7 @@ function setFileCacheHeaders(res) {
   res.vary("Cookie");
 }
 filesRouter.post("/", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
   const { dataUrl } = req.body;
   if (!dataUrl) {
     res.status(400).json({ error: "dataUrl is required" });
@@ -4373,19 +4833,28 @@ filesRouter.post("/", asyncHandler(async (req, res) => {
   try {
     const saved = await saveNormalizedUploadDataUrl(dataUrl);
     try {
-      await query(`
-        INSERT INTO files (
-          id, owner_id, source_type, mime_type, width, height, byte_length, normalized, created_at
-        ) VALUES ($1, $2, 'upload', $3, $4, $5, $6, TRUE, $7)
-      `, [
-        saved.id,
-        requestUser(req).id,
-        saved.mimeType,
-        saved.width,
-        saved.height,
-        saved.byteLength,
-        (/* @__PURE__ */ new Date()).toISOString()
-      ]);
+      const registered = await transaction(async (client) => {
+        if (!await lockActiveOwner(client, user.id)) return false;
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, mime_type, width, height, byte_length, normalized, created_at
+          ) VALUES ($1, $2, 'upload', $3, $4, $5, $6, TRUE, $7)
+        `, [
+          saved.id,
+          user.id,
+          saved.mimeType,
+          saved.width,
+          saved.height,
+          saved.byteLength,
+          (/* @__PURE__ */ new Date()).toISOString()
+        ]);
+        return true;
+      });
+      if (!registered) {
+        deleteStoredImage(saved.id);
+        res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u4E0A\u4F20\u6587\u4EF6" });
+        return;
+      }
     } catch (error) {
       deleteStoredImage(saved.id);
       throw error;
@@ -4399,8 +4868,73 @@ filesRouter.post("/", asyncHandler(async (req, res) => {
     }
   }
 }));
+filesRouter.post("/mask", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { dataUrl, sourceRef, projectId, nodeId } = req.body;
+  if (typeof dataUrl !== "string" || !dataUrl || typeof sourceRef !== "string" || !sourceRef || typeof projectId !== "string" || !SAFE_PROJECT_ID.test(projectId) || typeof nodeId !== "string" || !SAFE_NODE_ID.test(nodeId)) {
+    res.status(400).json({ error: "dataUrl, sourceRef, projectId and nodeId are required" });
+    return;
+  }
+  let saved;
+  let committed = false;
+  try {
+    await assertImageReferencesAccessible(sourceRef, user.id);
+    const sourceDataUrl = await normalizeImageRef(sourceRef);
+    const pair = await validateMaskForSource(sourceDataUrl, dataUrl);
+    const storedMask = saveDataUrl(dataUrl);
+    saved = storedMask;
+    try {
+      const registered = await transaction(async (client) => {
+        if (!await lockActiveOwner(client, user.id)) return false;
+        await assertImageReferencesAccessible(sourceRef, user.id, client);
+        const now = /* @__PURE__ */ new Date();
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, project_id, node_id,
+            mime_type, width, height, byte_length, normalized,
+            created_at, purge_after
+          ) VALUES ($1, $2, 'mask-draft', $3, $4, 'image/png', $5, $6, $7, FALSE, $8, $9)
+        `, [
+          storedMask.id,
+          user.id,
+          projectId,
+          nodeId,
+          pair.width,
+          pair.height,
+          pair.maskBuffer.byteLength,
+          now.toISOString(),
+          new Date(now.getTime() + MASK_DRAFT_RETENTION_MS).toISOString()
+        ]);
+        return true;
+      });
+      if (!registered) {
+        deleteStoredImage(storedMask.id);
+        saved = void 0;
+        res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u4FDD\u5B58\u8499\u7248" });
+        return;
+      }
+      committed = true;
+    } catch (error) {
+      deleteStoredImage(storedMask.id);
+      saved = void 0;
+      throw error;
+    }
+    res.json({
+      ...storedMask,
+      mimeType: "image/png",
+      width: pair.width,
+      height: pair.height,
+      byteLength: pair.maskBuffer.byteLength,
+      preserved: true
+    });
+  } catch (error) {
+    if (saved && !committed) deleteStoredImage(saved.id);
+    const status = error instanceof ImageReferenceAccessError ? 403 : error instanceof ProviderError || error instanceof ImageValidationError ? 400 : 500;
+    res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+}));
 filesRouter.get("/:id/thumbnail", asyncHandler(async (req, res) => {
-  const id = path4.basename(req.params.id);
+  const id = path3.basename(req.params.id);
   if (id !== req.params.id || !isSupportedImageFile(id)) {
     res.status(400).json({ error: "invalid file id" });
     return;
@@ -4420,12 +4954,12 @@ filesRouter.get("/:id/thumbnail", asyncHandler(async (req, res) => {
   }
 }));
 filesRouter.get("/:id", asyncHandler(async (req, res) => {
-  const id = path4.basename(req.params.id);
+  const id = path3.basename(req.params.id);
   if (id !== req.params.id || !isSupportedImageFile(id)) {
     res.status(400).json({ error: "invalid file id" });
     return;
   }
-  const filePath = path4.join(uploadsDir(), id);
+  const filePath = path3.join(uploadsDir(), id);
   if (!fs4.existsSync(filePath)) {
     res.status(404).json({ error: "file not found" });
     return;
@@ -4444,6 +4978,7 @@ filesRouter.get("/:id", asyncHandler(async (req, res) => {
 import { Router as Router4 } from "express";
 import { nanoid as nanoid6 } from "nanoid";
 var projectsRouter = Router4();
+var RETIRED_MASK_RETENTION_MS = 30 * 24 * 60 * 60 * 1e3;
 function imageRefs(value, output = /* @__PURE__ */ new Set()) {
   if (typeof value === "string" && value.startsWith("/api/files/")) output.add(value);
   else if (Array.isArray(value)) value.forEach((item) => imageRefs(item, output));
@@ -4468,6 +5003,49 @@ async function syncAssetRefs(client, projectId, ownerId, flow) {
     );
   }
 }
+function projectMaskFileRefs(flow) {
+  return flow.nodes.flatMap((node) => {
+    if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return [];
+    if (!isLocalImageReference(node.data.mask)) return [];
+    return [{
+      fileId: node.data.mask.slice("/api/files/".length),
+      nodeId: node.id
+    }];
+  });
+}
+async function syncMaskFiles(client, projectId, ownerId, flow, now) {
+  const refs = projectMaskFileRefs(flow);
+  const ids = [...new Set(refs.map((ref) => ref.fileId))];
+  const rows = ids.length === 0 ? [] : (await client.query(`
+        SELECT id, owner_id, source_type, project_id, node_id, mime_type
+        FROM files
+        WHERE id = ANY($1::text[]) AND deleted_at IS NULL
+        ORDER BY id
+        FOR UPDATE
+      `, [ids])).rows;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const ref of refs) {
+    const row = byId.get(ref.fileId);
+    if (!row || row.owner_id !== ownerId || row.source_type !== "mask-draft" && row.source_type !== "mask" || row.project_id !== projectId || row.node_id !== ref.nodeId || row.mime_type !== "image/png") {
+      throw new ImageReferenceAccessError("\u8499\u7248\u6587\u4EF6\u4E0E\u5F53\u524D\u9879\u76EE\u6216\u8282\u70B9\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u4FDD\u5B58\u8499\u7248");
+    }
+  }
+  const retireAt = new Date(now.getTime() + RETIRED_MASK_RETENTION_MS).toISOString();
+  await client.query(`
+    UPDATE files
+    SET purge_after = COALESCE(purge_after, $3)
+    WHERE owner_id = $1 AND project_id = $2
+      AND source_type IN ('mask-draft', 'mask')
+      AND NOT (id = ANY($4::text[]))
+  `, [ownerId, projectId, retireAt, ids]);
+  if (ids.length > 0) {
+    await client.query(`
+      UPDATE files
+      SET source_type = 'mask', purge_after = NULL
+      WHERE owner_id = $1 AND project_id = $2 AND id = ANY($3::text[])
+    `, [ownerId, projectId, ids]);
+  }
+}
 async function purgeExpiredProjects() {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const expiredFileIds = await transaction(async (client) => {
@@ -4482,16 +5060,40 @@ async function purgeExpiredProjects() {
       WHERE purge_after IS NOT NULL AND purge_after <= $1
         AND NOT EXISTS (SELECT 1 FROM project_asset_refs r WHERE r.asset_id = assets.id)
     `, [now]);
-    const files = await client.query(
-      `DELETE FROM files
-       WHERE purge_after IS NOT NULL AND purge_after <= $1
-         AND NOT EXISTS (
-           SELECT 1 FROM assets a
-           WHERE a.image = '/api/files/' || files.id
-         )
-       RETURNING id`,
-      [now]
-    );
+    const candidates = await client.query(`
+      SELECT f.id
+      FROM files f
+      WHERE f.purge_after IS NOT NULL AND f.purge_after <= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM assets a
+          WHERE a.image = '/api/files/' || f.id
+        )
+      ORDER BY f.id
+      FOR UPDATE OF f
+    `, [now]);
+    const candidateIds = candidates.rows.map((row) => row.id);
+    const files = candidateIds.length === 0 ? { rows: [] } : await client.query(`
+          DELETE FROM files f
+          WHERE f.id = ANY($2::text[])
+            AND f.purge_after IS NOT NULL AND f.purge_after <= $1
+            AND NOT EXISTS (
+              SELECT 1 FROM assets a
+              WHERE a.image = '/api/files/' || f.id
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM generation_runs r
+              WHERE r.deleted_at IS NULL
+                AND r.plan_json IS NOT NULL
+                AND r.status IN ('queued','running','retry_wait','cancel_requested')
+                AND jsonb_path_exists(
+                  r.plan_json::jsonb,
+                  '$.** ? (@ == $ref)',
+                  jsonb_build_object('ref', '/api/files/' || f.id)
+                )
+            )
+          RETURNING f.id
+        `, [now, candidateIds]);
     await client.query("DELETE FROM projects WHERE purge_after IS NOT NULL AND purge_after <= $1", [now]);
     return files.rows.map((row) => row.id);
   });
@@ -4513,12 +5115,16 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
     const projectId = id || nanoid6(10);
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const saved = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
       const existing = await queryOne(
-        "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        "SELECT owner_id, deleted_at FROM projects WHERE id = $1 FOR UPDATE",
         [projectId],
         client
       );
-      if (existing && existing.owner_id !== user.id) return false;
+      if (existing?.owner_id !== void 0 && existing.owner_id !== user.id) return "forbidden";
+      if (existing?.deleted_at) return "deleted";
+      await assertImageReferencesAccessible(normalized, user.id, client, { fileLock: "update" });
+      await syncMaskFiles(client, projectId, user.id, normalized, new Date(now));
       const result = await client.query(`
         INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
         VALUES ($1, $2, $3, $4, $5, $5)
@@ -4527,17 +5133,25 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
           WHERE projects.owner_id = excluded.owner_id
         RETURNING id
       `, [projectId, user.id, name.trim(), JSON.stringify(normalized), now]);
-      if (result.rowCount !== 1) return false;
+      if (result.rowCount !== 1) return "forbidden";
       await syncAssetRefs(client, projectId, user.id, normalized);
-      return true;
+      return "saved";
     });
-    if (!saved) {
+    if (saved === "forbidden") {
       res.status(403).json({ error: "\u7BA1\u7406\u5458\u53EA\u80FD\u67E5\u770B\u5176\u4ED6\u7528\u6237\u9879\u76EE\uFF0C\u4E0D\u80FD\u4FEE\u6539" });
+      return;
+    }
+    if (saved === "deleted") {
+      res.status(409).json({ error: "\u9879\u76EE\u5DF2\u5728\u56DE\u6536\u7AD9\u4E2D\uFF0C\u8BF7\u5148\u6062\u590D\u9879\u76EE\u518D\u4FDD\u5B58" });
+      return;
+    }
+    if (saved === "owner_unavailable") {
+      res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u4FDD\u5B58\u9879\u76EE" });
       return;
     }
     res.json({ ok: true, id: projectId });
   } catch (error) {
-    res.status(error instanceof WorkflowValidationError ? 400 : 500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(error instanceof WorkflowValidationError ? 400 : error instanceof ImageReferenceAccessError ? 403 : 500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 }));
 projectsRouter.get("/", asyncHandler(async (req, res) => {
@@ -4594,17 +5208,17 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
 // server/routes/templates.ts
 import { Router as Router5 } from "express";
 import fs6 from "node:fs";
-import path6 from "node:path";
+import path5 from "node:path";
 import { nanoid as nanoid8 } from "nanoid";
 
 // server/lib/atomicJson.ts
 import fs5 from "node:fs";
-import path5 from "node:path";
+import path4 from "node:path";
 import { nanoid as nanoid7 } from "nanoid";
 function writeJsonAtomicSync(filePath, value) {
-  const dir = path5.dirname(filePath);
+  const dir = path4.dirname(filePath);
   fs5.mkdirSync(dir, { recursive: true });
-  const tempPath = path5.join(dir, `.${path5.basename(filePath)}.${process.pid}.${nanoid7(6)}.tmp`);
+  const tempPath = path4.join(dir, `.${path4.basename(filePath)}.${process.pid}.${nanoid7(6)}.tmp`);
   try {
     const fd = fs5.openSync(tempPath, "wx", 384);
     try {
@@ -4627,12 +5241,12 @@ function writeJsonAtomicSync(filePath, value) {
 // server/routes/templates.ts
 var templatesRouter = Router5();
 function templatesDir(sub) {
-  const dir = path6.join(config.dataDir(), "templates", sub);
+  const dir = path5.join(config.dataDir(), "templates", sub);
   fs6.mkdirSync(dir, { recursive: true });
   return dir;
 }
 function templatePath(sub, id) {
-  return path6.join(templatesDir(sub), `${path6.basename(id)}.json`);
+  return path5.join(templatesDir(sub), `${path5.basename(id)}.json`);
 }
 var BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
 function builtinTemplates() {
@@ -4980,7 +5594,7 @@ function readTemplates(sub) {
   for (const f of fs6.readdirSync(dir)) {
     if (!f.endsWith(".json")) continue;
     try {
-      list.push(readTemplateFile(path6.join(dir, f)));
+      list.push(readTemplateFile(path5.join(dir, f)));
     } catch {
     }
   }
@@ -5074,7 +5688,7 @@ templatesRouter.delete("/:id", (req, res) => {
 // server/routes/assets.ts
 import { Router as Router6 } from "express";
 import { nanoid as nanoid9 } from "nanoid";
-import path7 from "node:path";
+import path6 from "node:path";
 var assetsRouter = Router6();
 var CATEGORIES = ["print", "fabric", "reference"];
 var TRASH_DAYS = 15;
@@ -5141,6 +5755,7 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
     return;
   }
   let saved;
+  let committed = false;
   try {
     if (sourceNote !== void 0 && (typeof sourceNote !== "string" || sourceNote.length > 2e3)) {
       throw new ImageValidationError("sourceNote must be a string of at most 2000 characters");
@@ -5152,6 +5767,7 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
     const id = nanoid9(10);
     const createdAt = (/* @__PURE__ */ new Date()).toISOString();
     const created = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
       if (saved) {
         await client.query(`
           INSERT INTO files (
@@ -5168,55 +5784,53 @@ assetsRouter.post("/", asyncHandler(async (req, res) => {
           createdAt
         ]);
       } else {
+        const supportingAsset = await queryOne(`
+          SELECT id FROM assets
+          WHERE image = $1 AND deleted_at IS NULL AND scope IN ('global','shared')
+          ORDER BY id
+          LIMIT 1
+          FOR SHARE
+        `, [imageUrl2], client);
+        const shared = supportingAsset !== void 0;
+        const fileLock = finalScope === "global" ? "FOR UPDATE" : "FOR SHARE";
         const access = await queryOne(`
-          SELECT f.owner_id,
-            EXISTS(
-              SELECT 1 FROM assets a
-              WHERE a.image = $1 AND a.deleted_at IS NULL AND a.scope IN ('global','shared')
-            ) AS shared
-          FROM files f WHERE f.id = $2
-        `, [imageUrl2, path7.basename(imageUrl2)], client);
-        if (!access || access.owner_id !== null && access.owner_id !== user.id && user.role !== "admin" && !access.shared) {
-          return false;
+          SELECT owner_id FROM files
+          WHERE id = $1 AND deleted_at IS NULL
+          ${fileLock}
+        `, [path6.basename(imageUrl2)], client);
+        if (!access || access.owner_id !== null && access.owner_id !== user.id && user.role !== "admin" && !shared) {
+          return "missing";
         }
       }
       if (finalScope === "global") {
         await client.query(`
           UPDATE files SET owner_id = NULL, deleted_at = NULL, purge_after = NULL WHERE id = $1
-        `, [path7.basename(imageUrl2)]);
+        `, [path6.basename(imageUrl2)]);
       }
       await client.query(`
         INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [id, finalScope === "global" ? null : user.id, finalScope, name.trim(), category, imageUrl2, sourceNote ?? null, createdAt]);
-      return true;
+      return "created";
     });
-    if (!created) {
+    if (created !== "created") {
       if (saved) deleteStoredImage(saved.id);
+      if (created === "owner_unavailable") {
+        res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u521B\u5EFA\u7D20\u6750" });
+        return;
+      }
       res.status(404).json({ error: "image file not found" });
       return;
     }
+    committed = true;
     res.status(201).json({ ok: true, id });
   } catch (error) {
-    if (saved) deleteStoredImage(saved.id);
+    if (saved && !committed) deleteStoredImage(saved.id);
     res.status(error instanceof ImageValidationError ? 400 : 500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 }));
 assetsRouter.patch("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne(
-    "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL",
-    [req.params.id]
-  );
-  if (!row) {
-    res.status(404).json({ error: "asset not found" });
-    return;
-  }
-  const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
-  if (!canManage) {
-    res.status(403).json({ error: "\u65E0\u6743\u4FEE\u6539\u6B64\u7D20\u6750" });
-    return;
-  }
   const { name, scope } = req.body;
   if (name !== void 0 && (typeof name !== "string" || !name.trim() || name.length > 200)) {
     res.status(400).json({ error: "\u7D20\u6750\u540D\u79F0\u65E0\u6548" });
@@ -5226,13 +5840,35 @@ assetsRouter.patch("/:id", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "\u53EA\u6709\u7BA1\u7406\u5458\u53EF\u4EE5\u8BBE\u7F6E\u901A\u7528\u7D20\u6750" });
     return;
   }
-  const nextScope = scope ?? row.scope;
-  await query("UPDATE assets SET name = COALESCE($1, name), scope = $2, owner_id = $3 WHERE id = $4", [
-    name?.trim() ?? null,
-    nextScope,
-    nextScope === "global" ? null : row.owner_id ?? user.id,
-    req.params.id
-  ]);
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
+    const row = await queryOne(
+      "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+      [req.params.id],
+      client
+    );
+    if (!row) return "missing";
+    const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
+    if (!canManage) return "forbidden";
+    const nextScope = scope ?? row.scope;
+    await client.query(
+      "UPDATE assets SET name = COALESCE($1, name), scope = $2, owner_id = $3 WHERE id = $4",
+      [name?.trim() ?? null, nextScope, nextScope === "global" ? null : row.owner_id ?? user.id, req.params.id]
+    );
+    return "updated";
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u4FEE\u6539\u7D20\u6750" });
+    return;
+  }
+  if (result === "missing") {
+    res.status(404).json({ error: "asset not found" });
+    return;
+  }
+  if (result === "forbidden") {
+    res.status(403).json({ error: "\u65E0\u6743\u4FEE\u6539\u6B64\u7D20\u6750" });
+    return;
+  }
   res.json({ ok: true });
 }));
 assetsRouter.post("/:id/references", asyncHandler(async (req, res) => {
@@ -5243,25 +5879,30 @@ assetsRouter.post("/:id/references", asyncHandler(async (req, res) => {
     return;
   }
   const linked = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
     const project = await queryOne(`
       SELECT id FROM projects
       WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
       FOR UPDATE
     `, [projectId, user.id], client);
-    if (!project) return false;
+    if (!project) return "missing";
     const asset = await queryOne(`
       SELECT id FROM assets WHERE id = $1 AND deleted_at IS NULL
         AND (scope IN ('global','shared') OR owner_id = $2)
       FOR KEY SHARE
     `, [req.params.id, user.id], client);
-    if (!asset) return false;
+    if (!asset) return "missing";
     await client.query(`
       INSERT INTO project_asset_refs (project_id, asset_id, created_at) VALUES ($1, $2, $3)
       ON CONFLICT (project_id, asset_id) DO NOTHING
     `, [projectId, req.params.id, (/* @__PURE__ */ new Date()).toISOString()]);
-    return true;
+    return "linked";
   });
-  if (!linked) {
+  if (linked === "owner_unavailable") {
+    res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u5173\u8054\u7D20\u6750" });
+    return;
+  }
+  if (linked === "missing") {
     res.status(404).json({ error: "project or asset not found" });
     return;
   }
@@ -5270,6 +5911,7 @@ assetsRouter.post("/:id/references", asyncHandler(async (req, res) => {
 assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
   const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" };
     const row = await queryOne(
       "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
       [req.params.id],
@@ -5297,6 +5939,10 @@ assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "asset not found" });
     return;
   }
+  if (result.status === "owner_unavailable") {
+    res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u5220\u9664\u7D20\u6750" });
+    return;
+  }
   if (result.status === "forbidden") {
     res.status(403).json({ error: "\u65E0\u6743\u5220\u9664\u6B64\u7D20\u6750" });
     return;
@@ -5309,20 +5955,31 @@ assetsRouter.delete("/:id", asyncHandler(async (req, res) => {
 }));
 assetsRouter.post("/:id/restore", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne(
-    "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NOT NULL",
-    [req.params.id]
-  );
-  if (!row) {
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
+    const row = await queryOne(
+      "SELECT owner_id, scope FROM assets WHERE id = $1 AND deleted_at IS NOT NULL FOR UPDATE",
+      [req.params.id],
+      client
+    );
+    if (!row) return "missing";
+    const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
+    if (!canManage) return "forbidden";
+    await client.query("UPDATE assets SET deleted_at = NULL, purge_after = NULL WHERE id = $1", [req.params.id]);
+    return "restored";
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u6062\u590D\u7D20\u6750" });
+    return;
+  }
+  if (result === "missing") {
     res.status(404).json({ error: "\u56DE\u6536\u7AD9\u4E2D\u6CA1\u6709\u6B64\u7D20\u6750" });
     return;
   }
-  const canManage = row.scope === "global" ? user.role === "admin" : row.owner_id === user.id;
-  if (!canManage) {
+  if (result === "forbidden") {
     res.status(403).json({ error: "\u65E0\u6743\u6062\u590D\u6B64\u7D20\u6750" });
     return;
   }
-  await query("UPDATE assets SET deleted_at = NULL, purge_after = NULL WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -5512,6 +6169,10 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     res.status(400).json({ error: "\u5FC5\u987B\u9009\u62E9\u6570\u636E\u63A5\u6536\u7528\u6237\uFF0C\u6216\u660E\u786E\u5C06\u6570\u636E\u653E\u5165 15 \u5929\u56DE\u6536\u7AD9" });
     return;
   }
+  if (transferToUserId === req.params.id) {
+    res.status(400).json({ error: "\u4E0D\u80FD\u628A\u8D26\u53F7\u6570\u636E\u8F6C\u79FB\u7ED9\u81EA\u8EAB" });
+    return;
+  }
   const source = await queryOne("SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL", [req.params.id]);
   if (!source) {
     res.status(404).json({ error: "\u7528\u6237\u4E0D\u5B58\u5728" });
@@ -5530,11 +6191,70 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
   const now = /* @__PURE__ */ new Date();
   const nowIso = now.toISOString();
   const purgeAfter = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1e3).toISOString();
-  await transaction(async (client) => {
+  const outcome = await transaction(async (client) => {
+    const userIds = transferToUserId ? [req.params.id, transferToUserId] : [req.params.id];
+    const lockedUsers = (await client.query(`
+      SELECT id, active, deleted_at FROM users
+      WHERE id = ANY($1::text[])
+      ORDER BY id
+      FOR NO KEY UPDATE
+    `, [userIds])).rows;
+    const lockedSource = lockedUsers.find((row) => row.id === req.params.id);
+    if (!lockedSource || lockedSource.deleted_at !== null) {
+      return { status: "source_changed" };
+    }
     if (transferToUserId) {
-      for (const table of ["projects", "assets", "files", "generation_runs", "usage_events"]) {
+      const lockedTarget = lockedUsers.find((row) => row.id === transferToUserId);
+      if (!lockedTarget || lockedTarget.active !== 1 || lockedTarget.deleted_at !== null) {
+        return { status: "target_changed" };
+      }
+      const activeRuns = (await client.query(`
+        SELECT COUNT(*)::int AS count FROM generation_runs
+        WHERE owner_id = ANY($1::text[])
+          AND deleted_at IS NULL
+          AND plan_json IS NOT NULL
+          AND status IN ('queued','running','retry_wait','cancel_requested')
+      `, [[req.params.id, transferToUserId]])).rows[0]?.count ?? 0;
+      if (activeRuns > ACTIVE_RUN_LIMIT) {
+        return { status: "active_limit" };
+      }
+    } else {
+      const activeRuns = (await client.query(`
+        SELECT COUNT(*)::int AS count FROM generation_runs
+        WHERE owner_id = $1
+          AND deleted_at IS NULL
+          AND plan_json IS NOT NULL
+          AND status IN ('queued','running','retry_wait','cancel_requested')
+      `, [req.params.id])).rows[0]?.count ?? 0;
+      if (activeRuns > 0) return { status: "active_runs" };
+    }
+    if (transferToUserId) {
+      for (const table of ["projects", "assets"]) {
         await client.query(`UPDATE ${table} SET owner_id = $1 WHERE owner_id = $2`, [transferToUserId, req.params.id]);
       }
+      await client.query(`
+        UPDATE generation_runs source
+        SET client_request_id = NULL, request_fingerprint = NULL
+        WHERE source.owner_id = $2
+          AND source.client_request_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM generation_runs target
+            WHERE target.owner_id = $1
+              AND target.client_request_id = source.client_request_id
+          )
+      `, [transferToUserId, req.params.id]);
+      await client.query(
+        "UPDATE generation_runs SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id]
+      );
+      await client.query(
+        "UPDATE usage_events SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id]
+      );
+      await client.query(
+        "UPDATE files SET owner_id = $1 WHERE owner_id = $2",
+        [transferToUserId, req.params.id]
+      );
     } else {
       await client.query(
         "UPDATE projects SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL",
@@ -5544,7 +6264,7 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
         "UPDATE assets SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL",
         [nowIso, purgeAfter, req.params.id]
       );
-      for (const table of ["files", "generation_runs", "usage_events"]) {
+      for (const table of ["generation_runs", "usage_events", "files"]) {
         await client.query(
           `UPDATE ${table} SET deleted_at = $1, purge_after = $2 WHERE owner_id = $3 AND deleted_at IS NULL`,
           [nowIso, purgeAfter, req.params.id]
@@ -5553,7 +6273,24 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     }
     await client.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
     await client.query("UPDATE users SET active = 0, deleted_at = $1, updated_at = $1 WHERE id = $2", [nowIso, req.params.id]);
+    return { status: "ok" };
   });
+  if (outcome.status === "source_changed") {
+    res.status(404).json({ error: "\u7528\u6237\u4E0D\u5B58\u5728\u6216\u72B6\u6001\u5DF2\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5" });
+    return;
+  }
+  if (outcome.status === "target_changed") {
+    res.status(409).json({ error: "\u6570\u636E\u63A5\u6536\u7528\u6237\u72B6\u6001\u5DF2\u53D8\u5316\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5" });
+    return;
+  }
+  if (outcome.status === "active_limit") {
+    res.status(409).json({ error: `\u6570\u636E\u8F6C\u79FB\u540E\u6D3B\u52A8\u4EFB\u52A1\u5C06\u8D85\u8FC7 ${ACTIVE_RUN_LIMIT} \u6761\uFF0C\u8BF7\u7B49\u5F85\u4EFB\u52A1\u7ED3\u675F\u540E\u518D\u8BD5` });
+    return;
+  }
+  if (outcome.status === "active_runs") {
+    res.status(409).json({ error: "\u8D26\u53F7\u4ECD\u6709\u751F\u6210\u4EFB\u52A1\uFF0C\u8BF7\u5148\u7B49\u5F85\u4EFB\u52A1\u7ED3\u675F\u6216\u53D6\u6D88\u4EFB\u52A1\u540E\u518D\u5220\u9664" });
+    return;
+  }
   res.json({ ok: true, purgeAfter: transferToUserId ? null : purgeAfter });
 }));
 
@@ -5611,7 +6348,8 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
         OR (r.started_at = $3 AND r.id < $4)
       )
       AND (
-        r.status IN ('queued','running','retry_wait','cancel_requested','cancelled','outcome_unknown','failed','succeeded')
+        (r.plan_json IS NOT NULL AND r.status IN ('queued','running','retry_wait','cancel_requested'))
+        OR r.status IN ('cancelled','outcome_unknown','failed','succeeded')
         OR EXISTS (SELECT 1 FROM generation_outputs output WHERE output.run_id = r.id)
       )
     ORDER BY r.started_at DESC, r.id DESC
@@ -5638,6 +6376,7 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     return {
       id: row.output_id ?? row.id,
       runId: row.id,
+      clientRequestId: row.client_request_id,
       image: row.image ?? "",
       thumbnail: row.image ? thumbnailUrlForImage(row.image) : "",
       nodeId: row.node_id,
@@ -5668,17 +6407,77 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     hasMore
   });
 }));
+historyRouter.get("/active", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const rows = await query(`
+    SELECT
+      r.id, r.client_request_id, r.node_id, r.node_label, r.kind,
+      r.project_id, r.project_name, r.owner_id, r.prompt, r.model,
+      r.requested_count, r.successful_count, r.provider_requests,
+      r.started_at, r.status, r.error,
+      u.display_name AS owner_name
+    FROM generation_runs r
+    JOIN users u ON u.id = r.owner_id
+    WHERE r.owner_id = $1
+      AND r.deleted_at IS NULL
+      AND r.plan_json IS NOT NULL
+      AND r.status IN ('queued','running','retry_wait','cancel_requested')
+    ORDER BY r.started_at DESC, r.id DESC
+    LIMIT $2
+  `, [user.id, ACTIVE_RUN_LIMIT + 1]);
+  if (rows.length > ACTIVE_RUN_LIMIT) {
+    res.status(409).json({ error: "\u6D3B\u52A8\u4EFB\u52A1\u8FC7\u591A\uFF0C\u6682\u65F6\u7981\u6B62\u521B\u5EFA\u65B0\u4EFB\u52A1\uFF0C\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u5904\u7406" });
+    return;
+  }
+  res.json({
+    records: rows.map((row) => ({
+      id: row.id,
+      runId: row.id,
+      clientRequestId: row.client_request_id,
+      image: "",
+      thumbnail: "",
+      nodeId: row.node_id,
+      nodeLabel: row.node_label,
+      kind: row.kind,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      prompt: row.prompt,
+      model: row.model,
+      requestedCount: row.requested_count,
+      successfulCount: row.successful_count,
+      providerRequests: row.provider_requests,
+      startedAt: row.started_at,
+      status: row.status,
+      error: row.error
+    })),
+    nextCursor: null,
+    hasMore: false
+  });
+}));
 historyRouter.delete("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const row = await queryOne(`
-    SELECT r.owner_id, r.id AS run_id FROM generation_outputs o
-    JOIN generation_runs r ON r.id = o.run_id WHERE o.id = $1 AND r.owner_id = $2
-  `, [req.params.id, user.id]);
-  if (!row) {
+  const result = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return "owner_unavailable";
+    const row = await queryOne(`
+      SELECT r.id AS run_id FROM generation_outputs o
+      JOIN generation_runs r ON r.id = o.run_id
+      WHERE o.id = $1 AND r.owner_id = $2 AND r.deleted_at IS NULL
+      FOR UPDATE OF r, o
+    `, [req.params.id, user.id], client);
+    if (!row) return "missing";
+    await client.query("DELETE FROM generation_outputs WHERE id = $1", [req.params.id]);
+    return "deleted";
+  });
+  if (result === "owner_unavailable") {
+    res.status(409).json({ error: "\u8D26\u53F7\u5DF2\u505C\u7528\u6216\u5220\u9664\uFF0C\u4E0D\u80FD\u7EE7\u7EED\u5220\u9664\u5386\u53F2\u8BB0\u5F55" });
+    return;
+  }
+  if (result === "missing") {
     res.status(404).json({ error: "\u8BB0\u5F55\u4E0D\u5B58\u5728" });
     return;
   }
-  await query("DELETE FROM generation_outputs WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -5909,7 +6708,7 @@ function createAiDiagnosticsRouter(probeRateLimit) {
 
 // server/lib/legacyMigration.ts
 import fs7 from "node:fs";
-import path8 from "node:path";
+import path7 from "node:path";
 import { nanoid as nanoid11 } from "nanoid";
 var LEGACY_PLACEHOLDER_NOTE = "\u4ECE\u5347\u7EA7\u524D\u670D\u52A1\u5668\u6587\u4EF6\u8FC1\u79FB";
 async function migrateLegacyData() {
@@ -5918,12 +6717,12 @@ async function migrateLegacyData() {
   `);
   if (!admin) return;
   const now = (/* @__PURE__ */ new Date()).toISOString();
-  const uploads = path8.join(config.dataDir(), "uploads");
+  const uploads = path7.join(config.dataDir(), "uploads");
   const uploadFiles = fs7.existsSync(uploads) ? fs7.readdirSync(uploads) : [];
   if (uploadFiles.length > 0) {
     await transaction(async (client) => {
       for (const file of uploadFiles) {
-        const id = path8.basename(file);
+        const id = path7.basename(file);
         await client.query(`
           INSERT INTO files (id, owner_id, source_type, created_at) VALUES ($1, NULL, 'legacy', $2)
           ON CONFLICT (id) DO NOTHING
@@ -5931,13 +6730,13 @@ async function migrateLegacyData() {
       }
     });
   }
-  const projects = path8.join(config.dataDir(), "projects");
+  const projects = path7.join(config.dataDir(), "projects");
   if (fs7.existsSync(projects)) {
     await transaction(async (client) => {
       for (const file of fs7.readdirSync(projects)) {
         if (!file.endsWith(".json")) continue;
         try {
-          const raw = JSON.parse(fs7.readFileSync(path8.join(projects, file), "utf-8"));
+          const raw = JSON.parse(fs7.readFileSync(path7.join(projects, file), "utf-8"));
           if (typeof raw.id !== "string" || typeof raw.name !== "string") continue;
           const flow = validateAndMigrateFlow(raw.flow);
           const updatedAt = typeof raw.updatedAt === "string" && Number.isFinite(Date.parse(raw.updatedAt)) ? raw.updatedAt : now;
@@ -5950,13 +6749,13 @@ async function migrateLegacyData() {
       }
     });
   }
-  const assets = path8.join(config.dataDir(), "assets");
+  const assets = path7.join(config.dataDir(), "assets");
   if (fs7.existsSync(assets)) {
     await transaction(async (client) => {
       for (const file of fs7.readdirSync(assets)) {
         if (!file.endsWith(".json")) continue;
         try {
-          const raw = JSON.parse(fs7.readFileSync(path8.join(assets, file), "utf-8"));
+          const raw = JSON.parse(fs7.readFileSync(path7.join(assets, file), "utf-8"));
           if (typeof raw.id !== "string" || typeof raw.name !== "string" || !["print", "fabric", "reference"].includes(String(raw.category)) || typeof raw.image !== "string" || !isLocalImageReference(raw.image)) continue;
           const note = typeof raw.sourceNote === "string" ? raw.sourceNote : null;
           const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : now;
@@ -5970,7 +6769,7 @@ async function migrateLegacyData() {
               INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
               VALUES ($1, NULL, 'global', $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING
             `, [raw.id, raw.name, raw.category, raw.image, note, createdAt]);
-          } else if (existing.owner_id === null && existing.scope === "global" && existing.name === `\u5386\u53F2\u7D20\u6750-${path8.parse(path8.basename(raw.image)).name}` && existing.source_note === LEGACY_PLACEHOLDER_NOTE) {
+          } else if (existing.owner_id === null && existing.scope === "global" && existing.name === `\u5386\u53F2\u7D20\u6750-${path7.parse(path7.basename(raw.image)).name}` && existing.source_note === LEGACY_PLACEHOLDER_NOTE) {
             await client.query(`
               UPDATE assets SET name = $1, category = $2, source_note = $3, created_at = $4
               WHERE id = $5
@@ -5984,7 +6783,7 @@ async function migrateLegacyData() {
   if (uploadFiles.length > 0) {
     await transaction(async (client) => {
       for (const file of uploadFiles) {
-        const id = path8.basename(file);
+        const id = path7.basename(file);
         const image = `/api/files/${id}`;
         const existing = await queryOne(
           "SELECT id FROM assets WHERE image = $1 LIMIT 1",
@@ -5995,7 +6794,7 @@ async function migrateLegacyData() {
           await client.query(`
             INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
             VALUES ($1, NULL, 'global', $2, 'reference', $3, $4, $5)
-          `, [nanoid11(10), `\u5386\u53F2\u7D20\u6750-${path8.parse(id).name}`, image, LEGACY_PLACEHOLDER_NOTE, now]);
+          `, [nanoid11(10), `\u5386\u53F2\u7D20\u6750-${path7.parse(id).name}`, image, LEGACY_PLACEHOLDER_NOTE, now]);
         }
       }
     });
@@ -6004,22 +6803,22 @@ async function migrateLegacyData() {
 
 // server/lib/staticFrontend.ts
 import express from "express";
-import path9 from "node:path";
+import path8 from "node:path";
 var HASHED_ASSET = /-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/;
 function explicitlyAcceptsHtml(req) {
   const accept = req.get("Accept") ?? "";
   return /\btext\/html\b/i.test(accept) && req.accepts("html") === "html";
 }
 function mountProductionFrontend(app2, distDir2) {
-  const distIndex2 = path9.join(distDir2, "index.html");
-  const assetsDir = path9.join(distDir2, "assets") + path9.sep;
+  const distIndex2 = path8.join(distDir2, "index.html");
+  const assetsDir = path8.join(distDir2, "assets") + path8.sep;
   app2.use(express.static(distDir2, {
     index: false,
     fallthrough: true,
     setHeaders: (res, filePath) => {
-      if (path9.resolve(filePath) === path9.resolve(distIndex2)) {
+      if (path8.resolve(filePath) === path8.resolve(distIndex2)) {
         res.setHeader("Cache-Control", "no-store");
-      } else if (filePath.startsWith(assetsDir) && HASHED_ASSET.test(path9.basename(filePath))) {
+      } else if (filePath.startsWith(assetsDir) && HASHED_ASSET.test(path8.basename(filePath))) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       } else {
         res.setHeader("Cache-Control", "no-cache");
@@ -6030,7 +6829,7 @@ function mountProductionFrontend(app2, distDir2) {
     res.status(404).type("text/plain").send("Asset not found");
   });
   app2.get("*", (req, res) => {
-    const isResourcePath = path9.extname(req.path) !== "";
+    const isResourcePath = path8.extname(req.path) !== "";
     if (isResourcePath || !explicitlyAcceptsHtml(req)) {
       res.status(404).type("text/plain").send("Not found");
       return;
@@ -6049,11 +6848,11 @@ var aiDiagnosticsRouter = createAiDiagnosticsRouter(aiRateLimit);
 app.get("/api/health", (_req, res) => res.json({ ok: true, status: "alive" }));
 var isProduction = process.env.NODE_ENV === "production";
 var apiOnly = config.apiOnly();
-var distDir = path10.join(ROOT_DIR, "dist");
-var distIndex = path10.join(distDir, "index.html");
+var distDir = path9.join(ROOT_DIR, "dist");
+var distIndex = path9.join(distDir, "index.html");
 function dataDirWritable() {
   const dataDir = config.dataDir();
-  const probePath = path10.join(dataDir, `.readiness-${process.pid}-${Date.now()}`);
+  const probePath = path9.join(dataDir, `.readiness-${process.pid}-${Date.now()}`);
   let fd;
   let writable = false;
   try {

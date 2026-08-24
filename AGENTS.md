@@ -49,6 +49,8 @@ This project is indexed by GitNexus as **garment-canvas** (7300 symbols, 15964 r
 ## Project Baseline
 
 - Use Node.js 20.9 or newer. The application is TypeScript with React 19, Vite 6, Express 4, and PostgreSQL 18.
+- Treat Garment Canvas as a desktop-only web product. The supported viewport starts at 1024 CSS pixels; use 1280px and 1440px as the primary layout and visual-regression widths.
+- Mobile and touch-specific adaptation is outside the product contract. Do not add mobile navigation, mobile-only interaction patterns, or mobile visual-regression scope unless the user explicitly changes this rule. Existing narrow-screen fallbacks are best-effort only and must not drive desktop architecture.
 - Treat PostgreSQL as the production source of truth. SQLite support exists only for legacy import and migration verification.
 - Use the existing npm scripts: `npm run lint` for type-checking, `npm run test` for the isolated PostgreSQL regression suite, `npm run check` for both, and `npm run build` for production bundles.
 - The PostgreSQL test runner assigns a stable Docker Compose project to each worktree, cleans crash leftovers before starting, and rejects concurrent runs in the same worktree. Different worktrees remain isolated. Do not replace it with direct `docker compose -f compose.test.yaml` lifecycle commands in agent workflows.

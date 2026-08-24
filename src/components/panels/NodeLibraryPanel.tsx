@@ -129,13 +129,9 @@ function AssetList() {
 
   /** 点击素材：在最左侧节点左边新增一个 image-input 节点并灌入图片 */
   const addToCanvas = (asset: Asset) => {
-    const { nodes, addNode, updateNodeData } = useFlowStore.getState();
+    const { nodes, addAssetNode } = useFlowStore.getState();
     const minX = Math.min(0, ...nodes.map((n) => n.position.x));
-    addNode("image-input", { x: minX - 320, y: nodes.length * 40 });
-    const newId = useFlowStore.getState().selectedNodeId;
-    if (newId) {
-      updateNodeData(newId, { imageUrl: asset.image, status: "success", label: asset.name });
-    }
+    addAssetNode(asset, { x: minX - 320, y: nodes.length * 40 });
     // 引用关系由项目保存时根据最终画布统一同步；未保存项目不提前占用素材。
   };
 

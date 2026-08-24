@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { isNodeRunActive, type NodeRunStatus } from "@/types/workflow";
 import { useFlowStore } from "@/store/flowStore";
+import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 
 const STATUS_STYLE: Record<NodeRunStatus, string> = {
   idle: "bg-neutral-500",
@@ -114,17 +115,20 @@ interface RunButtonProps {
 
 export function RunButton({ status, onClick, onCancel, label = "运行", disabled }: RunButtonProps) {
   const active = isNodeRunActive(status);
+  const safetyBlockReason = useGenerationSafetyBlockReason();
+  const newGenerationBlocked = !active && Boolean(safetyBlockReason);
   return (
     <div className={active && onCancel ? "grid grid-cols-[1fr_auto] gap-2" : undefined}>
       <button
         type="button"
         onClick={onClick}
-        disabled={active || disabled}
+        disabled={active || disabled || newGenerationBlocked}
+        title={newGenerationBlocked ? safetyBlockReason ?? undefined : undefined}
         className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
           active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
         }`}
       >
-        {active ? STATUS_TEXT[status] : label}
+        {active ? STATUS_TEXT[status] : newGenerationBlocked ? "生成暂不可用" : label}
       </button>
       {active && onCancel && status !== "cancel_requested" && (
         <button

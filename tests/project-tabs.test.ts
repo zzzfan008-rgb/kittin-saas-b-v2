@@ -10,7 +10,9 @@ import {
   selectNodeInputImages,
   useFlowStore,
   type FlowNode,
+  type RecentResult,
 } from "../src/store/flowStore";
+import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 
 let passed = 0;
 
@@ -63,6 +65,9 @@ function assertNodeModelSelection(
 }
 
 console.log("项目多页签状态测试");
+
+// 此文件验证已完成历史对账后的运行路径；冷启动 fail-closed 由 generation-safety.test 覆盖。
+setGenerationSafetyBlockReason(null);
 
 const initial = useFlowStore.getState();
 const tabA = initial.activeTabId;
@@ -160,6 +165,57 @@ await test("关闭当前页签后切换到相邻页签，至少保留一个画�
   assert.equal(useFlowStore.getState().nodes.length, 1);
 });
 
+await test("删除已选节点时同步清理 selectedNodeId", () => {
+  useFlowStore.getState().openFlowTab({
+    projectId: "selection-removal-project",
+    projectName: "选择清理测试",
+    nodes: [imageNode("selected-for-removal", "待删除节点")],
+    edges: [],
+  });
+  useFlowStore.getState().setSelectedNodeId("selected-for-removal");
+
+  useFlowStore.getState().onNodesChange([{
+    id: "selected-for-removal",
+    type: "remove",
+  }]);
+
+  assert.equal(useFlowStore.getState().nodes.length, 0);
+  assert.equal(useFlowStore.getState().selectedNodeId, null);
+});
+
+await test("素材节点以单一原子 action 加入，一次撤销完整移除", () => {
+  const baseline = imageNode("asset-baseline", "基准节点");
+  useFlowStore.getState().openFlowTab({
+    projectId: "atomic-asset-project",
+    projectName: "原子素材测试",
+    nodes: [baseline],
+    edges: [],
+  });
+  const addedId = useFlowStore.getState().addAssetNode(
+    { name: "金色面料", image: "/api/files/gold-fabric.png" },
+    { x: -320, y: 40 },
+  );
+  assert.ok(addedId);
+  const added = useFlowStore.getState().nodes.find((node) => node.id === addedId);
+  assert.equal(added?.data.kind, "image-input");
+  assert.equal(added?.data.label, "金色面料");
+  assert.equal(added?.data.status, "success");
+  assert.equal(added?.data.kind === "image-input" ? added.data.imageUrl : undefined, "/api/files/gold-fabric.png");
+
+  useFlowStore.getState().undo();
+  assert.equal(useFlowStore.getState().nodes.length, 1);
+  assert.equal(useFlowStore.getState().nodes[0].id, baseline.id);
+  assert.equal(useFlowStore.getState().nodes.some((node) => node.id === addedId), false);
+  assert.equal(useFlowStore.getState().selectedNodeId, null);
+
+  const librarySource = fs.readFileSync(
+    new URL("../src/components/panels/NodeLibraryPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(librarySource, /addAssetNode\(asset,/);
+  assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
+});
+
 await test("保存期间继续编辑会排队并最终写入最新版本", async () => {
   const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
   const originalFetch = globalThis.fetch;
@@ -231,6 +287,79 @@ await test("新建项目首次生成会先保存同一份项目，再提交运�
     assert.deepEqual(runBody.nodes, saveBody.flow.nodes);
     assert.deepEqual(runBody.edges, saveBody.flow.edges);
   } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("runNode 创建 queued 记录时保留当前结果选择", async () => {
+  useFlowStore.getState().openFlowTab({
+    projectId: "queued-selection-project",
+    projectName: "运行选择测试",
+    nodes: [aiNode("queued-selection-node", "不抢占选择")],
+    edges: [],
+  });
+  const keptResult = {
+    id: "kept-result-selection",
+    image: "/api/files/kept.png",
+    nodeId: "older-node",
+    nodeLabel: "原已选结果",
+    kind: "ai-modify",
+    projectId: "older-project",
+    startedAt: 1,
+    finishedAt: 2,
+    status: "success",
+  } satisfies RecentResult;
+  useFlowStore.setState({ recentResults: [keptResult] });
+  useFlowStore.getState().setSelectedResultId(keptResult.id);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在调用生图服务前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+
+  try {
+    const running = useFlowStore.getState().runNode("queued-selection-node");
+    const queued = useFlowStore.getState().recentResults.find(
+      (record) => record.nodeId === "queued-selection-node",
+    );
+    assert.equal(queued?.status, "queued");
+    assert.equal(useFlowStore.getState().selectedResultId, keptResult.id);
+    await running;
+    assert.equal(useFlowStore.getState().selectedResultId, keptResult.id);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("历史安全门从 runNode 唯一入口阻止新的付费运行", async () => {
+  useFlowStore.getState().openFlowTab({
+    projectId: "history-gate-project",
+    projectName: "历史安全门测试",
+    nodes: [aiNode("history-gate-node", "门禁节点")],
+    edges: [],
+  });
+  const before = useFlowStore.getState().recentResults.length;
+  const beforeStatus = useFlowStore.getState().nodes[0].data.status;
+  const originalFetch = globalThis.fetch;
+  let requested = false;
+  globalThis.fetch = async () => {
+    requested = true;
+    throw new Error("安全门开启时不应发起请求");
+  };
+  setGenerationSafetyBlockReason("运行历史同步失败");
+
+  try {
+    await useFlowStore.getState().runNode("history-gate-node");
+    assert.equal(requested, false);
+    assert.equal(useFlowStore.getState().recentResults.length, before);
+    assert.equal(useFlowStore.getState().nodes[0].data.status, beforeStatus);
+  } finally {
+    setGenerationSafetyBlockReason(null);
     globalThis.fetch = originalFetch;
   }
 });

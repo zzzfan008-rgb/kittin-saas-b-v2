@@ -8,13 +8,13 @@ import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
 import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
-import { InspectorPanel } from "@/components/panels/InspectorPanel";
-import { ResultsPanel } from "@/components/panels/ResultsPanel";
+import { ContextPanel } from "@/components/panels/ContextPanel";
 import { TemplatesDock } from "@/components/panels/TemplatesDock";
 import { CompareOverlay } from "@/components/CompareOverlay";
 import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
+import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useAuth } from "@/auth/AuthContext";
 import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
 import {
@@ -139,6 +139,20 @@ function Workspace() {
   const historyBefore = useRef(Date.now()).current;
 
   useEffect(() => {
+    setGenerationSafetyBlockReason(
+      initialHistoryState === "ready"
+        ? null
+        : initialHistoryState === "loading"
+          ? "正在确认运行历史，完成前暂停新的生成任务"
+          : "运行历史同步失败，为避免重复计费，新的生成任务已暂停",
+    );
+  }, [initialHistoryState]);
+
+  useEffect(() => () => {
+    setGenerationSafetyBlockReason("正在确认运行历史，完成前暂停新的生成任务");
+  }, []);
+
+  useEffect(() => {
     if (!shouldWarnBeforeWorkspaceUnload({
       hasDirtyTabs,
       tabSessionPersistenceError,
@@ -212,41 +226,45 @@ function Workspace() {
 
   return (
     <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
+      <TopBar />
+      <ProjectTabs />
       {initialHistoryState !== "ready" && (
-        <div className="absolute inset-0 z-100 flex items-center justify-center bg-[#101214]/95 px-6 text-center">
-          {initialHistoryState === "loading" ? (
-            <p className="text-xs text-neutral-400">正在确认运行历史，确认完成前暂停新的生成任务…</p>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-amber-300">运行历史加载失败。为避免重复计费，暂时禁止新的生成任务。</p>
-              <button
-                type="button"
-                onClick={() => setInitialHistoryAttempt((value) => value + 1)}
-                className="rounded-sm border border-gold/60 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
-              >
-                重试同步
-              </button>
-            </div>
+        <div
+          role={initialHistoryState === "error" ? "alert" : "status"}
+          className="gc-panel flex min-h-9 shrink-0 items-center justify-center gap-3 border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 py-1.5 text-center"
+        >
+          <p className={`text-[10px] ${initialHistoryState === "error" ? "text-amber-300" : "text-[var(--gc-text-muted)]"}`}>
+            {initialHistoryState === "loading"
+              ? "正在确认运行历史；画布仍可查看和编辑，新的生成任务暂不可用。"
+              : "运行历史同步失败；画布仍可编辑和保存，为避免重复计费，新的生成任务已暂停。"}
+          </p>
+          {initialHistoryState === "error" && (
+            <button
+              type="button"
+              onClick={() => setInitialHistoryAttempt((value) => value + 1)}
+              className="shrink-0 rounded-sm border border-gold/60 px-2 py-1 text-[10px] text-gold hover:bg-gold/10"
+            >
+              重试同步
+            </button>
           )}
         </div>
       )}
-      <TopBar />
-      <ProjectTabs />
       <WorkbenchShell
         workspaceKey={activeTabId}
         library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
-        inspector={<InspectorPanel className="h-full w-full border-l-0" />}
+        inspector={(
+          <ContextPanel
+            hasMore={historyHasMore}
+            loadingMore={historyLoading}
+            onLoadMore={() => void loadMoreHistory()}
+          />
+        )}
       >
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <TemplatesDock />
           <ReactFlowProvider key={activeTabId}>
             <CanvasFlow />
           </ReactFlowProvider>
-          <ResultsPanel
-            hasMore={historyHasMore}
-            loadingMore={historyLoading}
-            onLoadMore={() => void loadMoreHistory()}
-          />
         </div>
       </WorkbenchShell>
       <CompareOverlay />

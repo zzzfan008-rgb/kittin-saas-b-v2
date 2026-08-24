@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
+import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 2;
@@ -15,6 +16,7 @@ export function ImageViewer() {
   const selectedResultId = useFlowStore((s) => s.selectedResultId);
   const record = useFlowStore((s) => s.recentResults.find((item) => item.id === selectedResultId));
   const closeViewer = useFlowStore((s) => s.closeViewer);
+  const generationSafetyBlockReason = useGenerationSafetyBlockReason();
   const [scale, setScale] = useState(1);
   const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -70,7 +72,7 @@ export function ImageViewer() {
   };
 
   const runAgain = () => {
-    if (!record) return;
+    if (!record || generationSafetyBlockReason) return;
     const store = useFlowStore.getState();
     const tab = store.tabs.find((item) => item.projectId === record.projectId);
     if (!tab || !tab.nodes.some((node) => node.id === record.nodeId)) return;
@@ -127,7 +129,17 @@ export function ImageViewer() {
         <div className="mt-5 flex flex-wrap gap-2">
           <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
           <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
-          {record && <button type="button" onClick={runAgain} className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300">重新生成</button>}
+          {record && (
+            <button
+              type="button"
+              onClick={runAgain}
+              disabled={Boolean(generationSafetyBlockReason)}
+              title={generationSafetyBlockReason ?? undefined}
+              className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
+            </button>
+          )}
         </div>
       </aside>
     </div>
