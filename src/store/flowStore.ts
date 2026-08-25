@@ -34,6 +34,15 @@ import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
 } from "@/lib/documentSnapshot";
+import {
+  clearUnreferencedProjectTabSessionStorage,
+  PROJECT_TABS_STORAGE_KEY,
+  PROJECT_TABS_STORAGE_SCHEMA_VERSION,
+  isProjectTabSessionPersistenceSuspended,
+  parseProjectTabsStorageManifest,
+  projectTabStorageKey,
+  type ProjectTabsStorageManifest,
+} from "@/lib/tabSessionStorage";
 
 export type FlowNode = Node<WorkflowNodeData>;
 
@@ -204,6 +213,7 @@ let historySuppressionDepth = 0;
 let activeHistoryTransaction: ActiveHistoryTransaction | null = null;
 let recordHistoryEntry: (pastState: FlowTemporalState, currentState: FlowTemporalState) => void = () => undefined;
 let flushDeferredTabSessionPersistence = (): void => undefined;
+let flushPendingTabSessionPersistence = (): boolean => true;
 const DOCUMENT_HISTORY_LIMIT = 50;
 
 interface TabTemporalHistory {
@@ -622,6 +632,9 @@ export function beginHistoryTransaction(
   onSettled?: HistoryTransactionSettledCallback,
 ): HistoryTransactionToken {
   const token = Symbol(label);
+  // Debounced edits that predate the gesture are already stable. Persist them
+  // before live drag frames begin so a pagehide during the gesture cannot lose them.
+  if (!activeHistoryTransaction) flushPendingTabSessionPersistence();
   const state = useFlowStore.getState();
   if (!activeHistoryTransaction || activeHistoryTransaction.tabId !== state.activeTabId) {
     const tab = selectActiveDocument(state);
@@ -1204,8 +1217,8 @@ function updateTabNodes(
 
 /** 最近生成持久化（localStorage）：刷新/重开浏览器不丢 */
 const RECENT_STORAGE_KEY = "garment-canvas-recent-results";
-const TAB_SESSION_STORAGE_KEY = "garment-canvas-project-tabs";
-export const TAB_SESSION_SCHEMA_VERSION = 1 as const;
+const TAB_SESSION_STORAGE_KEY = PROJECT_TABS_STORAGE_KEY;
+export const TAB_SESSION_SCHEMA_VERSION = PROJECT_TABS_STORAGE_SCHEMA_VERSION;
 
 export interface PersistedTabSession {
   schemaVersion: typeof TAB_SESSION_SCHEMA_VERSION;
@@ -1216,9 +1229,11 @@ export interface PersistedTabSession {
 export interface TabSessionWriteResult {
   ok: boolean;
   error?: string;
+  failedTabIds?: string[];
 }
 
 const TAB_SESSION_WRITE_ERROR = "本地草稿未写入浏览器，请先保存项目或重新保存大蒙版；刷新会丢失本页修改";
+const TAB_SESSION_READ_ERROR = "浏览器暂时无法读取完整草稿；为避免覆盖恢复点，本页不再写入会话缓存，请刷新后重试";
 
 const NODE_KINDS = new Set<NodeKind>(Object.keys(NODE_SPECS) as NodeKind[]);
 const NODE_STATUSES = new Set<NodeRunStatus>([
@@ -1421,6 +1436,7 @@ export function normalizeTabSessionValue(value: unknown): PersistedTabSession | 
   if (
     raw.schemaVersion !== undefined &&
     raw.schemaVersion !== 0 &&
+    raw.schemaVersion !== 1 &&
     raw.schemaVersion !== TAB_SESSION_SCHEMA_VERSION
   ) return undefined;
   if (!Array.isArray(raw.tabs) || typeof raw.activeTabId !== "string") return undefined;
@@ -1433,65 +1449,241 @@ export function normalizeTabSessionValue(value: unknown): PersistedTabSession | 
   return { schemaVersion: TAB_SESSION_SCHEMA_VERSION, tabs, activeTabId };
 }
 
-function loadTabSession(): { tabs: ProjectTab[]; activeTabId: string } | undefined {
+export function readTabSessionSnapshot(
+  storage: Pick<Storage, "getItem">,
+): PersistedTabSession | undefined {
+  return readTabSessionSnapshotResult(storage).snapshot;
+}
+
+export interface TabSessionReadResult {
+  snapshot?: PersistedTabSession;
+  manifest?: ProjectTabsStorageManifest;
+  /**
+   * Storage access threw while loading the root or a referenced shard. This is
+   * deliberately different from a confirmed missing/corrupt shard: callers
+   * must not repair the manifest or clean fragments from an incomplete view.
+   */
+  unreadable: boolean;
+}
+
+export function readTabSessionSnapshotResult(
+  storage: Pick<Storage, "getItem">,
+): TabSessionReadResult {
+  let raw: string | null;
   try {
-    const raw = window.sessionStorage.getItem(TAB_SESSION_STORAGE_KEY);
-    if (!raw) return undefined;
-    return normalizeTabSessionValue(JSON.parse(raw));
+    raw = storage.getItem(TAB_SESSION_STORAGE_KEY);
   } catch {
-    return undefined;
+    return { unreadable: true };
+  }
+  if (!raw) return { unreadable: false };
+
+  const manifest = parseProjectTabsStorageManifest(raw);
+  if (manifest) {
+    const tabs: ProjectTab[] = [];
+    let unreadable = false;
+    for (const tabId of manifest.tabIds) {
+      let tabRaw: string | null;
+      try {
+        tabRaw = storage.getItem(projectTabStorageKey(tabId));
+      } catch {
+        unreadable = true;
+        continue;
+      }
+      if (!tabRaw) continue;
+      try {
+        const tab = normalizeSessionTab(JSON.parse(tabRaw));
+        if (tab?.id === tabId) tabs.push(tab);
+      } catch {
+        // Confirmed malformed JSON is an isolated corrupt shard, not an
+        // indeterminate Storage read.
+      }
+    }
+    if (tabs.length === 0) return { manifest, unreadable };
+    const activeTabId = tabs.some((tab) => tab.id === manifest.activeTabId)
+      ? manifest.activeTabId
+      : tabs[0].id;
+    return {
+      manifest,
+      unreadable,
+      snapshot: { schemaVersion: TAB_SESSION_SCHEMA_VERSION, tabs, activeTabId },
+    };
+  }
+
+  try {
+    return { unreadable: false, snapshot: normalizeTabSessionValue(JSON.parse(raw)) };
+  } catch {
+    return { unreadable: false };
   }
 }
 
+let initialTabSessionReadResult: TabSessionReadResult | undefined;
+
+/** Auth ownership binding uses this to reject a restored in-memory draft when
+ * Storage becomes unreadable between module bootstrap and `/me`. */
+export function didRestoreProjectTabSessionWorkspace(): boolean {
+  return initialTabSessionReadResult?.snapshot !== undefined;
+}
+
+function loadTabSession(): { tabs: ProjectTab[]; activeTabId: string } | undefined {
+  initialTabSessionReadResult = readTabSessionSnapshotResult(window.sessionStorage);
+  return initialTabSessionReadResult.snapshot;
+}
+
+interface TabSessionWriteOptions {
+  writeTabIds?: ReadonlySet<string>;
+  knownPersistedTabIds?: ReadonlySet<string>;
+  unresolvedTabIds?: ReadonlySet<string>;
+}
+
+interface DetailedTabSessionWriteResult extends TabSessionWriteResult {
+  persistedTabIds: string[];
+  manifestWritten: boolean;
+  /** Referenced shards whose Storage read threw. They remain known-good until
+   * a later read proves absence or a write definitively fails. */
+  indeterminateTabIds?: string[];
+}
+
+function sessionTabSnapshot(tab: ProjectTab): ProjectTab {
+  const document = createDocumentSnapshot(tab);
+  const flow = documentSnapshotToPersistedWorkflow(document);
+  return {
+    ...tab,
+    projectName: document.projectName,
+    nodes: flow.nodes as FlowNode[],
+    edges: flow.edges as Edge[],
+    selectedNodeIds: [],
+    selectedNodeId: null,
+    selectedResultId: null,
+    compareIds: [],
+  };
+}
+
 export function writeTabSessionSnapshot(
-  storage: Pick<Storage, "setItem" | "removeItem">,
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> &
+    Partial<Pick<Storage, "key" | "length">>,
   value: PersistedTabSession,
-): TabSessionWriteResult {
+  options?: TabSessionWriteOptions,
+): DetailedTabSessionWriteResult {
+  let previousRaw: string | null = null;
+  let previousReadFailed = false;
+  try { previousRaw = storage.getItem(TAB_SESSION_STORAGE_KEY); } catch { previousReadFailed = true; }
+  const previousManifest = parseProjectTabsStorageManifest(previousRaw);
+  let migratingLegacy = false;
+  if (previousRaw && !previousManifest) {
+    try { migratingLegacy = Boolean(normalizeTabSessionValue(JSON.parse(previousRaw))); } catch { /* invalid */ }
+  }
+  const writeTabIds = options?.writeTabIds;
+  const knownPersistedTabIds = options?.knownPersistedTabIds ?? new Set<string>();
+  const unresolvedTabIds = options?.unresolvedTabIds ?? new Set<string>();
+  const persistedTabIds: string[] = [];
+  const failedTabIds: string[] = [];
+  const indeterminateTabIds: string[] = [];
+  let indeterminateRead = false;
+  const recordFailure = (tabId: string) => {
+    if (!failedTabIds.includes(tabId)) failedTabIds.push(tabId);
+  };
+
+  for (const tab of value.tabs) {
+    const key = projectTabStorageKey(tab.id);
+    const shouldWrite = !writeTabIds || writeTabIds.has(tab.id);
+    if (!shouldWrite) {
+      if (unresolvedTabIds.has(tab.id)) {
+        recordFailure(tab.id);
+        continue;
+      }
+      if (knownPersistedTabIds.has(tab.id)) {
+        try {
+          if (storage.getItem(key) !== null) persistedTabIds.push(tab.id);
+          else recordFailure(tab.id);
+        } catch {
+          recordFailure(tab.id);
+          indeterminateTabIds.push(tab.id);
+          indeterminateRead = true;
+        }
+      }
+      continue;
+    }
+    try {
+      storage.setItem(key, JSON.stringify(sessionTabSnapshot(tab)));
+      persistedTabIds.push(tab.id);
+    } catch {
+      recordFailure(tab.id);
+      // Never restore the stale version of the one tab whose latest write failed.
+      try { storage.removeItem(key); } catch { /* best effort */ }
+    }
+  }
+
+  // A legacy monolith remains the only complete recovery point until every tab
+  // key succeeds. Never replace it with a partial v2 manifest.
+  if (
+    previousReadFailed ||
+    indeterminateRead ||
+    (migratingLegacy && (
+      failedTabIds.length > 0 || persistedTabIds.length !== value.tabs.length
+    ))
+  ) {
+    return {
+      ok: false,
+      error: TAB_SESSION_WRITE_ERROR,
+      failedTabIds,
+      ...(indeterminateTabIds.length > 0 ? { indeterminateTabIds } : {}),
+      persistedTabIds,
+      manifestWritten: false,
+    };
+  }
+
+  if (persistedTabIds.length === 0) {
+    if (!migratingLegacy) {
+      try { storage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
+    }
+    return {
+      ok: false,
+      error: TAB_SESSION_WRITE_ERROR,
+      failedTabIds,
+      persistedTabIds,
+      manifestWritten: false,
+    };
+  }
+
+  const activeTabId = persistedTabIds.includes(value.activeTabId)
+    ? value.activeTabId
+    : persistedTabIds[0];
   try {
-    storage.setItem(TAB_SESSION_STORAGE_KEY, JSON.stringify(value));
-    return { ok: true };
+    storage.setItem(TAB_SESSION_STORAGE_KEY, JSON.stringify({
+      schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+      activeTabId,
+      tabIds: persistedTabIds,
+    }));
   } catch (error) {
-    // setItem 失败会保留同 key 的旧值；必须废弃它，不能让刷新恢复成旧画布。
-    try { storage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
     return {
       ok: false,
       error: error instanceof Error && error.name !== "QuotaExceededError"
         ? `${TAB_SESSION_WRITE_ERROR}（${error.message}）`
         : TAB_SESSION_WRITE_ERROR,
+      failedTabIds,
+      persistedTabIds,
+      manifestWritten: false,
     };
   }
+
+  clearUnreferencedProjectTabSessionStorage(storage, new Set(persistedTabIds));
+  return {
+    ok: failedTabIds.length === 0,
+    ...(failedTabIds.length > 0 ? { error: TAB_SESSION_WRITE_ERROR, failedTabIds } : {}),
+    persistedTabIds,
+    manifestWritten: true,
+  };
 }
 
-function persistTabSession(state: FlowState): TabSessionWriteResult {
-  try {
-    const tabs = state.tabs.map((tab) => {
-      const document = createDocumentSnapshot(tab);
-      const flow = documentSnapshotToPersistedWorkflow(document);
-      return {
-        ...tab,
-        projectName: document.projectName,
-        nodes: flow.nodes as FlowNode[],
-        edges: flow.edges as Edge[],
-        selectedNodeIds: [],
-        selectedNodeId: null,
-        selectedResultId: null,
-        compareIds: [],
-      } satisfies ProjectTab;
-    });
-    const normalized = normalizeTabSessionValue({
-      schemaVersion: TAB_SESSION_SCHEMA_VERSION,
-      tabs,
-      activeTabId: state.activeTabId,
-    });
-    if (!normalized) return { ok: false, error: TAB_SESSION_WRITE_ERROR };
-    return writeTabSessionSnapshot(window.sessionStorage, normalized);
-  } catch (error) {
-    try { window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
-    return {
-      ok: false,
-      error: error instanceof Error ? `${TAB_SESSION_WRITE_ERROR}（${error.message}）` : TAB_SESSION_WRITE_ERROR,
-    };
-  }
+function persistTabSession(
+  state: FlowState,
+  options?: TabSessionWriteOptions,
+): DetailedTabSessionWriteResult {
+  return writeTabSessionSnapshot(window.sessionStorage, {
+    schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+    tabs: state.tabs,
+    activeTabId: state.activeTabId,
+  }, options);
 }
 
 /** 错误边界恢复：只丢弃当前损坏页签，其他页签与服务端项目都不受影响。 */
@@ -1500,6 +1692,30 @@ export function discardActiveTabSession(): void {
   try {
     const raw = window.sessionStorage.getItem(TAB_SESSION_STORAGE_KEY);
     if (!raw) return;
+    const manifest = parseProjectTabsStorageManifest(raw);
+    if (manifest) {
+      const activeIndex = manifest.tabIds.indexOf(manifest.activeTabId);
+      try {
+        window.sessionStorage.removeItem(projectTabStorageKey(manifest.activeTabId));
+      } catch { /* best effort */ }
+      const tabIds = manifest.tabIds.filter((tabId) => tabId !== manifest.activeTabId);
+      if (tabIds.length === 0) {
+        window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY);
+        return;
+      }
+      const fallbackIndex = Math.max(0, Math.min(activeIndex, tabIds.length - 1));
+      try {
+        window.sessionStorage.setItem(TAB_SESSION_STORAGE_KEY, JSON.stringify({
+          schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+          activeTabId: tabIds[fallbackIndex],
+          tabIds,
+        }));
+      } catch {
+        // The old manifest now references a missing active key; load filters it
+        // and still recovers every remaining independently stored tab.
+      }
+      return;
+    }
     const parsed = JSON.parse(raw) as { tabs?: unknown; activeTabId?: unknown };
     if (!Array.isArray(parsed.tabs) || typeof parsed.activeTabId !== "string") {
       window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY);
@@ -1526,7 +1742,7 @@ export function discardActiveTabSession(): void {
       JSON.stringify({ tabs: remaining, activeTabId: fallback.id }),
     );
   } catch {
-    window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY);
+    try { window.sessionStorage.removeItem(TAB_SESSION_STORAGE_KEY); } catch { /* best effort */ }
   }
 }
 
@@ -2938,78 +3154,237 @@ export function beginMaskWork(): () => void {
 }
 
 let retryTabSessionPersistenceImpl = (): boolean => false;
+let flushTabSessionPersistenceImpl = (): boolean => false;
 
 /** 用户显式重试当前完整页签快照；返回本次是否成功写入浏览器会话。 */
 export function retryTabSessionPersistence(): boolean {
   return retryTabSessionPersistenceImpl();
 }
 
+/** 生命周期收口：同步写入最新稳定草稿，不等待 debounce / idle。 */
+export function flushTabSessionPersistence(): boolean {
+  return flushTabSessionPersistenceImpl();
+}
+
 if (typeof window !== "undefined") {
-  let lastTabSessionJson = "";
+  const bootstrapStorageUnreadable = initialTabSessionReadResult?.unreadable === true;
+  const storedTabMarkers = new Map<string, string>();
+  const attemptedTabMarkers = new Map<string, string>();
+  const failedTabIds = new Set<string>();
   let tabSessionPersistenceDeferred = false;
-  const sessionFingerprint = (state: FlowState): string => {
-    try {
-      return JSON.stringify({
-        tabs: state.tabs,
-        activeTabId: state.activeTabId,
-      });
-    } catch {
-      return "";
+  let tabSessionPersistencePending = false;
+  let forceRetryPending = false;
+  let idleHandle: number | null = null;
+  let debounceHandle: number | null = null;
+
+  const tabMarker = (tab: ProjectTab): string => [
+    tab.projectId,
+    tab.documentEpoch,
+    tab.revision,
+    tab.savedRevision,
+    tab.dirty ? 1 : 0,
+    tab.readOnly ? 1 : 0,
+    tab.saveState,
+  ].join("\u0000");
+  const persistenceSignalChanged = (state: FlowState, previous: FlowState): boolean => {
+    if (state.activeTabId !== previous.activeTabId || state.tabs.length !== previous.tabs.length) {
+      return true;
     }
+    return state.tabs.some((tab, index) => {
+      const previousTab = previous.tabs[index];
+      return !previousTab || tab.id !== previousTab.id || tabMarker(tab) !== tabMarker(previousTab);
+    });
   };
   const publishPersistenceResult = (result: TabSessionWriteResult): void => {
-    // 写失败时旧 key 已被移除；旧成功指纹也必须失效，否则用户撤销回那份
-    // 恰好相同的状态时会被误判为“已经写过”，导致 session 仍为空。
-    if (!result.ok) lastTabSessionJson = "";
     const nextError = result.ok ? null : result.error ?? TAB_SESSION_WRITE_ERROR;
     if (useFlowStore.getState().tabSessionPersistenceError !== nextError) {
       useFlowStore.setState({ tabSessionPersistenceError: nextError });
     }
   };
-  flushDeferredTabSessionPersistence = () => {
-    if (!tabSessionPersistenceDeferred || activeHistoryTransaction) return;
-    tabSessionPersistenceDeferred = false;
-    const state = useFlowStore.getState();
-    const sessionJson = sessionFingerprint(state);
-    if (sessionJson && sessionJson === lastTabSessionJson) return;
-    const result = persistTabSession(state);
-    if (result.ok) lastTabSessionJson = sessionJson;
-    publishPersistenceResult(result);
+
+  const cancelScheduledPersistence = () => {
+    if (idleHandle !== null && typeof window.cancelIdleCallback === "function") {
+      window.cancelIdleCallback(idleHandle);
+    }
+    if (debounceHandle !== null) window.clearTimeout(debounceHandle);
+    idleHandle = null;
+    debounceHandle = null;
   };
-  retryTabSessionPersistenceImpl = () => {
-    const state = useFlowStore.getState();
-    // An explicit retry must not turn an in-flight drag frame into a durable,
-    // apparently clean snapshot. The completed transaction will trigger a write.
-    if (activeHistoryTransaction?.tabId === state.activeTabId) {
-      tabSessionPersistenceDeferred = true;
+
+  const persistLatestStableState = (
+    forceRetry: boolean,
+    allowTransactionRebase = false,
+  ): boolean => {
+    cancelScheduledPersistence();
+    const currentState = useFlowStore.getState();
+    if (bootstrapStorageUnreadable) {
+      tabSessionPersistenceDeferred = false;
+      tabSessionPersistencePending = false;
+      forceRetryPending = false;
+      publishPersistenceResult({ ok: false, error: TAB_SESSION_READ_ERROR });
       return false;
     }
-    const sessionJson = sessionFingerprint(state);
-    const result = persistTabSession(state);
-    if (result.ok) lastTabSessionJson = sessionJson;
-    publishPersistenceResult(result);
-    return result.ok;
+    if (isProjectTabSessionPersistenceSuspended()) {
+      tabSessionPersistenceDeferred = false;
+      tabSessionPersistencePending = false;
+      forceRetryPending = false;
+      return false;
+    }
+    const transaction = activeHistoryTransaction;
+    if (transaction && !allowTransactionRebase) {
+      if (forceRetry) forceRetryPending = true;
+      tabSessionPersistenceDeferred = true;
+      tabSessionPersistencePending = true;
+      return false;
+    }
+    const retryAllTabs = forceRetry || forceRetryPending;
+    forceRetryPending = false;
+    const state = transaction
+      ? {
+          ...currentState,
+          tabs: currentState.tabs.map((tab) => {
+            if (tab.id !== transaction.tabId) return tab;
+            const stableDocument = rebaseDocumentOutsideTransaction(
+              temporalDocument(tab),
+              transaction,
+            );
+            return { ...tab, ...stableDocument };
+          }),
+        }
+      : currentState;
+    tabSessionPersistenceDeferred = false;
+    tabSessionPersistencePending = false;
+
+    const currentIds = new Set(state.tabs.map((tab) => tab.id));
+    for (const tabId of [...storedTabMarkers.keys()]) {
+      if (!currentIds.has(tabId)) storedTabMarkers.delete(tabId);
+    }
+    for (const tabId of [...attemptedTabMarkers.keys()]) {
+      if (!currentIds.has(tabId)) attemptedTabMarkers.delete(tabId);
+    }
+    for (const tabId of [...failedTabIds]) {
+      if (!currentIds.has(tabId)) failedTabIds.delete(tabId);
+    }
+
+    const writeTabIds = new Set<string>();
+    for (const tab of state.tabs) {
+      const marker = tabMarker(tab);
+      if (retryAllTabs || attemptedTabMarkers.get(tab.id) !== marker) writeTabIds.add(tab.id);
+    }
+    const result = persistTabSession(state, {
+      writeTabIds,
+      knownPersistedTabIds: new Set(storedTabMarkers.keys()),
+      unresolvedTabIds: new Set(failedTabIds),
+    });
+    const persistedIds = new Set(result.persistedTabIds);
+    const indeterminateThisAttempt = new Set(result.indeterminateTabIds ?? []);
+    const failedThisAttempt = new Set(
+      (result.failedTabIds ?? []).filter((tabId) => !indeterminateThisAttempt.has(tabId)),
+    );
+    for (const tabId of failedThisAttempt) {
+      failedTabIds.add(tabId);
+      storedTabMarkers.delete(tabId);
+    }
+    for (const tab of state.tabs) {
+      if (!writeTabIds.has(tab.id)) continue;
+      const marker = tabMarker(tab);
+      attemptedTabMarkers.set(tab.id, marker);
+      if (!failedThisAttempt.has(tab.id) && persistedIds.has(tab.id)) {
+        failedTabIds.delete(tab.id);
+        storedTabMarkers.set(tab.id, marker);
+      }
+    }
+    const unresolvedFailure = [...failedTabIds].some((tabId) => currentIds.has(tabId));
+    const ok = result.manifestWritten && !unresolvedFailure;
+    publishPersistenceResult({
+      ok,
+      ...(!ok ? { error: result.error ?? TAB_SESSION_WRITE_ERROR } : {}),
+    });
+    return ok;
   };
-  useFlowStore.subscribe((state, previousState) => {
-    // Drag frames are live UI state until endHistoryTransaction commits their
-    // final coordinates together with revision/dirty. Preserve the last durable
-    // snapshot so a crash/refresh during the drag restores the pre-drag document.
-    if (activeHistoryTransaction?.tabId === state.activeTabId) {
+
+  const runScheduledPersistence = () => {
+    idleHandle = null;
+    if (!tabSessionPersistencePending) return;
+    persistLatestStableState(false);
+  };
+  const scheduleIdlePersistence = () => {
+    if (typeof window.requestIdleCallback === "function") {
+      let ranSynchronously = false;
+      const handle = window.requestIdleCallback(() => {
+        ranSynchronously = true;
+        runScheduledPersistence();
+      }, { timeout: 500 });
+      if (!ranSynchronously) idleHandle = handle;
+      return;
+    }
+    runScheduledPersistence();
+  };
+  const scheduleTabSessionPersistence = () => {
+    if (bootstrapStorageUnreadable) return;
+    if (isProjectTabSessionPersistenceSuspended()) return;
+    tabSessionPersistencePending = true;
+    cancelScheduledPersistence();
+    let ranSynchronously = false;
+    const handle = window.setTimeout(() => {
+      ranSynchronously = true;
+      debounceHandle = null;
+      scheduleIdlePersistence();
+    }, 250);
+    if (!ranSynchronously) debounceHandle = handle;
+  };
+
+  flushDeferredTabSessionPersistence = () => {
+    if (activeHistoryTransaction) {
       tabSessionPersistenceDeferred = true;
       return;
     }
-    // 页签文档变化会直接替换 tabs；历史/SSE/viewer 等全局状态无需序列化项目。
-    if (state.tabs === previousState.tabs && state.activeTabId === previousState.activeTabId) return;
-    const sessionJson = sessionFingerprint(state);
-    if (sessionJson && sessionJson === lastTabSessionJson) return;
-    const result = persistTabSession(state);
-    if (result.ok) lastTabSessionJson = sessionJson;
-    publishPersistenceResult(result);
+    if (!tabSessionPersistenceDeferred && !tabSessionPersistencePending) return;
+    tabSessionPersistenceDeferred = false;
+    scheduleTabSessionPersistence();
+  };
+  retryTabSessionPersistenceImpl = () => persistLatestStableState(true);
+  flushTabSessionPersistenceImpl = () => persistLatestStableState(false, true);
+  flushPendingTabSessionPersistence = () => {
+    if (!tabSessionPersistencePending && !tabSessionPersistenceDeferred) return true;
+    return persistLatestStableState(false);
+  };
+
+  useFlowStore.subscribe((state, previousState) => {
+    if (!persistenceSignalChanged(state, previousState)) return;
+    if (activeHistoryTransaction) {
+      tabSessionPersistenceDeferred = true;
+      tabSessionPersistencePending = true;
+      return;
+    }
+    scheduleTabSessionPersistence();
   });
+
   const initialState = useFlowStore.getState();
-  const initialResult = persistTabSession(initialState);
-  if (initialResult.ok) lastTabSessionJson = sessionFingerprint(initialState);
-  publishPersistenceResult(initialResult);
+  const restoredManifest = initialTabSessionReadResult?.manifest;
+  if (bootstrapStorageUnreadable) {
+    publishPersistenceResult({ ok: false, error: TAB_SESSION_READ_ERROR });
+  } else if (restoredManifest) {
+    clearUnreferencedProjectTabSessionStorage(
+      window.sessionStorage,
+      new Set(restoredManifest.tabIds),
+    );
+    for (const tab of initialState.tabs) {
+      if (!restoredManifest.tabIds.includes(tab.id)) continue;
+      const marker = tabMarker(tab);
+      storedTabMarkers.set(tab.id, marker);
+      attemptedTabMarkers.set(tab.id, marker);
+    }
+    const recoveredIds = initialState.tabs.map((tab) => tab.id);
+    const manifestMatches = (
+      restoredManifest.activeTabId === initialState.activeTabId &&
+      restoredManifest.tabIds.length === recoveredIds.length &&
+      restoredManifest.tabIds.every((tabId, index) => tabId === recoveredIds[index])
+    );
+    if (!manifestMatches) scheduleTabSessionPersistence();
+  } else {
+    persistLatestStableState(true);
+  }
 }
 
 /** 登录后以服务器历史为准，恢复仍在当前服务进程中执行的任务。 */

@@ -58,16 +58,18 @@ Phase A 本地行为证据：`flow-history` 19/19、`selection-consistency` 11/1
 - [x] selection、viewer、compare、运行状态、测量尺寸和临时 UI 不进入文档。
 - [x] tabs 中活动文档成为唯一数据源；移除依赖订阅顺序的双向复制同步。
 - [x] 保留兼容 selector，分步迁移消费者。
-- [ ] session 持久化按文档 revision / 页签拓扑触发，并 debounce 或 idle flush。
-- [ ] 草稿按页签隔离；单页签配额失败不删除其他草稿。
+- [x] session 持久化按文档 revision / 页签拓扑触发，并 debounce 或 idle flush。
+- [x] 草稿按页签隔离；单页签配额失败不删除其他草稿。
 - [ ] 连续输入形成合理撤销粒度，不逐键序列化完整 tabs。
-- [ ] 刷新、切页、后台任务、坏页签、配额失败、撤销重做和跨账号清理均有测试。
+- [x] 刷新、切页、后台任务、坏页签、配额失败、撤销重做和跨账号清理均有测试。
 
 Phase B1 本地证据：项目保存、模板保存、运行计划与 v1 浏览器草稿统一走同一纯文档 serializer；9 种节点的运行态、错误、选择、测量、React Flow 外壳与未知字段均被剥离，wire 仅补 `status: idle`。服务端严格 canonicalization、v0/v1 模板读取、历史不兼容 v2 内置模板修复与全新目录六份模板均有回归。`document-snapshot`、`workflow-schema` 22/22、`project-tabs-session`、`project-tabs` 35/35、`npm run check` 与生产构建通过；三名独立审计最终均为 APPROVE。
 
 Phase B2 本地证据：建立完整活动文档 selector 边界，并将画布、顶栏、属性/结果面板、节点、模板、复制粘贴与命令式 `getState()` 路径全部迁移。TypeScript TypeChecker 架构门禁扫描 57 个 `flowStore` 外的消费者源文件，拒绝绕过 selector 直读 14 个临时镜像字段，并以故意违规的参数解构/重命名负向探针防止门禁空跑。印花素材异步保存修复了请求期间切页后误回写新页签的竞态，回归验证始终定向发起命令的原页签。`npm run check` 含完整隔离 PostgreSQL 套件通过；GitNexus 因涉及 48 个已变更符号、41 个受影响符号与多条画布/页签流程评为 critical，已用页签、选择、历史、会话与全套回归覆盖，三次独立审计最终均为 APPROVE。
 
 Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真相，`FlowState` 已删除 14 个顶层镜像字段、镜像 helper 和同步 subscriber；selector 直接返回 `tabs` 内原始对象引用。文档、选择、结果引用、保存元数据、SSE 回写、会话草稿与页签切换都以单次 `tabs` 替换原子发布。zundo 仅作为每页签历史栈记录器，公开与应用内 undo/redo 统一由 canonical 页签回放适配器执行，不会生成顶层幽灵字段，并保留服务端运行态、选择与 React Flow 测量瞬态。所有保存、运行、上传、素材选择、蒙版和印花素材异步回写在发起时捕获不可变 `DocumentTarget(tabId, projectId, documentEpoch)`，因此同一页签整体换项目后，旧响应也不能污染新文档。`npm run check`、`npm run build`、`git diff --check` 通过；历史 21/21、页签 37/37、选择 11/11、会话 13/13、结果 20/20、活动文档边界 5/5，共 107 项高风险定向回归通过。GitNexus 最终识别 131 个变更符号、110 个受影响符号与 12 个索引文件，风险为 critical；范围与本次横切单一数据源及异步身份迁移一致。三轮独立终审均为 APPROVE，无 P0–P3。
+
+Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分片，以 `projectId / documentEpoch / revision / savedRevision / dirty / readOnly / saveState` 和页签拓扑为稳定信号，250 ms trailing debounce 后在 idle 写入，`pagehide` / hidden 同步收口。单页签 quota 失败仅隔离该分片，健康新页签仍可发布拓扑；legacy 迁移和 manifest 发布失败保留上一完整恢复点。Storage 读取抛错与确定缺失/写失败已分类：瞬时读异常不修剪 manifest、不清理分片，启动时读取不完则停用本页 writer；跨账号清理会先永久停用旧页面 writer，并验证旧草稿确已删除后才绑定新 owner。`project-tabs-session`、`auth-client`、历史/页签/选择定向回归、`npm run check`、`npm run build` 与 `git diff --check` 均通过；未发送真实 AI 请求。
 
 ### C. 首次生成黄金路径
 
@@ -121,13 +123,13 @@ Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真�
 | 门禁 | 最新结果 | 证据/备注 |
 | --- | --- | --- |
 | `npm ci` | 通过 | 2026-08-24；依赖安装完成，未使用真实 AI 配置 |
-| `npm run check` | 通过 | 2026-08-25；Phase B3 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；仅使用 dummy/stub AI |
+| `npm run check` | 通过 | 2026-08-25；Phase B4 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；仅使用 dummy/stub AI |
 | `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
 | production browser smoke | 待实现 | Phase E |
-| `npm run build` | 通过 | 2026-08-25；Phase B3 Web + server；主 JS 734.01 kB / gzip 234.37 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
+| `npm run build` | 通过 | 2026-08-25；Phase B4 Web + server；主 JS 740.39 kB / gzip 236.30 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
-| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B3 最终差异为 critical：131 changed / 110 affected / 12 indexed files。范围为 canonical tabs、文档 mutation/history、页签生命周期、异步 DocumentTarget、SSE/结果引用与 session 序列化；完整 `npm run check` 及六类共 107 项高风险定向回归覆盖 |
+| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B4 最终差异为 critical：208 changed / 20 affected / 8 indexed files。范围为 v2 分片草稿、debounce/lifecycle flush、Storage 异常分类、跨账号清理与拖拽事务稳定边界；完整 `npm run check` 及 session/auth/history/tabs/selection 定向回归覆盖 |
 | GitHub CI | Phase B B3 checkpoint 通过 | [Actions 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 对应 `e3672fc`，检查、11 项桌面浏览器回归与生产构建全部成功；Phase A [合并后 main 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) 已成功 |
 | Codex Cloud Review | Phase B B3 checkpoint 通过 | [精确头审查 5405637505](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 对应 `e3672fc720`，未发现重大问题；Phase A [最终审查 5398788404](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404) 同样通过 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
@@ -154,6 +156,8 @@ Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真�
 | 2026-08-25 | canonical tabs 与 zundo 回放 | 顶层活动文档镜像与同步 subscriber 已删除。zundo 继续保管每页签 past/future，但不再将 partial snapshot 直接合并到根 Store；所有回放原子替换活动 `ProjectTab`，并保留 runtime、selection、edge selection 与 React Flow 测量瞬态。 |
 | 2026-08-25 | 同页签整体换项目的异步身份 | 仅固定 `tabId` 仍可能让旧保存、运行或上传响应写入同一容器中的新项目；异步边界统一改为捕获并校验 `tabId + projectId + documentEpoch`，保存队列和运行准备键也使用完整身份。 |
 | 2026-08-25 | 切页取消拖拽回滚 | 取消事务回到起点时显式不保留 `dragging`，并直接断言后台 canonical 页签内存状态，避免依赖 session sanitize 掩盖永久拖拽态。 |
+| 2026-08-25 | 分片草稿与发布边界 | manifest 只引用已确认存在的页签分片；单页签 quota 失败不得阻断健康拓扑，manifest 发布或 legacy 迁移未完成时保留上一完整恢复点。 |
+| 2026-08-25 | Storage 读异常与账号安全 | `getItem` 抛错是归属/存在性未知，不能降级为缺失并清理。启动恢复不完时 fail-closed 停 writer；认证绑定期间读失败则通过重载隔离已恢复内存画布。 |
 
 ## 更新规则
 

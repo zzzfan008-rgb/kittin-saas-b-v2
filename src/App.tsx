@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
+  flushTabSessionPersistence,
   reconcileRunHistory,
   recentResultsPatch,
   resumeRecentResults,
@@ -160,6 +161,19 @@ function Workspace() {
 
   useEffect(() => () => {
     setGenerationSafetyBlockReason("正在确认运行历史，完成前暂停新的生成任务");
+  }, []);
+
+  useEffect(() => {
+    const flushDrafts = () => { flushTabSessionPersistence(); };
+    const flushHiddenDrafts = () => {
+      if (document.visibilityState === "hidden") flushDrafts();
+    };
+    window.addEventListener("pagehide", flushDrafts);
+    document.addEventListener("visibilitychange", flushHiddenDrafts);
+    return () => {
+      window.removeEventListener("pagehide", flushDrafts);
+      document.removeEventListener("visibilitychange", flushHiddenDrafts);
+    };
   }, []);
 
   useEffect(() => {

@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import {
+  isProjectTabSessionPersistenceSuspended,
+  projectTabStorageKey,
+} from "../src/lib/tabSessionStorage";
 import {
   AUTH_CHANGE_STORAGE_KEY,
   authChangeFromStorageEvent,
@@ -22,6 +27,8 @@ function memoryStorage(initial: Record<string, string> = {}) {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
     removeItem: (key: string) => { values.delete(key); },
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() { return values.size; },
     has: (key: string) => values.has(key),
   };
 }
@@ -58,9 +65,15 @@ assert.equal(noticeValues.get("garment-canvas-project-tabs"), "unsaved-draft");
 console.log("  ✓ 强制退出只记录原因，不删除未保存画布");
 
 const removed: string[] = [];
+assert.equal(isProjectTabSessionPersistenceSuspended(), false);
 clearLocalWorkspace(
   { removeItem: (key) => removed.push(`session:${key}`) },
   { removeItem: (key) => removed.push(`local:${key}`) },
+);
+assert.equal(
+  isProjectTabSessionPersistenceSuspended(),
+  false,
+  "低层定向清理本身不应永久关闭一个仍会继续使用的空工作区",
 );
 assert.deepEqual(removed, [
   "session:garment-canvas-project-tabs",
@@ -85,6 +98,111 @@ assert.deepEqual(cleanupAttempts, [
 ]);
 console.log("  ✓ 单个缓存键清理失败不阻断其它跨账号状态清理");
 
+const v2Manifest = JSON.stringify({
+  schemaVersion: 2,
+  activeTabId: "tab-a",
+  tabIds: ["tab-a", "tab-b"],
+});
+const fragmentedSession = memoryStorage({
+  "garment-canvas-workspace-owner-id": "user-a",
+  "garment-canvas-project-tabs": v2Manifest,
+  "garment-canvas-project-tab:tab-a": "draft-a",
+  "garment-canvas-project-tab:tab-b": "draft-b",
+  "garment-canvas-project-tab:orphan": "orphan-draft",
+  "garment-canvas-ambiguous-run-requests": "request-a",
+  "unrelated-session-key": "keep-me",
+});
+const fragmentedLocal = memoryStorage({ "garment-canvas-recent-results": "history-a" });
+clearLocalWorkspace(fragmentedSession, fragmentedLocal);
+assert.equal(fragmentedSession.has("garment-canvas-project-tabs"), false);
+assert.equal(fragmentedSession.has("garment-canvas-project-tab:tab-a"), false);
+assert.equal(fragmentedSession.has("garment-canvas-project-tab:tab-b"), false);
+assert.equal(fragmentedSession.has("garment-canvas-project-tab:orphan"), false);
+assert.equal(fragmentedSession.has("garment-canvas-ambiguous-run-requests"), false);
+assert.equal(fragmentedLocal.has("garment-canvas-recent-results"), false);
+assert.equal(fragmentedSession.has("garment-canvas-workspace-owner-id"), true);
+assert.equal(fragmentedSession.has("unrelated-session-key"), true);
+console.log("  ✓ 跨账号清理会删除 v2 manifest 引用草稿与可枚举孤儿草稿");
+
+function storageWithBrokenEnumeration(
+  brokenMember: "key" | "length",
+  projectTabsRoot = v2Manifest,
+) {
+  const values = new Map(Object.entries({
+    "garment-canvas-project-tabs": projectTabsRoot,
+    "garment-canvas-project-tab:tab-a": "draft-a",
+    "garment-canvas-project-tab:tab-b": "draft-b",
+    "garment-canvas-project-tab:orphan": "orphan-draft",
+    "garment-canvas-ambiguous-run-requests": "request-a",
+  }));
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    removeItem: (key: string) => { values.delete(key); },
+    has: (key: string) => values.has(key),
+  } as {
+    getItem(key: string): string | null;
+    removeItem(key: string): void;
+    has(key: string): boolean;
+    key?: (index: number) => string | null;
+    readonly length?: number;
+  };
+  if (brokenMember === "key") {
+    Object.defineProperty(storage, "key", {
+      get: () => { throw new Error("key unavailable"); },
+    });
+    Object.defineProperty(storage, "length", {
+      get: () => values.size,
+    });
+  } else {
+    storage.key = (index) => [...values.keys()][index] ?? null;
+    Object.defineProperty(storage, "length", {
+      get: () => { throw new Error("length unavailable"); },
+    });
+  }
+  return storage;
+}
+
+for (const brokenMember of ["key", "length"] as const) {
+  const brokenEnumerationSession = storageWithBrokenEnumeration(brokenMember);
+  const brokenEnumerationLocal = memoryStorage({
+    "garment-canvas-recent-results": "history-a",
+  });
+  clearLocalWorkspace(brokenEnumerationSession, brokenEnumerationLocal);
+  assert.equal(brokenEnumerationSession.has("garment-canvas-project-tabs"), false, brokenMember);
+  assert.equal(brokenEnumerationSession.has("garment-canvas-project-tab:tab-a"), false, brokenMember);
+  assert.equal(brokenEnumerationSession.has("garment-canvas-project-tab:tab-b"), false, brokenMember);
+  assert.equal(
+    brokenEnumerationSession.has("garment-canvas-project-tab:orphan"),
+    true,
+    `${brokenMember} 不可用时无法发现孤儿 key，但不能阻断 manifest 引用清理`,
+  );
+  assert.equal(brokenEnumerationSession.has("garment-canvas-ambiguous-run-requests"), false, brokenMember);
+  assert.equal(brokenEnumerationLocal.has("garment-canvas-recent-results"), false, brokenMember);
+}
+console.log("  ✓ key/length 枚举 getter 异常时仍清理 manifest 引用与其他账号缓存");
+
+const interruptedMigrationSession = storageWithBrokenEnumeration("key", JSON.stringify({
+  activeTabId: "tab-a",
+  tabs: [{ id: "tab-a" }, { id: "tab-b" }],
+}));
+clearLocalWorkspace(interruptedMigrationSession, memoryStorage());
+assert.equal(interruptedMigrationSession.has("garment-canvas-project-tab:tab-a"), false);
+assert.equal(interruptedMigrationSession.has("garment-canvas-project-tab:tab-b"), false);
+console.log("  ✓ legacy 迁移中断且无法枚举时仍按单体引用清理已写分片");
+
+const malformedTabId = "\ud800";
+const malformedTabKey = projectTabStorageKey(malformedTabId);
+const malformedIdSession = memoryStorage({
+  "garment-canvas-project-tabs": JSON.stringify({
+    activeTabId: malformedTabId,
+    tabs: [{ id: malformedTabId }],
+  }),
+  [malformedTabKey]: "malformed-id-draft",
+});
+assert.equal(clearLocalWorkspace(malformedIdSession, memoryStorage()), true);
+assert.equal(malformedIdSession.has(malformedTabKey), false);
+console.log("  ✓ 非法 UTF-16 tabId 不会中断跨账号草稿清理");
+
 const sameAccountSession = memoryStorage({
   "garment-canvas-workspace-owner-id": "user-a",
   "garment-canvas-project-tabs": "draft-a",
@@ -98,6 +216,66 @@ assert.equal(sameAccountSession.getItem("garment-canvas-project-tabs"), "draft-a
 assert.equal(sameAccountLocal.getItem("garment-canvas-recent-results"), "history-a");
 console.log("  ✓ 同一账号重新登录保留未保存画布");
 
+const firstAuthenticatedSession = memoryStorage();
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(firstAuthenticatedSession, memoryStorage(), "user-first"),
+  "preserved",
+);
+assert.equal(readWorkspaceOwner(firstAuthenticatedSession), "user-first");
+assert.equal(
+  isProjectTabSessionPersistenceSuspended(),
+  false,
+  "首次空工作区绑定后仍需允许本页写入新账号草稿",
+);
+console.log("  ✓ 首次空工作区绑定 owner 时不会误停用新账号草稿写入器");
+
+const ownerOnlyTransition = memoryStorage({
+  "garment-canvas-workspace-owner-id": "user-a",
+});
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(ownerOnlyTransition, memoryStorage(), "user-b"),
+  "cleared",
+  "即使磁盘草稿恰为空，A→B 仍需重载丢弃 A 的内存工作区",
+);
+assert.equal(readWorkspaceOwner(ownerOnlyTransition), "user-b");
+console.log("  ✓ owner-only A→B 仍强制重载，不留下已停用但继续运行的工作区");
+
+let failOldRootRemovalOnce = true;
+const cleanupFailureValues = new Map(Object.entries({
+  "garment-canvas-workspace-owner-id": "user-a",
+  "garment-canvas-project-tabs": "legacy-a-draft",
+}));
+const cleanupFailureSession = {
+  get length() { return cleanupFailureValues.size; },
+  getItem: (key: string) => cleanupFailureValues.get(key) ?? null,
+  key: (index: number) => [...cleanupFailureValues.keys()][index] ?? null,
+  setItem: (key: string, value: string) => { cleanupFailureValues.set(key, value); },
+  removeItem: (key: string) => {
+    if (key === "garment-canvas-project-tabs" && failOldRootRemovalOnce) {
+      failOldRootRemovalOnce = false;
+      throw new Error("transient removal failure");
+    }
+    cleanupFailureValues.delete(key);
+  },
+};
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(cleanupFailureSession, memoryStorage(), "user-b"),
+  "cleared",
+);
+assert.equal(cleanupFailureSession.getItem("garment-canvas-project-tabs"), "legacy-a-draft");
+assert.equal(
+  cleanupFailureSession.getItem("garment-canvas-workspace-owner-id"),
+  null,
+  "旧草稿未确认删除时绝不能把 owner 绑定到新账号",
+);
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(cleanupFailureSession, memoryStorage(), "user-b"),
+  "cleared",
+);
+assert.equal(cleanupFailureSession.getItem("garment-canvas-project-tabs"), null);
+assert.equal(cleanupFailureSession.getItem("garment-canvas-workspace-owner-id"), "user-b");
+console.log("  ✓ 定向清理失败时不绑定新 owner，重载重试成功后才允许账号接管");
+
 const switchedSession = memoryStorage({
   "garment-canvas-workspace-owner-id": "user-a",
   "garment-canvas-project-tabs": "draft-a",
@@ -105,6 +283,7 @@ const switchedSession = memoryStorage({
 });
 const switchedLocal = memoryStorage({ "garment-canvas-recent-results": "history-a" });
 assert.equal(prepareWorkspaceForLogin(switchedSession, switchedLocal, "user-b"), "cleared");
+assert.equal(isProjectTabSessionPersistenceSuspended(), true);
 assert.equal(switchedSession.has("garment-canvas-project-tabs"), false);
 assert.equal(switchedSession.has("garment-canvas-ambiguous-run-requests"), false);
 assert.equal(switchedLocal.has("garment-canvas-recent-results"), false);
@@ -207,6 +386,28 @@ assert.equal(
 );
 console.log("  ✓ 会话替换和退出事件同样可通知其他页签立即终止工作区");
 
+const mixedAvailabilitySession = memoryStorage({
+  "garment-canvas-workspace-owner-id": "user-a",
+  "garment-canvas-project-tabs": "draft-a",
+});
+const unavailableHistoryStorage = {
+  getItem: (_key: string): string | null => { throw new Error("local history unavailable"); },
+  removeItem: (_key: string): void => undefined,
+};
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(mixedAvailabilitySession, unavailableHistoryStorage, "user-b"),
+  "cleared",
+);
+assert.equal(mixedAvailabilitySession.has("garment-canvas-project-tabs"), false);
+assert.equal(readWorkspaceOwner(mixedAvailabilitySession), "user-b");
+mixedAvailabilitySession.setItem("garment-canvas-project-tabs", "fresh-b-draft");
+assert.equal(
+  bindWorkspaceToAuthenticatedUser(mixedAvailabilitySession, unavailableHistoryStorage, "user-b"),
+  "preserved",
+  "local history 不可读不能让已隔离的 session workspace 永久 reload",
+);
+console.log("  ✓ local history 不可用时 session 草稿仍可完成一次隔离并稳定绑定新 owner");
+
 const unavailableSessionStorage = {
   getItem: (_key: string): string | null => { throw new Error("storage disabled"); },
   setItem: (_key: string, _value: string): void => { throw new Error("storage disabled"); },
@@ -244,4 +445,17 @@ assert.equal(
   true,
   "已清理旧缓存时仍须重载丢弃模块初始化时恢复的内存画布",
 );
+assert.equal(
+  shouldReloadForAuthenticatedUserTransition(null, "user-b", "unavailable", true),
+  true,
+  "启动已恢复 A 草稿后存储才失效时，首次 /me 不得将 A 内存画布交给 B",
+);
 console.log("  ✓ 存储完全不可用时仍以当前已认证 userId 阻断 A→B 内存画布复用");
+
+const authContextSource = readFileSync(new URL("../src/auth/AuthContext.tsx", import.meta.url), "utf8");
+assert.match(
+  authContextSource,
+  /if \(shouldReloadForAuthenticatedUserTransition[\s\S]{0,500}?didRestoreProjectTabSessionWorkspace\(\)[\s\S]{0,800}?suspendProjectTabSessionPersistence\(\);[\s\S]{0,500}?window\.location\.reload\(\)/,
+  "A→B 内存身份变化必须在 reload/pagehide 前停用旧账号草稿写入器",
+);
+console.log("  ✓ A→B 内存身份变化在 reload 前停用旧页写入器");

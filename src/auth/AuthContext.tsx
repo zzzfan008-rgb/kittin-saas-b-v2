@@ -12,6 +12,8 @@ import {
   type SessionEndReason,
 } from "./session";
 import { suppressWorkspaceUnloadWarning } from "@/lib/workspaceUnload";
+import { suspendProjectTabSessionPersistence } from "@/lib/tabSessionStorage";
+import { didRestoreProjectTabSessionWorkspace } from "@/store/flowStore";
 
 export interface CurrentUser {
   id: string;
@@ -80,8 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authenticatedUserId.current,
           body.user.id,
           workspace,
+          didRestoreProjectTabSessionWorkspace(),
         )) {
           // 共享 cookie 可能已切换账号；即使存储不可用，也必须重载丢弃旧账号内存画布。
+          suspendProjectTabSessionPersistence();
           authenticatedUserId.current = null;
           sessionEnded.current = true;
           refreshSequence.current += 1;
