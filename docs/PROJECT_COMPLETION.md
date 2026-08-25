@@ -128,7 +128,7 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | `npm run check` | 通过 | 2026-08-25；Phase B5 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；新增 9 项文本事务与 session 单次分片写入回归，仅使用 dummy/stub AI |
 | `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
 | production browser smoke | 待实现 | Phase E |
-| `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 745.37 kB / gzip 237.87 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
+| `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 745.36 kB / gzip 237.87 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
 | GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B5 差异为 critical：50 changed / 202 affected / 14 indexed files。范围为统一文本事务、所有 durable mutation 前置 flush、IME/生命周期与输入消费者；完整 `npm run check`、文本/session/history/tabs/save/run 回归覆盖，import cycle 为 0 |

@@ -144,6 +144,9 @@ await test("IME 候选确认 Enter 的 compositionend 后 keyup 不成为多行�
   guard.markKeyDown("Enter", false);
   assert.equal(guard.consumeKeyUp("Enter"), false);
   guard.markKeyDown("Enter", true);
+  guard.markKeyDown("Enter", false);
+  assert.equal(guard.consumeKeyUp("Enter"), false);
+  guard.markKeyDown("Enter", true);
   guard.reset();
   assert.equal(guard.consumeKeyUp("Enter"), false);
 });

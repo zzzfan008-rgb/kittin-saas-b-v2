@@ -27,7 +27,7 @@ export function createCompositionEnterGuard() {
   let pendingEnterKeyUp = false;
   return {
     markKeyDown(key: string, composing: boolean) {
-      if (key === "Enter" && composing) pendingEnterKeyUp = true;
+      if (key === "Enter") pendingEnterKeyUp = composing;
     },
     consumeKeyUp(key: string) {
       if (key !== "Enter" || !pendingEnterKeyUp) return false;
