@@ -18,8 +18,8 @@
 | 上一阶段 PR | 已合并 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) |
 | 基线提交 | 已确认 | `d50aa6dc46fcdea23368c4c547683a582b9ca49a` |
 | 基线 main CI | 通过 | [GitHub Actions 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) |
-| 当前工作分支 | 进行中 | `codex/document-persistence-boundary` |
-| GitNexus | 已重建 | Phase B5 工作树索引：16,213 nodes、35,266 edges、218 clusters、300 flows；索引未写入仓库 |
+| 当前工作分支 | 待用户确认 | `codex/document-persistence-boundary`；PR #3 尚未合并 |
+| GitNexus | 已重建 | Phase B5 工作树索引：16,275 nodes、35,367 edges、217 clusters、300 flows；索引未写入仓库 |
 
 ## 阶段进度
 
@@ -28,7 +28,7 @@
 | 阶段 | 状态 | 交付范围 | PR | CI | Cloud Review |
 | --- | --- | --- | --- | --- | --- |
 | A 状态正确性与撤销事务 | 已完成 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012)与[合并后 main](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095)通过 | [最终精确头审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404)无重大问题 |
-| B 文档与持久化边界 | 进行中 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [B3 checkpoint CI 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 通过 | B1、B2、B3 各三次独立本地审计 APPROVE；[B3 精确头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 无重大问题 |
+| B 文档与持久化边界 | 待用户确认 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [最终代码头 CI 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 通过 | B1–B3 独立本地审计 APPROVE；[最终代码头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，5 个线程全部解决 |
 | C 首次生成黄金路径 | 未开始 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | — | — | — |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
 | E 生产产物与 CI | 未开始 | production Playwright smoke、CI 顺序、runner 信号清理 | — | — | — |
@@ -71,7 +71,7 @@ Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真�
 
 Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分片，以 `projectId / documentEpoch / revision / savedRevision / dirty / readOnly / saveState` 和页签拓扑为稳定信号，250 ms trailing debounce 后在 idle 写入，`pagehide` / hidden 同步收口。单页签 quota 失败仅隔离该分片，健康新页签仍可发布拓扑；legacy 迁移和 manifest 发布失败保留上一完整恢复点。Storage 读取抛错与确定缺失/写失败已分类：瞬时读异常不修剪 manifest、不清理分片，启动时读取不完则停用本页 writer；跨账号清理会先永久停用旧页面 writer，并验证旧草稿确已删除后才绑定新 owner。`project-tabs-session`、`auth-client`、历史/页签/选择定向回归、`npm run check`、`npm run build` 与 `git diff --check` 均通过；未发送真实 AI 请求。
 
-Phase B5 本地证据：项目名、节点标题、提示词与结果备注统一接入 800 ms 空闲收口的文本事务。输入过程直接更新 canonical 文档供界面实时显示，但不逐键增加 revision、history 或 session 写入；blur、单行 Enter、多行 Enter 后、IME composition end、切页/关页/新建/载入、保存、运行、撤销重做、拖拽开始、同文档后台 success 回写及 `pagehide` / hidden / beforeunload 均先提交当前 burst。IME 候选确认 Enter 会跨 `keydown → compositionend → keyup` 保留身份并吞掉对应 keyup，避免被误判为多行提交边界。事务 token 固定 `tabId + projectId + documentEpoch + field`，迟到的 blur/组合事件不能污染新页签或同容器新项目；所有运行事件在任何 durable 分支前同样完成全目标校验，旧项目 success 不能因复用同一 tab 容器而提交新项目的 IME；NodeFrame 的 Escape 仅恢复所属字段；后台页签的 durable success 独立写入该页签 history，不结束前台页签正在进行的输入或 IME 事务。新增 9 项文本事务回归，并在真实 session scheduler 中验证一个 burst 只增加一次 revision、写一次页签分片。Cloud 对 B4 的迟到 P1 指出恢复页签在活动任务对账完成前看似 idle、可能被关闭；现由 ProjectTabs 与 canonical `closeTab` 双层复用冷启动安全门，在 loading/error 时 fail-closed，对账 ready 后才开放关闭，并新增行为与源码契约回归。完整 `npm run check`、Web/server 构建、`git diff --check` 与 0 import cycle 均通过。GitNexus 因统一边界横切所有文档 mutation 评为 critical（50 changed / 202 affected / 14 indexed files），已由历史、页签、session、保存/运行与全套隔离回归覆盖；未发送真实 AI 请求。
+Phase B5 本地证据：项目名、节点标题、提示词与结果备注统一接入 800 ms 空闲收口的文本事务。输入过程直接更新 canonical 文档供界面实时显示，但不逐键增加 revision、history 或 session 写入；blur、单行 Enter、多行 Enter 后、IME composition end、切页/关页/新建/载入、保存、运行、撤销重做、拖拽开始、同文档后台 success 回写及 `pagehide` / hidden / beforeunload 均先提交当前 burst。IME 候选确认 Enter 会跨 `keydown → compositionend → keyup` 保留身份并吞掉对应 keyup，避免被误判为多行提交边界；若该 keyup 丢失，下一次普通 Enter keydown 会清理陈旧抑制。事务 token 固定 `tabId + projectId + documentEpoch + field`，迟到的 blur/组合事件不能污染新页签或同容器新项目；所有运行事件在任何 durable 分支前同样完成全目标校验，旧项目 success 不能因复用同一 tab 容器而提交新项目的 IME；NodeFrame 的 Escape 仅恢复所属字段；后台页签的 durable success 独立写入该页签 history，不结束前台页签正在进行的输入或 IME 事务。新增 9 项文本事务回归，并在真实 session scheduler 中验证一个 burst 只增加一次 revision、写一次页签分片。Cloud 对 B4/B5 共提出 1 个 P1 与 4 个 P2，均已补行为回归并解决全部 5 个线程；[最终代码头 `34b3665` 精确审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，[CI #24](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 成功。完整 `npm run check`、Web/server 构建、`git diff --check` 与 0 import cycle 均通过。GitNexus 因统一边界横切所有文档 mutation 评为 critical（50 changed / 202 affected / 14 indexed files），已由历史、页签、session、保存/运行与全套隔离回归覆盖；未发送真实 AI 请求。
 
 ### C. 首次生成黄金路径
 
@@ -132,8 +132,8 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
 | GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B5 差异为 critical：50 changed / 202 affected / 14 indexed files。范围为统一文本事务、所有 durable mutation 前置 flush、IME/生命周期与输入消费者；完整 `npm run check`、文本/session/history/tabs/save/run 回归覆盖，import cycle 为 0 |
-| GitHub CI | Phase B B3 checkpoint 通过 | [Actions 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 对应 `e3672fc`，检查、11 项桌面浏览器回归与生产构建全部成功；Phase A [合并后 main 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) 已成功 |
-| Codex Cloud Review | Phase B B3 checkpoint 通过 | [精确头审查 5405637505](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 对应 `e3672fc720`，未发现重大问题；Phase A [最终审查 5398788404](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404) 同样通过 |
+| GitHub CI | Phase B 最终代码头通过 | [Actions 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 对应 `34b3665`，检查、11 项桌面浏览器回归与生产构建全部成功；纯文档证据头仍需自身 CI |
+| Codex Cloud Review | Phase B 最终代码头通过 | [精确头审查 5409048696](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 对应 `34b366525c`，未发现重大问题且无未解决线程；纯文档证据头仍需精确复审 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
 
 ## 已知风险与决策日志
