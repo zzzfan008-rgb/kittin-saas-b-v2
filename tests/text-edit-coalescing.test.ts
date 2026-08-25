@@ -11,6 +11,7 @@ import {
   type DocumentTarget,
   type FlowNode,
 } from "../src/store/flowStore";
+import { createCompositionEnterGuard } from "../src/hooks/useCoalescedTextEdit";
 
 let passed = 0;
 
@@ -133,6 +134,20 @@ await test("IME 组合输入期间不会被空闲计时器中途提交", async (
   assert.equal(prompt(), "衣身保持不变");
 });
 
+await test("IME 候选确认 Enter 的 compositionend 后 keyup 不成为多行提交边界", () => {
+  const guard = createCompositionEnterGuard();
+  guard.markKeyDown("Enter", true);
+  // compositionend happens here and intentionally does not clear the guard.
+  assert.equal(guard.consumeKeyUp("Enter"), true);
+  assert.equal(guard.consumeKeyUp("Enter"), false);
+
+  guard.markKeyDown("Enter", false);
+  assert.equal(guard.consumeKeyUp("Enter"), false);
+  guard.markKeyDown("Enter", true);
+  guard.reset();
+  assert.equal(guard.consumeKeyUp("Enter"), false);
+});
+
 await test("标签切换先提交源标签文本，旧 token 不能写入新项目", () => {
   resetDocument("tab-source");
   const sourceTabId = useFlowStore.getState().activeTabId;
@@ -230,18 +245,21 @@ await test("后台页签 success 不会拆分前台页签的输入或 IME 事务
 });
 
 await test("页面退出、关闭页签和所有文本入口都接入统一提交边界", async () => {
-  const [app, projectTabs, topBar, inspector, nodeFrame] = await Promise.all([
+  const [app, projectTabs, topBar, inspector, nodeFrame, textEditHook] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/panels/TopBar.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/nodes/NodeFrame.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/hooks/useCoalescedTextEdit.ts", import.meta.url), "utf8"),
   ]);
   assert.match(app, /flushActiveTextEdit\(\);\s*flushTabSessionPersistence\(\);/);
   assert.match(projectTabs, /flushActiveTextEdit\(\);[\s\S]*useFlowStore\.getState\(\)\.tabs\.find/);
   assert.match(topBar, /useCoalescedTextEdit\(\{ kind: "project-name" \}\)/);
   assert.match(inspector, /field: "label"[\s\S]*field: "prompt"[\s\S]*field: "note"/);
   assert.match(nodeFrame, /labelEdit\.cancel\(\)/);
+  assert.match(textEditHook, /markKeyDown\(event\.key, composing\)/);
+  assert.match(textEditHook, /consumeKeyUp\(event\.key\)\) return/);
 });
 
 console.log(`\n通过 ${passed} 项`);
