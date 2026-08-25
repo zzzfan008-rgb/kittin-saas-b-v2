@@ -1258,6 +1258,21 @@ export function flushActiveTextEdit(token?: CoalescedTextEditToken): boolean {
   return true;
 }
 
+/**
+ * Durable work for an inactive document must not split the foreground editor's
+ * burst. Only the document that owns the edit may force its early commit.
+ */
+function flushActiveTextEditForTarget(target: DocumentTarget): boolean {
+  const edit = activeTextEdit;
+  if (
+    !edit ||
+    edit.token.target.tabId !== target.tabId ||
+    edit.token.target.projectId !== target.projectId ||
+    edit.token.target.documentEpoch !== target.documentEpoch
+  ) return false;
+  return flushActiveTextEdit(edit.token);
+}
+
 /** Restore only the field owned by the active editor, without creating history. */
 export function cancelCoalescedTextEdit(token: CoalescedTextEditToken): boolean {
   const edit = activeTextEdit;
@@ -1384,7 +1399,7 @@ function updateTabNodes(
   update: (nodes: FlowNode[]) => FlowNode[],
   opts?: { markDirty?: boolean },
 ): void {
-  if (opts?.markDirty === true) flushActiveTextEdit();
+  if (opts?.markDirty === true) flushActiveTextEditForTarget(target);
   const currentState = useFlowStore.getState();
   if (!documentForTarget(currentState, target)) return;
   if (opts?.markDirty === true && currentState.activeTabId === target.tabId) {

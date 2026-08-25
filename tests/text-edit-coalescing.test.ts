@@ -177,6 +177,58 @@ await test("异步成功回写前先提交文本，撤销顺序保持为 success
   assert.equal(prompt(), "初始提示词");
 });
 
+await test("后台页签 success 不会拆分前台页签的输入或 IME 事务", () => {
+  resetDocument("background-success");
+  const backgroundTarget = activeTarget();
+  const backgroundTabId = backgroundTarget.tabId;
+  useFlowStore.getState().createBlankTab();
+  useFlowStore.getState().loadFlow({
+    projectId: "coalesced-project-foreground-edit",
+    projectName: "前台连续输入",
+    nodes: [aiNode("foreground-edit")],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+
+  const foregroundBeforeRevision = activeDocument().revision;
+  const token = updateCoalescedTextEdit(
+    { kind: "node-data", nodeId: "foreground-edit", field: "prompt" },
+    "衣身",
+    null,
+    { composing: true },
+  );
+  assert.ok(token);
+
+  applyRunEventToTab(backgroundTarget, "background-success", {
+    type: "node-status",
+    nodeId: "background-success",
+    status: "success",
+    images: ["/api/files/background-success.png"],
+  });
+
+  assert.equal(prompt(), "衣身");
+  assert.equal(activeDocument().revision, foregroundBeforeRevision);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  const backgroundTab = useFlowStore.getState().tabs.find((tab) => tab.id === backgroundTabId);
+  assert.deepEqual(
+    backgroundTab?.nodes[0].data.outputImages,
+    ["/api/files/background-success.png"],
+  );
+
+  const finalToken = updateCoalescedTextEdit(
+    { kind: "node-data", nodeId: "foreground-edit", field: "prompt" },
+    "衣身保持不变",
+    token,
+    { composing: true },
+  );
+  assert.ok(finalToken);
+  assert.equal(setCoalescedTextEditComposing(finalToken, false), true);
+  assert.equal(flushActiveTextEdit(finalToken), true);
+  assert.equal(prompt(), "衣身保持不变");
+  assert.equal(activeDocument().revision, foregroundBeforeRevision + 1);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
+});
+
 await test("页面退出、关闭页签和所有文本入口都接入统一提交边界", async () => {
   const [app, projectTabs, topBar, inspector, nodeFrame] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
