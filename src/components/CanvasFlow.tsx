@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
   Controls,
+  useNodesInitialized,
   useReactFlow,
   type NodeChange,
 } from "@xyflow/react";
@@ -21,10 +22,45 @@ import { PulseEdge } from "./edges/PulseEdge";
 import { nodeTypes } from "./nodes";
 import { useTheme, type ThemeId } from "@/lib/theme";
 import type { NodeKind } from "@/types/workflow";
+import {
+  CANVAS_LANDING_EVENT,
+  consumeCanvasLanding,
+  peekCanvasLanding,
+  type CanvasLandingIntent,
+} from "@/lib/canvasLanding";
 
 export const DND_MIME = "application/garment-node";
 
 const edgeTypes = { pulse: PulseEdge };
+
+function landingControl(nodeId: string): HTMLElement | null {
+  const node = document.querySelector<HTMLElement>(
+    `.react-flow__node[data-id="${CSS.escape(nodeId)}"]`,
+  );
+  if (!node) return null;
+  return node.querySelector<HTMLElement>(
+    'input[type="file"], textarea, input:not([type="hidden"]), select, button',
+  );
+}
+
+function focusLandingControl(intent: CanvasLandingIntent, attempts = 8): void {
+  if (!intent.nodeId) return;
+  const control = landingControl(intent.nodeId);
+  if (!control) {
+    if (attempts > 0) requestAnimationFrame(() => focusLandingControl(intent, attempts - 1));
+    return;
+  }
+  control.focus({ preventScroll: true });
+  if (
+    intent.selectText &&
+    (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement)
+  ) control.select();
+  if (
+    intent.activateFilePicker &&
+    control instanceof HTMLInputElement &&
+    control.type === "file"
+  ) control.click();
+}
 
 interface DragHistoryTransactionRef {
   current: HistoryTransactionToken | null;
@@ -119,8 +155,11 @@ export function CanvasFlow() {
   const isValidConnection = useFlowStore((s) => s.isValidConnection);
   const addNode = useFlowStore((s) => s.addNode);
   const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
+  const activeTabId = useFlowStore((s) => s.activeTabId);
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const { screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
+  const [landingVersion, setLandingVersion] = useState(0);
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
   const dragTransactionRef = useRef<DragHistoryTransactionRef>({
@@ -132,6 +171,31 @@ export function CanvasFlow() {
     () => registerDragInterruptionHandlers(dragTransactionRef, window),
     [],
   );
+
+  useEffect(() => {
+    const onLanding = (event: Event) => {
+      const intent = (event as CustomEvent<CanvasLandingIntent>).detail;
+      if (intent?.tabId === activeTabId) setLandingVersion((version) => version + 1);
+    };
+    window.addEventListener(CANVAS_LANDING_EVENT, onLanding);
+    return () => window.removeEventListener(CANVAS_LANDING_EVENT, onLanding);
+  }, [activeTabId]);
+
+  useEffect(() => {
+    if (!nodesInitialized || !peekCanvasLanding(activeTabId)) return;
+    const intent = consumeCanvasLanding(activeTabId);
+    if (!intent) return;
+    let cancelled = false;
+    void (async () => {
+      if (intent.fitView) {
+        await fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 1, duration: 0 });
+      }
+      if (!cancelled) requestAnimationFrame(() => focusLandingControl(intent));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTabId, fitView, landingVersion, nodesInitialized]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {

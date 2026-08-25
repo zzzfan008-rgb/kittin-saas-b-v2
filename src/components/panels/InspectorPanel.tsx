@@ -1,11 +1,18 @@
 import {
+  selectActiveEdges,
   selectActiveNodes,
   selectActivePrimarySelectedNodeId,
+  selectActiveReadOnly,
   selectActiveSelectedResultId,
   useFlowStore,
+  type ConnectedNodeDirection,
   type RecentResult,
 } from "@/store/flowStore";
-import { NODE_SPECS, isNodeRunActive, type ImageInputNodeData } from "@/types/workflow";
+import {
+  NODE_SPECS,
+  isNodeRunActive,
+  type NodeKind,
+} from "@/types/workflow";
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
 import { thumbnailImageUrl } from "@/lib/images";
@@ -17,6 +24,84 @@ import {
   type GenerationImageModelId,
   type ImageModelOptions,
 } from "@/types/imageModels";
+import { requestCanvasLanding } from "@/lib/canvasLanding";
+
+const UPSTREAM_SUGGESTIONS: Record<NodeKind, NodeKind[]> = {
+  "image-input": [],
+  "sketch-to-render": ["image-input"],
+  "ai-modify": ["image-input", "sketch-to-render"],
+  "fabric-recolor": ["image-input", "sketch-to-render"],
+  upscale: ["sketch-to-render", "ai-modify"],
+  "print-extract": ["image-input", "ai-modify"],
+  "print-mutate": ["image-input", "print-extract"],
+  "mask-redraw": ["image-input", "ai-modify"],
+  result: ["sketch-to-render", "ai-modify", "upscale"],
+};
+
+const DOWNSTREAM_SUGGESTIONS: Record<NodeKind, NodeKind[]> = {
+  "image-input": ["sketch-to-render", "ai-modify", "print-extract"],
+  "sketch-to-render": ["ai-modify", "fabric-recolor", "upscale", "result"],
+  "ai-modify": ["fabric-recolor", "upscale", "result"],
+  "fabric-recolor": ["upscale", "result"],
+  upscale: ["result"],
+  "print-extract": ["print-mutate", "result"],
+  "print-mutate": ["result"],
+  "mask-redraw": ["result"],
+  result: [],
+};
+
+function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
+  const edges = useFlowStore(selectActiveEdges);
+  const readOnly = useFlowStore(selectActiveReadOnly);
+  const addConnectedNode = useFlowStore((state) => state.addConnectedNode);
+  const upstreamFull = edges.filter((edge) => edge.target === nodeId).length >= NODE_SPECS[kind].inputs;
+
+  const add = (nextKind: NodeKind, direction: ConnectedNodeDirection) => {
+    const addedId = addConnectedNode(nodeId, nextKind, direction);
+    if (!addedId) return;
+    requestCanvasLanding({
+      tabId: useFlowStore.getState().activeTabId,
+      nodeId: addedId,
+      fitView: false,
+      activateFilePicker: nextKind === "image-input",
+      selectText: nextKind !== "image-input" && nextKind !== "result",
+    });
+  };
+
+  const groups = [
+    { label: "快速添加上游", direction: "upstream" as const, kinds: UPSTREAM_SUGGESTIONS[kind], disabled: upstreamFull },
+    { label: "快速添加下游", direction: "downstream" as const, kinds: DOWNSTREAM_SUGGESTIONS[kind], disabled: false },
+  ].filter((group) => group.kinds.length > 0);
+  if (groups.length === 0) return null;
+
+  return (
+    <section aria-label="快捷建图" className="space-y-2 border-t border-[var(--gc-border)] pt-3">
+      <p className="text-[10px] font-medium text-[var(--gc-text-muted)]">快捷建图</p>
+      {groups.map((group) => (
+        <div key={group.direction} className="space-y-1">
+          <div className="flex items-center justify-between text-[9px] text-neutral-600">
+            <span>{group.label}</span>
+            {group.disabled && <span>输入已满</span>}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {group.kinds.map((nextKind) => (
+              <button
+                key={nextKind}
+                type="button"
+                disabled={readOnly || group.disabled}
+                onClick={() => add(nextKind, group.direction)}
+                className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[9px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {group.direction === "upstream" ? "← " : "+ "}{NODE_SPECS[nextKind].title}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <p className="text-[9px] leading-relaxed text-neutral-600">新增节点与连线属于同一次撤销操作。</p>
+    </section>
+  );
+}
 
 function PropertyEditor({ nodeId }: { nodeId: string }) {
   const node = useFlowStore((state) =>
@@ -140,6 +225,8 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
           label="运行此节点"
         />
       )}
+
+      <QuickConnect nodeId={nodeId} kind={d.kind} />
     </div>
   );
 }

@@ -38,6 +38,7 @@ const ACTIVE_DOCUMENT_FIELDS = new Set([
   "selectedResultId",
   "compareIds",
   "saveState",
+  "hasBeenPersisted",
   "revision",
   "savedRevision",
   "dirty",

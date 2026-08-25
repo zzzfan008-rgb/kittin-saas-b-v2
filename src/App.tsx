@@ -25,6 +25,7 @@ import { CompareOverlay } from "@/components/CompareOverlay";
 import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
+import { TaskLauncher } from "@/components/TaskLauncher";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useAuth } from "@/auth/AuthContext";
 import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
@@ -288,6 +289,7 @@ function Workspace() {
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <TemplatesDock />
           <ReactFlowProvider key={activeTabId}>
+            <TaskLauncher />
             <CanvasFlow />
           </ReactFlowProvider>
         </div>
