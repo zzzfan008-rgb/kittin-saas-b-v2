@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { retryTabSessionPersistence, useFlowStore } from "@/store/flowStore";
+import {
+  retryTabSessionPersistence,
+  selectActiveDirty,
+  selectActiveProjectId,
+  selectActiveProjectName,
+  selectActiveReadOnly,
+  selectActiveSaveState,
+  useFlowStore,
+} from "@/store/flowStore";
 import { THEMES, useTheme } from "@/lib/theme";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { AccountMenu } from "./AccountMenu";
 
 const SAVE_TEXT = {
@@ -24,7 +33,7 @@ function ProjectPicker() {
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const openRequestIdRef = useRef(0);
-  const currentId = useFlowStore((s) => s.projectId);
+  const currentId = useFlowStore(selectActiveProjectId);
   const openFlowTab = useFlowStore((s) => s.openFlowTab);
 
   useEffect(() => {
@@ -248,11 +257,11 @@ function ThemeSwitcher() {
 }
 
 export function TopBar() {
-  const projectName = useFlowStore((s) => s.projectName);
-  const setProjectName = useFlowStore((s) => s.setProjectName);
-  const saveState = useFlowStore((s) => s.saveState);
-  const dirty = useFlowStore((s) => s.dirty);
-  const readOnly = useFlowStore((s) => s.readOnly);
+  const projectName = useFlowStore(selectActiveProjectName);
+  const projectNameEdit = useCoalescedTextEdit({ kind: "project-name" });
+  const saveState = useFlowStore(selectActiveSaveState);
+  const dirty = useFlowStore(selectActiveDirty);
+  const readOnly = useFlowStore(selectActiveReadOnly);
   const saveProject = useFlowStore((s) => s.saveProject);
   const tabSessionPersistenceError = useFlowStore((s) => s.tabSessionPersistenceError);
 
@@ -263,7 +272,7 @@ export function TopBar() {
       <span className="hidden h-4 w-px bg-[#262626] lg:block" />
       <input
         value={projectName}
-        onChange={(e) => setProjectName(e.target.value)}
+        {...projectNameEdit.bind}
         className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-hidden sm:w-44 sm:flex-none sm:px-2 lg:w-56"
         placeholder="项目名称"
       />

@@ -1,9 +1,16 @@
-import { selectPrimarySelectedNodeId, useFlowStore, type RecentResult } from "@/store/flowStore";
+import {
+  selectActiveNodes,
+  selectActivePrimarySelectedNodeId,
+  selectActiveSelectedResultId,
+  useFlowStore,
+  type RecentResult,
+} from "@/store/flowStore";
 import { NODE_SPECS, isNodeRunActive, type ImageInputNodeData } from "@/types/workflow";
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import {
   imageModelAspectRatioPatch,
   isImageModelId,
@@ -12,10 +19,21 @@ import {
 } from "@/types/imageModels";
 
 function PropertyEditor({ nodeId }: { nodeId: string }) {
-  const node = useFlowStore((s) => s.nodes.find((n) => n.id === nodeId));
+  const node = useFlowStore((state) =>
+    selectActiveNodes(state).find((candidate) => candidate.id === nodeId),
+  );
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
+  const labelEdit = useCoalescedTextEdit({ kind: "node-data", nodeId, field: "label" });
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId, field: "prompt" },
+    { multiline: true },
+  );
+  const noteEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId, field: "note" },
+    { multiline: true },
+  );
   if (!node) return null;
   const d = node.data;
   const spec = NODE_SPECS[d.kind];
@@ -36,7 +54,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         <span className="text-[10px] text-neutral-500">节点名称</span>
         <input
           value={d.label}
-          onChange={(e) => updateNodeData(nodeId, { label: e.target.value })}
+          {...labelEdit.bind}
           className={inputClass}
         />
       </label>
@@ -46,7 +64,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
           <span className="text-[10px] text-neutral-500">提示词</span>
           <textarea
             value={d.prompt}
-            onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
+            {...promptEdit.bind}
             rows={12}
             className={`${inputClass} resize-none`}
           />
@@ -97,7 +115,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
           <span className="text-[10px] text-neutral-500">备注</span>
           <textarea
             value={d.note ?? ""}
-            onChange={(e) => updateNodeData(nodeId, { note: e.target.value })}
+            {...noteEdit.bind}
             rows={3}
             className={`${inputClass} resize-none`}
           />
@@ -234,8 +252,8 @@ interface InspectorPanelProps {
 }
 
 export function InspectorPanel({ className, view = "auto" }: InspectorPanelProps) {
-  const selectedNodeId = useFlowStore(selectPrimarySelectedNodeId);
-  const selectedResultId = useFlowStore((s) => s.selectedResultId);
+  const selectedNodeId = useFlowStore(selectActivePrimarySelectedNodeId);
+  const selectedResultId = useFlowStore(selectActiveSelectedResultId);
   const showResult = view === "result" || (view === "auto" && Boolean(selectedResultId));
 
   return (

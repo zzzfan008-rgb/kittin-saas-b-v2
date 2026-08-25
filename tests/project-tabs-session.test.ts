@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { prepareWorkspaceForLogin } from "../src/auth/session";
 import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
+import type { DocumentTarget } from "../src/store/flowStore";
+import {
+  clearUnreferencedProjectTabSessionStorage,
+  PROJECT_TAB_STORAGE_KEY_PREFIX,
+  projectTabStorageKey,
+} from "../src/lib/tabSessionStorage";
 
 interface MemoryStorage {
+  readonly length: number;
   getItem(key: string): string | null;
+  key(index: number): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  has(key: string): boolean;
 }
 
 function memoryStorage(
@@ -14,7 +25,9 @@ function memoryStorage(
 ): MemoryStorage {
   const values = new Map(Object.entries(initial));
   return {
+    get length() { return values.size; },
     getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
     setItem: (key, value) => {
       onSet?.(key);
       if (shouldFail?.(key, value)) {
@@ -25,6 +38,7 @@ function memoryStorage(
       values.set(key, value);
     },
     removeItem: (key) => values.delete(key),
+    has: (key) => values.has(key),
   };
 }
 
@@ -136,14 +150,64 @@ const storedRecentResults = [
 ];
 
 let sessionWrites = 0;
+const sessionWriteKeys: string[] = [];
 let failSessionWrites = false;
+let failedSessionTabId: string | null = null;
 const sessionStorage = memoryStorage(
   { [sessionKey]: JSON.stringify(storedSession) },
-  (key) => { if (key === sessionKey) sessionWrites += 1; },
-  (key) => key === sessionKey && failSessionWrites,
+  (key) => {
+    if (key === sessionKey || key.startsWith(PROJECT_TAB_STORAGE_KEY_PREFIX)) {
+      sessionWrites += 1;
+      sessionWriteKeys.push(key);
+    }
+  },
+  (key) => failSessionWrites && key === (
+    failedSessionTabId ? projectTabStorageKey(failedSessionTabId) : sessionKey
+  ),
 );
 const localStorage = memoryStorage({ [recentKey]: JSON.stringify(storedRecentResults) });
-Object.assign(globalThis, { window: { sessionStorage, localStorage } });
+let deferIdleWrites = false;
+let nextScheduledCallbackId = 0;
+const idleCallbacks = new Map<number, IdleRequestCallback>();
+const timeoutCallbacks = new Map<number, () => void>();
+const runIdleCallback = (callback: IdleRequestCallback) => callback({
+  didTimeout: false,
+  timeRemaining: () => 50,
+});
+const requestIdleCallback = (callback: IdleRequestCallback): number => {
+  const id = ++nextScheduledCallbackId;
+  if (deferIdleWrites) idleCallbacks.set(id, callback);
+  else runIdleCallback(callback);
+  return id;
+};
+const cancelIdleCallback = (id: number) => { idleCallbacks.delete(id); };
+const setWindowTimeout = (callback: () => void): number => {
+  const id = ++nextScheduledCallbackId;
+  if (deferIdleWrites) timeoutCallbacks.set(id, callback);
+  else callback();
+  return id;
+};
+const clearWindowTimeout = (id: number) => { timeoutCallbacks.delete(id); };
+function flushIdleCallbacks(): void {
+  while (timeoutCallbacks.size > 0 || idleCallbacks.size > 0) {
+    const pendingTimeouts = [...timeoutCallbacks.values()];
+    timeoutCallbacks.clear();
+    for (const callback of pendingTimeouts) callback();
+    const pendingIdle = [...idleCallbacks.values()];
+    idleCallbacks.clear();
+    for (const callback of pendingIdle) runIdleCallback(callback);
+  }
+}
+Object.assign(globalThis, {
+  window: {
+    sessionStorage,
+    localStorage,
+    requestIdleCallback,
+    cancelIdleCallback,
+    setTimeout: setWindowTimeout,
+    clearTimeout: clearWindowTimeout,
+  },
+});
 
 const {
   applyRunEventToRecentResults,
@@ -151,29 +215,60 @@ const {
   beginHistoryTransaction,
   discardActiveTabSession,
   endHistoryTransaction,
+  flushActiveTextEdit,
+  flushTabSessionPersistence,
   normalizeTabSessionValue,
+  readTabSessionSnapshot,
+  readTabSessionSnapshotResult,
   reconcileRunHistory,
   retryTabSessionPersistence,
+  selectActiveDocument,
   TAB_SESSION_SCHEMA_VERSION,
+  updateCoalescedTextEdit,
   useFlowStore,
+  writeTabSessionSnapshot,
 } = await import("../src/store/flowStore");
+const { createTemplateRequestPayload } = await import(
+  "../src/components/panels/TemplatesDock"
+);
+
+function activeDocument(state = useFlowStore.getState()) {
+  return selectActiveDocument(state);
+}
+
+function persistedSession() {
+  const session = readTabSessionSnapshot(sessionStorage);
+  assert.ok(session, "应存在可恢复的项目页签会话");
+  return session;
+}
+
+function persistedSessionJson(): string {
+  return JSON.stringify(persistedSession());
+}
+
+function documentTargetForTab(tabId: string): DocumentTarget {
+  const tab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tabId);
+  assert.ok(tab, `找不到页签 ${tabId}`);
+  return { tabId, projectId: tab.projectId, documentEpoch: tab.documentEpoch };
+}
 
 // 本文件模拟的是历史已经完成对账后的会话恢复路径。
 setGenerationSafetyBlockReason(null);
 const state = useFlowStore.getState();
+const document = activeDocument(state);
 
 console.log("项目页签会话恢复测试");
 
-assert.deepEqual(state.edges, [restoredEdge]);
+assert.deepEqual(document.edges, [restoredEdge]);
 assert.deepEqual(state.tabs[0].edges, [restoredEdge]);
 console.log("  ✓ 刷新恢复活动页签的完整连线");
 
-assert.equal(state.saveState, "idle");
+assert.equal(document.saveState, "idle");
 assert.equal(state.tabs[0].saveState, "idle");
-assert.equal(state.dirty, true);
+assert.equal(document.dirty, true);
 console.log("  ✓ 刷新将中断的 saving 状态归一为 idle 并保留未保存标记");
 
-const persisted = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as typeof storedSession;
+const persisted = persistedSession();
 assert.deepEqual(persisted.tabs[0].edges, [restoredEdge]);
 assert.equal(persisted.tabs[0].saveState, "idle");
 assert.equal((persisted as typeof storedSession & { schemaVersion: number }).schemaVersion, TAB_SESSION_SCHEMA_VERSION);
@@ -428,7 +523,7 @@ useFlowStore.getState().openFlowTab({
   edges: [],
 });
 reconcileRunHistory([]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "idle");
+assert.equal(activeDocument().nodes[0].data.status, "idle");
 useFlowStore.getState().setNodeStatus("run-recovery-node", "queued");
 reconcileRunHistory([{
   id: "server-active-record",
@@ -443,7 +538,7 @@ reconcileRunHistory([{
   startedAt: 5_000,
   status: "running",
 }]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 assert.equal(
   useFlowStore.getState().recentResults.find((record) => record.id === "server-active-record")?.runId,
   "server-active-run",
@@ -492,7 +587,7 @@ useFlowStore.getState().openFlowTab({
   }],
   edges: [],
 });
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 console.log("  ✓ 历史确认会解除孤儿运行态，并恢复真实服务端任务");
 
 const overflowActiveRecords = Array.from({ length: 180 }, (_, index) => ({
@@ -542,7 +637,7 @@ useFlowStore.getState().openFlowTab({
   edges: [],
 });
 reconcileRunHistory([...overflowActiveRecords, ...overflowTerminalRecords]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 assert.equal(
   useFlowStore.getState().recentResults.some((record) => record.runId === "overflow-run-179"),
   true,
@@ -601,34 +696,124 @@ useFlowStore.getState().openFlowTab({
   }],
   edges: [{ id: "quota-edge", source: "quota-source", target: "quota-mask" }],
 });
-assert.match(sessionStorage.getItem(sessionKey) ?? "", /old-mask\.png/);
+const quotaTabId = useFlowStore.getState().activeTabId;
+const preservedTab = useFlowStore.getState().tabs.find((tab) => tab.id !== quotaTabId);
+assert.ok(preservedTab);
+const preservedTabKey = projectTabStorageKey(preservedTab.id);
+const preservedBeforeQuotaFailure = sessionStorage.getItem(preservedTabKey);
+assert.ok(preservedBeforeQuotaFailure);
+assert.match(sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "", /old-mask\.png/);
+failedSessionTabId = quotaTabId;
 failSessionWrites = true;
 const oversizedInlineMask = `data:image/png;base64,${"x".repeat(300_000)}`;
 useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
-assert.equal(sessionStorage.getItem(sessionKey), null, "写失败后必须移除旧快照，不能刷新恢复旧蒙版");
+assert.equal(
+  sessionStorage.getItem(projectTabStorageKey(quotaTabId)),
+  null,
+  "失败页签必须移除旧快照，不能刷新恢复旧蒙版",
+);
+assert.equal(sessionStorage.getItem(preservedTabKey), preservedBeforeQuotaFailure);
+assert.ok(persistedSession().tabs.some((tab) => tab.id === preservedTab.id));
+assert.equal(persistedSession().tabs.some((tab) => tab.id === quotaTabId), false);
 assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
+
+useFlowStore.getState().switchTab(preservedTab.id);
+useFlowStore.getState().setProjectName(`${preservedTab.projectName}（仍可恢复）`);
+assert.match(
+  useFlowStore.getState().tabSessionPersistenceError ?? "",
+  /刷新会丢失/,
+  "其他页签成功写入不能掩盖失败页签错误",
+);
+assert.equal(sessionStorage.getItem(projectTabStorageKey(quotaTabId)), null);
+useFlowStore.getState().openFlowTab({
+  projectId: "quota-healthy-new-project",
+  projectName: "容量故障后的健康新页签",
+  nodes: [storedSelectionNode("quota-healthy-new-node")],
+  edges: [],
+});
+const healthyNewTabId = useFlowStore.getState().activeTabId;
+const healthyTopologyAfterQuotaFailure = readTabSessionSnapshot(sessionStorage);
+assert.ok(healthyTopologyAfterQuotaFailure);
+assert.equal(
+  healthyTopologyAfterQuotaFailure.tabs.some((tab) => tab.id === quotaTabId),
+  false,
+  "确定写失败页签不应重新进入 manifest",
+);
+assert.equal(
+  healthyTopologyAfterQuotaFailure.tabs.some((tab) => tab.id === healthyNewTabId),
+  true,
+  "失败页签不得阻止健康新页签发布到 manifest",
+);
+assert.ok(sessionStorage.has(projectTabStorageKey(healthyNewTabId)));
+assert.match(
+  useFlowStore.getState().tabSessionPersistenceError ?? "",
+  /刷新会丢失/,
+  "健康新页签成功仍不能掩盖原页签错误",
+);
+useFlowStore.getState().switchTab(quotaTabId);
 
 failSessionWrites = false;
 useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/old-mask.png" });
 assert.match(
-  sessionStorage.getItem(sessionKey) ?? "",
+  sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "",
   /old-mask\.png/,
-  "失败后撤销回旧成功指纹也必须重新写入已被移除的 session key",
+  "失败后改回旧内容也必须重新写入已被移除的页签 key",
 );
 assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
 
 failSessionWrites = true;
 useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
-assert.equal(sessionStorage.getItem(sessionKey), null);
+assert.equal(sessionStorage.getItem(projectTabStorageKey(quotaTabId)), null);
 failSessionWrites = false;
 assert.equal(retryTabSessionPersistence(), true, "同一份未变化快照必须能够显式重试");
-assert.match(sessionStorage.getItem(sessionKey) ?? "", /data:image\/png;base64/);
+assert.match(sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "", /data:image\/png;base64/);
 assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
 useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/latest-mask.png" });
-const compactSession = sessionStorage.getItem(sessionKey) ?? "";
+const compactSession = sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "";
 assert.match(compactSession, /latest-mask\.png/);
 assert.doesNotMatch(compactSession, /data:image\/png;base64/);
-console.log("  ✓ 容量写失败废弃旧快照并允许同内容重试，短蒙版 URL 可恢复持久化");
+failedSessionTabId = null;
+
+const originalSessionGetItem = sessionStorage.getItem;
+const preservedBeforeTransientKnownRead = originalSessionGetItem(preservedTabKey);
+const manifestBeforeTransientKnownRead = originalSessionGetItem(sessionKey);
+let throwPreservedKnownReadOnce = true;
+sessionStorage.getItem = (key: string) => {
+  if (key === preservedTabKey && throwPreservedKnownReadOnce) {
+    throwPreservedKnownReadOnce = false;
+    throw new Error("transient known shard read failure");
+  }
+  return originalSessionGetItem(key);
+};
+useFlowStore.getState().updateNodeData("quota-mask", { prompt: "瞬时读失败期间更新 A" });
+assert.equal(throwPreservedKnownReadOnce, false);
+assert.equal(sessionStorage.getItem(sessionKey), manifestBeforeTransientKnownRead);
+assert.equal(sessionStorage.getItem(preservedTabKey), preservedBeforeTransientKnownRead);
+assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
+sessionStorage.getItem = originalSessionGetItem;
+
+useFlowStore.getState().openFlowTab({
+  projectId: "transient-read-followup-project",
+  projectName: "瞬时读失败后的新页签",
+  nodes: [storedSelectionNode("transient-read-followup-node")],
+  edges: [],
+});
+const transientReadFollowupTabId = useFlowStore.getState().activeTabId;
+const recoveredAfterTransientKnownRead = readTabSessionSnapshot(sessionStorage);
+assert.ok(recoveredAfterTransientKnownRead);
+assert.equal(
+  recoveredAfterTransientKnownRead.tabs.some((tab) => tab.id === preservedTab.id),
+  true,
+  "瞬时读失败不得把实际存在的健康分片降级为确定失败",
+);
+assert.equal(
+  recoveredAfterTransientKnownRead.tabs.some((tab) => tab.id === transientReadFollowupTabId),
+  true,
+  "下一次无关写入应重新确认旧分片并安全发布新拓扑",
+);
+assert.equal(sessionStorage.getItem(preservedTabKey), preservedBeforeTransientKnownRead);
+assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
+console.log("  ✓ 单页签容量失败隔离其他草稿，且支持同内容重试恢复");
 
 useFlowStore.getState().loadFlow({
   projectId: "drag-session-project",
@@ -641,7 +826,7 @@ useFlowStore.getState().loadFlow({
   }],
   edges: [],
 });
-const durableBeforeDrag = sessionStorage.getItem(sessionKey);
+const durableBeforeDrag = persistedSessionJson();
 const writesBeforeDrag = sessionWrites;
 const dragTransaction = beginHistoryTransaction("session-crash-contract");
 useFlowStore.getState().onNodesChange([{
@@ -652,22 +837,15 @@ useFlowStore.getState().onNodesChange([{
 }]);
 assert.equal(sessionWrites, writesBeforeDrag, "未提交拖拽帧不得写入 session");
 assert.equal(
-  sessionStorage.getItem(sessionKey),
+  persistedSessionJson(),
   durableBeforeDrag,
   "崩溃或刷新必须恢复拖拽前的 durable snapshot",
 );
 assert.equal(retryTabSessionPersistence(), false, "事务中显式重试也不得固化中间帧");
-assert.equal(sessionStorage.getItem(sessionKey), durableBeforeDrag);
+assert.equal(persistedSessionJson(), durableBeforeDrag);
 
 assert.equal(endHistoryTransaction(dragTransaction), true);
-const durableAfterDrag = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
-  tabs: Array<{
-    projectId: string;
-    nodes: Array<{ id: string; position: { x: number; y: number } }>;
-    revision: number;
-    dirty: boolean;
-  }>;
-};
+const durableAfterDrag = persistedSession();
 const committedDragTab = durableAfterDrag.tabs.find((tab) => tab.projectId === "drag-session-project");
 assert.deepEqual(
   committedDragTab?.nodes.find((node) => node.id === "drag-session-node")?.position,
@@ -696,26 +874,19 @@ useFlowStore.getState().loadFlow({
   edges: [],
 });
 const noMoveTabId = useFlowStore.getState().activeTabId;
-const durableBeforeNoMoveSuccess = sessionStorage.getItem(sessionKey);
+const durableBeforeNoMoveSuccess = persistedSessionJson();
 const writesBeforeNoMoveSuccess = sessionWrites;
 const noMoveTransaction = beginHistoryTransaction("session-no-move-success");
-applyRunEventToTab(noMoveTabId, "drag-session-no-move-node", {
+applyRunEventToTab(documentTargetForTab(noMoveTabId), "drag-session-no-move-node", {
   type: "node-status",
   nodeId: "drag-session-no-move-node",
   status: "success",
   images: ["/api/files/no-move-success.png"],
 });
 assert.equal(sessionWrites, writesBeforeNoMoveSuccess, "无位移事务中的 success 必须延迟落盘");
-assert.equal(sessionStorage.getItem(sessionKey), durableBeforeNoMoveSuccess);
+assert.equal(persistedSessionJson(), durableBeforeNoMoveSuccess);
 assert.equal(endHistoryTransaction(noMoveTransaction), false);
-const durableAfterNoMoveSuccess = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
-  tabs: Array<{
-    projectId: string;
-    nodes: Array<{ id: string; data: { outputImages?: string[] } }>;
-    revision: number;
-    dirty: boolean;
-  }>;
-};
+const durableAfterNoMoveSuccess = persistedSession();
 const noMoveSuccessTab = durableAfterNoMoveSuccess.tabs.find(
   (tab) => tab.projectId === "drag-session-no-move-success",
 );
@@ -746,7 +917,7 @@ useFlowStore.getState().loadFlow({
   edges: [],
 });
 const netZeroTabId = useFlowStore.getState().activeTabId;
-const durableBeforeNetZeroSuccess = sessionStorage.getItem(sessionKey);
+const durableBeforeNetZeroSuccess = persistedSessionJson();
 const writesBeforeNetZeroSuccess = sessionWrites;
 const netZeroTransaction = beginHistoryTransaction("session-net-zero-success");
 useFlowStore.getState().onNodesChange([{
@@ -755,7 +926,7 @@ useFlowStore.getState().onNodesChange([{
   position: { x: 160, y: 64 },
   dragging: true,
 }]);
-applyRunEventToTab(netZeroTabId, "drag-session-net-zero-node", {
+applyRunEventToTab(documentTargetForTab(netZeroTabId), "drag-session-net-zero-node", {
   type: "node-status",
   nodeId: "drag-session-net-zero-node",
   status: "success",
@@ -768,20 +939,9 @@ useFlowStore.getState().onNodesChange([{
   dragging: false,
 }]);
 assert.equal(sessionWrites, writesBeforeNetZeroSuccess, "净零位移事务中的 success 必须延迟落盘");
-assert.equal(sessionStorage.getItem(sessionKey), durableBeforeNetZeroSuccess);
+assert.equal(persistedSessionJson(), durableBeforeNetZeroSuccess);
 assert.equal(endHistoryTransaction(netZeroTransaction), false);
-const durableAfterNetZeroSuccess = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
-  tabs: Array<{
-    projectId: string;
-    nodes: Array<{
-      id: string;
-      position: { x: number; y: number };
-      data: { outputImages?: string[] };
-    }>;
-    revision: number;
-    dirty: boolean;
-  }>;
-};
+const durableAfterNetZeroSuccess = persistedSession();
 const netZeroSuccessTab = durableAfterNetZeroSuccess.tabs.find(
   (tab) => tab.projectId === "drag-session-net-zero-success",
 );
@@ -828,14 +988,7 @@ useFlowStore.getState().onNodesChange([{
 }]);
 useFlowStore.getState().switchTab(secondDragTabId);
 assert.equal(endHistoryTransaction(cancelledDrag), false);
-const durableAfterSwitch = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
-  tabs: Array<{
-    projectId: string;
-    nodes: Array<{ id: string; position: { x: number; y: number } }>;
-    revision: number;
-    dirty: boolean;
-  }>;
-};
+const durableAfterSwitch = persistedSession();
 const cancelledDragTab = durableAfterSwitch.tabs.find((tab) => tab.projectId === "drag-session-project");
 assert.deepEqual(
   cancelledDragTab?.nodes.find((node) => node.id === "drag-session-node")?.position,
@@ -845,6 +998,661 @@ assert.equal(cancelledDragTab?.revision, 0);
 assert.equal(cancelledDragTab?.dirty, false);
 console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切页取消恢复 durable snapshot");
 
+const unsafeDocumentNode = {
+  id: "pure-boundary-node",
+  type: "ai-modify",
+  position: { x: 120, y: 48 },
+  selected: true,
+  dragging: true,
+  measured: { width: 320, height: 180 },
+  width: 320,
+  height: 180,
+  unknownNodeShell: "不得持久化",
+  data: {
+    kind: "ai-modify",
+    label: "纯文档边界",
+    status: "error",
+    error: "旧运行错误不得持久化",
+    prompt: "保留衣身，只修改领型",
+    aspectRatio: "1:1",
+    batchSize: 1,
+    outputImages: ["/api/files/pure-boundary-before.png"],
+    modelId: "gpt-image-2-vip",
+    modelOptions: { size: "2048x2048" },
+    unknownData: "不得持久化",
+  },
+} as import("../src/store/flowStore").FlowNode;
+const unsafeDocumentEdge = {
+  id: "pure-boundary-edge",
+  source: "pure-boundary-node",
+  target: "pure-boundary-node",
+  sourceHandle: "output",
+  targetHandle: "input",
+  selected: true,
+  unknownEdgeShell: "不得持久化",
+};
+useFlowStore.getState().openFlowTab({
+  projectId: "pure-boundary-project",
+  projectName: "纯文档边界项目",
+  nodes: [unsafeDocumentNode],
+  edges: [unsafeDocumentEdge],
+});
+useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
+
+const boundaryState = useFlowStore.getState();
+const boundaryDocument = activeDocument(boundaryState);
+const templatePayload = createTemplateRequestPayload({
+  name: "纯文档边界模板",
+  description: "四条持久化路径必须共享同一序列化器",
+  projectName: boundaryDocument.projectName,
+  nodes: boundaryDocument.nodes,
+  edges: boundaryDocument.edges,
+});
+const boundaryRequests: Array<{ url: string; body: Record<string, unknown> }> = [];
+const fetchBeforeBoundaryTest = globalThis.fetch;
+try {
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    boundaryRequests.push({ url, body });
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在 Provider 调用前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+  await useFlowStore.getState().runNode(unsafeDocumentNode.id);
+} finally {
+  globalThis.fetch = fetchBeforeBoundaryTest;
+}
+
+assert.deepEqual(
+  boundaryRequests.map((request) => request.url),
+  ["/api/projects", "/api/run-plan"],
+);
+const projectPayload = boundaryRequests[0].body as {
+  flow: { schemaVersion: number; nodes: unknown[]; edges: unknown[] };
+};
+const runPayload = boundaryRequests[1].body as { nodes: unknown[]; edges: unknown[] };
+const runWorkflow = {
+  schemaVersion: projectPayload.flow.schemaVersion,
+  nodes: runPayload.nodes,
+  edges: runPayload.edges,
+};
+const boundarySession = persistedSession();
+const sessionTab = boundarySession.tabs.find(
+  (tab) => tab.projectId === "pure-boundary-project",
+);
+assert.ok(sessionTab);
+const sessionWorkflow = {
+  schemaVersion: projectPayload.flow.schemaVersion,
+  nodes: sessionTab.nodes,
+  edges: sessionTab.edges,
+};
+
+assert.deepEqual(templatePayload.flow, projectPayload.flow);
+assert.deepEqual(runWorkflow, projectPayload.flow);
+assert.deepEqual(sessionWorkflow, projectPayload.flow);
+const persistedBoundaryNode = projectPayload.flow.nodes[0] as Record<string, unknown>;
+const persistedBoundaryData = persistedBoundaryNode.data as Record<string, unknown>;
+assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "position", "type"]);
+assert.equal(persistedBoundaryData.status, "idle");
+assert.equal("error" in persistedBoundaryData, false);
+assert.equal("unknownData" in persistedBoundaryData, false);
+assert.deepEqual(
+  Object.keys(projectPayload.flow.edges[0] as Record<string, unknown>).sort(),
+  ["id", "source", "sourceHandle", "target", "targetHandle"],
+);
+assert.deepEqual(sessionTab.selectedNodeIds, []);
+assert.equal(sessionTab.selectedNodeId, null);
+assert.equal(sessionTab.selectedResultId, null);
+assert.deepEqual(sessionTab.compareIds, []);
+console.log("  ✓ 项目、模板、运行与 v1 会话共享纯文档序列化边界");
+
+flushTabSessionPersistence();
+deferIdleWrites = true;
+sessionWriteKeys.length = 0;
+const writesBeforeTransientChanges = sessionWrites;
+const revisionBeforeTransientChanges = activeDocument().revision;
+useFlowStore.getState().setSelectedNodeId(null);
+useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
+useFlowStore.getState().setNodeStatus(unsafeDocumentNode.id, "running");
+useFlowStore.getState().setNodeStatus(unsafeDocumentNode.id, "idle");
+useFlowStore.getState().onNodesChange([{
+  id: unsafeDocumentNode.id,
+  type: "dimensions",
+  dimensions: { width: 360, height: 220 },
+  setAttributes: true,
+}]);
+assert.equal(activeDocument().revision, revisionBeforeTransientChanges);
+assert.equal(sessionWrites, writesBeforeTransientChanges);
+assert.equal(timeoutCallbacks.size, 0);
+assert.equal(idleCallbacks.size, 0);
+
+const debouncedTabId = useFlowStore.getState().activeTabId;
+const originalSaveState = activeDocument().saveState;
+const changedSaveState = originalSaveState === "saved" ? "error" : "saved";
+useFlowStore.setState((current) => ({
+  tabs: current.tabs.map((tab) => tab.id === debouncedTabId
+    ? { ...tab, saveState: changedSaveState }
+    : tab),
+}));
+assert.equal(timeoutCallbacks.size, 1, "saveState 单独变化也必须进入 durable signal");
+flushIdleCallbacks();
+assert.equal(
+  persistedSession().tabs.find((tab) => tab.id === debouncedTabId)?.saveState,
+  changedSaveState,
+);
+useFlowStore.setState((current) => ({
+  tabs: current.tabs.map((tab) => tab.id === debouncedTabId
+    ? { ...tab, saveState: originalSaveState }
+    : tab),
+}));
+flushIdleCallbacks();
+console.log("  ✓ saveState 即使不改变 revision/dirty 也会更新可恢复草稿元数据");
+
+sessionWriteKeys.length = 0;
+const writesBeforeDebouncedChanges = sessionWrites;
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改袖型" });
+assert.equal(sessionWrites, writesBeforeDebouncedChanges, "连续文档修改在 debounce 前不得同步写盘");
+assert.equal(timeoutCallbacks.size, 1, "连续修改必须重置为同一个 debounce 任务");
+assert.equal(idleCallbacks.size, 0);
+flushIdleCallbacks();
+assert.equal(
+  sessionWriteKeys.filter((key) => key === projectTabStorageKey(debouncedTabId)).length,
+  1,
+  "一次修改 burst 只写一次活动页签快照",
+);
+assert.equal(
+  sessionWriteKeys.filter((key) => key === sessionKey).length,
+  1,
+  "一次修改 burst 只发布一次 manifest",
+);
+assert.equal(
+  persistedSession().tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.data.prompt,
+  "保留衣身，只修改袖型",
+);
+console.log("  ✓ revision/topology 驱动持久化：瞬态零写入，连续修改 debounce 为单次分片写入");
+
+sessionWriteKeys.length = 0;
+const revisionBeforeTextBurst = activeDocument().revision;
+const writesBeforeTextBurst = sessionWrites;
+let textToken = updateCoalescedTextEdit(
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  "合并输入第一段",
+);
+assert.ok(textToken);
+textToken = updateCoalescedTextEdit(
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  "合并输入最终内容",
+  textToken,
+);
+assert.ok(textToken);
+assert.equal(activeDocument().revision, revisionBeforeTextBurst, "输入中不能逐键增加 revision");
+assert.equal(sessionWrites, writesBeforeTextBurst, "输入中不能逐键写 session");
+assert.equal(timeoutCallbacks.size, 0, "输入未提交前不能触发草稿持久化 debounce");
+assert.equal(flushActiveTextEdit(textToken), true);
+assert.equal(activeDocument().revision, revisionBeforeTextBurst + 1, "一次输入 burst 只增加一次 revision");
+assert.equal(timeoutCallbacks.size, 1);
+flushIdleCallbacks();
+assert.equal(
+  sessionWriteKeys.filter((key) => key === projectTabStorageKey(debouncedTabId)).length,
+  1,
+  "一次文本 burst 只写一次活动页签分片",
+);
+assert.equal(
+  persistedSession().tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.data.prompt,
+  "合并输入最终内容",
+);
+console.log("  ✓ 连续文本输入实时可见，但每个 burst 只提交一次 revision/session 分片");
+
+sessionWriteKeys.length = 0;
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "页面隐藏前的最后内容" });
+assert.equal(timeoutCallbacks.size, 1);
+assert.equal(flushTabSessionPersistence(), true);
+assert.equal(timeoutCallbacks.size, 0, "生命周期同步 flush 必须取消尚未执行的 debounce");
+assert.equal(idleCallbacks.size, 0);
+assert.equal(
+  persistedSession().tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.data.prompt,
+  "页面隐藏前的最后内容",
+);
+const writesAfterLifecycleFlush = sessionWrites;
+flushIdleCallbacks();
+assert.equal(sessionWrites, writesAfterLifecycleFlush, "已取消的延迟任务不得重复覆盖生命周期快照");
+deferIdleWrites = false;
+
+const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+assert.match(appSource, /addEventListener\("pagehide", flushDrafts\)/);
+assert.match(appSource, /addEventListener\("visibilitychange", flushHiddenDrafts\)/);
+assert.match(appSource, /document\.visibilityState === "hidden"/);
+console.log("  ✓ pagehide / hidden 生命周期同步收口最新草稿且不会重复延迟写入");
+
+useFlowStore.getState().openFlowTab({
+  projectId: "background-session-project",
+  projectName: "后台持久化项目",
+  nodes: [{
+    id: "background-session-node",
+    type: "ai-modify",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "ai-modify",
+      label: "后台生成节点",
+      status: "idle",
+      prompt: "后台成功",
+      aspectRatio: "1:1",
+      batchSize: 1,
+      outputImages: ["/api/files/background-before.png"],
+    },
+  }],
+  edges: [],
+});
+const backgroundTabId = useFlowStore.getState().activeTabId;
+const backgroundTarget = documentTargetForTab(backgroundTabId);
+useFlowStore.getState().switchTab(debouncedTabId);
+flushTabSessionPersistence();
+
+deferIdleWrites = true;
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "拖拽前稳定编辑" });
+assert.equal(timeoutCallbacks.size, 1);
+const lifecycleDrag = beginHistoryTransaction("lifecycle-stable-rebase");
+assert.equal(timeoutCallbacks.size, 0, "开始实时事务前必须同步落盘已稳定的 debounce 编辑");
+assert.equal(
+  persistedSession().tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.data.prompt,
+  "拖拽前稳定编辑",
+);
+const writesAfterTransactionBaseline = sessionWrites;
+useFlowStore.getState().onNodesChange([{
+  id: unsafeDocumentNode.id,
+  type: "position",
+  position: { x: 999, y: 777 },
+  dragging: true,
+}]);
+applyRunEventToTab(backgroundTarget, "background-session-node", {
+  type: "node-status",
+  nodeId: "background-session-node",
+  status: "success",
+  images: ["/api/files/background-success.png"],
+});
+assert.equal(sessionWrites, writesAfterTransactionBaseline, "事务中后台 success 先保持 pending");
+assert.equal(flushTabSessionPersistence(), true);
+const transactionLifecycleSnapshot = persistedSession();
+assert.deepEqual(
+  transactionLifecycleSnapshot.tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.position,
+  { x: 120, y: 48 },
+  "生命周期 flush 不得固化拖拽中间坐标",
+);
+assert.deepEqual(
+  transactionLifecycleSnapshot.tabs
+    .find((tab) => tab.id === backgroundTabId)
+    ?.nodes.find((node) => node.id === "background-session-node")
+    ?.data.outputImages,
+  ["/api/files/background-success.png"],
+  "生命周期 flush 必须保存事务期间其他页签的稳定 success",
+);
+useFlowStore.getState().onNodesChange([{
+  id: unsafeDocumentNode.id,
+  type: "position",
+  position: { x: 120, y: 48 },
+  dragging: false,
+}]);
+assert.equal(endHistoryTransaction(lifecycleDrag), false);
+deferIdleWrites = false;
+flushIdleCallbacks();
+console.log("  ✓ 实时事务前 flush 稳定编辑；事务期生命周期只写稳定坐标与后台结果");
+
+failedSessionTabId = debouncedTabId;
+failSessionWrites = true;
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "等待事务后重试" });
+assert.equal(sessionStorage.getItem(projectTabStorageKey(debouncedTabId)), null);
+assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
+const deferredRetryTransaction = beginHistoryTransaction("deferred-session-retry");
+assert.equal(retryTabSessionPersistence(), false, "事务中的显式重试必须等待稳定边界");
+failSessionWrites = false;
+useFlowStore.getState().onNodesChange([{
+  id: unsafeDocumentNode.id,
+  type: "position",
+  position: { x: 400, y: 300 },
+  dragging: true,
+}]);
+useFlowStore.getState().onNodesChange([{
+  id: unsafeDocumentNode.id,
+  type: "position",
+  position: { x: 120, y: 48 },
+  dragging: false,
+}]);
+assert.equal(endHistoryTransaction(deferredRetryTransaction), false);
+assert.match(
+  sessionStorage.getItem(projectTabStorageKey(debouncedTabId)) ?? "",
+  /等待事务后重试/,
+  "净零事务结束后必须保留并执行用户的 force retry",
+);
+assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
+failedSessionTabId = null;
+console.log("  ✓ 显式 force retry 跨净零事务保留，稳定后重写失败分片并清错");
+
+const readerTabs = normalizeTabSessionValue({
+  activeTabId: "reader-good",
+  tabs: [
+    storedSelectionTab("reader-good", [storedSelectionNode("reader-good-node")]),
+    storedSelectionTab("reader-other", [storedSelectionNode("reader-other-node")]),
+  ],
+});
+assert.ok(readerTabs);
+const corruptedV2Storage = memoryStorage({
+  [sessionKey]: JSON.stringify({
+    schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+    activeTabId: "reader-missing",
+    tabIds: ["reader-missing", "reader-corrupt", "reader-mismatch", "reader-good"],
+  }),
+  [projectTabStorageKey("reader-corrupt")]: "{bad json",
+  [projectTabStorageKey("reader-mismatch")]: JSON.stringify(readerTabs.tabs[1]),
+  [projectTabStorageKey("reader-good")]: JSON.stringify(readerTabs.tabs[0]),
+});
+const recoveredV2 = readTabSessionSnapshot(corruptedV2Storage);
+assert.ok(recoveredV2);
+assert.equal(recoveredV2.activeTabId, "reader-good");
+assert.deepEqual(recoveredV2.tabs.map((tab) => tab.id), ["reader-good"]);
+console.log("  ✓ v2 读取隔离缺失、损坏与 id 不匹配的页签，并安全回退活动页签");
+
+const bootstrapReadStorage = memoryStorage({
+  [sessionKey]: JSON.stringify({
+    schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+    activeTabId: "reader-good",
+    tabIds: ["reader-good", "reader-other"],
+  }),
+  [projectTabStorageKey("reader-good")]: JSON.stringify(readerTabs.tabs[0]),
+  [projectTabStorageKey("reader-other")]: JSON.stringify(readerTabs.tabs[1]),
+});
+let throwBootstrapShardOnce = true;
+const bootstrapReadResult = readTabSessionSnapshotResult({
+  getItem: (key: string) => {
+    if (key === projectTabStorageKey("reader-other") && throwBootstrapShardOnce) {
+      throwBootstrapShardOnce = false;
+      throw new Error("transient bootstrap shard read failure");
+    }
+    return bootstrapReadStorage.getItem(key);
+  },
+});
+assert.equal(bootstrapReadResult.unreadable, true);
+assert.deepEqual(bootstrapReadResult.snapshot?.tabs.map((tab) => tab.id), ["reader-good"]);
+assert.deepEqual(bootstrapReadResult.manifest?.tabIds, ["reader-good", "reader-other"]);
+const bootstrapRootReadResult = readTabSessionSnapshotResult({
+  getItem: () => { throw new Error("transient bootstrap root read failure"); },
+});
+assert.equal(bootstrapRootReadResult.unreadable, true);
+assert.equal(bootstrapRootReadResult.snapshot, undefined);
+const flowStoreSource = readFileSync(new URL("../src/store/flowStore.ts", import.meta.url), "utf8");
+assert.match(
+  flowStoreSource,
+  /if \(bootstrapStorageUnreadable\)[\s\S]{0,500}?publishPersistenceResult\(\{ ok: false, error: TAB_SESSION_READ_ERROR \}\)[\s\S]{0,500}?else if \(restoredManifest\)/,
+  "启动读异常必须阻断 manifest repair 与 orphan cleanup",
+);
+console.log("  ✓ 启动 root/shard 瞬时读异常保留旧拓扑并停用本页写入修复");
+
+const malformedSessionTabId = "\ud800";
+const malformedSession = normalizeTabSessionValue({
+  activeTabId: malformedSessionTabId,
+  tabs: [storedSelectionTab(
+    malformedSessionTabId,
+    [storedSelectionNode("malformed-session-node")],
+  )],
+});
+assert.ok(malformedSession);
+const malformedSessionStorage = memoryStorage();
+assert.equal(writeTabSessionSnapshot(malformedSessionStorage, malformedSession).ok, true);
+assert.equal(readTabSessionSnapshot(malformedSessionStorage)?.activeTabId, malformedSessionTabId);
+assert.ok(malformedSessionStorage.has(projectTabStorageKey(malformedSessionTabId)));
+console.log("  ✓ lone-surrogate tabId 使用无碰撞降级键，读写与清理均不抛错");
+
+const externallyMissingFragmentStorage = memoryStorage({
+  [sessionKey]: JSON.stringify({
+    schemaVersion: TAB_SESSION_SCHEMA_VERSION,
+    activeTabId: "reader-good",
+    tabIds: ["reader-good", "reader-other"],
+  }),
+  [projectTabStorageKey("reader-good")]: JSON.stringify(readerTabs.tabs[0]),
+});
+const missingKnownFragment = writeTabSessionSnapshot(
+  externallyMissingFragmentStorage,
+  readerTabs,
+  {
+    writeTabIds: new Set(["reader-good"]),
+    knownPersistedTabIds: new Set(["reader-good", "reader-other"]),
+  },
+);
+assert.equal(missingKnownFragment.ok, false);
+assert.deepEqual(missingKnownFragment.failedTabIds, ["reader-other"]);
+assert.deepEqual(
+  readTabSessionSnapshot(externallyMissingFragmentStorage)?.tabs.map((tab) => tab.id),
+  ["reader-good"],
+);
+console.log("  ✓ 进程外消失的 known 分片会转为显式失败，不能被 manifest 伪装为已保存");
+
+const transientReadStorage = memoryStorage();
+assert.equal(writeTabSessionSnapshot(transientReadStorage, readerTabs).ok, true);
+const manifestBeforeTransientRead = transientReadStorage.getItem(sessionKey);
+const readerOtherBeforeTransientRead = transientReadStorage.getItem(
+  projectTabStorageKey("reader-other"),
+);
+let throwReaderOtherOnce = true;
+const transientReadWrapper = {
+  get length() { return transientReadStorage.length; },
+  getItem: (key: string) => {
+    if (key === projectTabStorageKey("reader-other") && throwReaderOtherOnce) {
+      throwReaderOtherOnce = false;
+      throw new Error("transient shard read failure");
+    }
+    return transientReadStorage.getItem(key);
+  },
+  key: (index: number) => transientReadStorage.key(index),
+  setItem: (key: string, value: string) => transientReadStorage.setItem(key, value),
+  removeItem: (key: string) => transientReadStorage.removeItem(key),
+};
+const readerTabsWithUpdatedA = {
+  ...readerTabs,
+  tabs: readerTabs.tabs.map((tab) => tab.id === "reader-good"
+    ? { ...tab, projectName: "reader A updated", revision: tab.revision + 1, dirty: true }
+    : tab),
+};
+const transientKnownReadFailure = writeTabSessionSnapshot(
+  transientReadWrapper,
+  readerTabsWithUpdatedA,
+  {
+    writeTabIds: new Set(["reader-good"]),
+    knownPersistedTabIds: new Set(["reader-good", "reader-other"]),
+  },
+);
+assert.equal(transientKnownReadFailure.ok, false);
+assert.equal(transientKnownReadFailure.manifestWritten, false);
+assert.deepEqual(transientKnownReadFailure.indeterminateTabIds, ["reader-other"]);
+assert.equal(transientReadStorage.getItem(sessionKey), manifestBeforeTransientRead);
+assert.equal(
+  transientReadStorage.getItem(projectTabStorageKey("reader-other")),
+  readerOtherBeforeTransientRead,
+  "读异常不同于确认缺失，必须保留旧 manifest 与实际分片",
+);
+assert.equal(writeTabSessionSnapshot(
+  transientReadWrapper,
+  readerTabsWithUpdatedA,
+  {
+    writeTabIds: new Set(["reader-good"]),
+    knownPersistedTabIds: new Set(["reader-good", "reader-other"]),
+  },
+).ok, true);
+console.log("  ✓ known 分片瞬时读异常阻止 manifest/cleanup，重试后完整恢复");
+
+const migrationTabs = normalizeTabSessionValue({
+  activeTabId: "migration-a",
+  tabs: [
+    storedSelectionTab("migration-a", [storedSelectionNode("migration-a-node")]),
+    storedSelectionTab("migration-b", [storedSelectionNode("migration-b-node")]),
+  ],
+});
+assert.ok(migrationTabs);
+const legacyMigrationRaw = JSON.stringify({
+  activeTabId: migrationTabs.activeTabId,
+  tabs: migrationTabs.tabs,
+});
+let failMigrationB = true;
+let migrationBWrites = 0;
+const migrationStorage = memoryStorage(
+  { [sessionKey]: legacyMigrationRaw },
+  (key) => { if (key === projectTabStorageKey("migration-b")) migrationBWrites += 1; },
+  (key) => failMigrationB && key === projectTabStorageKey("migration-b"),
+);
+const failedMigration = writeTabSessionSnapshot(migrationStorage, migrationTabs);
+assert.equal(failedMigration.ok, false);
+assert.equal(failedMigration.manifestWritten, false);
+assert.equal(migrationStorage.getItem(sessionKey), legacyMigrationRaw);
+assert.deepEqual(
+  readTabSessionSnapshot(migrationStorage)?.tabs.map((tab) => tab.id),
+  ["migration-a", "migration-b"],
+  "迁移失败必须继续从完整 legacy 单体恢复",
+);
+
+const updatedMigrationTabs = {
+  ...migrationTabs,
+  tabs: migrationTabs.tabs.map((tab) => tab.id === "migration-a"
+    ? { ...tab, projectName: "迁移 A 新内容", revision: tab.revision + 1, dirty: true }
+    : tab),
+};
+const migrationBWritesAfterFailure = migrationBWrites;
+const unrelatedMigrationWrite = writeTabSessionSnapshot(migrationStorage, updatedMigrationTabs, {
+  writeTabIds: new Set(["migration-a"]),
+  knownPersistedTabIds: new Set(["migration-a"]),
+});
+assert.equal(unrelatedMigrationWrite.ok, false);
+assert.equal(unrelatedMigrationWrite.manifestWritten, false);
+assert.equal(migrationBWrites, migrationBWritesAfterFailure, "A 的变化不得反复重试未变化的失败页签 B");
+assert.equal(migrationStorage.getItem(sessionKey), legacyMigrationRaw);
+
+failMigrationB = false;
+const recoveredMigration = writeTabSessionSnapshot(migrationStorage, updatedMigrationTabs, {
+  writeTabIds: new Set(["migration-b"]),
+  knownPersistedTabIds: new Set(["migration-a"]),
+});
+assert.equal(recoveredMigration.ok, true);
+assert.equal(recoveredMigration.manifestWritten, true);
+assert.equal(readTabSessionSnapshot(migrationStorage)?.tabs[0].projectName, "迁移 A 新内容");
+console.log("  ✓ legacy → v2 迁移保持完整恢复点，并隔离失败页签的重试节奏");
+
+const rootReadFailureStorage = memoryStorage({ [sessionKey]: legacyMigrationRaw });
+let throwRootReadOnce = true;
+const rootReadFailureWrapper = {
+  get length() { return rootReadFailureStorage.length; },
+  getItem: (key: string) => {
+    if (key === sessionKey && throwRootReadOnce) {
+      throwRootReadOnce = false;
+      throw new Error("transient root read failure");
+    }
+    return rootReadFailureStorage.getItem(key);
+  },
+  key: (index: number) => rootReadFailureStorage.key(index),
+  setItem: (key: string, value: string) => {
+    if (key === projectTabStorageKey("migration-b")) throw new Error("quota exceeded");
+    rootReadFailureStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => rootReadFailureStorage.removeItem(key),
+};
+const rootReadFailure = writeTabSessionSnapshot(rootReadFailureWrapper, migrationTabs);
+assert.equal(rootReadFailure.ok, false);
+assert.equal(rootReadFailure.manifestWritten, false);
+assert.equal(rootReadFailureStorage.getItem(sessionKey), legacyMigrationRaw);
+assert.deepEqual(
+  readTabSessionSnapshot(rootReadFailureStorage)?.tabs.map((tab) => tab.id),
+  ["migration-a", "migration-b"],
+);
+console.log("  ✓ root 读取异常与分片失败并发时不会覆盖未知 legacy 恢复点");
+
+let failManifestWrite = true;
+const manifestFailureStorage = memoryStorage(
+  { [sessionKey]: legacyMigrationRaw },
+  undefined,
+  (key) => failManifestWrite && key === sessionKey,
+);
+const manifestFailure = writeTabSessionSnapshot(manifestFailureStorage, migrationTabs);
+assert.equal(manifestFailure.ok, false);
+assert.equal(manifestFailure.manifestWritten, false);
+assert.equal(manifestFailureStorage.getItem(sessionKey), legacyMigrationRaw);
+assert.ok(manifestFailureStorage.has(projectTabStorageKey("migration-a")));
+assert.ok(manifestFailureStorage.has(projectTabStorageKey("migration-b")));
+failManifestWrite = false;
+const manifestRetry = writeTabSessionSnapshot(manifestFailureStorage, migrationTabs, {
+  writeTabIds: new Set(),
+  knownPersistedTabIds: new Set(["migration-a", "migration-b"]),
+});
+assert.equal(manifestRetry.ok, true);
+assert.deepEqual(
+  readTabSessionSnapshot(manifestFailureStorage)?.tabs.map((tab) => tab.id),
+  ["migration-a", "migration-b"],
+);
+console.log("  ✓ manifest 发布失败不覆盖 legacy 恢复点，重试无需重写成功分片");
+
+let failNewTabManifest = false;
+const orphanRecoveryStorage = memoryStorage(
+  {},
+  undefined,
+  (key) => failNewTabManifest && key === sessionKey,
+);
+assert.equal(writeTabSessionSnapshot(orphanRecoveryStorage, {
+  ...readerTabs,
+  tabs: [readerTabs.tabs[0]],
+  activeTabId: "reader-good",
+}).ok, true);
+failNewTabManifest = true;
+const orphanedNewTab = writeTabSessionSnapshot(orphanRecoveryStorage, readerTabs, {
+  writeTabIds: new Set(["reader-other"]),
+  knownPersistedTabIds: new Set(["reader-good"]),
+});
+assert.equal(orphanedNewTab.ok, false);
+assert.equal(orphanRecoveryStorage.has(projectTabStorageKey("reader-other")), true);
+assert.deepEqual(
+  readTabSessionSnapshot(orphanRecoveryStorage)?.tabs.map((tab) => tab.id),
+  ["reader-good"],
+);
+clearUnreferencedProjectTabSessionStorage(
+  orphanRecoveryStorage,
+  new Set(["reader-good"]),
+);
+assert.equal(orphanRecoveryStorage.has(projectTabStorageKey("reader-other")), false);
+console.log("  ✓ v2 新页签 manifest 失败产生的不可达分片会在重载初始化时回收");
+
+const v2DiscardStorage = memoryStorage();
+assert.equal(writeTabSessionSnapshot(v2DiscardStorage, {
+  ...readerTabs,
+  activeTabId: "reader-other",
+}).ok, true);
+const originalWindowSessionStorage = window.sessionStorage;
+try {
+  Object.assign(window, { sessionStorage: v2DiscardStorage });
+  discardActiveTabSession();
+} finally {
+  Object.assign(window, { sessionStorage: originalWindowSessionStorage });
+}
+const afterV2Discard = readTabSessionSnapshot(v2DiscardStorage);
+assert.ok(afterV2Discard);
+assert.equal(afterV2Discard.activeTabId, "reader-good");
+assert.deepEqual(afterV2Discard.tabs.map((tab) => tab.id), ["reader-good"]);
+assert.equal(v2DiscardStorage.has(projectTabStorageKey("reader-other")), false);
+console.log("  ✓ v2 错误恢复只删除活动页签分片并保留其他草稿");
+
 sessionStorage.setItem(sessionKey, JSON.stringify({
   activeTabId: "bad-tab",
   tabs: [
@@ -853,12 +1661,22 @@ sessionStorage.setItem(sessionKey, JSON.stringify({
   ],
 }));
 discardActiveTabSession();
-const recovered = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
-  activeTabId: string;
-  tabs: Array<{ id: string }>;
-};
+const recovered = persistedSession();
 assert.equal(recovered.activeTabId, "good-tab");
 assert.deepEqual(recovered.tabs.map((tab) => tab.id), ["good-tab"]);
 console.log("  ✓ 错误恢复只清除当前损坏页签并保留其他页签");
 
-console.log("\n通过 12 项");
+const oldAccountTabKeys = useFlowStore.getState().tabs.map((tab) => projectTabStorageKey(tab.id));
+const writesBeforeAccountUnbind = sessionWrites;
+assert.equal(prepareWorkspaceForLogin(sessionStorage, localStorage, "new-account"), "cleared");
+assert.equal(sessionStorage.getItem(sessionKey), null);
+for (const key of oldAccountTabKeys) assert.equal(sessionStorage.getItem(key), null);
+useFlowStore.getState().setProjectName("旧账号解绑后不得回写");
+assert.equal(flushTabSessionPersistence(), false);
+flushIdleCallbacks();
+assert.equal(sessionWrites, writesBeforeAccountUnbind);
+assert.equal(sessionStorage.getItem(sessionKey), null);
+for (const key of oldAccountTabKeys) assert.equal(sessionStorage.getItem(key), null);
+console.log("  ✓ 跨账号解绑会永久失效当前页写入器，pagehide 不能复活旧账号草稿");
+
+console.log("\n通过 28 项");

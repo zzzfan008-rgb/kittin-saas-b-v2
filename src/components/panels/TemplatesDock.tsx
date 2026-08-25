@@ -2,12 +2,31 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type { Edge } from "@xyflow/react";
 import { Dialog } from "@base-ui/react/dialog";
 import { nanoid } from "nanoid";
-import { useFlowStore, type FlowNode } from "@/store/flowStore";
-import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "@/types/workflow";
+import { selectActiveDocument, useFlowStore, type FlowNode } from "@/store/flowStore";
+import type { WorkflowTemplate } from "@/types/workflow";
 import { WorkflowMini } from "./WorkflowMini";
 import { thumbnailImageUrl } from "@/lib/images";
+import {
+  createDocumentSnapshot,
+  documentSnapshotToPersistedWorkflow,
+} from "@/lib/documentSnapshot";
 
 const TEMPLATES_PANEL_ID = "templates-dock-panel";
+
+export function createTemplateRequestPayload(input: {
+  name: string;
+  description: string;
+  projectName: string;
+  nodes: FlowNode[];
+  edges: Edge[];
+}) {
+  const document = createDocumentSnapshot(input);
+  return {
+    name: input.name,
+    description: input.description,
+    flow: documentSnapshotToPersistedWorkflow(document),
+  };
+}
 
 /**
  * 画布顶部中央的模板悬浮入口：
@@ -280,15 +299,17 @@ function SaveTemplateForm({
     setError(null);
     const submissionVersion = ++submissionVersionRef.current;
     try {
-      const { nodes, edges } = useFlowStore.getState();
+      const { projectName, nodes, edges } = selectActiveDocument(useFlowStore.getState());
       const res = await fetch("/api/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(createTemplateRequestPayload({
           name: name.trim(),
           description: description.trim(),
-          flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes, edges },
-        }),
+          projectName,
+          nodes,
+          edges,
+        })),
       });
       if (submissionVersion !== submissionVersionRef.current) return;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

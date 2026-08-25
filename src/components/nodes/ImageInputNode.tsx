@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveDocumentTarget, useFlowStore } from "@/store/flowStore";
 import type { ImageInputNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/components/AssetPickerOverlay";
@@ -74,7 +74,10 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
   const [dragOver, setDragOver] = useState(false);
 
   const openAssetPicker = useCallback(() => {
-    const detail: AssetPickerRequest = { tabId: useFlowStore.getState().activeTabId, nodeId: id };
+    const detail: AssetPickerRequest = {
+      target: selectActiveDocumentTarget(useFlowStore.getState()),
+      nodeId: id,
+    };
     window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail }));
   }, [id]);
 
@@ -82,21 +85,16 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
     async (file: File | undefined | null) => {
       if (!file || !file.type.startsWith("image/")) return;
       const requestId = ++uploadRequestRef.current;
-      const tabId = useFlowStore.getState().activeTabId;
+      const target = selectActiveDocumentTarget(useFlowStore.getState());
       setUploading(true);
       try {
         const upload = await uploadFile(file);
-        if (
-          requestId !== uploadRequestRef.current ||
-          !useFlowStore.getState().tabs.some((tab) =>
-            tab.id === tabId && tab.nodes.some((node) => node.id === id),
-          )
-        ) return;
-        updateNodeDataInTab(tabId, id, { imageUrl: upload.url, status: "success", error: undefined });
+        if (requestId !== uploadRequestRef.current) return;
+        updateNodeDataInTab(target, id, { imageUrl: upload.url, status: "success", error: undefined });
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
-        updateNodeDataInTab(tabId, id, {
+        updateNodeDataInTab(target, id, {
           status: "error",
           error: message || "上传失败，请重试",
         });

@@ -9,6 +9,10 @@ import {
   type WorkflowNodeData,
   BATCH_SIZES,
 } from "../../src/types/workflow";
+import {
+  createDocumentSnapshot,
+  documentSnapshotToPersistedWorkflow,
+} from "../../src/lib/documentSnapshot";
 import { isLocalImageReference, validateImageDataUrl } from "./imageValidation";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -206,7 +210,17 @@ function validateModelSelection(kind: NodeKind, raw: Record<string, unknown>, pa
   if (!isModelAllowedForNode(raw.modelId, kind)) {
     fail(`${path}.modelId`, `${raw.modelId} is not allowed for ${kind}`);
   }
-  const optionsError = imageModelOptionsError(raw.modelId, raw.modelOptions);
+  const inputOptions = raw.modelOptions;
+  const normalizedOptions = normalizeImageModelOptions(raw.modelId, inputOptions);
+  const supportedOptions =
+    typeof inputOptions === "object" && inputOptions !== null && !Array.isArray(inputOptions)
+      ? Object.fromEntries(
+          Object.entries(inputOptions).filter(([key]) => (
+            Object.hasOwn(normalizedOptions, key)
+          )),
+        )
+      : inputOptions;
+  const optionsError = imageModelOptionsError(raw.modelId, supportedOptions);
   if (optionsError) fail(`${path}.modelOptions`, optionsError);
 }
 
@@ -347,5 +361,9 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
       fail("flow.edges", `node ${node.id} accepts at most ${MAX_REFERENCE_IMAGES} reference images`);
     }
   }
-  return { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes, edges };
+  return documentSnapshotToPersistedWorkflow(createDocumentSnapshot({
+    projectName: "",
+    nodes,
+    edges,
+  }));
 }

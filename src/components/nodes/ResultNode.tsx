@@ -7,6 +7,7 @@ import type { ResultNodeData } from "@/types/workflow";
 import { imageExtensionFromReference, type ImageFileExtension } from "@/lib/imageFormat";
 import { NodeFrame, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 function downloadImage(url: string, index: number, extension?: ImageFileExtension) {
   const a = document.createElement("a");
@@ -133,8 +134,11 @@ function ResultSaveControls({ images }: { images: string[] }) {
 }
 
 export function ResultNode({ id, data, selected }: NodeProps<Node<ResultNodeData>>) {
-  const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const images = useFlowStore(useShallow((s) => selectResultImages(s, id)));
+  const noteEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "note" },
+    { multiline: true },
+  );
 
   return (
     <>
@@ -165,7 +169,7 @@ export function ResultNode({ id, data, selected }: NodeProps<Node<ResultNodeData
           <span className="text-[10px] text-neutral-500">备注</span>
           <textarea
             value={data.note ?? ""}
-            onChange={(e) => updateNodeData(id, { note: e.target.value })}
+            {...noteEdit.bind}
             rows={2}
             placeholder="记录这一版结果的说明…"
             className={`${inputClass} resize-none`}

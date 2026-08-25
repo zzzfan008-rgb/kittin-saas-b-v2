@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import {
+  useFlowStore,
+  type DocumentTarget,
+} from "@/store/flowStore";
 import type { Asset } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 
@@ -7,7 +10,7 @@ import { thumbnailImageUrl } from "@/lib/images";
 export const OPEN_ASSET_PICKER_EVENT = "garment:open-asset-picker";
 
 export interface AssetPickerRequest {
-  tabId: string;
+  target: DocumentTarget;
   nodeId: string;
 }
 
@@ -38,7 +41,7 @@ export function AssetPickerOverlay() {
   useEffect(() => {
     const onOpen = (event: Event) => {
       const detail = (event as CustomEvent<AssetPickerRequest>).detail;
-      if (!detail?.tabId || !detail?.nodeId) return;
+      if (!detail?.target || !detail?.nodeId) return;
       setTarget(detail);
       setCategory("all");
       setSearch("");
@@ -106,17 +109,11 @@ export function AssetPickerOverlay() {
   if (!target) return null;
 
   const pick = (asset: Asset) => {
-    // 选择器打开期间目标页签或节点可能已被关闭/删除，写回前再校验一次
-    const exists = useFlowStore.getState().tabs.some((tab) =>
-      tab.id === target.tabId && tab.nodes.some((node) => node.id === target.nodeId),
-    );
-    if (exists) {
-      updateNodeDataInTab(target.tabId, target.nodeId, {
-        imageUrl: asset.image,
-        status: "success",
-        error: undefined,
-      });
-    }
+    updateNodeDataInTab(target.target, target.nodeId, {
+      imageUrl: asset.image,
+      status: "success",
+      error: undefined,
+    });
     setTarget(null);
   };
 

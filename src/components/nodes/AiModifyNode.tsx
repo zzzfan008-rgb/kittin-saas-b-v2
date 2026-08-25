@@ -5,12 +5,17 @@ import { imageModelAspectRatioPatch } from "@/types/imageModels";
 import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
 export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "prompt" },
+    { multiline: true },
+  );
   const running = isNodeRunActive(data.status);
 
   return (
@@ -21,7 +26,7 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
           <span className="text-[10px] text-neutral-500">编辑指令</span>
           <textarea
             value={data.prompt}
-            onChange={(e) => updateNodeData(id, { prompt: e.target.value })}
+            {...promptEdit.bind}
             rows={9}
             placeholder="描述需要如何组合、迁移或修改参考图"
             className={`${inputClass} resize-none`}

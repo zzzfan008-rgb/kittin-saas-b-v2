@@ -9,14 +9,27 @@ import {
   beginHistoryTransaction,
   beginMaskWork,
   endHistoryTransaction,
+  selectActiveDocument,
+  selectActiveDocumentTarget,
   selectNodeInputImages,
   useFlowStore,
+  type DocumentTarget,
   type FlowNode,
   type RecentResult,
 } from "../src/store/flowStore";
 import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 
 let passed = 0;
+
+function activeDocument(state = useFlowStore.getState()) {
+  return selectActiveDocument(state);
+}
+
+function documentTargetForTab(tabId: string): DocumentTarget {
+  const tab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tabId);
+  assert.ok(tab, `找不到页签 ${tabId}`);
+  return { tabId, projectId: tab.projectId, documentEpoch: tab.documentEpoch };
+}
 
 async function test(name: string, run: () => void | Promise<void>): Promise<void> {
   try {
@@ -87,7 +100,7 @@ setGenerationSafetyBlockReason(null);
 const initial = useFlowStore.getState();
 const tabA = initial.activeTabId;
 initial.setProjectName("项目 A");
-initial.updateNodeData(initial.nodes[0].id, { label: "A 上传节点" });
+initial.updateNodeData(activeDocument(initial).nodes[0].id, { label: "A 上传节点" });
 
 useFlowStore.getState().openFlowTab({
   projectId: "project-b",
@@ -99,13 +112,13 @@ const tabB = useFlowStore.getState().activeTabId;
 
 await test("切换页签保留各自画布与项目名称", () => {
   assert.notEqual(tabA, tabB);
-  assert.equal(useFlowStore.getState().projectName, "项目 B");
-  assert.equal(useFlowStore.getState().nodes[0].id, "b-node");
+  assert.equal(activeDocument().projectName, "项目 B");
+  assert.equal(activeDocument().nodes[0].id, "b-node");
   useFlowStore.getState().switchTab(tabA);
-  assert.equal(useFlowStore.getState().projectName, "项目 A");
-  assert.equal(useFlowStore.getState().nodes[0].data.label, "A 上传节点");
+  assert.equal(activeDocument().projectName, "项目 A");
+  assert.equal(activeDocument().nodes[0].data.label, "A 上传节点");
   useFlowStore.getState().switchTab(tabB);
-  assert.equal(useFlowStore.getState().nodes[0].data.label, "B 上传节点");
+  assert.equal(activeDocument().nodes[0].data.label, "B 上传节点");
 });
 
 await test("重复打开同一项目复用已有页签且不覆盖未保存状态", () => {
@@ -119,18 +132,18 @@ await test("重复打开同一项目复用已有页签且不覆盖未保存状�
   });
   assert.equal(useFlowStore.getState().tabs.length, count);
   assert.equal(useFlowStore.getState().activeTabId, tabB);
-  assert.equal(useFlowStore.getState().nodes[0].data.label, "B 本地修改");
+  assert.equal(activeDocument().nodes[0].data.label, "B 本地修改");
 });
 
 await test("后台任务可定向回写非当前页签", () => {
   useFlowStore.getState().switchTab(tabA);
-  useFlowStore.getState().updateNodeDataInTab(tabB, "b-node", {
+  useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(tabB), "b-node", {
     status: "success",
     imageUrl: "/api/files/background-result.png",
   });
-  assert.equal(useFlowStore.getState().projectName, "项目 A");
+  assert.equal(activeDocument().projectName, "项目 A");
   useFlowStore.getState().switchTab(tabB);
-  const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "b-node");
+  const node = activeDocument().nodes.find((candidate) => candidate.id === "b-node");
   assert.equal(node?.data.status, "success");
   assert.equal(node?.data.kind === "image-input" ? node.data.imageUrl : undefined, "/api/files/background-result.png");
 });
@@ -139,9 +152,9 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
   useFlowStore.getState().switchTab(tabA);
   useFlowStore.getState().addExistingNode(aiNode("a-ai-node", "A 后台改款"));
   useFlowStore.getState().switchTab(tabB);
-  const beforeB = useFlowStore.getState().nodes;
+  const beforeB = activeDocument().nodes;
 
-  applyRunEventToTab(tabA, "a-ai-node", {
+  applyRunEventToTab(documentTargetForTab(tabA), "a-ai-node", {
     type: "node-status",
     nodeId: "a-ai-node",
     status: "error",
@@ -149,9 +162,9 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
   });
 
   assert.equal(useFlowStore.getState().activeTabId, tabB);
-  assert.strictEqual(useFlowStore.getState().nodes, beforeB);
+  assert.strictEqual(activeDocument().nodes, beforeB);
   useFlowStore.getState().switchTab(tabA);
-  const failedNode = useFlowStore.getState().nodes.find((node) => node.id === "a-ai-node");
+  const failedNode = activeDocument().nodes.find((node) => node.id === "a-ai-node");
   assert.equal(failedNode?.data.status, "error");
   assert.equal(failedNode?.data.error, "AI 网关暂不可用");
   assert.deepEqual(
@@ -159,6 +172,18 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
     ["/api/files/previous.png"],
   );
   useFlowStore.getState().switchTab(tabB);
+});
+
+await test("活动任务对账完成前禁止关闭看似空闲的恢复页签", () => {
+  const count = useFlowStore.getState().tabs.length;
+  setGenerationSafetyBlockReason("正在确认运行历史");
+  try {
+    useFlowStore.getState().closeTab(tabB);
+    assert.equal(useFlowStore.getState().tabs.length, count);
+    assert.ok(useFlowStore.getState().tabs.some((tab) => tab.id === tabB));
+  } finally {
+    setGenerationSafetyBlockReason(null);
+  }
 });
 
 await test("运行中的页签不能关闭，避免任务结果丢失画布回写", () => {
@@ -177,7 +202,7 @@ await test("关闭当前页签后切换到相邻页签，至少保留一个画�
   useFlowStore.getState().closeTab(tabA);
   assert.equal(useFlowStore.getState().tabs.length, 1);
   assert.ok(useFlowStore.getState().activeTabId);
-  assert.equal(useFlowStore.getState().nodes.length, 1);
+  assert.equal(activeDocument().nodes.length, 1);
 });
 
 await test("删除已选节点时同步清理 selectedNodeId", () => {
@@ -194,8 +219,8 @@ await test("删除已选节点时同步清理 selectedNodeId", () => {
     type: "remove",
   }]);
 
-  assert.equal(useFlowStore.getState().nodes.length, 0);
-  assert.equal(useFlowStore.getState().selectedNodeId, null);
+  assert.equal(activeDocument().nodes.length, 0);
+  assert.equal(activeDocument().selectedNodeId, null);
 });
 
 await test("素材节点以单一原子 action 加入，一次撤销完整移除", () => {
@@ -211,17 +236,17 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
     { x: -320, y: 40 },
   );
   assert.ok(addedId);
-  const added = useFlowStore.getState().nodes.find((node) => node.id === addedId);
+  const added = activeDocument().nodes.find((node) => node.id === addedId);
   assert.equal(added?.data.kind, "image-input");
   assert.equal(added?.data.label, "金色面料");
   assert.equal(added?.data.status, "success");
   assert.equal(added?.data.kind === "image-input" ? added.data.imageUrl : undefined, "/api/files/gold-fabric.png");
 
   useFlowStore.getState().undo();
-  assert.equal(useFlowStore.getState().nodes.length, 1);
-  assert.equal(useFlowStore.getState().nodes[0].id, baseline.id);
-  assert.equal(useFlowStore.getState().nodes.some((node) => node.id === addedId), false);
-  assert.equal(useFlowStore.getState().selectedNodeId, null);
+  assert.equal(activeDocument().nodes.length, 1);
+  assert.equal(activeDocument().nodes[0].id, baseline.id);
+  assert.equal(activeDocument().nodes.some((node) => node.id === addedId), false);
+  assert.equal(activeDocument().selectedNodeId, null);
 
   const librarySource = fs.readFileSync(
     new URL("../src/components/panels/NodeLibraryPanel.tsx", import.meta.url),
@@ -262,10 +287,108 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
     await flushCommandMicrotasks();
     assert.equal(requests.length, 2, "当前快照成功后不得为重复点击发第三次请求");
 
-    const after = useFlowStore.getState();
+    const after = activeDocument();
     assert.equal(after.dirty, false);
     assert.equal(after.saveState, "saved");
     assert.equal(after.savedRevision, after.revision);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("旧保存响应不得将同页签新项目标记为已保存", async () => {
+  const sharedNodeId = "same-tab-save-identity";
+  useFlowStore.getState().loadFlow({
+    projectId: "same-tab-save-project-a",
+    projectName: "同页签项目 A",
+    nodes: [aiNode(sharedNodeId, "A")],
+    edges: [],
+    markDirty: true,
+  });
+  const source = selectActiveDocumentTarget(useFlowStore.getState());
+  let resolveSave: ((response: Response) => void) | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => new Promise<Response>((resolve) => {
+    resolveSave = resolve;
+  });
+
+  try {
+    const saving = useFlowStore.getState().saveProject();
+    assert.ok(resolveSave, "旧项目保存请求应已发出");
+    useFlowStore.getState().loadFlow({
+      projectId: "same-tab-save-project-b",
+      projectName: "同页签项目 B",
+      nodes: [aiNode(sharedNodeId, "B")],
+      edges: [],
+      markDirty: true,
+    });
+    const replacement = activeDocument();
+    assert.equal(replacement.id, source.tabId);
+    assert.equal(replacement.documentEpoch, source.documentEpoch + 1);
+
+    resolveSave(Response.json({ ok: true }));
+    assert.equal(await saving, false, "失效保存响应必须报告未保存新项目");
+    const after = activeDocument();
+    assert.equal(after.projectId, "same-tab-save-project-b");
+    assert.equal(after.dirty, true);
+    assert.equal(after.saveState, "idle");
+    assert.equal(after.savedRevision, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", async () => {
+  const sharedNodeId = "same-tab-async-identity";
+  const sourceNode = aiNode(sharedNodeId, "旧项目节点");
+  sourceNode.data.status = "idle";
+  useFlowStore.getState().loadFlow({
+    projectId: "same-tab-async-project-a",
+    projectName: "异步项目 A",
+    nodes: [sourceNode],
+    edges: [],
+    markDirty: true,
+  });
+  const staleTarget = selectActiveDocumentTarget(useFlowStore.getState());
+  const requests: string[] = [];
+  let resolveSave: ((response: Response) => void) | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === "/api/projects") {
+      return new Promise<Response>((resolve) => {
+        resolveSave = resolve;
+      });
+    }
+    return Promise.resolve(Response.json({ runId: "must-not-be-created" }, { status: 202 }));
+  };
+
+  try {
+    const running = useFlowStore.getState().runNode(sharedNodeId);
+    assert.ok(resolveSave, "运行应先等待旧项目保存");
+    const replacementNode = aiNode(sharedNodeId, "新项目节点");
+    replacementNode.data.status = "idle";
+    useFlowStore.getState().loadFlow({
+      projectId: "same-tab-async-project-b",
+      projectName: "异步项目 B",
+      nodes: [replacementNode],
+      edges: [],
+      markDirty: true,
+    });
+    useFlowStore.getState().updateNodeDataInTab(staleTarget, sharedNodeId, {
+      label: "旧上传误写",
+      status: "success",
+    });
+    assert.equal(activeDocument().nodes[0].data.label, "新项目节点");
+
+    resolveSave(Response.json({ ok: true }));
+    await running;
+    assert.deepEqual(requests, ["/api/projects"], "失效旧快照不得继续创建付费 Run");
+    const after = activeDocument();
+    assert.equal(after.projectId, "same-tab-async-project-b");
+    assert.equal(after.nodes[0].data.label, "新项目节点");
+    assert.equal(after.nodes[0].data.status, "idle");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -280,7 +403,7 @@ await test("保存失败响应落在拖拽中时，等待结束后再标记最�
     edges: [],
   });
   useFlowStore.temporal.getState().clear();
-  const before = useFlowStore.getState();
+  const before = activeDocument();
   const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
@@ -298,12 +421,12 @@ await test("保存失败响应落在拖拽中时，等待结束后再标记最�
     requests[0].resolve(Response.json({ error: "测试失败" }, { status: 503 }));
     await flushCommandMicrotasks();
     assert.equal(saveSettled, false, "失败响应不得在拖拽中提前改写元数据");
-    assert.equal(useFlowStore.getState().saveState, "saving");
+    assert.equal(activeDocument().saveState, "saving");
 
     moveNode(node.id, 160);
     assert.equal(endHistoryTransaction(transaction), true);
     assert.equal(await saving, false);
-    const after = useFlowStore.getState();
+    const after = activeDocument();
     assert.deepEqual(after.nodes[0].position, { x: 160, y: 24 });
     assert.notEqual(after.nodes[0].dragging, true);
     assert.equal(after.revision, before.revision + 1);
@@ -325,7 +448,7 @@ await test("净零拖拽保存等待结束后只写入起点快照", async () =>
     edges: [],
   });
   useFlowStore.temporal.getState().clear();
-  const before = useFlowStore.getState();
+  const before = activeDocument();
   const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (_input, init) => new Promise<Response>((resolve) => {
@@ -348,7 +471,7 @@ await test("净零拖拽保存等待结束后只写入起点快照", async () =>
     requests[0].resolve(Response.json({ ok: true }));
     assert.equal(await saving, true);
 
-    const after = useFlowStore.getState();
+    const after = activeDocument();
     assert.equal(after.revision, before.revision);
     assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
     assert.equal(after.dirty, false);
@@ -384,7 +507,7 @@ await test("失败响应先等待拖拽时，后到的显式保存会重试一�
     requests[0].resolve(Response.json({ error: "首次保存失败" }, { status: 503 }));
     await flushCommandMicrotasks();
     assert.equal(firstSettled, false, "失败响应已先登记 settlement waiter");
-    assert.equal(useFlowStore.getState().saveState, "saving");
+    assert.equal(activeDocument().saveState, "saving");
 
     const secondSave = useFlowStore.getState().saveProject();
     assert.equal(requests.length, 1, "显式重试不得发送拖拽中间帧");
@@ -401,7 +524,7 @@ await test("失败响应先等待拖拽时，后到的显式保存会重试一�
     await Promise.all([firstSave, secondSave]);
     await flushCommandMicrotasks();
     assert.equal(requests.length, 2, "第二次成功已覆盖显式重试，不得发第三次请求");
-    const after = useFlowStore.getState();
+    const after = activeDocument();
     assert.equal(after.dirty, false);
     assert.equal(after.saveState, "saved");
     assert.equal(after.savedRevision, after.revision);
@@ -529,13 +652,13 @@ await test("Undo→Save 会先撤销拖拽，再保存撤销后快照", async ()
     assert.equal(requests.length, 1);
     const payload = JSON.parse(requests[0].body) as { flow: { nodes: FlowNode[] } };
     assert.deepEqual(payload.flow.nodes[0].position, { x: 320, y: 0 });
-    assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 320, y: 0 });
+    assert.deepEqual(activeDocument().nodes[0].position, { x: 320, y: 0 });
     assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
 
     requests[0].resolve(Response.json({ ok: true }));
     assert.equal(await saving, true);
-    assert.equal(useFlowStore.getState().dirty, false);
-    assert.equal(useFlowStore.getState().saveState, "saved");
+    assert.equal(activeDocument().dirty, false);
+    assert.equal(activeDocument().saveState, "saved");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -569,7 +692,7 @@ await test("Save→Undo 先发送拖拽终点，再排队补写撤销快照", as
     const firstPayload = JSON.parse(requests[0].body) as { flow: { nodes: FlowNode[] } };
     assert.deepEqual(firstPayload.flow.nodes[0].position, { x: 500, y: 24 });
     assert.notEqual(firstPayload.flow.nodes[0].dragging, true);
-    assert.deepEqual(useFlowStore.getState().nodes[0].position, { x: 320, y: 0 });
+    assert.deepEqual(activeDocument().nodes[0].position, { x: 320, y: 0 });
 
     requests[0].resolve(Response.json({ ok: true }));
     await flushCommandMicrotasks(12);
@@ -579,8 +702,8 @@ await test("Save→Undo 先发送拖拽终点，再排队补写撤销快照", as
 
     requests[1].resolve(Response.json({ ok: true }));
     assert.equal(await saving, true);
-    assert.equal(useFlowStore.getState().dirty, false);
-    assert.equal(useFlowStore.getState().saveState, "saved");
+    assert.equal(activeDocument().dirty, false);
+    assert.equal(activeDocument().saveState, "saved");
     assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
@@ -590,7 +713,7 @@ await test("Save→Undo 先发送拖拽终点，再排队补写撤销快照", as
 await test("新建项目首次生成会先保存同一份项目，再提交运行", async () => {
   useFlowStore.getState().createBlankTab();
   useFlowStore.getState().addExistingNode(aiNode("first-run-ai", "首次生成"));
-  const projectId = useFlowStore.getState().projectId;
+  const projectId = activeDocument().projectId;
   const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -705,9 +828,9 @@ await test("runNode 创建 queued 记录时保留当前结果选择", async () =
       (record) => record.nodeId === "queued-selection-node",
     );
     assert.equal(queued?.status, "queued");
-    assert.equal(useFlowStore.getState().selectedResultId, keptResult.id);
+    assert.equal(activeDocument().selectedResultId, keptResult.id);
     await running;
-    assert.equal(useFlowStore.getState().selectedResultId, keptResult.id);
+    assert.equal(activeDocument().selectedResultId, keptResult.id);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -721,7 +844,7 @@ await test("历史安全门从 runNode 唯一入口阻止新的付费运行", as
     edges: [],
   });
   const before = useFlowStore.getState().recentResults.length;
-  const beforeStatus = useFlowStore.getState().nodes[0].data.status;
+  const beforeStatus = activeDocument().nodes[0].data.status;
   const originalFetch = globalThis.fetch;
   let requested = false;
   globalThis.fetch = async () => {
@@ -734,7 +857,7 @@ await test("历史安全门从 runNode 唯一入口阻止新的付费运行", as
     await useFlowStore.getState().runNode("history-gate-node");
     assert.equal(requested, false);
     assert.equal(useFlowStore.getState().recentResults.length, before);
-    assert.equal(useFlowStore.getState().nodes[0].data.status, beforeStatus);
+    assert.equal(activeDocument().nodes[0].data.status, beforeStatus);
   } finally {
     setGenerationSafetyBlockReason(null);
     globalThis.fetch = originalFetch;
@@ -759,15 +882,15 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   };
 
   useFlowStore.getState().updateNodeData(generationNode.id, expected);
-  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+  assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   await Promise.resolve().then(() => {
-    useFlowStore.getState().updateNodeDataInTab(invariantTabId, "model-invariant-upload", {
+    useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(invariantTabId), "model-invariant-upload", {
       status: "success",
       imageUrl: "/api/files/model-invariant-upload.png",
     });
   });
-  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+  assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   useFlowStore.getState().addExistingNode({
     id: "model-invariant-mask",
@@ -789,7 +912,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
     sourceHandle: null,
     targetHandle: null,
   });
-  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+  assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   useFlowStore.getState().openFlowTab({
     projectId: "model-invariant-other-project",
@@ -801,7 +924,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   assert.ok(storedInvariantTab);
   assertNodeModelSelection(storedInvariantTab.nodes, generationNode.id, expected);
   useFlowStore.getState().switchTab(invariantTabId);
-  assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+  assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
   const originalFetch = globalThis.fetch;
@@ -819,7 +942,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   try {
     await useFlowStore.getState().runNode(generationNode.id);
     assert.deepEqual(requests.map((request) => request.url), ["/api/projects", "/api/run-plan"]);
-    assertNodeModelSelection(useFlowStore.getState().nodes, generationNode.id, expected);
+    assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
     const savedFlow = (requests[0].body as { flow: { nodes: FlowNode[] } }).flow;
     const runNodes = (requests[1].body as { nodes: FlowNode[] }).nodes;
@@ -887,7 +1010,7 @@ await test("项目保存失败时显示错误且绝不提交生成", async () =>
   try {
     await useFlowStore.getState().runNode("blocked-first-run");
     assert.deepEqual(requests, ["/api/projects"]);
-    const failedNode = useFlowStore.getState().nodes.find((node) => node.id === "blocked-first-run");
+    const failedNode = activeDocument().nodes.find((node) => node.id === "blocked-first-run");
     assert.equal(failedNode?.data.status, "error");
     assert.match(failedNode?.data.error ?? "", /项目保存失败.*未调用生图服务.*保存服务暂不可用/);
     const result = useFlowStore.getState().recentResults.find(
@@ -937,7 +1060,7 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
     assert.equal(submitted?.data.kind, "ai-modify");
     assert.equal(submitted?.data.kind === "ai-modify" ? submitted.data.prompt : undefined, "修改衣领");
     assert.match(
-      useFlowStore.getState().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
+      activeDocument().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
       /画布尚未保存或已在其他位置更新/,
     );
   } finally {
@@ -963,13 +1086,13 @@ await test("保存预检期间取消会阻止生成请求", async () => {
     assert.equal(requests.length, 1);
     await useFlowStore.getState().cancelNodeRun("cancel-preflight");
     assert.equal(
-      useFlowStore.getState().nodes.find((node) => node.id === "cancel-preflight")?.data.status,
+      activeDocument().nodes.find((node) => node.id === "cancel-preflight")?.data.status,
       "cancel_requested",
     );
     resolveSave?.(Response.json({ ok: true }));
     await running;
     assert.deepEqual(requests, ["/api/projects"]);
-    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "cancel-preflight");
+    const node = activeDocument().nodes.find((candidate) => candidate.id === "cancel-preflight");
     assert.equal(node?.data.status, "cancelled");
     assert.match(node?.data.error ?? "", /调用生图服务前取消/);
     const result = useFlowStore.getState().recentResults.find(
@@ -1047,19 +1170,19 @@ await test("网络或网关响应不确定时复用同一请求号，已知 runI
 
   try {
     await useFlowStore.getState().runNode("idempotent-run");
-    const uncertain = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    const uncertain = activeDocument().nodes.find((node) => node.id === "idempotent-run");
     assert.equal(uncertain?.data.status, "outcome_unknown");
     assert.match(uncertain?.data.error ?? "", /同一请求号安全确认/);
 
     await useFlowStore.getState().runNode("idempotent-run");
     assert.deepEqual(clientRequestIds.length, 2);
     assert.equal(clientRequestIds[1], clientRequestIds[0]);
-    const gatewayUnknown = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    const gatewayUnknown = activeDocument().nodes.find((node) => node.id === "idempotent-run");
     assert.equal(gatewayUnknown?.data.status, "outcome_unknown");
 
     await useFlowStore.getState().runNode("idempotent-run");
     assert.equal(clientRequestIds[2], clientRequestIds[0]);
-    const recovering = useFlowStore.getState().nodes.find((node) => node.id === "idempotent-run");
+    const recovering = activeDocument().nodes.find((node) => node.id === "idempotent-run");
     assert.equal(recovering?.data.status, "retry_wait");
     assert.match(recovering?.data.error ?? "", /勿重复提交/);
 
@@ -1098,7 +1221,7 @@ await test("丢失响应后即使参数变化收到 409，也持续复用原付�
     await useFlowStore.getState().runNode("ambiguous-conflict");
     assert.equal(clientRequestIds.length, 3);
     assert.deepEqual(new Set(clientRequestIds).size, 1, "409 后不得换新请求号再次付费");
-    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "ambiguous-conflict");
+    const node = activeDocument().nodes.find((candidate) => candidate.id === "ambiguous-conflict");
     assert.equal(node?.data.status, "outcome_unknown");
     assert.match(node?.data.error ?? "", /旧请求可能已创建任务/);
   } finally {
@@ -1110,7 +1233,7 @@ await test("取消请求断网不会产生未处理异常或把原任务误判�
   useFlowStore.getState().createBlankTab();
   useFlowStore.getState().addExistingNode(aiNode("cancel-network", "取消断网"));
   useFlowStore.getState().setNodeStatus("cancel-network", "running");
-  const state = useFlowStore.getState();
+  const document = activeDocument();
   useFlowStore.setState({
     recentResults: [{
       id: "cancel-network-record",
@@ -1118,8 +1241,8 @@ await test("取消请求断网不会产生未处理异常或把原任务误判�
       nodeId: "cancel-network",
       nodeLabel: "取消断网",
       kind: "ai-modify",
-      projectId: state.projectId,
-      projectName: state.projectName,
+      projectId: document.projectId,
+      projectName: document.projectName,
       runId: "cancel-network-run",
       startedAt: Date.now(),
       status: "running",
@@ -1132,7 +1255,7 @@ await test("取消请求断网不会产生未处理异常或把原任务误判�
 
   try {
     await useFlowStore.getState().cancelNodeRun("cancel-network");
-    const node = useFlowStore.getState().nodes.find((candidate) => candidate.id === "cancel-network");
+    const node = activeDocument().nodes.find((candidate) => candidate.id === "cancel-network");
     assert.equal(node?.data.status, "running");
     assert.match(node?.data.error ?? "", /取消结果未知.*继续同步/);
   } finally {
@@ -1147,16 +1270,16 @@ await test("React Flow 初始化尺寸不会移动节点或标记项目未保存
     nodes: [imageNode("dimension-node", "尺寸初始化节点")],
     edges: [],
   });
-  const before = useFlowStore.getState();
+  const before = activeDocument();
   const originalPosition = { ...before.nodes[0].position };
 
-  before.onNodesChange([{
+  useFlowStore.getState().onNodesChange([{
     id: "dimension-node",
     type: "dimensions",
     dimensions: { width: 280, height: 162 },
   }]);
 
-  const after = useFlowStore.getState();
+  const after = activeDocument();
   assert.equal(after.revision, before.revision);
   assert.equal(after.dirty, false);
   assert.deepEqual(after.nodes[0].position, originalPosition);
@@ -1168,7 +1291,7 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
     new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
     "utf8",
   );
-  assert.ok(source.includes("const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);"));
+  assert.ok(source.includes("const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);"));
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
 });
 
@@ -1208,7 +1331,7 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     edges: [{ id: "mask-edge", source: "mask-source", target: "mask-node" }],
   });
 
-  const source = selectNodeInputImages(useFlowStore.getState(), "mask-node")[0];
+  const source = selectNodeInputImages(activeDocument(), "mask-node")[0];
   assert.equal(source, sourceRef);
   const beforeSave = maskRedrawReadiness({ source, prompt: "" });
   assert.equal(beforeSave.canOpenRunAction, false);
@@ -1217,7 +1340,7 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     mask: "data:image/png;base64,bWFzaw==",
     maskSourceRef: source,
   });
-  const savedNode = useFlowStore.getState().nodes.find((node) => node.id === "mask-node");
+  const savedNode = activeDocument().nodes.find((node) => node.id === "mask-node");
   assert.equal(savedNode?.data.kind, "mask-redraw");
   if (savedNode?.data.kind !== "mask-redraw") throw new Error("蒙版节点丢失");
   const afterSave = maskRedrawReadiness({
@@ -1307,7 +1430,7 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
   assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
   assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== source/);
-  assert.match(redrawSource, /updateNodeDataInTab\(tabId, id, \{ mask: url, maskSourceRef: source/);
+  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: source/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);

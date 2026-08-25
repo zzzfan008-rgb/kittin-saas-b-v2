@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { beginMaskWork, selectNodeInputImages, useFlowStore } from "@/store/flowStore";
+import {
+  beginMaskWork,
+  selectActiveDocumentTarget,
+  selectActiveNodeInputImages,
+  selectActiveReadOnly,
+  selectDocumentForTab,
+  selectNodeInputImages,
+  useFlowStore,
+} from "@/store/flowStore";
 import { isNodeRunActive, type MaskRedrawNodeData } from "@/types/workflow";
 import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
@@ -8,17 +16,17 @@ import { MaskEditor } from "./MaskEditor";
 import { thumbnailImageUrl } from "@/lib/images";
 import { maskRedrawReadiness } from "@/lib/maskRedraw";
 import { saveMaskDraft } from "@/lib/maskUpload";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedrawNodeData>>) {
   const [editing, setEditing] = useState(false);
   const [promptRequired, setPromptRequired] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
-  const readOnly = useFlowStore((state) => state.readOnly);
-  const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);
+  const readOnly = useFlowStore(selectActiveReadOnly);
+  const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
   const readiness = maskRedrawReadiness({
     source,
@@ -28,6 +36,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   });
   const staleMask = Boolean(data.mask && source && !readiness.hasCurrentMask);
   const editorVisible = editing && Boolean(source);
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "prompt" },
+    { multiline: true },
+  );
 
   useEffect(() => {
     if (!editorVisible) return;
@@ -68,9 +80,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <textarea
             ref={promptRef}
             value={data.prompt}
+            {...promptEdit.bind}
             onChange={(event) => {
               const prompt = event.target.value;
-              updateNodeData(id, { prompt });
+              promptEdit.updateValue(prompt);
               if (prompt.trim()) setPromptRequired(false);
             }}
             rows={4}
@@ -113,11 +126,8 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           onSave={async (mask) => {
             const releaseUploadPending = beginMaskWork();
             const state = useFlowStore.getState();
-            const tabId = state.activeTabId;
-            const storedTab = state.tabs.find((candidate) => candidate.id === tabId);
-            const tab = storedTab && state.activeTabId === tabId
-              ? { ...storedTab, nodes: state.nodes, edges: state.edges, readOnly: state.readOnly }
-              : storedTab;
+            const target = selectActiveDocumentTarget(state);
+            const tab = selectDocumentForTab(state, target.tabId);
             try {
               if (!tab || tab.readOnly || !tab.nodes.some((node) => node.id === id)) {
                 throw new Error(tab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
@@ -130,17 +140,16 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
               }, {
                 commit: (url) => {
                   const current = useFlowStore.getState();
-                  const storedCurrentTab = current.tabs.find((candidate) => candidate.id === tabId);
-                  const currentTab = storedCurrentTab && current.activeTabId === tabId
-                    ? { ...storedCurrentTab, nodes: current.nodes, edges: current.edges, readOnly: current.readOnly }
-                    : storedCurrentTab;
-                  if (!currentTab || currentTab.readOnly || !currentTab.nodes.some((node) => node.id === id)) {
+                  const currentTab = selectDocumentForTab(current, target.tabId);
+                  const targetStillMatches = currentTab?.projectId === target.projectId &&
+                    currentTab.documentEpoch === target.documentEpoch;
+                  if (!targetStillMatches || !currentTab || currentTab.readOnly || !currentTab.nodes.some((node) => node.id === id)) {
                     throw new Error(currentTab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
                   }
                   if (selectNodeInputImages(currentTab, id)[0] !== source) {
                     throw new Error("原图已变化，旧蒙版未覆盖当前节点，请基于新原图重新绘制");
                   }
-                  updateNodeDataInTab(tabId, id, { mask: url, maskSourceRef: source, error: undefined });
+                  updateNodeDataInTab(target, id, { mask: url, maskSourceRef: source, error: undefined });
                 },
                 close: () => setEditing(false),
               });

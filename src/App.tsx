@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
+  flushActiveTextEdit,
+  flushTabSessionPersistence,
   reconcileRunHistory,
   recentResultsPatch,
   resumeRecentResults,
-  selectPrimarySelectedNodeId,
+  selectActiveNodes,
+  selectActivePrimarySelectedNodeId,
+  selectHasDirtyTabs,
   trimRecentResults,
   useFlowStore,
   type FlowNode,
@@ -80,8 +84,8 @@ function useGlobalShortcuts() {
       } else if (key === "c") {
         // 复制选中节点（不带连线，避免悬空边）
         const state = useFlowStore.getState();
-        const { nodes } = state;
-        const selectedNodeId = selectPrimarySelectedNodeId(state);
+        const nodes = selectActiveNodes(state);
+        const selectedNodeId = selectActivePrimarySelectedNodeId(state);
         const node = nodes.find((n) => n.id === selectedNodeId);
         if (node) {
           nodeClipboard = {
@@ -93,12 +97,13 @@ function useGlobalShortcuts() {
         // 粘贴：在副本右侧偏移落位，状态复位
         if (!nodeClipboard) return;
         e.preventDefault();
-        const { nodes } = useFlowStore.getState();
+        const state = useFlowStore.getState();
+        const nodes = selectActiveNodes(state);
         const data = JSON.parse(JSON.stringify(nodeClipboard.data)) as FlowNode["data"];
         data.status = "idle";
         data.error = undefined;
         const anchor =
-          nodes.find((n) => n.id === selectPrimarySelectedNodeId(useFlowStore.getState())) ??
+          nodes.find((n) => n.id === selectActivePrimarySelectedNodeId(state)) ??
           nodes[nodes.length - 1];
         const position = anchor
           ? { x: anchor.position.x + 40, y: anchor.position.y + 40 }
@@ -134,9 +139,6 @@ export default function App() {
 function Workspace() {
   useGlobalShortcuts();
   const activeTabId = useFlowStore((state) => state.activeTabId);
-  const hasDirtyTabs = useFlowStore((state) => state.dirty || state.tabs.some((tab) => tab.dirty));
-  const tabSessionPersistenceError = useFlowStore((state) => state.tabSessionPersistenceError);
-  const pendingMaskWorkCount = useFlowStore((state) => state.pendingMaskWorkCount);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -160,19 +162,38 @@ function Workspace() {
   }, []);
 
   useEffect(() => {
-    if (!shouldWarnBeforeWorkspaceUnload({
-      hasDirtyTabs,
-      tabSessionPersistenceError,
-      pendingMaskWorkCount,
-    })) return;
+    const flushDrafts = () => {
+      flushActiveTextEdit();
+      flushTabSessionPersistence();
+    };
+    const flushHiddenDrafts = () => {
+      if (document.visibilityState === "hidden") flushDrafts();
+    };
+    window.addEventListener("pagehide", flushDrafts);
+    document.addEventListener("visibilitychange", flushHiddenDrafts);
+    return () => {
+      window.removeEventListener("pagehide", flushDrafts);
+      document.removeEventListener("visibilitychange", flushHiddenDrafts);
+    };
+  }, []);
+
+  useEffect(() => {
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      flushActiveTextEdit();
+      flushTabSessionPersistence();
       if (isWorkspaceUnloadWarningSuppressed()) return;
+      const latest = useFlowStore.getState();
+      if (!shouldWarnBeforeWorkspaceUnload({
+        hasDirtyTabs: selectHasDirtyTabs(latest),
+        tabSessionPersistenceError: latest.tabSessionPersistenceError,
+        pendingMaskWorkCount: latest.pendingMaskWorkCount,
+      })) return;
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [hasDirtyTabs, pendingMaskWorkCount, tabSessionPersistenceError]);
+  }, []);
 
   useEffect(() => {
     let active = true;

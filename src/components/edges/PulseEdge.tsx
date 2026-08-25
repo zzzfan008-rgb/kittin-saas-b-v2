@@ -1,5 +1,5 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveNodes, useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive } from "@/types/workflow";
 
 /**
@@ -26,8 +26,8 @@ export function PulseEdge({
     targetPosition,
   });
   const running = useFlowStore(
-    (s) => {
-      const status = s.nodes.find((n) => n.id === source)?.data.status;
+    (state) => {
+      const status = selectActiveNodes(state).find((node) => node.id === source)?.data.status;
       return status ? isNodeRunActive(status) : false;
     },
   );

@@ -1,3 +1,9 @@
+import {
+  clearProjectTabSessionStorage,
+  PROJECT_TABS_STORAGE_KEY,
+  suspendProjectTabSessionPersistence,
+} from "@/lib/tabSessionStorage";
+
 export type SessionEndReason = "replaced";
 export type AuthChangeType = "login" | "logout" | "auth-changed";
 
@@ -9,7 +15,7 @@ export interface AuthChangeMessage {
 
 const SESSION_END_NOTICE_KEY = "garment-canvas-session-end-reason";
 const WORKSPACE_OWNER_KEY = "garment-canvas-workspace-owner-id";
-const PROJECT_TABS_KEY = "garment-canvas-project-tabs";
+const PROJECT_TABS_KEY = PROJECT_TABS_STORAGE_KEY;
 const AMBIGUOUS_RUN_REQUESTS_KEY = "garment-canvas-ambiguous-run-requests";
 const RECENT_RESULTS_KEY = "garment-canvas-recent-results";
 export const AUTH_CHANGE_STORAGE_KEY = "garment-canvas-auth-change";
@@ -132,21 +138,33 @@ function writeWorkspaceOwner(storage: Pick<Storage, "setItem">, userId: string):
 }
 
 export function clearLocalWorkspace(
-  sessionStorage: Pick<Storage, "removeItem">,
-  localStorage: Pick<Storage, "removeItem">,
-): void {
-  for (const key of [PROJECT_TABS_KEY, AMBIGUOUS_RUN_REQUESTS_KEY]) {
-    try {
-      sessionStorage.removeItem(key);
-    } catch {
-      // 单个 key 清理失败不能阻止继续清理其它账号绑定状态。
-    }
+  sessionStorage: Pick<Storage, "removeItem"> &
+    Partial<Pick<Storage, "getItem" | "key" | "length">>,
+  localStorage: Pick<Storage, "removeItem"> & Partial<Pick<Storage, "getItem">>,
+): boolean {
+  let complete = clearProjectTabSessionStorage(sessionStorage);
+  try {
+    sessionStorage.removeItem(AMBIGUOUS_RUN_REQUESTS_KEY);
+  } catch {
+    // 单个 key 清理失败不能阻止继续清理其它账号绑定状态。
+    complete = false;
   }
   try {
     localStorage.removeItem(RECENT_RESULTS_KEY);
   } catch {
-    // 同上。
+    // Recent results are never restored before authenticated server history;
+    // localStorage failure must not trap an otherwise isolated workspace in reload.
   }
+  try {
+    if (sessionStorage.getItem?.(AMBIGUOUS_RUN_REQUESTS_KEY) !== null) complete = false;
+  } catch {
+    complete = false;
+  }
+  try {
+    // Best-effort verification only; this cache is not a trusted restore source.
+    localStorage.getItem?.(RECENT_RESULTS_KEY);
+  } catch { /* unavailable local history does not weaken document isolation */ }
+  return complete;
 }
 
 /**
@@ -163,11 +181,26 @@ export function bindWorkspaceToAuthenticatedUser(
   const tabCache = storageValue(sessionStorage, PROJECT_TABS_KEY);
   const ambiguousRunCache = storageValue(sessionStorage, AMBIGUOUS_RUN_REQUESTS_KEY);
   const recentCache = storageValue(localStorage, RECENT_RESULTS_KEY);
-  clearLocalWorkspace(sessionStorage, localStorage);
+  const hasKnownPreviousWorkspace = (
+    owner !== null ||
+    tabCache.value !== null ||
+    ambiguousRunCache.value !== null ||
+    recentCache.value !== null
+  );
+  if (
+    !hasKnownPreviousWorkspace &&
+    (!tabCache.available || !ambiguousRunCache.available || !recentCache.available)
+  ) return "unavailable";
+  if (hasKnownPreviousWorkspace) suspendProjectTabSessionPersistence();
+  const workspaceCleared = clearLocalWorkspace(sessionStorage, localStorage);
+  if (!workspaceCleared) {
+    try { sessionStorage.removeItem(WORKSPACE_OWNER_KEY); } catch { /* reload retries cleanup */ }
+    return "cleared";
+  }
   const ownerBound = writeWorkspaceOwner(sessionStorage, userId);
   // 只有确实加载过旧缓存时才需要重载来丢弃其内存副本；存储整体不可用时
   // flowStore 同样无法恢复旧缓存，不能因无法写 owner 而进入无限重载。
-  if (tabCache.value !== null || ambiguousRunCache.value !== null || recentCache.value !== null) return "cleared";
+  if (hasKnownPreviousWorkspace) return "cleared";
   return ownerBound ? "preserved" : "unavailable";
 }
 
@@ -175,10 +208,14 @@ export function shouldReloadForAuthenticatedUserTransition(
   currentAuthenticatedUserId: string | null,
   nextAuthenticatedUserId: string,
   workspace: "preserved" | "cleared" | "unavailable",
+  didRestoreWorkspace = false,
 ): boolean {
-  // 存储完全不可用时无法通过 owner key 识别切号，但当前内存工作区仍属于旧账号。
+  // Storage 可能在 flowStore 恢复草稿后才暂时失效。首次 /me 即使
+  // 还没有 currentAuthenticatedUserId，也不能把归属未知的内存画布交给新账号。
   return workspace === "cleared" || (
     currentAuthenticatedUserId !== null && currentAuthenticatedUserId !== nextAuthenticatedUserId
+  ) || (
+    workspace === "unavailable" && currentAuthenticatedUserId === null && didRestoreWorkspace
   );
 }
 
@@ -193,7 +230,8 @@ export function prepareWorkspaceForLogin(
 ): "preserved" | "cleared" {
   const owner = readWorkspaceOwner(sessionStorage);
   if (owner === userId) return "preserved";
-  clearLocalWorkspace(sessionStorage, localStorage);
-  writeWorkspaceOwner(sessionStorage, userId);
+  suspendProjectTabSessionPersistence();
+  const workspaceCleared = clearLocalWorkspace(sessionStorage, localStorage);
+  if (workspaceCleared) writeWorkspaceOwner(sessionStorage, userId);
   return "cleared";
 }

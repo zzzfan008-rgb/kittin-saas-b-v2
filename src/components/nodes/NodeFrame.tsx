@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { isNodeRunActive, type NodeRunStatus } from "@/types/workflow";
-import { useFlowStore } from "@/store/flowStore";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 const STATUS_STYLE: Record<NodeRunStatus, string> = {
   idle: "bg-neutral-500",
@@ -50,11 +50,18 @@ interface NodeFrameProps {
 export function NodeFrame({ title, status, error, selected, nodeId, children }: NodeFrameProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
-  const updateNodeData = useFlowStore((s) => s.updateNodeData);
+  const cancelledRef = useRef(false);
+  const labelEdit = useCoalescedTextEdit(
+    nodeId ? { kind: "node-data", nodeId, field: "label" } : null,
+  );
 
   const commit = () => {
     const v = draft.trim();
-    if (v && nodeId && v !== title) updateNodeData(nodeId, { label: v });
+    if (!v) labelEdit.cancel();
+    else {
+      labelEdit.updateValue(v);
+      labelEdit.flush();
+    }
     setEditing(false);
   };
 
@@ -70,11 +77,25 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
           <input
             value={draft}
             autoFocus
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
+            {...labelEdit.bind}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              labelEdit.updateValue(event.target.value);
+            }}
+            onBlur={() => {
+              if (cancelledRef.current) {
+                cancelledRef.current = false;
+                return;
+              }
+              commit();
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commit();
-              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
+              if (e.key === "Escape") {
+                cancelledRef.current = true;
+                labelEdit.cancel();
+                setEditing(false);
+              }
             }}
             className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[#0f0f0f] px-1.5 py-0.5 text-xs text-neutral-200 focus:outline-hidden"
           />
@@ -85,6 +106,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
             onDoubleClick={
               nodeId
                 ? () => {
+                    cancelledRef.current = false;
                     setDraft(title);
                     setEditing(true);
                   }

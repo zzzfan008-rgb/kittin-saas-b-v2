@@ -11,6 +11,7 @@ import {
   normalizeRunEvent,
   requestedResultCount,
   resumeRecentResults,
+  selectActiveDocument,
   trimRecentResults,
   useFlowStore,
   type RecentResult,
@@ -21,6 +22,20 @@ import { ImageGrid } from "../src/components/nodes/ImageGrid";
 import { RunButton } from "../src/components/nodes/NodeFrame";
 
 let passed = 0;
+
+function activeDocument(state = useFlowStore.getState()) {
+  return selectActiveDocument(state);
+}
+
+function patchActiveDocument(
+  patch: Partial<ReturnType<typeof activeDocument>>,
+): void {
+  useFlowStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (
+      tab.id === state.activeTabId ? { ...tab, ...patch } : tab
+    )),
+  }));
+}
 
 function test(name: string, fn: () => void): void {
   try {
@@ -326,10 +341,10 @@ test("选择第 5 张对比图时给出上限提示且不改变选择", () => {
         finishedAt: index + 2,
       })),
     });
-    useFlowStore.setState({ compareIds: ["a", "b", "c", "d"] });
+    patchActiveDocument({ compareIds: ["a", "b", "c", "d"] });
     useFlowStore.getState().toggleCompareId("e");
     assert.equal(alertMessage, "最多选择 4 张图片进行对比");
-    assert.deepEqual(useFlowStore.getState().compareIds, ["a", "b", "c", "d"]);
+    assert.deepEqual(activeDocument().compareIds, ["a", "b", "c", "d"]);
   } finally {
     if (previousWindow === undefined) delete (globalThis as { window?: Window }).window;
     else Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow });
@@ -418,13 +433,15 @@ async function waitFor(condition: () => boolean, message: string): Promise<void>
       cancelUrls.push(String(input));
       return Response.json({ status: "cancel_requested", finished: false });
     }) as typeof fetch;
-    useFlowStore.setState({
-      projectId: "project-current",
+    useFlowStore.setState((state) => ({
+      tabs: state.tabs.map((tab) => (
+        tab.id === state.activeTabId ? { ...tab, projectId: "project-current" } : tab
+      )),
       recentResults: [
         { ...queued, id: "wrong-project", projectId: "project-other", runId: "run-other", status: "running" },
         { ...queued, id: "right-project", projectId: "project-current", runId: "run-current", status: "running" },
       ],
-    });
+    }));
     await useFlowStore.getState().cancelNodeRun(queued.nodeId);
     assert.deepEqual(cancelUrls, ["/api/run-plan/run-current/cancel"]);
     passed += 1;

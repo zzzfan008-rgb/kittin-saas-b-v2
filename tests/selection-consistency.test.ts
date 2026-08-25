@@ -3,6 +3,7 @@ import fs from "node:fs";
 import {
   recentResultsPatch,
   reconcileRunHistory,
+  selectActiveDocument,
   selectPrimarySelectedNodeId,
   trimRecentResults,
   useFlowStore,
@@ -11,6 +12,32 @@ import {
 } from "../src/store/flowStore";
 
 let passed = 0;
+
+function activeDocument(state = useFlowStore.getState()) {
+  return selectActiveDocument(state);
+}
+
+function patchActiveDocument(
+  patch: Partial<ReturnType<typeof activeDocument>>,
+): void {
+  useFlowStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (
+      tab.id === state.activeTabId ? { ...tab, ...patch } : tab
+    )),
+  }));
+}
+
+function setRecentResultsAndPatchActiveDocument(
+  recentResults: RecentResult[],
+  patch: Partial<ReturnType<typeof activeDocument>>,
+): void {
+  useFlowStore.setState((state) => ({
+    recentResults,
+    tabs: state.tabs.map((tab) => (
+      tab.id === state.activeTabId ? { ...tab, ...patch } : tab
+    )),
+  }));
+}
 
 function test(name: string, run: () => void): void {
   try {
@@ -59,16 +86,16 @@ function reset(): void {
 }
 
 function selectedFlags(): Array<[string, boolean]> {
-  return useFlowStore.getState().nodes.map((candidate) => [candidate.id, Boolean(candidate.selected)]);
+  return activeDocument().nodes.map((candidate) => [candidate.id, Boolean(candidate.selected)]);
 }
 
 console.log("节点与结果选择一致性测试");
 
 test("程序化单选同步 canonical IDs、primary 与 React Flow flags", () => {
   reset();
-  const beforeRevision = useFlowStore.getState().revision;
+  const beforeRevision = activeDocument().revision;
   useFlowStore.getState().setSelectedNodeId("b");
-  const state = useFlowStore.getState();
+  const state = activeDocument();
 
   assert.deepEqual(state.selectedNodeIds, ["b"]);
   assert.equal(selectPrimarySelectedNodeId(state), "b");
@@ -84,14 +111,14 @@ test("React Flow 框选和取消选择同步业务 primary", () => {
     { id: "a", type: "select", selected: true },
     { id: "b", type: "select", selected: true },
   ]);
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, ["a", "b"]);
-  assert.equal(selectPrimarySelectedNodeId(useFlowStore.getState()), "b");
+  assert.deepEqual(activeDocument().selectedNodeIds, ["a", "b"]);
+  assert.equal(selectPrimarySelectedNodeId(activeDocument()), "b");
 
   useFlowStore.getState().onNodesChange([
     { id: "b", type: "select", selected: false },
   ]);
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, ["a"]);
-  assert.equal(selectPrimarySelectedNodeId(useFlowStore.getState()), "a");
+  assert.deepEqual(activeDocument().selectedNodeIds, ["a"]);
+  assert.equal(selectPrimarySelectedNodeId(activeDocument()), "a");
   assert.deepEqual(selectedFlags(), [["a", true], ["b", false]]);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
 });
@@ -100,8 +127,8 @@ test("增选顺序决定 primary，普通移动不会重排 canonical selection"
   reset();
   useFlowStore.getState().onNodesChange([{ id: "b", type: "select", selected: true }]);
   useFlowStore.getState().onNodesChange([{ id: "a", type: "select", selected: true }]);
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, ["b", "a"]);
-  assert.equal(selectPrimarySelectedNodeId(useFlowStore.getState()), "a");
+  assert.deepEqual(activeDocument().selectedNodeIds, ["b", "a"]);
+  assert.equal(selectPrimarySelectedNodeId(activeDocument()), "a");
 
   useFlowStore.getState().onNodesChange([{
     id: "a",
@@ -109,23 +136,23 @@ test("增选顺序决定 primary，普通移动不会重排 canonical selection"
     position: { x: 96, y: 48 },
     dragging: false,
   }]);
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, ["b", "a"]);
-  assert.equal(selectPrimarySelectedNodeId(useFlowStore.getState()), "a");
+  assert.deepEqual(activeDocument().selectedNodeIds, ["b", "a"]);
+  assert.equal(selectPrimarySelectedNodeId(activeDocument()), "a");
 });
 
 test("新增、删除和撤销始终清理 dangling selection", () => {
   reset();
   useFlowStore.getState().addExistingNode(node("c"));
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, ["c"]);
+  assert.deepEqual(activeDocument().selectedNodeIds, ["c"]);
   assert.deepEqual(selectedFlags(), [["a", false], ["b", false], ["c", true]]);
 
   useFlowStore.getState().onNodesChange([{ id: "c", type: "remove" }]);
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, []);
-  assert.equal(selectPrimarySelectedNodeId(useFlowStore.getState()), null);
+  assert.deepEqual(activeDocument().selectedNodeIds, []);
+  assert.equal(selectPrimarySelectedNodeId(activeDocument()), null);
 
   useFlowStore.getState().undo();
-  assert.deepEqual(useFlowStore.getState().selectedNodeIds, []);
-  assert.equal(useFlowStore.getState().nodes.some((candidate) => candidate.selected), false);
+  assert.deepEqual(activeDocument().selectedNodeIds, []);
+  assert.equal(activeDocument().nodes.some((candidate) => candidate.selected), false);
 });
 
 test("选择结果会清空全部节点选择且不写文档历史", () => {
@@ -135,7 +162,7 @@ test("选择结果会清空全部节点选择且不写文档历史", () => {
   useFlowStore.getState().setSelectedNodeIds(["a", "b"]);
   useFlowStore.getState().setSelectedResultId(kept.id);
 
-  const state = useFlowStore.getState();
+  const state = activeDocument();
   assert.deepEqual(state.selectedNodeIds, []);
   assert.equal(selectPrimarySelectedNodeId(state), null);
   assert.equal(state.selectedResultId, kept.id);
@@ -147,16 +174,16 @@ test("画布空白 canonical command 会清除节点 IDs、primary 与 React Flo
   reset();
   useFlowStore.getState().setSelectedNodeIds(["a", "b"]);
 
-  const selected = useFlowStore.getState();
+  const selected = activeDocument();
   assert.deepEqual(selected.selectedNodeIds, ["a", "b"]);
   assert.equal(selectPrimarySelectedNodeId(selected), "b");
   assert.equal(selected.selectedNodeId, "b");
   assert.deepEqual(selectedFlags(), [["a", true], ["b", true]]);
-  const beforeRevision = useFlowStore.getState().revision;
+  const beforeRevision = activeDocument().revision;
 
   useFlowStore.getState().setSelectedNodeIds([]);
 
-  const state = useFlowStore.getState();
+  const state = activeDocument();
   assert.deepEqual(state.selectedNodeIds, []);
   assert.equal(selectPrimarySelectedNodeId(state), null);
   assert.equal(state.selectedNodeId, null);
@@ -203,14 +230,14 @@ test("画布空白 canonical command 会清除结果选择但保留 compareIds",
   useFlowStore.getState().toggleCompareId(comparedResult.id);
   useFlowStore.getState().setSelectedResultId(selectedResult.id);
 
-  const selected = useFlowStore.getState();
+  const selected = activeDocument();
   assert.equal(selected.selectedResultId, selectedResult.id);
   assert.deepEqual(selected.compareIds, [comparedResult.id]);
   const beforeRevision = selected.revision;
 
   useFlowStore.getState().setSelectedNodeIds([]);
 
-  const state = useFlowStore.getState();
+  const state = activeDocument();
   assert.equal(state.selectedResultId, null);
   assert.deepEqual(state.compareIds, [comparedResult.id]);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
@@ -220,27 +247,25 @@ test("画布空白 canonical command 会清除结果选择但保留 compareIds",
 test("历史同步、裁剪与删除原子清理失效结果引用", () => {
   reset();
   const keep = result("keep");
-  useFlowStore.setState({
-    recentResults: [keep],
+  setRecentResultsAndPatchActiveDocument([keep], {
     selectedResultId: "stale",
     compareIds: ["stale", keep.id],
   });
   reconcileRunHistory([keep]);
-  assert.equal(useFlowStore.getState().selectedResultId, null);
-  assert.deepEqual(useFlowStore.getState().compareIds, [keep.id]);
+  assert.equal(activeDocument().selectedResultId, null);
+  assert.deepEqual(activeDocument().compareIds, [keep.id]);
 
   const records = Array.from({ length: 201 }, (_, index) => result(`result-${index}`));
-  useFlowStore.setState({
-    recentResults: records,
+  setRecentResultsAndPatchActiveDocument(records, {
     selectedResultId: records[200].id,
     compareIds: [records[200].id, records[0].id],
   });
   useFlowStore.setState((state) => recentResultsPatch(state, trimRecentResults(state.recentResults, 200)));
-  assert.equal(useFlowStore.getState().selectedResultId, null);
-  assert.deepEqual(useFlowStore.getState().compareIds, [records[0].id]);
+  assert.equal(activeDocument().selectedResultId, null);
+  assert.deepEqual(activeDocument().compareIds, [records[0].id]);
 
   useFlowStore.getState().removeRecentResult(records[0].id);
-  assert.deepEqual(useFlowStore.getState().compareIds, []);
+  assert.deepEqual(activeDocument().compareIds, []);
   assert.equal(useFlowStore.getState().recentResults.some((record) => record.id === records[0].id), false);
 });
 
@@ -248,8 +273,7 @@ test("结果裁剪会在同一快照清理活动与后台页签引用", () => {
   reset();
   const keep = result("cross-tab-keep");
   const drop = result("cross-tab-drop");
-  useFlowStore.setState({
-    recentResults: [keep, drop],
+  setRecentResultsAndPatchActiveDocument([keep, drop], {
     selectedResultId: drop.id,
     compareIds: [keep.id, drop.id],
   });
@@ -259,12 +283,12 @@ test("结果裁剪会在同一快照清理活动与后台页签引用", () => {
     nodes: [node("second-tab-node")],
     edges: [],
   });
-  useFlowStore.setState({ selectedResultId: drop.id, compareIds: [drop.id] });
+  patchActiveDocument({ selectedResultId: drop.id, compareIds: [drop.id] });
 
   const observed: Array<{
     activeReferencesValid: boolean;
     tabReferencesValid: boolean;
-    activeProjectionMatches: boolean;
+    activeDocumentIsCanonical: boolean;
   }> = [];
   const unsubscribe = useFlowStore.subscribe((state) => {
     const ids = new Set(state.recentResults.map((record) => record.id));
@@ -273,21 +297,18 @@ test("结果裁剪会在同一快照清理活动与后台页签引用", () => {
         .filter((record) => record.status === "success" && Boolean(record.image))
         .map((record) => record.id),
     );
+    const document = activeDocument(state);
     const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
     observed.push({
       activeReferencesValid: (
-        (!state.selectedResultId || ids.has(state.selectedResultId)) &&
-        state.compareIds.every((id) => comparableIds.has(id))
+        (!document.selectedResultId || ids.has(document.selectedResultId)) &&
+        document.compareIds.every((id) => comparableIds.has(id))
       ),
       tabReferencesValid: state.tabs.every((tab) => (
         (!tab.selectedResultId || ids.has(tab.selectedResultId)) &&
         tab.compareIds.every((id) => comparableIds.has(id))
       )),
-      activeProjectionMatches: Boolean(
-        activeTab &&
-        activeTab.selectedResultId === state.selectedResultId &&
-        JSON.stringify(activeTab.compareIds) === JSON.stringify(state.compareIds)
-      ),
+      activeDocumentIsCanonical: activeTab === document,
     });
   });
   useFlowStore.setState((state) => recentResultsPatch(state, [keep]));
@@ -299,13 +320,13 @@ test("结果裁剪会在同一快照清理活动与后台页签引用", () => {
     observed.every((snapshot) => (
       snapshot.activeReferencesValid &&
       snapshot.tabReferencesValid &&
-      snapshot.activeProjectionMatches
+      snapshot.activeDocumentIsCanonical
     )),
     true,
-    "每个可见快照的活动顶层与全部 tabs 都必须同时只引用现存结果",
+    "每个可见快照的活动文档与全部 tabs 都必须同时只引用现存结果",
   );
-  assert.equal(state.selectedResultId, null);
-  assert.deepEqual(state.compareIds, []);
+  assert.equal(activeDocument(state).selectedResultId, null);
+  assert.deepEqual(activeDocument(state).compareIds, []);
   assert.equal(state.tabs.every((tab) => tab.selectedResultId === null), true);
   assert.equal(state.tabs.every((tab) => !tab.compareIds.includes(drop.id)), true);
 });
@@ -330,7 +351,7 @@ test("实时页签切换恢复各自 canonical selection 与 primary", () => {
   useFlowStore.getState().setSelectedNodeIds(["live-b-1", "live-b-2"]);
 
   useFlowStore.getState().switchTab(tabA);
-  let state = useFlowStore.getState();
+  let state = activeDocument();
   assert.deepEqual(state.selectedNodeIds, ["live-a-2", "live-a-1"]);
   assert.equal(state.selectedNodeId, "live-a-1");
   assert.equal(selectPrimarySelectedNodeId(state), "live-a-1");
@@ -340,7 +361,7 @@ test("实时页签切换恢复各自 canonical selection 与 primary", () => {
   );
 
   useFlowStore.getState().switchTab(tabB);
-  state = useFlowStore.getState();
+  state = activeDocument();
   assert.deepEqual(state.selectedNodeIds, ["live-b-1", "live-b-2"]);
   assert.equal(state.selectedNodeId, "live-b-2");
   assert.equal(selectPrimarySelectedNodeId(state), "live-b-2");
@@ -354,7 +375,7 @@ test("复制与属性消费者共用 primary selector", () => {
   reset();
   useFlowStore.getState().onNodesChange([{ id: "b", type: "select", selected: true }]);
   useFlowStore.getState().onNodesChange([{ id: "a", type: "select", selected: true }]);
-  const state = useFlowStore.getState();
+  const state = activeDocument();
   const inspectorNodeId = selectPrimarySelectedNodeId(state);
   const copyTarget = state.nodes.find(
     (candidate) => candidate.id === selectPrimarySelectedNodeId(state),
@@ -367,8 +388,8 @@ test("复制与属性消费者共用 primary selector", () => {
     new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(appSource, /selectPrimarySelectedNodeId/);
-  assert.match(inspectorSource, /useFlowStore\(selectPrimarySelectedNodeId\)/);
+  assert.match(appSource, /selectActivePrimarySelectedNodeId/);
+  assert.match(inspectorSource, /useFlowStore\(selectActivePrimarySelectedNodeId\)/);
   assert.doesNotMatch(appSource, /getState\(\)\.selectedNodeId/);
 });
 

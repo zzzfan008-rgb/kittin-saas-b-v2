@@ -4,6 +4,7 @@ import { isNodeRunActive, type PrintMutateNodeData } from "@/types/workflow";
 import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 const COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -12,6 +13,10 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const running = isNodeRunActive(data.status);
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "prompt" },
+    { multiline: true },
+  );
 
   return (
     <>
@@ -35,7 +40,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
           <span className="text-[10px] text-neutral-500">补充说明</span>
           <textarea
             value={data.prompt}
-            onChange={(e) => updateNodeData(id, { prompt: e.target.value })}
+            {...promptEdit.bind}
             rows={3}
             placeholder="可选：如「保持花卉元素，换一种排列」"
             className={`${inputClass} resize-none`}

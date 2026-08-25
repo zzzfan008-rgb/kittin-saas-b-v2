@@ -16,6 +16,10 @@ import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflow
 import { isLocalImageReference } from "../lib/imageValidation";
 import { thumbnailUrlForImage } from "../lib/fileStore";
 import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "../../src/types/workflow";
+import {
+  DEFAULT_GENERATION_MODEL_ID,
+  defaultImageModelOptions,
+} from "../../src/types/imageModels";
 
 export const templatesRouter = Router();
 
@@ -62,6 +66,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -76,6 +82,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "1:1",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
             },
           },
           {
@@ -89,6 +97,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               colors: [],
               prompt: "",
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
@@ -127,6 +137,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -139,6 +151,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               status: "idle",
               imageSize: "2K",
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
@@ -170,6 +184,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -183,6 +199,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               colors: [],
               prompt: "",
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
@@ -211,6 +229,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -273,6 +293,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -339,6 +361,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              modelId: DEFAULT_GENERATION_MODEL_ID,
+              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
           },
           {
@@ -364,13 +388,24 @@ function builtinTemplates(): WorkflowTemplate[] {
   ];
 }
 
-/** 启动时逐个补齐新增的内置模板，不覆盖磁盘上已存在的同名模板。 */
+function builtinTemplateIsReadable(filePath: string): boolean {
+  try {
+    readTemplateFile(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 启动时补齐新增模板；保留可读旧版本，并用当前定义修复损坏或不兼容的内置文件。 */
 export function ensureBuiltinTemplates(): void {
   // 旧版模板已拆分为两个明确模板；它是部署内置数据，不属于用户模板。
   fs.rmSync(templatePath("builtin", "builtin-style-transfer"), { force: true });
   for (const tpl of builtinTemplates()) {
     const filePath = templatePath("builtin", tpl.id);
-    if (!fs.existsSync(filePath)) writeJsonAtomicSync(filePath, tpl);
+    if (!fs.existsSync(filePath) || !builtinTemplateIsReadable(filePath)) {
+      writeJsonAtomicSync(filePath, tpl);
+    }
   }
 }
 
@@ -392,7 +427,8 @@ function readTemplates(sub: "builtin" | "user"): WorkflowTemplate[] {
 
 function readTemplateFile(filePath: string): WorkflowTemplate {
   const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
-  if (raw.schemaVersion !== undefined && raw.schemaVersion !== WORKFLOW_SCHEMA_VERSION) {
+  const isLegacyVersion = raw.schemaVersion === undefined || raw.schemaVersion === 0 || raw.schemaVersion === 1;
+  if (!isLegacyVersion && raw.schemaVersion !== WORKFLOW_SCHEMA_VERSION) {
     throw new WorkflowValidationError(`unsupported template schemaVersion: ${String(raw.schemaVersion)}`);
   }
   const flow = validateAndMigrateFlow(raw.flow);

@@ -9,6 +9,9 @@ import {
 import {
   beginHistoryTransaction,
   endHistoryTransaction,
+  selectActiveEdges,
+  selectActiveNodes,
+  selectActiveReadOnly,
   useFlowStore,
   type FlowNode,
   type HistoryTransactionToken,
@@ -108,15 +111,15 @@ const MINIMAP_COLORS: Record<ThemeId, { bg: string; node: string; mask: string }
 };
 
 export function CanvasFlow() {
-  const nodes = useFlowStore((s) => s.nodes);
-  const edges = useFlowStore((s) => s.edges);
+  const nodes = useFlowStore(selectActiveNodes);
+  const edges = useFlowStore(selectActiveEdges);
   const onNodesChange = useFlowStore((s) => s.onNodesChange);
   const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
   const onConnect = useFlowStore((s) => s.onConnect);
   const isValidConnection = useFlowStore((s) => s.isValidConnection);
   const addNode = useFlowStore((s) => s.addNode);
   const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
-  const readOnly = useFlowStore((s) => s.readOnly);
+  const readOnly = useFlowStore(selectActiveReadOnly);
   const { screenToFlowPosition } = useReactFlow();
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
