@@ -11,6 +11,7 @@ const source = {
   readOnly: true,
   selectedNodeIds: ["upload"],
   saveState: "saving",
+  hasBeenPersisted: true,
   runtime: { runId: "paid-run" },
   nodes: [
     {

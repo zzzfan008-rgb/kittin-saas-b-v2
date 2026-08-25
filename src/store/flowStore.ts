@@ -95,6 +95,8 @@ export interface ProjectTab {
   selectedResultId: string | null;
   compareIds: string[];
   saveState: SaveState;
+  /** 是否至少被服务端确认保存或载入过；独立于瞬时保存状态。 */
+  hasBeenPersisted: boolean;
   revision: number;
   savedRevision: number;
   dirty: boolean;
@@ -1130,7 +1132,8 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
   if (
     tab.readOnly ||
     tab.dirty ||
-    tab.saveState !== "idle" ||
+    tab.hasBeenPersisted ||
+    tab.saveState === "saving" ||
     tab.revision !== 0 ||
     tab.savedRevision !== 0 ||
     tab.projectName !== DEFAULT_PROJECT_NAME ||
@@ -1440,6 +1443,7 @@ function newTab(opts?: {
     selectedResultId: null,
     compareIds: [],
     saveState: persisted ? "saved" : "idle",
+    hasBeenPersisted: persisted,
     revision: markDirty ? 1 : 0,
     savedRevision: 0,
     dirty: markDirty,
@@ -1674,6 +1678,9 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
   const wasSaving = raw.saveState === "saving";
   const dirty = wasSaving || raw.dirty === true;
   const savedRevision = Math.min(finiteNonNegative(raw.savedRevision, 0), revision);
+  const hasBeenPersisted = raw.hasBeenPersisted === true ||
+    raw.saveState === "saved" ||
+    savedRevision > 0;
   const requestedSelection = Array.isArray(raw.selectedNodeIds)
     ? stringList(raw.selectedNodeIds, nodes.length)
     : typeof raw.selectedNodeId === "string"
@@ -1697,6 +1704,7 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
     compareIds: [],
     // 刷新会中断 in-flight 请求；必须恢复成可再次保存，同时保守地视为未保存。
     saveState: raw.saveState === "saved" || raw.saveState === "error" ? raw.saveState : "idle",
+    hasBeenPersisted,
     revision,
     savedRevision,
     dirty,
@@ -2670,6 +2678,7 @@ export const useFlowStore = create<FlowState>()(
                   savedRevision: Math.max(latest.savedRevision, snapshot.revision),
                   dirty: !clean,
                   saveState: clean ? "saved" : "saving",
+                  hasBeenPersisted: true,
                 };
               });
               if (!matched) return { ok: false, error: "项目已切换，旧保存响应已忽略" };
@@ -3393,6 +3402,7 @@ export const useFlowStore = create<FlowState>()(
           selectedResultId: null,
           compareIds: [],
           saveState: markDirty ? "idle" : "saved",
+          hasBeenPersisted: !markDirty,
           revision: markDirty ? 1 : 0,
           savedRevision: 0,
           dirty: markDirty,
@@ -3504,6 +3514,7 @@ if (typeof window !== "undefined") {
     tab.dirty ? 1 : 0,
     tab.readOnly ? 1 : 0,
     tab.saveState,
+    tab.hasBeenPersisted ? 1 : 0,
   ].join("\u0000");
   const persistenceSignalChanged = (state: FlowState, previous: FlowState): boolean => {
     if (state.activeTabId !== previous.activeTabId || state.tabs.length !== previous.tabs.length) {

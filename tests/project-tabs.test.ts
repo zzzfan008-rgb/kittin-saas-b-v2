@@ -10,6 +10,7 @@ import {
   beginMaskWork,
   endHistoryTransaction,
   isPristineProjectTab,
+  normalizeTabSessionValue,
   selectActiveDocument,
   selectActiveDocumentTarget,
   selectNodeInputImages,
@@ -262,6 +263,27 @@ await test("空白项目启动器只在从未持久化的 pristine 文档中生�
   assert.equal(isPristineProjectTab(activeDocument()), true);
 
   const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "offline" }), {
+    status: 503,
+    headers: { "Content-Type": "application/json" },
+  });
+  try {
+    assert.equal(await useFlowStore.getState().saveProject(), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(activeDocument().saveState, "error");
+  assert.equal(activeDocument().hasBeenPersisted, false);
+  assert.equal(isPristineProjectTab(activeDocument()), true);
+  const restoredAfterFailure = normalizeTabSessionValue({
+    schemaVersion: 2,
+    activeTabId: useFlowStore.getState().activeTabId,
+    tabs: [activeDocument()],
+  });
+  assert.ok(restoredAfterFailure);
+  assert.equal(restoredAfterFailure.tabs[0].hasBeenPersisted, false);
+  assert.equal(isPristineProjectTab(restoredAfterFailure.tabs[0]), true);
+
   globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
@@ -272,6 +294,7 @@ await test("空白项目启动器只在从未持久化的 pristine 文档中生�
     globalThis.fetch = originalFetch;
   }
   assert.equal(activeDocument().saveState, "saved");
+  assert.equal(activeDocument().hasBeenPersisted, true);
   assert.equal(isPristineProjectTab(activeDocument()), false);
 
   const emptyNodes = activeDocument().nodes.map((node) => ({
@@ -285,6 +308,7 @@ await test("空白项目启动器只在从未持久化的 pristine 文档中生�
     edges: [],
   });
   assert.equal(activeDocument().saveState, "saved");
+  assert.equal(activeDocument().hasBeenPersisted, true);
   assert.equal(isPristineProjectTab(activeDocument()), false);
 
   useFlowStore.getState().createBlankTab();
