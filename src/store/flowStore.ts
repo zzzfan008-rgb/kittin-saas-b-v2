@@ -2473,7 +2473,11 @@ function updateTabFromRunEvent(
   const updateNodes = (nodes: FlowNode[]) => nodes.map((node) =>
     node.id === nodeId ? { ...node, data: applyRunEventToNode(node.data, event) } : node,
   );
-  if (commitsOutput && useFlowStore.getState().activeTabId === target.tabId) {
+  const currentState = useFlowStore.getState();
+  // A tab container can be reused for another project. Reject its old run
+  // before any durable branch can flush the replacement document's editor.
+  if (!documentForTarget(currentState, target)) return;
+  if (commitsOutput && currentState.activeTabId === target.tabId) {
     commitDocumentMutationWithSet(set, (tab) => (
       matchesDocumentTarget(tab, target) ? { nodes: updateNodes(tab.nodes) } : {}
     ));

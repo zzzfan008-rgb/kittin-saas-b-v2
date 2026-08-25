@@ -244,6 +244,43 @@ await test("后台页签 success 不会拆分前台页签的输入或 IME 事务
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
 });
 
+await test("同页签换项目后迟到的旧 success 不会提交新文档 IME 事务", () => {
+  resetDocument("stale-run-source");
+  const staleTarget = activeTarget();
+  useFlowStore.getState().loadFlow({
+    projectId: "coalesced-project-reused-tab",
+    projectName: "同页签新项目",
+    nodes: [aiNode("reused-tab-edit")],
+    edges: [],
+  });
+  useFlowStore.temporal.getState().clear();
+
+  const beforeRevision = activeDocument().revision;
+  const token = updateCoalescedTextEdit(
+    { kind: "node-data", nodeId: "reused-tab-edit", field: "prompt" },
+    "新项目正在组合",
+    null,
+    { composing: true },
+  );
+  assert.ok(token);
+  applyRunEventToTab(staleTarget, "stale-run-source", {
+    type: "node-status",
+    nodeId: "stale-run-source",
+    status: "success",
+    images: ["/api/files/stale-success.png"],
+  });
+
+  assert.equal(prompt(), "新项目正在组合");
+  assert.equal(activeDocument().revision, beforeRevision);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.equal(activeDocument().nodes[0].data.outputImages.length, 0);
+
+  assert.equal(setCoalescedTextEditComposing(token, false), true);
+  assert.equal(flushActiveTextEdit(token), true);
+  assert.equal(activeDocument().revision, beforeRevision + 1);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
+});
+
 await test("页面退出、关闭页签和所有文本入口都接入统一提交边界", async () => {
   const [app, projectTabs, topBar, inspector, nodeFrame, textEditHook] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
