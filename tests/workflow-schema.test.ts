@@ -147,6 +147,104 @@ async function main() {
     assert.deepEqual(data.modelOptions, { aspectRatio: "16:9", imageSize: "4K" });
   });
 
+  await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {
+    const normalized = validateAndMigrateFlow({
+      schemaVersion: 2,
+      debugOnly: "must-not-survive",
+      nodes: [
+        {
+          id: "n1",
+          type: "ai-modify",
+          position: { x: 1, y: 2, stalePositionField: true },
+          selected: true,
+          dragging: true,
+          measured: { width: 320, height: 180 },
+          width: 320,
+          height: 180,
+          unknownNodeField: "must-not-survive",
+          data: {
+            kind: "ai-modify",
+            label: "改款",
+            status: "success",
+            error: "runtime-only",
+            prompt: "保留版型",
+            aspectRatio: "1:1",
+            batchSize: 1,
+            outputImages: [],
+            modelId: "gpt-image-2-vip",
+            modelOptions: { size: "2048x2048", unknownModelOption: "must-not-survive" },
+            unknownDataField: "must-not-survive",
+          },
+        },
+        {
+          id: "n2",
+          type: "result",
+          position: { x: 420, y: 2 },
+          data: {
+            kind: "result",
+            label: "结果",
+            status: "idle",
+            images: [],
+          },
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "n1",
+          target: "n2",
+          sourceHandle: "images",
+          targetHandle: null,
+          selected: true,
+          animated: true,
+          unknownEdgeField: "must-not-survive",
+        },
+      ],
+    });
+
+    assert.deepEqual(normalized, {
+      schemaVersion: 2,
+      nodes: [
+        {
+          id: "n1",
+          type: "ai-modify",
+          position: { x: 1, y: 2 },
+          data: {
+            kind: "ai-modify",
+            label: "改款",
+            status: "idle",
+            prompt: "保留版型",
+            aspectRatio: "1:1",
+            batchSize: 1,
+            outputImages: [],
+            modelId: "gpt-image-2-vip",
+            modelOptions: { size: "2048x2048" },
+          },
+        },
+        {
+          id: "n2",
+          type: "result",
+          position: { x: 420, y: 2 },
+          data: {
+            kind: "result",
+            label: "结果",
+            status: "idle",
+            images: [],
+          },
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "n1",
+          target: "n2",
+          sourceHandle: "images",
+          targetHandle: null,
+        },
+      ],
+    });
+  });
+
   await test("拒绝未知版本、kind/type 不符、非法批量与悬空边", () => {
     assert.throws(() => validateAndMigrateFlow({ ...legacyAiFlow(), schemaVersion: 99 }), WorkflowValidationError);
     const mismatch = legacyAiFlow();
@@ -155,6 +253,14 @@ async function main() {
     const batch = legacyAiFlow();
     Object.assign(batch.nodes[0].data, { batchSize: 3 });
     assert.throws(() => validateAndMigrateFlow(batch), /batchSize/);
+    const invalidModelOptions = { ...legacyAiFlow(), schemaVersion: 2 };
+    Object.assign(invalidModelOptions.nodes[0].data, {
+      aspectRatio: "1:1",
+      batchSize: 1,
+      modelId: "gpt-image-2-vip",
+      modelOptions: { size: "unsupported-size", unknownModelOption: true },
+    });
+    assert.throws(() => validateAndMigrateFlow(invalidModelOptions), /modelOptions/);
     const dangling = legacyAiFlow();
     dangling.edges.push({ id: "e1", source: "n1", target: "missing" } as never);
     assert.throws(() => validateAndMigrateFlow(dangling), /target not found/);
@@ -303,20 +409,39 @@ async function main() {
     assert.equal(textToImage.flow.edges.length, 1, "文生图结果应自动汇总到结果节点");
   });
 
-  await test("已有数据目录增量补齐新内置模板且不覆盖现有文件", () => {
+  await test("已有数据目录保留可迁移的 v1 内置模板并增量补齐缺失模板", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-templates-"));
     const originalDataDir = process.env.DATA_DIR;
     try {
       process.env.DATA_DIR = dir;
+      ensureBuiltinTemplates();
       const builtinDir = path.join(dir, "templates", "builtin");
-      fs.mkdirSync(builtinDir, { recursive: true });
       const existingPath = path.join(builtinDir, "builtin-sketch-recolor.json");
-      fs.writeFileSync(existingPath, "preserve-existing", "utf-8");
+      const existing = JSON.parse(fs.readFileSync(existingPath, "utf-8")) as {
+        schemaVersion: number;
+        description: string;
+        flow: {
+          schemaVersion: number;
+          nodes: Array<{ data: Record<string, unknown> }>;
+        };
+      };
+      existing.schemaVersion = 1;
+      existing.flow.schemaVersion = 1;
+      existing.description = "preserve-existing-v1";
+      for (const node of existing.flow.nodes) {
+        delete node.data.modelId;
+        delete node.data.modelOptions;
+      }
+      const existingJson = JSON.stringify(existing, null, 2);
+      fs.writeFileSync(existingPath, existingJson, "utf-8");
+      for (const file of fs.readdirSync(builtinDir)) {
+        if (file !== path.basename(existingPath)) fs.rmSync(path.join(builtinDir, file));
+      }
       fs.writeFileSync(path.join(builtinDir, "builtin-style-transfer.json"), "deprecated", "utf-8");
 
       ensureBuiltinTemplates();
 
-      assert.equal(fs.readFileSync(existingPath, "utf-8"), "preserve-existing");
+      assert.equal(fs.readFileSync(existingPath, "utf-8"), existingJson);
       assert.equal(fs.existsSync(path.join(builtinDir, "builtin-style-transfer.json")), false);
       assert.deepEqual(
         fs.readdirSync(builtinDir).filter((name) => name.endsWith(".json")).sort(),
@@ -329,6 +454,66 @@ async function main() {
           "builtin-text-to-image.json",
         ],
       );
+    } finally {
+      if (originalDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = originalDataDir;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await test("历史 v2 内置模板缺少模型字段时会被当前合法定义修复", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-v2-template-upgrade-"));
+    const originalDataDir = process.env.DATA_DIR;
+    try {
+      process.env.DATA_DIR = dir;
+      ensureBuiltinTemplates();
+      const filePath = path.join(dir, "templates", "builtin", "builtin-sketch-upscale.json");
+      const broken = JSON.parse(fs.readFileSync(filePath, "utf-8")) as {
+        flow: { nodes: Array<{ data: Record<string, unknown> }> };
+      };
+      for (const node of broken.flow.nodes) {
+        delete node.data.modelId;
+        delete node.data.modelOptions;
+      }
+      fs.writeFileSync(filePath, JSON.stringify(broken, null, 2), "utf-8");
+
+      ensureBuiltinTemplates();
+
+      const repaired = JSON.parse(fs.readFileSync(filePath, "utf-8")) as {
+        schemaVersion: unknown;
+        flow: { nodes: Array<{ type: string; data: Record<string, unknown> }> };
+      };
+      assert.equal(repaired.schemaVersion, 2);
+      assert.equal(validateAndMigrateFlow(repaired.flow).schemaVersion, 2);
+      for (const node of repaired.flow.nodes.filter((candidate) => candidate.type !== "image-input")) {
+        assert.equal(typeof node.data.modelId, "string", `${node.type} 应补 modelId`);
+        assert.equal(typeof node.data.modelOptions, "object", `${node.type} 应补 modelOptions`);
+      }
+    } finally {
+      if (originalDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = originalDataDir;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await test("全新空数据目录生成的六份 v2 内置模板均可读取和校验", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-fresh-templates-"));
+    const originalDataDir = process.env.DATA_DIR;
+    try {
+      process.env.DATA_DIR = dir;
+      ensureBuiltinTemplates();
+
+      const builtinDir = path.join(dir, "templates", "builtin");
+      const files = fs.readdirSync(builtinDir).filter((name) => name.endsWith(".json")).sort();
+      assert.equal(files.length, 6);
+      for (const file of files) {
+        const template = JSON.parse(fs.readFileSync(path.join(builtinDir, file), "utf-8")) as {
+          schemaVersion: unknown;
+          flow: unknown;
+        };
+        assert.equal(template.schemaVersion, 2, file);
+        assert.equal(validateAndMigrateFlow(template.flow).schemaVersion, 2, file);
+      }
     } finally {
       if (originalDataDir === undefined) delete process.env.DATA_DIR;
       else process.env.DATA_DIR = originalDataDir;

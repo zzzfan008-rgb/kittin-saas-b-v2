@@ -13,7 +13,6 @@ import {
 import { nanoid } from "nanoid";
 import {
   NODE_SPECS,
-  WORKFLOW_SCHEMA_VERSION,
   isNodeRunActive,
   isNodeRunTerminal,
   type Asset,
@@ -31,6 +30,10 @@ import {
   normalizeImageModelOptions,
 } from "@/types/imageModels";
 import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
+import {
+  createDocumentSnapshot,
+  documentSnapshotToPersistedWorkflow,
+} from "@/lib/documentSnapshot";
 
 export type FlowNode = Node<WorkflowNodeData>;
 
@@ -1362,9 +1365,23 @@ export function writeTabSessionSnapshot(
 function persistTabSession(state: FlowState): TabSessionWriteResult {
   try {
     const current = snapshotActiveTab(state);
+    const tabs = replaceTab(state.tabs, current).map((tab) => {
+      const document = createDocumentSnapshot(tab);
+      const flow = documentSnapshotToPersistedWorkflow(document);
+      return {
+        ...tab,
+        projectName: document.projectName,
+        nodes: flow.nodes as FlowNode[],
+        edges: flow.edges as Edge[],
+        selectedNodeIds: [],
+        selectedNodeId: null,
+        selectedResultId: null,
+        compareIds: [],
+      } satisfies ProjectTab;
+    });
     const normalized = normalizeTabSessionValue({
       schemaVersion: TAB_SESSION_SCHEMA_VERSION,
-      tabs: replaceTab(state.tabs, current),
+      tabs,
       activeTabId: state.activeTabId,
     });
     if (!normalized) return { ok: false, error: TAB_SESSION_WRITE_ERROR };
@@ -2001,17 +2018,15 @@ export const useFlowStore = create<FlowState>()(
             }
             patchTab(set, tabId, { saveState: "saving" });
             try {
+              const document = createDocumentSnapshot(snapshot);
+              const flow = documentSnapshotToPersistedWorkflow(document);
               const res = await fetch("/api/projects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   id: snapshot.projectId,
-                  name: snapshot.projectName,
-                  flow: {
-                    schemaVersion: WORKFLOW_SCHEMA_VERSION,
-                    nodes: snapshot.nodes,
-                    edges: snapshot.edges,
-                  },
+                  name: document.projectName,
+                  flow,
                 }),
               });
               if (!res.ok) {
@@ -2438,6 +2453,8 @@ export const useFlowStore = create<FlowState>()(
           // 付费动作严格绑定点击时的不可变快照；保存期间发生编辑时服务端会以 409 拒绝旧快照。
           const submissionSnapshot = documentForTab(get(), tabId);
           if (!submissionSnapshot) throw new Error("项目或节点已关闭，未调用生图服务");
+          const submissionDocument = createDocumentSnapshot(submissionSnapshot);
+          const submissionFlow = documentSnapshotToPersistedWorkflow(submissionDocument);
           const saveResult = await saveTab(tabId);
           if (preparation.cancelled) {
             const event: NodeStatusRunEvent = {
@@ -2459,7 +2476,7 @@ export const useFlowStore = create<FlowState>()(
           if (!saveResult.ok) {
             throw new Error(`项目保存失败，未调用生图服务：${saveResult.error ?? "未知错误"}`);
           }
-          if (!submissionSnapshot.nodes.some((candidate) => candidate.id === id)) {
+          if (!submissionFlow.nodes.some((candidate) => candidate.id === id)) {
             throw new Error("项目或节点已关闭，未调用生图服务");
           }
           let response: Response;
@@ -2468,8 +2485,8 @@ export const useFlowStore = create<FlowState>()(
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                nodes: submissionSnapshot.nodes,
-                edges: submissionSnapshot.edges,
+                nodes: submissionFlow.nodes,
+                edges: submissionFlow.edges,
                 onlyNodeId: id,
                 includeDownstream: false,
                 projectId: submissionSnapshot.projectId,

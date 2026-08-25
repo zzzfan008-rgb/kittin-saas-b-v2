@@ -157,6 +157,9 @@ const {
   TAB_SESSION_SCHEMA_VERSION,
   useFlowStore,
 } = await import("../src/store/flowStore");
+const { createTemplateRequestPayload } = await import(
+  "../src/components/panels/TemplatesDock"
+);
 
 // 本文件模拟的是历史已经完成对账后的会话恢复路径。
 setGenerationSafetyBlockReason(null);
@@ -845,6 +848,126 @@ assert.equal(cancelledDragTab?.revision, 0);
 assert.equal(cancelledDragTab?.dirty, false);
 console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切页取消恢复 durable snapshot");
 
+const unsafeDocumentNode = {
+  id: "pure-boundary-node",
+  type: "ai-modify",
+  position: { x: 120, y: 48 },
+  selected: true,
+  dragging: true,
+  measured: { width: 320, height: 180 },
+  width: 320,
+  height: 180,
+  unknownNodeShell: "不得持久化",
+  data: {
+    kind: "ai-modify",
+    label: "纯文档边界",
+    status: "error",
+    error: "旧运行错误不得持久化",
+    prompt: "保留衣身，只修改领型",
+    aspectRatio: "1:1",
+    batchSize: 1,
+    outputImages: ["/api/files/pure-boundary-before.png"],
+    modelId: "gpt-image-2-vip",
+    modelOptions: { size: "2048x2048" },
+    unknownData: "不得持久化",
+  },
+} as import("../src/store/flowStore").FlowNode;
+const unsafeDocumentEdge = {
+  id: "pure-boundary-edge",
+  source: "pure-boundary-node",
+  target: "pure-boundary-node",
+  sourceHandle: "output",
+  targetHandle: "input",
+  selected: true,
+  unknownEdgeShell: "不得持久化",
+};
+useFlowStore.getState().openFlowTab({
+  projectId: "pure-boundary-project",
+  projectName: "纯文档边界项目",
+  nodes: [unsafeDocumentNode],
+  edges: [unsafeDocumentEdge],
+});
+useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
+
+const boundaryState = useFlowStore.getState();
+const templatePayload = createTemplateRequestPayload({
+  name: "纯文档边界模板",
+  description: "四条持久化路径必须共享同一序列化器",
+  projectName: boundaryState.projectName,
+  nodes: boundaryState.nodes,
+  edges: boundaryState.edges,
+});
+const boundaryRequests: Array<{ url: string; body: Record<string, unknown> }> = [];
+const fetchBeforeBoundaryTest = globalThis.fetch;
+try {
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    boundaryRequests.push({ url, body });
+    if (url === "/api/projects") return Response.json({ ok: true });
+    if (url === "/api/run-plan") {
+      return Response.json({ error: "测试在 Provider 调用前终止" }, { status: 400 });
+    }
+    throw new Error(`意外请求：${url}`);
+  };
+  await useFlowStore.getState().runNode(unsafeDocumentNode.id);
+} finally {
+  globalThis.fetch = fetchBeforeBoundaryTest;
+}
+
+assert.deepEqual(
+  boundaryRequests.map((request) => request.url),
+  ["/api/projects", "/api/run-plan"],
+);
+const projectPayload = boundaryRequests[0].body as {
+  flow: { schemaVersion: number; nodes: unknown[]; edges: unknown[] };
+};
+const runPayload = boundaryRequests[1].body as { nodes: unknown[]; edges: unknown[] };
+const runWorkflow = {
+  schemaVersion: projectPayload.flow.schemaVersion,
+  nodes: runPayload.nodes,
+  edges: runPayload.edges,
+};
+const boundarySession = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as {
+  tabs: Array<{
+    projectId: string;
+    nodes: unknown[];
+    edges: unknown[];
+    selectedNodeIds?: string[];
+    selectedNodeId?: string | null;
+    selectedResultId?: string | null;
+    compareIds?: string[];
+  }>;
+};
+const sessionTab = boundarySession.tabs.find(
+  (tab) => tab.projectId === "pure-boundary-project",
+);
+assert.ok(sessionTab);
+const sessionWorkflow = {
+  schemaVersion: projectPayload.flow.schemaVersion,
+  nodes: sessionTab.nodes,
+  edges: sessionTab.edges,
+};
+
+assert.deepEqual(templatePayload.flow, projectPayload.flow);
+assert.deepEqual(runWorkflow, projectPayload.flow);
+assert.deepEqual(sessionWorkflow, projectPayload.flow);
+const persistedBoundaryNode = projectPayload.flow.nodes[0] as Record<string, unknown>;
+const persistedBoundaryData = persistedBoundaryNode.data as Record<string, unknown>;
+assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "position", "type"]);
+assert.equal(persistedBoundaryData.status, "idle");
+assert.equal("error" in persistedBoundaryData, false);
+assert.equal("unknownData" in persistedBoundaryData, false);
+assert.deepEqual(
+  Object.keys(projectPayload.flow.edges[0] as Record<string, unknown>).sort(),
+  ["id", "source", "sourceHandle", "target", "targetHandle"],
+);
+assert.deepEqual(sessionTab.selectedNodeIds, []);
+assert.equal(sessionTab.selectedNodeId, null);
+assert.equal(sessionTab.selectedResultId, null);
+assert.deepEqual(sessionTab.compareIds, []);
+console.log("  ✓ 项目、模板、运行与 v1 会话共享纯文档序列化边界");
+
 sessionStorage.setItem(sessionKey, JSON.stringify({
   activeTabId: "bad-tab",
   tabs: [
@@ -861,4 +984,4 @@ assert.equal(recovered.activeTabId, "good-tab");
 assert.deepEqual(recovered.tabs.map((tab) => tab.id), ["good-tab"]);
 console.log("  ✓ 错误恢复只清除当前损坏页签并保留其他页签");
 
-console.log("\n通过 12 项");
+console.log("\n通过 13 项");
