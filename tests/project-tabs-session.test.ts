@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
+import type { DocumentTarget } from "../src/store/flowStore";
 
 interface MemoryStorage {
   getItem(key: string): string | null;
@@ -154,6 +155,7 @@ const {
   normalizeTabSessionValue,
   reconcileRunHistory,
   retryTabSessionPersistence,
+  selectActiveDocument,
   TAB_SESSION_SCHEMA_VERSION,
   useFlowStore,
 } = await import("../src/store/flowStore");
@@ -161,19 +163,30 @@ const { createTemplateRequestPayload } = await import(
   "../src/components/panels/TemplatesDock"
 );
 
+function activeDocument(state = useFlowStore.getState()) {
+  return selectActiveDocument(state);
+}
+
+function documentTargetForTab(tabId: string): DocumentTarget {
+  const tab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tabId);
+  assert.ok(tab, `找不到页签 ${tabId}`);
+  return { tabId, projectId: tab.projectId, documentEpoch: tab.documentEpoch };
+}
+
 // 本文件模拟的是历史已经完成对账后的会话恢复路径。
 setGenerationSafetyBlockReason(null);
 const state = useFlowStore.getState();
+const document = activeDocument(state);
 
 console.log("项目页签会话恢复测试");
 
-assert.deepEqual(state.edges, [restoredEdge]);
+assert.deepEqual(document.edges, [restoredEdge]);
 assert.deepEqual(state.tabs[0].edges, [restoredEdge]);
 console.log("  ✓ 刷新恢复活动页签的完整连线");
 
-assert.equal(state.saveState, "idle");
+assert.equal(document.saveState, "idle");
 assert.equal(state.tabs[0].saveState, "idle");
-assert.equal(state.dirty, true);
+assert.equal(document.dirty, true);
 console.log("  ✓ 刷新将中断的 saving 状态归一为 idle 并保留未保存标记");
 
 const persisted = JSON.parse(sessionStorage.getItem(sessionKey) ?? "null") as typeof storedSession;
@@ -431,7 +444,7 @@ useFlowStore.getState().openFlowTab({
   edges: [],
 });
 reconcileRunHistory([]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "idle");
+assert.equal(activeDocument().nodes[0].data.status, "idle");
 useFlowStore.getState().setNodeStatus("run-recovery-node", "queued");
 reconcileRunHistory([{
   id: "server-active-record",
@@ -446,7 +459,7 @@ reconcileRunHistory([{
   startedAt: 5_000,
   status: "running",
 }]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 assert.equal(
   useFlowStore.getState().recentResults.find((record) => record.id === "server-active-record")?.runId,
   "server-active-run",
@@ -495,7 +508,7 @@ useFlowStore.getState().openFlowTab({
   }],
   edges: [],
 });
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 console.log("  ✓ 历史确认会解除孤儿运行态，并恢复真实服务端任务");
 
 const overflowActiveRecords = Array.from({ length: 180 }, (_, index) => ({
@@ -545,7 +558,7 @@ useFlowStore.getState().openFlowTab({
   edges: [],
 });
 reconcileRunHistory([...overflowActiveRecords, ...overflowTerminalRecords]);
-assert.equal(useFlowStore.getState().nodes[0].data.status, "running");
+assert.equal(activeDocument().nodes[0].data.status, "running");
 assert.equal(
   useFlowStore.getState().recentResults.some((record) => record.runId === "overflow-run-179"),
   true,
@@ -702,7 +715,7 @@ const noMoveTabId = useFlowStore.getState().activeTabId;
 const durableBeforeNoMoveSuccess = sessionStorage.getItem(sessionKey);
 const writesBeforeNoMoveSuccess = sessionWrites;
 const noMoveTransaction = beginHistoryTransaction("session-no-move-success");
-applyRunEventToTab(noMoveTabId, "drag-session-no-move-node", {
+applyRunEventToTab(documentTargetForTab(noMoveTabId), "drag-session-no-move-node", {
   type: "node-status",
   nodeId: "drag-session-no-move-node",
   status: "success",
@@ -758,7 +771,7 @@ useFlowStore.getState().onNodesChange([{
   position: { x: 160, y: 64 },
   dragging: true,
 }]);
-applyRunEventToTab(netZeroTabId, "drag-session-net-zero-node", {
+applyRunEventToTab(documentTargetForTab(netZeroTabId), "drag-session-net-zero-node", {
   type: "node-status",
   nodeId: "drag-session-net-zero-node",
   status: "success",
@@ -890,12 +903,13 @@ useFlowStore.getState().openFlowTab({
 useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
 
 const boundaryState = useFlowStore.getState();
+const boundaryDocument = activeDocument(boundaryState);
 const templatePayload = createTemplateRequestPayload({
   name: "纯文档边界模板",
   description: "四条持久化路径必须共享同一序列化器",
-  projectName: boundaryState.projectName,
-  nodes: boundaryState.nodes,
-  edges: boundaryState.edges,
+  projectName: boundaryDocument.projectName,
+  nodes: boundaryDocument.nodes,
+  edges: boundaryDocument.edges,
 });
 const boundaryRequests: Array<{ url: string; body: Record<string, unknown> }> = [];
 const fetchBeforeBoundaryTest = globalThis.fetch;

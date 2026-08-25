@@ -1,5 +1,6 @@
 import {
   appendSavedAsset,
+  selectActiveDocumentTarget,
   selectDocumentForTab,
   useFlowStore,
 } from "@/store/flowStore";
@@ -17,7 +18,7 @@ export async function savePrintOutputAsAsset(
   input: { nodeId: string; nodeLabel: string; url: string; now?: Date },
   request: AssetRequest = fetch,
 ): Promise<void> {
-  const tabId = useFlowStore.getState().activeTabId;
+  const target = selectActiveDocumentTarget(useFlowStore.getState());
   const now = input.now ?? new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
   const name = `印花素材-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -34,12 +35,14 @@ export async function savePrintOutputAsAsset(
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const state = useFlowStore.getState();
-  const document = selectDocumentForTab(state, tabId);
+  const document = selectDocumentForTab(state, target.tabId);
+  const targetStillMatches = document?.projectId === target.projectId &&
+    document.documentEpoch === target.documentEpoch;
   const latest = document?.nodes.find((node) => node.id === input.nodeId)?.data;
-  if (!latest || latest.kind !== "print-extract") {
+  if (!targetStillMatches || !latest || latest.kind !== "print-extract") {
     throw new Error("原节点所在项目已关闭，素材已保存但节点未回写");
   }
-  state.updateNodeDataInTab(tabId, input.nodeId, {
+  state.updateNodeDataInTab(target, input.nodeId, {
     savedAsAssets: appendSavedAsset(latest.savedAsAssets, input.url),
   });
 }

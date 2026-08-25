@@ -47,7 +47,6 @@ const ACTIVE_DOCUMENT_FIELDS = new Set([
 const testRoot = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testRoot, "..");
 const sourceRoot = path.resolve(testRoot, "../src");
-const guardProbeFile = path.join(testRoot, "fixtures/active-document-guard-probe.ts");
 
 const configPath = path.join(repositoryRoot, "tsconfig.json");
 const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -55,11 +54,7 @@ if (configFile.error) {
   throw new Error(ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n"));
 }
 const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, repositoryRoot);
-const program = ts.createProgram(
-  [...parsedConfig.fileNames, guardProbeFile],
-  parsedConfig.options,
-);
-const checker = program.getTypeChecker();
+const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
 const flowStoreFile = program.getSourceFile(path.join(sourceRoot, "store/flowStore.ts"));
 assert.ok(flowStoreFile, "TypeScript Program 未包含 flowStore.ts");
 const flowStateDeclaration = flowStoreFile.statements.find(
@@ -78,55 +73,6 @@ function sourceFiles(root: string): string[] {
   return files.sort();
 }
 
-function propertyName(node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  const argument = node.argumentExpression;
-  return argument && ts.isStringLiteral(argument) ? argument.text : null;
-}
-
-function directActiveFieldReads(file: string): string[] {
-  const tree = program.getSourceFile(file);
-  assert.ok(tree, `TypeScript Program 未包含 ${path.relative(repositoryRoot, file)}`);
-  const findings: string[] = [];
-
-  const report = (node: ts.Node, field: string) => {
-    const position = tree.getLineAndCharacterOfPosition(node.getStart(tree));
-    findings.push(`${path.relative(sourceRoot, file)}:${position.line + 1}:${field}`);
-  };
-
-  const isFlowStateProperty = (receiver: ts.Node, field: string): boolean => {
-    const receiverType = checker.getNonNullableType(checker.getTypeAtLocation(receiver));
-    const symbol = checker.getPropertyOfType(receiverType, field);
-    return Boolean(symbol?.declarations?.some((declaration) => declaration.parent === flowStateDeclaration));
-  };
-
-  const visit = (node: ts.Node): void => {
-    if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
-      const fieldNode = node.propertyName ?? node.name;
-      const field = ts.isIdentifier(fieldNode) || ts.isStringLiteral(fieldNode)
-        ? fieldNode.text
-        : null;
-      if (field &&
-          ACTIVE_DOCUMENT_FIELDS.has(field) &&
-          isFlowStateProperty(node.parent, field)) {
-        report(node, field);
-      }
-    }
-
-    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const field = propertyName(node);
-      if (field &&
-          ACTIVE_DOCUMENT_FIELDS.has(field) &&
-          isFlowStateProperty(node.expression, field)) {
-        report(node, field);
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(tree);
-  return [...new Set(findings)];
-}
-
 function imageNode(id: string, label: string): FlowNode {
   return {
     id,
@@ -138,21 +84,22 @@ function imageNode(id: string, label: string): FlowNode {
 
 console.log("活动文档 selector 边界测试");
 
-const guardProbeFindings = directActiveFieldReads(guardProbeFile);
-assert.ok(
-  guardProbeFindings.some((finding) => finding.endsWith(":nodes")) &&
-    guardProbeFindings.some((finding) => finding.endsWith(":dirty")),
-  `架构门禁负向探针未捕获 FlowState 参数解构:\n${guardProbeFindings.join("\n")}`,
-);
-
-const consumerFiles = sourceFiles(sourceRoot).filter((file) => file !== flowStoreFile.fileName);
-const directReads = consumerFiles.flatMap(directActiveFieldReads);
+const flowStateMembers = new Set(flowStateDeclaration.members.flatMap((member) => {
+  const name = member.name;
+  return name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? [name.text] : [];
+}));
 assert.deepEqual(
-  directReads,
+  [...ACTIVE_DOCUMENT_FIELDS].filter((field) => flowStateMembers.has(field)),
   [],
-  `flowStore 以外的消费者不得越过 active-document selector 直读兼容镜像字段:\n${directReads.join("\n")}`,
+  "FlowState 不得恢复任何顶层活动文档镜像字段",
 );
-console.log(`  ✓ ${consumerFiles.length} 个消费者源文件无活动文档镜像直读`);
+const sourceText = sourceFiles(sourceRoot).map((file) => fs.readFileSync(file, "utf8")).join("\n");
+assert.doesNotMatch(
+  sourceText,
+  /\b(?:snapshotActiveTab|activeFields|lastActiveSnapshot)\b/,
+  "旧镜像投影 helper/subscriber 不得回归",
+);
+console.log("  ✓ FlowState 与源码不再包含活动文档镜像边界");
 
 useFlowStore.getState().loadFlow({
   projectId: "selector-a",
@@ -186,6 +133,18 @@ useFlowStore.getState().toggleCompareId("selector-result");
 
 const stateA = useFlowStore.getState();
 const documentA = selectActiveDocument(stateA);
+assert.strictEqual(
+  documentA,
+  stateA.tabs.find((tab) => tab.id === stateA.activeTabId),
+  "active-document selector 必须返回 canonical tabs 中的原始对象引用",
+);
+for (const field of ACTIVE_DOCUMENT_FIELDS) {
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(stateA, field),
+    false,
+    `FlowState 运行时不得含有镜像字段 ${field}`,
+  );
+}
 assert.equal(selectActiveProjectId(stateA), documentA.projectId);
 assert.equal(selectActiveProjectName(stateA), documentA.projectName);
 assert.equal(selectActiveReadOnly(stateA), documentA.readOnly);
@@ -204,7 +163,20 @@ assert.equal(selectActiveDirty(stateA), documentA.dirty);
 assert.equal(selectActiveDocumentEpoch(stateA), documentA.documentEpoch);
 assert.equal(selectHasDirtyTabs(stateA), documentA.dirty);
 assert.deepEqual(selectDocumentForTab(stateA, stateA.activeTabId), documentA);
-console.log("  ✓ 兼容 selector 完整覆盖当前文档、选择与保存状态");
+let projectNameEmissions = 0;
+let inconsistentProjectNameEmission = false;
+const unsubscribeProjectName = useFlowStore.subscribe((next) => {
+  projectNameEmissions += 1;
+  const active = next.tabs.find((tab) => tab.id === next.activeTabId);
+  if (!active || selectActiveDocument(next) !== active || selectActiveProjectName(next) !== active.projectName) {
+    inconsistentProjectNameEmission = true;
+  }
+});
+useFlowStore.getState().setProjectName("Selector A atomic");
+unsubscribeProjectName();
+assert.equal(projectNameEmissions, 1, "单次文档 action 只能发布一个 Zustand snapshot");
+assert.equal(inconsistentProjectNameEmission, false, "订阅者不得观察到 selector/tabs 不一致");
+console.log("  ✓ canonical selector 覆盖当前文档，且 action 原子发布一次");
 
 useFlowStore.getState().openFlowTab({
   projectId: "selector-read-only",
@@ -275,3 +247,48 @@ assert.deepEqual(savedPrint?.kind === "print-extract" ? savedPrint.savedAsAssets
 assert.equal(destination?.nodes.some((node) => node.id === "selector-print-node"), false);
 assert.equal(postSaveState.activeTabId, destinationTabId);
 console.log("  ✓ 异步素材保存在切页后仍定向回写发起命令的原页签");
+
+useFlowStore.getState().loadFlow({
+  projectId: "selector-replaced-print-a",
+  projectName: "Replaced print source",
+  nodes: [{
+    id: "selector-replaced-print-node",
+    type: "print-extract",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "print-extract",
+      label: "Old print source",
+      status: "success",
+      prompt: "",
+      outputImages: [printUrl],
+      savedAsAssets: [],
+      modelId: "grok-imagine-image",
+      modelOptions: { aspectRatio: "1:1", resolution: "2k" },
+    },
+  }],
+  edges: [],
+});
+let resolveReplacedAsset: ((response: Pick<Response, "ok" | "status">) => void) | undefined;
+const staleAssetSave = savePrintOutputAsAsset(
+  {
+    nodeId: "selector-replaced-print-node",
+    nodeLabel: "Old print source",
+    url: printUrl,
+  },
+  async () => new Promise((resolve) => {
+    resolveReplacedAsset = resolve;
+  }),
+);
+assert.ok(resolveReplacedAsset);
+useFlowStore.getState().loadFlow({
+  projectId: "selector-replaced-print-b",
+  projectName: "Replacement document",
+  nodes: [imageNode("selector-replaced-print-node", "Replacement node")],
+  edges: [],
+});
+resolveReplacedAsset({ ok: true, status: 201 });
+await assert.rejects(staleAssetSave, /原节点所在项目已关闭/);
+const replacementDocument = selectActiveDocument(useFlowStore.getState());
+assert.equal(replacementDocument.projectId, "selector-replaced-print-b");
+assert.equal(replacementDocument.nodes[0].data.label, "Replacement node");
+console.log("  ✓ 同页签换项目后旧素材响应被 documentEpoch 拦截");

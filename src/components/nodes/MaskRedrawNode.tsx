@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import {
   beginMaskWork,
+  selectActiveDocumentTarget,
   selectActiveNodeInputImages,
   selectActiveReadOnly,
   selectDocumentForTab,
@@ -120,8 +121,8 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           onSave={async (mask) => {
             const releaseUploadPending = beginMaskWork();
             const state = useFlowStore.getState();
-            const tabId = state.activeTabId;
-            const tab = selectDocumentForTab(state, tabId);
+            const target = selectActiveDocumentTarget(state);
+            const tab = selectDocumentForTab(state, target.tabId);
             try {
               if (!tab || tab.readOnly || !tab.nodes.some((node) => node.id === id)) {
                 throw new Error(tab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
@@ -134,14 +135,16 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
               }, {
                 commit: (url) => {
                   const current = useFlowStore.getState();
-                  const currentTab = selectDocumentForTab(current, tabId);
-                  if (!currentTab || currentTab.readOnly || !currentTab.nodes.some((node) => node.id === id)) {
+                  const currentTab = selectDocumentForTab(current, target.tabId);
+                  const targetStillMatches = currentTab?.projectId === target.projectId &&
+                    currentTab.documentEpoch === target.documentEpoch;
+                  if (!targetStillMatches || !currentTab || currentTab.readOnly || !currentTab.nodes.some((node) => node.id === id)) {
                     throw new Error(currentTab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
                   }
                   if (selectNodeInputImages(currentTab, id)[0] !== source) {
                     throw new Error("原图已变化，旧蒙版未覆盖当前节点，请基于新原图重新绘制");
                   }
-                  updateNodeDataInTab(tabId, id, { mask: url, maskSourceRef: source, error: undefined });
+                  updateNodeDataInTab(target, id, { mask: url, maskSourceRef: source, error: undefined });
                 },
                 close: () => setEditing(false),
               });
