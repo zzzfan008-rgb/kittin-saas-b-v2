@@ -122,5 +122,15 @@ export default defineConfig({
         viewport: { width: 1440, height: 900 },
       },
     },
+    {
+      name: "golden-path",
+      testMatch: /golden-path\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
   ],
 });

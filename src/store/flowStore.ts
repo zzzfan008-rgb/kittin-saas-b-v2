@@ -45,6 +45,8 @@ import {
 } from "@/lib/tabSessionStorage";
 
 export type FlowNode = Node<WorkflowNodeData>;
+export type ConnectedNodeDirection = "upstream" | "downstream";
+export const DEFAULT_PROJECT_NAME = "未命名设计项目";
 
 /** 最近生成条目：生成图片 + 该次运行的完整记录（运行记录已合并到这里） */
 export interface RecentResult {
@@ -153,7 +155,13 @@ export interface FlowState {
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
   onConnect: (conn: Connection) => void;
   isValidConnection: (conn: Connection | Edge) => boolean;
-  addNode: (kind: NodeKind, position: { x: number; y: number }) => void;
+  addNode: (kind: NodeKind, position: { x: number; y: number }) => string | null;
+  /** 在选中节点的上游或下游原子新增节点并连线；一次撤销移除节点和边。 */
+  addConnectedNode: (
+    anchorId: string,
+    kind: NodeKind,
+    direction: ConnectedNodeDirection,
+  ) => string | null;
   /** 将素材以已完成的图片输入节点原子加入画布，一次撤销即可完整移除。 */
   addAssetNode: (
     asset: Pick<Asset, "name" | "image">,
@@ -1117,6 +1125,49 @@ export function selectHasDirtyTabs(state: FlowState): boolean {
   return state.tabs.some((tab) => tab.dirty);
 }
 
+/** 只有从未编辑、未保存的初始空白项目才显示任务启动器。 */
+export function isPristineProjectTab(tab: ProjectTab): boolean {
+  if (
+    tab.readOnly ||
+    tab.dirty ||
+    tab.revision !== 0 ||
+    tab.savedRevision !== 0 ||
+    tab.projectName !== DEFAULT_PROJECT_NAME ||
+    tab.edges.length !== 0 ||
+    tab.nodes.length !== 1
+  ) return false;
+  const node = tab.nodes[0];
+  return node.data.kind === "image-input" &&
+    node.data.status === "idle" &&
+    !node.data.imageUrl;
+}
+
+export function selectActiveProjectIsPristine(state: FlowState): boolean {
+  return isPristineProjectTab(selectActiveDocument(state));
+}
+
+/** 连接规则的唯一纯函数；React Flow 拖线和快捷建图必须共用它。 */
+export function isDocumentConnectionValid(
+  document: Pick<ProjectTab, "nodes" | "edges">,
+  connection: Connection | Edge,
+): boolean {
+  if (
+    !connection.source ||
+    !connection.target ||
+    connection.source === connection.target ||
+    !document.nodes.some((node) => node.id === connection.source)
+  ) return false;
+  const target = document.nodes.find((node) => node.id === connection.target);
+  if (!target) return false;
+  const spec = NODE_SPECS[target.data.kind];
+  const incoming = document.edges.filter((edge) => edge.target === connection.target);
+  if (incoming.length >= spec.inputs) return false;
+  return !incoming.some(
+    (edge) => edge.source === connection.source &&
+      (edge.targetHandle ?? null) === (connection.targetHandle ?? null),
+  );
+}
+
 function replaceTab(tabs: ProjectTab[], tab: ProjectTab): ProjectTab[] {
   const index = tabs.findIndex((candidate) => candidate.id === tab.id);
   if (index < 0 || tabs[index] === tab) return tabs;
@@ -1376,7 +1427,7 @@ function newTab(opts?: {
   return {
     id: nanoid(10),
     projectId: opts?.projectId ?? nanoid(10),
-    projectName: opts?.projectName ?? "未命名设计项目",
+    projectName: opts?.projectName ?? DEFAULT_PROJECT_NAME,
     readOnly: opts?.readOnly ?? false,
     nodes: selection.nodes,
     edges: opts?.edges ?? [],
@@ -2870,17 +2921,8 @@ export const useFlowStore = create<FlowState>()(
       },
 
       isValidConnection: (conn) => {
-        if (!conn.source || !conn.target || conn.source === conn.target) return false;
         const tab = selectActiveDocument(get());
-        const target = tab.nodes.find((n) => n.id === conn.target);
-        if (!target) return false;
-        const spec = NODE_SPECS[target.data.kind];
-        const incoming = tab.edges.filter((e) => e.target === conn.target);
-        if (incoming.length >= spec.inputs) return false;
-        // 同一来源+同一输入口不允许重复连线
-        return !incoming.some(
-          (e) => e.source === conn.source && (e.targetHandle ?? null) === (conn.targetHandle ?? null),
-        );
+        return isDocumentConnectionValid(tab, conn);
       },
 
       onConnect: (conn) => {
@@ -2892,7 +2934,7 @@ export const useFlowStore = create<FlowState>()(
 
       addNode: (kind, position) => {
         const tab = selectActiveDocument(get());
-        if (tab.readOnly) return;
+        if (tab.readOnly) return null;
         const node: FlowNode = {
           id: nanoid(8),
           type: kind,
@@ -2901,6 +2943,38 @@ export const useFlowStore = create<FlowState>()(
         };
         const selection = normalizeNodeSelection([...tab.nodes, node], [node.id]);
         commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
+        return node.id;
+      },
+
+      addConnectedNode: (anchorId, kind, direction) => {
+        const tab = selectActiveDocument(get());
+        if (tab.readOnly) return null;
+        const anchor = tab.nodes.find((node) => node.id === anchorId);
+        if (!anchor) return null;
+        const id = nanoid(8);
+        const horizontalGap = 380;
+        const node: FlowNode = {
+          id,
+          type: kind,
+          position: {
+            x: anchor.position.x + (direction === "downstream" ? horizontalGap : -horizontalGap),
+            y: anchor.position.y,
+          },
+          data: defaultNodeData(kind),
+        };
+        const nodes = [...tab.nodes, node];
+        const connection: Connection = direction === "downstream"
+          ? { source: anchor.id, target: id, sourceHandle: null, targetHandle: null }
+          : { source: id, target: anchor.id, sourceHandle: null, targetHandle: null };
+        const draft = { nodes, edges: tab.edges };
+        if (!isDocumentConnectionValid(draft, connection)) return null;
+        const selection = normalizeNodeSelection(nodes, [id]);
+        commitDocumentMutationWithSet(set, {
+          ...selection,
+          edges: addEdge(connection, tab.edges),
+          selectedResultId: null,
+        });
+        return id;
       },
 
       addAssetNode: (asset, position) => {

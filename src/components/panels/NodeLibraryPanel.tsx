@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { NODE_SPECS, type Asset, type NodeKind } from "@/types/workflow";
-import { selectActiveNodes, useFlowStore } from "@/store/flowStore";
+import {
+  selectActiveNodes,
+  selectActivePrimarySelectedNodeId,
+  useFlowStore,
+  type FlowNode,
+} from "@/store/flowStore";
 import { DND_MIME } from "../CanvasFlow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
+import { requestCanvasLanding } from "@/lib/canvasLanding";
 
 const KIND_ORDER: NodeKind[] = [
   "image-input",
@@ -18,6 +25,15 @@ const KIND_ORDER: NodeKind[] = [
 ];
 
 type Tab = "nodes" | "assets";
+
+export function nodeLibraryClickPosition(
+  nodes: readonly FlowNode[],
+  selectedNodeId: string | null,
+): { x: number; y: number } {
+  const anchor = nodes.find((node) => node.id === selectedNodeId) ?? nodes.at(-1);
+  if (!anchor) return { x: 0, y: 0 };
+  return { x: anchor.position.x + 380, y: anchor.position.y };
+}
 
 export function NodeLibraryPanel({ className }: { className?: string }) {
   const [tab, setTab] = useState<Tab>("nodes");
@@ -54,7 +70,7 @@ export function NodeLibraryPanel({ className }: { className?: string }) {
       {tab === "assets" && <AssetList />}
       {tab === "nodes" && (
         <div className="border-t border-[#262626] px-3 py-2 text-[10px] leading-relaxed text-neutral-600">
-          拖拽节点到画布
+          点击添加 · 也可拖拽到画布
           <br />
           左键框选 · 中/右键平移 · Delete 删除
         </div>
@@ -64,25 +80,48 @@ export function NodeLibraryPanel({ className }: { className?: string }) {
 }
 
 function NodeList() {
+  const addByClick = (kind: NodeKind) => {
+    const state = useFlowStore.getState();
+    const position = nodeLibraryClickPosition(
+      selectActiveNodes(state),
+      selectActivePrimarySelectedNodeId(state),
+    );
+    let nodeId: string | null = null;
+    flushSync(() => {
+      nodeId = useFlowStore.getState().addNode(kind, position);
+    });
+    if (!nodeId) return;
+    requestCanvasLanding({
+      tabId: useFlowStore.getState().activeTabId,
+      nodeId,
+      fitView: false,
+      activateFilePicker: kind === "image-input",
+      selectText: kind !== "image-input" && kind !== "result",
+    });
+  };
+
   return (
     <div className="flex-1 space-y-2 overflow-y-auto p-3">
       {KIND_ORDER.map((kind) => {
         const spec = NODE_SPECS[kind];
         return (
-          <div
+          <button
+            type="button"
             key={kind}
             draggable
+            onClick={() => addByClick(kind)}
             onDragStart={(e) => {
               e.dataTransfer.setData(DND_MIME, kind);
               e.dataTransfer.effectAllowed = "move";
             }}
-            className="gc-node-library-card cursor-grab select-none rounded-lg border border-[#262626] bg-[#1a1a1a] p-2.5 transition-colors hover:border-gold/60 active:cursor-grabbing"
+            title={`点击添加${spec.title}，或拖拽到画布指定位置`}
+            className="gc-node-library-card block w-full cursor-grab select-none rounded-lg border border-[#262626] bg-[#1a1a1a] p-2.5 text-left transition-colors hover:border-gold/60 focus-visible:border-gold focus-visible:outline-hidden active:cursor-grabbing"
           >
             <div className="text-xs font-medium text-neutral-200">{spec.title}</div>
             <div className="mt-1 text-[10px] leading-relaxed text-neutral-500">
               {spec.description}
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

@@ -15,11 +15,11 @@
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 上一阶段 PR | 已合并 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) |
-| 基线提交 | 已确认 | `d50aa6dc46fcdea23368c4c547683a582b9ca49a` |
-| 基线 main CI | 通过 | [GitHub Actions 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) |
-| 当前工作分支 | 待用户确认 | `codex/document-persistence-boundary`；PR #3 尚未合并 |
-| GitNexus | 已重建 | Phase B5 工作树索引：16,275 nodes、35,367 edges、217 clusters、300 flows；索引未写入仓库 |
+| 上一阶段 PR | 已合并 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) |
+| 基线提交 | 已确认 | `9b0a1483762db7f9af9dd5d88df83cee2fce2838` |
+| 基线 main CI | 通过 | [GitHub Actions 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614) |
+| 当前工作分支 | 进行中 | `codex/first-generation-golden-path`；Phase C 本地门禁通过，待创建 PR |
+| GitNexus | 已重建 | Phase C 工作树索引已用 PDG 重建；索引为本地派生产物，未写入仓库 |
 
 ## 阶段进度
 
@@ -28,8 +28,8 @@
 | 阶段 | 状态 | 交付范围 | PR | CI | Cloud Review |
 | --- | --- | --- | --- | --- | --- |
 | A 状态正确性与撤销事务 | 已完成 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012)与[合并后 main](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095)通过 | [最终精确头审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404)无重大问题 |
-| B 文档与持久化边界 | 待用户确认 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [最终代码头 CI 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 通过 | B1–B3 独立本地审计 APPROVE；[最终代码头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，5 个线程全部解决 |
-| C 首次生成黄金路径 | 未开始 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | — | — | — |
+| B 文档与持久化边界 | 已完成 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [最终代码头 CI 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 与[合并后 main CI 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614)通过 | B1–B3 独立本地审计 APPROVE；[最终代码头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，5 个线程全部解决 |
+| C 首次生成黄金路径 | 待审查 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | 待创建 | 本地门禁通过 | 待请求 |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
 | E 生产产物与 CI | 未开始 | production Playwright smoke、CI 顺序、runner 信号清理 | — | — | — |
 | F 性能与包体 | 未开始 | lazy boundary、稳定拆包、初始 gzip 预算、CI 体积门禁 | — | — | — |
@@ -75,14 +75,16 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 
 ### C. 首次生成黄金路径
 
-- [ ] pristine 项目展示任务化启动器，至少含“上传图片开始”和“文本生成开始”。
-- [ ] 任务选择创建独立页签或明确替换；不静默覆盖现有画布。
-- [ ] 模板落地后自动 fitView，并聚焦首个缺失输入/参数节点。
-- [ ] Dock 开合保持 viewport，不触发自动 fit/recenter。
-- [ ] 节点库支持拖拽与点击添加。
-- [ ] 上下游快捷建图复用连接校验、只读门禁和撤销事务。
-- [ ] 隔离黄金路径 E2E：模板 → 输入 → stub 生成 → 运行状态 → 成功结果 → 查看/对比/继续处理。
-- [ ] Results 的跨项目恢复、失败、未知结果、查看和对比能力无降级。
+- [x] pristine 项目展示任务化启动器，至少含“上传图片开始”和“文本生成开始”。
+- [x] 任务选择创建独立页签或明确替换；不静默覆盖现有画布。
+- [x] 模板落地后自动 fitView，并聚焦首个缺失输入/参数节点。
+- [x] Dock 开合保持 viewport，不触发自动 fit/recenter。
+- [x] 节点库支持拖拽与点击添加。
+- [x] 上下游快捷建图复用连接校验、只读门禁和撤销事务。
+- [x] 隔离黄金路径 E2E：模板 → 输入 → stub 生成 → 运行状态 → 成功结果 → 查看/对比/继续处理。
+- [x] Results 的跨项目恢复、失败、未知结果、查看和对比能力无降级。
+
+Phase C 本地证据：空白项目任务启动器从内置模板分别提供上传图片与文本生成入口，始终新建独立项目页签并保留原空白画布；节点尺寸初始化后只执行一次模板 `fitView`，随后聚焦文件输入或提示词，普通 Dock 开合不触发重定位。节点库保留拖拽并支持相邻点击添加；Inspector 上下游快捷建图共用画布连接校验与只读/输入上限门禁，节点和边在一次文档事务内提交并可一次撤销。隔离 Playwright 黄金路径覆盖真实上传标准化、两条 stub 生成、保存与运行快照一致、运行中到成功、跨项目 Results、查看、双图对比及继续添加处理节点；全程未配置或访问真实 AI。`npm run check`、生产 Web 构建、41 项项目页签回归、12/12 Playwright 桌面回归与 `git diff --check` 通过。GitNexus 因改动画布、Inspector 与共享 Store 评为 critical（29 个已索引变更符号、84 个受影响符号）；高风险范围由全量隔离回归、三宽度既有工作台回归和新增黄金路径覆盖。
 
 ### D. 结果迭代与桌面体验
 
@@ -125,15 +127,15 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | 门禁 | 最新结果 | 证据/备注 |
 | --- | --- | --- |
 | `npm ci` | 通过 | 2026-08-24；依赖安装完成，未使用真实 AI 配置 |
-| `npm run check` | 通过 | 2026-08-25；Phase B5 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；新增 9 项文本事务与 session 单次分片写入回归，仅使用 dummy/stub AI |
-| `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
+| `npm run check` | 通过 | 2026-08-25；Phase C 的 lint、Vite/CSS 生产构建门禁与隔离 PostgreSQL 全套回归均通过；仅使用 dummy/stub AI |
+| `npm run test:e2e` | 通过 | 12/12；1024、1280、1440 桌面项目及独立 1280 黄金路径，临时 PostgreSQL + dummy/stub AI |
 | production browser smoke | 待实现 | Phase E |
 | `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 745.36 kB / gzip 237.87 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
-| `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
-| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B5 差异为 critical：50 changed / 202 affected / 14 indexed files。范围为统一文本事务、所有 durable mutation 前置 flush、IME/生命周期与输入消费者；完整 `npm run check`、文本/session/history/tabs/save/run 回归覆盖，import cycle 为 0 |
-| GitHub CI | Phase B 最终代码头通过 | [Actions 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 对应 `34b3665`，检查、11 项桌面浏览器回归与生产构建全部成功；纯文档证据头仍需自身 CI |
-| Codex Cloud Review | Phase B 最终代码头通过 | [精确头审查 5409048696](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 对应 `34b366525c`，未发现重大问题且无未解决线程；纯文档证据头仍需精确复审 |
+| `git diff --check` | 通过 | 2026-08-25；未发现空白错误，`dist` / `dist-server` 仍为忽略产物 |
+| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase C 差异为 critical：29 个已索引变更符号、84 个受影响符号、9 个已索引文件；新增文件由本地审查与编译/E2E 覆盖，完整 check 和桌面黄金路径通过 |
+| GitHub CI | Phase B 合并后 main 通过 | [Actions 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614)；Phase C 待 PR CI |
+| Codex Cloud Review | Phase B 通过 | [精确头审查 5409048696](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696)；Phase C 待请求 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
 
 ## 已知风险与决策日志
@@ -162,6 +164,8 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | 2026-08-25 | Storage 读异常与账号安全 | `getItem` 抛错是归属/存在性未知，不能降级为缺失并清理。启动恢复不完时 fail-closed 停 writer；认证绑定期间读失败则通过重载隔离已恢复内存画布。 |
 | 2026-08-25 | 连续文本事务 | 输入时只更新 canonical 字段；800 ms 空闲或明确边界才写一次 history/revision/session。所有 token 固定文档与字段身份，IME 期间暂停计时，后台 success 等非文本 mutation 必须先收口文本以保持撤销顺序。 |
 | 2026-08-25 | 恢复页签的活动任务锁 | 纯文档草稿不会持久化 runtime status，因此历史/活动任务对账完成前不能相信节点的 idle。冷启动安全门同时封锁新付费运行和页签关闭；同步失败保持 fail-closed，重试成功后统一解锁。 |
+| 2026-08-25 | 首次生成任务落地 | pristine 启动器只识别从未编辑的初始空白项目；任务和模板始终新建页签，避免覆盖现有画布。一次性 landing 意图只驻留内存，在节点尺寸就绪后执行 fit/聚焦，不进入文档、撤销或草稿。 |
+| 2026-08-25 | Results 保留边界 | Phase C 只增加启动、建图和黄金路径，不移动或削弱跨项目 Results；失败、未知状态、恢复、查看与对比继续由现有全局记录和回归保护。显式结果后续动作留在 Phase D 完善。 |
 
 ## 更新规则
 

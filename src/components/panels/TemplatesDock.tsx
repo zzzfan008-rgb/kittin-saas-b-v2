@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { Edge } from "@xyflow/react";
 import { Dialog } from "@base-ui/react/dialog";
-import { nanoid } from "nanoid";
 import { selectActiveDocument, useFlowStore, type FlowNode } from "@/store/flowStore";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { WorkflowMini } from "./WorkflowMini";
@@ -10,6 +9,7 @@ import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
 } from "@/lib/documentSnapshot";
+import { launchTemplateInNewTab } from "@/lib/templateLaunch";
 
 const TEMPLATES_PANEL_ID = "templates-dock-panel";
 
@@ -91,14 +91,7 @@ export function TemplatesDock() {
   }, [closeAndRestoreFocus, open, saving]);
 
   const applyTemplate = (tpl: WorkflowTemplate) => {
-    // 从模板新建独立项目页签，当前画布及其后台生成状态保持不变。
-    useFlowStore.getState().openFlowTab({
-      projectId: nanoid(10),
-      projectName: `${tpl.name} - 副本`,
-      nodes: tpl.flow.nodes as FlowNode[],
-      edges: tpl.flow.edges as Edge[],
-      markDirty: true,
-    });
+    launchTemplateInNewTab(tpl);
     setOpen(false);
   };
 

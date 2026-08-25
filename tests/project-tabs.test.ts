@@ -9,6 +9,7 @@ import {
   beginHistoryTransaction,
   beginMaskWork,
   endHistoryTransaction,
+  isPristineProjectTab,
   selectActiveDocument,
   selectActiveDocumentTarget,
   selectNodeInputImages,
@@ -254,6 +255,83 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   );
   assert.match(librarySource, /addAssetNode\(asset,/);
   assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
+});
+
+await test("空白项目启动器只在 pristine 文档中生效", () => {
+  useFlowStore.getState().createBlankTab();
+  assert.equal(isPristineProjectTab(activeDocument()), true);
+  const addedId = useFlowStore.getState().addNode("sketch-to-render", { x: 380, y: 0 });
+  assert.ok(addedId);
+  assert.equal(isPristineProjectTab(activeDocument()), false);
+});
+
+await test("快捷建图原子新增节点与合法连线，一次撤销完整恢复", () => {
+  const anchor = imageNode("quick-anchor", "快捷上游");
+  useFlowStore.getState().openFlowTab({
+    projectId: "quick-connect-project",
+    projectName: "快捷建图测试",
+    nodes: [anchor],
+    edges: [],
+  });
+  const beforeRevision = activeDocument().revision;
+  const addedId = useFlowStore.getState().addConnectedNode(
+    anchor.id,
+    "sketch-to-render",
+    "downstream",
+  );
+  assert.ok(addedId);
+  assert.equal(activeDocument().nodes.length, 2);
+  assert.equal(activeDocument().edges.length, 1);
+  assert.equal(activeDocument().edges[0].source, anchor.id);
+  assert.equal(activeDocument().edges[0].target, addedId);
+  assert.equal(activeDocument().selectedNodeId, addedId);
+  assert.equal(activeDocument().revision, beforeRevision + 1);
+
+  useFlowStore.getState().undo();
+  assert.deepEqual(activeDocument().nodes.map((node) => node.id), [anchor.id]);
+  assert.equal(activeDocument().edges.length, 0);
+});
+
+await test("快捷建图复用输入上限与只读门禁", () => {
+  const source = imageNode("full-source", "已有上游");
+  const target: FlowNode = {
+    id: "full-target",
+    type: "upscale",
+    position: { x: 380, y: 0 },
+    data: {
+      kind: "upscale",
+      label: "高清放大",
+      status: "idle",
+      imageSize: "2K",
+      outputImages: [],
+    },
+  };
+  useFlowStore.getState().openFlowTab({
+    projectId: "quick-connect-full",
+    projectName: "输入已满",
+    nodes: [source, target],
+    edges: [{ id: "already-connected", source: source.id, target: target.id }],
+  });
+  assert.equal(
+    useFlowStore.getState().addConnectedNode(target.id, "image-input", "upstream"),
+    null,
+  );
+  assert.equal(activeDocument().nodes.length, 2);
+
+  useFlowStore.getState().openFlowTab({
+    projectId: "quick-connect-readonly",
+    projectName: "只读快捷建图",
+    nodes: [imageNode("readonly-anchor", "只读节点")],
+    edges: [],
+    readOnly: true,
+  });
+  assert.equal(
+    useFlowStore.getState().addConnectedNode("readonly-anchor", "ai-modify", "downstream"),
+    null,
+  );
+  assert.equal(activeDocument().nodes.length, 1);
+  assert.equal(activeDocument().edges.length, 0);
+  useFlowStore.getState().createBlankTab();
 });
 
 await test("保存期间继续编辑会排队并最终写入最新版本", async () => {
