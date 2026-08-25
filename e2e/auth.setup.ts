@@ -45,6 +45,14 @@ setup("create an authenticated desktop session", async ({ page }) => {
   expect(meBody.user?.mustChangePassword).toBe(false);
 
   await page.goto("/");
+  const tutorial = page.getByRole("dialog", { name: "欢迎使用服装设计工作台" });
+  await expect(tutorial).toBeVisible();
+  await tutorial.getByRole("button", { name: "下一步" }).click();
+  await tutorial.getByRole("button", { name: "下一步" }).click();
+  await tutorial.getByRole("button", { name: "完成教程" }).click();
+  await expect(tutorial).toBeHidden();
+  await page.reload();
+  await expect(tutorial).toBeHidden();
   await expect(page.getByRole("navigation", { name: "工作台左侧工具" })).toBeVisible();
   await page.context().storageState({ path: authStatePath });
 });

@@ -26,6 +26,7 @@ import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { TaskLauncher } from "@/components/TaskLauncher";
+import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useAuth } from "@/auth/AuthContext";
 import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
@@ -297,6 +298,7 @@ function Workspace() {
       <CompareOverlay />
       <ImageViewer />
       <AssetPickerOverlay />
+      <TutorialOverlay />
     </div>
   );
 }
