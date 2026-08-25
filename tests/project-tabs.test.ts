@@ -257,9 +257,37 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
 });
 
-await test("空白项目启动器只在 pristine 文档中生效", () => {
+await test("空白项目启动器只在从未持久化的 pristine 文档中生效", async () => {
   useFlowStore.getState().createBlankTab();
   assert.equal(isPristineProjectTab(activeDocument()), true);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+  try {
+    assert.equal(await useFlowStore.getState().saveProject(), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(activeDocument().saveState, "saved");
+  assert.equal(isPristineProjectTab(activeDocument()), false);
+
+  const emptyNodes = activeDocument().nodes.map((node) => ({
+    ...node,
+    data: { ...node.data },
+  }));
+  useFlowStore.getState().openFlowTab({
+    projectId: "persisted-empty-project",
+    projectName: "未命名设计项目",
+    nodes: emptyNodes,
+    edges: [],
+  });
+  assert.equal(activeDocument().saveState, "saved");
+  assert.equal(isPristineProjectTab(activeDocument()), false);
+
+  useFlowStore.getState().createBlankTab();
   const addedId = useFlowStore.getState().addNode("sketch-to-render", { x: 380, y: 0 });
   assert.ok(addedId);
   assert.equal(isPristineProjectTab(activeDocument()), false);

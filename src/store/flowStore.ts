@@ -1130,6 +1130,7 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
   if (
     tab.readOnly ||
     tab.dirty ||
+    tab.saveState !== "idle" ||
     tab.revision !== 0 ||
     tab.savedRevision !== 0 ||
     tab.projectName !== DEFAULT_PROJECT_NAME ||
@@ -1421,8 +1422,11 @@ function newTab(opts?: {
   edges?: Edge[];
   markDirty?: boolean;
   readOnly?: boolean;
+  /** 已由服务端载入；即使内容为空，也不是首次未保存项目。 */
+  persisted?: boolean;
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
+  const persisted = opts?.persisted === true && !markDirty;
   const selection = normalizeNodeSelection(opts?.nodes ?? [makeStarterNode()], []);
   return {
     id: nanoid(10),
@@ -1435,7 +1439,7 @@ function newTab(opts?: {
     selectedNodeId: selection.selectedNodeId,
     selectedResultId: null,
     compareIds: [],
-    saveState: "idle",
+    saveState: persisted ? "saved" : "idle",
     revision: markDirty ? 1 : 0,
     savedRevision: 0,
     dirty: markDirty,
@@ -2781,7 +2785,13 @@ export const useFlowStore = create<FlowState>()(
         } else {
           stashActiveTemporalHistory(state.activeTabId);
           const tab = newTab({
-            projectId, projectName, nodes: applyActiveHistory(nodes), edges, markDirty, readOnly,
+            projectId,
+            projectName,
+            nodes: applyActiveHistory(nodes),
+            edges,
+            markDirty,
+            readOnly,
+            persisted: !markDirty,
           });
           runWithoutHistory(() => set({
             tabs: [...state.tabs, tab],
@@ -3382,7 +3392,7 @@ export const useFlowStore = create<FlowState>()(
           selectedNodeId: selection.selectedNodeId,
           selectedResultId: null,
           compareIds: [],
-          saveState: "idle",
+          saveState: markDirty ? "idle" : "saved",
           revision: markDirty ? 1 : 0,
           savedRevision: 0,
           dirty: markDirty,
