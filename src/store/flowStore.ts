@@ -1010,6 +1010,89 @@ function activeFields(tab: ProjectTab): ActiveDocumentState {
   };
 }
 
+/**
+ * B2 compatibility boundary for active-document consumers.
+ *
+ * Components and imperative UI commands must read the current document through
+ * these selectors instead of coupling themselves to the temporary top-level
+ * mirror fields. B3 can then move the source of truth into `tabs` without a
+ * second component migration.
+ */
+export function selectActiveDocument(state: FlowState): ProjectTab {
+  return snapshotActiveTab(state);
+}
+
+export function selectDocumentForTab(
+  state: FlowState,
+  tabId: string,
+): ProjectTab | undefined {
+  return documentForTab(state, tabId);
+}
+
+export function selectActiveProjectId(state: FlowState): string {
+  return state.projectId;
+}
+
+export function selectActiveProjectName(state: FlowState): string {
+  return state.projectName;
+}
+
+export function selectActiveReadOnly(state: FlowState): boolean {
+  return state.readOnly;
+}
+
+export function selectActiveNodes(state: FlowState): FlowNode[] {
+  return state.nodes;
+}
+
+export function selectActiveEdges(state: FlowState): Edge[] {
+  return state.edges;
+}
+
+export function selectActiveSelectedNodeIds(state: FlowState): string[] {
+  return state.selectedNodeIds;
+}
+
+export function selectActiveSelectedNodeId(state: FlowState): string | null {
+  return state.selectedNodeId;
+}
+
+export function selectActivePrimarySelectedNodeId(state: FlowState): string | null {
+  return selectPrimarySelectedNodeId(state);
+}
+
+export function selectActiveSelectedResultId(state: FlowState): string | null {
+  return state.selectedResultId;
+}
+
+export function selectActiveCompareIds(state: FlowState): string[] {
+  return state.compareIds;
+}
+
+export function selectActiveSaveState(state: FlowState): SaveState {
+  return state.saveState;
+}
+
+export function selectActiveRevision(state: FlowState): number {
+  return state.revision;
+}
+
+export function selectActiveSavedRevision(state: FlowState): number {
+  return state.savedRevision;
+}
+
+export function selectActiveDirty(state: FlowState): boolean {
+  return state.dirty;
+}
+
+export function selectActiveDocumentEpoch(state: FlowState): number {
+  return state.documentEpoch;
+}
+
+export function selectHasDirtyTabs(state: FlowState): boolean {
+  return state.dirty || state.tabs.some((tab) => tab.dirty);
+}
+
 function replaceTab(tabs: ProjectTab[], tab: ProjectTab): ProjectTab[] {
   return tabs.map((candidate) => (candidate.id === tab.id ? tab : candidate));
 }
@@ -3020,10 +3103,11 @@ export function applyRunEventToTab(
 
 /** 读取 result 节点聚合的上游图片（直接上游） */
 export function selectResultImages(state: FlowState, nodeId: string): string[] {
+  const document = selectActiveDocument(state);
   const urls: string[] = [];
-  for (const e of state.edges) {
+  for (const e of document.edges) {
     if (e.target !== nodeId) continue;
-    const src = state.nodes.find((n) => n.id === e.source);
+    const src = document.nodes.find((n) => n.id === e.source);
     if (src) urls.push(...nodeOutputImages(src.data));
   }
   return urls;
@@ -3031,14 +3115,19 @@ export function selectResultImages(state: FlowState, nodeId: string): string[] {
 
 /** 按连线顺序读取节点当前可见的上游图片，蒙版编辑器以第一张作为原图。 */
 export function selectNodeInputImages(
-  state: Pick<FlowState, "nodes" | "edges">,
+  document: Pick<ProjectTab, "nodes" | "edges">,
   nodeId: string,
 ): string[] {
   const urls: string[] = [];
-  for (const edge of state.edges) {
+  for (const edge of document.edges) {
     if (edge.target !== nodeId) continue;
-    const source = state.nodes.find((node) => node.id === edge.source);
+    const source = document.nodes.find((node) => node.id === edge.source);
     if (source) urls.push(...nodeOutputImages(source.data));
   }
   return urls;
+}
+
+/** Active-tab wrapper used by React subscriptions; the leaf result stays stable. */
+export function selectActiveNodeInputImages(state: FlowState, nodeId: string): string[] {
+  return selectNodeInputImages(selectActiveDocument(state), nodeId);
 }

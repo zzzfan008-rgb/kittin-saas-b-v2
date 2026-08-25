@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveSelectedResultId, useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 
@@ -13,7 +13,7 @@ const MAX_SCALE = 2;
  */
 export function ImageViewer() {
   const viewer = useFlowStore((s) => s.viewer);
-  const selectedResultId = useFlowStore((s) => s.selectedResultId);
+  const selectedResultId = useFlowStore(selectActiveSelectedResultId);
   const record = useFlowStore((s) => s.recentResults.find((item) => item.id === selectedResultId));
   const closeViewer = useFlowStore((s) => s.closeViewer);
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();

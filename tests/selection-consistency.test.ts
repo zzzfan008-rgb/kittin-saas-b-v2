@@ -367,8 +367,8 @@ test("复制与属性消费者共用 primary selector", () => {
     new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(appSource, /selectPrimarySelectedNodeId/);
-  assert.match(inspectorSource, /useFlowStore\(selectPrimarySelectedNodeId\)/);
+  assert.match(appSource, /selectActivePrimarySelectedNodeId/);
+  assert.match(inspectorSource, /useFlowStore\(selectActivePrimarySelectedNodeId\)/);
   assert.doesNotMatch(appSource, /getState\(\)\.selectedNodeId/);
 });
 

@@ -1,4 +1,10 @@
-import { selectPrimarySelectedNodeId, useFlowStore, type RecentResult } from "@/store/flowStore";
+import {
+  selectActiveNodes,
+  selectActivePrimarySelectedNodeId,
+  selectActiveSelectedResultId,
+  useFlowStore,
+  type RecentResult,
+} from "@/store/flowStore";
 import { NODE_SPECS, isNodeRunActive, type ImageInputNodeData } from "@/types/workflow";
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
@@ -12,7 +18,9 @@ import {
 } from "@/types/imageModels";
 
 function PropertyEditor({ nodeId }: { nodeId: string }) {
-  const node = useFlowStore((s) => s.nodes.find((n) => n.id === nodeId));
+  const node = useFlowStore((state) =>
+    selectActiveNodes(state).find((candidate) => candidate.id === nodeId),
+  );
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
@@ -234,8 +242,8 @@ interface InspectorPanelProps {
 }
 
 export function InspectorPanel({ className, view = "auto" }: InspectorPanelProps) {
-  const selectedNodeId = useFlowStore(selectPrimarySelectedNodeId);
-  const selectedResultId = useFlowStore((s) => s.selectedResultId);
+  const selectedNodeId = useFlowStore(selectActivePrimarySelectedNodeId);
+  const selectedResultId = useFlowStore(selectActiveSelectedResultId);
   const showResult = view === "result" || (view === "auto" && Boolean(selectedResultId));
 
   return (

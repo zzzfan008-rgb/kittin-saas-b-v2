@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveEdges, useFlowStore } from "@/store/flowStore";
 import { useCustomColors } from "@/store/customColors";
 import { isNodeRunActive, type FabricRecolorNodeData } from "@/types/workflow";
 import { NodeFrame, RunButton, Developing } from "./NodeFrame";
@@ -25,8 +25,8 @@ export function FabricRecolorNode({
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
-  const hasFabricInput = useFlowStore((s) =>
-    s.edges.some((e) => e.target === id && e.targetHandle === "fabric"),
+  const hasFabricInput = useFlowStore((state) =>
+    selectActiveEdges(state).some((edge) => edge.target === id && edge.targetHandle === "fabric"),
   );
   const running = isNodeRunActive(data.status);
 

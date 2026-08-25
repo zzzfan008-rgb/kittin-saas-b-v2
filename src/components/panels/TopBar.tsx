@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { retryTabSessionPersistence, useFlowStore } from "@/store/flowStore";
+import {
+  retryTabSessionPersistence,
+  selectActiveDirty,
+  selectActiveProjectId,
+  selectActiveProjectName,
+  selectActiveReadOnly,
+  selectActiveSaveState,
+  useFlowStore,
+} from "@/store/flowStore";
 import { THEMES, useTheme } from "@/lib/theme";
 import { AccountMenu } from "./AccountMenu";
 
@@ -24,7 +32,7 @@ function ProjectPicker() {
   const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const openRequestIdRef = useRef(0);
-  const currentId = useFlowStore((s) => s.projectId);
+  const currentId = useFlowStore(selectActiveProjectId);
   const openFlowTab = useFlowStore((s) => s.openFlowTab);
 
   useEffect(() => {
@@ -248,11 +256,11 @@ function ThemeSwitcher() {
 }
 
 export function TopBar() {
-  const projectName = useFlowStore((s) => s.projectName);
+  const projectName = useFlowStore(selectActiveProjectName);
   const setProjectName = useFlowStore((s) => s.setProjectName);
-  const saveState = useFlowStore((s) => s.saveState);
-  const dirty = useFlowStore((s) => s.dirty);
-  const readOnly = useFlowStore((s) => s.readOnly);
+  const saveState = useFlowStore(selectActiveSaveState);
+  const dirty = useFlowStore(selectActiveDirty);
+  const readOnly = useFlowStore(selectActiveReadOnly);
   const saveProject = useFlowStore((s) => s.saveProject);
   const tabSessionPersistenceError = useFlowStore((s) => s.tabSessionPersistenceError);
 

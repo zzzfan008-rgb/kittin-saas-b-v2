@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveCompareIds, useFlowStore } from "@/store/flowStore";
 
 /** ResultsPanel「对比 N 张」按钮派发此事件来打开对比浮层 */
 export const OPEN_COMPARE_EVENT = "garment:open-compare";
@@ -14,7 +14,7 @@ function formatTime(ts: number): string {
 
 /** 多变体并排对比浮层：compareIds >= 2 时可打开，横向并排 2~4 张大图 */
 export function CompareOverlay() {
-  const compareIds = useFlowStore((s) => s.compareIds);
+  const compareIds = useFlowStore(selectActiveCompareIds);
   const recentResults = useFlowStore((s) => s.recentResults);
   const clearCompare = useFlowStore((s) => s.clearCompare);
   const [open, setOpen] = useState(false);

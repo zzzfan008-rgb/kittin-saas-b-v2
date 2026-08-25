@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
-import { appendSavedAsset, useFlowStore } from "@/store/flowStore";
+import { useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type PrintExtractNodeData } from "@/types/workflow";
 import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
+import { savePrintOutputAsAsset } from "@/lib/printAsset";
 
 export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExtractNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
@@ -19,23 +20,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
     setSavingUrl(url);
     setSaveError(null);
     try {
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const name = `印花素材-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      const res = await fetch("/api/assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          category: "print",
-          image: url,
-          sourceNote: `来自节点「${data.label}」`,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const latest = useFlowStore.getState().nodes.find((node) => node.id === id)?.data;
-      const current = latest?.kind === "print-extract" ? latest.savedAsAssets : undefined;
-      updateNodeData(id, { savedAsAssets: appendSavedAsset(current, url) });
+      await savePrintOutputAsAsset({ nodeId: id, nodeLabel: data.label, url });
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     } finally {

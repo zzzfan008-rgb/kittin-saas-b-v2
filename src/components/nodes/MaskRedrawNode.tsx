@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { beginMaskWork, selectNodeInputImages, useFlowStore } from "@/store/flowStore";
+import {
+  beginMaskWork,
+  selectActiveNodeInputImages,
+  selectActiveReadOnly,
+  selectDocumentForTab,
+  selectNodeInputImages,
+  useFlowStore,
+} from "@/store/flowStore";
 import { isNodeRunActive, type MaskRedrawNodeData } from "@/types/workflow";
 import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
@@ -17,8 +24,8 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
-  const readOnly = useFlowStore((state) => state.readOnly);
-  const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);
+  const readOnly = useFlowStore(selectActiveReadOnly);
+  const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
   const readiness = maskRedrawReadiness({
     source,
@@ -114,10 +121,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             const releaseUploadPending = beginMaskWork();
             const state = useFlowStore.getState();
             const tabId = state.activeTabId;
-            const storedTab = state.tabs.find((candidate) => candidate.id === tabId);
-            const tab = storedTab && state.activeTabId === tabId
-              ? { ...storedTab, nodes: state.nodes, edges: state.edges, readOnly: state.readOnly }
-              : storedTab;
+            const tab = selectDocumentForTab(state, tabId);
             try {
               if (!tab || tab.readOnly || !tab.nodes.some((node) => node.id === id)) {
                 throw new Error(tab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
@@ -130,10 +134,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
               }, {
                 commit: (url) => {
                   const current = useFlowStore.getState();
-                  const storedCurrentTab = current.tabs.find((candidate) => candidate.id === tabId);
-                  const currentTab = storedCurrentTab && current.activeTabId === tabId
-                    ? { ...storedCurrentTab, nodes: current.nodes, edges: current.edges, readOnly: current.readOnly }
-                    : storedCurrentTab;
+                  const currentTab = selectDocumentForTab(current, tabId);
                   if (!currentTab || currentTab.readOnly || !currentTab.nodes.some((node) => node.id === id)) {
                     throw new Error(currentTab?.readOnly ? "只读项目不能保存蒙版" : "当前蒙版节点已关闭，请重新打开项目后再试");
                   }

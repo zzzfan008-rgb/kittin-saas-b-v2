@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { NODE_SPECS, type Asset, type NodeKind } from "@/types/workflow";
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveNodes, useFlowStore } from "@/store/flowStore";
 import { DND_MIME } from "../CanvasFlow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
@@ -129,7 +129,9 @@ function AssetList() {
 
   /** 点击素材：在最左侧节点左边新增一个 image-input 节点并灌入图片 */
   const addToCanvas = (asset: Asset) => {
-    const { nodes, addAssetNode } = useFlowStore.getState();
+    const state = useFlowStore.getState();
+    const nodes = selectActiveNodes(state);
+    const { addAssetNode } = state;
     const minX = Math.min(0, ...nodes.map((n) => n.position.x));
     addAssetNode(asset, { x: minX - 320, y: nodes.length * 40 });
     // 引用关系由项目保存时根据最终画布统一同步；未保存项目不提前占用素材。

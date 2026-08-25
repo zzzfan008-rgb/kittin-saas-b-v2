@@ -1,4 +1,8 @@
-import { useFlowStore } from "@/store/flowStore";
+import {
+  selectActiveCompareIds,
+  selectActiveSelectedResultId,
+  useFlowStore,
+} from "@/store/flowStore";
 import { OPEN_COMPARE_EVENT } from "@/components/CompareOverlay";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
@@ -21,9 +25,9 @@ export function ResultsPanel({
 }: ResultsPanelProps) {
   // 生成历史是跨项目的全局记录；即使项目页签未恢复，也必须能在刷新后找回。
   const recentResults = useFlowStore((s) => s.recentResults);
-  const selectedResultId = useFlowStore((s) => s.selectedResultId);
+  const selectedResultId = useFlowStore(selectActiveSelectedResultId);
   const setSelectedResultId = useFlowStore((s) => s.setSelectedResultId);
-  const compareIds = useFlowStore((s) => s.compareIds);
+  const compareIds = useFlowStore(selectActiveCompareIds);
   const toggleCompareId = useFlowStore((s) => s.toggleCompareId);
   const openViewer = useFlowStore((s) => s.openViewer);
   const resultCardClass = "aspect-square min-w-0 w-full";

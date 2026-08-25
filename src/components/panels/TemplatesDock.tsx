@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type { Edge } from "@xyflow/react";
 import { Dialog } from "@base-ui/react/dialog";
 import { nanoid } from "nanoid";
-import { useFlowStore, type FlowNode } from "@/store/flowStore";
+import { selectActiveDocument, useFlowStore, type FlowNode } from "@/store/flowStore";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { WorkflowMini } from "./WorkflowMini";
 import { thumbnailImageUrl } from "@/lib/images";
@@ -299,7 +299,7 @@ function SaveTemplateForm({
     setError(null);
     const submissionVersion = ++submissionVersionRef.current;
     try {
-      const { projectName, nodes, edges } = useFlowStore.getState();
+      const { projectName, nodes, edges } = selectActiveDocument(useFlowStore.getState());
       const res = await fetch("/api/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

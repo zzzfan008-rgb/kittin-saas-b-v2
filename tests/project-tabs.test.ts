@@ -1168,7 +1168,7 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
     new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
     "utf8",
   );
-  assert.ok(source.includes("const source = useFlowStore((state) => selectNodeInputImages(state, id)[0]);"));
+  assert.ok(source.includes("const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);"));
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
 });
 
