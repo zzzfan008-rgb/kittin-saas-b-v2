@@ -28,7 +28,7 @@
 | 阶段 | 状态 | 交付范围 | PR | CI | Cloud Review |
 | --- | --- | --- | --- | --- | --- |
 | A 状态正确性与撤销事务 | 已完成 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012)与[合并后 main](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095)通过 | [最终精确头审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404)无重大问题 |
-| B 文档与持久化边界 | 进行中 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | 本地 B1–B3 门禁通过；GitHub CI 待最新头运行 | B1、B2、B3 各三次独立本地审计 APPROVE；Cloud checkpoint 待最新头请求 |
+| B 文档与持久化边界 | 进行中 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [B3 checkpoint CI 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 通过 | B1、B2、B3 各三次独立本地审计 APPROVE；[B3 精确头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 无重大问题 |
 | C 首次生成黄金路径 | 未开始 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | — | — | — |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
 | E 生产产物与 CI | 未开始 | production Playwright smoke、CI 顺序、runner 信号清理 | — | — | — |
@@ -128,8 +128,8 @@ Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真�
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
 | GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B3 最终差异为 critical：131 changed / 110 affected / 12 indexed files。范围为 canonical tabs、文档 mutation/history、页签生命周期、异步 DocumentTarget、SSE/结果引用与 session 序列化；完整 `npm run check` 及六类共 107 项高风险定向回归覆盖 |
-| GitHub CI | Phase B PR 已创建 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) 等待最新头 CI；Phase A [Actions 32755048012](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012) 与[合并后 main 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) 已成功 |
-| Codex Cloud Review | Phase B 待请求 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) 将在本记录提交后请求 B3 精确头 checkpoint；Phase A [最终审查 5398788404](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404) 无重大问题 |
+| GitHub CI | Phase B B3 checkpoint 通过 | [Actions 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 对应 `e3672fc`，检查、11 项桌面浏览器回归与生产构建全部成功；Phase A [合并后 main 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) 已成功 |
+| Codex Cloud Review | Phase B B3 checkpoint 通过 | [精确头审查 5405637505](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 对应 `e3672fc720`，未发现重大问题；Phase A [最终审查 5398788404](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404) 同样通过 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
 
 ## 已知风险与决策日志
