@@ -174,6 +174,18 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
   useFlowStore.getState().switchTab(tabB);
 });
 
+await test("活动任务对账完成前禁止关闭看似空闲的恢复页签", () => {
+  const count = useFlowStore.getState().tabs.length;
+  setGenerationSafetyBlockReason("正在确认运行历史");
+  try {
+    useFlowStore.getState().closeTab(tabB);
+    assert.equal(useFlowStore.getState().tabs.length, count);
+    assert.ok(useFlowStore.getState().tabs.some((tab) => tab.id === tabB));
+  } finally {
+    setGenerationSafetyBlockReason(null);
+  }
+});
+
 await test("运行中的页签不能关闭，避免任务结果丢失画布回写", () => {
   useFlowStore.getState().updateNodeData("b-node", { status: "queued" });
   const count = useFlowStore.getState().tabs.length;

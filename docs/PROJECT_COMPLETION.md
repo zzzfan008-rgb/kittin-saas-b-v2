@@ -71,7 +71,7 @@ Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真�
 
 Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分片，以 `projectId / documentEpoch / revision / savedRevision / dirty / readOnly / saveState` 和页签拓扑为稳定信号，250 ms trailing debounce 后在 idle 写入，`pagehide` / hidden 同步收口。单页签 quota 失败仅隔离该分片，健康新页签仍可发布拓扑；legacy 迁移和 manifest 发布失败保留上一完整恢复点。Storage 读取抛错与确定缺失/写失败已分类：瞬时读异常不修剪 manifest、不清理分片，启动时读取不完则停用本页 writer；跨账号清理会先永久停用旧页面 writer，并验证旧草稿确已删除后才绑定新 owner。`project-tabs-session`、`auth-client`、历史/页签/选择定向回归、`npm run check`、`npm run build` 与 `git diff --check` 均通过；未发送真实 AI 请求。
 
-Phase B5 本地证据：项目名、节点标题、提示词与结果备注统一接入 800 ms 空闲收口的文本事务。输入过程直接更新 canonical 文档供界面实时显示，但不逐键增加 revision、history 或 session 写入；blur、单行 Enter、多行 Enter 后、IME composition end、切页/关页/新建/载入、保存、运行、撤销重做、拖拽开始、后台 success 回写及 `pagehide` / hidden / beforeunload 均先提交当前 burst。事务 token 固定 `tabId + projectId + documentEpoch + field`，迟到的 blur/组合事件不能污染新页签或同容器新项目；NodeFrame 的 Escape 仅恢复所属字段。新增 6 项文本事务回归，并在真实 session scheduler 中验证一个 burst 只增加一次 revision、写一次页签分片；完整 `npm run check`、Web/server 构建、`git diff --check` 与 0 import cycle 均通过。GitNexus 因统一边界横切所有文档 mutation 评为 critical（50 changed / 202 affected / 14 indexed files），已由历史、页签、session、保存/运行与全套隔离回归覆盖；未发送真实 AI 请求。
+Phase B5 本地证据：项目名、节点标题、提示词与结果备注统一接入 800 ms 空闲收口的文本事务。输入过程直接更新 canonical 文档供界面实时显示，但不逐键增加 revision、history 或 session 写入；blur、单行 Enter、多行 Enter 后、IME composition end、切页/关页/新建/载入、保存、运行、撤销重做、拖拽开始、后台 success 回写及 `pagehide` / hidden / beforeunload 均先提交当前 burst。事务 token 固定 `tabId + projectId + documentEpoch + field`，迟到的 blur/组合事件不能污染新页签或同容器新项目；NodeFrame 的 Escape 仅恢复所属字段。新增 6 项文本事务回归，并在真实 session scheduler 中验证一个 burst 只增加一次 revision、写一次页签分片。Cloud 对 B4 的迟到 P1 指出恢复页签在活动任务对账完成前看似 idle、可能被关闭；现由 ProjectTabs 与 canonical `closeTab` 双层复用冷启动安全门，在 loading/error 时 fail-closed，对账 ready 后才开放关闭，并新增行为与源码契约回归。完整 `npm run check`、Web/server 构建、`git diff --check` 与 0 import cycle 均通过。GitNexus 因统一边界横切所有文档 mutation 评为 critical（50 changed / 202 affected / 14 indexed files），已由历史、页签、session、保存/运行与全套隔离回归覆盖；未发送真实 AI 请求。
 
 ### C. 首次生成黄金路径
 
@@ -128,7 +128,7 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | `npm run check` | 通过 | 2026-08-25；Phase B5 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；新增 6 项文本事务与 session 单次分片写入回归，仅使用 dummy/stub AI |
 | `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
 | production browser smoke | 待实现 | Phase E |
-| `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 744.58 kB / gzip 237.64 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
+| `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 744.72 kB / gzip 237.73 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
 | GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B5 差异为 critical：50 changed / 202 affected / 14 indexed files。范围为统一文本事务、所有 durable mutation 前置 flush、IME/生命周期与输入消费者；完整 `npm run check`、文本/session/history/tabs/save/run 回归覆盖，import cycle 为 0 |
@@ -161,6 +161,7 @@ Phase B5 本地证据：项目名、节点标题、提示词与结果备注统�
 | 2026-08-25 | 分片草稿与发布边界 | manifest 只引用已确认存在的页签分片；单页签 quota 失败不得阻断健康拓扑，manifest 发布或 legacy 迁移未完成时保留上一完整恢复点。 |
 | 2026-08-25 | Storage 读异常与账号安全 | `getItem` 抛错是归属/存在性未知，不能降级为缺失并清理。启动恢复不完时 fail-closed 停 writer；认证绑定期间读失败则通过重载隔离已恢复内存画布。 |
 | 2026-08-25 | 连续文本事务 | 输入时只更新 canonical 字段；800 ms 空闲或明确边界才写一次 history/revision/session。所有 token 固定文档与字段身份，IME 期间暂停计时，后台 success 等非文本 mutation 必须先收口文本以保持撤销顺序。 |
+| 2026-08-25 | 恢复页签的活动任务锁 | 纯文档草稿不会持久化 runtime status，因此历史/活动任务对账完成前不能相信节点的 idle。冷启动安全门同时封锁新付费运行和页签关闭；同步失败保持 fail-closed，重试成功后统一解锁。 |
 
 ## 更新规则
 

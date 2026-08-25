@@ -1,4 +1,5 @@
 import { flushActiveTextEdit, useFlowStore, type ProjectTab } from "@/store/flowStore";
+import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { isNodeRunActive } from "@/types/workflow";
 
 function hasRunningNode(tab: ProjectTab): boolean {
@@ -11,12 +12,17 @@ export function ProjectTabs() {
   const switchTab = useFlowStore((state) => state.switchTab);
   const closeTab = useFlowStore((state) => state.closeTab);
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
+  const runReconciliationBlockReason = useGenerationSafetyBlockReason();
 
   const requestClose = (tab: ProjectTab) => {
     flushActiveTextEdit();
     const latestTab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tab.id);
     if (!latestTab) return;
     const warnings: string[] = [];
+    if (runReconciliationBlockReason) {
+      window.alert(`${runReconciliationBlockReason}。为避免运行中的付费结果失去画布，暂时不能关闭项目页签。`);
+      return;
+    }
     if (hasRunningNode(latestTab)) {
       window.alert("生成任务运行中，请等待任务完成后再关闭项目页签；结果会继续写回当前画布。");
       return;

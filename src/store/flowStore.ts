@@ -2650,6 +2650,9 @@ export const useFlowStore = create<FlowState>()(
       },
       closeTab: (tabId) => {
         flushActiveTextEdit();
+        // Session snapshots intentionally strip runtime status. Until active
+        // runs reconcile, an apparently-idle restored tab may still own paid work.
+        if (getGenerationSafetyBlockReason()) return;
         const initialState = get();
         const initialClosingTab = initialState.tabs.find((tab) => tab.id === tabId);
         if (!initialClosingTab) return;

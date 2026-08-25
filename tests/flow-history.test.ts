@@ -16,6 +16,7 @@ import {
   type FlowNode,
 } from "../src/store/flowStore";
 import type { WorkflowNodeData } from "../src/types/workflow";
+import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 
 let passed = 0;
 
@@ -79,6 +80,8 @@ function resetDocument(node = aiNode()): { tabId: string; nodeId: string } {
 }
 
 console.log("画布文档历史事务测试");
+// 这些用例验证已完成活动任务对账后的历史行为；冷启动关闭门禁另有契约测试。
+setGenerationSafetyBlockReason(null);
 
 await test("queued/running/retry/cancel 运行态不进入撤销历史", () => {
   const { tabId, nodeId } = resetDocument();
