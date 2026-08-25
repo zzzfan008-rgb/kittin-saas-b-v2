@@ -11,6 +11,10 @@ import {
   parseTutorialReceiptState,
 } from "../src/tutorials/tutorialContract";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
+import {
+  isWorkbenchTutorialBlocking,
+  setWorkbenchTutorialBlocking,
+} from "../src/tutorials/tutorialRuntime";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-tutorials-"));
 process.env.DATA_DIR = temp;
@@ -114,6 +118,14 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 
 console.log("V1.1.0 版本化教程回执测试");
+
+setWorkbenchTutorialBlocking(true);
+assert.equal(isWorkbenchTutorialBlocking(), true);
+setWorkbenchTutorialBlocking(false);
+assert.equal(isWorkbenchTutorialBlocking(), false);
+const appSource = fs.readFileSync(path.resolve("src/App.tsx"), "utf8");
+assert.match(appSource, /if \(isWorkbenchTutorialBlocking\(\)\) return;/);
+console.log("  ✓ 教程显示期间阻断工作台全局保存、撤销、复制和粘贴快捷键");
 
 await test("现有账号没有 V1.1.0 回执时必须显示教程", async () => {
   assert.deepEqual(await state("owner"), {
@@ -263,4 +275,4 @@ await new Promise<void>((resolve, reject) => {
 });
 await closeDatabaseForTests();
 fs.rmSync(temp, { recursive: true, force: true });
-console.log(`完成：${passed + 1} 项教程回归测试通过`);
+console.log(`完成：${passed + 2} 项教程回归测试通过`);

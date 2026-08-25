@@ -16,6 +16,7 @@ import {
   parseTutorialReceiptState,
   type TutorialOutcome,
 } from "@/tutorials/tutorialContract";
+import { setWorkbenchTutorialBlocking } from "@/tutorials/tutorialRuntime";
 
 const STEPS = [
   {
@@ -47,6 +48,11 @@ export function TutorialOverlay() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState<TutorialOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWorkbenchTutorialBlocking(loadState !== "hidden");
+    return () => setWorkbenchTutorialBlocking(false);
+  }, [loadState]);
 
   useEffect(() => {
     let ignore = false;
