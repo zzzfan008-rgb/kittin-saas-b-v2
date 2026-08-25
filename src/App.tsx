@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
+  flushActiveTextEdit,
   flushTabSessionPersistence,
   reconcileRunHistory,
   recentResultsPatch,
@@ -138,9 +139,6 @@ export default function App() {
 function Workspace() {
   useGlobalShortcuts();
   const activeTabId = useFlowStore((state) => state.activeTabId);
-  const hasDirtyTabs = useFlowStore(selectHasDirtyTabs);
-  const tabSessionPersistenceError = useFlowStore((state) => state.tabSessionPersistenceError);
-  const pendingMaskWorkCount = useFlowStore((state) => state.pendingMaskWorkCount);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -164,7 +162,10 @@ function Workspace() {
   }, []);
 
   useEffect(() => {
-    const flushDrafts = () => { flushTabSessionPersistence(); };
+    const flushDrafts = () => {
+      flushActiveTextEdit();
+      flushTabSessionPersistence();
+    };
     const flushHiddenDrafts = () => {
       if (document.visibilityState === "hidden") flushDrafts();
     };
@@ -177,19 +178,22 @@ function Workspace() {
   }, []);
 
   useEffect(() => {
-    if (!shouldWarnBeforeWorkspaceUnload({
-      hasDirtyTabs,
-      tabSessionPersistenceError,
-      pendingMaskWorkCount,
-    })) return;
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      flushActiveTextEdit();
+      flushTabSessionPersistence();
       if (isWorkspaceUnloadWarningSuppressed()) return;
+      const latest = useFlowStore.getState();
+      if (!shouldWarnBeforeWorkspaceUnload({
+        hasDirtyTabs: selectHasDirtyTabs(latest),
+        tabSessionPersistenceError: latest.tabSessionPersistenceError,
+        pendingMaskWorkCount: latest.pendingMaskWorkCount,
+      })) return;
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warnBeforeUnload);
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [hasDirtyTabs, pendingMaskWorkCount, tabSessionPersistenceError]);
+  }, []);
 
   useEffect(() => {
     let active = true;

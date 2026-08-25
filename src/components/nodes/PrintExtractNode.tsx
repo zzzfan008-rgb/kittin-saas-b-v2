@@ -6,15 +6,19 @@ import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import { savePrintOutputAsAsset } from "@/lib/printAsset";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExtractNodeData>>) {
-  const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
   const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const running = isNodeRunActive(data.status);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saved = data.savedAsAssets ?? [];
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "prompt" },
+    { multiline: true },
+  );
 
   const saveAsAsset = async (url: string) => {
     setSavingUrl(url);
@@ -36,7 +40,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
           <span className="text-[10px] text-neutral-500">补充说明</span>
           <textarea
             value={data.prompt}
-            onChange={(e) => updateNodeData(id, { prompt: e.target.value })}
+            {...promptEdit.bind}
             rows={3}
             placeholder='可选：如"只要胸前那朵花"'
             className={`${inputClass} resize-none`}

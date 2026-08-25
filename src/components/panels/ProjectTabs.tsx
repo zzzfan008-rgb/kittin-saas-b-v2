@@ -1,4 +1,4 @@
-import { useFlowStore, type ProjectTab } from "@/store/flowStore";
+import { flushActiveTextEdit, useFlowStore, type ProjectTab } from "@/store/flowStore";
 import { isNodeRunActive } from "@/types/workflow";
 
 function hasRunningNode(tab: ProjectTab): boolean {
@@ -13,19 +13,22 @@ export function ProjectTabs() {
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
 
   const requestClose = (tab: ProjectTab) => {
+    flushActiveTextEdit();
+    const latestTab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tab.id);
+    if (!latestTab) return;
     const warnings: string[] = [];
-    if (hasRunningNode(tab)) {
+    if (hasRunningNode(latestTab)) {
       window.alert("生成任务运行中，请等待任务完成后再关闭项目页签；结果会继续写回当前画布。");
       return;
     }
-    if (tab.dirty) warnings.push("有未保存修改");
+    if (latestTab.dirty) warnings.push("有未保存修改");
     if (
       warnings.length > 0 &&
-      !window.confirm(`${tab.projectName}：${warnings.join("，")}。确定关闭这个项目页签吗？`)
+      !window.confirm(`${latestTab.projectName}：${warnings.join("，")}。确定关闭这个项目页签吗？`)
     ) {
       return;
     }
-    closeTab(tab.id);
+    closeTab(latestTab.id);
   };
 
   return (

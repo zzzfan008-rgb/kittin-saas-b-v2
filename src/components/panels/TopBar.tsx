@@ -9,6 +9,7 @@ import {
   useFlowStore,
 } from "@/store/flowStore";
 import { THEMES, useTheme } from "@/lib/theme";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { AccountMenu } from "./AccountMenu";
 
 const SAVE_TEXT = {
@@ -257,7 +258,7 @@ function ThemeSwitcher() {
 
 export function TopBar() {
   const projectName = useFlowStore(selectActiveProjectName);
-  const setProjectName = useFlowStore((s) => s.setProjectName);
+  const projectNameEdit = useCoalescedTextEdit({ kind: "project-name" });
   const saveState = useFlowStore(selectActiveSaveState);
   const dirty = useFlowStore(selectActiveDirty);
   const readOnly = useFlowStore(selectActiveReadOnly);
@@ -271,7 +272,7 @@ export function TopBar() {
       <span className="hidden h-4 w-px bg-[#262626] lg:block" />
       <input
         value={projectName}
-        onChange={(e) => setProjectName(e.target.value)}
+        {...projectNameEdit.bind}
         className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-hidden sm:w-44 sm:flex-none sm:px-2 lg:w-56"
         placeholder="项目名称"
       />

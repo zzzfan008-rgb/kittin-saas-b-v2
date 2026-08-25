@@ -16,12 +16,12 @@ import { MaskEditor } from "./MaskEditor";
 import { thumbnailImageUrl } from "@/lib/images";
 import { maskRedrawReadiness } from "@/lib/maskRedraw";
 import { saveMaskDraft } from "@/lib/maskUpload";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedrawNodeData>>) {
   const [editing, setEditing] = useState(false);
   const [promptRequired, setPromptRequired] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
@@ -36,6 +36,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   });
   const staleMask = Boolean(data.mask && source && !readiness.hasCurrentMask);
   const editorVisible = editing && Boolean(source);
+  const promptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "prompt" },
+    { multiline: true },
+  );
 
   useEffect(() => {
     if (!editorVisible) return;
@@ -76,9 +80,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <textarea
             ref={promptRef}
             value={data.prompt}
+            {...promptEdit.bind}
             onChange={(event) => {
               const prompt = event.target.value;
-              updateNodeData(id, { prompt });
+              promptEdit.updateValue(prompt);
               if (prompt.trim()) setPromptRequired(false);
             }}
             rows={4}

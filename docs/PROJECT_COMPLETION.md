@@ -19,7 +19,7 @@
 | 基线提交 | 已确认 | `d50aa6dc46fcdea23368c4c547683a582b9ca49a` |
 | 基线 main CI | 通过 | [GitHub Actions 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) |
 | 当前工作分支 | 进行中 | `codex/document-persistence-boundary` |
-| GitNexus | 已重建 | 当前索引对应 `6e4feaf`：15,095 symbols、32,713 edges、226 clusters、300 flows；索引未写入仓库 |
+| GitNexus | 已重建 | Phase B5 工作树索引：16,213 nodes、35,266 edges、218 clusters、300 flows；索引未写入仓库 |
 
 ## 阶段进度
 
@@ -60,7 +60,7 @@ Phase A 本地行为证据：`flow-history` 19/19、`selection-consistency` 11/1
 - [x] 保留兼容 selector，分步迁移消费者。
 - [x] session 持久化按文档 revision / 页签拓扑触发，并 debounce 或 idle flush。
 - [x] 草稿按页签隔离；单页签配额失败不删除其他草稿。
-- [ ] 连续输入形成合理撤销粒度，不逐键序列化完整 tabs。
+- [x] 连续输入形成合理撤销粒度，不逐键序列化完整 tabs。
 - [x] 刷新、切页、后台任务、坏页签、配额失败、撤销重做和跨账号清理均有测试。
 
 Phase B1 本地证据：项目保存、模板保存、运行计划与 v1 浏览器草稿统一走同一纯文档 serializer；9 种节点的运行态、错误、选择、测量、React Flow 外壳与未知字段均被剥离，wire 仅补 `status: idle`。服务端严格 canonicalization、v0/v1 模板读取、历史不兼容 v2 内置模板修复与全新目录六份模板均有回归。`document-snapshot`、`workflow-schema` 22/22、`project-tabs-session`、`project-tabs` 35/35、`npm run check` 与生产构建通过；三名独立审计最终均为 APPROVE。
@@ -70,6 +70,8 @@ Phase B2 本地证据：建立完整活动文档 selector 边界，并将画布�
 Phase B3 本地证据：`ProjectTab[]` 成为活动与后台文档的唯一真相，`FlowState` 已删除 14 个顶层镜像字段、镜像 helper 和同步 subscriber；selector 直接返回 `tabs` 内原始对象引用。文档、选择、结果引用、保存元数据、SSE 回写、会话草稿与页签切换都以单次 `tabs` 替换原子发布。zundo 仅作为每页签历史栈记录器，公开与应用内 undo/redo 统一由 canonical 页签回放适配器执行，不会生成顶层幽灵字段，并保留服务端运行态、选择与 React Flow 测量瞬态。所有保存、运行、上传、素材选择、蒙版和印花素材异步回写在发起时捕获不可变 `DocumentTarget(tabId, projectId, documentEpoch)`，因此同一页签整体换项目后，旧响应也不能污染新文档。`npm run check`、`npm run build`、`git diff --check` 通过；历史 21/21、页签 37/37、选择 11/11、会话 13/13、结果 20/20、活动文档边界 5/5，共 107 项高风险定向回归通过。GitNexus 最终识别 131 个变更符号、110 个受影响符号与 12 个索引文件，风险为 critical；范围与本次横切单一数据源及异步身份迁移一致。三轮独立终审均为 APPROVE，无 P0–P3。
 
 Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分片，以 `projectId / documentEpoch / revision / savedRevision / dirty / readOnly / saveState` 和页签拓扑为稳定信号，250 ms trailing debounce 后在 idle 写入，`pagehide` / hidden 同步收口。单页签 quota 失败仅隔离该分片，健康新页签仍可发布拓扑；legacy 迁移和 manifest 发布失败保留上一完整恢复点。Storage 读取抛错与确定缺失/写失败已分类：瞬时读异常不修剪 manifest、不清理分片，启动时读取不完则停用本页 writer；跨账号清理会先永久停用旧页面 writer，并验证旧草稿确已删除后才绑定新 owner。`project-tabs-session`、`auth-client`、历史/页签/选择定向回归、`npm run check`、`npm run build` 与 `git diff --check` 均通过；未发送真实 AI 请求。
+
+Phase B5 本地证据：项目名、节点标题、提示词与结果备注统一接入 800 ms 空闲收口的文本事务。输入过程直接更新 canonical 文档供界面实时显示，但不逐键增加 revision、history 或 session 写入；blur、单行 Enter、多行 Enter 后、IME composition end、切页/关页/新建/载入、保存、运行、撤销重做、拖拽开始、后台 success 回写及 `pagehide` / hidden / beforeunload 均先提交当前 burst。事务 token 固定 `tabId + projectId + documentEpoch + field`，迟到的 blur/组合事件不能污染新页签或同容器新项目；NodeFrame 的 Escape 仅恢复所属字段。新增 6 项文本事务回归，并在真实 session scheduler 中验证一个 burst 只增加一次 revision、写一次页签分片；完整 `npm run check`、Web/server 构建、`git diff --check` 与 0 import cycle 均通过。GitNexus 因统一边界横切所有文档 mutation 评为 critical（50 changed / 202 affected / 14 indexed files），已由历史、页签、session、保存/运行与全套隔离回归覆盖；未发送真实 AI 请求。
 
 ### C. 首次生成黄金路径
 
@@ -123,13 +125,13 @@ Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分�
 | 门禁 | 最新结果 | 证据/备注 |
 | --- | --- | --- |
 | `npm ci` | 通过 | 2026-08-24；依赖安装完成，未使用真实 AI 配置 |
-| `npm run check` | 通过 | 2026-08-25；Phase B4 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；仅使用 dummy/stub AI |
+| `npm run check` | 通过 | 2026-08-25；Phase B5 的 lint、Vite/CSS 构建门禁与隔离 PostgreSQL 全套回归均通过；新增 6 项文本事务与 session 单次分片写入回归，仅使用 dummy/stub AI |
 | `npm run test:e2e` | 通过 | 11/11；1024、1280、1440 桌面项目，临时 PostgreSQL + dummy AI |
 | production browser smoke | 待实现 | Phase E |
-| `npm run build` | 通过 | 2026-08-25；Phase B4 Web + server；主 JS 740.39 kB / gzip 236.30 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
+| `npm run build` | 通过 | 2026-08-25；Phase B5 Web + server；主 JS 744.58 kB / gzip 237.64 kB，server 295.3 kB；既有 >500 kB 警告留待 Phase F |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 未发现空白错误；`dist` / `dist-server` 仍为忽略产物 |
-| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B4 最终差异为 critical：208 changed / 20 affected / 8 indexed files。范围为 v2 分片草稿、debounce/lifecycle flush、Storage 异常分类、跨账号清理与拖拽事务稳定边界；完整 `npm run check` 及 session/auth/history/tabs/selection 定向回归覆盖 |
+| GitNexus `detect_changes` | 已执行 | 2026-08-25 Phase B5 差异为 critical：50 changed / 202 affected / 14 indexed files。范围为统一文本事务、所有 durable mutation 前置 flush、IME/生命周期与输入消费者；完整 `npm run check`、文本/session/history/tabs/save/run 回归覆盖，import cycle 为 0 |
 | GitHub CI | Phase B B3 checkpoint 通过 | [Actions 32811518375](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32811518375) 对应 `e3672fc`，检查、11 项桌面浏览器回归与生产构建全部成功；Phase A [合并后 main 32802751095](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095) 已成功 |
 | Codex Cloud Review | Phase B B3 checkpoint 通过 | [精确头审查 5405637505](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5405637505) 对应 `e3672fc720`，未发现重大问题；Phase A [最终审查 5398788404](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404) 同样通过 |
 | 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
@@ -158,6 +160,7 @@ Phase B4 本地证据：会话草稿升级为 v2 manifest + 每页签独立分�
 | 2026-08-25 | 切页取消拖拽回滚 | 取消事务回到起点时显式不保留 `dragging`，并直接断言后台 canonical 页签内存状态，避免依赖 session sanitize 掩盖永久拖拽态。 |
 | 2026-08-25 | 分片草稿与发布边界 | manifest 只引用已确认存在的页签分片；单页签 quota 失败不得阻断健康拓扑，manifest 发布或 legacy 迁移未完成时保留上一完整恢复点。 |
 | 2026-08-25 | Storage 读异常与账号安全 | `getItem` 抛错是归属/存在性未知，不能降级为缺失并清理。启动恢复不完时 fail-closed 停 writer；认证绑定期间读失败则通过重载隔离已恢复内存画布。 |
+| 2026-08-25 | 连续文本事务 | 输入时只更新 canonical 字段；800 ms 空闲或明确边界才写一次 history/revision/session。所有 token 固定文档与字段身份，IME 期间暂停计时，后台 success 等非文本 mutation 必须先收口文本以保持撤销顺序。 |
 
 ## 更新规则
 

@@ -106,6 +106,16 @@ export interface DocumentTarget {
   documentEpoch: number;
 }
 
+export type CoalescedTextEditDescriptor =
+  | { kind: "project-name" }
+  | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" };
+
+export interface CoalescedTextEditToken {
+  readonly id: symbol;
+  readonly target: DocumentTarget;
+  readonly descriptorKey: string;
+}
+
 export interface FlowState {
   /** 应用内项目页签；活动文档始终是 activeTabId 对应的页签。 */
   tabs: ProjectTab[];
@@ -215,6 +225,20 @@ let recordHistoryEntry: (pastState: FlowTemporalState, currentState: FlowTempora
 let flushDeferredTabSessionPersistence = (): void => undefined;
 let flushPendingTabSessionPersistence = (): boolean => true;
 const DOCUMENT_HISTORY_LIMIT = 50;
+export const COALESCED_TEXT_EDIT_IDLE_MS = 800;
+
+interface ActiveTextEdit {
+  token: CoalescedTextEditToken;
+  descriptor: CoalescedTextEditDescriptor;
+  before: FlowTemporalState;
+  originalValue: string;
+  originalFieldExisted: boolean;
+  composing: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+let activeTextEdit: ActiveTextEdit | null = null;
+let finalizingTextEdit = false;
 
 interface TabTemporalHistory {
   pastStates: FlowTemporalState[];
@@ -563,6 +587,7 @@ function commitDocumentMutationWithSet(
   mutation: DocumentMutation,
   options?: { coalesceWithActiveTransaction?: boolean },
 ): boolean {
+  if (!finalizingTextEdit) flushActiveTextEdit();
   let changed = false;
   const concurrent: {
     transaction: ActiveHistoryTransaction | null;
@@ -632,6 +657,7 @@ export function beginHistoryTransaction(
   onSettled?: HistoryTransactionSettledCallback,
 ): HistoryTransactionToken {
   const token = Symbol(label);
+  flushActiveTextEdit();
   // Debounced edits that predate the gesture are already stable. Persist them
   // before live drag frames begin so a pagehide during the gesture cannot lose them.
   if (!activeHistoryTransaction) flushPendingTabSessionPersistence();
@@ -1145,6 +1171,183 @@ function patchDocumentTarget(
   return matched;
 }
 
+function textEditDescriptorKey(descriptor: CoalescedTextEditDescriptor): string {
+  return descriptor.kind === "project-name"
+    ? "project-name"
+    : JSON.stringify(["node-data", descriptor.nodeId, descriptor.field]);
+}
+
+function readTextEditValue(
+  tab: ProjectTab,
+  descriptor: CoalescedTextEditDescriptor,
+): { value: string; fieldExisted: boolean } | null {
+  if (descriptor.kind === "project-name") {
+    return { value: tab.projectName, fieldExisted: true };
+  }
+  const node = tab.nodes.find((candidate) => candidate.id === descriptor.nodeId);
+  if (!node) return null;
+  const fieldExisted = Object.prototype.hasOwnProperty.call(node.data, descriptor.field);
+  const value = node.data[descriptor.field];
+  return { value: typeof value === "string" ? value : "", fieldExisted };
+}
+
+function textEditPatch(
+  tab: ProjectTab,
+  descriptor: CoalescedTextEditDescriptor,
+  value: string,
+  fieldExisted = true,
+): Partial<ProjectTab> {
+  if (descriptor.kind === "project-name") return { projectName: value };
+  let matched = false;
+  const nodes = tab.nodes.map((node) => {
+    if (node.id !== descriptor.nodeId) return node;
+    matched = true;
+    const data = { ...node.data } as WorkflowNodeData & Record<string, unknown>;
+    if (fieldExisted) data[descriptor.field] = value;
+    else delete data[descriptor.field];
+    return { ...node, data };
+  });
+  return matched ? { nodes } : {};
+}
+
+function clearTextEditTimer(edit: ActiveTextEdit): void {
+  if (edit.timer !== null) clearTimeout(edit.timer);
+  edit.timer = null;
+}
+
+function scheduleTextEditCommit(edit: ActiveTextEdit): void {
+  clearTextEditTimer(edit);
+  if (edit.composing) return;
+  edit.timer = setTimeout(() => {
+    if (activeTextEdit?.token.id === edit.token.id) flushActiveTextEdit(edit.token);
+  }, COALESCED_TEXT_EDIT_IDLE_MS);
+}
+
+/**
+ * Commit the live value as one durable document mutation. A token makes delayed
+ * blur/composition events harmless after a tab or project boundary has moved.
+ */
+export function flushActiveTextEdit(token?: CoalescedTextEditToken): boolean {
+  const edit = activeTextEdit;
+  if (!edit || (token && edit.token.id !== token.id)) return false;
+  clearTextEditTimer(edit);
+  activeTextEdit = null;
+  const state = useFlowStore.getState();
+  const tab = documentForTarget(state, edit.token.target);
+  if (!tab) return false;
+  const current = temporalDocument(tab);
+  if (sameTemporalDocument(edit.before, current)) return false;
+
+  if (state.activeTabId === edit.token.target.tabId) {
+    recordHistoryEntry(edit.before, current);
+  } else {
+    recordInactiveTabHistory(edit.token.target.tabId, edit.before, current);
+  }
+  finalizingTextEdit = true;
+  try {
+    runWithoutHistory(() => {
+      patchDocumentTarget(useFlowStore.setState, edit.token.target, (latest) => ({
+        revision: latest.revision + 1,
+        dirty: true,
+        saveState: latest.saveState === "saving" ? "saving" : "idle",
+      }));
+    });
+  } finally {
+    finalizingTextEdit = false;
+  }
+  return true;
+}
+
+/** Restore only the field owned by the active editor, without creating history. */
+export function cancelCoalescedTextEdit(token: CoalescedTextEditToken): boolean {
+  const edit = activeTextEdit;
+  if (!edit || edit.token.id !== token.id) return false;
+  clearTextEditTimer(edit);
+  activeTextEdit = null;
+  runWithoutHistory(() => {
+    patchDocumentTarget(useFlowStore.setState, edit.token.target, (tab) => textEditPatch(
+      tab,
+      edit.descriptor,
+      edit.originalValue,
+      edit.originalFieldExisted,
+    ));
+  });
+  return true;
+}
+
+export function setCoalescedTextEditComposing(
+  token: CoalescedTextEditToken,
+  composing: boolean,
+): boolean {
+  const edit = activeTextEdit;
+  if (!edit || edit.token.id !== token.id) return false;
+  edit.composing = composing;
+  if (composing) clearTextEditTimer(edit);
+  else scheduleTextEditCommit(edit);
+  return true;
+}
+
+/** Live-update one text field; history/revision/session persistence wait for the burst boundary. */
+export function updateCoalescedTextEdit(
+  descriptor: CoalescedTextEditDescriptor,
+  value: string,
+  token?: CoalescedTextEditToken | null,
+  options?: { composing?: boolean },
+): CoalescedTextEditToken | null {
+  const state = useFlowStore.getState();
+  const target = selectActiveDocumentTarget(state);
+  const tab = documentForTarget(state, target);
+  const descriptorKey = textEditDescriptorKey(descriptor);
+  if (!tab || tab.readOnly) return null;
+  if (token && (
+    token.target.tabId !== target.tabId ||
+    token.target.projectId !== target.projectId ||
+    token.target.documentEpoch !== target.documentEpoch ||
+    token.descriptorKey !== descriptorKey
+  )) return null;
+
+  if (activeTextEdit && token?.id !== activeTextEdit.token.id) {
+    // A delayed event from an older editor must not terminate or overwrite the
+    // currently focused field. A new editor without a token starts a new burst.
+    if (token) return null;
+    flushActiveTextEdit();
+  }
+  if (activeHistoryTransaction) commitHistoryTransaction(activeHistoryTransaction);
+
+  let edit = activeTextEdit;
+  if (!edit) {
+    const initial = readTextEditValue(tab, descriptor);
+    if (!initial || initial.value === value) return null;
+    const nextToken: CoalescedTextEditToken = {
+      id: Symbol(`text-edit:${descriptorKey}`),
+      target,
+      descriptorKey,
+    };
+    edit = {
+      token: nextToken,
+      descriptor,
+      before: temporalDocument(tab),
+      originalValue: initial.value,
+      originalFieldExisted: initial.fieldExisted,
+      composing: options?.composing === true,
+      timer: null,
+    };
+    activeTextEdit = edit;
+  } else if (token?.id !== edit.token.id) {
+    return null;
+  }
+
+  edit.composing = options?.composing ?? edit.composing;
+  runWithoutHistory(() => {
+    patchDocumentTarget(useFlowStore.setState, edit.token.target, (latest) => {
+      const current = readTextEditValue(latest, edit.descriptor);
+      return current?.value === value ? {} : textEditPatch(latest, edit.descriptor, value);
+    });
+  });
+  scheduleTextEditCommit(edit);
+  return edit.token;
+}
+
 function newTab(opts?: {
   projectId?: string;
   projectName?: string;
@@ -1181,6 +1384,7 @@ function updateTabNodes(
   update: (nodes: FlowNode[]) => FlowNode[],
   opts?: { markDirty?: boolean },
 ): void {
+  if (opts?.markDirty === true) flushActiveTextEdit();
   const currentState = useFlowStore.getState();
   if (!documentForTarget(currentState, target)) return;
   if (opts?.markDirty === true && currentState.activeTabId === target.tabId) {
@@ -2432,6 +2636,7 @@ export const useFlowStore = create<FlowState>()(
         const initialState = get();
         if (tabId === initialState.activeTabId) return;
         if (!initialState.tabs.some((tab) => tab.id === tabId)) return;
+        flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
         const target = state.tabs.find((tab) => tab.id === tabId);
@@ -2444,6 +2649,7 @@ export const useFlowStore = create<FlowState>()(
         restoreTemporalHistory(target.id);
       },
       closeTab: (tabId) => {
+        flushActiveTextEdit();
         const initialState = get();
         const initialClosingTab = initialState.tabs.find((tab) => tab.id === tabId);
         if (!initialClosingTab) return;
@@ -2472,6 +2678,7 @@ export const useFlowStore = create<FlowState>()(
         restoreTemporalHistory(target.id);
       },
       openFlowTab: ({ projectId, projectName, nodes, edges, markDirty = false, readOnly = false }) => {
+        flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
         const applyActiveHistory = (inputNodes: FlowNode[]) => {
@@ -2513,6 +2720,7 @@ export const useFlowStore = create<FlowState>()(
         }
       },
       createBlankTab: () => {
+        flushActiveTextEdit();
         cancelHistoryTransaction();
         const tab = newTab();
         const state = get();
@@ -2743,6 +2951,7 @@ export const useFlowStore = create<FlowState>()(
       runNode: async (id) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
         if (getGenerationSafetyBlockReason()) return;
+        flushActiveTextEdit();
         const target = selectActiveDocumentTarget(get());
         const tabId = target.tabId;
         const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
@@ -3034,20 +3243,24 @@ export const useFlowStore = create<FlowState>()(
       saveProject: async () => {
         // Capture the invoking tab before awaiting a real dragStop/cancel. A tab
         // switch must save the rolled-back source tab, never the new active tab.
+        flushActiveTextEdit();
         const target = selectActiveDocumentTarget(get());
         return (await saveTab(target)).ok;
       },
 
       undo: () => {
+        flushActiveTextEdit();
         if (deferHistoryCommandUntilSettlement("undo")) return;
         applyActiveTemporalHistory("undo");
       },
       redo: () => {
+        flushActiveTextEdit();
         if (deferHistoryCommandUntilSettlement("redo")) return;
         applyActiveTemporalHistory("redo");
       },
 
       loadFlow: ({ projectId, projectName, nodes, edges, markDirty = false }) => {
+        flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
         const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);

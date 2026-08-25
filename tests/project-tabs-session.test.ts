@@ -215,6 +215,7 @@ const {
   beginHistoryTransaction,
   discardActiveTabSession,
   endHistoryTransaction,
+  flushActiveTextEdit,
   flushTabSessionPersistence,
   normalizeTabSessionValue,
   readTabSessionSnapshot,
@@ -223,6 +224,7 @@ const {
   retryTabSessionPersistence,
   selectActiveDocument,
   TAB_SESSION_SCHEMA_VERSION,
+  updateCoalescedTextEdit,
   useFlowStore,
   writeTabSessionSnapshot,
 } = await import("../src/store/flowStore");
@@ -1176,6 +1178,41 @@ assert.equal(
   "保留衣身，只修改袖型",
 );
 console.log("  ✓ revision/topology 驱动持久化：瞬态零写入，连续修改 debounce 为单次分片写入");
+
+sessionWriteKeys.length = 0;
+const revisionBeforeTextBurst = activeDocument().revision;
+const writesBeforeTextBurst = sessionWrites;
+let textToken = updateCoalescedTextEdit(
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  "合并输入第一段",
+);
+assert.ok(textToken);
+textToken = updateCoalescedTextEdit(
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  "合并输入最终内容",
+  textToken,
+);
+assert.ok(textToken);
+assert.equal(activeDocument().revision, revisionBeforeTextBurst, "输入中不能逐键增加 revision");
+assert.equal(sessionWrites, writesBeforeTextBurst, "输入中不能逐键写 session");
+assert.equal(timeoutCallbacks.size, 0, "输入未提交前不能触发草稿持久化 debounce");
+assert.equal(flushActiveTextEdit(textToken), true);
+assert.equal(activeDocument().revision, revisionBeforeTextBurst + 1, "一次输入 burst 只增加一次 revision");
+assert.equal(timeoutCallbacks.size, 1);
+flushIdleCallbacks();
+assert.equal(
+  sessionWriteKeys.filter((key) => key === projectTabStorageKey(debouncedTabId)).length,
+  1,
+  "一次文本 burst 只写一次活动页签分片",
+);
+assert.equal(
+  persistedSession().tabs
+    .find((tab) => tab.id === debouncedTabId)
+    ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
+    ?.data.prompt,
+  "合并输入最终内容",
+);
+console.log("  ✓ 连续文本输入实时可见，但每个 burst 只提交一次 revision/session 分片");
 
 sessionWriteKeys.length = 0;
 useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "页面隐藏前的最后内容" });
