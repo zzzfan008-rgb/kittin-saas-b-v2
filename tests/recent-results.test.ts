@@ -317,6 +317,15 @@ test("选择第 5 张对比图时给出上限提示且不改变选择", () => {
     value: { alert: (message: string) => { alertMessage = message; } },
   });
   try {
+    useFlowStore.setState({
+      recentResults: ["a", "b", "c", "d", "e"].map((id, index) => ({
+        ...queued,
+        id,
+        image: `/api/files/${id}.png`,
+        status: "success",
+        finishedAt: index + 2,
+      })),
+    });
     useFlowStore.setState({ compareIds: ["a", "b", "c", "d"] });
     useFlowStore.getState().toggleCompareId("e");
     assert.equal(alertMessage, "最多选择 4 张图片进行对比");

@@ -35,7 +35,24 @@ function listTests(overrides = {}, omitted = []) {
 try {
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: 8 tests/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 3 files/);
+  for (const width of [1024, 1280, 1440]) {
+    assert.match(
+      baseline.stdout,
+      new RegExp(`\\[desktop-${width}\\].*node drag is one undo transaction`),
+      `desktop-${width} must include the real drag transaction regression`,
+    );
+    assert.match(
+      baseline.stdout,
+      new RegExp(`\\[desktop-${width}\\].*docks preserve canvas identity`),
+      `desktop-${width} must include the stable workbench regression`,
+    );
+    assert.match(
+      baseline.stdout,
+      new RegExp(`\\[desktop-${width}\\].*theme picker reports state`),
+      `desktop-${width} must include the theme and focus regression`,
+    );
+  }
 
   const cases = [
     {

@@ -75,6 +75,8 @@ export interface ProjectTab {
   readOnly: boolean;
   nodes: FlowNode[];
   edges: Edge[];
+  /** 节点选择唯一真相；selectedNodeId 仅为兼容派生字段。 */
+  selectedNodeIds: string[];
   selectedNodeId: string | null;
   selectedResultId: string | null;
   compareIds: string[];
@@ -85,7 +87,7 @@ export interface ProjectTab {
   documentEpoch: number;
 }
 
-interface FlowState {
+export interface FlowState {
   /** 应用内项目页签；当前页签的实时内容仍映射到下方兼容字段。 */
   tabs: ProjectTab[];
   activeTabId: string;
@@ -94,6 +96,8 @@ interface FlowState {
   readOnly: boolean;
   nodes: FlowNode[];
   edges: Edge[];
+  /** 节点选择唯一真相，顺序稳定；最后一项为 primary。 */
+  selectedNodeIds: string[];
   selectedNodeId: string | null;
   /** 底部「最近生成」中被点选的条目（右侧面板显示其运行记录） */
   selectedResultId: string | null;
@@ -129,10 +133,12 @@ interface FlowState {
   }) => void;
   createBlankTab: () => void;
   setProjectName: (name: string) => void;
+  setSelectedNodeIds: (ids: string[]) => void;
   setSelectedNodeId: (id: string | null) => void;
   setSelectedResultId: (id: string | null) => void;
   toggleCompareId: (id: string) => void;
   clearCompare: () => void;
+  removeRecentResult: (id: string) => void;
   openViewer: (v: { url: string; title?: string; prompt?: string; meta?: string }) => void;
   closeViewer: () => void;
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
@@ -171,9 +177,58 @@ interface FlowState {
   redo: () => void;
 }
 
+type FlowSet = (
+  partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>),
+) => unknown;
+
+type FlowTemporalState = Pick<FlowState, "projectName" | "nodes" | "edges">;
+
+type DocumentMutation =
+  | Partial<FlowState>
+  | ((state: FlowState) => Partial<FlowState>);
+
+export type HistoryTransactionToken = symbol;
+type HistoryTransactionOutcome = "ended" | "cancelled";
+type HistoryTransactionSettledCallback = (
+  outcome: HistoryTransactionOutcome,
+  token: HistoryTransactionToken,
+) => void;
+
+interface DeferredHistoryTransactionAction {
+  runOnCancel: boolean;
+  requireActiveTab: boolean;
+  run: () => void;
+  discard?: () => void;
+}
+
+interface ActiveHistoryTransaction {
+  tokens: Set<HistoryTransactionToken>;
+  onSettledByToken: Map<HistoryTransactionToken, HistoryTransactionSettledCallback>;
+  deferredActions: DeferredHistoryTransactionAction[];
+  tabId: string;
+  before: FlowTemporalState;
+  positionBeforeByNodeId: Map<string, { x: number; y: number }>;
+  documentChanged: boolean;
+}
+
+let historySuppressionDepth = 0;
+let activeHistoryTransaction: ActiveHistoryTransaction | null = null;
+let recordHistoryEntry: (pastState: FlowTemporalState, currentState: FlowTemporalState) => void = () => undefined;
+let flushDeferredTabSessionPersistence = (): void => undefined;
+const DOCUMENT_HISTORY_LIMIT = 50;
+
+interface TabTemporalHistory {
+  pastStates: FlowTemporalState[];
+  futureStates: FlowTemporalState[];
+}
+
+/** zundo 只挂在活动文档上；非活动页签的内存历史在切页时显式换入换出。 */
+const temporalHistoryByTab = new Map<string, TabTemporalHistory>();
+
 interface TabSaveQueue {
   promise: Promise<SaveTabResult>;
-  queued: boolean;
+  /** 用户在当前 attempt 未完成时再次明确发起保存的世代号。 */
+  explicitRetryGeneration: number;
 }
 
 interface SaveTabResult {
@@ -282,29 +337,477 @@ export function isLatestTrackedRun(
 /** 历史分页可能重叠；同一后端 Run 同一时刻只允许一条恢复连接。 */
 const resumingRecentRunIds = new Set<string>();
 
-/** 仅屏蔽这一小段运行态/UI 写入，不暂停用户在异步任务期间产生的文档历史。 */
-function withoutTemporalTracking(run: () => void): void {
-  const temporalStore = useFlowStore.temporal.getState();
-  const wasTracking = temporalStore.isTracking;
-  if (wasTracking) temporalStore.pause();
+/**
+ * 屏蔽一个同步运行态/UI mutation 的历史记录。不得把异步 Promise 包在这里，
+ * 否则 await 期间的真实用户编辑也会被吞掉。
+ */
+export function runWithoutHistory<T>(run: () => T): T {
+  historySuppressionDepth += 1;
   try {
-    run();
+    return run();
   } finally {
-    if (wasTracking) temporalStore.resume();
+    historySuppressionDepth = Math.max(0, historySuppressionDepth - 1);
+  }
+}
+
+const TRANSIENT_NODE_KEYS = new Set([
+  "selected",
+  "dragging",
+  "measured",
+  "width",
+  "height",
+]);
+
+const DOCUMENT_NODE_SHELL_EXCLUDED_KEYS = new Set([
+  ...TRANSIENT_NODE_KEYS,
+  "id",
+  "type",
+  "position",
+  "data",
+]);
+
+const RUNTIME_NODE_DATA_KEYS = new Set(["status", "error"]);
+
+function sameRecordValues(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  excludedKeys: ReadonlySet<string>,
+): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if (excludedKeys.has(key)) continue;
+    const leftValue = left[key];
+    const rightValue = right[key];
+    if (Object.is(leftValue, rightValue)) continue;
+    if (JSON.stringify(leftValue) !== JSON.stringify(rightValue)) return false;
+  }
+  return true;
+}
+
+function sameDocumentNode(left: FlowNode, right: FlowNode): boolean {
+  if (left === right) return true;
+  if (
+    left.id !== right.id ||
+    left.type !== right.type ||
+    left.position.x !== right.position.x ||
+    left.position.y !== right.position.y
+  ) return false;
+  if (!sameRecordValues(
+    left as unknown as Record<string, unknown>,
+    right as unknown as Record<string, unknown>,
+    DOCUMENT_NODE_SHELL_EXCLUDED_KEYS,
+  )) return false;
+  if (left.data === right.data) return true;
+  return sameRecordValues(
+    left.data as unknown as Record<string, unknown>,
+    right.data as unknown as Record<string, unknown>,
+    RUNTIME_NODE_DATA_KEYS,
+  );
+}
+
+function documentEdgeValue(edge: Edge): unknown {
+  const { selected: _selected, ...documentEdge } = edge;
+  return documentEdge;
+}
+
+function sameDocumentNodes(left: FlowNode[], right: FlowNode[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (!sameDocumentNode(left[index], right[index])) return false;
+  }
+  return true;
+}
+
+function sameDocumentEdges(left: Edge[], right: Edge[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] === right[index]) continue;
+    if (JSON.stringify(documentEdgeValue(left[index])) !== JSON.stringify(documentEdgeValue(right[index]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sameTemporalDocument(left: FlowTemporalState, right: FlowTemporalState): boolean {
+  return left.projectName === right.projectName &&
+    sameDocumentNodes(left.nodes, right.nodes) &&
+    sameDocumentEdges(left.edges, right.edges);
+}
+
+function stashActiveTemporalHistory(tabId: string): void {
+  const temporalState = useFlowStore.temporal.getState();
+  if (temporalState.pastStates.length === 0 && temporalState.futureStates.length === 0) {
+    temporalHistoryByTab.delete(tabId);
+    return;
+  }
+  temporalHistoryByTab.set(tabId, {
+    pastStates: [...temporalState.pastStates] as FlowTemporalState[],
+    futureStates: [...temporalState.futureStates] as FlowTemporalState[],
+  });
+}
+
+function restoreTemporalHistory(tabId: string): void {
+  const history = temporalHistoryByTab.get(tabId);
+  useFlowStore.temporal.setState({
+    pastStates: history ? [...history.pastStates] : [],
+    futureStates: history ? [...history.futureStates] : [],
+  });
+}
+
+function recordInactiveTabHistory(
+  tabId: string,
+  before: FlowTemporalState,
+  current: FlowTemporalState,
+): void {
+  if (sameTemporalDocument(before, current)) return;
+  const history = temporalHistoryByTab.get(tabId) ?? { pastStates: [], futureStates: [] };
+  temporalHistoryByTab.set(tabId, {
+    pastStates: [...history.pastStates, before].slice(-DOCUMENT_HISTORY_LIMIT),
+    futureStates: [],
+  });
+}
+
+function documentMutationChanged(state: FlowState, patch: Partial<FlowState>): boolean {
+  if (patch.projectName !== undefined && patch.projectName !== state.projectName) return true;
+  if (patch.nodes !== undefined && !sameDocumentNodes(state.nodes, patch.nodes)) return true;
+  if (patch.edges !== undefined && !sameDocumentEdges(state.edges, patch.edges)) return true;
+  return false;
+}
+
+function captureTransactionPositionChanges(
+  transaction: ActiveHistoryTransaction,
+  state: FlowState,
+  patch: Partial<FlowState>,
+): void {
+  if (!patch.nodes) return;
+  const currentById = new Map(state.nodes.map((node) => [node.id, node]));
+  for (const nextNode of patch.nodes) {
+    const currentNode = currentById.get(nextNode.id);
+    if (
+      !currentNode ||
+      transaction.positionBeforeByNodeId.has(nextNode.id) ||
+      (currentNode.position.x === nextNode.position.x && currentNode.position.y === nextNode.position.y)
+    ) continue;
+    transaction.positionBeforeByNodeId.set(nextNode.id, { ...currentNode.position });
   }
 }
 
 /**
- * 异步运行生命周期令牌。AI 状态本身通过 setNodeStatus 直接写入，不进入 undo；
- * 不暂停整个 temporal store，确保运行期间的提示词、移动和连线仍然可以撤销。
+ * 将事务中的实时拖拽位置还原到起点，同时保留期间发生的其他文档变化。
+ * 这样后台 success/output 等并发提交可以获得独立、按时间排序的历史记录。
  */
-export function beginNonUndoableRun(label = "async-run"): () => void {
-  void label;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
+function rebaseDocumentOutsideTransaction(
+  document: FlowTemporalState,
+  transaction: ActiveHistoryTransaction,
+): FlowTemporalState {
+  if (transaction.positionBeforeByNodeId.size === 0) return document;
+  const baselineById = new Map(transaction.before.nodes.map((node) => [node.id, node]));
+  let changed = false;
+  const nodes = document.nodes.map((node) => {
+    const position = transaction.positionBeforeByNodeId.get(node.id);
+    if (!position) return node;
+    const baseline = baselineById.get(node.id);
+    if (
+      node.position.x === position.x &&
+      node.position.y === position.y &&
+      node.dragging === baseline?.dragging
+    ) return node;
+    changed = true;
+    return { ...node, position: { ...position }, dragging: baseline?.dragging };
+  });
+  return {
+    projectName: document.projectName,
+    nodes: changed ? nodes : document.nodes,
+    edges: document.edges,
   };
+}
+
+function commitDocumentMutationWithSet(
+  set: FlowSet,
+  mutation: DocumentMutation,
+  options?: { coalesceWithActiveTransaction?: boolean },
+): boolean {
+  let changed = false;
+  const concurrent: {
+    transaction: ActiveHistoryTransaction | null;
+    before: FlowTemporalState | null;
+  } = { transaction: null, before: null };
+  set((state) => {
+    const patch = typeof mutation === "function" ? mutation(state) : mutation;
+    if (!documentMutationChanged(state, patch)) {
+      // 同一次 action 可能只更新运行态或选择投影；应用它，但不写 history/revision。
+      // 完全同引用的真正 no-op 仍直接返回空 patch。
+      const hasTransientChange = Object.entries(patch).some(([key, value]) => (
+        value !== state[key as keyof FlowState]
+      ));
+      return hasTransientChange ? patch : {};
+    }
+    changed = true;
+    const transaction = activeHistoryTransaction?.tabId === state.activeTabId
+      ? activeHistoryTransaction
+      : null;
+    if (transaction && options?.coalesceWithActiveTransaction) {
+      captureTransactionPositionChanges(transaction, state, patch);
+      transaction.documentChanged = true;
+      return patch;
+    }
+    if (transaction) {
+      concurrent.transaction = transaction;
+      concurrent.before = rebaseDocumentOutsideTransaction(
+        { projectName: state.projectName, nodes: state.nodes, edges: state.edges },
+        transaction,
+      );
+    }
+    return {
+      ...patch,
+      revision: state.revision + 1,
+      dirty: true,
+      saveState: state.saveState === "saving" ? "saving" : "idle",
+    };
+  });
+  if (changed && concurrent.transaction && concurrent.before) {
+    const latest = useFlowStore.getState();
+    const concurrentAfter = rebaseDocumentOutsideTransaction(
+      { projectName: latest.projectName, nodes: latest.nodes, edges: latest.edges },
+      concurrent.transaction,
+    );
+    if (!sameTemporalDocument(concurrent.before, concurrentAfter)) {
+      recordHistoryEntry(concurrent.before, concurrentAfter);
+    }
+    concurrent.transaction.before = concurrentAfter;
+  }
+  return changed;
+}
+
+/** 对当前项目文档执行一次原子、可撤销且具备 no-op 判定的修改。 */
+export function commitDocumentMutation(mutation: DocumentMutation): boolean {
+  return commitDocumentMutationWithSet(useFlowStore.setState, mutation);
+}
+
+/** 开始一组实时可见、但只在结束时写入一次历史与 revision 的文档事务。 */
+export function beginHistoryTransaction(
+  label = "document-transaction",
+  onSettled?: HistoryTransactionSettledCallback,
+): HistoryTransactionToken {
+  const token = Symbol(label);
+  const state = useFlowStore.getState();
+  if (!activeHistoryTransaction || activeHistoryTransaction.tabId !== state.activeTabId) {
+    activeHistoryTransaction = {
+      tokens: new Set(),
+      onSettledByToken: new Map(),
+      deferredActions: [],
+      tabId: state.activeTabId,
+      before: { projectName: state.projectName, nodes: state.nodes, edges: state.edges },
+      positionBeforeByNodeId: new Map(),
+      documentChanged: false,
+    };
+  }
+  activeHistoryTransaction.tokens.add(token);
+  if (onSettled) activeHistoryTransaction.onSettledByToken.set(token, onSettled);
+  return token;
+}
+
+function notifyHistoryTransactionSettled(
+  callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>,
+  outcome: HistoryTransactionOutcome,
+): void {
+  for (const [token, callback] of callbacks) {
+    try {
+      callback(outcome, token);
+    } catch {
+      // Settlement cleanup must not make the document command fail.
+    }
+  }
+}
+
+interface HistoryTransactionCompletion {
+  tabId: string;
+  callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>;
+  actions: DeferredHistoryTransactionAction[];
+}
+
+function detachHistoryTransaction(
+  transaction: ActiveHistoryTransaction,
+  callbacks = [...transaction.onSettledByToken.entries()],
+): HistoryTransactionCompletion {
+  const completion: HistoryTransactionCompletion = {
+    tabId: transaction.tabId,
+    callbacks,
+    actions: [...transaction.deferredActions],
+  };
+  if (activeHistoryTransaction === transaction) activeHistoryTransaction = null;
+  transaction.tokens.clear();
+  transaction.onSettledByToken.clear();
+  transaction.deferredActions.length = 0;
+  return completion;
+}
+
+function finishHistoryTransactionCompletion(
+  completion: HistoryTransactionCompletion,
+  outcome: HistoryTransactionOutcome,
+): void {
+  notifyHistoryTransactionSettled(completion.callbacks, outcome);
+  if (completion.actions.length === 0) return;
+  queueMicrotask(() => {
+    for (const action of completion.actions) {
+      const allowed =
+        (outcome === "ended" || action.runOnCancel) &&
+        (!action.requireActiveTab || useFlowStore.getState().activeTabId === completion.tabId);
+      if (!allowed) {
+        action.discard?.();
+        continue;
+      }
+      try {
+        action.run();
+      } catch {
+        // One deferred command must not prevent later commands from settling.
+        action.discard?.();
+      }
+    }
+  });
+}
+
+function waitForHistoryTransactionSettlement(tabId: string): Promise<void> | null {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || transaction.tabId !== tabId) return null;
+  return new Promise((resolve) => {
+    transaction.deferredActions.push({
+      runOnCancel: true,
+      requireActiveTab: false,
+      run: () => {
+        const nextSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (nextSettlement) void nextSettlement.then(resolve);
+        else resolve();
+      },
+      discard: resolve,
+    });
+  });
+}
+
+function deferHistoryCommandUntilSettlement(command: "undo" | "redo"): boolean {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || transaction.tabId !== useFlowStore.getState().activeTabId) return false;
+  const tabId = transaction.tabId;
+  transaction.deferredActions.push({
+    runOnCancel: false,
+    requireActiveTab: true,
+    // Promise resolvers for save/run naturally schedule their continuations as
+    // microtasks. Queue history commands the same way so the single action list
+    // preserves the user's Save→Undo and Undo→Save registration order.
+    run: () => queueMicrotask(() => {
+      if (useFlowStore.getState().activeTabId !== tabId) return;
+      useFlowStore.getState()[command]();
+    }),
+  });
+  return true;
+}
+
+function commitHistoryTransaction(
+  transaction: ActiveHistoryTransaction,
+  callbacks?: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]>,
+): boolean {
+  let state = useFlowStore.getState();
+  const settledNodes = state.nodes.map((node) => (
+    node.dragging ? { ...node, dragging: false } : node
+  ));
+  if (settledNodes.some((node, index) => node !== state.nodes[index])) {
+    runWithoutHistory(() => useFlowStore.setState({ nodes: settledNodes }));
+    state = useFlowStore.getState();
+  }
+  if (!transaction.documentChanged || transaction.tabId !== state.activeTabId) {
+    const completion = detachHistoryTransaction(transaction, callbacks);
+    flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "ended");
+    return false;
+  }
+  const current: FlowTemporalState = {
+    projectName: state.projectName,
+    nodes: state.nodes,
+    edges: state.edges,
+  };
+  const temporalChanged = !sameTemporalDocument(transaction.before, current);
+  if (!temporalChanged) {
+    const completion = detachHistoryTransaction(transaction, callbacks);
+    flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "ended");
+    return false;
+  }
+
+  recordHistoryEntry(transaction.before, current);
+  // Keep session persistence suppressed until the final coordinates and their
+  // revision/dirty metadata can be observed in the same completed transaction.
+  const completion = detachHistoryTransaction(transaction, callbacks);
+  runWithoutHistory(() => {
+    useFlowStore.setState((latest) => ({
+      revision: latest.revision + 1,
+      dirty: true,
+      saveState: latest.saveState === "saving" ? "saving" : "idle",
+    }));
+  });
+  flushDeferredTabSessionPersistence();
+  finishHistoryTransactionCompletion(completion, "ended");
+  return true;
+}
+
+/** 结束调用方持有的事务 token；返回是否产生了一次净文档提交。 */
+export function endHistoryTransaction(token: HistoryTransactionToken): boolean {
+  const transaction = activeHistoryTransaction;
+  if (!transaction || !transaction.tokens.delete(token)) return false;
+  const callback = transaction.onSettledByToken.get(token);
+  transaction.onSettledByToken.delete(token);
+  const callbacks: Array<[HistoryTransactionToken, HistoryTransactionSettledCallback]> = callback
+    ? [[token, callback]]
+    : [];
+  if (transaction.tokens.size > 0) {
+    notifyHistoryTransactionSettled(callbacks, "ended");
+    return false;
+  }
+  return commitHistoryTransaction(transaction, callbacks);
+}
+
+function cancelHistoryTransaction(): void {
+  const transaction = activeHistoryTransaction;
+  if (!transaction) return;
+
+  const state = useFlowStore.getState();
+  if (transaction.tabId !== state.activeTabId) {
+    const completion = detachHistoryTransaction(transaction);
+    flushDeferredTabSessionPersistence();
+    finishHistoryTransactionCompletion(completion, "cancelled");
+    return;
+  }
+
+  // A tab/load transition can invalidate a drag before React Flow emits dragStop.
+  // Restore the document snapshot so an intermediate position is never persisted
+  // without a history entry or revision. Runtime status and current selection are
+  // transient, so keep those values while rolling the persisted document back.
+  const runtimeById = new Map(
+    state.nodes.map((node) => [node.id, { status: node.data.status, error: node.data.error }]),
+  );
+  const selectedEdges = new Map(state.edges.map((edge) => [edge.id, edge.selected]));
+  const nodes = transaction.before.nodes.map((node) => {
+    const runtime = runtimeById.get(node.id);
+    return runtime
+      ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
+      : node;
+  });
+  const edges = transaction.before.edges.map((edge) => {
+    const selected = selectedEdges.get(edge.id);
+    return edge.selected === selected ? edge : { ...edge, selected };
+  });
+  runWithoutHistory(() => {
+    useFlowStore.setState({
+      ...normalizeNodeSelection(nodes, state.selectedNodeIds),
+      edges,
+      projectName: transaction.before.projectName,
+    });
+  });
+  const completion = detachHistoryTransaction(transaction);
+  flushDeferredTabSessionPersistence();
+  finishHistoryTransactionCompletion(completion, "cancelled");
 }
 
 /**
@@ -312,28 +815,7 @@ export function beginNonUndoableRun(label = "async-run"): () => void {
  * 用于 App 等既有调用方尚未迁移到 store action 的兼容路径。
  */
 export function markFlowDocumentChanged(partial: Pick<FlowState, "nodes"> | Pick<FlowState, "edges">): void {
-  useFlowStore.setState((state) => ({
-    ...partial,
-    revision: state.revision + 1,
-    dirty: true,
-    saveState: state.saveState === "saving" ? "saving" : "idle",
-  }));
-}
-
-function markDocumentChanged(
-  set: (
-    partial:
-      | Partial<FlowState>
-      | ((state: FlowState) => Partial<FlowState>),
-  ) => unknown,
-  partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>),
-): void {
-  set((state) => ({
-    ...(typeof partial === "function" ? partial(state) : partial),
-    revision: state.revision + 1,
-    dirty: true,
-    saveState: state.saveState === "saving" ? "saving" : "idle",
-  }));
+  commitDocumentMutation(partial);
 }
 
 function defaultNodeData(kind: NodeKind): WorkflowNodeData {
@@ -395,10 +877,68 @@ function nodeOutputImages(data: WorkflowNodeData): string[] {
   return data.outputImages ?? [];
 }
 
-function retainSelectedNodeId(nodes: FlowNode[], selectedNodeId: string | null): string | null {
-  return selectedNodeId && nodes.some((node) => node.id === selectedNodeId)
-    ? selectedNodeId
-    : null;
+function sameStringList(left: string[], right: string[]): boolean {
+  return left === right || (
+    left.length === right.length && left.every((value, index) => value === right[index])
+  );
+}
+
+export function selectPrimarySelectedNodeId(
+  state: Pick<FlowState, "selectedNodeIds">,
+): string | null {
+  return state.selectedNodeIds.at(-1) ?? null;
+}
+
+function normalizeNodeSelection(
+  nodes: FlowNode[],
+  requestedIds: readonly string[],
+): Pick<FlowState, "nodes" | "selectedNodeIds" | "selectedNodeId"> {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const seen = new Set<string>();
+  const selectedNodeIds = requestedIds.filter((id) => {
+    if (!nodeIds.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const selected = new Set(selectedNodeIds);
+  let changed = false;
+  const normalizedNodes = nodes.map((node) => {
+    const shouldSelect = selected.has(node.id);
+    if (Boolean(node.selected) === shouldSelect) return node;
+    changed = true;
+    return { ...node, selected: shouldSelect };
+  });
+  return {
+    nodes: changed ? normalizedNodes : nodes,
+    selectedNodeIds,
+    selectedNodeId: selectedNodeIds.at(-1) ?? null,
+  };
+}
+
+function selectionIdsAfterNodeChanges(
+  currentIds: readonly string[],
+  nodes: FlowNode[],
+  changes: readonly NodeChange<FlowNode>[],
+): string[] {
+  const selectedNodeIds = new Set(
+    nodes.filter((node) => node.selected).map((node) => node.id),
+  );
+  let nextIds = currentIds.filter((id) => selectedNodeIds.has(id));
+  const selectionChanges = changes.filter(
+    (change): change is Extract<NodeChange<FlowNode>, { type: "select" }> => change.type === "select",
+  );
+  if (selectionChanges.length === 0) return nextIds;
+
+  for (const change of selectionChanges) {
+    nextIds = nextIds.filter((id) => id !== change.id);
+    if (change.selected && selectedNodeIds.has(change.id)) nextIds.push(change.id);
+  }
+  // Defensive fallback for a React Flow version that batches a selected node
+  // without an explicit select change; event order remains authoritative.
+  for (const node of nodes) {
+    if (node.selected && !nextIds.includes(node.id)) nextIds.push(node.id);
+  }
+  return nextIds;
 }
 
 function makeStarterNode(): FlowNode {
@@ -417,6 +957,7 @@ type ActiveDocumentState = Pick<
   | "readOnly"
   | "nodes"
   | "edges"
+  | "selectedNodeIds"
   | "selectedNodeId"
   | "selectedResultId"
   | "compareIds"
@@ -435,6 +976,7 @@ function snapshotActiveTab(state: FlowState): ProjectTab {
     readOnly: state.readOnly,
     nodes: state.nodes,
     edges: state.edges,
+    selectedNodeIds: state.selectedNodeIds,
     selectedNodeId: state.selectedNodeId,
     selectedResultId: state.selectedResultId,
     compareIds: state.compareIds,
@@ -453,6 +995,7 @@ function activeFields(tab: ProjectTab): ActiveDocumentState {
     readOnly: tab.readOnly,
     nodes: tab.nodes,
     edges: tab.edges,
+    selectedNodeIds: tab.selectedNodeIds,
     selectedNodeId: tab.selectedNodeId,
     selectedResultId: tab.selectedResultId,
     compareIds: tab.compareIds,
@@ -498,14 +1041,16 @@ function newTab(opts?: {
   readOnly?: boolean;
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
+  const selection = normalizeNodeSelection(opts?.nodes ?? [makeStarterNode()], []);
   return {
     id: nanoid(10),
     projectId: opts?.projectId ?? nanoid(10),
     projectName: opts?.projectName ?? "未命名设计项目",
     readOnly: opts?.readOnly ?? false,
-    nodes: opts?.nodes ?? [makeStarterNode()],
+    nodes: selection.nodes,
     edges: opts?.edges ?? [],
-    selectedNodeId: null,
+    selectedNodeIds: [],
+    selectedNodeId: selection.selectedNodeId,
     selectedResultId: null,
     compareIds: [],
     saveState: "idle",
@@ -523,19 +1068,36 @@ function updateTabNodes(
   update: (nodes: FlowNode[]) => FlowNode[],
   opts?: { markDirty?: boolean },
 ): void {
+  if (opts?.markDirty === true && useFlowStore.getState().activeTabId === tabId) {
+    commitDocumentMutationWithSet(set, (state) => {
+      const nodes = update(state.nodes);
+      return nodes === state.nodes ? {} : { nodes };
+    });
+    return;
+  }
+  const history: {
+    before: FlowTemporalState | null;
+    current: FlowTemporalState | null;
+  } = { before: null, current: null };
   patchTab(set, tabId, (tab) => {
     const nodes = update(tab.nodes);
     if (nodes === tab.nodes) return {};
+    const documentChanged = opts?.markDirty === true && !sameDocumentNodes(tab.nodes, nodes);
+    if (documentChanged) {
+      history.before = { projectName: tab.projectName, nodes: tab.nodes, edges: tab.edges };
+      history.current = { projectName: tab.projectName, nodes, edges: tab.edges };
+    }
     return {
       nodes,
-      revision: opts?.markDirty ? tab.revision + 1 : tab.revision,
-      dirty: opts?.markDirty ? true : tab.dirty,
-      saveState: opts?.markDirty && tab.saveState !== "saving" ? "idle" : tab.saveState,
+      revision: documentChanged ? tab.revision + 1 : tab.revision,
+      dirty: documentChanged ? true : tab.dirty,
+      saveState: documentChanged && tab.saveState !== "saving" ? "idle" : tab.saveState,
     };
   });
+  if (history.before && history.current) {
+    recordInactiveTabHistory(tabId, history.before, history.current);
+  }
 }
-
-type FlowTemporalState = Pick<FlowState, "nodes" | "edges">;
 
 /** 最近生成持久化（localStorage）：刷新/重开浏览器不丢 */
 const RECENT_STORAGE_KEY = "garment-canvas-recent-results";
@@ -669,8 +1231,9 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       break;
   }
 
+  const { dragging: _dragging, ...sessionNode } = raw;
   return {
-    ...raw,
+    ...sessionNode,
     id: raw.id,
     type: kind,
     position: { x: position.x, y: position.y },
@@ -719,19 +1282,27 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
   const wasSaving = raw.saveState === "saving";
   const dirty = wasSaving || raw.dirty === true;
   const savedRevision = Math.min(finiteNonNegative(raw.savedRevision, 0), revision);
+  const requestedSelection = Array.isArray(raw.selectedNodeIds)
+    ? stringList(raw.selectedNodeIds, nodes.length)
+    : typeof raw.selectedNodeId === "string"
+      ? [raw.selectedNodeId]
+      : [];
+  const selection = normalizeNodeSelection(nodes, requestedSelection);
 
   return {
     id: raw.id,
     projectId: raw.projectId,
     projectName: raw.projectName,
     readOnly: raw.readOnly === true,
-    nodes,
+    nodes: selection.nodes,
     edges,
-    selectedNodeId: typeof raw.selectedNodeId === "string" && seenNodeIds.has(raw.selectedNodeId)
-      ? raw.selectedNodeId
-      : null,
-    selectedResultId: typeof raw.selectedResultId === "string" ? raw.selectedResultId : null,
-    compareIds: stringList(raw.compareIds, 4),
+    selectedNodeIds: selection.selectedNodeIds,
+    selectedNodeId: selection.selectedNodeId,
+    // Recent results are deliberately reloaded from the authenticated server and
+    // never restored from the browser session. Clear their view references here
+    // so a failed/slow history request cannot leave a phantom detail or compare UI.
+    selectedResultId: null,
+    compareIds: [],
     // 刷新会中断 in-flight 请求；必须恢复成可再次保存，同时保守地视为未保存。
     saveState: raw.saveState === "saved" || raw.saveState === "error" ? raw.saveState : "idle",
     revision,
@@ -1179,6 +1750,55 @@ export function mergeRecentResults(
   ], limit);
 }
 
+function pruneResultReferences(
+  tab: ProjectTab,
+  validIds: Set<string>,
+  comparableIds: Set<string>,
+): ProjectTab {
+  const selectedResultId = tab.selectedResultId && validIds.has(tab.selectedResultId)
+    ? tab.selectedResultId
+    : null;
+  const compareIds = tab.compareIds.filter((id, index, ids) => (
+    comparableIds.has(id) && ids.indexOf(id) === index
+  )).slice(0, 4);
+  if (selectedResultId === tab.selectedResultId && sameStringList(compareIds, tab.compareIds)) {
+    return tab;
+  }
+  return { ...tab, selectedResultId, compareIds };
+}
+
+/**
+ * recentResults 与所有页签引用必须在同一个 Zustand snapshot 中变化，避免
+ * Inspector/CompareOverlay 短暂观察到已不存在的结果 ID。
+ */
+export function recentResultsPatch(
+  state: FlowState,
+  recentResults: RecentResult[],
+): Partial<FlowState> {
+  const validIds = new Set(recentResults.map((record) => record.id));
+  const comparableIds = new Set(
+    recentResults
+      .filter((record) => record.status === "success" && Boolean(record.image))
+      .map((record) => record.id),
+  );
+  const activeSnapshot = snapshotActiveTab(state);
+  let referencesChanged = false;
+  const tabs = state.tabs.map((tab) => {
+    const source = tab.id === state.activeTabId ? activeSnapshot : tab;
+    const pruned = pruneResultReferences(source, validIds, comparableIds);
+    if (pruned !== source) referencesChanged = true;
+    return pruned;
+  });
+  if (!referencesChanged) return { recentResults };
+  const activeTab = tabs.find((tab) => tab.id === state.activeTabId);
+  return {
+    recentResults,
+    tabs,
+    selectedResultId: activeTab?.selectedResultId ?? null,
+    compareIds: activeTab?.compareIds ?? [],
+  };
+}
+
 /**
  * 首屏历史确认后，用服务端仍在运行的记录恢复节点；会话里没有后端 Run 的
  * queued/running 属于刷新中断的孤儿状态，必须解除，避免页签永久卡死。
@@ -1201,34 +1821,45 @@ export function reconcileRunHistory(records: RecentResult[]): void {
     const existing = activeByNode.get(key);
     if (!existing || existing.startedAt < record.startedAt) activeByNode.set(key, record);
   }
-  useFlowStore.setState((state) => {
-    const syncedTabs = replaceTab(state.tabs, snapshotActiveTab(state));
-    const tabs = syncedTabs.map((tab) => ({
-      ...tab,
-      nodes: tab.nodes.map((node) => {
-        const active = activeByNode.get(`${tab.projectId}\u0000${node.id}`);
-        if (active) {
-          return {
-            ...node,
-            data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
-          };
-        }
-        if (!isNodeRunActive(node.data.status)) return node;
-        const data = { ...node.data, status: "idle" as const } as WorkflowNodeData;
-        delete data.error;
-        return { ...node, data };
-      }),
-    }));
-    const activeTab = tabs.find((tab) => tab.id === state.activeTabId) ?? tabs[0];
-    const retainedResults = state.recentResults.filter((record) =>
-      !isNodeRunActive(record.status) ||
-      (Boolean(record.runId) && confirmedActiveRunIds.has(record.runId!)),
-    );
-    return {
-      tabs,
-      ...(activeTab ? activeFields(activeTab) : {}),
-      recentResults: mergeRecentResults(retainedResults, [...uniqueRecordsById.values()]),
-    };
+  runWithoutHistory(() => {
+    useFlowStore.setState((state) => {
+      const syncedTabs = replaceTab(state.tabs, snapshotActiveTab(state));
+      const tabs = syncedTabs.map((tab) => ({
+        ...tab,
+        nodes: tab.nodes.map((node) => {
+          const active = activeByNode.get(`${tab.projectId}\u0000${node.id}`);
+          if (active) {
+            return {
+              ...node,
+              data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
+            };
+          }
+          if (!isNodeRunActive(node.data.status)) return node;
+          const data = { ...node.data, status: "idle" as const } as WorkflowNodeData;
+          delete data.error;
+          return { ...node, data };
+        }),
+      }));
+      const activeTab = tabs.find((tab) => tab.id === state.activeTabId) ?? tabs[0];
+      const retainedResults = state.recentResults.filter((record) =>
+        !isNodeRunActive(record.status) ||
+        (Boolean(record.runId) && confirmedActiveRunIds.has(record.runId!)),
+      );
+      const runtimeState = {
+        ...state,
+        tabs,
+        ...(activeTab ? activeFields(activeTab) : {}),
+      };
+      const resultPatch = recentResultsPatch(
+        runtimeState,
+        mergeRecentResults(retainedResults, [...uniqueRecordsById.values()]),
+      );
+      return {
+        tabs,
+        ...(activeTab ? activeFields(activeTab) : {}),
+        ...resultPatch,
+      };
+    });
   });
 }
 
@@ -1306,15 +1937,22 @@ function updateTabFromRunEvent(
   nodeId: string,
   event: NodeStatusRunEvent,
 ): void {
-  updateTabNodes(
+  const commitsOutput = event.status === "success" && event.images.length > 0;
+  const updateNodes = (nodes: FlowNode[]) => nodes.map((node) =>
+    node.id === nodeId ? { ...node, data: applyRunEventToNode(node.data, event) } : node,
+  );
+  if (commitsOutput && useFlowStore.getState().activeTabId === tabId) {
+    commitDocumentMutationWithSet(set, (state) => ({ nodes: updateNodes(state.nodes) }));
+    return;
+  }
+  const update = () => updateTabNodes(
     set,
     tabId,
-    (nodes) =>
-      nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: applyRunEventToNode(node.data, event) } : node,
-      ),
-    { markDirty: event.status === "success" && event.images.length > 0 },
+    updateNodes,
+    { markDirty: commitsOutput },
   );
+  if (commitsOutput) update();
+  else runWithoutHistory(update);
 }
 
 export const useFlowStore = create<FlowState>()(
@@ -1324,6 +1962,19 @@ export const useFlowStore = create<FlowState>()(
       const initialTab =
         restored?.tabs.find((tab) => tab.id === restored.activeTabId) ?? newTab();
       const saveTab = async (tabId: string): Promise<SaveTabResult> => {
+        // Register an explicit retry before joining the transaction barrier. A
+        // failed response may already be ahead of this save in the settlement
+        // FIFO and must still observe the user's later retry intent.
+        const existingBeforeSettlement = saveQueueByTab.get(tabId);
+        if (existingBeforeSettlement) {
+          existingBeforeSettlement.explicitRetryGeneration += 1;
+          const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+          if (pendingSettlement) await pendingSettlement;
+          return existingBeforeSettlement.promise;
+        }
+
+        const initialSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (initialSettlement) await initialSettlement;
         const firstSnapshot = documentForTab(get(), tabId);
         if (!firstSnapshot || firstSnapshot.readOnly) {
           return { ok: false, error: "项目不存在或当前页签为只读" };
@@ -1331,15 +1982,19 @@ export const useFlowStore = create<FlowState>()(
 
         const existing = saveQueueByTab.get(tabId);
         if (existing) {
-          existing.queued = true;
+          existing.explicitRetryGeneration += 1;
           return existing.promise;
         }
 
-        const queue: TabSaveQueue = { promise: Promise.resolve({ ok: false }), queued: false };
+        const queue: TabSaveQueue = {
+          promise: Promise.resolve({ ok: false }),
+          explicitRetryGeneration: 0,
+        };
         queue.promise = (async () => {
-          let saved = false;
-          do {
-            queue.queued = false;
+          while (true) {
+            const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+            if (pendingSettlement) await pendingSettlement;
+            const attemptGeneration = queue.explicitRetryGeneration;
             const snapshot = documentForTab(get(), tabId);
             if (!snapshot || snapshot.readOnly) {
               return { ok: false, error: "项目不存在或当前页签为只读" };
@@ -1363,18 +2018,23 @@ export const useFlowStore = create<FlowState>()(
                 const body = await res.json().catch(() => ({}));
                 throw new Error(responseErrorMessage(res.status, body));
               }
-              saved = true;
+              const responseSettlement = waitForHistoryTransactionSettlement(tabId);
+              if (responseSettlement) await responseSettlement;
+              let needsRevisionFollowup = false;
               patchTab(set, tabId, (latest) => {
                 const clean = latest.revision === snapshot.revision;
-                if (!clean) queue.queued = true;
+                needsRevisionFollowup = !clean;
                 return {
                   savedRevision: Math.max(latest.savedRevision, snapshot.revision),
                   dirty: !clean,
                   saveState: clean ? "saved" : "saving",
                 };
               });
+              if (!needsRevisionFollowup) return { ok: true };
             } catch (error) {
-              queue.queued = false;
+              const failureSettlement = waitForHistoryTransactionSettlement(tabId);
+              if (failureSettlement) await failureSettlement;
+              if (queue.explicitRetryGeneration > attemptGeneration) continue;
               patchTab(set, tabId, (latest) => ({
                 saveState: "error",
                 dirty: latest.revision !== latest.savedRevision,
@@ -1384,8 +2044,7 @@ export const useFlowStore = create<FlowState>()(
                 error: error instanceof Error ? error.message : String(error),
               };
             }
-          } while (queue.queued);
-          return { ok: saved };
+          }
         })();
         saveQueueByTab.set(tabId, queue);
         try {
@@ -1405,10 +2064,14 @@ export const useFlowStore = create<FlowState>()(
         viewer: null,
 
       switchTab: (tabId) => {
+        const initialState = get();
+        if (tabId === initialState.activeTabId) return;
+        if (!initialState.tabs.some((tab) => tab.id === tabId)) return;
+        cancelHistoryTransaction();
         const state = get();
-        if (tabId === state.activeTabId) return;
         const target = state.tabs.find((tab) => tab.id === tabId);
         if (!target) return;
+        stashActiveTemporalHistory(state.activeTabId);
         const current = snapshotActiveTab(state);
         set({
           tabs: replaceTab(state.tabs, current),
@@ -1416,24 +2079,31 @@ export const useFlowStore = create<FlowState>()(
           ...activeFields(target),
           viewer: null,
         });
-        useFlowStore.temporal.getState().clear();
+        restoreTemporalHistory(target.id);
       },
       closeTab: (tabId) => {
+        const initialState = get();
+        const initialTabs = replaceTab(initialState.tabs, snapshotActiveTab(initialState));
+        const initialClosingTab = initialTabs.find((tab) => tab.id === tabId);
+        if (!initialClosingTab) return;
+        const closingTab = initialClosingTab;
+        if (closingTab.nodes.some((node) => isNodeRunActive(node.data.status))) {
+          return;
+        }
+        if (tabId === initialState.activeTabId) cancelHistoryTransaction();
         const state = get();
         const current = snapshotActiveTab(state);
         const syncedTabs = replaceTab(state.tabs, current);
         const closingIndex = syncedTabs.findIndex((tab) => tab.id === tabId);
         if (closingIndex < 0) return;
-        const closingTab = syncedTabs[closingIndex];
-        if (closingTab.nodes.some((node) => isNodeRunActive(node.data.status))) {
-          return;
-        }
         const remaining = syncedTabs.filter((tab) => tab.id !== tabId);
         if (remaining.length === 0) remaining.push(newTab());
         if (tabId !== state.activeTabId) {
+          temporalHistoryByTab.delete(tabId);
           set({ tabs: remaining });
           return;
         }
+        temporalHistoryByTab.delete(tabId);
         const target = remaining[Math.min(closingIndex, remaining.length - 1)];
         set({
           tabs: remaining,
@@ -1441,9 +2111,10 @@ export const useFlowStore = create<FlowState>()(
           ...activeFields(target),
           viewer: null,
         });
-        useFlowStore.temporal.getState().clear();
+        restoreTemporalHistory(target.id);
       },
       openFlowTab: ({ projectId, projectName, nodes, edges, markDirty = false, readOnly = false }) => {
+        cancelHistoryTransaction();
         const state = get();
         const current = snapshotActiveTab(state);
         const syncedTabs = replaceTab(state.tabs, current);
@@ -1462,6 +2133,8 @@ export const useFlowStore = create<FlowState>()(
         const found = syncedTabs.find((tab) => tab.projectId === projectId);
         const existing = found ? { ...found, nodes: applyActiveHistory(found.nodes) } : undefined;
         if (existing) {
+          const switchesTab = existing.id !== state.activeTabId;
+          if (switchesTab) stashActiveTemporalHistory(state.activeTabId);
           const tabs = replaceTab(syncedTabs, existing);
           set({
             tabs,
@@ -1469,7 +2142,9 @@ export const useFlowStore = create<FlowState>()(
             ...activeFields(existing),
             viewer: null,
           });
+          if (switchesTab) restoreTemporalHistory(existing.id);
         } else {
+          stashActiveTemporalHistory(state.activeTabId);
           const tab = newTab({
             projectId, projectName, nodes: applyActiveHistory(nodes), edges, markDirty, readOnly,
           });
@@ -1479,39 +2154,85 @@ export const useFlowStore = create<FlowState>()(
             ...activeFields(tab),
             viewer: null,
           });
+          temporalHistoryByTab.delete(tab.id);
+          restoreTemporalHistory(tab.id);
         }
-        useFlowStore.temporal.getState().clear();
       },
       createBlankTab: () => {
+        cancelHistoryTransaction();
         const tab = newTab();
         const state = get();
+        stashActiveTemporalHistory(state.activeTabId);
         set({
           tabs: [...replaceTab(state.tabs, snapshotActiveTab(state)), tab],
           activeTabId: tab.id,
           ...activeFields(tab),
           viewer: null,
         });
-        useFlowStore.temporal.getState().clear();
+        temporalHistoryByTab.delete(tab.id);
+        restoreTemporalHistory(tab.id);
       },
 
       setProjectName: (name) => {
         if (get().readOnly) return;
         if (name === get().projectName) return;
-        markDocumentChanged(set, { projectName: name });
+        commitDocumentMutationWithSet(set, { projectName: name });
       },
-      setSelectedNodeId: (id) => set({ selectedNodeId: id, selectedResultId: null }),
-      setSelectedResultId: (id) => set({ selectedResultId: id, selectedNodeId: null }),
+      setSelectedNodeIds: (ids) => {
+        runWithoutHistory(() => {
+          set((state) => {
+            const selection = normalizeNodeSelection(state.nodes, ids);
+            if (
+              sameStringList(selection.selectedNodeIds, state.selectedNodeIds) &&
+              selection.nodes === state.nodes &&
+              state.selectedResultId === null
+            ) return {};
+            return { ...selection, selectedResultId: null };
+          });
+        });
+      },
+      setSelectedNodeId: (id) => get().setSelectedNodeIds(id ? [id] : []),
+      setSelectedResultId: (id) => {
+        const nextId = id && get().recentResults.some((record) => record.id === id) ? id : null;
+        runWithoutHistory(() => {
+          set((state) => ({
+            ...normalizeNodeSelection(state.nodes, []),
+            selectedResultId: nextId,
+          }));
+        });
+      },
       toggleCompareId: (id) => {
-        const cur = get().compareIds;
+        const comparableIds = new Set(
+          get().recentResults
+            .filter((record) => record.status === "success" && Boolean(record.image))
+            .map((record) => record.id),
+        );
+        const cur = get().compareIds.filter((candidate, index, ids) => (
+          comparableIds.has(candidate) && ids.indexOf(candidate) === index
+        ));
+        if (!comparableIds.has(id)) {
+          if (!sameStringList(cur, get().compareIds)) set({ compareIds: cur });
+          return;
+        }
         if (cur.includes(id)) {
-          set({ compareIds: cur.filter((c) => c !== id) });
+          runWithoutHistory(() => set({ compareIds: cur.filter((c) => c !== id) }));
         } else if (cur.length < 4) {
-          set({ compareIds: [...cur, id], selectedResultId: null, selectedNodeId: null });
+          runWithoutHistory(() => set((state) => ({
+            compareIds: [...cur, id],
+            selectedResultId: null,
+            ...normalizeNodeSelection(state.nodes, []),
+          })));
         } else if (typeof window !== "undefined") {
           window.alert("最多选择 4 张图片进行对比");
         }
       },
-      clearCompare: () => set({ compareIds: [] }),
+      clearCompare: () => runWithoutHistory(() => set({ compareIds: [] })),
+      removeRecentResult: (id) => {
+        runWithoutHistory(() => set((state) => recentResultsPatch(
+          state,
+          state.recentResults.filter((record) => record.id !== id),
+        )));
+      },
       openViewer: (v) => set({ viewer: v }),
       closeViewer: () => set({ viewer: null }),
 
@@ -1520,23 +2241,34 @@ export const useFlowStore = create<FlowState>()(
         const allowed = state.readOnly ? changes.filter((change) => change.type === "select" || change.type === "dimensions") : changes;
         const nodes = applyNodeChanges(allowed, state.nodes);
         if (nodes === state.nodes) return;
-        const selectedNodeId = retainSelectedNodeId(nodes, state.selectedNodeId);
-        const patch = selectedNodeId === state.selectedNodeId
-          ? { nodes }
-          : { nodes, selectedNodeId };
+        const selection = normalizeNodeSelection(
+          nodes,
+          selectionIdsAfterNodeChanges(state.selectedNodeIds, nodes, allowed),
+        );
+        const patch = {
+          ...selection,
+          ...(selection.selectedNodeIds.length > 0 ? { selectedResultId: null } : {}),
+        };
         const changesDocument = allowed.some(
           (change) => change.type !== "select" && change.type !== "dimensions",
         );
-        if (changesDocument) markDocumentChanged(set, patch);
-        else withoutTemporalTracking(() => set(patch));
+        const onlyMovesNodes = changesDocument && allowed.every(
+          (change) => change.type === "select" || change.type === "dimensions" || change.type === "position",
+        );
+        if (changesDocument) {
+          commitDocumentMutationWithSet(set, patch, {
+            coalesceWithActiveTransaction: onlyMovesNodes,
+          });
+        }
+        else runWithoutHistory(() => set(patch));
       },
       onEdgesChange: (changes) => {
         const allowed = get().readOnly ? changes.filter((change) => change.type === "select") : changes;
         const edges = applyEdgeChanges(allowed, get().edges);
         if (edges === get().edges) return;
         const changesDocument = allowed.some((change) => change.type !== "select");
-        if (changesDocument) markDocumentChanged(set, { edges });
-        else withoutTemporalTracking(() => set({ edges }));
+        if (changesDocument) commitDocumentMutationWithSet(set, { edges });
+        else runWithoutHistory(() => set({ edges }));
       },
 
       isValidConnection: (conn) => {
@@ -1555,7 +2287,7 @@ export const useFlowStore = create<FlowState>()(
       onConnect: (conn) => {
         if (get().readOnly) return;
         if (!get().isValidConnection(conn)) return;
-        markDocumentChanged(set, { edges: addEdge(conn, get().edges) });
+        commitDocumentMutationWithSet(set, { edges: addEdge(conn, get().edges) });
       },
 
       addNode: (kind, position) => {
@@ -1566,7 +2298,8 @@ export const useFlowStore = create<FlowState>()(
           position,
           data: defaultNodeData(kind),
         };
-        markDocumentChanged(set, { nodes: [...get().nodes, node], selectedNodeId: node.id });
+        const selection = normalizeNodeSelection([...get().nodes, node], [node.id]);
+        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
       },
 
       addAssetNode: (asset, position) => {
@@ -1584,23 +2317,21 @@ export const useFlowStore = create<FlowState>()(
             imageUrl: asset.image,
           } as ImageInputNodeData,
         };
-        markDocumentChanged(set, {
-          nodes: [...state.nodes, node],
-          selectedNodeId: id,
-          selectedResultId: null,
-        });
+        const selection = normalizeNodeSelection([...state.nodes, node], [id]);
+        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
         return id;
       },
 
       addExistingNode: (node) => {
         if (get().readOnly) return;
-        markDocumentChanged(set, { nodes: [...get().nodes, node], selectedNodeId: node.id });
+        const selection = normalizeNodeSelection([...get().nodes, node], [node.id]);
+        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
       },
 
       updateNodeData: (id, patch) => {
         if (get().readOnly) return;
         if (!get().nodes.some((n) => n.id === id)) return;
-        markDocumentChanged(set, {
+        commitDocumentMutationWithSet(set, {
           nodes: get().nodes.map((n) =>
             n.id === id ? { ...n, data: { ...n.data, ...patch } as WorkflowNodeData } : n,
           ),
@@ -1625,7 +2356,7 @@ export const useFlowStore = create<FlowState>()(
 
       setNodeStatus: (id, status, error) =>
         (() => {
-          withoutTemporalTracking(() => {
+          runWithoutHistory(() => {
             set({
               nodes: get().nodes.map((n) =>
                 n.id === id ? { ...n, data: { ...n.data, status, error } } : n,
@@ -1637,7 +2368,12 @@ export const useFlowStore = create<FlowState>()(
       runNode: async (id) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
         if (getGenerationSafetyBlockReason()) return;
+        const tabId = get().activeTabId;
+        const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (pendingSettlement) await pendingSettlement;
+        if (getGenerationSafetyBlockReason()) return;
         const initialState = get();
+        if (initialState.activeTabId !== tabId) return;
         if (initialState.readOnly) return;
         const node = initialState.nodes.find((n) => n.id === id);
         if (
@@ -1654,7 +2390,6 @@ export const useFlowStore = create<FlowState>()(
         const spec = NODE_SPECS[kind];
         if (!spec.providerId) return;
 
-        const tabId = initialState.activeTabId;
         const preparationKey = runPreparationKey(tabId, id);
         const submissionKey = runSubmissionKey(initialState.projectId, id);
         if (runPreparations.has(preparationKey)) return;
@@ -1666,7 +2401,6 @@ export const useFlowStore = create<FlowState>()(
         const clientRequestId = ambiguousClientRequestId ?? nanoid(16);
         const retryingAmbiguousSubmission = ambiguousClientRequestId !== undefined;
         const requestedCount = requestedResultCount(node.data);
-        const releaseNonUndoableRun = beginNonUndoableRun(`run:${id}`);
         let terminalRecorded = false;
         let knownRunId: string | undefined;
 
@@ -1686,21 +2420,21 @@ export const useFlowStore = create<FlowState>()(
           requestedCount,
         };
         const queuedRecords = createQueuedResultCards(initialRecord, requestedCount);
-        set({
-          recentResults: trimRecentResults([
+        set((state) => recentResultsPatch(state, trimRecentResults([
             ...queuedRecords,
             ...initialState.recentResults,
-          ]),
-        });
+          ])));
 
         try {
-          updateTabNodes(set, tabId, (nodes) =>
-            nodes.map((candidate) =>
-              candidate.id === id
-                ? { ...candidate, data: { ...candidate.data, status: "queued", error: undefined } }
-                : candidate,
-            ),
-          );
+          runWithoutHistory(() => {
+            updateTabNodes(set, tabId, (nodes) =>
+              nodes.map((candidate) =>
+                candidate.id === id
+                  ? { ...candidate, data: { ...candidate.data, status: "queued", error: undefined } }
+                  : candidate,
+              ),
+            );
+          });
           // 付费动作严格绑定点击时的不可变快照；保存期间发生编辑时服务端会以 409 拒绝旧快照。
           const submissionSnapshot = documentForTab(get(), tabId);
           if (!submissionSnapshot) throw new Error("项目或节点已关闭，未调用生图服务");
@@ -1714,9 +2448,10 @@ export const useFlowStore = create<FlowState>()(
               startedAt: localStartedAt,
               finishedAt: Date.now(),
             };
-            set((state) => ({
-              recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
-            }));
+            set((state) => recentResultsPatch(
+              state,
+              applyRunEventToRecentResults(state.recentResults, recordId, event),
+            ));
             updateTabFromRunEvent(set, tabId, id, event);
             terminalRecorded = true;
             return;
@@ -1782,13 +2517,14 @@ export const useFlowStore = create<FlowState>()(
           clearAmbiguousRunRequest(submissionKey);
           knownRunId = payload.runId;
 
-          set((state) => ({
-            recentResults: state.recentResults.map((record) =>
+          set((state) => recentResultsPatch(
+            state,
+            state.recentResults.map((record) =>
               record.id === recordId || record.id.startsWith(`${recordId}:pending:`)
                 ? { ...record, runId: payload.runId }
               : record,
             ),
-          }));
+          ));
           if (preparation.cancelled) {
             try {
               const cancelResponse = await fetch(
@@ -1808,9 +2544,10 @@ export const useFlowStore = create<FlowState>()(
                 error: `取消请求失败：${message}；任务状态将继续同步`,
                 startedAt: localStartedAt,
               };
-              set((state) => ({
-                recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
-              }));
+              set((state) => recentResultsPatch(
+                state,
+                applyRunEventToRecentResults(state.recentResults, recordId, event),
+              ));
               updateTabFromRunEvent(set, tabId, id, event);
             }
           }
@@ -1829,9 +2566,10 @@ export const useFlowStore = create<FlowState>()(
 
           await consumeRunEvents(payload.runId, id, (event) => {
             if (event.type !== "node-status" || event.nodeId !== id) return;
-            set((state) => ({
-              recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
-            }));
+            set((state) => recentResultsPatch(
+              state,
+              applyRunEventToRecentResults(state.recentResults, recordId, event),
+            ));
             updateTabFromRunEvent(set, tabId, id, event);
             if (isNodeRunTerminal(event.status)) terminalRecorded = true;
           });
@@ -1854,16 +2592,16 @@ export const useFlowStore = create<FlowState>()(
                 startedAt: localStartedAt,
                 ...(isNodeRunTerminal(status) ? { finishedAt: Date.now() } : {}),
               };
-            set((state) => ({
-              recentResults: applyRunEventToRecentResults(state.recentResults, recordId, event),
-            }));
+            set((state) => recentResultsPatch(
+              state,
+              applyRunEventToRecentResults(state.recentResults, recordId, event),
+            ));
             updateTabFromRunEvent(set, tabId, id, event);
           }
         } finally {
           if (runPreparations.get(preparationKey) === preparation) {
             runPreparations.delete(preparationKey);
           }
-          releaseNonUndoableRun();
         }
       },
 
@@ -1884,9 +2622,10 @@ export const useFlowStore = create<FlowState>()(
             status: "cancel_requested",
             startedAt: active.startedAt,
           };
-          set((current) => ({
-            recentResults: applyRunEventToRecentResults(current.recentResults, active.id, event),
-          }));
+          set((current) => recentResultsPatch(
+            current,
+            applyRunEventToRecentResults(current.recentResults, active.id, event),
+          ));
           updateTabFromRunEvent(set, state.activeTabId, id, event);
           return;
         }
@@ -1897,102 +2636,121 @@ export const useFlowStore = create<FlowState>()(
           throw new Error(responseErrorMessage(response.status, body));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          updateTabNodes(set, state.activeTabId, (nodes) => nodes.map((node) =>
-            node.id === id
-              ? { ...node, data: { ...node.data, error: `取消结果未知：${message}；任务状态将继续同步` } }
-              : node,
-          ));
+          runWithoutHistory(() => {
+            updateTabNodes(set, state.activeTabId, (nodes) => nodes.map((node) =>
+              node.id === id
+                ? { ...node, data: { ...node.data, error: `取消结果未知：${message}；任务状态将继续同步` } }
+                : node,
+            ));
+          });
         }
       },
 
-      saveProject: async () => (await saveTab(get().activeTabId)).ok,
+      saveProject: async () => {
+        // Capture the invoking tab before awaiting a real dragStop/cancel. A tab
+        // switch must save the rolled-back source tab, never the new active tab.
+        const tabId = get().activeTabId;
+        return (await saveTab(tabId)).ok;
+      },
 
       undo: () => {
+        if (deferHistoryCommandUntilSettlement("undo")) return;
+        const temporalStore = useFlowStore.temporal.getState();
+        if (temporalStore.pastStates.length === 0) return;
         const before = useFlowStore.getState();
+        const beforeDocument: FlowTemporalState = {
+          projectName: before.projectName,
+          nodes: before.nodes,
+          edges: before.edges,
+        };
         const runtimeById = new Map(
           before.nodes.map((node) => [node.id, { status: node.data.status, error: node.data.error }]),
         );
-        useFlowStore.temporal.getState().undo();
+        temporalStore.undo();
         let after = useFlowStore.getState();
-        const temporalStore = useFlowStore.temporal.getState();
-        const wasTracking = temporalStore.isTracking;
-        if (wasTracking) temporalStore.pause();
-        try {
+        runWithoutHistory(() => {
           const nodes = after.nodes.map((node) => {
             const runtime = runtimeById.get(node.id);
             return runtime
               ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
               : node;
           });
-          useFlowStore.setState({
-            nodes,
-            selectedNodeId: retainSelectedNodeId(nodes, after.selectedNodeId),
-          });
-        } finally {
-          if (wasTracking) temporalStore.resume();
-        }
+          useFlowStore.setState(normalizeNodeSelection(nodes, before.selectedNodeIds));
+        });
         after = useFlowStore.getState();
-        if (after.nodes !== before.nodes || after.edges !== before.edges) {
-          useFlowStore.setState({
+        if (!sameTemporalDocument(beforeDocument, {
+          projectName: after.projectName,
+          nodes: after.nodes,
+          edges: after.edges,
+        })) {
+          runWithoutHistory(() => useFlowStore.setState({
             revision: after.revision + 1,
             dirty: true,
             saveState: after.saveState === "saving" ? "saving" : "idle",
-          });
+          }));
         }
       },
       redo: () => {
+        if (deferHistoryCommandUntilSettlement("redo")) return;
+        const temporalStore = useFlowStore.temporal.getState();
+        if (temporalStore.futureStates.length === 0) return;
         const before = useFlowStore.getState();
+        const beforeDocument: FlowTemporalState = {
+          projectName: before.projectName,
+          nodes: before.nodes,
+          edges: before.edges,
+        };
         const runtimeById = new Map(
           before.nodes.map((node) => [node.id, { status: node.data.status, error: node.data.error }]),
         );
-        useFlowStore.temporal.getState().redo();
+        temporalStore.redo();
         let after = useFlowStore.getState();
-        const temporalStore = useFlowStore.temporal.getState();
-        const wasTracking = temporalStore.isTracking;
-        if (wasTracking) temporalStore.pause();
-        try {
+        runWithoutHistory(() => {
           const nodes = after.nodes.map((node) => {
             const runtime = runtimeById.get(node.id);
             return runtime
               ? { ...node, data: { ...node.data, ...runtime } as WorkflowNodeData }
               : node;
           });
-          useFlowStore.setState({
-            nodes,
-            selectedNodeId: retainSelectedNodeId(nodes, after.selectedNodeId),
-          });
-        } finally {
-          if (wasTracking) temporalStore.resume();
-        }
+          useFlowStore.setState(normalizeNodeSelection(nodes, before.selectedNodeIds));
+        });
         after = useFlowStore.getState();
-        if (after.nodes !== before.nodes || after.edges !== before.edges) {
-          useFlowStore.setState({
+        if (!sameTemporalDocument(beforeDocument, {
+          projectName: after.projectName,
+          nodes: after.nodes,
+          edges: after.edges,
+        })) {
+          runWithoutHistory(() => useFlowStore.setState({
             revision: after.revision + 1,
             dirty: true,
             saveState: after.saveState === "saving" ? "saving" : "idle",
-          });
+          }));
         }
       },
 
       loadFlow: ({ projectId, projectName, nodes, edges, markDirty = false }) => {
+        cancelHistoryTransaction();
         const state = get();
         const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);
+        const loadedNodes = nodes.map((node) => {
+          const active = activeByNode.get(node.id);
+          return active
+            ? {
+              ...node,
+              data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
+            }
+            : node;
+        });
+        const selection = normalizeNodeSelection(loadedNodes, []);
         const tab: ProjectTab = {
           ...snapshotActiveTab(state),
           projectId,
           projectName,
           readOnly: false,
-          nodes: nodes.map((node) => {
-            const active = activeByNode.get(node.id);
-            return active
-              ? {
-                ...node,
-                data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
-              }
-              : node;
-          }),
+          nodes: selection.nodes,
           edges,
-          selectedNodeId: null,
+          selectedNodeIds: selection.selectedNodeIds,
+          selectedNodeId: selection.selectedNodeId,
           selectedResultId: null,
           compareIds: [],
           saveState: "idle",
@@ -2003,17 +2761,41 @@ export const useFlowStore = create<FlowState>()(
         };
         set({ tabs: replaceTab(state.tabs, tab), ...activeFields(tab), viewer: null });
         // 清空撤销历史，避免撤销回上一个项目的画布状态
+        temporalHistoryByTab.delete(state.activeTabId);
         useFlowStore.temporal.getState().clear();
       },
     });
     },
     {
-      limit: 50,
+      limit: DOCUMENT_HISTORY_LIMIT,
       partialize: (state): FlowTemporalState => ({
+        projectName: state.projectName,
         nodes: state.nodes,
         edges: state.edges,
       }),
-      equality: (a, b) => a.nodes === b.nodes && a.edges === b.edges,
+      equality: sameTemporalDocument,
+      handleSet: (handleSet) => {
+        // zundo 2.2 的公开类型把内部 recorder 标成 Zustand setState，运行时契约
+        // 实际为 (past, replace, current, delta)；Context7 与本地实现均已核对。
+        const saveHistory = handleSet as unknown as (
+          pastState: FlowTemporalState,
+          replace: boolean | undefined,
+          currentState: FlowTemporalState,
+          deltaState?: Partial<FlowTemporalState> | null,
+        ) => void;
+        recordHistoryEntry = (pastState, currentState) => {
+          saveHistory(pastState, undefined, currentState);
+        };
+        return (pastState, replace, currentState, deltaState) => {
+          if (historySuppressionDepth > 0 || activeHistoryTransaction) return;
+          saveHistory(
+            pastState as unknown as FlowTemporalState,
+            replace,
+            currentState,
+            deltaState,
+          );
+        };
+      },
     },
   ),
 );
@@ -2045,6 +2827,7 @@ export function retryTabSessionPersistence(): boolean {
 
 if (typeof window !== "undefined") {
   let lastTabSessionJson = "";
+  let tabSessionPersistenceDeferred = false;
   const sessionFingerprint = (state: FlowState): string => {
     try {
       const current = snapshotActiveTab(state);
@@ -2065,8 +2848,24 @@ if (typeof window !== "undefined") {
       useFlowStore.setState({ tabSessionPersistenceError: nextError });
     }
   };
+  flushDeferredTabSessionPersistence = () => {
+    if (!tabSessionPersistenceDeferred || activeHistoryTransaction) return;
+    tabSessionPersistenceDeferred = false;
+    const state = useFlowStore.getState();
+    const sessionJson = sessionFingerprint(state);
+    if (sessionJson && sessionJson === lastTabSessionJson) return;
+    const result = persistTabSession(state);
+    if (result.ok) lastTabSessionJson = sessionJson;
+    publishPersistenceResult(result);
+  };
   retryTabSessionPersistenceImpl = () => {
     const state = useFlowStore.getState();
+    // An explicit retry must not turn an in-flight drag frame into a durable,
+    // apparently clean snapshot. The completed transaction will trigger a write.
+    if (activeHistoryTransaction?.tabId === state.activeTabId) {
+      tabSessionPersistenceDeferred = true;
+      return false;
+    }
     const sessionJson = sessionFingerprint(state);
     const result = persistTabSession(state);
     if (result.ok) lastTabSessionJson = sessionJson;
@@ -2074,6 +2873,13 @@ if (typeof window !== "undefined") {
     return result.ok;
   };
   useFlowStore.subscribe((state, previousState) => {
+    // Drag frames are live UI state until endHistoryTransaction commits their
+    // final coordinates together with revision/dirty. Preserve the last durable
+    // snapshot so a crash/refresh during the drag restores the pre-drag document.
+    if (activeHistoryTransaction?.tabId === state.activeTabId) {
+      tabSessionPersistenceDeferred = true;
+      return;
+    }
     // 活动画布变化会由下一个订阅先同步进 tabs；历史/SSE/viewer 等全局状态无需序列化项目。
     if (state.tabs === previousState.tabs && state.activeTabId === previousState.activeTabId) return;
     const sessionJson = sessionFingerprint(state);
@@ -2098,6 +2904,7 @@ if (typeof window !== "undefined") {
       snapshot.readOnly !== lastActiveSnapshot.readOnly ||
       snapshot.nodes !== lastActiveSnapshot.nodes ||
       snapshot.edges !== lastActiveSnapshot.edges ||
+      snapshot.selectedNodeIds !== lastActiveSnapshot.selectedNodeIds ||
       snapshot.selectedNodeId !== lastActiveSnapshot.selectedNodeId ||
       snapshot.selectedResultId !== lastActiveSnapshot.selectedResultId ||
       snapshot.compareIds !== lastActiveSnapshot.compareIds ||
@@ -2139,9 +2946,10 @@ export function resumeRecentResults(records: RecentResult[]): void {
         }
         await consumeRunEvents(runId, record.nodeId, (event) => {
           if (event.type !== "node-status" || event.nodeId !== record.nodeId) return;
-          useFlowStore.setState((state) => ({
-            recentResults: applyRunEventToRecentResults(state.recentResults, record.id, event),
-          }));
+          useFlowStore.setState((state) => recentResultsPatch(
+            state,
+            applyRunEventToRecentResults(state.recentResults, record.id, event),
+          ));
           const tabId = useFlowStore
             .getState()
             .tabs.find((tab) => tab.projectId === record.projectId)?.id;
@@ -2154,15 +2962,16 @@ export function resumeRecentResults(records: RecentResult[]): void {
         if (terminalRecorded) return;
         const message = error instanceof Error ? error.message : String(error);
         const recoveryMessage = `运行 ${runId} 的状态同步中断：${message}；请稍后重试同步，勿重复提交`;
-        useFlowStore.setState((state) => ({
-          recentResults: applyRunEventToRecentResults(state.recentResults, record.id, {
+        useFlowStore.setState((state) => recentResultsPatch(
+          state,
+          applyRunEventToRecentResults(state.recentResults, record.id, {
             type: "node-status",
             nodeId: record.nodeId,
             status: "retry_wait",
             error: recoveryMessage,
             startedAt: record.startedAt,
           }),
-        }));
+        ));
         const tabId = useFlowStore
           .getState()
           .tabs.find((tab) => tab.projectId === record.projectId)?.id;
