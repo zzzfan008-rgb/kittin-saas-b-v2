@@ -9,10 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangleIcon, CloudIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
+import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { readWorkspaceOwner } from "@/auth/session";
 import {
   applyServerInitialDraftToTab,
+  createFreshLocalTabForInitialDraft,
   didRestoreProjectTabSessionWorkspace,
   isPristineProjectTab,
   markInitialDraftSynced,
@@ -27,6 +29,7 @@ import {
 import {
   abandonInitialDraft,
   bootstrapInitialDraft,
+  copyProjectScopedMasks,
   fetchInitialDraft,
   InitialDraftApiError,
   isServerInitialDraftPristine,
@@ -74,7 +77,10 @@ function localDraftDirty(tab: ProjectTab): boolean {
 function applyDraft(
   tab: ProjectTab,
   draft: ServerInitialDraftSnapshot,
-  options?: { preserveLocalBackup?: boolean; forceDirty?: boolean },
+  options?: {
+    preserveLocalBackup?: { projectId: string; flow: ReturnType<typeof persistedWorkflowForProjectTab> };
+    forceDirty?: boolean;
+  },
 ): boolean {
   const dirty = options?.forceDirty ?? (
     tab.projectId === draft.id && projectTabLifecycle(tab) === "initial_draft"
@@ -235,7 +241,10 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       let decision = decideInitialDraftStartup(placeholder, local, server);
 
       if (decision.kind === "bootstrap-pristine" || decision.kind === "bootstrap-local") {
-        const source = decision.local;
+        const source = decision.kind === "bootstrap-pristine"
+          ? createFreshLocalTabForInitialDraft(decision.local.id)
+          : decision.local;
+        if (!source) throw new Error("无法创建新的未保存项目，请刷新后重试");
         const bootstrapped = await bootstrapInitialDraft({
           id: source.projectId,
           ...(decision.kind === "bootstrap-local" ? { name: source.projectName } : {}),
@@ -260,11 +269,17 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
         return;
       }
       if (decision.kind === "sync-local") {
+        const flow = await copyProjectScopedMasks({
+          sourceProjectId: decision.local.projectId,
+          targetProjectId: decision.server.id,
+          flow: persistedWorkflowForProjectTab(decision.local),
+          signal,
+        });
         const draft = await syncInitialDraft({
           id: decision.server.id,
           expectedRevision: decision.server.revision,
           name: decision.local.projectName,
-          flow: persistedWorkflowForProjectTab(decision.local),
+          flow,
           signal,
         });
         if (signal.aborted) return;
@@ -346,11 +361,16 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     if (!local) return;
     setConflictBusy(true);
     try {
+      const flow = await copyProjectScopedMasks({
+        sourceProjectId: local.projectId,
+        targetProjectId: conflict.server.id,
+        flow: persistedWorkflowForProjectTab(local),
+      });
       const draft = await syncInitialDraft({
         id: conflict.server.id,
         expectedRevision: conflict.server.revision,
         name: local.projectName,
-        flow: persistedWorkflowForProjectTab(local),
+        flow,
       });
       applyDraft(local, draft, { forceDirty: true });
       setConflict(null);
@@ -369,15 +389,31 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     }
   }, [conflict, conflictBusy]);
 
-  const resolveUseServer = useCallback(() => {
+  const resolveUseServer = useCallback(async () => {
     if (!conflict || conflictBusy) return;
     const local = useFlowStore.getState().tabs.find((tab) => tab.id === conflict.localTabId);
     if (!local) return;
-    applyDraft(local, conflict.server, { preserveLocalBackup: true });
-    setConflict(null);
-    setSyncState("idle");
-    setSyncError(null);
-    setGateState("ready");
+    setConflictBusy(true);
+    try {
+      const backupProjectId = nanoid(10);
+      const backupFlow = await copyProjectScopedMasks({
+        sourceProjectId: local.projectId,
+        targetProjectId: backupProjectId,
+        flow: persistedWorkflowForProjectTab(local),
+      });
+      applyDraft(local, conflict.server, {
+        preserveLocalBackup: { projectId: backupProjectId, flow: backupFlow },
+      });
+      setConflict(null);
+      setSyncState("idle");
+      setSyncError(null);
+      setGateState("ready");
+    } catch (error) {
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConflictBusy(false);
+    }
   }, [conflict, conflictBusy]);
 
   const abandon = useCallback(async (tabId: string): Promise<boolean> => {
@@ -435,7 +471,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
           conflict={conflict}
           busy={conflictBusy}
           onKeepLocal={() => void resolveKeepLocal()}
-          onUseServer={resolveUseServer}
+          onUseServer={() => void resolveUseServer()}
         />
       )}
     </InitialDraftContext.Provider>

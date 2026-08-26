@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { ProjectTab, ServerInitialDraftSnapshot } from "../src/store/flowStore";
 import {
   applyServerInitialDraftToTab,
+  createFreshLocalTabForInitialDraft,
   isPristineProjectTab,
   normalizeTabSessionValue,
   persistedWorkflowForProjectTab,
@@ -15,6 +16,7 @@ import {
   selectLocalInitialDraftCandidate,
 } from "../src/initialDraft/initialDraftMigration";
 import {
+  copyProjectScopedMasks,
   isServerInitialDraftPristine,
   parseInitialDraft,
   syncInitialDraft,
@@ -159,6 +161,53 @@ try {
 }
 console.log("  ✓ 自动同步携带乐观锁版本");
 
+const maskLocal = tab({
+  projectId: "mask-source-project",
+  nodes: [{
+    id: "mask-node",
+    type: "mask-redraw",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "mask-redraw",
+      label: "局部重绘",
+      status: "idle",
+      modelId: "gpt-image-2",
+      modelOptions: {},
+      prompt: "改色",
+      mask: "/api/files/source-mask.png",
+      outputImages: [],
+    },
+  }],
+});
+const maskFlow = persistedWorkflowForProjectTab(maskLocal);
+let maskCopyPayload: Record<string, unknown> | null = null;
+globalThis.fetch = async (_input, init) => {
+  maskCopyPayload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+  return Response.json({
+    masks: [{
+      sourceUrl: "/api/files/source-mask.png",
+      targetUrl: "/api/files/copied-mask.png",
+      nodeId: "mask-node",
+    }],
+  });
+};
+try {
+  const copied = await copyProjectScopedMasks({
+    sourceProjectId: "mask-source-project",
+    targetProjectId: "mask-target-project",
+    flow: maskFlow,
+  });
+  assert.equal(maskCopyPayload?.sourceProjectId, "mask-source-project");
+  assert.equal(maskCopyPayload?.targetProjectId, "mask-target-project");
+  assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
+  assert.equal(copied.nodes[0].data.kind, "mask-redraw");
+  if (copied.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+  assert.equal(copied.nodes[0].data.mask, "/api/files/copied-mask.png");
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log("  ✓ 项目身份变化会复制并改写项目级蒙版引用");
+
 let barrierCalls = 0;
 const unregisterBarrier = registerInitialDraftSaveBarrier(async (target) => {
   barrierCalls += 1;
@@ -209,6 +258,49 @@ try {
   globalThis.fetch = originalFetch;
 }
 console.log("  ✓ 正式保存失败保留初始草稿，成功才以同一 ID 原子提升");
+
+const conflictLocal = tab({
+  ...maskLocal,
+  id: "conflict-local-tab",
+  projectId: "conflict-draft",
+  lifecycle: "initial_draft",
+  dirty: true,
+  revision: 3,
+  draftRevision: 1,
+  draftSyncedRevision: 1,
+});
+useFlowStore.setState({ tabs: [conflictLocal], activeTabId: conflictLocal.id, viewer: null });
+const copiedBackupFlow = {
+  ...persistedWorkflowForProjectTab(conflictLocal),
+  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "mask-redraw"
+    ? { ...node, data: { ...node.data, mask: "/api/files/backup-mask.png" } }
+    : node),
+};
+assert.equal(applyServerInitialDraftToTab(conflictLocal.id, draft({ id: "conflict-draft" }), {
+  preserveReplacedAsBackup: { projectId: "backup-project", flow: copiedBackupFlow },
+}), true);
+const backup = useFlowStore.getState().tabs.find((candidate) => candidate.projectId === "backup-project");
+assert.ok(backup);
+assert.equal(projectTabLifecycle(backup), "local");
+assert.equal(backup.nodes[0].data.kind, "mask-redraw");
+if (backup.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected backup node kind");
+assert.equal(backup.nodes[0].data.mask, "/api/files/backup-mask.png");
+console.log("  ✓ 采用云端冲突版本时，本机备份使用独立项目 ID 与复制后的蒙版");
+
+const savedPlaceholder = tab({
+  id: "saved-placeholder-tab",
+  projectId: "saved-placeholder-project",
+  lifecycle: "saved",
+  hasBeenPersisted: true,
+  saveState: "saved",
+});
+useFlowStore.setState({ tabs: [savedPlaceholder], activeTabId: savedPlaceholder.id, viewer: null });
+const freshInitial = createFreshLocalTabForInitialDraft(savedPlaceholder.id);
+assert.ok(freshInitial);
+assert.notEqual(freshInitial.projectId, savedPlaceholder.projectId);
+assert.ok(useFlowStore.getState().tabs.some((candidate) => candidate.id === savedPlaceholder.id));
+assert.equal(useFlowStore.getState().activeTabId, freshInitial.id);
+console.log("  ✓ 服务器无草稿时为初始项目分配新 ID，且不覆盖已保存页签");
 
 const projectTabsSource = readFileSync(
   new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url),

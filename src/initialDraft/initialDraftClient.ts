@@ -43,6 +43,64 @@ async function json(response: Response): Promise<Record<string, unknown>> {
   return body;
 }
 
+function projectMaskRefs(flow: PersistedWorkflow): Array<{
+  sourceUrl: string;
+  fileId: string;
+  nodeId: string;
+}> {
+  return flow.nodes.flatMap((node) => {
+    if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return [];
+    const match = /^\/api\/files\/([^/?#]+\.png)$/.exec(node.data.mask);
+    return match ? [{ sourceUrl: node.data.mask, fileId: match[1], nodeId: node.id }] : [];
+  });
+}
+
+/** 复制项目级蒙版并把工作流引用改写为目标项目的独立文件。 */
+export async function copyProjectScopedMasks(input: {
+  sourceProjectId: string;
+  targetProjectId: string;
+  flow: PersistedWorkflow;
+  signal?: AbortSignal;
+}): Promise<PersistedWorkflow> {
+  if (input.sourceProjectId === input.targetProjectId) return input.flow;
+  const refs = projectMaskRefs(input.flow);
+  if (refs.length === 0) return input.flow;
+  const response = await fetch("/api/files/masks/copy", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+      masks: refs.map(({ fileId, nodeId }) => ({ fileId, nodeId })),
+    }),
+    signal: input.signal,
+  });
+  const body = await json(response);
+  if (!Array.isArray(body.masks)) throw new Error("蒙版复制响应格式无效");
+  const expected = new Map(refs.map((ref) => [ref.sourceUrl, ref.nodeId]));
+  const replacements = new Map<string, string>();
+  for (const value of body.masks) {
+    if (!value || typeof value !== "object") throw new Error("蒙版复制响应格式无效");
+    const copy = value as { sourceUrl?: unknown; targetUrl?: unknown; nodeId?: unknown };
+    if (
+      typeof copy.sourceUrl !== "string" ||
+      typeof copy.targetUrl !== "string" || !/^\/api\/files\/[^/?#]+\.png$/.test(copy.targetUrl) ||
+      typeof copy.nodeId !== "string" || expected.get(copy.sourceUrl) !== copy.nodeId ||
+      replacements.has(copy.sourceUrl)
+    ) throw new Error("蒙版复制响应格式无效");
+    replacements.set(copy.sourceUrl, copy.targetUrl);
+  }
+  if (replacements.size !== expected.size) throw new Error("蒙版复制响应不完整");
+  return {
+    ...input.flow,
+    nodes: input.flow.nodes.map((node) => {
+      if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return node;
+      const mask = replacements.get(node.data.mask);
+      return mask ? { ...node, data: { ...node.data, mask } } : node;
+    }),
+  };
+}
+
 export async function fetchInitialDraft(signal?: AbortSignal): Promise<ServerInitialDraftSnapshot | null> {
   const response = await fetch("/api/projects/initial-draft", {
     cache: "no-store",

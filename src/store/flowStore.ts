@@ -3534,7 +3534,7 @@ export function applyServerInitialDraftToTab(
   options?: {
     dirty?: boolean;
     localDocumentRevision?: number;
-    preserveReplacedAsBackup?: boolean;
+    preserveReplacedAsBackup?: { projectId: string; flow: PersistedWorkflow };
   },
 ): boolean {
   flushActiveTextEdit();
@@ -3574,11 +3574,19 @@ export function applyServerInitialDraftToTab(
     .filter((tab) => tab.id === tabId || tab.projectId !== draft.id)
     .map((tab) => tab.id === tabId ? serverTab : tab);
   if (options?.preserveReplacedAsBackup) {
+    const prepared = options.preserveReplacedAsBackup;
+    const selection = normalizeNodeSelection(prepared.flow.nodes as FlowNode[], source.selectedNodeIds);
     const backup: ProjectTab = {
       ...source,
       id: nanoid(10),
-      projectId: nanoid(10),
+      projectId: prepared.projectId,
       projectName: `${source.projectName}（本机备份）`,
+      nodes: selection.nodes,
+      edges: prepared.flow.edges as Edge[],
+      selectedNodeIds: selection.selectedNodeIds,
+      selectedNodeId: selection.selectedNodeId,
+      selectedResultId: null,
+      compareIds: [],
       saveState: "idle",
       hasBeenPersisted: false,
       revision: Math.max(1, source.revision),
@@ -3639,6 +3647,38 @@ export function replaceAbandonedInitialDraftWithFreshLocalTab(tabId: string): Pr
   temporalHistoryByTab.delete(tabId);
   temporalHistoryByTab.delete(fresh.id);
   if (state.activeTabId === tabId) useFlowStore.temporal.getState().clear();
+  return fresh;
+}
+
+/**
+ * 服务器尚无初始草稿时创建全新身份。只替换真正空白的本地占位页签；
+ * 已保存或有意义的页签会被保留，并在旁边追加初始草稿。
+ */
+export function createFreshLocalTabForInitialDraft(placeholderTabId: string): ProjectTab | undefined {
+  flushActiveTextEdit();
+  cancelHistoryTransaction();
+  const state = useFlowStore.getState();
+  const index = state.tabs.findIndex((tab) => tab.id === placeholderTabId);
+  if (index < 0) return undefined;
+  const placeholder = state.tabs[index];
+  const fresh = newTab();
+  const replacePlaceholder = (
+    projectTabLifecycle(placeholder) === "local" &&
+    !placeholder.hasBeenPersisted &&
+    isPristineProjectTab(placeholder)
+  );
+  const tabs = replacePlaceholder
+    ? state.tabs.map((tab) => tab.id === placeholderTabId ? fresh : tab)
+    : [...state.tabs, fresh];
+  stashActiveTemporalHistory(state.activeTabId);
+  runWithoutHistory(() => useFlowStore.setState({
+    tabs,
+    activeTabId: fresh.id,
+    viewer: null,
+  }));
+  if (replacePlaceholder) temporalHistoryByTab.delete(placeholderTabId);
+  temporalHistoryByTab.delete(fresh.id);
+  useFlowStore.temporal.getState().clear();
   return fresh;
 }
 

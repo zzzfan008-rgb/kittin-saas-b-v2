@@ -385,6 +385,66 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       SELECT source_type, purge_after FROM files WHERE id = $1
     `, [maskBody.id]), { source_type: "mask", purge_after: null });
 
+    const copyMaskResponse = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        targetProjectId: "mask-backup-project",
+        masks: [{ fileId: maskBody.id, nodeId: "mask-node" }],
+      }),
+    });
+    assert.equal(copyMaskResponse.status, 200);
+    const copiedMaskBody = await copyMaskResponse.json() as {
+      masks: Array<{ sourceUrl: string; targetUrl: string; nodeId: string }>;
+    };
+    assert.equal(copiedMaskBody.masks.length, 1);
+    const copiedMask = copiedMaskBody.masks[0];
+    const copiedMaskId = copiedMask.targetUrl.slice("/api/files/".length);
+    assert.deepEqual(copiedMask, {
+      sourceUrl: maskBody.url,
+      targetUrl: copiedMask.targetUrl,
+      nodeId: "mask-node",
+    });
+    assert.notEqual(copiedMaskId, maskBody.id);
+    assert.deepEqual(
+      fs.readFileSync(path.join(uploadsDir(), copiedMaskId)),
+      fs.readFileSync(path.join(uploadsDir(), maskBody.id)),
+      "项目身份变化必须复制蒙版字节，不能移动或重编码原文件",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT owner_id, source_type, project_id, node_id, mime_type,
+             purge_after IS NOT NULL AS expiring
+      FROM files WHERE id = $1
+    `, [copiedMaskId]), {
+      owner_id: admin.id,
+      source_type: "mask-draft",
+      project_id: "mask-backup-project",
+      node_id: "mask-node",
+      mime_type: "image/png",
+      expiring: true,
+    });
+    assert.equal(
+      (await saveMaskProject(copiedMask.targetUrl, "mask-backup-project")).status,
+      200,
+      "复制后的本机备份必须可以按新项目 ID 正式保存",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT source_type, purge_after FROM files WHERE id = $1
+    `, [copiedMaskId]), { source_type: "mask", purge_after: null });
+    const beforeTargetConflictFiles = fs.readdirSync(uploadsDir()).sort();
+    const targetConflict = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        targetProjectId: "mask-backup-project",
+        masks: [{ fileId: maskBody.id, nodeId: "mask-node" }],
+      }),
+    });
+    assert.equal(targetConflict.status, 409);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeTargetConflictFiles);
+
     const secondMaskResponse = await uploadMask(maskDataUrl);
     assert.equal(secondMaskResponse.status, 200);
     const secondMaskBody = await secondMaskResponse.json() as { id: string; url: string };
