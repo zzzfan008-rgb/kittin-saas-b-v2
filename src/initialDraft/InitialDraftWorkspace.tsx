@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangleIcon, CloudIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
-import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { readWorkspaceOwner } from "@/auth/session";
 import {
@@ -36,6 +35,7 @@ import {
   syncInitialDraft,
 } from "./initialDraftClient";
 import {
+  bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
 } from "./initialDraftMigration";
@@ -92,6 +92,23 @@ function applyDraft(
     localDocumentRevision: dirty ? Math.max(1, tab.revision, draft.revision) : 0,
     preserveReplacedAsBackup: options?.preserveLocalBackup,
   });
+}
+
+export async function settleInitialDraftBeforeAbandon(
+  tabId: string,
+  read: () => ProjectTab | undefined,
+  synchronize: (tab: ProjectTab) => Promise<boolean>,
+  hasSyncInFlight: () => boolean,
+): Promise<ProjectTab | undefined> {
+  for (let attemptIndex = 0; attemptIndex < 8; attemptIndex += 1) {
+    const latest = read();
+    if (!latest || latest.id !== tabId || projectTabLifecycle(latest) !== "initial_draft") {
+      return undefined;
+    }
+    if (!hasSyncInFlight() && latest.revision <= (latest.draftSyncedRevision ?? 0)) return latest;
+    if (!await synchronize(latest)) return undefined;
+  }
+  throw new Error("项目仍在持续修改，请停止编辑后再放弃");
 }
 
 function BlockingScreen({
@@ -241,14 +258,23 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       let decision = decideInitialDraftStartup(placeholder, local, server);
 
       if (decision.kind === "bootstrap-pristine" || decision.kind === "bootstrap-local") {
+        const needsFreshIdentity = bootstrapNeedsFreshProjectIdentity(decision);
         const source = decision.kind === "bootstrap-pristine"
           ? createFreshLocalTabForInitialDraft(decision.local.id)
           : decision.local;
         if (!source) throw new Error("无法创建新的未保存项目，请刷新后重试");
+        const prepared = decision.kind === "bootstrap-local" && needsFreshIdentity
+          ? await copyProjectScopedMasks({
+              sourceProjectId: source.projectId,
+              createFreshTarget: true,
+              flow: persistedWorkflowForProjectTab(source),
+              signal,
+            })
+          : { targetProjectId: source.projectId, flow: persistedWorkflowForProjectTab(source) };
         const bootstrapped = await bootstrapInitialDraft({
-          id: source.projectId,
+          id: prepared.targetProjectId,
           ...(decision.kind === "bootstrap-local" ? { name: source.projectName } : {}),
-          flow: persistedWorkflowForProjectTab(source),
+          flow: prepared.flow,
           signal,
         });
         if (signal.aborted) return;
@@ -269,7 +295,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
         return;
       }
       if (decision.kind === "sync-local") {
-        const flow = await copyProjectScopedMasks({
+        const prepared = await copyProjectScopedMasks({
           sourceProjectId: decision.local.projectId,
           targetProjectId: decision.server.id,
           flow: persistedWorkflowForProjectTab(decision.local),
@@ -279,7 +305,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
           id: decision.server.id,
           expectedRevision: decision.server.revision,
           name: decision.local.projectName,
-          flow,
+          flow: prepared.flow,
           signal,
         });
         if (signal.aborted) return;
@@ -361,7 +387,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     if (!local) return;
     setConflictBusy(true);
     try {
-      const flow = await copyProjectScopedMasks({
+      const prepared = await copyProjectScopedMasks({
         sourceProjectId: local.projectId,
         targetProjectId: conflict.server.id,
         flow: persistedWorkflowForProjectTab(local),
@@ -370,7 +396,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
         id: conflict.server.id,
         expectedRevision: conflict.server.revision,
         name: local.projectName,
-        flow,
+        flow: prepared.flow,
       });
       applyDraft(local, draft, { forceDirty: true });
       setConflict(null);
@@ -395,14 +421,13 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     if (!local) return;
     setConflictBusy(true);
     try {
-      const backupProjectId = nanoid(10);
-      const backupFlow = await copyProjectScopedMasks({
+      const backup = await copyProjectScopedMasks({
         sourceProjectId: local.projectId,
-        targetProjectId: backupProjectId,
+        createFreshTarget: true,
         flow: persistedWorkflowForProjectTab(local),
       });
       applyDraft(local, conflict.server, {
-        preserveLocalBackup: { projectId: backupProjectId, flow: backupFlow },
+        preserveLocalBackup: { projectId: backup.targetProjectId, flow: backup.flow },
       });
       setConflict(null);
       setSyncState("idle");
@@ -423,7 +448,17 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     setAbandoningTabId(tabId);
     setSyncError(null);
     try {
-      await abandonInitialDraft({ id: tab.projectId, expectedRevision: tab.draftRevision ?? 0 });
+      const settled = await settleInitialDraftBeforeAbandon(
+        tabId,
+        () => useFlowStore.getState().tabs.find((candidate) => candidate.id === tabId),
+        synchronizeTab,
+        () => syncInFlight.current !== null,
+      );
+      if (!settled) return false;
+      await abandonInitialDraft({
+        id: settled.projectId,
+        expectedRevision: settled.draftRevision ?? 0,
+      });
       const fresh = replaceAbandonedInitialDraftWithFreshLocalTab(tabId);
       if (!fresh) throw new Error("初始草稿已变化，请刷新后重试");
       const next = await bootstrapInitialDraft({
@@ -450,7 +485,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     } finally {
       setAbandoningTabId(null);
     }
-  }, [abandoningTabId]);
+  }, [abandoningTabId, synchronizeTab]);
 
   const context = useMemo<InitialDraftContextValue>(() => ({
     syncState,

@@ -1,5 +1,6 @@
 import type { PersistedWorkflow } from "@/types/workflow";
 import type { ServerInitialDraftSnapshot } from "@/store/flowStore";
+import { nanoid } from "nanoid";
 
 export class InitialDraftApiError extends Error {
   readonly status: number;
@@ -58,25 +59,42 @@ function projectMaskRefs(flow: PersistedWorkflow): Array<{
 /** 复制项目级蒙版并把工作流引用改写为目标项目的独立文件。 */
 export async function copyProjectScopedMasks(input: {
   sourceProjectId: string;
-  targetProjectId: string;
+  targetProjectId?: string;
+  createFreshTarget?: boolean;
   flow: PersistedWorkflow;
   signal?: AbortSignal;
-}): Promise<PersistedWorkflow> {
-  if (input.sourceProjectId === input.targetProjectId) return input.flow;
+}): Promise<{ flow: PersistedWorkflow; targetProjectId: string }> {
+  const createFreshTarget = input.createFreshTarget === true;
+  if (
+    createFreshTarget === Boolean(input.targetProjectId) ||
+    input.sourceProjectId === input.targetProjectId
+  ) throw new Error("蒙版复制目标无效");
   const refs = projectMaskRefs(input.flow);
-  if (refs.length === 0) return input.flow;
+  if (refs.length === 0) {
+    return {
+      flow: input.flow,
+      targetProjectId: createFreshTarget ? nanoid(10) : input.targetProjectId!,
+    };
+  }
   const response = await fetch("/api/files/masks/copy", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       sourceProjectId: input.sourceProjectId,
-      targetProjectId: input.targetProjectId,
+      ...(createFreshTarget
+        ? { createTarget: true }
+        : { targetProjectId: input.targetProjectId }),
       masks: refs.map(({ fileId, nodeId }) => ({ fileId, nodeId })),
     }),
     signal: input.signal,
   });
   const body = await json(response);
-  if (!Array.isArray(body.masks)) throw new Error("蒙版复制响应格式无效");
+  if (
+    typeof body.targetProjectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(body.targetProjectId) ||
+    body.targetProjectId === input.sourceProjectId ||
+    (!createFreshTarget && body.targetProjectId !== input.targetProjectId) ||
+    !Array.isArray(body.masks)
+  ) throw new Error("蒙版复制响应格式无效");
   const expected = new Map(refs.map((ref) => [ref.sourceUrl, ref.nodeId]));
   const replacements = new Map<string, string>();
   for (const value of body.masks) {
@@ -92,12 +110,15 @@ export async function copyProjectScopedMasks(input: {
   }
   if (replacements.size !== expected.size) throw new Error("蒙版复制响应不完整");
   return {
-    ...input.flow,
-    nodes: input.flow.nodes.map((node) => {
-      if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return node;
-      const mask = replacements.get(node.data.mask);
-      return mask ? { ...node, data: { ...node.data, mask } } : node;
-    }),
+    targetProjectId: body.targetProjectId,
+    flow: {
+      ...input.flow,
+      nodes: input.flow.nodes.map((node) => {
+        if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return node;
+        const mask = replacements.get(node.data.mask);
+        return mask ? { ...node, data: { ...node.data, mask } } : node;
+      }),
+    },
   };
 }
 

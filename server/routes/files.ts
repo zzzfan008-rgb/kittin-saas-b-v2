@@ -6,6 +6,7 @@
 import { Router, type Response } from "express";
 import fs from "node:fs";
 import path from "node:path";
+import { nanoid } from "nanoid";
 import {
   deleteStoredImage, ensureThumbnail, isSupportedImageFile, mimeOfFile,
   normalizeImageRef, resolveToDataUrl, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
@@ -181,18 +182,21 @@ filesRouter.post("/mask", asyncHandler(async (req, res) => {
  */
 filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const { sourceProjectId, targetProjectId, masks } = req.body as {
+  const { sourceProjectId, targetProjectId, createTarget, masks } = req.body as {
     sourceProjectId?: unknown;
     targetProjectId?: unknown;
+    createTarget?: unknown;
     masks?: unknown;
   };
+  const wantsFreshTarget = createTarget === true;
+  const hasExistingTarget = typeof targetProjectId === "string" && SAFE_PROJECT_ID.test(targetProjectId);
   if (
     typeof sourceProjectId !== "string" || !SAFE_PROJECT_ID.test(sourceProjectId) ||
-    typeof targetProjectId !== "string" || !SAFE_PROJECT_ID.test(targetProjectId) ||
-    sourceProjectId === targetProjectId ||
-    !Array.isArray(masks) || masks.length > MAX_MASK_COPY_REFS
+    !Array.isArray(masks) || masks.length === 0 || masks.length > MAX_MASK_COPY_REFS ||
+    (wantsFreshTarget ? targetProjectId !== undefined : !hasExistingTarget) ||
+    (!wantsFreshTarget && sourceProjectId === targetProjectId)
   ) {
-    res.status(400).json({ error: "sourceProjectId, a distinct targetProjectId and masks are required" });
+    res.status(400).json({ error: "sourceProjectId, a target mode and one or more masks are required" });
     return;
   }
 
@@ -223,29 +227,36 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
   try {
     const outcome = await transaction(async (client) => {
       if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
-      const target = await queryOne<{
-        owner_id: string;
-        lifecycle: "initial_draft" | "saved";
-        deleted_at: string | null;
-      }>(`
-        SELECT owner_id, lifecycle, deleted_at
-        FROM projects WHERE id = $1 FOR UPDATE
-      `, [targetProjectId], client);
-      if (
-        target &&
-        (target.owner_id !== user.id || target.deleted_at !== null || target.lifecycle !== "initial_draft")
-      ) return { status: "target_conflict" as const };
-      if (!target) {
-        const occupiedTarget = await queryOne<{ id: string }>(`
-          SELECT id FROM files
-          WHERE project_id = $1 AND deleted_at IS NULL
-          ORDER BY id LIMIT 1
+      let resolvedTargetId: string | undefined;
+      if (wantsFreshTarget) {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const candidate = nanoid(10);
+          const occupied = await queryOne<{ occupied: number }>(`
+            SELECT 1 AS occupied FROM projects WHERE id = $1
+            UNION ALL
+            SELECT 1 AS occupied FROM files WHERE project_id = $1
+            LIMIT 1
+          `, [candidate], client);
+          if (!occupied) {
+            resolvedTargetId = candidate;
+            break;
+          }
+        }
+        if (!resolvedTargetId) return { status: "target_unavailable" as const };
+      } else {
+        const target = await queryOne<{ id: string }>(`
+          SELECT id FROM projects
+          WHERE id = $1 AND owner_id = $2
+            AND lifecycle = 'initial_draft' AND deleted_at IS NULL
           FOR UPDATE
-        `, [targetProjectId], client);
-        if (occupiedTarget) return { status: "target_conflict" as const };
+        `, [targetProjectId, user.id], client);
+        if (!target) return { status: "target_unavailable" as const };
+        resolvedTargetId = target.id;
       }
 
       const ids = refs.map((ref) => ref.fileId);
+      const now = new Date();
+      const nowIso = now.toISOString();
       const rows = ids.length === 0 ? [] : (await client.query<{
         id: string;
         owner_id: string | null;
@@ -256,14 +267,17 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
         width: number | null;
         height: number | null;
         byte_length: number | null;
+        deleted_at: string | null;
+        purge_after: string | null;
       }>(`
         SELECT id, owner_id, source_type, project_id, node_id, mime_type,
-          width, height, byte_length
+          width, height, byte_length, deleted_at, purge_after
         FROM files
-        WHERE id = ANY($1::text[]) AND deleted_at IS NULL
+        WHERE id = ANY($1::text[])
+          AND (deleted_at IS NULL OR purge_after > $2)
         ORDER BY id
         FOR UPDATE
-      `, [ids])).rows;
+      `, [ids, nowIso])).rows;
       const byId = new Map(rows.map((row) => [row.id, row]));
       for (const ref of refs) {
         const row = byId.get(ref.fileId);
@@ -275,7 +289,6 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
         ) return { status: "source_forbidden" as const };
       }
 
-      const now = new Date();
       const purgeAfter = new Date(now.getTime() + MASK_DRAFT_RETENTION_MS).toISOString();
       const copies: Array<{ sourceUrl: string; targetUrl: string; nodeId: string }> = [];
       for (const ref of refs) {
@@ -289,8 +302,8 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
             created_at, purge_after
           ) VALUES ($1, $2, 'mask-draft', $3, $4, 'image/png', $5, $6, $7, FALSE, $8, $9)
         `, [
-          saved.id, user.id, targetProjectId, ref.nodeId,
-          row.width, row.height, row.byte_length, now.toISOString(), purgeAfter,
+          saved.id, user.id, resolvedTargetId, ref.nodeId,
+          row.width, row.height, row.byte_length, nowIso, purgeAfter,
         ]);
         copies.push({
           sourceUrl: `/api/files/${ref.fileId}`,
@@ -298,7 +311,7 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
           nodeId: ref.nodeId,
         });
       }
-      return { status: "copied" as const, copies };
+      return { status: "copied" as const, targetProjectId: resolvedTargetId, copies };
     });
     committed = outcome.status === "copied";
 
@@ -306,15 +319,15 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
       res.status(409).json({ error: "账号已停用或删除，不能复制蒙版" });
       return;
     }
-    if (outcome.status === "target_conflict") {
-      res.status(409).json({ error: "目标项目 ID 已被占用或不能接收蒙版" });
+    if (outcome.status === "target_unavailable") {
+      res.status(404).json({ error: "目标初始草稿不可用" });
       return;
     }
     if (outcome.status === "source_forbidden") {
       res.status(403).json({ error: "蒙版文件与来源项目、节点或当前账号不匹配" });
       return;
     }
-    res.json({ masks: outcome.copies });
+    res.json({ targetProjectId: outcome.targetProjectId, masks: outcome.copies });
   } catch (error) {
     if (!committed) copiedFileIds.forEach(deleteStoredImage);
     throw error;

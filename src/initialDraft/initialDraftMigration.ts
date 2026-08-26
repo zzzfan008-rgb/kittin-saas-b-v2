@@ -14,6 +14,15 @@ export type InitialDraftStartupDecision =
   | { kind: "sync-local"; local: ProjectTab; server: ServerInitialDraftSnapshot }
   | { kind: "conflict"; local: ProjectTab; server: ServerInitialDraftSnapshot };
 
+/** 服务器已没有该草稿时，旧 initial_draft ID 已退役，必须保留内容但换新身份。 */
+export function bootstrapNeedsFreshProjectIdentity(
+  decision: InitialDraftStartupDecision,
+): boolean {
+  return decision.kind === "bootstrap-pristine" || (
+    decision.kind === "bootstrap-local" && projectTabLifecycle(decision.local) === "initial_draft"
+  );
+}
+
 /** 只有 Auth owner 已证明时才接管旧本地草稿；已标记的 initial_draft 优先。 */
 export function selectLocalInitialDraftCandidate(
   tabs: ProjectTab[],

@@ -12,9 +12,11 @@ import {
   useFlowStore,
 } from "../src/store/flowStore";
 import {
+  bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
 } from "../src/initialDraft/initialDraftMigration";
+import { settleInitialDraftBeforeAbandon } from "../src/initialDraft/InitialDraftWorkspace";
 import {
   copyProjectScopedMasks,
   isServerInitialDraftPristine,
@@ -76,7 +78,24 @@ console.log("初始项目客户端测试");
 const placeholder = tab();
 const editedLegacy = tab({ projectName: "本机设计", dirty: true, revision: 2 });
 assert.equal(decideInitialDraftStartup(placeholder, editedLegacy, null).kind, "bootstrap-local");
+assert.equal(
+  bootstrapNeedsFreshProjectIdentity(decideInitialDraftStartup(placeholder, editedLegacy, null)),
+  false,
+);
 console.log("  ✓ 首次接入会迁移已有本机未保存内容");
+
+const staleInitialDraft = tab({
+  projectId: "retired-draft-id",
+  lifecycle: "initial_draft",
+  dirty: true,
+  revision: 3,
+  draftRevision: 2,
+  draftSyncedRevision: 2,
+});
+const staleDecision = decideInitialDraftStartup(placeholder, staleInitialDraft, null);
+assert.equal(staleDecision.kind, "bootstrap-local");
+assert.equal(bootstrapNeedsFreshProjectIdentity(staleDecision), true);
+console.log("  ✓ 其他页签已保存或放弃的旧草稿会保留内容但分配新项目 ID");
 
 const serverOnly = draft();
 assert.equal(decideInitialDraftStartup(placeholder, null, serverOnly).kind, "restore-server");
@@ -184,6 +203,7 @@ let maskCopyPayload: Record<string, unknown> | null = null;
 globalThis.fetch = async (_input, init) => {
   maskCopyPayload = JSON.parse(String(init?.body)) as Record<string, unknown>;
   return Response.json({
+    targetProjectId: "mask-target-project",
     masks: [{
       sourceUrl: "/api/files/source-mask.png",
       targetUrl: "/api/files/copied-mask.png",
@@ -200,13 +220,74 @@ try {
   assert.equal(maskCopyPayload?.sourceProjectId, "mask-source-project");
   assert.equal(maskCopyPayload?.targetProjectId, "mask-target-project");
   assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
-  assert.equal(copied.nodes[0].data.kind, "mask-redraw");
-  if (copied.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
-  assert.equal(copied.nodes[0].data.mask, "/api/files/copied-mask.png");
+  assert.equal(copied.targetProjectId, "mask-target-project");
+  assert.equal(copied.flow.nodes[0].data.kind, "mask-redraw");
+  if (copied.flow.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+  assert.equal(copied.flow.nodes[0].data.mask, "/api/files/copied-mask.png");
 } finally {
   globalThis.fetch = originalFetch;
 }
 console.log("  ✓ 项目身份变化会复制并改写项目级蒙版引用");
+
+let freshCopyPayload: Record<string, unknown> | null = null;
+globalThis.fetch = async (_input, init) => {
+  freshCopyPayload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+  return Response.json({
+    targetProjectId: "server-issued-backup",
+    masks: [{
+      sourceUrl: "/api/files/source-mask.png",
+      targetUrl: "/api/files/fresh-mask.png",
+      nodeId: "mask-node",
+    }],
+  });
+};
+try {
+  const copied = await copyProjectScopedMasks({
+    sourceProjectId: "mask-source-project",
+    createFreshTarget: true,
+    flow: maskFlow,
+  });
+  assert.equal(freshCopyPayload?.createTarget, true);
+  assert.equal(freshCopyPayload?.targetProjectId, undefined);
+  assert.equal(copied.targetProjectId, "server-issued-backup");
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log("  ✓ 本机备份的目标项目 ID 由服务端分配，不能探测任意项目 ID");
+
+let abandonSnapshot = tab({
+  id: "abandon-tab",
+  projectId: "abandon-draft",
+  lifecycle: "initial_draft",
+  revision: 4,
+  draftSyncedRevision: 2,
+  draftRevision: 1,
+});
+let abandonSyncCalls = 0;
+const settledForAbandon = await settleInitialDraftBeforeAbandon(
+  abandonSnapshot.id,
+  () => abandonSnapshot,
+  async (latest) => {
+    abandonSyncCalls += 1;
+    abandonSnapshot = {
+      ...latest,
+      draftSyncedRevision: latest.revision,
+      draftRevision: (latest.draftRevision ?? 0) + 1,
+    };
+    return true;
+  },
+  () => false,
+);
+assert.equal(abandonSyncCalls, 1);
+assert.equal(settledForAbandon?.draftSyncedRevision, 4);
+assert.equal(settledForAbandon?.draftRevision, 2);
+assert.equal(await settleInitialDraftBeforeAbandon(
+  abandonSnapshot.id,
+  () => abandonSnapshot,
+  async () => false,
+  () => false,
+), abandonSnapshot);
+console.log("  ✓ 放弃草稿前会收口最新编辑并使用同步后的 revision");
 
 let barrierCalls = 0;
 const unregisterBarrier = registerInitialDraftSaveBarrier(async (target) => {
