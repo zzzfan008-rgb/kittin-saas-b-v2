@@ -65,9 +65,11 @@ export async function copyProjectScopedMasks(input: {
   signal?: AbortSignal;
 }): Promise<{ flow: PersistedWorkflow; targetProjectId: string }> {
   const createFreshTarget = input.createFreshTarget === true;
+  if (!createFreshTarget && input.targetProjectId === input.sourceProjectId) {
+    return { flow: input.flow, targetProjectId: input.sourceProjectId };
+  }
   if (
-    createFreshTarget === Boolean(input.targetProjectId) ||
-    input.sourceProjectId === input.targetProjectId
+    createFreshTarget === Boolean(input.targetProjectId)
   ) throw new Error("蒙版复制目标无效");
   const refs = projectMaskRefs(input.flow);
   if (refs.length === 0) {

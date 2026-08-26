@@ -229,6 +229,25 @@ try {
 }
 console.log("  ✓ 项目身份变化会复制并改写项目级蒙版引用");
 
+let sameProjectFetchCalls = 0;
+globalThis.fetch = async () => {
+  sameProjectFetchCalls += 1;
+  throw new Error("同项目蒙版同步不应发起复制请求");
+};
+try {
+  const unchanged = await copyProjectScopedMasks({
+    sourceProjectId: "same-draft-project",
+    targetProjectId: "same-draft-project",
+    flow: maskFlow,
+  });
+  assert.equal(sameProjectFetchCalls, 0);
+  assert.equal(unchanged.targetProjectId, "same-draft-project");
+  assert.equal(unchanged.flow, maskFlow);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log("  ✓ 同一初始草稿的未同步修改保留蒙版且不发起复制请求");
+
 let freshCopyPayload: Record<string, unknown> | null = null;
 globalThis.fetch = async (_input, init) => {
   freshCopyPayload = JSON.parse(String(init?.body)) as Record<string, unknown>;
