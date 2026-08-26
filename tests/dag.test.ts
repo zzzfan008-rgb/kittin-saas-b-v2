@@ -39,6 +39,28 @@ const SECOND_PNG = await sharp({
 }).png().toBuffer();
 const SEED_DATA_URL = `data:image/png;base64,${SEED_PNG.toString("base64")}`;
 const SECOND_DATA_URL = `data:image/png;base64,${SECOND_PNG.toString("base64")}`;
+const MASK_SOURCE_PNG = await sharp({
+  create: { width: 128, height: 128, channels: 3, background: { r: 35, g: 92, b: 165 } },
+}).png().toBuffer();
+const MASK_SOURCE_DATA_URL = `data:image/png;base64,${MASK_SOURCE_PNG.toString("base64")}`;
+const MASK_PIXELS = Buffer.alloc(128 * 128 * 4, 255);
+for (let y = 40; y < 88; y += 1) {
+  for (let x = 40; x < 88; x += 1) MASK_PIXELS[(y * 128 + x) * 4 + 3] = 0;
+}
+const MASK_PNG = await sharp(MASK_PIXELS, { raw: { width: 128, height: 128, channels: 4 } }).png().toBuffer();
+const MASK_DATA_URL = `data:image/png;base64,${MASK_PNG.toString("base64")}`;
+const PATCH_PIXELS = Buffer.alloc(128 * 128 * 4);
+for (let y = 52; y < 76; y += 1) {
+  for (let x = 52; x < 76; x += 1) {
+    const offset = (y * 128 + x) * 4;
+    PATCH_PIXELS[offset] = 225;
+    PATCH_PIXELS[offset + 1] = 42;
+    PATCH_PIXELS[offset + 2] = 48;
+    PATCH_PIXELS[offset + 3] = 255;
+  }
+}
+const PATCH_PNG = await sharp(PATCH_PIXELS, { raw: { width: 128, height: 128, channels: 4 } }).png().toBuffer();
+const PATCH_DATA_URL = `data:image/png;base64,${PATCH_PNG.toString("base64")}`;
 fs.writeFileSync(path.join(uploadsDir(), "seed.png"), SEED_PNG);
 
 let passed = 0;
@@ -105,6 +127,7 @@ async function runRecordedAiStep(
   kind: Exclude<NodeKind, "image-input" | "result">,
   params: Record<string, unknown>,
   inputImages: string[],
+  providerImages?: string[],
 ) {
   const calls: RecordedProviderCall[] = [];
   const providerIds: string[] = [];
@@ -118,7 +141,7 @@ async function runRecordedAiStep(
     });
     const count = Math.max(1, request.batchSize ?? 1);
     return {
-      images: Array.from({ length: count }, () => SEED_DATA_URL),
+      images: providerImages ?? Array.from({ length: count }, () => SEED_DATA_URL),
       model: "runner-stub-model",
     };
   };
@@ -442,6 +465,39 @@ async function main() {
     assert.strictEqual(result.images.length, 3);
     assert.strictEqual(result.prompts?.length, 3);
     assert.strictEqual(result.providerRequests, 1);
+  });
+
+  await ok("runner 蒙版保持模式：模式、透明层提示、安全区与底图保护贯穿完整链路", async () => {
+    const { calls, providerIds, result } = await runRecordedAiStep(
+      "mask-redraw",
+      {
+        prompt: "在胸前添加红色刺绣",
+        mask: MASK_DATA_URL,
+        maskSourceRef: MASK_SOURCE_DATA_URL,
+        maskMode: "preserve",
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      },
+      [MASK_SOURCE_DATA_URL],
+      [PATCH_DATA_URL],
+    );
+    assert.deepStrictEqual(providerIds, ["gpt-image-2"]);
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].method, "edit");
+    assert.strictEqual(calls[0].request.maskMode, "preserve");
+    assert.match(calls[0].request.prompt, /透明 PNG 修改图层/);
+    assert.match(calls[0].request.prompt, /保留实际新增或改变的视觉内容/);
+    assert.notStrictEqual(calls[0].request.mask, MASK_DATA_URL, "模型必须收到扩展后的安全区蒙版");
+    assert.strictEqual(result.images.length, 1);
+    const decoded = await sharp(Buffer.from(result.images[0].split(",")[1], "base64"))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const backgroundOffset = (64 * decoded.info.width + 44) * decoded.info.channels;
+    assert.deepStrictEqual(
+      Array.from(decoded.data.subarray(backgroundOffset, backgroundOffset + 3)),
+      [35, 92, 165],
+      "选区内没有生成内容的底图必须保持原色",
+    );
   });
 
   await ok("端到端（无 AI）：result 节点收到上游本次产出", async () => {

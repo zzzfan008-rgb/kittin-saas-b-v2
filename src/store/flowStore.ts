@@ -955,7 +955,7 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
       };
     case "mask-redraw":
       return {
-        ...base, kind, prompt: "", outputImages: [],
+        ...base, kind, prompt: "", maskMode: "preserve", outputImages: [],
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":
@@ -1646,6 +1646,7 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
     case "mask-redraw":
       data.modelId = MASK_REDRAW_MODEL_ID;
       data.modelOptions = {};
+      data.maskMode = input.maskMode === "replace" ? "replace" : "preserve";
       data.prompt = typeof input.prompt === "string" ? input.prompt : "";
       data.outputImages = stringList(input.outputImages);
       if (typeof input.mask !== "string") delete data.mask;

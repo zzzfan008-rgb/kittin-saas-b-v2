@@ -251,7 +251,7 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       return { prompt: data.prompt, count: data.count, ...modelFields() };
     case "mask-redraw":
       return {
-        prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef,
+        prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef, maskMode: data.maskMode,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":

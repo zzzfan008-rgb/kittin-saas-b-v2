@@ -8,6 +8,7 @@ import {
   type PersistedWorkflowNode,
   type WorkflowNodeData,
   BATCH_SIZES,
+  MASK_COMPOSITE_MODES,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -196,6 +197,7 @@ function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<s
     case "mask-redraw":
       return {
         prompt: "", outputImages: [], ...raw,
+        maskMode: raw.maskMode === "replace" ? "replace" : "preserve",
         modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: defaultImageModelOptions(MASK_REDRAW_MODEL_ID),
       };
@@ -278,6 +280,8 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
       break;
     case "mask-redraw":
       stringValue(raw.prompt, `${path}.prompt`);
+      if (raw.maskMode === undefined) raw.maskMode = "preserve";
+      oneOf(raw.maskMode, MASK_COMPOSITE_MODES, `${path}.maskMode`);
       optionalMaskReference(raw.mask, `${path}.mask`);
       optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
       imageReferenceArray(raw.outputImages, `${path}.outputImages`);

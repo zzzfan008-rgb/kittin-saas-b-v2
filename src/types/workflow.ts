@@ -117,10 +117,19 @@ export interface MaskRedrawNodeData extends BaseNodeData {
   kind: "mask-redraw";
   modelId: "gpt-image-2";
   modelOptions: ImageModelOptions;
+  /** 保持原图仅叠加透明修改层；替换模式允许重绘选区底层像素。 */
+  maskMode?: MaskCompositeMode;
   prompt: string;
   mask?: string;
   maskSourceRef?: string;
   outputImages: string[];
+}
+
+export const MASK_COMPOSITE_MODES = ["preserve", "replace"] as const;
+export type MaskCompositeMode = (typeof MASK_COMPOSITE_MODES)[number];
+
+export function normalizeMaskCompositeMode(value: unknown): MaskCompositeMode {
+  return value === "replace" ? "replace" : "preserve";
 }
 
 export interface ResultNodeData extends BaseNodeData {
@@ -185,6 +194,8 @@ export interface ImageGenRequest {
   modelOptions?: ImageModelOptions;
   /** 局部编辑蒙版（dataURL），P0 可选 */
   mask?: string;
+  /** 蒙版合成语义；缺省按保持原图处理。 */
+  maskMode?: MaskCompositeMode;
 }
 
 export interface ImageGenResult {

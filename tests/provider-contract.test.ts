@@ -215,12 +215,12 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版且不发送禁用字段", async () => {
+    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版并按模式请求透明背景", async () => {
       let calls = 0;
-      let capturedForm: FormData | undefined;
+      const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
         calls += 1;
-        capturedForm = init?.body as FormData;
+        capturedForms.push(init?.body as FormData);
         return Response.json(pngPayload(red));
       });
       try {
@@ -276,14 +276,21 @@ async function main(): Promise<void> {
           prompt: "局部改红", referenceImages: [blue], mask, modelOptions: {},
         });
         assert.equal(calls, 1);
-        assert.equal(capturedForm?.get("model"), "gpt-image-2");
-        assert.equal(capturedForm?.get("n"), null);
-        assert.equal(capturedForm?.get("output_format"), "png");
-        assert.equal(capturedForm?.get("response_format"), null);
-        assert.equal(capturedForm?.get("input_fidelity"), null);
-        assert.ok(capturedForm?.get("image[]") instanceof Blob);
-        assert.equal(capturedForm?.get("image"), null);
-        assert.ok(capturedForm?.get("mask") instanceof Blob);
+        assert.equal(capturedForms[0].get("model"), "gpt-image-2");
+        assert.equal(capturedForms[0].get("n"), null);
+        assert.equal(capturedForms[0].get("output_format"), "png");
+        assert.equal(capturedForms[0].get("background"), "transparent");
+        assert.equal(capturedForms[0].get("response_format"), null);
+        assert.equal(capturedForms[0].get("input_fidelity"), null);
+        assert.ok(capturedForms[0].get("image[]") instanceof Blob);
+        assert.equal(capturedForms[0].get("image"), null);
+        assert.ok(capturedForms[0].get("mask") instanceof Blob);
+
+        await apiyiProviders["gpt-image-2"].edit({
+          prompt: "整体替换选区", referenceImages: [blue], mask, maskMode: "replace", modelOptions: {},
+        });
+        assert.equal(calls, 2);
+        assert.equal(capturedForms[1].get("background"), null);
       } finally {
         restoreFetch();
       }
@@ -291,7 +298,7 @@ async function main(): Promise<void> {
 
     await test("蒙版外像素由服务端合成硬保护", async () => {
       await validateMaskForSource(blue, mask);
-      const output = await compositeMaskedEdit(blue, mask, red);
+      const output = await compositeMaskedEdit(blue, mask, red, { mode: "replace" });
       const decoded = await sharp(Buffer.from(output.split(",")[1], "base64"))
         .raw()
         .toBuffer({ resolveWithObject: true });

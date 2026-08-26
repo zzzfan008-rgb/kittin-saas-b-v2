@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { createLatestMaskLoadGuard } from "@/lib/maskUpload";
+import { maskSafetyRadius } from "@/lib/maskGeometry";
 
 interface MaskEditorProps {
   source: string;
@@ -36,12 +37,29 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     if (!mask || !overlay) return;
     const context = overlay.getContext("2d");
     if (!context) return;
+    const selectionLayer = (fillStyle: string) => {
+      const layer = document.createElement("canvas");
+      layer.width = overlay.width;
+      layer.height = overlay.height;
+      const layerContext = layer.getContext("2d");
+      if (!layerContext) return layer;
+      layerContext.fillStyle = fillStyle;
+      layerContext.fillRect(0, 0, layer.width, layer.height);
+      layerContext.globalCompositeOperation = "destination-out";
+      layerContext.drawImage(mask, 0, 0);
+      layerContext.globalCompositeOperation = "source-over";
+      return layer;
+    };
     context.clearRect(0, 0, overlay.width, overlay.height);
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "rgba(239, 68, 68, 0.48)";
-    context.fillRect(0, 0, overlay.width, overlay.height);
-    context.globalCompositeOperation = "destination-out";
-    context.drawImage(mask, 0, 0);
+    const safetyRadius = maskSafetyRadius(overlay.width, overlay.height);
+    if (safetyRadius > 0) {
+      context.save();
+      context.filter = `blur(${Math.max(2, Math.round(safetyRadius / 2))}px)`;
+      context.drawImage(selectionLayer("rgba(245, 158, 11, 0.34)"), 0, 0);
+      context.restore();
+    }
+    context.drawImage(selectionLayer("rgba(239, 68, 68, 0.48)"), 0, 0);
     context.globalCompositeOperation = "source-over";
   };
 
@@ -326,6 +344,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
             className="accent-gold disabled:opacity-40"
           />
         </label>
+        <span className="text-[10px] text-neutral-600">红色为核心修改区 · 金色为防截断安全过渡区</span>
         {error && <p className="min-w-0 flex-1 truncate text-[10px] text-red-400" title={error}>{error}</p>}
         <button
           type="button"

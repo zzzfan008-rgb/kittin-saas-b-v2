@@ -9,7 +9,12 @@ import {
   selectNodeInputImages,
   useFlowStore,
 } from "@/store/flowStore";
-import { isNodeRunActive, type MaskRedrawNodeData } from "@/types/workflow";
+import {
+  isNodeRunActive,
+  normalizeMaskCompositeMode,
+  type MaskCompositeMode,
+  type MaskRedrawNodeData,
+} from "@/types/workflow";
 import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { MaskEditor } from "./MaskEditor";
@@ -23,11 +28,13 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const [promptRequired, setPromptRequired] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
+  const documentTarget = useFlowStore(selectActiveDocumentTarget);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
+  const maskMode = normalizeMaskCompositeMode(data.maskMode);
   const readiness = maskRedrawReadiness({
     source,
     mask: data.mask,
@@ -56,6 +63,11 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
     void runNode(id);
   };
 
+  const selectMaskMode = (nextMode: MaskCompositeMode) => {
+    if (readOnly || running || nextMode === maskMode) return;
+    updateNodeDataInTab(documentTarget, id, { maskMode: nextMode });
+  };
+
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -63,6 +75,33 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-neutral-500">图片模型</span>
           <span className="font-mono text-neutral-300">gpt-image-2</span>
+        </div>
+        <div className="space-y-1.5">
+          <span className="text-[10px] text-neutral-500">处理方式</span>
+          <div className="grid grid-cols-2 gap-1 rounded-md border border-[#333] bg-[#0f0f0f] p-1" role="group" aria-label="蒙版处理方式">
+            {([
+              ["preserve", "保持原图", "添加印花、刺绣或装饰，保留底色与光影"],
+              ["replace", "替换选区", "改色、去除或重做，选区内容可能整体变化"],
+            ] as const).map(([value, label, description]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={maskMode === value}
+                disabled={readOnly || running}
+                onClick={() => selectMaskMode(value)}
+                className={`nodrag rounded px-2 py-1.5 text-left text-[10px] transition-colors disabled:opacity-40 ${
+                  maskMode === value
+                    ? "bg-gold text-ink"
+                    : "text-neutral-400 hover:bg-[#1a1a1a] hover:text-neutral-200"
+                }`}
+              >
+                <span className="block font-medium">{label}</span>
+                <span className={`mt-0.5 block text-[9px] leading-3 ${maskMode === value ? "text-ink/70" : "text-neutral-600"}`}>
+                  {description}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
         {source ? (
           <img

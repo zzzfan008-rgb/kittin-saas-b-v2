@@ -452,6 +452,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         const mask = parseDataUrl(req.mask!);
         form.append("mask", new Blob([new Uint8Array(mask.buffer)], { type: "image/png" }), "mask.png");
         form.append("output_format", "png");
+        if (req.maskMode !== "replace") form.append("background", "transparent");
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
       });
       return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }), model: modelId };
