@@ -60,7 +60,8 @@ for (let y = 52; y < 76; y += 1) {
   }
 }
 const PATCH_PNG = await sharp(PATCH_PIXELS, { raw: { width: 128, height: 128, channels: 4 } }).png().toBuffer();
-const PATCH_DATA_URL = `data:image/png;base64,${PATCH_PNG.toString("base64")}`;
+const PATCH_PROVIDER_PNG = await sharp(PATCH_PNG).resize({ width: 816, height: 816, fit: "fill" }).png().toBuffer();
+const PATCH_PROVIDER_DATA_URL = `data:image/png;base64,${PATCH_PROVIDER_PNG.toString("base64")}`;
 fs.writeFileSync(path.join(uploadsDir(), "seed.png"), SEED_PNG);
 
 let passed = 0;
@@ -467,7 +468,7 @@ async function main() {
     assert.strictEqual(result.providerRequests, 1);
   });
 
-  await ok("runner 蒙版保持模式：模式、透明层提示、安全区与底图保护贯穿完整链路", async () => {
+  await ok("runner 蒙版保持模式：精确尺寸、安全区、差异提取与底图保护贯穿完整链路", async () => {
     const { calls, providerIds, result } = await runRecordedAiStep(
       "mask-redraw",
       {
@@ -479,14 +480,15 @@ async function main() {
         modelOptions: {},
       },
       [MASK_SOURCE_DATA_URL],
-      [PATCH_DATA_URL],
+      [PATCH_PROVIDER_DATA_URL],
     );
     assert.deepStrictEqual(providerIds, ["gpt-image-2"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.strictEqual(calls[0].request.maskMode, "preserve");
-    assert.match(calls[0].request.prompt, /透明 PNG 修改图层/);
-    assert.match(calls[0].request.prompt, /保留实际新增或改变的视觉内容/);
+    assert.match(calls[0].request.prompt, /返回完整图片/);
+    assert.match(calls[0].request.prompt, /只新增明确要求的视觉内容/);
+    assert.deepStrictEqual(calls[0].request.modelOptions, { size: "816x816" });
     assert.notStrictEqual(calls[0].request.mask, MASK_DATA_URL, "模型必须收到扩展后的安全区蒙版");
     assert.strictEqual(result.images.length, 1);
     const decoded = await sharp(Buffer.from(result.images[0].split(",")[1], "base64"))

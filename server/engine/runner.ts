@@ -477,7 +477,7 @@ export async function executeStep(
               ? (() => {
                   const mode = normalizeMaskCompositeMode(step.params.maskMode);
                   return mode === "preserve"
-                    ? `在蒙版允许范围内完成以下修改：${extra}。输出与原图尺寸和坐标完全一致的透明 PNG 修改图层；只保留实际新增或改变的视觉内容，其余像素必须透明。保持原图底色、材质、纹理、褶皱、光影、摄影背景、构图和未指定元素不变。新增内容必须完整位于可编辑范围内并预留边缘安全距离，禁止用不透明色块填满整个选区。`
+                    ? `在蒙版允许范围内完成以下修改：${extra}。返回完整图片，严格保持原图底色、材质、纹理、褶皱、光影、摄影背景、构图和未指定元素不变，只新增明确要求的视觉内容。新增内容必须完整位于可编辑范围内并预留边缘安全距离，禁止整体重绘或填满选区。`
                     : `只在蒙版允许范围内完成以下修改：${extra}。保持蒙版外内容不变；需要新增的图案或结构必须完整位于可编辑范围内并预留边缘安全距离，避免主体贴边或被截断。`;
                 })()
               : extra || DEFAULT_PROMPTS[step.kind] || NODE_SPECS[step.kind].description;
@@ -492,9 +492,10 @@ export async function executeStep(
       const maskMode = step.kind === "mask-redraw"
         ? normalizeMaskCompositeMode(step.params.maskMode)
         : undefined;
-      const providerMask = step.kind === "mask-redraw"
+      const preparedMask = step.kind === "mask-redraw"
         ? await prepareMaskForGeneration(referenceImages[0], mask!)
-        : mask;
+        : undefined;
+      const providerMask = preparedMask?.mask ?? mask;
       const request = {
         prompt,
         referenceImages: referenceImages.length ? referenceImages : undefined,
@@ -503,7 +504,7 @@ export async function executeStep(
           : step.params.aspectRatio as string | undefined,
         batchSize: step.params.batchSize as number | undefined,
         imageSize: step.kind === "upscale" ? normalizeUpscaleSize(step.params.imageSize) : undefined,
-        modelOptions,
+        modelOptions: preparedMask ? { ...modelOptions, size: preparedMask.size } : modelOptions,
         mask: providerMask,
         maskMode,
       };
@@ -518,7 +519,12 @@ export async function executeStep(
       );
       const providerImages = step.kind === "mask-redraw"
         ? await Promise.all(result.images.map((image) => (
-            compositeMaskedEdit(referenceImages[0], mask!, image, { mode: maskMode })
+            compositeMaskedEdit(referenceImages[0], mask!, image, {
+              mode: maskMode,
+              expectedGeneratedSize: preparedMask
+                ? { width: preparedMask.width, height: preparedMask.height }
+                : undefined,
+            })
           )))
         : result.images;
       const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);

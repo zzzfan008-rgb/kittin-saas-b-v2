@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import {
   compositeMaskedEdit,
+  maskGenerationDimensions,
   prepareMaskForGeneration,
 } from "../server/lib/maskProcessing";
 import { normalizeMaskCompositeMode } from "../src/types/workflow";
@@ -105,7 +106,7 @@ const height = 128;
 const source = await solidImage(width, height, { r: 35, g: 92, b: 165 });
 const mask = await rectangularMask(width, height, { left: 40, top: 40, width: 48, height: 48 });
 
-await test("保持原图模式只叠加透明修改层，不改变选区内未生成区域的底色", async () => {
+await test("保持原图模式只叠加新增内容，不改变选区内未生成区域的底色", async () => {
   const patch = await transparentPatch(
     width,
     height,
@@ -119,20 +120,67 @@ await test("保持原图模式只叠加透明修改层，不改变选区内未�
   assert.deepEqual(pixel(decoded, 8, 8), { r: 35, g: 92, b: 165, a: 255 });
 });
 
+await test("保持原图模式从完整不透明返回图中提取明显新增内容并保留轻微底色偏移", async () => {
+  const generatedPixels = Buffer.alloc(width * height * 3);
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 3;
+    generatedPixels[offset] = 42;
+    generatedPixels[offset + 1] = 98;
+    generatedPixels[offset + 2] = 170;
+  }
+  for (let y = 52; y < 76; y += 1) {
+    for (let x = 52; x < 76; x += 1) {
+      const offset = (y * width + x) * 3;
+      generatedPixels[offset] = 225;
+      generatedPixels[offset + 1] = 42;
+      generatedPixels[offset + 2] = 48;
+    }
+  }
+  const generated = await sharp(generatedPixels, { raw: { width, height, channels: 3 } }).png().toBuffer();
+  const generatedUrl = `data:image/png;base64,${generated.toString("base64")}`;
+  const output = await compositeMaskedEdit(source, mask, generatedUrl, { mode: "preserve" });
+  const decoded = await rawImage(output);
+  assertRgbNear(pixel(decoded, 64, 64), { r: 225, g: 42, b: 48, a: 255 });
+  assert.deepEqual(pixel(decoded, 44, 64), { r: 35, g: 92, b: 165, a: 255 });
+  assert.deepEqual(pixel(decoded, 8, 8), { r: 35, g: 92, b: 165, a: 255 });
+});
+
 await test("保持原图模式拒绝整块不透明返回，避免污染原图底色", async () => {
   const opaque = await solidImage(width, height, { r: 225, g: 42, b: 48 });
   await assert.rejects(
     () => compositeMaskedEdit(source, mask, opaque, { mode: "preserve" }),
-    /透明修改层|整块不透明选区/,
+    /透明修改层|整块不透明选区|几乎被整体替换/,
   );
 });
 
 await test("模型蒙版自动增加安全过渡区，核心边缘外仍可生成完整内容", async () => {
-  const providerMask = await prepareMaskForGeneration(source, mask);
-  const decoded = await rawImage(providerMask);
+  const prepared = await prepareMaskForGeneration(source, mask);
+  const decoded = await rawImage(prepared.mask);
   assert.equal(pixel(decoded, 40, 64).a, 0, "核心选区必须继续可编辑");
   assert.equal(pixel(decoded, 37, 64).a, 0, "核心选区外应增加可编辑安全区");
   assert.equal(pixel(decoded, 30, 64).a, 255, "远离选区的位置必须继续受保护");
+  assert.equal(prepared.size, "816x816");
+});
+
+await test("蒙版输出尺寸固定为最接近原图比例的合法 16 像素网格", () => {
+  assert.deepEqual(maskGenerationDimensions(1024, 1536), { width: 1024, height: 1536 });
+  assert.deepEqual(maskGenerationDimensions(1000, 1000), { width: 1008, height: 1008 });
+  assert.throws(() => maskGenerationDimensions(4000, 1000), /宽高比超过/);
+});
+
+await test("模型按请求尺寸返回后可无裁切映射回原图并继续硬保护蒙版外像素", async () => {
+  const generatedWidth = 160;
+  const generatedHeight = 160;
+  const generated = await solidImage(generatedWidth, generatedHeight, { r: 225, g: 42, b: 48 });
+  const output = await compositeMaskedEdit(source, mask, generated, {
+    mode: "replace",
+    expectedGeneratedSize: { width: generatedWidth, height: generatedHeight },
+  });
+  const decoded = await rawImage(output);
+  assert.equal(decoded.info.width, width);
+  assert.equal(decoded.info.height, height);
+  assertRgbNear(pixel(decoded, 64, 64), { r: 225, g: 42, b: 48, a: 255 });
+  assert.deepEqual(pixel(decoded, 8, 8), { r: 35, g: 92, b: 165, a: 255 });
 });
 
 await test("旧项目默认迁移到保持原图模式，显式替换模式保持不变", () => {

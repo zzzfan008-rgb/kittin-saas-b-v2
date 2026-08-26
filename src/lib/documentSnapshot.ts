@@ -217,7 +217,8 @@ function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
         ...optionalString("maskSourceRef", data.maskSourceRef),
         outputImages: [...data.outputImages],
         modelId: MASK_REDRAW_MODEL_ID,
-        modelOptions: normalizeImageModelOptions(MASK_REDRAW_MODEL_ID, data.modelOptions),
+        // 蒙版输出尺寸由服务端按原图逐次计算，不能写入项目文档形成陈旧参数。
+        modelOptions: {},
       };
     case "result":
       return {

@@ -49,6 +49,7 @@
           "preservedAlpha": 255
         }
       },
+      "dimensions": {"multipleOf": 16, "minSide": 16, "maxSide": 3840, "minPixels": 655360, "maxPixels": 8294400, "maxAspectRatio": 3},
       "forbiddenParameters": ["input_fidelity", "response_format"],
       "output": {"kind": "openai-image", "fields": ["b64_json"], "maxImages": 1}
     },

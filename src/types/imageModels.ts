@@ -53,7 +53,14 @@ export interface ImageModelContract {
   outputFormats?: string[];
   resolutions?: string[];
   outputCounts?: { min: number; max: number };
-  dimensions?: { multipleOf: number; minSide: number; maxPixels: number };
+  dimensions?: {
+    multipleOf: number;
+    minSide: number;
+    maxSide?: number;
+    minPixels?: number;
+    maxPixels: number;
+    maxAspectRatio?: number;
+  };
   output: { maxImages?: number };
 }
 
@@ -164,8 +171,22 @@ export function normalizeImageModelOptions(
   const raw = objectValue(value);
   const defaults = defaultImageModelOptions(modelId, preferredAspectRatio);
   switch (modelId) {
-    case "gpt-image-2":
-      return {};
+    case "gpt-image-2": {
+      const dimensions = getImageModelContract(modelId).dimensions!;
+      const match = typeof raw.size === "string" ? /^(\d+)x(\d+)$/.exec(raw.size) : null;
+      const width = Number(match?.[1]);
+      const height = Number(match?.[2]);
+      const aspectRatio = Math.max(width / height, height / width);
+      const valid = Number.isInteger(width) && Number.isInteger(height)
+        && width > 0 && height > 0
+        && width % dimensions.multipleOf === 0 && height % dimensions.multipleOf === 0
+        && width <= (dimensions.maxSide ?? Number.POSITIVE_INFINITY)
+        && height <= (dimensions.maxSide ?? Number.POSITIVE_INFINITY)
+        && width * height >= (dimensions.minPixels ?? 0)
+        && width * height <= dimensions.maxPixels
+        && aspectRatio <= (dimensions.maxAspectRatio ?? Number.POSITIVE_INFINITY);
+      return valid ? { size: raw.size as string } : {};
+    }
     case "gpt-image-2-vip": {
       const sizes = getImageModelContract(modelId).sizes ?? [];
       return { size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size };
@@ -256,7 +277,7 @@ export function imageModelOptionsError(modelId: ImageModelId, value: unknown): s
   const raw = value as Record<string, unknown>;
   const normalized = normalizeImageModelOptions(modelId, raw);
   const allowedKeys: Record<ImageModelId, readonly string[]> = {
-    "gpt-image-2": [],
+    "gpt-image-2": ["size"],
     "gpt-image-2-vip": ["size"],
     "gemini-3.1-flash-image": ["aspectRatio", "imageSize"],
     "flux-2-pro": ["width", "height", "outputFormat"],

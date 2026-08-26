@@ -18,7 +18,9 @@
 - 不得发送 response_format。
 - background 不得为 transparent。
 
-可发送 size、quality、output_format 和 output_compression，但必须使用文档枚举。quality 仅允许 auto、low、medium、high；output_format 仅允许 png、jpeg、webp。
+可发送 size、quality、output_format 和 output_compression。quality 仅允许 auto、low、medium、high；output_format 仅允许 png、jpeg、webp。
+
+蒙版请求必须显式发送与原图比例最接近的合法 `size`，禁止依赖 `auto`：两边均为 16 的倍数、最长边不超过 3840、总像素在 655,360–8,294,400 之间且宽高比不超过 3:1。模型返回后先核对实际尺寸与请求尺寸，再无裁切映射回原图坐标，最后执行蒙版外像素硬保护。
 
 ## 响应
 
@@ -32,3 +34,4 @@
 - 蒙版没有 Alpha 通道、完全不透明或完全透明时给出明确提示；前两项分别意味着无有效编辑区或整图重绘风险。
 - 蒙版节点至少提供画笔、橡皮擦、撤销、重做、清空和反选，并把画布坐标精确映射到原图像素。
 - 为严格保留蒙版外像素，可在模型输出后使用原图与蒙版做像素合成；不得向用户承诺模型自身会保持边界外逐像素不变。
+- `background` 只能使用 `auto` 或 `opaque`；本项目不得发送模型不支持的 `transparent`。保持原图模式通过服务端原图差异提取新增内容，替换选区模式则使用完整选区重绘结果。

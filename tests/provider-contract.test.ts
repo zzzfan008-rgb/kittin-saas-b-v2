@@ -215,7 +215,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版并按模式请求透明背景", async () => {
+    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
       let calls = 0;
       const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
@@ -273,13 +273,14 @@ async function main(): Promise<void> {
         assert.equal(calls, 0);
 
         await apiyiProviders["gpt-image-2"].edit({
-          prompt: "局部改红", referenceImages: [blue], mask, modelOptions: {},
+          prompt: "局部改红", referenceImages: [blue], mask, modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
         assert.equal(capturedForms[0].get("model"), "gpt-image-2");
         assert.equal(capturedForms[0].get("n"), null);
+        assert.equal(capturedForms[0].get("size"), "1152x576");
         assert.equal(capturedForms[0].get("output_format"), "png");
-        assert.equal(capturedForms[0].get("background"), "transparent");
+        assert.equal(capturedForms[0].get("background"), null);
         assert.equal(capturedForms[0].get("response_format"), null);
         assert.equal(capturedForms[0].get("input_fidelity"), null);
         assert.ok(capturedForms[0].get("image[]") instanceof Blob);
@@ -287,7 +288,8 @@ async function main(): Promise<void> {
         assert.ok(capturedForms[0].get("mask") instanceof Blob);
 
         await apiyiProviders["gpt-image-2"].edit({
-          prompt: "整体替换选区", referenceImages: [blue], mask, maskMode: "replace", modelOptions: {},
+          prompt: "整体替换选区", referenceImages: [blue], mask, maskMode: "replace",
+          modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 2);
         assert.equal(capturedForms[1].get("background"), null);

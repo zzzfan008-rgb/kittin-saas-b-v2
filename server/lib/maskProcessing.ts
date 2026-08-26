@@ -10,12 +10,67 @@ import {
 
 export const MAX_GPT_IMAGE_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_MASK_PIXELS = 40_000_000;
+const GPT_IMAGE_SIZE_MULTIPLE = 16;
+const GPT_IMAGE_MAX_SIDE = 3840;
+const GPT_IMAGE_MIN_PIXELS = 655_360;
+const GPT_IMAGE_MAX_PIXELS = 8_294_400;
+const GPT_IMAGE_MAX_ASPECT_RATIO = 3;
+const PRESERVE_DIFF_LOW = 16;
+const PRESERVE_DIFF_HIGH = 64;
 
 export interface ValidatedMaskPair {
   sourceBuffer: Buffer;
   maskBuffer: Buffer;
   width: number;
   height: number;
+}
+
+export interface PreparedMaskGeneration {
+  mask: string;
+  size: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * GPT Image 2 的输出尺寸必须是 16 的倍数，并落在文档规定的像素与比例范围内。
+ * 在全部合法候选中选择最接近原图比例和像素量的一档；合法原图会原尺寸直出。
+ */
+export function maskGenerationDimensions(width: number, height: number): { width: number; height: number } {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    throw new ProviderError("原图尺寸无效，无法准备蒙版生成", 400, "gpt-image-2", "invalid_request");
+  }
+  const sourceAspect = width / height;
+  const symmetricAspect = Math.max(sourceAspect, 1 / sourceAspect);
+  if (symmetricAspect > GPT_IMAGE_MAX_ASPECT_RATIO) {
+    throw new ProviderError(
+      "原图宽高比超过蒙版模型支持范围，请先裁剪至 3:1 以内",
+      400, "gpt-image-2", "invalid_request",
+    );
+  }
+  const desiredPixels = Math.min(GPT_IMAGE_MAX_PIXELS, Math.max(GPT_IMAGE_MIN_PIXELS, width * height));
+  let best: { width: number; height: number; score: number } | undefined;
+  for (
+    let candidateWidth = GPT_IMAGE_SIZE_MULTIPLE;
+    candidateWidth <= GPT_IMAGE_MAX_SIDE;
+    candidateWidth += GPT_IMAGE_SIZE_MULTIPLE
+  ) {
+    const candidateHeight = Math.round(candidateWidth / sourceAspect / GPT_IMAGE_SIZE_MULTIPLE)
+      * GPT_IMAGE_SIZE_MULTIPLE;
+    if (candidateHeight < GPT_IMAGE_SIZE_MULTIPLE || candidateHeight > GPT_IMAGE_MAX_SIDE) continue;
+    const pixels = candidateWidth * candidateHeight;
+    if (pixels < GPT_IMAGE_MIN_PIXELS || pixels > GPT_IMAGE_MAX_PIXELS) continue;
+    const candidateAspect = Math.max(candidateWidth / candidateHeight, candidateHeight / candidateWidth);
+    if (candidateAspect > GPT_IMAGE_MAX_ASPECT_RATIO) continue;
+    const aspectError = Math.abs(Math.log((candidateWidth / candidateHeight) / sourceAspect));
+    const pixelError = Math.abs(Math.log(pixels / desiredPixels));
+    const score = aspectError * 100 + pixelError;
+    if (!best || score < best.score) best = { width: candidateWidth, height: candidateHeight, score };
+  }
+  if (!best) {
+    throw new ProviderError("找不到可安全映射的蒙版输出尺寸", 400, "gpt-image-2", "invalid_request");
+  }
+  return { width: best.width, height: best.height };
 }
 
 const SHARP_MASK_INPUT = {
@@ -139,47 +194,67 @@ export async function validateMaskForSource(
 export async function prepareMaskForGeneration(
   sourceDataUrl: string,
   maskDataUrl: string,
-): Promise<string> {
+): Promise<PreparedMaskGeneration> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
+  const dimensions = maskGenerationDimensions(pair.width, pair.height);
   const radius = maskSafetyRadius(pair.width, pair.height);
-  if (radius === 0) return maskDataUrl;
-  const expandedEditAlpha = await withImageProcessingSlot(() => editableAlpha(pair, false));
-  const providerMask = await withImageProcessingSlot(() => (
-    rgbaMaskFromAlpha(expandedEditAlpha, pair.width, pair.height, true)
-  ));
-  return toDataUrl(providerMask.toString("base64"), "image/png");
+  let providerMask = pair.maskBuffer;
+  if (radius > 0) {
+    const expandedEditAlpha = await withImageProcessingSlot(() => editableAlpha(pair, false));
+    providerMask = await withImageProcessingSlot(() => (
+      rgbaMaskFromAlpha(expandedEditAlpha, pair.width, pair.height, true)
+    ));
+  }
+  return {
+    mask: toDataUrl(providerMask.toString("base64"), "image/png"),
+    size: `${dimensions.width}x${dimensions.height}`,
+    ...dimensions,
+  };
 }
 
-async function assertPreserveLayer(
+async function preserveGeneratedLayer(
+  sourceBuffer: Buffer,
   generatedBuffer: Buffer,
   editAlpha: Buffer,
   width: number,
   height: number,
-): Promise<void> {
-  const image = sharp(generatedBuffer, SHARP_MASK_INPUT);
-  const metadata = await image.metadata();
-  if (!metadata.hasAlpha) {
-    throw new ProviderError(
-      "保持原图模式没有获得透明修改层，原图未被覆盖；请重试或改用替换选区模式",
-      502, "gpt-image-2", "invalid_response",
-    );
-  }
-  const alpha = await image.extractChannel("alpha").raw().toBuffer();
+): Promise<Buffer> {
+  const [source, generated] = await Promise.all([
+    sharp(sourceBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer(),
+    sharp(generatedBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer(),
+  ]);
+  const layer = Buffer.alloc(width * height * 4);
   let editablePixels = 0;
-  let opaqueEditablePixels = 0;
-  let transparentPixels = 0;
+  let stronglyChangedPixels = 0;
   for (let index = 0; index < width * height; index += 1) {
-    if (alpha[index] === 0) transparentPixels += 1;
-    if (editAlpha[index] < 128) continue;
-    editablePixels += 1;
-    if (alpha[index] >= 250) opaqueEditablePixels += 1;
+    const offset = index * 4;
+    const difference = Math.max(
+      Math.abs(generated[offset] - source[offset]),
+      Math.abs(generated[offset + 1] - source[offset + 1]),
+      Math.abs(generated[offset + 2] - source[offset + 2]),
+    );
+    const differenceAlpha = difference <= PRESERVE_DIFF_LOW
+      ? 0
+      : difference >= PRESERVE_DIFF_HIGH
+        ? 255
+        : Math.round(((difference - PRESERVE_DIFF_LOW) / (PRESERVE_DIFF_HIGH - PRESERVE_DIFF_LOW)) * 255);
+    const alpha = Math.min(generated[offset + 3], differenceAlpha);
+    layer[offset] = generated[offset];
+    layer[offset + 1] = generated[offset + 1];
+    layer[offset + 2] = generated[offset + 2];
+    layer[offset + 3] = alpha;
+    if (editAlpha[index] >= 128) {
+      editablePixels += 1;
+      if (alpha >= 250) stronglyChangedPixels += 1;
+    }
   }
-  if (transparentPixels === 0 || (editablePixels > 0 && opaqueEditablePixels / editablePixels > 0.92)) {
+  if (editablePixels > 0 && stronglyChangedPixels / editablePixels > 0.92) {
     throw new ProviderError(
-      "保持原图模式返回了整块不透明选区，可能污染原有底色；原图未被覆盖，请重试或改用替换选区模式",
+      "保持原图模式检测到选区几乎被整体替换，原图未被覆盖；请缩小选区、调整提示词或改用替换选区模式",
       502, "gpt-image-2", "invalid_response",
     );
   }
+  return sharp(layer, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
 /**
@@ -190,7 +265,10 @@ export async function compositeMaskedEdit(
   sourceDataUrl: string,
   maskDataUrl: string,
   generatedDataUrl: string,
-  options: { mode?: MaskCompositeMode } = {},
+  options: {
+    mode?: MaskCompositeMode;
+    expectedGeneratedSize?: { width: number; height: number };
+  } = {},
 ): Promise<string> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
   const generated = validateImageDataUrl(generatedDataUrl);
@@ -199,18 +277,25 @@ export async function compositeMaskedEdit(
     const generatedMeta = await sharp(generated.buffer, {
       animated: false, failOn: "error", limitInputPixels: MAX_MASK_PIXELS,
     }).metadata();
-    if (generatedMeta.width !== pair.width || generatedMeta.height !== pair.height) {
+    const expected = options.expectedGeneratedSize ?? { width: pair.width, height: pair.height };
+    if (generatedMeta.width !== expected.width || generatedMeta.height !== expected.height) {
       throw new ProviderError(
-        "AI 返回图片尺寸与原图不一致，无法安全执行蒙版外像素保护",
+        `AI 返回图片尺寸与请求不一致（请求 ${expected.width}x${expected.height}，返回 ${generatedMeta.width ?? "?"}x${generatedMeta.height ?? "?"}），无法安全执行蒙版外像素保护`,
         502, "gpt-image-2", "invalid_response",
       );
     }
+    const alignedGenerated = expected.width === pair.width && expected.height === pair.height
+      ? generated.buffer
+      : await sharp(generated.buffer, SHARP_MASK_INPUT)
+        .resize({ width: pair.width, height: pair.height, fit: "fill" })
+        .png()
+        .toBuffer();
     const editAlpha = await editableAlpha(pair, true);
-    if (mode === "preserve") {
-      await assertPreserveLayer(generated.buffer, editAlpha, pair.width, pair.height);
-    }
+    const generatedLayer = mode === "preserve"
+      ? await preserveGeneratedLayer(pair.sourceBuffer, alignedGenerated, editAlpha, pair.width, pair.height)
+      : alignedGenerated;
     const editMask = await rgbaMaskFromAlpha(editAlpha, pair.width, pair.height);
-    const editableLayer = await sharp(generated.buffer)
+    const editableLayer = await sharp(generatedLayer)
       .ensureAlpha()
       .composite([{ input: editMask, blend: "dest-in" }])
       .png()
