@@ -15,6 +15,7 @@ import { createRateLimitMiddleware } from "./lib/rateLimit";
 import { authRouter } from "./routes/auth";
 import { historyRouter } from "./routes/history";
 import { usageRouter } from "./routes/usage";
+import { tutorialsRouter } from "./routes/tutorials";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
@@ -96,6 +97,7 @@ app.use("/api/templates", templatesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/usage", usageRouter);
+app.use("/api/tutorials", tutorialsRouter);
 app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
 app.use("/api", (_req, res) => res.status(404).json({ error: "API not found" }));
 

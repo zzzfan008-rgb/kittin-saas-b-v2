@@ -515,6 +515,23 @@ async function migrate(): Promise<void> {
       );
     }
 
+    if (!applied.has(11)) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_tutorial_receipts (
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          tutorial_key TEXT NOT NULL,
+          tutorial_version TEXT NOT NULL,
+          outcome TEXT NOT NULL CHECK (outcome IN ('dismissed','completed')),
+          acknowledged_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, tutorial_key, tutorial_version)
+        );
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (11, $1, $2)",
+        ["versioned_tutorial_receipts", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

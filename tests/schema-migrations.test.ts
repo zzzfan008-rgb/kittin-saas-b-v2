@@ -31,8 +31,44 @@ assert.deepEqual(versions, [
   { version: 8, name: "normalized_upload_metadata" },
   { version: 9, name: "generation_queue_concurrency_hardening" },
   { version: 10, name: "generation_run_request_idempotency" },
+  { version: 11, name: "versioned_tutorial_receipts" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
+
+const tutorialReceiptColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'user_tutorial_receipts'
+  ORDER BY ordinal_position
+`);
+assert.deepEqual(tutorialReceiptColumns, [
+  { column_name: "user_id" },
+  { column_name: "tutorial_key" },
+  { column_name: "tutorial_version" },
+  { column_name: "outcome" },
+  { column_name: "acknowledged_at" },
+]);
+const tutorialReceiptPrimaryKey = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conrelid = 'user_tutorial_receipts'::regclass AND contype = 'p'
+`);
+assert.match(tutorialReceiptPrimaryKey?.definition ?? "", /user_id, tutorial_key, tutorial_version/);
+const tutorialOutcomeConstraint = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conrelid = 'user_tutorial_receipts'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) LIKE '%outcome%'
+`);
+assert.match(tutorialOutcomeConstraint?.definition ?? "", /dismissed/);
+assert.match(tutorialOutcomeConstraint?.definition ?? "", /completed/);
+const tutorialUserForeignKey = await queryOne<{ delete_action: string }>(`
+  SELECT confdeltype AS delete_action
+  FROM pg_constraint
+  WHERE conrelid = 'user_tutorial_receipts'::regclass AND contype = 'f'
+`);
+assert.equal(tutorialUserForeignKey?.delete_action, "c");
+console.log("  ✓ 教程回执按用户、教程标识和版本唯一存储且随用户级联删除");
 
 const queueTables = await query<{ table_name: string }>(`
   SELECT table_name FROM information_schema.tables
