@@ -37,6 +37,7 @@ interface ProjectMaskFileRef {
 }
 
 const RETIRED_MASK_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const INITIAL_DRAFT_TRASH_RETENTION_MS = 15 * 24 * 60 * 60 * 1_000;
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_DRAFT_REVISION = 2_147_483_646;
 
@@ -480,16 +481,14 @@ projectsRouter.put("/initial-draft/:id", asyncHandler(async (req, res) => {
     const outcome = await transaction(async (client) => {
       if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
       const existing = await queryOne<{
-        owner_id: string;
         deleted_at: string | null;
         lifecycle: "initial_draft" | "saved";
         draft_revision: number;
       }>(`
-        SELECT owner_id, deleted_at, lifecycle, draft_revision
-        FROM projects WHERE id = $1 FOR UPDATE
-      `, [req.params.id], client);
+        SELECT deleted_at, lifecycle, draft_revision
+        FROM projects WHERE id = $1 AND owner_id = $2 FOR UPDATE
+      `, [req.params.id, user.id], client);
       if (!existing) return { status: "not_found" as const };
-      if (existing.owner_id !== user.id) return { status: "forbidden" as const };
       if (existing.deleted_at) return { status: "deleted" as const };
       if (existing.lifecycle !== "initial_draft") return { status: "already_saved" as const };
       if (existing.draft_revision !== expectedRevision) {
@@ -522,10 +521,6 @@ projectsRouter.put("/initial-draft/:id", asyncHandler(async (req, res) => {
       res.status(404).json({ error: "initial draft not found" });
       return;
     }
-    if (outcome.status === "forbidden") {
-      res.status(403).json({ error: "无权修改此初始草稿" });
-      return;
-    }
     if (outcome.status === "deleted") {
       res.status(409).json({ error: "初始草稿已在回收站中" });
       return;
@@ -546,6 +541,155 @@ projectsRouter.put("/initial-draft/:id", asyncHandler(async (req, res) => {
     res.status(error instanceof WorkflowValidationError ? 400 : error instanceof ImageReferenceAccessError ? 403 : 500)
       .json({ error: error instanceof Error ? error.message : String(error) });
   }
+}));
+
+projectsRouter.delete("/initial-draft/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { confirm, expectedRevision } = req.body as {
+    confirm?: unknown;
+    expectedRevision?: unknown;
+  };
+  if (!PROJECT_ID_PATTERN.test(req.params.id)) {
+    res.status(400).json({ error: "invalid project id" });
+    return;
+  }
+  if (confirm !== true) {
+    res.status(400).json({ error: "confirm must be true to abandon an initial draft" });
+    return;
+  }
+  if (
+    typeof expectedRevision !== "number" ||
+    !Number.isSafeInteger(expectedRevision) ||
+    expectedRevision < 0 ||
+    expectedRevision > MAX_DRAFT_REVISION
+  ) {
+    res.status(400).json({ error: "expectedRevision must be a non-negative integer" });
+    return;
+  }
+
+  const outcome = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+    const existing = await queryOne<{
+      lifecycle: "initial_draft" | "saved";
+      draft_revision: number;
+    }>(`
+      SELECT lifecycle, draft_revision
+      FROM projects
+      WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+      FOR UPDATE
+    `, [req.params.id, user.id], client);
+    if (!existing) return { status: "not_found" as const };
+    if (existing.lifecycle !== "initial_draft") return { status: "already_saved" as const };
+    if (existing.draft_revision !== expectedRevision) {
+      return {
+        status: "revision_conflict" as const,
+        currentRevision: existing.draft_revision,
+      };
+    }
+
+    const deletedAt = new Date();
+    const purgeAfter = new Date(deletedAt.getTime() + INITIAL_DRAFT_TRASH_RETENTION_MS);
+    const deletedAtIso = deletedAt.toISOString();
+    const purgeAfterIso = purgeAfter.toISOString();
+    await client.query(`
+      UPDATE projects
+      SET deleted_at = $1, purge_after = $2, updated_at = $1
+      WHERE id = $3 AND owner_id = $4 AND lifecycle = 'initial_draft' AND deleted_at IS NULL
+    `, [deletedAtIso, purgeAfterIso, req.params.id, user.id]);
+    await client.query(`
+      UPDATE files
+      SET deleted_at = $1, purge_after = $2
+      WHERE owner_id = $3 AND project_id = $4
+        AND source_type IN ('mask-draft', 'mask') AND deleted_at IS NULL
+    `, [deletedAtIso, purgeAfterIso, user.id, req.params.id]);
+    return { status: "abandoned" as const, purgeAfter: purgeAfterIso };
+  });
+
+  if (outcome.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能放弃初始草稿" });
+    return;
+  }
+  if (outcome.status === "not_found") {
+    res.status(404).json({ error: "initial draft not found" });
+    return;
+  }
+  if (outcome.status === "already_saved") {
+    res.status(409).json({ error: "项目已经正式保存，不能作为初始草稿放弃" });
+    return;
+  }
+  if (outcome.status === "revision_conflict") {
+    res.status(409).json({
+      error: "初始草稿已在其他页面或设备更新，请先合并最新内容",
+      currentRevision: outcome.currentRevision,
+    });
+    return;
+  }
+  res.json({ ok: true, purgeAfter: outcome.purgeAfter });
+}));
+
+projectsRouter.post("/initial-draft/:id/restore", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  if (!PROJECT_ID_PATTERN.test(req.params.id)) {
+    res.status(400).json({ error: "invalid project id" });
+    return;
+  }
+  const outcome = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+    const existing = await queryOne<{
+      lifecycle: "initial_draft" | "saved";
+      deleted_at: string;
+      purge_after: string | null;
+    }>(`
+      SELECT lifecycle, deleted_at, purge_after
+      FROM projects
+      WHERE id = $1 AND owner_id = $2 AND deleted_at IS NOT NULL
+      FOR UPDATE
+    `, [req.params.id, user.id], client);
+    if (!existing || existing.lifecycle !== "initial_draft") return { status: "not_found" as const };
+    if (!existing.purge_after || existing.purge_after <= new Date().toISOString()) {
+      return { status: "expired" as const };
+    }
+    const activeDraft = await findInitialDraft(client, user.id, true);
+    if (activeDraft) {
+      return { status: "active_conflict" as const, currentDraftId: activeDraft.id };
+    }
+    const restored = (await client.query<InitialDraftRow>(`
+      UPDATE projects
+      SET deleted_at = NULL, purge_after = NULL, updated_at = $1
+      WHERE id = $2 AND owner_id = $3 AND lifecycle = 'initial_draft'
+      RETURNING id, owner_id, ''::text AS owner_name, name, flow_json,
+        lifecycle, draft_revision, created_at, updated_at
+    `, [new Date().toISOString(), req.params.id, user.id])).rows[0];
+    await client.query(`
+      UPDATE files
+      SET deleted_at = NULL, purge_after = NULL
+      WHERE owner_id = $1 AND project_id = $2
+        AND source_type IN ('mask-draft', 'mask')
+        AND deleted_at = $3 AND purge_after = $4
+    `, [user.id, req.params.id, existing.deleted_at, existing.purge_after]);
+    return { status: "restored" as const, row: restored };
+  });
+
+  if (outcome.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能恢复初始草稿" });
+    return;
+  }
+  if (outcome.status === "not_found") {
+    res.status(404).json({ error: "recoverable initial draft not found" });
+    return;
+  }
+  if (outcome.status === "expired") {
+    res.status(410).json({ error: "初始草稿已超过 15 天恢复期" });
+    return;
+  }
+  if (outcome.status === "active_conflict") {
+    res.status(409).json({
+      error: "当前账号已有另一个有效初始草稿",
+      currentDraftId: outcome.currentDraftId,
+    });
+    return;
+  }
+  res.json({ draft: initialDraftPayload(outcome.row) });
 }));
 
 projectsRouter.get("/:id", asyncHandler(async (req, res) => {

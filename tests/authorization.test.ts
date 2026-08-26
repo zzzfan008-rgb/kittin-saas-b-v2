@@ -1022,6 +1022,145 @@ await test("并发 bootstrap 只创建一个草稿，revision 冲突不覆盖且
   }
 });
 
+await test("草稿权限统一隐藏，放弃需确认且 15 天内可恢复", async () => {
+  const ownerDraftId = "abandon-owner-initial-draft";
+  const otherDraftId = "abandon-other-initial-draft";
+  const replacementDraftId = "abandon-owner-replacement";
+  const maskFileId = "abandon-owner-mask";
+  const retiredMaskFileId = "abandon-owner-retired-mask";
+  try {
+    for (const [user, id] of [["owner", ownerDraftId], ["other", otherDraftId]] as const) {
+      const bootstrap = await request("/projects/initial-draft/bootstrap", user, {
+        method: "POST",
+        body: JSON.stringify({ id, flow: flow() }),
+      });
+      assert.equal(bootstrap.status, 201, await bootstrap.text());
+    }
+    const retiredAt = new Date(Date.now() - 60_000).toISOString();
+    const retiredPurgeAfter = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000).toISOString();
+    await query(`
+      INSERT INTO files (
+        id, owner_id, source_type, mime_type, project_id, node_id, created_at,
+        deleted_at, purge_after
+      ) VALUES
+        ($1, $3, 'mask-draft', 'image/png', $4, 'mask-node', $5, NULL, NULL),
+        ($2, $3, 'mask', 'image/png', $4, 'retired-mask-node', $5, $6, $7)
+    `, [
+      maskFileId,
+      retiredMaskFileId,
+      users.owner.id,
+      ownerDraftId,
+      now,
+      retiredAt,
+      retiredPurgeAfter,
+    ]);
+
+    const deniedUpdate = await request(`/projects/initial-draft/${ownerDraftId}`, "other", {
+      method: "PUT",
+      body: JSON.stringify({ expectedRevision: 0, name: "不应该可见", flow: flow() }),
+    });
+    const unknownUpdate = await request("/projects/initial-draft/unknown-draft-id", "other", {
+      method: "PUT",
+      body: JSON.stringify({ expectedRevision: 0, name: "不存在", flow: flow() }),
+    });
+    assert.equal(deniedUpdate.status, 404);
+    assert.equal(unknownUpdate.status, 404);
+    assert.deepEqual(await deniedUpdate.json(), await unknownUpdate.json());
+
+    const deniedDelete = await request(`/projects/initial-draft/${ownerDraftId}`, "other", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: true, expectedRevision: 0 }),
+    });
+    assert.equal(deniedDelete.status, 404, await deniedDelete.text());
+
+    const missingConfirmation = await request(`/projects/initial-draft/${ownerDraftId}`, "owner", {
+      method: "DELETE",
+      body: JSON.stringify({ expectedRevision: 0 }),
+    });
+    assert.equal(missingConfirmation.status, 400, await missingConfirmation.text());
+    const stale = await request(`/projects/initial-draft/${ownerDraftId}`, "owner", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: true, expectedRevision: 1 }),
+    });
+    assert.equal(stale.status, 409, await stale.text());
+    assert.deepEqual(await queryOne<{ deleted_at: string | null; draft_revision: number }>(`
+      SELECT deleted_at, draft_revision FROM projects WHERE id = $1
+    `, [ownerDraftId]), { deleted_at: null, draft_revision: 0 });
+
+    const beforeAbandon = Date.now();
+    const abandoned = await request(`/projects/initial-draft/${ownerDraftId}`, "owner", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: true, expectedRevision: 0 }),
+    });
+    const abandonedPayload = await abandoned.json() as { ok?: boolean; purgeAfter?: string; error?: string };
+    assert.equal(abandoned.status, 200, abandonedPayload.error);
+    assert.equal(abandonedPayload.ok, true);
+    const purgeAfterMs = new Date(abandonedPayload.purgeAfter ?? "").getTime();
+    assert.ok(purgeAfterMs >= beforeAbandon + 15 * 24 * 60 * 60 * 1_000 - 2_000);
+    assert.ok(purgeAfterMs <= Date.now() + 15 * 24 * 60 * 60 * 1_000 + 2_000);
+    const abandonedRow = await queryOne<{
+      lifecycle: string;
+      deleted_at: string | null;
+      purge_after: string | null;
+    }>(`
+      SELECT lifecycle, deleted_at, purge_after FROM projects WHERE id = $1
+    `, [ownerDraftId]);
+    assert.equal(abandonedRow?.lifecycle, "initial_draft");
+    assert.ok(abandonedRow?.deleted_at);
+    assert.equal(abandonedRow?.purge_after, abandonedPayload.purgeAfter);
+    const abandonedMask = await queryOne<{ deleted_at: string | null; purge_after: string | null }>(`
+      SELECT deleted_at, purge_after FROM files WHERE id = $1
+    `, [maskFileId]);
+    assert.ok(abandonedMask?.deleted_at);
+    assert.equal(abandonedMask?.purge_after, abandonedPayload.purgeAfter);
+    const afterAbandon = await (await request("/projects/initial-draft", "owner")).json() as { draft: unknown };
+    assert.equal(afterAbandon.draft, null);
+
+    const replacement = await request("/projects/initial-draft/bootstrap", "owner", {
+      method: "POST",
+      body: JSON.stringify({ id: replacementDraftId, flow: flow() }),
+    });
+    const replacementPayload = await replacement.json() as { draft?: { id: string }; error?: string };
+    assert.equal(replacement.status, 201, replacementPayload.error);
+    assert.equal(replacementPayload.draft?.id, replacementDraftId);
+
+    const blockedRestore = await request(`/projects/initial-draft/${ownerDraftId}/restore`, "owner", {
+      method: "POST",
+      body: "{}",
+    });
+    const blockedRestorePayload = await blockedRestore.json() as { currentDraftId?: string; error?: string };
+    assert.equal(blockedRestore.status, 409, blockedRestorePayload.error);
+    assert.equal(blockedRestorePayload.currentDraftId, replacementDraftId);
+
+    const abandonReplacement = await request(`/projects/initial-draft/${replacementDraftId}`, "owner", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: true, expectedRevision: 0 }),
+    });
+    assert.equal(abandonReplacement.status, 200, await abandonReplacement.text());
+    const restored = await request(`/projects/initial-draft/${ownerDraftId}/restore`, "owner", {
+      method: "POST",
+      body: "{}",
+    });
+    const restoredPayload = await restored.json() as { draft?: { id: string; revision: number }; error?: string };
+    assert.equal(restored.status, 200, restoredPayload.error);
+    assert.equal(restoredPayload.draft?.id, ownerDraftId);
+    assert.equal(restoredPayload.draft?.revision, 0);
+    assert.deepEqual(await queryOne<{ deleted_at: string | null; purge_after: string | null }>(`
+      SELECT deleted_at, purge_after FROM files WHERE id = $1
+    `, [maskFileId]), { deleted_at: null, purge_after: null });
+    assert.deepEqual(await queryOne<{ deleted_at: string | null; purge_after: string | null }>(`
+      SELECT deleted_at, purge_after FROM files WHERE id = $1
+    `, [retiredMaskFileId]), { deleted_at: retiredAt, purge_after: retiredPurgeAfter });
+  } finally {
+    await query("DELETE FROM files WHERE id = ANY($1::text[])", [[maskFileId, retiredMaskFileId]]);
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[
+      ownerDraftId,
+      otherDraftId,
+      replacementDraftId,
+    ]]);
+  }
+});
+
 await test("账号转移遇到双方各自的初始草稿时明确拒绝且不改变归属", async () => {
   const sourceDraftId = "transfer-source-initial-draft";
   const targetDraftId = "transfer-target-initial-draft";
