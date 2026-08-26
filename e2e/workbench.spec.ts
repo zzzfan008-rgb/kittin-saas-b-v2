@@ -65,6 +65,7 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   const nodes = page.locator(".react-flow__node");
   const selectedNodes = page.locator(".react-flow__node.selected");
   const node = nodes.first();
+  const initialNodeCount = await nodes.count();
   const nodeHeader = node.locator(".gc-node-header");
   const pane = page.locator(".react-flow__pane");
 
@@ -80,10 +81,10 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   // node becomes the sole selection, and one undo removes the whole paste action.
   await page.keyboard.press(`${modifier}+c`);
   await page.keyboard.press(`${modifier}+v`);
-  await expect(nodes).toHaveCount(2);
+  await expect(nodes).toHaveCount(initialNodeCount + 1);
   await expect(selectedNodes).toHaveCount(1);
   await page.keyboard.press(`${modifier}+z`);
-  await expect(nodes).toHaveCount(1);
+  await expect(nodes).toHaveCount(initialNodeCount);
   await expect(selectedNodes).toHaveCount(0);
   await nodeHeader.click();
   await expect(selectedNodes).toHaveCount(1);

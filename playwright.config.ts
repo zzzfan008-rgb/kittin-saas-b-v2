@@ -132,5 +132,15 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
       },
     },
+    {
+      name: "initial-draft",
+      testMatch: /initial-draft\.spec\.ts/,
+      dependencies: ["desktop-1024", "desktop-1280", "desktop-1440", "golden-path"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
   ],
 });

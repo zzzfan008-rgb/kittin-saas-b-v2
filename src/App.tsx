@@ -35,6 +35,11 @@ import {
   shouldWarnBeforeWorkspaceUnload,
 } from "@/lib/workspaceUnload";
 import { isWorkbenchTutorialBlocking } from "@/tutorials/tutorialRuntime";
+import {
+  InitialDraftSyncNotice,
+  InitialDraftWorkspace,
+} from "@/initialDraft/InitialDraftWorkspace";
+import { isInitialDraftInteractionBlocking } from "@/initialDraft/initialDraftRuntime";
 
 /** 剪贴板里的节点快照（仅内存，跨项目/刷新不保留） */
 let nodeClipboard: { data: FlowNode["data"]; type: string } | null = null;
@@ -65,6 +70,7 @@ function useGlobalShortcuts() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       if (isWorkbenchTutorialBlocking()) return;
+      if (isInitialDraftInteractionBlocking()) return;
       // 蒙版编辑器使用独立撤销栈；打开或上传期间不能让全局快捷键修改底层画布。
       if (useFlowStore.getState().pendingMaskWorkCount > 0) return;
       const key = e.key.toLowerCase();
@@ -137,7 +143,11 @@ export default function App() {
   }
   if (!user) return <LoginPage />;
   if (user.mustChangePassword) return <ChangePasswordPage />;
-  return <Workspace />;
+  return (
+    <InitialDraftWorkspace userId={user.id}>
+      <Workspace />
+    </InitialDraftWorkspace>
+  );
 }
 
 function Workspace() {
@@ -258,6 +268,7 @@ function Workspace() {
     <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
       <TopBar />
       <ProjectTabs />
+      <InitialDraftSyncNotice />
       {initialHistoryState !== "ready" && (
         <div
           role={initialHistoryState === "error" ? "alert" : "status"}

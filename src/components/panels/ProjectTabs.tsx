@@ -1,6 +1,12 @@
-import { flushActiveTextEdit, useFlowStore, type ProjectTab } from "@/store/flowStore";
+import {
+  flushActiveTextEdit,
+  projectTabLifecycle,
+  useFlowStore,
+  type ProjectTab,
+} from "@/store/flowStore";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { isNodeRunActive } from "@/types/workflow";
+import { useInitialDraftWorkspace } from "@/initialDraft/InitialDraftWorkspace";
 
 function hasRunningNode(tab: ProjectTab): boolean {
   return tab.nodes.some((node) => isNodeRunActive(node.data.status));
@@ -13,8 +19,9 @@ export function ProjectTabs() {
   const closeTab = useFlowStore((state) => state.closeTab);
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
   const runReconciliationBlockReason = useGenerationSafetyBlockReason();
+  const { abandon, abandoningTabId } = useInitialDraftWorkspace();
 
-  const requestClose = (tab: ProjectTab) => {
+  const requestClose = async (tab: ProjectTab) => {
     flushActiveTextEdit();
     const latestTab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tab.id);
     if (!latestTab) return;
@@ -25,6 +32,19 @@ export function ProjectTabs() {
     }
     if (hasRunningNode(latestTab)) {
       window.alert("生成任务运行中，请等待任务完成后再关闭项目页签；结果会继续写回当前画布。");
+      return;
+    }
+    if (projectTabLifecycle(latestTab) === "initial_draft") {
+      const firstConfirmed = window.confirm(
+        `${latestTab.projectName} 是当前账号唯一的未保存初始项目。放弃后它会从工作台移除，并进入 15 天恢复期。是否继续？`,
+      );
+      if (!firstConfirmed) return;
+      const secondConfirmed = window.confirm(
+        `再次确认放弃 ${latestTab.projectName}？系统随后会创建一个全新的未保存初始项目。`,
+      );
+      if (!secondConfirmed) return;
+      const abandoned = await abandon(latestTab.id);
+      if (!abandoned) window.alert("未能放弃当前初始项目，请根据工作台提示重试。");
       return;
     }
     if (latestTab.dirty) warnings.push("有未保存修改");
@@ -73,10 +93,11 @@ export function ProjectTabs() {
             </button>
             <button
               type="button"
-              onClick={() => requestClose(tab)}
+              onClick={() => void requestClose(tab)}
+              disabled={abandoningTabId === tab.id}
               aria-label={`关闭 ${tab.projectName}`}
               title="关闭页签"
-              className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-neutral-600 hover:bg-white/5 hover:text-neutral-300"
+              className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-neutral-600 hover:bg-white/5 hover:text-neutral-300 disabled:cursor-wait disabled:opacity-40"
             >
               ×
             </button>

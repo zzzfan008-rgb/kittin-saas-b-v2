@@ -385,6 +385,197 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       SELECT source_type, purge_after FROM files WHERE id = $1
     `, [maskBody.id]), { source_type: "mask", purge_after: null });
 
+    const copyMaskResponse = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        createTarget: true,
+        masks: [{ fileId: maskBody.id, nodeId: "mask-node" }],
+      }),
+    });
+    assert.equal(copyMaskResponse.status, 200);
+    const copiedMaskBody = await copyMaskResponse.json() as {
+      targetProjectId: string;
+      masks: Array<{ sourceUrl: string; targetUrl: string; nodeId: string }>;
+    };
+    assert.match(copiedMaskBody.targetProjectId, /^[A-Za-z0-9_-]{10}$/);
+    assert.equal(copiedMaskBody.masks.length, 1);
+    const copiedMask = copiedMaskBody.masks[0];
+    const copiedMaskId = copiedMask.targetUrl.slice("/api/files/".length);
+    assert.deepEqual(copiedMask, {
+      sourceUrl: maskBody.url,
+      targetUrl: copiedMask.targetUrl,
+      nodeId: "mask-node",
+    });
+    assert.notEqual(copiedMaskId, maskBody.id);
+    assert.deepEqual(
+      fs.readFileSync(path.join(uploadsDir(), copiedMaskId)),
+      fs.readFileSync(path.join(uploadsDir(), maskBody.id)),
+      "项目身份变化必须复制蒙版字节，不能移动或重编码原文件",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT owner_id, source_type, project_id, node_id, mime_type,
+             purge_after IS NOT NULL AS expiring
+      FROM files WHERE id = $1
+    `, [copiedMaskId]), {
+      owner_id: admin.id,
+      source_type: "mask-draft",
+      project_id: copiedMaskBody.targetProjectId,
+      node_id: "mask-node",
+      mime_type: "image/png",
+      expiring: true,
+    });
+    assert.equal(
+      (await saveMaskProject(copiedMask.targetUrl, copiedMaskBody.targetProjectId)).status,
+      200,
+      "复制后的本机备份必须可以按新项目 ID 正式保存",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT source_type, purge_after FROM files WHERE id = $1
+    `, [copiedMaskId]), { source_type: "mask", purge_after: null });
+    const beforeUnavailableTargetFiles = fs.readdirSync(uploadsDir()).sort();
+    const copyToUnavailable = async (targetProjectId: string) => fetch(
+      `${server.baseUrl}/api/files/masks/copy`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceProjectId: "mask-project",
+          targetProjectId,
+          masks: [{ fileId: maskBody.id, nodeId: "mask-node" }],
+        }),
+      },
+    );
+    assert.equal((await copyToUnavailable(copiedMaskBody.targetProjectId)).status, 404);
+    assert.equal((await copyToUnavailable("unused-target-project")).status, 404);
+    const emptyProbe = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        targetProjectId: copiedMaskBody.targetProjectId,
+        masks: [],
+      }),
+    });
+    assert.equal(emptyProbe.status, 400);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
+
+    const schemaMaximumMasks = Array.from({ length: 500 }, (_, index) => ({
+      fileId: `missing-mask-${index}.png`,
+      nodeId: `mask-node-${index}`,
+    }));
+    const maximumMaskCopy = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        createTarget: true,
+        masks: schemaMaximumMasks,
+      }),
+    });
+    assert.equal(maximumMaskCopy.status, 403, await maximumMaskCopy.text());
+    const overMaximumMaskCopy = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        createTarget: true,
+        masks: [...schemaMaximumMasks, { fileId: "missing-mask-500.png", nodeId: "mask-node-500" }],
+      }),
+    });
+    assert.equal(overMaximumMaskCopy.status, 400);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
+
+    const blankFlow = {
+      schemaVersion: 2,
+      nodes: [{
+        id: "starter",
+        type: "image-input",
+        position: { x: 0, y: 0 },
+        data: { kind: "image-input", label: "上传服装图", status: "idle", imageRole: "default" },
+      }],
+      edges: [],
+    };
+    const initialTargetId = "mask-sync-draft";
+    const targetBootstrap = await fetch(`${server.baseUrl}/api/projects/initial-draft/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: initialTargetId, flow: blankFlow }),
+    });
+    assert.equal(targetBootstrap.status, 201);
+    const copyToInitial = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        targetProjectId: initialTargetId,
+        masks: [{ fileId: maskBody.id, nodeId: "mask-node" }],
+      }),
+    });
+    assert.equal(copyToInitial.status, 200);
+    const initialCopyBody = await copyToInitial.json() as {
+      targetProjectId: string;
+      masks: Array<{ targetUrl: string }>;
+    };
+    assert.equal(initialCopyBody.targetProjectId, initialTargetId);
+    const initialMaskUrl = initialCopyBody.masks[0].targetUrl;
+    const initialMaskId = initialMaskUrl.slice("/api/files/".length);
+    const syncTarget = await fetch(`${server.baseUrl}/api/projects/initial-draft/${initialTargetId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        expectedRevision: 0,
+        name: "待放弃的其他页签草稿",
+        flow: maskFlow(initialMaskUrl),
+      }),
+    });
+    assert.equal(syncTarget.status, 200);
+    const syncTargetBody = await syncTarget.json() as { draft: { revision: number } };
+    const abandonTarget = await fetch(`${server.baseUrl}/api/projects/initial-draft/${initialTargetId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true, expectedRevision: syncTargetBody.draft.revision }),
+    });
+    assert.equal(abandonTarget.status, 200);
+    assert.equal((await queryOne<{ deleted: boolean }>(`
+      SELECT deleted_at IS NOT NULL AS deleted FROM files WHERE id = $1
+    `, [initialMaskId]))?.deleted, true);
+
+    const recoverStaleMask = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: initialTargetId,
+        createTarget: true,
+        masks: [{ fileId: initialMaskId, nodeId: "mask-node" }],
+      }),
+    });
+    assert.equal(recoverStaleMask.status, 200);
+    const recoveredMaskBody = await recoverStaleMask.json() as {
+      targetProjectId: string;
+      masks: Array<{ targetUrl: string }>;
+    };
+    const recoveredBootstrap = await fetch(`${server.baseUrl}/api/projects/initial-draft/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: recoveredMaskBody.targetProjectId,
+        name: "从其他页签恢复",
+        flow: maskFlow(recoveredMaskBody.masks[0].targetUrl),
+      }),
+    });
+    assert.equal(recoveredBootstrap.status, 201);
+    const cleanupRecovered = await fetch(
+      `${server.baseUrl}/api/projects/initial-draft/${recoveredMaskBody.targetProjectId}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true, expectedRevision: 0 }),
+      },
+    );
+    assert.equal(cleanupRecovered.status, 200);
+
     const secondMaskResponse = await uploadMask(maskDataUrl);
     assert.equal(secondMaskResponse.status, 200);
     const secondMaskBody = await secondMaskResponse.json() as { id: string; url: string };

@@ -6,9 +6,10 @@
 import { Router, type Response } from "express";
 import fs from "node:fs";
 import path from "node:path";
+import { nanoid } from "nanoid";
 import {
   deleteStoredImage, ensureThumbnail, isSupportedImageFile, mimeOfFile,
-  normalizeImageRef, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
+  normalizeImageRef, resolveToDataUrl, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
 } from "../lib/fileStore";
 import { ProviderError } from "../providers/base";
 import { ImageValidationError } from "../lib/imageValidation";
@@ -21,12 +22,14 @@ import {
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
 import { validateMaskForSource } from "../lib/maskProcessing";
+import { MAX_WORKFLOW_NODES } from "../lib/workflowSchema";
 
 export const filesRouter = Router();
 
 const SAFE_PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_NODE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MASK_DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const MAX_MASK_COPY_REFS = MAX_WORKFLOW_NODES;
 
 type FileAccess = "public" | "private" | "denied";
 
@@ -171,6 +174,164 @@ filesRouter.post("/mask", asyncHandler(async (req, res) => {
         ? 400
         : 500;
     res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+}));
+
+/**
+ * 项目身份变化时复制而非移动蒙版。原项目继续持有原文件；复制件先作为
+ * mask-draft 绑定目标项目，待目标草稿同步或正式保存成功后再由项目路由认领。
+ */
+filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { sourceProjectId, targetProjectId, createTarget, masks } = req.body as {
+    sourceProjectId?: unknown;
+    targetProjectId?: unknown;
+    createTarget?: unknown;
+    masks?: unknown;
+  };
+  const wantsFreshTarget = createTarget === true;
+  const hasExistingTarget = typeof targetProjectId === "string" && SAFE_PROJECT_ID.test(targetProjectId);
+  if (
+    typeof sourceProjectId !== "string" || !SAFE_PROJECT_ID.test(sourceProjectId) ||
+    !Array.isArray(masks) || masks.length === 0 || masks.length > MAX_MASK_COPY_REFS ||
+    (wantsFreshTarget ? targetProjectId !== undefined : !hasExistingTarget) ||
+    (!wantsFreshTarget && sourceProjectId === targetProjectId)
+  ) {
+    res.status(400).json({ error: "sourceProjectId, a target mode and one or more masks are required" });
+    return;
+  }
+
+  const requested = masks.map((value) => {
+    if (!value || typeof value !== "object") return null;
+    const candidate = value as { fileId?: unknown; nodeId?: unknown };
+    if (
+      typeof candidate.fileId !== "string" ||
+      candidate.fileId !== path.basename(candidate.fileId) ||
+      !candidate.fileId.endsWith(".png") ||
+      !isSupportedImageFile(candidate.fileId) ||
+      typeof candidate.nodeId !== "string" || !SAFE_NODE_ID.test(candidate.nodeId)
+    ) return null;
+    return { fileId: candidate.fileId, nodeId: candidate.nodeId };
+  });
+  if (requested.some((value) => value === null)) {
+    res.status(400).json({ error: "each mask must contain a valid PNG fileId and nodeId" });
+    return;
+  }
+  const refs = requested as Array<{ fileId: string; nodeId: string }>;
+  if (new Set(refs.map((ref) => ref.fileId)).size !== refs.length) {
+    res.status(400).json({ error: "mask fileId values must be unique" });
+    return;
+  }
+
+  const copiedFileIds: string[] = [];
+  let committed = false;
+  try {
+    const outcome = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+      let resolvedTargetId: string | undefined;
+      if (wantsFreshTarget) {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const candidate = nanoid(10);
+          const occupied = await queryOne<{ occupied: number }>(`
+            SELECT 1 AS occupied FROM projects WHERE id = $1
+            UNION ALL
+            SELECT 1 AS occupied FROM files WHERE project_id = $1
+            LIMIT 1
+          `, [candidate], client);
+          if (!occupied) {
+            resolvedTargetId = candidate;
+            break;
+          }
+        }
+        if (!resolvedTargetId) return { status: "target_unavailable" as const };
+      } else {
+        const target = await queryOne<{ id: string }>(`
+          SELECT id FROM projects
+          WHERE id = $1 AND owner_id = $2
+            AND lifecycle = 'initial_draft' AND deleted_at IS NULL
+          FOR UPDATE
+        `, [targetProjectId, user.id], client);
+        if (!target) return { status: "target_unavailable" as const };
+        resolvedTargetId = target.id;
+      }
+
+      const ids = refs.map((ref) => ref.fileId);
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const rows = ids.length === 0 ? [] : (await client.query<{
+        id: string;
+        owner_id: string | null;
+        source_type: string;
+        project_id: string | null;
+        node_id: string | null;
+        mime_type: string | null;
+        width: number | null;
+        height: number | null;
+        byte_length: number | null;
+        deleted_at: string | null;
+        purge_after: string | null;
+      }>(`
+        SELECT id, owner_id, source_type, project_id, node_id, mime_type,
+          width, height, byte_length, deleted_at, purge_after
+        FROM files
+        WHERE id = ANY($1::text[])
+          AND (deleted_at IS NULL OR purge_after > $2)
+        ORDER BY id
+        FOR UPDATE
+      `, [ids, nowIso])).rows;
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      for (const ref of refs) {
+        const row = byId.get(ref.fileId);
+        if (
+          !row || row.owner_id !== user.id ||
+          (row.source_type !== "mask-draft" && row.source_type !== "mask") ||
+          row.project_id !== sourceProjectId || row.node_id !== ref.nodeId ||
+          row.mime_type !== "image/png"
+        ) return { status: "source_forbidden" as const };
+      }
+
+      const purgeAfter = new Date(now.getTime() + MASK_DRAFT_RETENTION_MS).toISOString();
+      const copies: Array<{ sourceUrl: string; targetUrl: string; nodeId: string }> = [];
+      for (const ref of refs) {
+        const row = byId.get(ref.fileId)!;
+        const saved = saveDataUrl(resolveToDataUrl(`/api/files/${ref.fileId}`));
+        copiedFileIds.push(saved.id);
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, project_id, node_id,
+            mime_type, width, height, byte_length, normalized,
+            created_at, purge_after
+          ) VALUES ($1, $2, 'mask-draft', $3, $4, 'image/png', $5, $6, $7, FALSE, $8, $9)
+        `, [
+          saved.id, user.id, resolvedTargetId, ref.nodeId,
+          row.width, row.height, row.byte_length, nowIso, purgeAfter,
+        ]);
+        copies.push({
+          sourceUrl: `/api/files/${ref.fileId}`,
+          targetUrl: saved.url,
+          nodeId: ref.nodeId,
+        });
+      }
+      return { status: "copied" as const, targetProjectId: resolvedTargetId, copies };
+    });
+    committed = outcome.status === "copied";
+
+    if (outcome.status === "owner_unavailable") {
+      res.status(409).json({ error: "账号已停用或删除，不能复制蒙版" });
+      return;
+    }
+    if (outcome.status === "target_unavailable") {
+      res.status(404).json({ error: "目标初始草稿不可用" });
+      return;
+    }
+    if (outcome.status === "source_forbidden") {
+      res.status(403).json({ error: "蒙版文件与来源项目、节点或当前账号不匹配" });
+      return;
+    }
+    res.json({ targetProjectId: outcome.targetProjectId, masks: outcome.copies });
+  } catch (error) {
+    if (!committed) copiedFileIds.forEach(deleteStoredImage);
+    throw error;
   }
 }));
 

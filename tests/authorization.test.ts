@@ -1010,9 +1010,36 @@ await test("并发 bootstrap 只创建一个草稿，revision 冲突不覆盖且
       }),
     });
     assert.equal(promoted.status, 200, await promoted.text());
-    assert.deepEqual(await queryOne<{ id: string; lifecycle: string; name: string }>(`
-      SELECT id, lifecycle, name FROM projects WHERE id = $1
-    `, [draftId]), { id: draftId, lifecycle: "saved", name: "正式项目" });
+    const savedBeforeStaleTab = await queryOne<{
+      id: string;
+      lifecycle: string;
+      name: string;
+      flow_json: string;
+    }>(`
+      SELECT id, lifecycle, name, flow_json FROM projects WHERE id = $1
+    `, [draftId]);
+    assert.equal(savedBeforeStaleTab?.id, draftId);
+    assert.equal(savedBeforeStaleTab?.lifecycle, "saved");
+    assert.equal(savedBeforeStaleTab?.name, "正式项目");
+
+    const staleTabPromotion = await request("/projects", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        id: draftId,
+        name: "旧页签不应覆盖",
+        flow: flow(),
+        expectedDraftRevision: 1,
+      }),
+    });
+    assert.equal(staleTabPromotion.status, 409, await staleTabPromotion.text());
+    assert.deepEqual(await queryOne<{
+      id: string;
+      lifecycle: string;
+      name: string;
+      flow_json: string;
+    }>(`
+      SELECT id, lifecycle, name, flow_json FROM projects WHERE id = $1
+    `, [draftId]), savedBeforeStaleTab);
     const afterPromotion = await (await request("/projects/initial-draft", "owner")).json() as { draft: unknown };
     assert.equal(afterPromotion.draft, null);
     const officialList = await (await request("/projects", "owner")).json() as Array<{ id: string }>;

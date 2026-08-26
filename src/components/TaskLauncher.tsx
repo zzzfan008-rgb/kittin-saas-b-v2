@@ -3,7 +3,7 @@ import { ImagePlusIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { selectActiveProjectIsPristine, useFlowStore } from "@/store/flowStore";
 import type { WorkflowTemplate } from "@/types/workflow";
-import { launchTemplateInNewTab } from "@/lib/templateLaunch";
+import { launchStarterTemplate } from "@/lib/templateLaunch";
 
 const UPLOAD_TEMPLATE_ID = "builtin-sketch-upscale";
 const TEXT_TEMPLATE_ID = "builtin-text-to-image";
@@ -51,7 +51,7 @@ export function TaskLauncher() {
           </p>
           <h1 className="mt-2 text-lg font-semibold text-[var(--gc-text)]">从一个明确任务开始</h1>
           <p className="mt-1 text-xs leading-relaxed text-[var(--gc-text-muted)]">
-            选择入口后会新建独立项目页签，当前空白画布会保留。
+            选择入口后会直接进入当前未保存项目，刷新或重新登录仍可继续。
           </p>
         </div>
 
@@ -60,7 +60,7 @@ export function TaskLauncher() {
             type="button"
             variant="outline"
             disabled={!ready}
-            onClick={() => uploadTemplate && launchTemplateInNewTab(uploadTemplate, "upload")}
+            onClick={() => uploadTemplate && launchStarterTemplate(uploadTemplate, "upload")}
             className="h-auto min-h-28 flex-col items-start gap-2 whitespace-normal border-[var(--gc-border)] bg-[var(--gc-panel-soft)] p-4 text-left hover:border-[var(--gc-accent)] hover:bg-[var(--gc-panel-hover)]"
           >
             <ImagePlusIcon aria-hidden="true" className="size-5 text-[var(--gc-accent)]" />
@@ -73,7 +73,7 @@ export function TaskLauncher() {
             type="button"
             variant="outline"
             disabled={!ready}
-            onClick={() => textTemplate && launchTemplateInNewTab(textTemplate, "text")}
+            onClick={() => textTemplate && launchStarterTemplate(textTemplate, "text")}
             className="h-auto min-h-28 flex-col items-start gap-2 whitespace-normal border-[var(--gc-border)] bg-[var(--gc-panel-soft)] p-4 text-left hover:border-[var(--gc-accent)] hover:bg-[var(--gc-panel-hover)]"
           >
             <SparklesIcon aria-hidden="true" className="size-5 text-[var(--gc-accent)]" />

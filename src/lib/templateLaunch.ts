@@ -1,7 +1,15 @@
 import type { Edge } from "@xyflow/react";
 import { nanoid } from "nanoid";
+import { flushSync } from "react-dom";
 import type { WorkflowTemplate, WorkflowNodeData } from "@/types/workflow";
-import { useFlowStore, type FlowNode } from "@/store/flowStore";
+import {
+  commitDocumentMutation,
+  isPristineProjectTab,
+  projectTabLifecycle,
+  selectActiveDocument,
+  useFlowStore,
+  type FlowNode,
+} from "@/store/flowStore";
 import { requestCanvasLanding } from "@/lib/canvasLanding";
 
 export type TemplateLaunchMode = "default" | "upload" | "text";
@@ -71,3 +79,39 @@ export function launchTemplateInNewTab(
   return { tabId, projectId, landingNodeId };
 }
 
+/** 首次任务直接接管唯一初始草稿；普通空白页签仍沿用“从模板新建”语义。 */
+export function launchStarterTemplate(
+  template: WorkflowTemplate,
+  mode: Exclude<TemplateLaunchMode, "default">,
+): { tabId: string; projectId: string; landingNodeId?: string } {
+  const active = selectActiveDocument(useFlowStore.getState());
+  if (projectTabLifecycle(active) !== "initial_draft" || !isPristineProjectTab(active)) {
+    return launchTemplateInNewTab(template, mode);
+  }
+
+  const nodes = cloneNodes(template.flow.nodes);
+  const edges = cloneEdges(template.flow.edges);
+  const landingNodeId = templateLandingNodeId(nodes, mode);
+  let changed = false;
+  flushSync(() => {
+    changed = commitDocumentMutation({
+      nodes,
+      edges,
+      selectedNodeIds: [],
+      selectedNodeId: null,
+      selectedResultId: null,
+      compareIds: [],
+    });
+  });
+  if (!changed) return { tabId: active.id, projectId: active.projectId };
+  if (landingNodeId) useFlowStore.getState().setSelectedNodeIds([landingNodeId]);
+  useFlowStore.getState().closeViewer();
+  requestCanvasLanding({
+    tabId: active.id,
+    nodeId: landingNodeId,
+    fitView: true,
+    activateFilePicker: mode === "upload",
+    selectText: mode === "text",
+  });
+  return { tabId: active.id, projectId: active.projectId, landingNodeId };
+}

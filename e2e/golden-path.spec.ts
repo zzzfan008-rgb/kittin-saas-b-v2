@@ -94,6 +94,10 @@ test("upload and text starters complete the isolated first-generation golden pat
 
   await page.goto("/");
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
+  const initialDraftResponse = await page.context().request.get("/api/projects/initial-draft");
+  expect(initialDraftResponse.ok()).toBeTruthy();
+  const initialDraft = await initialDraftResponse.json() as { draft?: { id?: string } };
+  expect(initialDraft.draft?.id).toBeTruthy();
   const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
   await expect(launcher).toBeVisible();
 
@@ -110,6 +114,7 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(uploadGenerateNode.getByTitle("成功")).toBeVisible();
   await expect.poll(() => runs.length).toBe(1);
   await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0].id).toBe(initialDraft.draft?.id);
   expect(runs[0].nodes).toEqual(saves[0].flow.nodes);
   expect(runs[0].edges).toEqual(saves[0].flow.edges);
 
@@ -119,7 +124,7 @@ test("upload and text starters complete the isolated first-generation golden pat
   const results = page.getByRole("region", { name: "最近生成" });
   await expect(results.getByAltText("草图→效果图")).toBeVisible();
 
-  await page.getByRole("button", { name: "未命名设计项目", exact: true }).click();
+  await page.getByRole("button", { name: "新建空白项目页签" }).click();
   await expect(launcher).toBeVisible();
   await launcher.getByRole("button", { name: /文本生成开始/ }).click();
   const textNode = page.locator(".react-flow__node").filter({ hasText: "文生图" });
