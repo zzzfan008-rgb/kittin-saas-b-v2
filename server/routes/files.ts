@@ -22,13 +22,14 @@ import {
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
 import { validateMaskForSource } from "../lib/maskProcessing";
+import { MAX_WORKFLOW_NODES } from "../lib/workflowSchema";
 
 export const filesRouter = Router();
 
 const SAFE_PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_NODE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MASK_DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
-const MAX_MASK_COPY_REFS = 100;
+const MAX_MASK_COPY_REFS = MAX_WORKFLOW_NODES;
 
 type FileAccess = "public" | "private" | "denied";
 

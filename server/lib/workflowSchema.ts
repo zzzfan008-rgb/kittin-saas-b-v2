@@ -43,7 +43,7 @@ const STATUSES = [
 const IMAGE_ROLES = ["default", "sketch", "garment", "fabric", "reference"] as const;
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
 const IMAGE_SIZES = ["2K", "4K"] as const;
-const MAX_NODES = 500;
+export const MAX_WORKFLOW_NODES = 500;
 const MAX_EDGES = 2_000;
 const MAX_TEXT_LENGTH = 20_000;
 const MAX_IMAGE_REFERENCE_LENGTH = 20_000;
@@ -332,7 +332,9 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   }
   if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
   if (!Array.isArray(raw.edges)) fail("flow.edges", "must be an array");
-  if (raw.nodes.length > MAX_NODES) fail("flow.nodes", `must contain at most ${MAX_NODES} nodes`);
+  if (raw.nodes.length > MAX_WORKFLOW_NODES) {
+    fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
+  }
   if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
 
   const nodes = raw.nodes.map((node, index) => validateNode(node, index, migrateLegacy));

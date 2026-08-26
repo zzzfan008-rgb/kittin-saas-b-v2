@@ -461,6 +461,32 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     assert.equal(emptyProbe.status, 400);
     assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
 
+    const schemaMaximumMasks = Array.from({ length: 500 }, (_, index) => ({
+      fileId: `missing-mask-${index}.png`,
+      nodeId: `mask-node-${index}`,
+    }));
+    const maximumMaskCopy = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        createTarget: true,
+        masks: schemaMaximumMasks,
+      }),
+    });
+    assert.equal(maximumMaskCopy.status, 403, await maximumMaskCopy.text());
+    const overMaximumMaskCopy = await fetch(`${server.baseUrl}/api/files/masks/copy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceProjectId: "mask-project",
+        createTarget: true,
+        masks: [...schemaMaximumMasks, { fileId: "missing-mask-500.png", nodeId: "mask-node-500" }],
+      }),
+    });
+    assert.equal(overMaximumMaskCopy.status, 400);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
+
     const blankFlow = {
       schemaVersion: 2,
       nodes: [{

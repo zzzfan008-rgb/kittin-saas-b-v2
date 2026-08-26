@@ -294,6 +294,12 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
       }
       if (existing?.deleted_at) return { status: "deleted" as const };
       if (
+        expectedDraftRevision !== undefined &&
+        existing?.lifecycle !== "initial_draft"
+      ) {
+        return { status: "draft_unavailable" as const };
+      }
+      if (
         existing?.lifecycle === "initial_draft" &&
         expectedDraftRevision !== existing.draft_revision
       ) {
@@ -336,6 +342,12 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
       res.status(409).json({
         error: "初始草稿已在其他页面或设备更新，请先合并最新内容",
         currentRevision: outcome.currentRevision,
+      });
+      return;
+    }
+    if (outcome.status === "draft_unavailable") {
+      res.status(409).json({
+        error: "初始草稿已在其他页面保存或不再可用，请刷新后继续",
       });
       return;
     }
