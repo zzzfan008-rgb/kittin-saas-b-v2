@@ -20,6 +20,7 @@ import {
   type WorkflowNodeData,
   type NodeRunStatus,
   type ImageInputNodeData,
+  type PersistedWorkflow,
 } from "@/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -43,10 +44,12 @@ import {
   projectTabStorageKey,
   type ProjectTabsStorageManifest,
 } from "@/lib/tabSessionStorage";
+import { waitForInitialDraftSyncBeforeFormalSave } from "@/initialDraft/initialDraftRuntime";
 
 export type FlowNode = Node<WorkflowNodeData>;
 export type ConnectedNodeDirection = "upstream" | "downstream";
 export const DEFAULT_PROJECT_NAME = "未命名设计项目";
+export type ProjectLifecycle = "local" | "initial_draft" | "saved";
 
 /** 最近生成条目：生成图片 + 该次运行的完整记录（运行记录已合并到这里） */
 export interface RecentResult {
@@ -101,6 +104,13 @@ export interface ProjectTab {
   savedRevision: number;
   dirty: boolean;
   documentEpoch: number;
+  /** 旧会话没有此字段；归一化时按原有保存状态推断。 */
+  lifecycle?: ProjectLifecycle;
+  /** 服务端 initial_draft 的乐观锁版本。 */
+  draftRevision?: number;
+  /** 已被服务端草稿确认的本地 document revision。 */
+  draftSyncedRevision?: number;
+  draftCreatedAt?: string;
 }
 
 /** Immutable identity captured before async work starts. */
@@ -1129,6 +1139,7 @@ export function selectHasDirtyTabs(state: FlowState): boolean {
 
 /** 只有从未编辑、未保存的初始空白项目才显示任务启动器。 */
 export function isPristineProjectTab(tab: ProjectTab): boolean {
+  const lifecycle = projectTabLifecycle(tab);
   if (
     tab.readOnly ||
     tab.dirty ||
@@ -1136,7 +1147,9 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
     tab.saveState === "saving" ||
     tab.revision !== 0 ||
     tab.savedRevision !== 0 ||
-    tab.projectName !== DEFAULT_PROJECT_NAME ||
+    (lifecycle === "initial_draft"
+      ? !/^\u672a\u4fee\u6539\u9879\u76ee\u540d\u79f0\d{8}000000$/.test(tab.projectName)
+      : tab.projectName !== DEFAULT_PROJECT_NAME) ||
     tab.edges.length !== 0 ||
     tab.nodes.length !== 1
   ) return false;
@@ -1144,6 +1157,21 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
   return node.data.kind === "image-input" &&
     node.data.status === "idle" &&
     !node.data.imageUrl;
+}
+
+export function projectTabLifecycle(tab: ProjectTab): ProjectLifecycle {
+  if (tab.lifecycle === "initial_draft" || tab.lifecycle === "saved" || tab.lifecycle === "local") {
+    return tab.lifecycle;
+  }
+  return tab.hasBeenPersisted || tab.saveState === "saved" ? "saved" : "local";
+}
+
+export function projectTabHasLocalDraftChanges(tab: ProjectTab): boolean {
+  if (tab.readOnly || projectTabLifecycle(tab) === "saved") return false;
+  if (projectTabLifecycle(tab) === "initial_draft") {
+    return tab.revision > (tab.draftSyncedRevision ?? 0);
+  }
+  return !isPristineProjectTab(tab);
 }
 
 export function selectActiveProjectIsPristine(state: FlowState): boolean {
@@ -1427,6 +1455,7 @@ function newTab(opts?: {
   readOnly?: boolean;
   /** 已由服务端载入；即使内容为空，也不是首次未保存项目。 */
   persisted?: boolean;
+  lifecycle?: ProjectLifecycle;
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
   const persisted = opts?.persisted === true && !markDirty;
@@ -1448,6 +1477,7 @@ function newTab(opts?: {
     savedRevision: 0,
     dirty: markDirty,
     documentEpoch: 0,
+    lifecycle: opts?.lifecycle ?? (persisted ? "saved" : "local"),
   };
 }
 
@@ -1681,6 +1711,16 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
   const hasBeenPersisted = raw.hasBeenPersisted === true ||
     raw.saveState === "saved" ||
     savedRevision > 0;
+  const lifecycle: ProjectLifecycle = raw.lifecycle === "initial_draft" ||
+    raw.lifecycle === "saved" || raw.lifecycle === "local"
+    ? raw.lifecycle
+    : hasBeenPersisted ? "saved" : "local";
+  const draftRevision = lifecycle === "initial_draft"
+    ? finiteNonNegative(raw.draftRevision, 0)
+    : undefined;
+  const draftSyncedRevision = lifecycle === "initial_draft"
+    ? Math.min(finiteNonNegative(raw.draftSyncedRevision, 0), revision)
+    : undefined;
   const requestedSelection = Array.isArray(raw.selectedNodeIds)
     ? stringList(raw.selectedNodeIds, nodes.length)
     : typeof raw.selectedNodeId === "string"
@@ -1709,6 +1749,12 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
     savedRevision,
     dirty,
     documentEpoch: finiteNonNegative(raw.documentEpoch, 0),
+    lifecycle,
+    ...(draftRevision === undefined ? {} : { draftRevision }),
+    ...(draftSyncedRevision === undefined ? {} : { draftSyncedRevision }),
+    ...(lifecycle === "initial_draft" && typeof raw.draftCreatedAt === "string"
+      ? { draftCreatedAt: raw.draftCreatedAt }
+      : {}),
   };
 }
 
@@ -2653,15 +2699,25 @@ export const useFlowStore = create<FlowState>()(
             }
             patchDocumentTarget(set, target, { saveState: "saving" });
             try {
-              const document = createDocumentSnapshot(snapshot);
+              if (projectTabLifecycle(snapshot) === "initial_draft") {
+                await waitForInitialDraftSyncBeforeFormalSave(target);
+              }
+              const synchronizedSnapshot = documentForTarget(get(), target);
+              if (!synchronizedSnapshot || synchronizedSnapshot.readOnly) {
+                return { ok: false, error: "项目已切换、不存在或当前页签为只读" };
+              }
+              const document = createDocumentSnapshot(synchronizedSnapshot);
               const flow = documentSnapshotToPersistedWorkflow(document);
               const res = await fetch("/api/projects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  id: snapshot.projectId,
+                  id: synchronizedSnapshot.projectId,
                   name: document.projectName,
                   flow,
+                  ...(projectTabLifecycle(synchronizedSnapshot) === "initial_draft"
+                    ? { expectedDraftRevision: synchronizedSnapshot.draftRevision ?? 0 }
+                    : {}),
                 }),
               });
               if (!res.ok) {
@@ -2672,13 +2728,17 @@ export const useFlowStore = create<FlowState>()(
               if (responseSettlement) await responseSettlement;
               let needsRevisionFollowup = false;
               const matched = patchDocumentTarget(set, target, (latest) => {
-                const clean = latest.revision === snapshot.revision;
+                const clean = latest.revision === synchronizedSnapshot.revision;
                 needsRevisionFollowup = !clean;
                 return {
-                  savedRevision: Math.max(latest.savedRevision, snapshot.revision),
+                  savedRevision: Math.max(latest.savedRevision, synchronizedSnapshot.revision),
                   dirty: !clean,
                   saveState: clean ? "saved" : "saving",
                   hasBeenPersisted: true,
+                  lifecycle: "saved",
+                  draftRevision: undefined,
+                  draftSyncedRevision: undefined,
+                  draftCreatedAt: undefined,
                 };
               });
               if (!matched) return { ok: false, error: "项目已切换，旧保存响应已忽略" };
@@ -3407,6 +3467,10 @@ export const useFlowStore = create<FlowState>()(
           savedRevision: 0,
           dirty: markDirty,
           documentEpoch: current.documentEpoch + 1,
+          lifecycle: markDirty ? "local" : "saved",
+          draftRevision: undefined,
+          draftSyncedRevision: undefined,
+          draftCreatedAt: undefined,
         };
         runWithoutHistory(() => set({ tabs: replaceTab(state.tabs, tab), viewer: null }));
         // 清空撤销历史，避免撤销回上一个项目的画布状态
@@ -3448,6 +3512,135 @@ export const useFlowStore = create<FlowState>()(
     },
   ),
 );
+
+export interface ServerInitialDraftSnapshot {
+  id: string;
+  name: string;
+  flow: PersistedWorkflow;
+  revision: number;
+  lifecycle: "initial_draft";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function persistedWorkflowForProjectTab(tab: ProjectTab): PersistedWorkflow {
+  return documentSnapshotToPersistedWorkflow(createDocumentSnapshot(tab));
+}
+
+/** 初始化/冲突解决的单一入口：只替换指定页签的文档，不改写普通新建与打开语义。 */
+export function applyServerInitialDraftToTab(
+  tabId: string,
+  draft: ServerInitialDraftSnapshot,
+  options?: {
+    dirty?: boolean;
+    localDocumentRevision?: number;
+    preserveReplacedAsBackup?: boolean;
+  },
+): boolean {
+  flushActiveTextEdit();
+  cancelHistoryTransaction();
+  const state = useFlowStore.getState();
+  const source = state.tabs.find((tab) => tab.id === tabId);
+  if (!source || source.readOnly) return false;
+  const dirty = options?.dirty === true;
+  const revision = Math.max(
+    dirty ? 1 : 0,
+    finiteNonNegative(options?.localDocumentRevision, draft.revision),
+  );
+  const selection = normalizeNodeSelection(draft.flow.nodes as FlowNode[], []);
+  const serverTab: ProjectTab = {
+    ...source,
+    projectId: draft.id,
+    projectName: draft.name,
+    readOnly: false,
+    nodes: selection.nodes,
+    edges: draft.flow.edges as Edge[],
+    selectedNodeIds: selection.selectedNodeIds,
+    selectedNodeId: selection.selectedNodeId,
+    selectedResultId: null,
+    compareIds: [],
+    saveState: "idle",
+    hasBeenPersisted: false,
+    revision,
+    savedRevision: 0,
+    dirty,
+    documentEpoch: source.documentEpoch + (source.projectId === draft.id ? 0 : 1),
+    lifecycle: "initial_draft",
+    draftRevision: draft.revision,
+    draftSyncedRevision: revision,
+    draftCreatedAt: draft.createdAt,
+  };
+  let tabs = state.tabs
+    .filter((tab) => tab.id === tabId || tab.projectId !== draft.id)
+    .map((tab) => tab.id === tabId ? serverTab : tab);
+  if (options?.preserveReplacedAsBackup) {
+    const backup: ProjectTab = {
+      ...source,
+      id: nanoid(10),
+      projectId: nanoid(10),
+      projectName: `${source.projectName}（本机备份）`,
+      saveState: "idle",
+      hasBeenPersisted: false,
+      revision: Math.max(1, source.revision),
+      savedRevision: 0,
+      dirty: true,
+      documentEpoch: source.documentEpoch + 1,
+      lifecycle: "local",
+      draftRevision: undefined,
+      draftSyncedRevision: undefined,
+      draftCreatedAt: undefined,
+    };
+    const index = tabs.findIndex((tab) => tab.id === tabId);
+    tabs = [...tabs.slice(0, index + 1), backup, ...tabs.slice(index + 1)];
+  }
+  runWithoutHistory(() => useFlowStore.setState({ tabs, activeTabId: tabId, viewer: null }));
+  temporalHistoryByTab.delete(tabId);
+  useFlowStore.temporal.getState().clear();
+  return true;
+}
+
+export function markInitialDraftSynced(
+  target: DocumentTarget,
+  localRevision: number,
+  expectedDraftRevision: number,
+  nextDraftRevision: number,
+): boolean {
+  let matched = false;
+  runWithoutHistory(() => {
+    patchDocumentTarget(useFlowStore.setState, target, (tab) => {
+      if (
+        projectTabLifecycle(tab) !== "initial_draft" ||
+        (tab.draftRevision ?? 0) !== expectedDraftRevision
+      ) return {};
+      matched = true;
+      return {
+        draftRevision: nextDraftRevision,
+        draftSyncedRevision: Math.max(tab.draftSyncedRevision ?? 0, localRevision),
+      };
+    });
+  });
+  return matched;
+}
+
+export function replaceAbandonedInitialDraftWithFreshLocalTab(tabId: string): ProjectTab | undefined {
+  flushActiveTextEdit();
+  cancelHistoryTransaction();
+  const state = useFlowStore.getState();
+  const index = state.tabs.findIndex((tab) => tab.id === tabId);
+  if (index < 0 || projectTabLifecycle(state.tabs[index]) !== "initial_draft") return undefined;
+  const fresh = newTab();
+  const tabs = [...state.tabs];
+  tabs[index] = fresh;
+  runWithoutHistory(() => useFlowStore.setState({
+    tabs,
+    activeTabId: state.activeTabId === tabId ? fresh.id : state.activeTabId,
+    viewer: null,
+  }));
+  temporalHistoryByTab.delete(tabId);
+  temporalHistoryByTab.delete(fresh.id);
+  if (state.activeTabId === tabId) useFlowStore.temporal.getState().clear();
+  return fresh;
+}
 
 // zundo's native replay merges the partialized value into the root Zustand
 // store. Our partial value is an active-tab document, so expose the same public
@@ -3515,6 +3708,10 @@ if (typeof window !== "undefined") {
     tab.readOnly ? 1 : 0,
     tab.saveState,
     tab.hasBeenPersisted ? 1 : 0,
+    projectTabLifecycle(tab),
+    tab.draftRevision ?? "",
+    tab.draftSyncedRevision ?? "",
+    tab.draftCreatedAt ?? "",
   ].join("\u0000");
   const persistenceSignalChanged = (state: FlowState, previous: FlowState): boolean => {
     if (state.activeTabId !== previous.activeTabId || state.tabs.length !== previous.tabs.length) {

@@ -35,11 +35,16 @@ function listTests(overrides = {}, omitted = []) {
 try {
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 4 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 5 files/);
   assert.match(
     baseline.stdout,
     /\[golden-path\].*upload and text starters complete the isolated first-generation golden path/,
     "isolated golden-path project must remain in the browser regression matrix",
+  );
+  assert.match(
+    baseline.stdout,
+    /\[initial-draft\].*hard refresh, a second tab, and relogin restore the same initial draft/,
+    "initial-draft recovery must remain in the isolated browser regression matrix",
   );
   for (const width of [1024, 1280, 1440]) {
     assert.match(
