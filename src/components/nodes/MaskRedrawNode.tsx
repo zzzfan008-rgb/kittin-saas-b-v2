@@ -28,7 +28,6 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const [promptRequired, setPromptRequired] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
-  const documentTarget = useFlowStore(selectActiveDocumentTarget);
   const runNode = useFlowStore((state) => state.runNode);
   const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
   const readOnly = useFlowStore(selectActiveReadOnly);
@@ -65,7 +64,8 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
 
   const selectMaskMode = (nextMode: MaskCompositeMode) => {
     if (readOnly || running || nextMode === maskMode) return;
-    updateNodeDataInTab(documentTarget, id, { maskMode: nextMode });
+    const target = selectActiveDocumentTarget(useFlowStore.getState());
+    updateNodeDataInTab(target, id, { maskMode: nextMode });
   };
 
   return (

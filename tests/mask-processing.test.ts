@@ -143,6 +143,11 @@ await test("旧项目默认迁移到保持原图模式，显式替换模式保�
 
 await test("节点同时展示两种处理方式及简约说明", () => {
   const sourceCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/MaskRedrawNode.tsx"), "utf8");
+  assert.doesNotMatch(
+    sourceCode,
+    /useFlowStore\(selectActiveDocumentTarget\)/,
+    "返回新对象的文档目标 selector 不能直接用于渲染期订阅",
+  );
   assert.match(sourceCode, /保持原图/);
   assert.match(sourceCode, /添加印花、刺绣或装饰，保留底色与光影/);
   assert.match(sourceCode, /替换选区/);

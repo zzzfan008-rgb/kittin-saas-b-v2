@@ -60,6 +60,24 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
 });
 
+test("adding a mask redraw node keeps the canvas mounted and exposes both modes", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const nodes = page.locator(".react-flow__node");
+  const initialNodeCount = await nodes.count();
+
+  await page.getByRole("button", { name: "节点 / 素材" }).click();
+  await page.getByTitle("点击添加蒙版局部重绘，或拖拽到画布指定位置").click();
+
+  await expect(nodes).toHaveCount(initialNodeCount + 1);
+  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "蒙版处理方式" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /保持原图/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /替换选区/ })).toBeVisible();
+  await expect(page.getByText("页面出现异常")).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});
+
 test("node drag is one undo transaction and selection stays canonical", async ({ page }) => {
   const modifier = process.platform === "darwin" ? "Meta" : "Control";
   const nodes = page.locator(".react-flow__node");
