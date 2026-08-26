@@ -251,6 +251,18 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
       if (activeRuns > ACTIVE_RUN_LIMIT) {
         return { status: "active_limit" as const };
       }
+      const initialDrafts = (await client.query<{ owner_id: string }>(`
+        SELECT owner_id FROM projects
+        WHERE owner_id = ANY($1::text[])
+          AND lifecycle = 'initial_draft'
+          AND deleted_at IS NULL
+        ORDER BY id
+        FOR UPDATE
+      `, [[req.params.id, transferToUserId]])).rows;
+      const draftOwners = new Set(initialDrafts.map((row) => row.owner_id));
+      if (draftOwners.has(req.params.id) && draftOwners.has(transferToUserId)) {
+        return { status: "draft_conflict" as const };
+      }
     } else {
       const activeRuns = (await client.query<{ count: number }>(`
         SELECT COUNT(*)::int AS count FROM generation_runs
@@ -326,6 +338,12 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
   }
   if (outcome.status === "active_runs") {
     res.status(409).json({ error: "账号仍有生成任务，请先等待任务结束或取消任务后再删除" });
+    return;
+  }
+  if (outcome.status === "draft_conflict") {
+    res.status(409).json({
+      error: "转出账号和接收账号都存在未保存初始草稿，请先在其中一个账号保存或放弃草稿",
+    });
     return;
   }
   res.json({ ok: true, purgeAfter: transferToUserId ? null : purgeAfter });

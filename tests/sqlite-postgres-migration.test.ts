@@ -75,6 +75,8 @@ console.log("  ✓ 保留旧用户账号与密码哈希");
 const legacyProject = await queryOne<Record<string, unknown>>("SELECT * FROM projects WHERE id = $1", ["legacy-project"]);
 assert.equal(legacyProject?.owner_id, "legacy-user");
 assert.equal(legacyProject?.name, "旧项目");
+assert.equal(legacyProject?.lifecycle, "saved");
+assert.equal(legacyProject?.draft_revision, 0);
 console.log("  ✓ 保留旧项目及用户归属");
 
 const importedRefs = await query<{ project_id: string; asset_id: string }>(`
@@ -106,7 +108,7 @@ await initializeDatabase();
 const preAppliedVersions = await query<{ version: number }>(
   "SELECT version FROM schema_migrations ORDER BY version",
 );
-assert.deepEqual(preAppliedVersions.map((row) => row.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+assert.deepEqual(preAppliedVersions.map((row) => row.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 assert.equal((await queryOne<{ count: number }>("SELECT COUNT(*)::int AS count FROM users"))?.count, 0);
 await closeDatabaseForTests();
 
