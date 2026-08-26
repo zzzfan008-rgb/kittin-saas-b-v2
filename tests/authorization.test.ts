@@ -1036,22 +1036,20 @@ await test("草稿权限统一隐藏，放弃需确认且 15 天内可恢复", a
       });
       assert.equal(bootstrap.status, 201, await bootstrap.text());
     }
-    const retiredAt = new Date(Date.now() - 60_000).toISOString();
     const retiredPurgeAfter = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000).toISOString();
     await query(`
       INSERT INTO files (
         id, owner_id, source_type, mime_type, project_id, node_id, created_at,
         deleted_at, purge_after
       ) VALUES
-        ($1, $3, 'mask-draft', 'image/png', $4, 'mask-node', $5, NULL, NULL),
-        ($2, $3, 'mask', 'image/png', $4, 'retired-mask-node', $5, $6, $7)
+        ($1, $3, 'mask', 'image/png', $4, 'mask-node', $5, NULL, NULL),
+        ($2, $3, 'mask', 'image/png', $4, 'retired-mask-node', $5, NULL, $6)
     `, [
       maskFileId,
       retiredMaskFileId,
       users.owner.id,
       ownerDraftId,
       now,
-      retiredAt,
       retiredPurgeAfter,
     ]);
 
@@ -1150,7 +1148,7 @@ await test("草稿权限统一隐藏，放弃需确认且 15 天内可恢复", a
     `, [maskFileId]), { deleted_at: null, purge_after: null });
     assert.deepEqual(await queryOne<{ deleted_at: string | null; purge_after: string | null }>(`
       SELECT deleted_at, purge_after FROM files WHERE id = $1
-    `, [retiredMaskFileId]), { deleted_at: retiredAt, purge_after: retiredPurgeAfter });
+    `, [retiredMaskFileId]), { deleted_at: null, purge_after: retiredPurgeAfter });
   } finally {
     await query("DELETE FROM files WHERE id = ANY($1::text[])", [[maskFileId, retiredMaskFileId]]);
     await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[

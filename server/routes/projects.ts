@@ -600,7 +600,7 @@ projectsRouter.delete("/initial-draft/:id", asyncHandler(async (req, res) => {
       UPDATE files
       SET deleted_at = $1, purge_after = $2
       WHERE owner_id = $3 AND project_id = $4
-        AND source_type IN ('mask-draft', 'mask') AND deleted_at IS NULL
+        AND source_type = 'mask' AND deleted_at IS NULL AND purge_after IS NULL
     `, [deletedAtIso, purgeAfterIso, user.id, req.params.id]);
     return { status: "abandoned" as const, purgeAfter: purgeAfterIso };
   });
@@ -664,7 +664,7 @@ projectsRouter.post("/initial-draft/:id/restore", asyncHandler(async (req, res) 
       UPDATE files
       SET deleted_at = NULL, purge_after = NULL
       WHERE owner_id = $1 AND project_id = $2
-        AND source_type IN ('mask-draft', 'mask')
+        AND source_type = 'mask'
         AND deleted_at = $3 AND purge_after = $4
     `, [user.id, req.params.id, existing.deleted_at, existing.purge_after]);
     return { status: "restored" as const, row: restored };
