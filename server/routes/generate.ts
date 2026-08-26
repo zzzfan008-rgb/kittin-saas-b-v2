@@ -166,7 +166,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
       if (projectId) {
         const project = await queryOne<{ owner_id: string; name: string }>(`
           SELECT owner_id, name FROM projects
-          WHERE id = $1 AND deleted_at IS NULL
+          WHERE id = $1 AND deleted_at IS NULL AND lifecycle = 'saved'
           FOR SHARE
         `, [projectId], client);
         if (!project) return { status: "not_found" as const };

@@ -24,7 +24,11 @@ const { runPlanRouter } = await import("../server/routes/runPlan");
 const { generateRouter } = await import("../server/routes/generate");
 const { assetsRouter } = await import("../server/routes/assets");
 const { filesRouter } = await import("../server/routes/files");
-const { projectsRouter, purgeExpiredProjects } = await import("../server/routes/projects");
+const {
+  initialDraftProjectName,
+  projectsRouter,
+  purgeExpiredProjects,
+} = await import("../server/routes/projects");
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
 
@@ -840,6 +844,217 @@ await test("回收站项目不能被同 ID 保存请求隐式复活", async () =
   assert.ok(row?.deleted_at);
 });
 
+await test("初始草稿名称按上海日期固定生成", () => {
+  assert.equal(
+    initialDraftProjectName(new Date("2026-08-25T15:59:59.000Z")),
+    "未修改项目名称20260825000000",
+  );
+  assert.equal(
+    initialDraftProjectName(new Date("2026-08-25T16:00:00.000Z")),
+    "未修改项目名称20260826000000",
+  );
+});
+
+await test("并发 bootstrap 只创建一个草稿，revision 冲突不覆盖且正式保存原子提升同一项目", async () => {
+  const candidateIds = ["initial-draft-concurrent-a", "initial-draft-concurrent-b"];
+  let draftId = "";
+  try {
+    const responses = await Promise.all(candidateIds.map((id) => request(
+      "/projects/initial-draft/bootstrap",
+      "owner",
+      {
+        method: "POST",
+        body: JSON.stringify({ id, flow: flow() }),
+      },
+    )));
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 201]);
+    const payloads = await Promise.all(responses.map((response) => response.json() as Promise<{
+      created: boolean;
+      draft: {
+        id: string;
+        name: string;
+        revision: number;
+        lifecycle: string;
+        flow: ReturnType<typeof flow>;
+      };
+    }>));
+    assert.equal(payloads.filter((payload) => payload.created).length, 1);
+    assert.equal(new Set(payloads.map((payload) => payload.draft.id)).size, 1);
+    draftId = payloads[0].draft.id;
+    assert.match(payloads[0].draft.name, /^未修改项目名称\d{8}000000$/);
+    assert.equal(payloads[0].draft.revision, 0);
+    assert.equal(payloads[0].draft.lifecycle, "initial_draft");
+
+    const storedDrafts = await query<{ id: string; lifecycle: string; draft_revision: number }>(`
+      SELECT id, lifecycle, draft_revision FROM projects
+      WHERE owner_id = $1 AND lifecycle = 'initial_draft' AND deleted_at IS NULL
+    `, [users.owner.id]);
+    assert.deepEqual(storedDrafts, [{ id: draftId, lifecycle: "initial_draft", draft_revision: 0 }]);
+
+    const ownerDraftResponse = await request("/projects/initial-draft", "owner");
+    assert.equal(ownerDraftResponse.status, 200);
+    assert.equal(ownerDraftResponse.headers.get("cache-control"), "no-store");
+    const ownerDraft = await ownerDraftResponse.json() as { draft: { id: string; revision: number } | null };
+    assert.equal(ownerDraft.draft?.id, draftId);
+    assert.equal(ownerDraft.draft?.revision, 0);
+    const otherDraft = await (await request("/projects/initial-draft", "other")).json() as { draft: unknown };
+    assert.equal(otherDraft.draft, null);
+
+    for (const viewer of ["owner", "admin"] as const) {
+      const list = await (await request("/projects", viewer)).json() as Array<{ id: string }>;
+      assert.equal(list.some((project) => project.id === draftId), false);
+      assert.equal((await request(`/projects/${draftId}`, viewer)).status, 404);
+    }
+
+    const editedFlow = flow(["/api/files/own-private.png"]);
+    const synchronized = await request(`/projects/initial-draft/${draftId}`, "owner", {
+      method: "PUT",
+      body: JSON.stringify({
+        expectedRevision: 0,
+        name: "本地旧草稿名称",
+        flow: editedFlow,
+      }),
+    });
+    const synchronizedPayload = await synchronized.json() as {
+      draft: { id: string; name: string; revision: number };
+      error?: string;
+    };
+    assert.equal(synchronized.status, 200, synchronizedPayload.error);
+    assert.equal(synchronizedPayload.draft.id, draftId);
+    assert.equal(synchronizedPayload.draft.name, "本地旧草稿名称");
+    assert.equal(synchronizedPayload.draft.revision, 1);
+    assert.deepEqual(await query<{ asset_id: string }>(`
+      SELECT asset_id FROM project_asset_refs WHERE project_id = $1 ORDER BY asset_id
+    `, [draftId]), [{ asset_id: "own-private" }]);
+
+    const runsBeforeDraftBypass = (await queryOne<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM generation_runs",
+    ))?.count ?? 0;
+    const draftRunPlan = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        nodes: editedFlow.nodes,
+        edges: editedFlow.edges,
+        onlyNodeId: "image_0",
+        includeDownstream: false,
+        projectId: draftId,
+        clientRequestId: "initial-draft-run-plan-blocked",
+      }),
+    });
+    assert.equal(draftRunPlan.status, 404, await draftRunPlan.text());
+    const draftDirectRun = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(directGenerateBody(
+        PNG_DATA_URL,
+        draftId,
+        "initial-draft-direct-blocked",
+      )),
+    });
+    assert.equal(draftDirectRun.status, 404, await draftDirectRun.text());
+    assert.equal((await queryOne<{ count: number }>(
+      "SELECT COUNT(*)::int AS count FROM generation_runs",
+    ))?.count, runsBeforeDraftBypass);
+
+    const stale = await request(`/projects/initial-draft/${draftId}`, "owner", {
+      method: "PUT",
+      body: JSON.stringify({ expectedRevision: 0, name: "不应覆盖", flow: flow() }),
+    });
+    const stalePayload = await stale.json() as { currentRevision: number; error?: string };
+    assert.equal(stale.status, 409, stalePayload.error);
+    assert.equal(stalePayload.currentRevision, 1);
+    assert.deepEqual(await queryOne<{ name: string; draft_revision: number }>(`
+      SELECT name, draft_revision FROM projects WHERE id = $1
+    `, [draftId]), { name: "本地旧草稿名称", draft_revision: 1 });
+
+    const stalePromotion = await request("/projects", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        id: draftId,
+        name: "旧设备不应提升",
+        flow: flow(),
+        expectedDraftRevision: 0,
+      }),
+    });
+    const stalePromotionPayload = await stalePromotion.json() as {
+      currentRevision?: number;
+      error?: string;
+    };
+    assert.equal(stalePromotion.status, 409, stalePromotionPayload.error);
+    assert.equal(stalePromotionPayload.currentRevision, 1);
+
+    const deniedPromotion = await request("/projects", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        id: draftId,
+        name: "不应提升",
+        flow: flow(["/api/files/other-secret.png"]),
+        expectedDraftRevision: 1,
+      }),
+    });
+    assert.equal(deniedPromotion.status, 403, await deniedPromotion.text());
+    assert.deepEqual(await queryOne<{ lifecycle: string; name: string; draft_revision: number }>(`
+      SELECT lifecycle, name, draft_revision FROM projects WHERE id = $1
+    `, [draftId]), {
+      lifecycle: "initial_draft",
+      name: "本地旧草稿名称",
+      draft_revision: 1,
+    });
+
+    const promoted = await request("/projects", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        id: draftId,
+        name: "正式项目",
+        flow: editedFlow,
+        expectedDraftRevision: 1,
+      }),
+    });
+    assert.equal(promoted.status, 200, await promoted.text());
+    assert.deepEqual(await queryOne<{ id: string; lifecycle: string; name: string }>(`
+      SELECT id, lifecycle, name FROM projects WHERE id = $1
+    `, [draftId]), { id: draftId, lifecycle: "saved", name: "正式项目" });
+    const afterPromotion = await (await request("/projects/initial-draft", "owner")).json() as { draft: unknown };
+    assert.equal(afterPromotion.draft, null);
+    const officialList = await (await request("/projects", "owner")).json() as Array<{ id: string }>;
+    assert.equal(officialList.some((project) => project.id === draftId), true);
+  } finally {
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [candidateIds]);
+  }
+});
+
+await test("账号转移遇到双方各自的初始草稿时明确拒绝且不改变归属", async () => {
+  const sourceDraftId = "transfer-source-initial-draft";
+  const targetDraftId = "transfer-target-initial-draft";
+  await query(`
+    INSERT INTO projects (
+      id, owner_id, name, flow_json, lifecycle, draft_revision, updated_at, created_at
+    ) VALUES
+      ($1, $3, '转出草稿', $5, 'initial_draft', 0, $6, $6),
+      ($2, $4, '接收草稿', $5, 'initial_draft', 0, $6, $6)
+  `, [sourceDraftId, targetDraftId, users.owner.id, users.other.id, JSON.stringify(flow()), now]);
+  try {
+    const response = await request(`/auth/users/${users.owner.id}`, "admin", {
+      method: "DELETE",
+      headers: { cookie: `${SESSION_COOKIE}=${adminSession.token}` },
+      body: JSON.stringify({ transferToUserId: users.other.id }),
+    });
+    const payload = await response.json() as { error: string };
+    assert.equal(response.status, 409, payload.error);
+    assert.match(payload.error, /初始草稿/);
+    assert.deepEqual(await query<{ id: string; owner_id: string }>(`
+      SELECT id, owner_id FROM projects WHERE id = ANY($1::text[]) ORDER BY id
+    `, [[sourceDraftId, targetDraftId]]), [
+      { id: sourceDraftId, owner_id: users.owner.id },
+      { id: targetDraftId, owner_id: users.other.id },
+    ]);
+    assert.equal((await queryOne<{ active: number }>(`
+      SELECT active FROM users WHERE id = $1
+    `, [users.owner.id]))?.active, 1);
+  } finally {
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[sourceDraftId, targetDraftId]]);
+  }
+});
+
 await test("项目保存按最终画布原子同步可访问素材引用", async () => {
   const save = await request("/projects", "owner", {
     method: "POST",
@@ -921,7 +1136,7 @@ await test("项目写入先持 owner 锁时，真实账号转移等待并接收�
       const row = await queryOne<{ pid: number }>(`
         SELECT activity.pid FROM pg_stat_activity activity
         WHERE $1::int = ANY(pg_blocking_pids(activity.pid))
-          AND activity.query LIKE '%SELECT owner_id, deleted_at FROM projects%'
+          AND activity.query LIKE '%FROM projects WHERE id = $1 FOR UPDATE%'
         LIMIT 1
       `, [blockerPid]);
       saveBackendPid = row?.pid ?? 0;

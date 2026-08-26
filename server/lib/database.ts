@@ -532,6 +532,41 @@ async function migrate(): Promise<void> {
       );
     }
 
+    if (!applied.has(12)) {
+      await client.query(`
+        ALTER TABLE projects
+          ADD COLUMN IF NOT EXISTS lifecycle TEXT NOT NULL DEFAULT 'saved';
+        ALTER TABLE projects
+          ADD COLUMN IF NOT EXISTS draft_revision INTEGER NOT NULL DEFAULT 0;
+
+        UPDATE projects SET lifecycle = 'saved' WHERE lifecycle IS NULL;
+        UPDATE projects SET draft_revision = 0 WHERE draft_revision IS NULL;
+
+        ALTER TABLE projects ALTER COLUMN lifecycle SET DEFAULT 'saved';
+        ALTER TABLE projects ALTER COLUMN lifecycle SET NOT NULL;
+        ALTER TABLE projects ALTER COLUMN draft_revision SET DEFAULT 0;
+        ALTER TABLE projects ALTER COLUMN draft_revision SET NOT NULL;
+
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_lifecycle_check;
+        ALTER TABLE projects
+          ADD CONSTRAINT projects_lifecycle_check
+          CHECK (lifecycle IN ('initial_draft','saved'));
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_draft_revision_check;
+        ALTER TABLE projects
+          ADD CONSTRAINT projects_draft_revision_check
+          CHECK (draft_revision >= 0);
+
+        DROP INDEX IF EXISTS projects_active_initial_draft_owner_unique;
+        CREATE UNIQUE INDEX projects_active_initial_draft_owner_unique
+          ON projects(owner_id)
+          WHERE lifecycle = 'initial_draft' AND deleted_at IS NULL;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (12, $1, $2)",
+        ["initial_draft_project_lifecycle", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

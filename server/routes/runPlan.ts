@@ -80,7 +80,7 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       // 与入队处于同一事务并持有共享锁，避免项目/素材在授权后、入队前被并发替换。
       const project = await queryOne<{ owner_id: string; name: string; flow_json: string }>(`
         SELECT owner_id, name, flow_json FROM projects
-        WHERE id = $1 AND deleted_at IS NULL
+        WHERE id = $1 AND deleted_at IS NULL AND lifecycle = 'saved'
         FOR SHARE
       `, [projectId], client);
       if (!project) return { status: "not_found" as const };

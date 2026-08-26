@@ -32,6 +32,7 @@ assert.deepEqual(versions, [
   { version: 9, name: "generation_queue_concurrency_hardening" },
   { version: 10, name: "generation_run_request_idempotency" },
   { version: 11, name: "versioned_tutorial_receipts" },
+  { version: 12, name: "initial_draft_project_lifecycle" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -69,6 +70,57 @@ const tutorialUserForeignKey = await queryOne<{ delete_action: string }>(`
 `);
 assert.equal(tutorialUserForeignKey?.delete_action, "c");
 console.log("  ✓ 教程回执按用户、教程标识和版本唯一存储且随用户级联删除");
+
+const projectLifecycleColumns = await query<{
+  column_name: string;
+  column_default: string | null;
+  is_nullable: string;
+}>(`
+  SELECT column_name, column_default, is_nullable
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'projects'
+    AND column_name IN ('lifecycle','draft_revision')
+  ORDER BY column_name
+`);
+assert.deepEqual(projectLifecycleColumns.map((row) => ({
+  column_name: row.column_name,
+  is_nullable: row.is_nullable,
+})), [
+  { column_name: "draft_revision", is_nullable: "NO" },
+  { column_name: "lifecycle", is_nullable: "NO" },
+]);
+assert.match(
+  projectLifecycleColumns.find((row) => row.column_name === "draft_revision")?.column_default ?? "",
+  /0/,
+);
+assert.match(
+  projectLifecycleColumns.find((row) => row.column_name === "lifecycle")?.column_default ?? "",
+  /saved/,
+);
+const projectLifecycleConstraints = await query<{ conname: string; definition: string }>(`
+  SELECT conname, pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conrelid = 'projects'::regclass
+    AND conname IN ('projects_lifecycle_check','projects_draft_revision_check')
+  ORDER BY conname
+`);
+assert.deepEqual(projectLifecycleConstraints.map((row) => row.conname), [
+  "projects_draft_revision_check",
+  "projects_lifecycle_check",
+]);
+assert.match(projectLifecycleConstraints[0]?.definition ?? "", />= 0/);
+assert.match(projectLifecycleConstraints[1]?.definition ?? "", /initial_draft/);
+assert.match(projectLifecycleConstraints[1]?.definition ?? "", /saved/);
+const initialDraftUniqueIndex = await queryOne<{ indexdef: string }>(`
+  SELECT indexdef FROM pg_indexes
+  WHERE schemaname = 'public'
+    AND indexname = 'projects_active_initial_draft_owner_unique'
+`);
+assert.match(initialDraftUniqueIndex?.indexdef ?? "", /UNIQUE INDEX/);
+assert.match(initialDraftUniqueIndex?.indexdef ?? "", /owner_id/);
+assert.match(initialDraftUniqueIndex?.indexdef ?? "", /lifecycle = 'initial_draft'/);
+assert.match(initialDraftUniqueIndex?.indexdef ?? "", /deleted_at IS NULL/);
+console.log("  ✓ 项目生命周期、草稿 revision 与单用户唯一有效草稿约束已建立");
 
 const queueTables = await query<{ table_name: string }>(`
   SELECT table_name FROM information_schema.tables
@@ -306,6 +358,34 @@ const cascaded = await queryOne<{ count: number }>(
 );
 assert.equal(cascaded?.count, 0);
 console.log("  ✓ 删除项目会级联移除素材引用");
+
+await query("DROP INDEX IF EXISTS projects_active_initial_draft_owner_unique");
+await query("ALTER TABLE projects DROP COLUMN lifecycle");
+await query("ALTER TABLE projects DROP COLUMN draft_revision");
+await query("DELETE FROM schema_migrations WHERE version = 12");
+await query(`
+  INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+  VALUES ('pre-lifecycle-project', $1, '升级前项目',
+    '{"schemaVersion":1,"nodes":[],"edges":[]}', $2, $2)
+`, [admin.id, now]);
+await closeDatabaseForTests();
+await initializeDatabase();
+assert.deepEqual(await queryOne<{ lifecycle: string; draft_revision: number; name: string }>(`
+  SELECT lifecycle, draft_revision, name FROM projects WHERE id = 'pre-lifecycle-project'
+`), {
+  lifecycle: "saved",
+  draft_revision: 0,
+  name: "升级前项目",
+});
+assert.equal((await queryOne<{ count: number }>(`
+  SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version = 12
+`))?.count, 1);
+await closeDatabaseForTests();
+await initializeDatabase();
+assert.equal((await queryOne<{ count: number }>(`
+  SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version = 12
+`))?.count, 1);
+console.log("  ✓ 旧数据库无损补齐生命周期字段且迁移重复启动保持幂等");
 
 await closeDatabaseForTests();
 fs.rmSync(temp, { recursive: true, force: true });
