@@ -109,6 +109,7 @@ export function ProjectCenter({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadVersion = useRef(0);
+  const openRequestVersion = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const tabs = useFlowStore((state) => state.tabs);
   const activeTabId = useFlowStore((state) => state.activeTabId);
@@ -143,6 +144,7 @@ export function ProjectCenter({
   useEffect(() => {
     if (!open) {
       loadVersion.current += 1;
+      openRequestVersion.current += 1;
       setQuery("");
       return;
     }
@@ -150,6 +152,7 @@ export function ProjectCenter({
   }, [load, open]);
 
   const openProject = useCallback(async (project: ProjectSummary) => {
+    const requestVersion = ++openRequestVersion.current;
     const alreadyOpen = useFlowStore.getState().tabs.find((tab) => tab.projectId === project.id);
     if (alreadyOpen) {
       useFlowStore.getState().switchTab(alreadyOpen.id);
@@ -161,6 +164,7 @@ export function ProjectCenter({
       const response = await fetch(`/api/projects/${project.id}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const detail = await response.json() as ProjectDetail;
+      if (requestVersion !== openRequestVersion.current) return;
       if (!Array.isArray(detail.flow?.nodes) || !Array.isArray(detail.flow?.edges)) {
         throw new Error("项目数据损坏或不兼容");
       }
@@ -173,6 +177,7 @@ export function ProjectCenter({
       });
       onOpenChange(false);
     } catch (openError) {
+      if (requestVersion !== openRequestVersion.current) return;
       setError(openError instanceof Error ? openError.message : String(openError));
     }
   }, [onOpenChange]);

@@ -1509,6 +1509,8 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectCenterSource, /activeSection === "templates"/);
   assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
   assert.doesNotMatch(projectCenterSource, /Promise\.allSettled|projectDetails/);
+  assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
+  assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
   assert.match(projectCenterSource, /最近项目/);
   assert.match(projectCenterSource, /内置模板/);
   assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
