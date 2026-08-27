@@ -19,14 +19,22 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
     return (await response.json() as InitialDraftBody).draft;
   };
 
+  const beginRename = async (targetPage: typeof page) => {
+    const tabName = targetPage.getByTitle(/双击重命名/).first();
+    await expect(tabName).toBeVisible();
+    await tabName.dblclick();
+    const input = targetPage.getByRole("textbox", { name: "项目名称" });
+    await expect(input).toBeVisible();
+    return input;
+  };
+
   await page.goto("/");
-  const projectName = page.getByPlaceholder("项目名称");
-  await expect(projectName).toBeVisible();
   const initial = await readDraft();
   expect(initial).not.toBeNull();
   if (!initial) throw new Error("Initial draft was not bootstrapped");
 
   const editedName = `E2E 未保存草稿 ${Date.now()}`;
+  const projectName = await beginRename(page);
   await projectName.fill(editedName);
   await projectName.blur();
   await expect.poll(async () => (await readDraft())?.name).toBe(editedName);
@@ -34,12 +42,12 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   expect(synchronized?.id).toBe(initial.id);
 
   await page.reload();
-  await expect(page.getByPlaceholder("项目名称")).toHaveValue(editedName);
+  await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   expect((await readDraft())?.id).toBe(initial.id);
 
   const secondPage = await page.context().newPage();
   await secondPage.goto("/");
-  await expect(secondPage.getByPlaceholder("项目名称")).toHaveValue(editedName);
+  await expect(secondPage.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   const secondTabDraft = await secondPage.context().request.get("/api/projects/initial-draft");
   expect(secondTabDraft.ok()).toBeTruthy();
   expect(((await secondTabDraft.json()) as InitialDraftBody).draft?.id).toBe(initial.id);
@@ -52,7 +60,7 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
 
-  await expect(page.getByPlaceholder("项目名称")).toHaveValue(editedName);
+  await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   const afterRelogin = await readDraft();
   expect(afterRelogin?.id).toBe(initial.id);
   expect(afterRelogin?.name).toBe(editedName);

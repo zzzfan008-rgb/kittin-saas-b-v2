@@ -1507,14 +1507,27 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectTabsSource, /role="alert"/);
   assert.match(projectCenterSource, /activeSection === "recent"/);
   assert.match(projectCenterSource, /activeSection === "templates"/);
+  assert.match(projectCenterSource, /"my-templates"/);
   assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
+  assert.match(projectCenterSource, /if \(template\.builtIn\) return false/);
   assert.doesNotMatch(projectCenterSource, /Promise\.allSettled|projectDetails/);
   assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
   assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
   assert.match(projectCenterSource, /最近项目/);
   assert.match(projectCenterSource, /内置模板/);
+  assert.match(projectCenterSource, /我的模板/);
+  assert.match(projectCenterSource, /保存当前画布为模板/);
+  assert.match(projectCenterSource, /DELETE/);
+  assert.match(projectCenterSource, /删除后无法恢复；由此模板创建的项目不会受到影响/);
+  assert.match(projectCenterSource, /<Tabs[\s\S]*<TabsTrigger[\s\S]*<Card/);
+  assert.match(projectCenterSource, /<DropdownMenu[\s\S]*<AlertDialog/);
   assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
   assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
+  assert.match(projectCenterSource, /SAVE_TEMPLATE_COVER/);
+  assert.ok(
+    fs.existsSync(new URL("../public/assets/project-center/save-template-cover.png", import.meta.url)),
+    "我的模板保存卡必须使用仓库内图片素材",
+  );
 });
 
 console.log(`\n通过 ${passed} 项`);

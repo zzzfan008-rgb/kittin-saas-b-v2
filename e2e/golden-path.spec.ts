@@ -124,7 +124,10 @@ test("upload and text starters complete the isolated first-generation golden pat
   const results = page.getByRole("region", { name: "最近生成" });
   await expect(results.getByAltText("草图→效果图")).toBeVisible();
 
-  await page.getByRole("button", { name: "新建空白项目页签" }).click();
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const projectCenter = page.getByRole("dialog", { name: "项目中心" });
+  await expect(projectCenter).toBeVisible();
+  await projectCenter.getByRole("button", { name: /新建项目/ }).click();
   await expect(launcher).toBeVisible();
   await launcher.getByRole("button", { name: /文本生成开始/ }).click();
   const textNode = page.locator(".react-flow__node").filter({ hasText: "文生图" });

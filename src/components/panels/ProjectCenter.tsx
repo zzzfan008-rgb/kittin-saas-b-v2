@@ -1,14 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Dialog } from "@base-ui/react/dialog";
 import {
   FolderOpenIcon,
   LayoutTemplateIcon,
   LoaderCircleIcon,
+  MoreHorizontalIcon,
   PlusIcon,
   SearchIcon,
+  Trash2Icon,
+  UserRoundIcon,
   XIcon,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { thumbnailImageUrl } from "@/lib/images";
 import { launchTemplateInNewTab } from "@/lib/templateLaunch";
 import {
@@ -17,8 +45,9 @@ import {
   type ProjectTab,
 } from "@/store/flowStore";
 import type { PersistedWorkflow, WorkflowTemplate } from "@/types/workflow";
+import { SaveTemplateForm } from "./TemplatesDock";
 
-type ProjectCenterTab = "recent" | "templates";
+type ProjectCenterTab = "recent" | "templates" | "my-templates";
 
 interface ProjectSummary {
   id: string;
@@ -34,6 +63,7 @@ interface ProjectDetail extends ProjectSummary {
 
 const NEW_PROJECT_COVER = "/assets/project-center/new-project-cover.jpg";
 const EMPTY_PROJECT_COVER = "/assets/project-center/empty-project-cover.jpg";
+const SAVE_TEMPLATE_COVER = "/assets/project-center/save-template-cover.png";
 
 function flowPreviewImage(flow: { nodes: unknown[] }): string | undefined {
   for (const rawNode of [...flow.nodes].reverse()) {
@@ -89,8 +119,24 @@ function ProjectCover({
 
 function CardFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="group overflow-hidden rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] transition-colors hover:border-[var(--gc-accent)]">
+    <Card size="sm" className="group gap-0 overflow-hidden border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] py-0 text-[var(--gc-text)] ring-0 transition-colors hover:border-[var(--gc-accent)]">
       {children}
+    </Card>
+  );
+}
+
+function TemplateSkeletons() {
+  return (
+    <div aria-label="正在加载模板" className="grid grid-cols-4 gap-4">
+      {Array.from({ length: 8 }, (_, index) => (
+        <Card key={index} size="sm" className="gap-3 border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] py-0 ring-0">
+          <Skeleton className="aspect-[16/10] w-full rounded-none bg-[var(--gc-panel-hover)]" />
+          <div className="space-y-2 px-3 pb-3">
+            <Skeleton className="h-3 w-2/3 bg-[var(--gc-panel-hover)]" />
+            <Skeleton className="h-2.5 w-full bg-[var(--gc-panel-hover)]" />
+          </div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -108,9 +154,14 @@ export function ProjectCenter({
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<WorkflowTemplate | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const openRequestVersion = useRef(0);
+  const hasLoaded = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const saveTemplateButtonRef = useRef<HTMLButtonElement>(null);
   const tabs = useFlowStore((state) => state.tabs);
   const activeTabId = useFlowStore((state) => state.activeTabId);
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
@@ -118,7 +169,7 @@ export function ProjectCenter({
 
   const load = useCallback(async () => {
     const version = ++loadVersion.current;
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
       const [projectsResponse, templatesResponse] = await Promise.all([
@@ -132,6 +183,7 @@ export function ProjectCenter({
       if (version !== loadVersion.current) return;
       setProjects(summaries);
       setTemplates(loadedTemplates);
+      hasLoaded.current = true;
     } catch (loadError) {
       if (version === loadVersion.current) {
         setError(loadError instanceof Error ? loadError.message : String(loadError));
@@ -146,6 +198,8 @@ export function ProjectCenter({
       loadVersion.current += 1;
       openRequestVersion.current += 1;
       setQuery("");
+      setSaveTemplateOpen(false);
+      setTemplateToDelete(null);
       return;
     }
     void load();
@@ -195,6 +249,14 @@ export function ProjectCenter({
     }),
     [normalizedQuery, templates],
   );
+  const filteredMyTemplates = useMemo(
+    () => templates.filter((template) => {
+      if (template.builtIn) return false;
+      if (!normalizedQuery) return true;
+      return `${template.name} ${template.description}`.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
+    }),
+    [normalizedQuery, templates],
+  );
 
   const createProject = () => {
     createBlankTab();
@@ -206,20 +268,53 @@ export function ProjectCenter({
     onOpenChange(false);
   };
 
+  const openTemplate = (template: WorkflowTemplate) => {
+    launchTemplateInNewTab(template);
+    onOpenChange(false);
+  };
+
+  const removeTemplate = async () => {
+    if (!templateToDelete || templateToDelete.builtIn) return;
+    setDeletingTemplateId(templateToDelete.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/templates/${templateToDelete.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`删除模板 HTTP ${response.status}`);
+      setTemplates((current) => current.filter((template) => template.id !== templateToDelete.id));
+      setTemplateToDelete(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
+    } finally {
+      setDeletingTemplateId(null);
+    }
+  };
+
+  const selectSection = (value: unknown) => {
+    if (value !== "recent" && value !== "templates" && value !== "my-templates") return;
+    setActiveSection(value);
+    setQuery("");
+  };
+
+  const searchPlaceholder = activeSection === "recent"
+    ? "搜索最近项目"
+    : activeSection === "templates"
+      ? "搜索内置模板"
+      : "搜索我的模板";
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm" />
-        <Dialog.Popup
-          initialFocus={searchRef}
-          className="gc-panel fixed left-1/2 top-1/2 z-[61] flex h-[min(760px,calc(100vh-5rem))] w-[min(1180px,calc(100vw-5rem))] min-w-[944px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] shadow-2xl shadow-black/70 outline-hidden"
-        >
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        initialFocus={searchRef}
+        showCloseButton={false}
+        overlayClassName="z-[60] bg-black/75 backdrop-blur-sm"
+        className="gc-panel z-[61] flex h-[min(760px,calc(100vh-5rem))] w-[min(1180px,calc(100vw-5rem))] min-w-[944px] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-0 text-[var(--gc-text)] shadow-2xl shadow-black/70 ring-0"
+      >
           <header className="flex items-center gap-6 border-b border-[var(--gc-border)] px-7 py-5">
             <div className="min-w-48">
-              <Dialog.Title className="text-base font-semibold text-[var(--gc-text)]">项目中心</Dialog.Title>
-              <Dialog.Description className="mt-1 text-[10px] text-[var(--gc-text-muted)]">
+              <DialogTitle className="text-base font-semibold text-[var(--gc-text)]">项目中心</DialogTitle>
+              <DialogDescription className="mt-1 text-[10px] text-[var(--gc-text-muted)]">
                 新建、继续或从模板开始
-              </Dialog.Description>
+              </DialogDescription>
             </div>
             <label className="relative ml-auto block w-80">
               <SearchIcon aria-hidden="true" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--gc-text-muted)]" />
@@ -227,60 +322,45 @@ export function ProjectCenter({
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={activeSection === "recent" ? "搜索最近项目" : "搜索内置模板"}
+                placeholder={searchPlaceholder}
                 className="h-9 w-full rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] pl-9 pr-3 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
               />
             </label>
-            <Dialog.Close
+            <DialogClose
               type="button"
               aria-label="关闭项目中心"
               className="flex size-8 items-center justify-center rounded-lg text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
             >
               <XIcon aria-hidden="true" className="size-4" />
-            </Dialog.Close>
+            </DialogClose>
           </header>
 
-          <div className="flex h-12 shrink-0 items-end gap-7 border-b border-[var(--gc-border)] px-7">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveSection("recent");
-                setQuery("");
-              }}
-              className={`relative flex h-12 items-center gap-2 text-xs font-medium ${
-                activeSection === "recent" ? "text-[var(--gc-accent)]" : "text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-              }`}
-            >
-              <FolderOpenIcon aria-hidden="true" className="size-3.5" />
-              最近项目
-              {activeSection === "recent" && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--gc-accent)]" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveSection("templates");
-                setQuery("");
-              }}
-              className={`relative flex h-12 items-center gap-2 text-xs font-medium ${
-                activeSection === "templates" ? "text-[var(--gc-accent)]" : "text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-              }`}
-            >
-              <LayoutTemplateIcon aria-hidden="true" className="size-3.5" />
-              内置模板
-              {activeSection === "templates" && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--gc-accent)]" />}
-            </button>
-          </div>
+          <Tabs value={activeSection} onValueChange={selectSection} className="min-h-0 flex-1 flex-col gap-0">
+            <TabsList variant="line" aria-label="项目中心分类" className="h-12 w-full shrink-0 justify-start gap-7 rounded-none border-b border-[var(--gc-border)] px-7 py-0">
+              <TabsTrigger value="recent" className="h-12 flex-none rounded-none px-0 text-xs text-[var(--gc-text-muted)] data-active:text-[var(--gc-accent)] after:bg-[var(--gc-accent)]">
+                <FolderOpenIcon aria-hidden="true" className="size-3.5" />
+                最近项目
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="h-12 flex-none rounded-none px-0 text-xs text-[var(--gc-text-muted)] data-active:text-[var(--gc-accent)] after:bg-[var(--gc-accent)]">
+                <LayoutTemplateIcon aria-hidden="true" className="size-3.5" />
+                内置模板
+              </TabsTrigger>
+              <TabsTrigger value="my-templates" className="h-12 flex-none rounded-none px-0 text-xs text-[var(--gc-text-muted)] data-active:text-[var(--gc-accent)] after:bg-[var(--gc-accent)]">
+                <UserRoundIcon aria-hidden="true" className="size-3.5" />
+                我的模板
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-7">
             {error && (
-              <div role="alert" className="mb-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-[10px] text-red-300">
+              <div role="alert" className="mx-7 mt-5 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-[10px] text-red-300">
                 <span>加载失败：{error}</span>
                 <Button type="button" variant="outline" size="xs" onClick={() => void load()}>重试</Button>
               </div>
             )}
 
-            {activeSection === "recent" ? (
-              <div className="grid grid-cols-4 gap-4">
+            <TabsContent value="recent" className="min-h-0 overflow-y-auto p-7">
+              {loading ? <TemplateSkeletons /> : (
+                <div className="grid grid-cols-4 gap-4">
                 <CardFrame>
                   <button type="button" onClick={createProject} className="block w-full text-left">
                     <div className="relative overflow-hidden">
@@ -334,19 +414,23 @@ export function ProjectCenter({
                     </CardFrame>
                   );
                 })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-4">
+                </div>
+              )}
+              {!loading && filteredProjects.length === 0 && !initialDraft && (
+                <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">暂无已保存项目，可以从“新建项目”开始。</p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="templates" className="min-h-0 overflow-y-auto p-7">
+              {loading ? <TemplateSkeletons /> : (
+                <div className="grid grid-cols-4 gap-4">
                 {filteredTemplates.map((template) => {
                   const image = template.thumbnail ?? flowPreviewImage(template.flow);
                   return (
                     <CardFrame key={template.id}>
                       <button
                         type="button"
-                        onClick={() => {
-                          launchTemplateInNewTab(template);
-                          onOpenChange(false);
-                        }}
+                        onClick={() => openTemplate(template)}
                         className="block w-full text-left"
                       >
                         <ProjectCover src={image} alt={template.name} />
@@ -354,7 +438,7 @@ export function ProjectCenter({
                           <span className="flex items-center gap-2">
                             <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--gc-text)]">{template.name}</span>
                             <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">
-                              {template.builtIn ? "内置" : "我的"}
+                              内置
                             </span>
                           </span>
                           <span className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
@@ -365,24 +449,122 @@ export function ProjectCenter({
                     </CardFrame>
                   );
                 })}
-              </div>
-            )}
+                </div>
+              )}
+              {!loading && filteredTemplates.length === 0 && (
+                <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">没有符合条件的内置模板。</p>
+              )}
+            </TabsContent>
 
-            {loading && (
-              <div className="flex min-h-48 items-center justify-center gap-2 text-xs text-[var(--gc-text-muted)]">
-                <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-                正在加载项目内容…
-              </div>
-            )}
-            {!loading && activeSection === "recent" && filteredProjects.length === 0 && !initialDraft && (
-              <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">暂无已保存项目，可以从“新建项目”开始。</p>
-            )}
-            {!loading && activeSection === "templates" && filteredTemplates.length === 0 && (
-              <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">没有符合条件的模板。</p>
-            )}
-          </div>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+            <TabsContent value="my-templates" className="min-h-0 overflow-y-auto p-7">
+              {loading ? <TemplateSkeletons /> : (
+                <div className="grid grid-cols-4 gap-4">
+                  <CardFrame>
+                    <button
+                      ref={saveTemplateButtonRef}
+                      type="button"
+                      onClick={() => setSaveTemplateOpen(true)}
+                      className="block w-full text-left"
+                    >
+                      <div className="relative overflow-hidden">
+                        <ProjectCover src={SAVE_TEMPLATE_COVER} fallback={SAVE_TEMPLATE_COVER} alt="保存当前画布为模板" />
+                        <span className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-sm">
+                          <PlusIcon aria-hidden="true" className="size-4" />
+                        </span>
+                      </div>
+                      <span className="block p-3">
+                        <span className="block text-xs font-semibold text-[var(--gc-accent)]">保存当前画布为模板</span>
+                        <span className="mt-1 block text-[10px] text-[var(--gc-text-muted)]">复用当前节点、连接和参数配置</span>
+                      </span>
+                    </button>
+                  </CardFrame>
+
+                  {filteredMyTemplates.map((template) => {
+                    const image = template.thumbnail ?? flowPreviewImage(template.flow);
+                    return (
+                      <CardFrame key={template.id}>
+                        <div className="relative overflow-hidden">
+                          <button type="button" onClick={() => openTemplate(template)} className="block w-full text-left">
+                            <ProjectCover src={image} alt={template.name} />
+                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              aria-label={`管理模板 ${template.name}`}
+                              className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/30 bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"
+                            >
+                              <MoreHorizontalIcon aria-hidden="true" className="size-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-36 border border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text)] ring-0"
+                            >
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setTemplateToDelete(template)}
+                                className="text-xs"
+                              >
+                                <Trash2Icon aria-hidden="true" className="size-3.5" />
+                                删除模板
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="p-3">
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => openTemplate(template)} className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-[var(--gc-text)] hover:text-[var(--gc-accent)]">
+                              {template.name}
+                            </button>
+                            <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">我的</span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
+                            {template.description || "从此工作流模板创建一个新项目"}
+                          </p>
+                        </div>
+                      </CardFrame>
+                    );
+                  })}
+                </div>
+              )}
+              {!loading && filteredMyTemplates.length === 0 && (
+                <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">还没有自建模板，可以先保存当前画布。</p>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <SaveTemplateForm
+            open={saveTemplateOpen}
+            onOpenChange={setSaveTemplateOpen}
+            onSaved={() => void load()}
+            finalFocusRef={saveTemplateButtonRef}
+          />
+
+          <AlertDialog open={templateToDelete !== null} onOpenChange={(nextOpen) => {
+            if (!nextOpen && deletingTemplateId === null) setTemplateToDelete(null);
+          }}>
+            <AlertDialogContent
+              overlayClassName="z-[70] bg-black/75 backdrop-blur-sm"
+              className="z-[71] border border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text)] ring-0"
+            >
+              <AlertDialogHeader>
+                <AlertDialogTitle>删除“{templateToDelete?.name}”？</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-[var(--gc-text-muted)]">
+                  删除后无法恢复；由此模板创建的项目不会受到影响。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="border-[var(--gc-border)] bg-[var(--gc-panel-soft)]">
+                <AlertDialogCancel disabled={deletingTemplateId !== null}>保留模板</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={deletingTemplateId !== null}
+                  onClick={() => void removeTemplate()}
+                >
+                  {deletingTemplateId !== null && <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" />}
+                  {deletingTemplateId !== null ? "删除中…" : "确认删除"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+      </DialogContent>
+    </Dialog>
   );
 }
