@@ -17,7 +17,10 @@ import {
   parseTutorialReceiptState,
   type TutorialOutcome,
 } from "@/tutorials/tutorialContract";
-import { setWorkbenchTutorialBlocking } from "@/tutorials/tutorialRuntime";
+import {
+  OPEN_TUTORIAL_EVENT,
+  setWorkbenchTutorialBlocking,
+} from "@/tutorials/tutorialRuntime";
 
 const STEPS = [
   {
@@ -60,6 +63,16 @@ export function TutorialOverlay() {
     setWorkbenchTutorialBlocking(loadState !== "hidden");
     return () => setWorkbenchTutorialBlocking(false);
   }, [loadState]);
+
+  useEffect(() => {
+    const openTutorial = () => {
+      setStep(0);
+      setError(null);
+      setLoadState("ready");
+    };
+    window.addEventListener(OPEN_TUTORIAL_EVENT, openTutorial);
+    return () => window.removeEventListener(OPEN_TUTORIAL_EVENT, openTutorial);
+  }, []);
 
   useEffect(() => {
     let ignore = false;

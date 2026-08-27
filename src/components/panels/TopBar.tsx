@@ -1,170 +1,52 @@
 import { useEffect, useRef, useState } from "react";
+import { CircleHelpIcon, KeyboardIcon, PaletteIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   retryTabSessionPersistence,
-  selectActiveDirty,
-  selectActiveProjectId,
-  selectActiveProjectName,
   selectActiveReadOnly,
-  selectActiveSaveState,
   useFlowStore,
 } from "@/store/flowStore";
-import { THEMES, useTheme } from "@/lib/theme";
-import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
+import { OPEN_TUTORIAL_EVENT } from "@/tutorials/tutorialRuntime";
 import { AccountMenu } from "./AccountMenu";
 
-const SAVE_TEXT = {
-  idle: "保存",
-  saving: "保存中…",
-  saved: "已保存",
-  error: "保存失败，重试",
-} as const;
+const THEME_PICKER_ID = "theme-picker-options";
+const SHORTCUTS_PANEL_ID = "workbench-shortcuts";
 
-const SAVE_TEXT_COMPACT = {
-  idle: "保存",
-  saving: "保存中",
-  saved: "已保存",
-  error: "重试",
-} as const;
-
-/** 打开项目：下拉列出已保存项目，加载恢复画布 */
-function ProjectPicker() {
-  const [open, setOpen] = useState(false);
-  const [list, setList] = useState<{ id: string; name: string; ownerName?: string; readOnly?: boolean; updatedAt: string }[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const openRequestIdRef = useRef(0);
-  const currentId = useFlowStore(selectActiveProjectId);
-  const openFlowTab = useFlowStore((s) => s.openFlowTab);
-
-  useEffect(() => {
-    if (!open) return;
-    setError(null);
-    fetch("/api/projects")
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data) => setList(data as typeof list))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const openProject = async (id: string) => {
-    const alreadyOpen = useFlowStore.getState().tabs.find((tab) => tab.projectId === id);
-    if (alreadyOpen) {
-      useFlowStore.getState().switchTab(alreadyOpen.id);
-      setOpen(false);
-      return;
-    }
-    const requestId = ++openRequestIdRef.current;
-    try {
-      const res = await fetch(`/api/projects/${id}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const p = (await res.json()) as {
-        id: string;
-        name: string;
-        ownerName?: string;
-        readOnly?: boolean;
-        flow?: { nodes?: unknown; edges?: unknown };
-      };
-      if (!Array.isArray(p.flow?.nodes) || !Array.isArray(p.flow?.edges)) {
-        throw new Error("项目数据损坏或不兼容");
-      }
-      if (requestId !== openRequestIdRef.current) return;
-      openFlowTab({
-        projectId: p.id,
-        projectName: p.name,
-        nodes: p.flow.nodes as never,
-        edges: p.flow.edges as never,
-        readOnly: p.readOnly ?? false,
-      });
-      setOpen(false);
-    } catch (err) {
-      // 加载失败只提示，绝不清空当前画布
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`h-8 rounded-md border px-2 py-1 text-[10px] transition-colors sm:h-auto sm:px-2.5 ${
-          open
-            ? "border-gold text-gold"
-            : "border-[#262626] text-neutral-400 hover:border-gold/50 hover:text-neutral-200"
-        }`}
-      >
-        打开
-      </button>
-      {open && (
-        <div className="fixed left-2 right-2 top-12 z-50 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60 sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1.5 sm:w-64">
-          <div className="px-2.5 pb-1.5 pt-1 text-[10px] uppercase tracking-widest text-neutral-600">
-            已保存的项目
-          </div>
-          {error ? (
-            <p className="px-2.5 py-2 text-[10px] text-red-400">加载失败：{error}</p>
-          ) : list.length === 0 ? (
-            <p className="px-2.5 py-2 text-[10px] text-neutral-600">暂无项目，Ctrl+S 保存当前画布</p>
-          ) : (
-            <div className="max-h-56 overflow-y-auto">
-              {list.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => void openProject(p.id)}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left hover:bg-[#222]"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={`block truncate text-[11px] ${p.id === currentId ? "text-gold" : "text-neutral-200"}`}
-                    >
-                      {p.name}
-                    </span>
-                    <span className="block text-[9px] text-neutral-600">
-                      {p.readOnly && p.ownerName ? `${p.ownerName} · 只读 · ` : ""}
-                      {new Date(p.updatedAt).toLocaleString("zh-CN", {
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </span>
-                  {p.id === currentId && (
-                    <span className="shrink-0 text-[9px] text-gold">当前</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+function themePreviewColors(theme: ThemeId) {
+  if (theme === "white") {
+    return { shell: "#f5f5f7", panel: "#ffffff", line: "#d3d3d8", accent: "#e98fa8" };
+  }
+  if (theme === "eye") {
+    return { shell: "#dcebd0", panel: "#eef5e8", line: "#a4bb94", accent: "#173b63" };
+  }
+  return { shell: "#101010", panel: "#1b1b1b", line: "#3a3a3a", accent: "#c9a66b" };
 }
 
-/** 主题切换：胶囊触发 + 悬浮下拉窗口 */
-const THEME_PICKER_ID = "theme-picker-options";
+function ThemeMiniature({ theme }: { theme: ThemeId }) {
+  const colors = themePreviewColors(theme);
+  return (
+    <span
+      aria-hidden="true"
+      className="relative block h-10 w-16 shrink-0 overflow-hidden rounded-md border border-white/10"
+      style={{ backgroundColor: colors.shell }}
+    >
+      <span className="absolute inset-x-0 top-0 h-2" style={{ backgroundColor: colors.panel }} />
+      <span className="absolute bottom-1.5 left-1.5 top-3 w-2 rounded-sm" style={{ backgroundColor: colors.panel }} />
+      <span className="absolute left-5 top-3 h-3 w-4 rounded-sm border" style={{ borderColor: colors.line }} />
+      <span className="absolute left-10 top-4 h-px w-3" style={{ backgroundColor: colors.line }} />
+      <span className="absolute bottom-1.5 right-1.5 h-3 w-4 rounded-sm border" style={{ borderColor: colors.accent }} />
+      <span className="absolute left-[35px] top-[19px] size-1 rounded-full" style={{ backgroundColor: colors.accent }} />
+    </span>
+  );
+}
 
 function ThemeSwitcher() {
   const [theme, switchTheme] = useTheme();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const current = THEMES.find((t) => t.id === theme) ?? THEMES[0];
+  const current = THEMES.find((item) => item.id === theme) ?? THEMES[0];
 
   const closeAndRestoreFocus = () => {
     setOpen(false);
@@ -173,11 +55,12 @@ function ThemeSwitcher() {
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
+    const onDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as globalThis.Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
         closeAndRestoreFocus();
       }
     };
@@ -194,62 +77,168 @@ function ThemeSwitcher() {
       ref={rootRef}
       className="relative"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) {
-          setOpen(false);
-        }
+        if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) setOpen(false);
       }}
     >
-      <button
+      <Button
         ref={triggerRef}
         type="button"
+        variant="outline"
+        size="sm"
         aria-label={`切换主题，当前为${current.label}`}
         aria-controls={THEME_PICKER_ID}
         aria-expanded={open}
-        title={`切换主题，当前为${current.label}`}
-        onClick={() => setOpen((v) => !v)}
-        className={`flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border px-0 text-[10px] transition-colors sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 ${
-          open
-            ? "border-gold text-gold"
-            : "border-[#262626] text-neutral-400 hover:border-gold/50 hover:text-neutral-200"
-        }`}
+        onClick={() => setOpen((value) => !value)}
+        className="h-8 min-w-32 justify-between border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] text-[var(--gc-text)] hover:border-[var(--gc-accent)]"
       >
-        <span
-          className="h-2.5 w-2.5 rounded-full border border-white/20"
-          style={{ backgroundColor: current.swatch }}
-        />
-        <span className="hidden sm:inline">{current.label}</span>
-        <span className="hidden text-[8px] text-neutral-600 sm:inline">{open ? "▲" : "▼"}</span>
-      </button>
+        <PaletteIcon aria-hidden="true" className="size-3.5 text-[var(--gc-accent)]" />
+        <span>{current.label}</span>
+        <span aria-hidden="true" className="text-[9px] text-[var(--gc-text-muted)]">{open ? "▲" : "▼"}</span>
+      </Button>
 
       {open && (
-        <div id={THEME_PICKER_ID} className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-[#333] bg-[#161616] p-1.5 shadow-xl shadow-black/60">
-          {THEMES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                switchTheme(t.id);
-                closeAndRestoreFocus();
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors ${
-                theme === t.id ? "bg-gold/10" : "hover:bg-[#222]"
-              }`}
-            >
-              <span
-                className="h-4 w-4 shrink-0 rounded-full border border-white/20"
-                style={{ backgroundColor: t.swatch }}
-              />
-              <span className="min-w-0">
-                <span
-                  className={`block text-[11px] ${theme === t.id ? "text-gold" : "text-neutral-200"}`}
-                >
-                  {t.label}
+        <div
+          id={THEME_PICKER_ID}
+          role="menu"
+          aria-label="主题"
+          className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 shadow-2xl shadow-black/60"
+        >
+          <p className="px-2 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">主题</p>
+          <div className="space-y-1">
+            {THEMES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={theme === item.id}
+                onClick={() => {
+                  switchTheme(item.id);
+                  closeAndRestoreFocus();
+                }}
+                className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors ${
+                  theme === item.id
+                    ? "border-[var(--gc-accent)] bg-[var(--gc-panel-hover)]"
+                    : "border-transparent hover:border-[var(--gc-border)] hover:bg-[var(--gc-panel-hover)]"
+                }`}
+              >
+                <ThemeMiniature theme={item.id} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
+                    {item.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[9px] text-[var(--gc-text-muted)]">{item.desc}</span>
                 </span>
-                <span className="block truncate text-[9px] text-neutral-500">{t.desc}</span>
-              </span>
-              {theme === t.id && <span className="ml-auto text-[10px] text-gold">✓</span>}
-            </button>
-          ))}
+                {theme === item.id && <span className="text-xs text-[var(--gc-accent)]">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ShortcutKey({ children }: { children: string }) {
+  return (
+    <kbd className="min-w-6 rounded border border-[var(--gc-border)] bg-[var(--gc-control)] px-1.5 py-0.5 text-center font-mono text-[9px] leading-4 text-[var(--gc-text)] shadow-sm">
+      {children}
+    </kbd>
+  );
+}
+
+function ShortcutMenu() {
+  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const openTimer = useRef<number | null>(null);
+  const closeTimer = useRef<number | null>(null);
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const command = isMac ? "⌘" : "Ctrl";
+
+  const clearTimers = () => {
+    if (openTimer.current !== null) window.clearTimeout(openTimer.current);
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    openTimer.current = null;
+    closeTimer.current = null;
+  };
+
+  useEffect(() => () => clearTimers(), []);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setPinned(false);
+      setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const shortcuts = [
+    { label: "保存", keys: [command, "S"] },
+    { label: "撤销", keys: [command, "Z"] },
+    { label: "重做", keys: isMac ? ["⇧", command, "Z"] : [command, "Shift", "Z"] },
+    { label: "复制节点", keys: [command, "C"] },
+    { label: "粘贴节点", keys: [command, "V"] },
+    { label: "删除节点", keys: [isMac ? "⌫" : "Delete"] },
+    { label: "关闭浮层", keys: ["Esc"] },
+  ];
+
+  return (
+    <div
+      className="relative"
+      onPointerEnter={() => {
+        clearTimers();
+        if (!open) openTimer.current = window.setTimeout(() => setOpen(true), 180);
+      }}
+      onPointerLeave={() => {
+        clearTimers();
+        if (!pinned) closeTimer.current = window.setTimeout(() => setOpen(false), 150);
+      }}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(event) => {
+        if (!pinned && !event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) setOpen(false);
+      }}
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label="查看快捷键"
+        aria-controls={SHORTCUTS_PANEL_ID}
+        aria-expanded={open}
+        aria-pressed={pinned}
+        title="快捷键"
+        onClick={() => {
+          const nextPinned = !pinned;
+          setPinned(nextPinned);
+          setOpen(nextPinned);
+        }}
+        className="border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] hover:text-[var(--gc-text)]"
+      >
+        <KeyboardIcon aria-hidden="true" className="size-4" />
+      </Button>
+
+      {open && (
+        <div
+          id={SHORTCUTS_PANEL_ID}
+          role="region"
+          aria-label="快捷键说明"
+          className="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 shadow-2xl shadow-black/60"
+        >
+          <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-2 pb-2 pt-1">
+            <span className="text-[11px] font-semibold text-[var(--gc-text)]">快捷键</span>
+            <span className="text-[9px] text-[var(--gc-text-muted)]">{pinned ? "已固定" : "点击图标可固定"}</span>
+          </div>
+          <div className="pt-1">
+            {shortcuts.map((shortcut) => (
+              <div key={shortcut.label} className="flex min-h-9 items-center justify-between gap-4 rounded-md px-2 hover:bg-[var(--gc-panel-hover)]">
+                <span className="text-[10px] text-[var(--gc-text-muted)]">{shortcut.label}</span>
+                <span className="flex items-center gap-1">
+                  {shortcut.keys.map((key, index) => <ShortcutKey key={`${shortcut.label}-${index}`}>{key}</ShortcutKey>)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -257,66 +246,50 @@ function ThemeSwitcher() {
 }
 
 export function TopBar() {
-  const projectName = useFlowStore(selectActiveProjectName);
-  const projectNameEdit = useCoalescedTextEdit({ kind: "project-name" });
-  const saveState = useFlowStore(selectActiveSaveState);
-  const dirty = useFlowStore(selectActiveDirty);
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const saveProject = useFlowStore((s) => s.saveProject);
-  const tabSessionPersistenceError = useFlowStore((s) => s.tabSessionPersistenceError);
+  const tabSessionPersistenceError = useFlowStore((state) => state.tabSessionPersistenceError);
 
   return (
-    <header className="gc-panel relative z-40 flex h-11 min-w-0 shrink-0 items-center gap-1.5 border-b border-[#262626] bg-[#141414] px-2 sm:gap-3 sm:px-4">
-      {/* 左：品牌 + 项目名 */}
-      <span className="hidden text-xs font-semibold tracking-widest text-gold lg:inline">GARMENT CANVAS</span>
-      <span className="hidden h-4 w-px bg-[#262626] lg:block" />
-      <input
-        value={projectName}
-        {...projectNameEdit.bind}
-        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs text-neutral-200 hover:border-[#262626] focus:border-gold focus:outline-hidden sm:w-44 sm:flex-none sm:px-2 lg:w-56"
-        placeholder="项目名称"
-      />
-      {dirty && <span className="shrink-0 text-[10px] text-gold" title="有未保存修改">●</span>}
-      {tabSessionPersistenceError && (
-        <button
-          type="button"
-          onClick={retryTabSessionPersistence}
-          className="shrink-0 rounded-sm border border-red-500/50 px-1.5 py-0.5 text-[9px] text-red-300 hover:border-red-400"
-          title={tabSessionPersistenceError}
-        >
-          本地恢复失败 · 重试
-        </button>
-      )}
-      {readOnly && (
-        <span className="shrink-0 rounded-sm border border-blue-400/40 px-1.5 py-0.5 text-[9px] text-blue-400">
-          <span className="sm:hidden">只读</span>
-          <span className="hidden sm:inline">管理员只读</span>
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => void saveProject()}
-        disabled={readOnly || saveState === "saving" || (!dirty && saveState === "saved")}
-        className={`h-8 shrink-0 rounded-md px-2 text-[10px] font-medium transition-colors sm:h-auto sm:px-3 sm:py-1.5 sm:text-xs ${
-          saveState === "error"
-            ? "bg-red-900/60 text-red-300 hover:bg-red-900"
-            : "bg-gold text-ink hover:opacity-90"
-        } disabled:opacity-50`}
-      >
-        <span className="sm:hidden">{SAVE_TEXT_COMPACT[saveState]}</span>
-        <span className="hidden sm:inline">{SAVE_TEXT[saveState]}</span>
-      </button>
-
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="hidden text-[10px] text-neutral-600 xl:inline">
-          Ctrl+S 保存 · Ctrl+Z 撤销 · Ctrl+C/V 复制粘贴节点
-        </span>
-        <ProjectPicker />
+    <header className="gc-panel relative z-40 grid h-12 min-w-[1024px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-4">
+      <div className="flex min-w-0 items-center gap-3 justify-self-start">
+        <span className="whitespace-nowrap text-sm font-semibold tracking-[0.08em] text-[var(--gc-accent)]">Coin AI - Canvas</span>
+        <span aria-hidden="true" className="h-5 w-px bg-[var(--gc-border)]" />
+        <AccountMenu />
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 sm:ml-auto sm:gap-2">
+      <div className="relative flex items-center justify-center">
         <ThemeSwitcher />
-        <AccountMenu />
+        <div className="absolute left-full ml-2">
+          <ShortcutMenu />
+        </div>
+      </div>
+
+      <div className="flex min-w-0 items-center justify-end gap-2 justify-self-end">
+        {tabSessionPersistenceError && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="xs"
+            onClick={retryTabSessionPersistence}
+            title={tabSessionPersistenceError}
+          >
+            本地恢复失败 · 重试
+          </Button>
+        )}
+        {readOnly && (
+          <span className="rounded-md border border-blue-400/40 px-2 py-1 text-[10px] text-blue-400">管理员只读</span>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="打开使用教程"
+          title="使用教程"
+          onClick={() => window.dispatchEvent(new Event(OPEN_TUTORIAL_EVENT))}
+          className="text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+        >
+          <CircleHelpIcon aria-hidden="true" className="size-4" />
+        </Button>
       </div>
     </header>
   );

@@ -20,7 +20,6 @@ import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
 import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
 import { ContextPanel } from "@/components/panels/ContextPanel";
-import { TemplatesDock } from "@/components/panels/TemplatesDock";
 import { CompareOverlay } from "@/components/CompareOverlay";
 import { ImageViewer } from "@/components/ImageViewer";
 import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
@@ -301,7 +300,6 @@ function Workspace() {
         )}
       >
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <TemplatesDock />
           <ReactFlowProvider key={activeTabId}>
             <TaskLauncher />
             <CanvasFlow />

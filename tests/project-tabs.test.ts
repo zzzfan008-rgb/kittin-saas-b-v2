@@ -1437,7 +1437,6 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
     "utf8",
   );
-
   assert.match(editorSource, /if \(!ready \|\| savingRef\.current\) return/);
   assert.match(editorSource, /onClick=\{onClose\} disabled=\{saving\}/);
   assert.match(editorSource, /aria-disabled=\{saving\}/);
@@ -1463,10 +1462,18 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(topBarSource, /onClick=\{retryTabSessionPersistence\}/);
 });
 
-await test("桌面工作台使用稳定 Dock 且顶栏不再依赖绝对居中", () => {
+await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居中", () => {
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const topBarSource = fs.readFileSync(
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
+    "utf8",
+  );
+  const projectTabsSource = fs.readFileSync(
+    new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url),
+    "utf8",
+  );
+  const projectCenterSource = fs.readFileSync(
+    new URL("../src/components/panels/ProjectCenter.tsx", import.meta.url),
     "utf8",
   );
   const shellSource = fs.readFileSync(
@@ -1483,8 +1490,23 @@ await test("桌面工作台使用稳定 Dock 且顶栏不再依赖绝对居中",
   assert.match(shellSource, /controls=\{LIBRARY_PANEL_ID\}/);
   assert.match(shellSource, /controls=\{INSPECTOR_PANEL_ID\}/);
   assert.match(shellSource, /transition-\[width,visibility\]/);
-  assert.match(topBarSource, /min-w-0 flex-1/);
-  assert.doesNotMatch(topBarSource, /absolute left-1\/2/);
+  assert.match(topBarSource, /grid-cols-\[1fr_auto_1fr\]/);
+  assert.match(topBarSource, /Coin AI - Canvas/);
+  assert.match(topBarSource, /<ThemeSwitcher \/>/);
+  assert.match(topBarSource, /absolute left-full ml-2/);
+  assert.match(topBarSource, /onPointerEnter=[\s\S]*setTimeout\(\(\) => setOpen\(true\), 180\)/);
+  assert.match(topBarSource, /点击图标可固定/);
+  assert.doesNotMatch(topBarSource, /GARMENT CANVAS|ProjectPicker/);
+  assert.doesNotMatch(appSource, /TemplatesDock/);
+  assert.match(projectTabsSource, /<ProjectCenter open=\{projectCenterOpen\}/);
+  assert.match(projectTabsSource, /onDoubleClick=\{\(\) => beginRename\(tab\)\}/);
+  assert.match(projectTabsSource, /aria-label="保存项目名称和画布"/);
+  assert.match(projectCenterSource, /activeSection === "recent"/);
+  assert.match(projectCenterSource, /activeSection === "templates"/);
+  assert.match(projectCenterSource, /最近项目/);
+  assert.match(projectCenterSource, /内置模板/);
+  assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
+  assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
 });
 
 console.log(`\n通过 ${passed} 项`);
