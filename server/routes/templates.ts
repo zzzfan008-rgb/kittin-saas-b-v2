@@ -16,6 +16,10 @@ import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflow
 import { isLocalImageReference } from "../lib/imageValidation";
 import { thumbnailUrlForImage } from "../lib/fileStore";
 import { requestUser } from "../lib/auth";
+import { asyncHandler } from "../lib/asyncHandler";
+import { transaction } from "../lib/database";
+import { lockActiveOwner } from "../lib/ownerMutation";
+import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
 import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -23,6 +27,11 @@ import {
 } from "../../src/types/imageModels";
 
 export const templatesRouter = Router();
+
+interface StoredWorkflowTemplate extends WorkflowTemplate {
+  deletedAt?: string;
+  purgeAfter?: string;
+}
 
 function templatesDir(sub: "builtin" | "user"): string {
   const dir = path.join(config.dataDir(), "templates", sub);
@@ -412,13 +421,16 @@ export function ensureBuiltinTemplates(): void {
 
 ensureBuiltinTemplates();
 
-function readTemplates(sub: "builtin" | "user"): WorkflowTemplate[] {
+function readTemplates(sub: "builtin" | "user"): StoredWorkflowTemplate[] {
+  if (sub === "user") purgeExpiredUserTemplates();
   const dir = templatesDir(sub);
-  const list: WorkflowTemplate[] = [];
+  const list: StoredWorkflowTemplate[] = [];
   for (const f of fs.readdirSync(dir)) {
     if (!f.endsWith(".json")) continue;
     try {
-      list.push(readTemplateFile(path.join(dir, f)));
+      const template = readTemplateFile(path.join(dir, f));
+      if (sub === "user" && template.deletedAt) continue;
+      list.push(template);
     } catch {
       // 跳过损坏文件
     }
@@ -426,7 +438,7 @@ function readTemplates(sub: "builtin" | "user"): WorkflowTemplate[] {
   return list;
 }
 
-function readTemplateFile(filePath: string): WorkflowTemplate {
+function readTemplateFile(filePath: string): StoredWorkflowTemplate {
   const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
   const isLegacyVersion = raw.schemaVersion === undefined || raw.schemaVersion === 0 || raw.schemaVersion === 1 || raw.schemaVersion === 2;
   if (!isLegacyVersion && raw.schemaVersion !== WORKFLOW_SCHEMA_VERSION) {
@@ -447,13 +459,19 @@ function readTemplateFile(filePath: string): WorkflowTemplate {
   if (raw.ownerId !== undefined && (typeof raw.ownerId !== "string" || raw.ownerId.length === 0)) {
     throw new WorkflowValidationError("invalid template owner");
   }
-  return { ...raw, schemaVersion: WORKFLOW_SCHEMA_VERSION, flow } as unknown as WorkflowTemplate;
+  for (const key of ["deletedAt", "purgeAfter"] as const) {
+    if (raw[key] !== undefined && (typeof raw[key] !== "string" || !Number.isFinite(Date.parse(raw[key])))) {
+      throw new WorkflowValidationError(`invalid template ${key}`);
+    }
+  }
+  return { ...raw, schemaVersion: WORKFLOW_SCHEMA_VERSION, flow } as unknown as StoredWorkflowTemplate;
 }
 
-function templateForResponse(template: WorkflowTemplate): WorkflowTemplate {
-  return template.thumbnail
-    ? { ...template, thumbnail: thumbnailUrlForImage(template.thumbnail) }
-    : template;
+function templateForResponse(template: StoredWorkflowTemplate): WorkflowTemplate {
+  const { deletedAt: _deletedAt, purgeAfter: _purgeAfter, ...visible } = template;
+  return visible.thumbnail
+    ? { ...visible, thumbnail: thumbnailUrlForImage(visible.thumbnail) }
+    : visible;
 }
 
 templatesRouter.get("/", (req, res) => {
@@ -483,6 +501,10 @@ templatesRouter.get("/:id", (req, res) => {
   }
   try {
     const template = readTemplateFile(filePath);
+    if (isUserTemplate && template.deletedAt) {
+      res.status(404).json({ error: "template not found" });
+      return;
+    }
     if (isUserTemplate && template.ownerId !== currentUser.id && currentUser.role !== "admin") {
       res.status(404).json({ error: "template not found" });
       return;
@@ -493,7 +515,7 @@ templatesRouter.get("/:id", (req, res) => {
   }
 });
 
-templatesRouter.post("/", (req, res) => {
+templatesRouter.post("/", asyncHandler(async (req, res) => {
   const currentUser = requestUser(req);
   const { name, description, thumbnail, flow } = req.body as {
     name?: string;
@@ -505,6 +527,7 @@ templatesRouter.post("/", (req, res) => {
     res.status(400).json({ error: "name and flow are required" });
     return;
   }
+  let createdFilePath: string | undefined;
   try {
     if (description !== undefined && typeof description !== "string") throw new WorkflowValidationError("description must be a string");
     if (thumbnail !== undefined && !isLocalImageReference(thumbnail)) {
@@ -521,12 +544,22 @@ templatesRouter.post("/", (req, res) => {
       flow: validateAndMigrateFlow(flow),
       createdAt: new Date().toISOString(),
     };
-    writeJsonAtomicSync(templatePath("user", id), template);
+    createdFilePath = templatePath("user", id);
+    const created = await transaction(async (client) => {
+      if (!await lockActiveOwner(client, currentUser.id)) return false;
+      writeJsonAtomicSync(createdFilePath as string, template);
+      return true;
+    });
+    if (!created) {
+      res.status(409).json({ error: "账号状态已变化，请刷新后重试" });
+      return;
+    }
     res.json({ ok: true, id });
   } catch (err) {
+    if (createdFilePath) fs.rmSync(createdFilePath, { force: true });
     res.status(err instanceof WorkflowValidationError ? 400 : 500).json({ error: err instanceof Error ? err.message : String(err) });
   }
-});
+}));
 
 templatesRouter.delete("/:id", (req, res) => {
   const currentUser = requestUser(req);
@@ -542,6 +575,10 @@ templatesRouter.delete("/:id", (req, res) => {
   }
   try {
     const template = readTemplateFile(filePath);
+    if (template.deletedAt) {
+      res.status(404).json({ error: "template not found" });
+      return;
+    }
     if (template.ownerId !== currentUser.id && currentUser.role !== "admin") {
       res.status(404).json({ error: "template not found" });
       return;
