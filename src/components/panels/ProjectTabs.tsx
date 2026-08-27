@@ -25,7 +25,9 @@ export function ProjectTabs() {
   const saveProject = useFlowStore((state) => state.saveProject);
   const [projectCenterOpen, setProjectCenterOpen] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
+  const renameComposingRef = useRef(false);
   const projectNameEdit = useCoalescedTextEdit(
     editingTabId === activeTabId ? { kind: "project-name" } : null,
   );
@@ -42,26 +44,42 @@ export function ProjectTabs() {
   }, [editingTabId]);
 
   const finishRename = async (persist: boolean) => {
+    if (renameComposingRef.current) return;
     projectNameEdit.flush();
-    if (persist) await saveProject();
+    if (persist) {
+      setRenameError(null);
+      const saved = await saveProject();
+      if (!saved) {
+        setRenameError("保存失败，请检查网络后重试");
+        requestAnimationFrame(() => editingInputRef.current?.focus());
+        return;
+      }
+    }
+    renameComposingRef.current = false;
+    setRenameError(null);
     setEditingTabId(null);
   };
 
   const beginRename = (tab: ProjectTab) => {
     if (tab.readOnly) return;
     if (tab.id !== activeTabId) switchTab(tab.id);
+    renameComposingRef.current = false;
+    setRenameError(null);
     setEditingTabId(tab.id);
   };
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+    const composing = event.nativeEvent.isComposing || renameComposingRef.current;
+    if (event.key === "Escape" && !composing) {
       event.preventDefault();
       projectNameEdit.cancel();
+      renameComposingRef.current = false;
+      setRenameError(null);
       setEditingTabId(null);
       return;
     }
     projectNameEdit.bind.onKeyDown(event);
-    if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+    if (event.key === "Enter" && !composing) {
       event.preventDefault();
       void finishRename(true);
     }
@@ -134,14 +152,20 @@ export function ProjectTabs() {
               />
 
               {editing ? (
-                <div className="flex min-w-0 flex-1 items-center rounded-md border border-[var(--gc-accent)] bg-[var(--gc-control)] pl-2">
+                <div className="relative flex min-w-0 flex-1 items-center rounded-md border border-[var(--gc-accent)] bg-[var(--gc-control)] pl-2">
                   <input
                     ref={editingInputRef}
                     value={tab.projectName}
                     onChange={projectNameEdit.bind.onChange}
                     onBlur={projectNameEdit.bind.onBlur}
-                    onCompositionStart={projectNameEdit.bind.onCompositionStart}
-                    onCompositionEnd={projectNameEdit.bind.onCompositionEnd}
+                    onCompositionStart={(event) => {
+                      renameComposingRef.current = true;
+                      projectNameEdit.bind.onCompositionStart(event);
+                    }}
+                    onCompositionEnd={(event) => {
+                      projectNameEdit.bind.onCompositionEnd(event);
+                      renameComposingRef.current = false;
+                    }}
                     onKeyDown={handleRenameKeyDown}
                     onKeyUp={projectNameEdit.bind.onKeyUp}
                     aria-label="项目名称"
@@ -160,6 +184,14 @@ export function ProjectTabs() {
                   >
                     <SaveIcon aria-hidden="true" className="size-3" />
                   </Button>
+                  {renameError && (
+                    <span
+                      role="alert"
+                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-[9px] text-red-200 shadow-lg"
+                    >
+                      {renameError}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <button

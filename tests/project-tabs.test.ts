@@ -1501,8 +1501,14 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectTabsSource, /<ProjectCenter open=\{projectCenterOpen\}/);
   assert.match(projectTabsSource, /onDoubleClick=\{\(\) => beginRename\(tab\)\}/);
   assert.match(projectTabsSource, /aria-label="保存项目名称和画布"/);
+  assert.match(projectTabsSource, /event\.nativeEvent\.isComposing \|\| renameComposingRef\.current/);
+  assert.match(projectTabsSource, /const saved = await saveProject\(\)/);
+  assert.match(projectTabsSource, /if \(!saved\) \{[\s\S]*setRenameError/);
+  assert.match(projectTabsSource, /role="alert"/);
   assert.match(projectCenterSource, /activeSection === "recent"/);
   assert.match(projectCenterSource, /activeSection === "templates"/);
+  assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
+  assert.doesNotMatch(projectCenterSource, /Promise\.allSettled|projectDetails/);
   assert.match(projectCenterSource, /最近项目/);
   assert.match(projectCenterSource, /内置模板/);
   assert.match(projectCenterSource, /NEW_PROJECT_COVER/);

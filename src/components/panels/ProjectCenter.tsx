@@ -105,7 +105,6 @@ export function ProjectCenter({
   const [activeSection, setActiveSection] = useState<ProjectCenterTab>("recent");
   const [query, setQuery] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [projectDetails, setProjectDetails] = useState<Record<string, ProjectDetail>>({});
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,20 +131,6 @@ export function ProjectCenter({
       if (version !== loadVersion.current) return;
       setProjects(summaries);
       setTemplates(loadedTemplates);
-
-      const details = await Promise.allSettled(
-        summaries.map(async (project) => {
-          const response = await fetch(`/api/projects/${project.id}`);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          return await response.json() as ProjectDetail;
-        }),
-      );
-      if (version !== loadVersion.current) return;
-      setProjectDetails(Object.fromEntries(
-        details.flatMap((result) => result.status === "fulfilled"
-          ? [[result.value.id, result.value] as const]
-          : []),
-      ));
     } catch (loadError) {
       if (version === loadVersion.current) {
         setError(loadError instanceof Error ? loadError.message : String(loadError));
@@ -173,12 +158,9 @@ export function ProjectCenter({
     }
     try {
       setError(null);
-      let detail = projectDetails[project.id];
-      if (!detail) {
-        const response = await fetch(`/api/projects/${project.id}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        detail = await response.json() as ProjectDetail;
-      }
+      const response = await fetch(`/api/projects/${project.id}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const detail = await response.json() as ProjectDetail;
       if (!Array.isArray(detail.flow?.nodes) || !Array.isArray(detail.flow?.edges)) {
         throw new Error("项目数据损坏或不兼容");
       }
@@ -193,7 +175,7 @@ export function ProjectCenter({
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : String(openError));
     }
-  }, [onOpenChange, projectDetails]);
+  }, [onOpenChange]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const filteredProjects = useMemo(
@@ -202,6 +184,7 @@ export function ProjectCenter({
   );
   const filteredTemplates = useMemo(
     () => templates.filter((template) => {
+      if (!template.builtIn) return false;
       if (!normalizedQuery) return true;
       return `${template.name} ${template.description}`.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
     }),
@@ -327,12 +310,11 @@ export function ProjectCenter({
                 )}
 
                 {filteredProjects.map((project) => {
-                  const detail = projectDetails[project.id];
                   const openTab = tabs.find((tab) => tab.projectId === project.id);
                   return (
                     <CardFrame key={project.id}>
                       <button type="button" onClick={() => void openProject(project)} className="block w-full text-left">
-                        <ProjectCover src={detail ? flowPreviewImage(detail.flow) : undefined} alt={project.name} />
+                        <ProjectCover alt={project.name} />
                         <span className="block p-3">
                           <span className="flex items-center gap-2">
                             <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--gc-text)]">{project.name}</span>
