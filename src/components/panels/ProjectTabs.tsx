@@ -157,7 +157,12 @@ export function ProjectTabs() {
                     ref={editingInputRef}
                     value={tab.projectName}
                     onChange={projectNameEdit.bind.onChange}
-                    onBlur={projectNameEdit.bind.onBlur}
+                    onBlur={(event) => {
+                      projectNameEdit.bind.onBlur(event);
+                      renameComposingRef.current = false;
+                      setRenameError(null);
+                      setEditingTabId(null);
+                    }}
                     onCompositionStart={(event) => {
                       renameComposingRef.current = true;
                       projectNameEdit.bind.onCompositionStart(event);

@@ -15,6 +15,7 @@ import { writeJsonAtomicSync } from "../lib/atomicJson";
 import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflowSchema";
 import { isLocalImageReference } from "../lib/imageValidation";
 import { thumbnailUrlForImage } from "../lib/fileStore";
+import { requestUser } from "../lib/auth";
 import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -443,6 +444,9 @@ function readTemplateFile(filePath: string): WorkflowTemplate {
   if (raw.thumbnail !== undefined && !isLocalImageReference(raw.thumbnail)) {
     throw new WorkflowValidationError("template thumbnail must be a local /api/files image reference");
   }
+  if (raw.ownerId !== undefined && (typeof raw.ownerId !== "string" || raw.ownerId.length === 0)) {
+    throw new WorkflowValidationError("invalid template owner");
+  }
   return { ...raw, schemaVersion: WORKFLOW_SCHEMA_VERSION, flow } as unknown as WorkflowTemplate;
 }
 
@@ -452,10 +456,14 @@ function templateForResponse(template: WorkflowTemplate): WorkflowTemplate {
     : template;
 }
 
-templatesRouter.get("/", (_req, res) => {
+templatesRouter.get("/", (req, res) => {
   try {
+    const currentUser = requestUser(req);
+    res.setHeader("Cache-Control", "no-store");
     const builtin = readTemplates("builtin");
-    const user = readTemplates("user").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const user = readTemplates("user")
+      .filter((template) => template.ownerId === currentUser.id || currentUser.role === "admin")
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     res.json([...builtin, ...user].map(templateForResponse));
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -463,22 +471,30 @@ templatesRouter.get("/", (_req, res) => {
 });
 
 templatesRouter.get("/:id", (req, res) => {
+  const currentUser = requestUser(req);
+  res.setHeader("Cache-Control", "no-store");
   const id = req.params.id;
-  const filePath = fs.existsSync(templatePath("user", id))
-    ? templatePath("user", id)
-    : templatePath("builtin", id);
+  const userFilePath = templatePath("user", id);
+  const isUserTemplate = fs.existsSync(userFilePath);
+  const filePath = isUserTemplate ? userFilePath : templatePath("builtin", id);
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: "template not found" });
     return;
   }
   try {
-    res.json(templateForResponse(readTemplateFile(filePath)));
+    const template = readTemplateFile(filePath);
+    if (isUserTemplate && template.ownerId !== currentUser.id && currentUser.role !== "admin") {
+      res.status(404).json({ error: "template not found" });
+      return;
+    }
+    res.json(templateForResponse(template));
   } catch (err) {
     res.status(err instanceof WorkflowValidationError ? 422 : 500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 templatesRouter.post("/", (req, res) => {
+  const currentUser = requestUser(req);
   const { name, description, thumbnail, flow } = req.body as {
     name?: string;
     description?: string;
@@ -498,6 +514,7 @@ templatesRouter.post("/", (req, res) => {
     const template: WorkflowTemplate = {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
       id,
+      ownerId: currentUser.id,
       name: name.trim(),
       description: description ?? "",
       ...(thumbnail ? { thumbnail } : {}),
@@ -512,6 +529,7 @@ templatesRouter.post("/", (req, res) => {
 });
 
 templatesRouter.delete("/:id", (req, res) => {
+  const currentUser = requestUser(req);
   const id = req.params.id;
   if (fs.existsSync(templatePath("builtin", id))) {
     res.status(403).json({ error: "builtin template cannot be deleted" });
@@ -523,6 +541,11 @@ templatesRouter.delete("/:id", (req, res) => {
     return;
   }
   try {
+    const template = readTemplateFile(filePath);
+    if (template.ownerId !== currentUser.id && currentUser.role !== "admin") {
+      res.status(404).json({ error: "template not found" });
+      return;
+    }
     fs.unlinkSync(filePath);
     res.json({ ok: true });
   } catch (err) {

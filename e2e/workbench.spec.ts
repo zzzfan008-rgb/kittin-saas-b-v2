@@ -103,6 +103,23 @@ test("project center separates built-in and user templates and keeps template ac
   await expect(center.getByText(templateName)).toBeVisible();
 });
 
+test("project center keeps projects usable when template loading fails", async ({ page }) => {
+  await page.route("**/api/templates", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ status: 500, json: { error: "template fixture unavailable" } });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+  await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
+  await expect(center.getByRole("alert")).toContainText("模板 HTTP 500");
+  await expect(center.getByText("正在加载模板")).toHaveCount(0);
+});
+
 test("adding a local edit node keeps the canvas mounted and exposes one clear workflow", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

@@ -1504,13 +1504,16 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectTabsSource, /event\.nativeEvent\.isComposing \|\| renameComposingRef\.current/);
   assert.match(projectTabsSource, /const saved = await saveProject\(\)/);
   assert.match(projectTabsSource, /if \(!saved\) \{[\s\S]*setRenameError/);
+  assert.match(projectTabsSource, /onBlur=\{\(event\) => \{[\s\S]*setEditingTabId\(null\)/);
   assert.match(projectTabsSource, /role="alert"/);
   assert.match(projectCenterSource, /activeSection === "recent"/);
   assert.match(projectCenterSource, /activeSection === "templates"/);
   assert.match(projectCenterSource, /"my-templates"/);
   assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
   assert.match(projectCenterSource, /if \(template\.builtIn\) return false/);
-  assert.doesNotMatch(projectCenterSource, /Promise\.allSettled|projectDetails/);
+  assert.doesNotMatch(projectCenterSource, /projectDetails/);
+  assert.match(projectCenterSource, /Promise\.allSettled\(\[loadProjects\(\), loadTemplates\(\)\]\)/);
+  assert.match(projectCenterSource, /onSaved=\{\(\) => void loadTemplates\(\)\}/);
   assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
   assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
   assert.match(projectCenterSource, /最近项目/);

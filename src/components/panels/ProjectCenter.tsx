@@ -152,14 +152,19 @@ export function ProjectCenter({
   const [query, setQuery] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
+  const [templatesLoadError, setTemplatesLoadError] = useState<string | null>(null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<WorkflowTemplate | null>(null);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
-  const loadVersion = useRef(0);
+  const projectsLoadVersion = useRef(0);
+  const templatesLoadVersion = useRef(0);
   const openRequestVersion = useRef(0);
-  const hasLoaded = useRef(false);
+  const projectsHaveLoaded = useRef(false);
+  const templatesHaveLoaded = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const saveTemplateButtonRef = useRef<HTMLButtonElement>(null);
   const tabs = useFlowStore((state) => state.tabs);
@@ -167,35 +172,55 @@ export function ProjectCenter({
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
   const initialDraft = tabs.find((tab) => projectTabLifecycle(tab) === "initial_draft");
 
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current;
-    if (!hasLoaded.current) setLoading(true);
-    setError(null);
+  const loadProjects = useCallback(async () => {
+    const version = ++projectsLoadVersion.current;
+    if (!projectsHaveLoaded.current) setProjectsLoading(true);
+    setProjectsLoadError(null);
     try {
-      const [projectsResponse, templatesResponse] = await Promise.all([
-        fetch("/api/projects"),
-        fetch("/api/templates"),
-      ]);
+      const projectsResponse = await fetch("/api/projects");
       if (!projectsResponse.ok) throw new Error(`项目 HTTP ${projectsResponse.status}`);
-      if (!templatesResponse.ok) throw new Error(`模板 HTTP ${templatesResponse.status}`);
       const summaries = await projectsResponse.json() as ProjectSummary[];
-      const loadedTemplates = await templatesResponse.json() as WorkflowTemplate[];
-      if (version !== loadVersion.current) return;
+      if (version !== projectsLoadVersion.current) return;
       setProjects(summaries);
-      setTemplates(loadedTemplates);
-      hasLoaded.current = true;
+      projectsHaveLoaded.current = true;
     } catch (loadError) {
-      if (version === loadVersion.current) {
-        setError(loadError instanceof Error ? loadError.message : String(loadError));
+      if (version === projectsLoadVersion.current) {
+        setProjectsLoadError(loadError instanceof Error ? loadError.message : String(loadError));
       }
     } finally {
-      if (version === loadVersion.current) setLoading(false);
+      if (version === projectsLoadVersion.current) setProjectsLoading(false);
     }
   }, []);
 
+  const loadTemplates = useCallback(async () => {
+    const version = ++templatesLoadVersion.current;
+    if (!templatesHaveLoaded.current) setTemplatesLoading(true);
+    setTemplatesLoadError(null);
+    try {
+      const templatesResponse = await fetch("/api/templates");
+      if (!templatesResponse.ok) throw new Error(`模板 HTTP ${templatesResponse.status}`);
+      const loadedTemplates = await templatesResponse.json() as WorkflowTemplate[];
+      if (version !== templatesLoadVersion.current) return;
+      setTemplates(loadedTemplates);
+      templatesHaveLoaded.current = true;
+    } catch (loadError) {
+      if (version === templatesLoadVersion.current) {
+        setTemplatesLoadError(loadError instanceof Error ? loadError.message : String(loadError));
+      }
+    } finally {
+      if (version === templatesLoadVersion.current) setTemplatesLoading(false);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
+    setError(null);
+    await Promise.allSettled([loadProjects(), loadTemplates()]);
+  }, [loadProjects, loadTemplates]);
+
   useEffect(() => {
     if (!open) {
-      loadVersion.current += 1;
+      projectsLoadVersion.current += 1;
+      templatesLoadVersion.current += 1;
       openRequestVersion.current += 1;
       setQuery("");
       setSaveTemplateOpen(false);
@@ -204,6 +229,8 @@ export function ProjectCenter({
     }
     void load();
   }, [load, open]);
+
+  const visibleError = [error, projectsLoadError, templatesLoadError].filter(Boolean).join("；");
 
   const openProject = useCallback(async (project: ProjectSummary) => {
     const requestVersion = ++openRequestVersion.current;
@@ -351,15 +378,15 @@ export function ProjectCenter({
               </TabsTrigger>
             </TabsList>
 
-            {error && (
+            {visibleError && (
               <div role="alert" className="mx-7 mt-5 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-[10px] text-red-300">
-                <span>加载失败：{error}</span>
+                <span>加载失败：{visibleError}</span>
                 <Button type="button" variant="outline" size="xs" onClick={() => void load()}>重试</Button>
               </div>
             )}
 
             <TabsContent value="recent" className="min-h-0 overflow-y-auto p-7">
-              {loading ? <TemplateSkeletons /> : (
+              {projectsLoading ? <TemplateSkeletons /> : (
                 <div className="grid grid-cols-4 gap-4">
                 <CardFrame>
                   <button type="button" onClick={createProject} className="block w-full text-left">
@@ -416,13 +443,13 @@ export function ProjectCenter({
                 })}
                 </div>
               )}
-              {!loading && filteredProjects.length === 0 && !initialDraft && (
+              {!projectsLoading && filteredProjects.length === 0 && !initialDraft && (
                 <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">暂无已保存项目，可以从“新建项目”开始。</p>
               )}
             </TabsContent>
 
             <TabsContent value="templates" className="min-h-0 overflow-y-auto p-7">
-              {loading ? <TemplateSkeletons /> : (
+              {templatesLoading ? <TemplateSkeletons /> : (
                 <div className="grid grid-cols-4 gap-4">
                 {filteredTemplates.map((template) => {
                   const image = template.thumbnail ?? flowPreviewImage(template.flow);
@@ -451,13 +478,13 @@ export function ProjectCenter({
                 })}
                 </div>
               )}
-              {!loading && filteredTemplates.length === 0 && (
+              {!templatesLoading && filteredTemplates.length === 0 && (
                 <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">没有符合条件的内置模板。</p>
               )}
             </TabsContent>
 
             <TabsContent value="my-templates" className="min-h-0 overflow-y-auto p-7">
-              {loading ? <TemplateSkeletons /> : (
+              {templatesLoading ? <TemplateSkeletons /> : (
                 <div className="grid grid-cols-4 gap-4">
                   <CardFrame>
                     <button
@@ -525,7 +552,7 @@ export function ProjectCenter({
                   })}
                 </div>
               )}
-              {!loading && filteredMyTemplates.length === 0 && (
+              {!templatesLoading && filteredMyTemplates.length === 0 && (
                 <p className="py-10 text-center text-xs text-[var(--gc-text-muted)]">还没有自建模板，可以先保存当前画布。</p>
               )}
             </TabsContent>
@@ -534,7 +561,7 @@ export function ProjectCenter({
           <SaveTemplateForm
             open={saveTemplateOpen}
             onOpenChange={setSaveTemplateOpen}
-            onSaved={() => void load()}
+            onSaved={() => void loadTemplates()}
             finalFocusRef={saveTemplateButtonRef}
           />
 

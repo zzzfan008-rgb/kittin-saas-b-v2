@@ -31,6 +31,7 @@ const {
 } = await import("../server/routes/projects");
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
+const { templatesRouter } = await import("../server/routes/templates");
 
 const users: Record<string, AuthUser> = {
   owner: {
@@ -173,6 +174,7 @@ app.use("/files", filesRouter);
 app.use("/projects", projectsRouter);
 app.use("/usage", usageRouter);
 app.use("/history", historyRouter);
+app.use("/templates", templatesRouter);
 
 const server = app.listen(0, "127.0.0.1");
 await new Promise<void>((resolve, reject) => {
@@ -225,6 +227,40 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
 }
 
 console.log("运行任务与素材引用授权回归测试");
+
+await test("用户模板按账号隔离，其他用户无法读取或删除，管理员可审计", async () => {
+  const create = async (user: keyof typeof users, name: string) => {
+    const response = await request("/templates", user, {
+      method: "POST",
+      body: JSON.stringify({ name, description: `${name} 描述`, flow: flow() }),
+    });
+    const responseText = await response.text();
+    assert.equal(response.status, 200, responseText);
+    return (JSON.parse(responseText) as { id: string }).id;
+  };
+
+  const ownerTemplateId = await create("owner", "Owner Template");
+  const otherTemplateId = await create("other", "Other Template");
+
+  const ownerList = await request("/templates", "owner");
+  assert.equal(ownerList.status, 200);
+  assert.equal(ownerList.headers.get("cache-control"), "no-store");
+  const ownerTemplates = await ownerList.json() as Array<{ id: string; ownerId?: string }>;
+  assert.equal(ownerTemplates.some((template) => template.id === ownerTemplateId), true);
+  assert.equal(ownerTemplates.some((template) => template.id === otherTemplateId), false);
+  assert.equal(ownerTemplates.find((template) => template.id === ownerTemplateId)?.ownerId, users.owner.id);
+
+  assert.equal((await request(`/templates/${ownerTemplateId}`, "other")).status, 404);
+  assert.equal((await request(`/templates/${ownerTemplateId}`, "other", { method: "DELETE" })).status, 404);
+  assert.equal((await request(`/templates/${ownerTemplateId}`, "owner")).status, 200);
+
+  const adminList = await request("/templates", "admin");
+  const adminTemplates = await adminList.json() as Array<{ id: string }>;
+  assert.equal(adminTemplates.some((template) => template.id === ownerTemplateId), true);
+  assert.equal(adminTemplates.some((template) => template.id === otherTemplateId), true);
+  assert.equal((await request(`/templates/${otherTemplateId}`, "admin", { method: "DELETE" })).status, 200);
+  assert.equal((await request(`/templates/${ownerTemplateId}`, "owner", { method: "DELETE" })).status, 200);
+});
 
 await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式越权", async () => {
   const plan = buildExecutionPlan([{

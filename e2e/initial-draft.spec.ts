@@ -37,6 +37,8 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   const projectName = await beginRename(page);
   await projectName.fill(editedName);
   await projectName.blur();
+  await expect(projectName).toBeHidden();
+  await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   await expect.poll(async () => (await readDraft())?.name).toBe(editedName);
   const synchronized = await readDraft();
   expect(synchronized?.id).toBe(initial.id);
