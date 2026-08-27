@@ -529,68 +529,6 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
 });
 
-await test("queued 任务可直接取消且不会调用上游", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
-  const runId = await enqueueSingle("cancel-queued");
-  assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), { status: "cancelled", finished: true });
-  const now = tick();
-  assert.equal(await queue.processNextGenerationJob("worker-cancelled", {
-    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0,
-  }), false);
-  assert.equal(fake.calls(), 0);
-  assert.equal((await runRow(runId))?.status, "cancelled");
-});
-
-await test("Provider 校验阶段取消会在实际调用前终止", async () => {
-  const runId = await enqueueSingle("cancel-during-validation");
-  let calls = 0;
-  const provider: AIProvider = {
-    id: "gpt-image-2-vip",
-    async validate() {
-      assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), {
-        status: "cancel_requested", finished: false,
-      });
-    },
-    async generate() {
-      calls += 1;
-      return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
-    },
-    async edit() {
-      calls += 1;
-      return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
-    },
-  };
-  assert.equal(new queue.CancelledBeforeProviderCall().message, "任务已在上游调用开始前取消");
-  const now = tick();
-  assert.equal(await queue.processNextGenerationJob("worker-cancel-validation", {
-    resolveProvider: () => provider, now: () => now, random: () => 0,
-  }), true);
-  assert.equal(calls, 0);
-  assert.deepEqual(await runRow(runId), {
-    status: "cancelled", error: "任务已在上游调用开始前取消",
-    provider_requests: 0, successful_count: 0,
-  });
-});
-
-await test("取消事务先等待 job 锁，再获取 run 锁，避免与 Worker 完成路径死锁", async () => {
-  const runId = await enqueueSingle("cancel-lock-order");
-  const blocker = await database.db().connect();
-  let cancellation: ReturnType<typeof queue.cancelDurableRun> | undefined;
-  try {
-    await blocker.query("BEGIN");
-    await blocker.query("SET LOCAL lock_timeout = '1s'");
-    await blocker.query("SELECT id FROM generation_jobs WHERE run_id = $1 FOR UPDATE", [runId]);
-    cancellation = queue.cancelDurableRun(runId, owner.id);
-    await new Promise<void>((resolve) => setTimeout(resolve, 75));
-    await blocker.query("SELECT id FROM generation_runs WHERE id = $1 FOR UPDATE", [runId]);
-    await blocker.query("ROLLBACK");
-    assert.deepEqual(await cancellation, { status: "cancelled", finished: true });
-  } finally {
-    await blocker.query("ROLLBACK").catch(() => undefined);
-    blocker.release();
-  }
-});
-
 await test("同一 run 的并发事件通过原子序号严格递增且无缺口", async () => {
   const runId = await enqueueSingle("concurrent-events");
   const first = await database.db().connect();
@@ -621,71 +559,7 @@ await test("同一 run 的并发事件通过原子序号严格递增且无缺口
   }
   const events = await queue.readDurableRunEvents(runId, owner.id, 0);
   assert.deepEqual(events?.map((event) => event.seq), [1, 2, 3]);
-  assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), { status: "cancelled", finished: true });
-});
-
-await test("目标步骤调用开始后的取消请求保留真实成功结果并记录警告", async () => {
-  let release!: () => void;
-  let started!: () => void;
-  const startedPromise = new Promise<void>((resolve) => { started = resolve; });
-  const releasePromise = new Promise<void>((resolve) => { release = resolve; });
-  const fake = resolver(async () => {
-    started();
-    await releasePromise;
-    return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
-  });
-  const runId = await enqueueSingle("cancel-running-target");
-  const now = tick();
-  const processing = queue.processNextGenerationJob("worker-running-target", {
-    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, heartbeatMs: 60_000,
-  });
-  await startedPromise;
-  assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), { status: "cancel_requested", finished: false });
-  assert.deepEqual(await queue.cancelDurableRun(runId, owner.id), { status: "cancel_requested", finished: false });
-  release();
-  assert.equal(await processing, true);
-  const row = await runRow(runId);
-  assert.equal(row?.status, "succeeded");
-  assert.match(row?.error ?? "", /未能中止已经开始的上游调用/);
-  assert.equal(row?.provider_requests, 1);
-  assert.equal(row?.successful_count, 1);
-});
-
-await test("取消早期运行步骤时，已取消的目标步骤决定整次运行终态", async () => {
-  sequence += 1;
-  const firstNode = `cancel-chain-first-${sequence}`;
-  const targetNode = `cancel-chain-target-${sequence}`;
-  const plan: ExecutionPlan = {
-    steps: [step(firstNode), step(targetNode, [{ nodeId: firstNode, images: [] }])],
-  };
-  const run = await queue.enqueueGenerationRun(plan, owner.id, context(targetNode));
-  let release!: () => void;
-  let started!: () => void;
-  const startedPromise = new Promise<void>((resolve) => { started = resolve; });
-  const releasePromise = new Promise<void>((resolve) => { release = resolve; });
-  const fake = resolver(async () => {
-    started();
-    await releasePromise;
-    return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
-  });
-  const now = tick();
-  const processing = queue.processNextGenerationJob("worker-cancel-chain", {
-    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, heartbeatMs: 60_000,
-  });
-  await startedPromise;
-  assert.deepEqual(await queue.cancelDurableRun(run.id, owner.id), { status: "cancel_requested", finished: false });
-  release();
-  assert.equal(await processing, true);
-  assert.equal(fake.calls(), 1);
-  assert.deepEqual(await runRow(run.id), {
-    status: "cancelled", error: "用户取消了后续步骤", provider_requests: 1, successful_count: 0,
-  });
-  const target = await database.queryOne<{ status: string }>(
-    "SELECT status FROM generation_run_steps WHERE run_id = $1 AND node_id = $2", [run.id, targetNode],
-  );
-  assert.equal(target?.status, "cancelled");
-  const events = await queue.readDurableRunEvents(run.id, owner.id, 0);
-  assert.ok(events?.some((event) => event.type === "node-status" && event.nodeId === targetNode && event.status === "cancelled"));
+  await database.query("DELETE FROM generation_runs WHERE id = $1", [runId]);
 });
 
 await test("SSE 在观察到终态后再次 drain，发送同一提交中的最后事件", async () => {
@@ -756,6 +630,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           prompt: "只修改左侧衣袖",
           referenceImages: [PNG_DATA_URL],
           mask: PNG_DATA_URL,
+          maskMode: "replace",
           modelOptions: {},
         },
       }),
@@ -771,7 +646,36 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     assert.equal(queuedStep.kind, "mask-redraw");
     assert.deepEqual(queuedStep.inputImages, [PNG_DATA_URL]);
     assert.equal(queuedStep.params.maskSourceRef, PNG_DATA_URL);
-    assert.deepEqual(await queue.cancelDurableRun(body.runId, owner.id), { status: "cancelled", finished: true });
+    assert.equal(queuedStep.params.maskMode, undefined);
+    assert.equal(queuedStep.params.maskPipelineVersion, 3);
+    const storedRun = await database.queryOne<{ parameters_json: string }>(
+      "SELECT parameters_json FROM generation_runs WHERE id = $1", [body.runId],
+    );
+    const parameters = JSON.parse(storedRun?.parameters_json ?? "{}") as Record<string, unknown>;
+    assert.equal(parameters.maskMode, undefined);
+    assert.equal(parameters.maskPipelineVersion, 3);
+
+    const overLimitResponse = await fetch(`http://127.0.0.1:${address.port}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientRequestId: "direct-mask-over-limit",
+        modelId: "gpt-image-2",
+        kind: "mask-redraw",
+        nodeId: "direct-mask-over-limit",
+        request: {
+          prompt: "局部修改",
+          referenceImages: Array.from({ length: 8 }, () => PNG_DATA_URL),
+          mask: PNG_DATA_URL,
+          modelOptions: {},
+        },
+      }),
+    });
+    const overLimitBody = await overLimitResponse.json() as { error?: string };
+    assert.equal(overLimitResponse.status, 400);
+    assert.match(overLimitBody.error ?? "", /at most 7 user images/);
+
+    await database.query("DELETE FROM generation_runs WHERE id = $1", [body.runId]);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

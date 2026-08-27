@@ -1,11 +1,11 @@
 {
-  "capturedOn": "2026-08-20",
+  "capturedOn": "2026-08-26",
   "sourceFormat": "official-markdown",
   "sourceHashScope": "Exact response body returned by markdownUrl",
   "documentationIndex": "https://docs.apiyi.com/llms.txt",
   "fullDocumentationFingerprint": {
     "url": "https://docs.apiyi.com/llms-full.txt",
-    "sha256": "a85be3955c9ee6788bb46c885e6c3de1986bbde4109e3a2462f2417dff8c9571"
+    "sha256": "015c1d8a4f40678e9de624fddc96d11ba6706f20a364288ead18a1c98e8a6054"
   },
   "localKnowledgeBase": {
     "kind": "curated-contract",
@@ -25,9 +25,10 @@
     "policy": "Local files are concise implementation contracts, not copies of upstream pages. Each source keeps its canonical URL, official Markdown URL, capture date, and SHA-256 fingerprint."
   },
   "sources": [
-    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md", "localDocument": "models/gpt-image-2.md", "sha256": "4e1425c9063e8c8fb7adb0274f6f8bfc37351807081862a3252dcf453a463b7a"},
-    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md", "localDocument": "models/gpt-image-2.md", "sha256": "da9a305579a220bc7ec9821d42a505cdb61e2d70adb077ac05144a37917a0f48"},
-    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md", "localDocument": "models/gpt-image-2.md", "sha256": "67f2fd051383ef7add5eb5a01f9ef5206656aa857892c296c4acd057cab56330"},
+    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md", "localDocument": "models/gpt-image-2.md", "sha256": "ed653fdc134c607049eda8ec5aae83f605e66b176609a3ca1994278d59ee9988"},
+    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md", "localDocument": "models/gpt-image-2.md", "sha256": "da73585e328b3fb282bb61053219f0743b653ae4da737295ff0064fe98a349d0"},
+    {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md", "localDocument": "models/gpt-image-2.md", "sha256": "82c9e3ebc7ba9716bf0aef90982e670c34b1f8c80d61ab30b13c51ebc4680c0b"},
+    {"url": "https://docs.apiyi.com/faq/image-transparent-background", "markdownUrl": "https://docs.apiyi.com/faq/image-transparent-background.md", "localDocument": "models/gpt-image-2.md", "sha256": "746238d07631fb05faeea28ef9e116de7bbae8946ef71105856174b0818952a9"},
     {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview.md", "localDocument": "models/gpt-image-2-vip.md", "sha256": "988326081558c5a95ef1255fef6915639e01ffa36f71f343f054cc11b4bd6360"},
     {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image.md", "localDocument": "models/gpt-image-2-vip.md", "sha256": "7a39b7f014135fba139ff65816714df76aea6da51263ffb049881f66d1a1d6c6"},
     {"url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit", "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit.md", "localDocument": "models/gpt-image-2-vip.md", "sha256": "bdff0e86d802ea1498a5b4e2cc14fc6af60460579942a22884a6996347a1c09f"},

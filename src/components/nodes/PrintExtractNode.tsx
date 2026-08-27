@@ -10,7 +10,6 @@ import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExtractNodeData>>) {
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const running = isNodeRunActive(data.status);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
           <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} onCancel={() => void cancelNodeRun(id)} label="提取印花" />
+        <RunButton status={data.status} onClick={() => void runNode(id)} label="提取印花" />
         {running && <Developing />}
         <ImageGrid
           images={data.outputImages}

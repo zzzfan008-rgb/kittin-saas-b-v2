@@ -289,6 +289,16 @@ await test("直接生成接口对显式节点种类严格校验尺寸参数", as
     validateDirectGenerateRequest("print-mutate", { prompt: "其他 AI 节点不要尺寸参数" }),
     { ok: true, kind: "print-mutate" },
   );
+  const tooManyMaskReferences = Array.from({ length: 8 }, (_, index) => `/api/files/mask-ref-${index}.png`);
+  const invalidMaskReferences = validateDirectGenerateRequest("mask-redraw", {
+    prompt: "局部修改",
+    referenceImages: tooManyMaskReferences,
+    mask: "/api/files/mask.png",
+  });
+  assert.equal(invalidMaskReferences.ok, false);
+  if (!invalidMaskReferences.ok) {
+    assert.match(invalidMaskReferences.error, /at most 7 user images/);
+  }
 });
 
 await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理", async () => {

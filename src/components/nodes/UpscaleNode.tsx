@@ -13,7 +13,6 @@ const IMAGE_SIZES = [
 export function UpscaleNode({ id, data, selected }: NodeProps<Node<UpscaleNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const running = isNodeRunActive(data.status);
 
   return (
@@ -43,7 +42,7 @@ export function UpscaleNode({ id, data, selected }: NodeProps<Node<UpscaleNodeDa
           </div>
         </div>
         <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} onCancel={() => void cancelNodeRun(id)} label="高清放大" />
+        <RunButton status={data.status} onClick={() => void runNode(id)} label="高清放大" />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
       </NodeFrame>

@@ -23,8 +23,7 @@ API易图片端点是同步接口：一次 HTTP 请求持续到生成完成，�
 - succeeded：结果已转存并落库。
 - failed：确定失败且不可重试，或明确重试已用尽。
 - outcome_unknown：请求可能已被上游执行和计费，但本项目没有收到可验证结果。
-- cancel_requested：用户请求取消；只阻止尚未开始的新调用。
-- cancelled：上游调用开始前已取消。
+- cancel_requested、cancelled：仅为兼容历史运行记录保留；当前产品不再提供用户取消入口。
 
 终态为 succeeded、failed、outcome_unknown、cancelled。
 
@@ -50,11 +49,11 @@ API易图片端点是同步接口：一次 HTTP 请求持续到生成完成，�
 
 固定退避为 5 秒、30 秒、120 秒，并加入 0-999ms 随机抖动。retry_count 只统计实际重放次数，不包含首次调用，因此最多产生 4 次真实上游请求。每次调度和达到上限都写结构化重试日志。
 
-## 取消语义
+## 用户运行语义
 
-- queued 和 retry_wait 可以直接取消。
-- running 只能设置 cancel_requested。由于 API易无上游取消接口，不能宣称已中止计费。
-- running 调用成功返回后仍应转存结果并记录真实终态，同时在事件中说明取消请求未能中止上游。
+- 产品不提供取消按钮、客户端取消动作或公开取消 API。
+- 用户提交后由队列持续执行到确定终态；刷新页面或断开 SSE 不会中止任务。
+- 历史 cancel_requested、cancelled 记录继续可读，避免升级时破坏旧数据。
 
 ## 结果持久化
 

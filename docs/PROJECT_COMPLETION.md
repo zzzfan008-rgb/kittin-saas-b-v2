@@ -15,10 +15,10 @@
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 上一阶段 PR | 已合并 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) |
-| 基线提交 | 已确认 | `9b0a1483762db7f9af9dd5d88df83cee2fce2838` |
-| 基线 main CI | 通过 | [GitHub Actions 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614) |
-| 当前工作分支 | 待用户确认 | `codex/first-generation-golden-path`；[PR #4](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4) CI 与 Cloud Review 通过，尚未合并 |
+| 上一阶段 PR | 已合并 | [PR #7](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/7)；PR #4–#7 均已完成用户确认与合并 |
+| 基线提交 | 已确认 | `a0f56aa69cd71e6e139c07fe620c1b007d507baa` |
+| 基线 main CI | 通过 | PR #7 合并后 `origin/main` 已同步到上述基线 |
+| 当前工作分支 | 进行中 | `codex/mask-preserve-composite`；统一局部修改 V3、移除取消能力与教程 V1.2.0 已完成本地收口，[PR #8](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/8) 待 CI 与 Codex Cloud 审核 |
 | GitNexus | 已重建 | Phase C 工作树索引已用 PDG 重建；索引为本地派生产物，未写入仓库 |
 
 ## 阶段进度
@@ -29,7 +29,7 @@
 | --- | --- | --- | --- | --- | --- |
 | A 状态正确性与撤销事务 | 已完成 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012)与[合并后 main](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095)通过 | [最终精确头审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404)无重大问题 |
 | B 文档与持久化边界 | 已完成 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [最终代码头 CI 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 与[合并后 main CI 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614)通过 | B1–B3 独立本地审计 APPROVE；[最终代码头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，5 个线程全部解决 |
-| C 首次生成黄金路径 | 待用户确认 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | [PR #4](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4) | [最终代码头 CI 32854643883](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32854643883) 通过 | [最终代码头精确复审](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4#issuecomment-5411293171)无重大问题；2 个 P2 线程已解决 |
+| C 首次生成黄金路径 | 已完成 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | [PR #4](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4) | [最终代码头 CI 32854643883](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32854643883) 通过 | [最终代码头精确复审](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4#issuecomment-5411293171)无重大问题；2 个 P2 线程已解决 |
 | D 结果迭代与桌面体验 | 未开始 | 显式结果动作、三主题 × 三宽度、键盘与焦点、人工浏览器验收 | — | — | — |
 | E 生产产物与 CI | 未开始 | production Playwright smoke、CI 顺序、runner 信号清理 | — | — | — |
 | F 性能与包体 | 未开始 | lazy boundary、稳定拆包、初始 gzip 预算、CI 体积门禁 | — | — | — |

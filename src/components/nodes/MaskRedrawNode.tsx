@@ -9,7 +9,10 @@ import {
   selectNodeInputImages,
   useFlowStore,
 } from "@/store/flowStore";
-import { isNodeRunActive, type MaskRedrawNodeData } from "@/types/workflow";
+import {
+  isNodeRunActive,
+  type MaskRedrawNodeData,
+} from "@/types/workflow";
 import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { MaskEditor } from "./MaskEditor";
@@ -24,7 +27,6 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const runNode = useFlowStore((state) => state.runNode);
-  const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
@@ -64,6 +66,9 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <span className="text-neutral-500">图片模型</span>
           <span className="font-mono text-neutral-300">gpt-image-2</span>
         </div>
+        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[9px] leading-4 text-neutral-500">
+          涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
+        </p>
         {source ? (
           <img
             src={thumbnailImageUrl(source)}
@@ -110,8 +115,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         <RunButton
           status={data.status}
           onClick={run}
-          onCancel={() => void cancelNodeRun(id)}
-          label="局部重绘"
+          label="生成局部修改"
           disabled={!readiness.canOpenRunAction}
         />
         {running && <Developing />}

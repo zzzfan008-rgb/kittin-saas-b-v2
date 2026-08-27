@@ -117,10 +117,10 @@ const legacyAiFlow = () => ({
 async function main() {
   console.log("工作流 Schema / 图片 / SSRF 回归测试");
 
-  await test("无版本 v0 确定性迁移到 v2，并补模型默认字段", () => {
+  await test("无版本 v0 确定性迁移到 v3，并补模型默认字段", () => {
     const first = validateAndMigrateFlow(legacyAiFlow());
     const second = validateAndMigrateFlow(first);
-    assert.equal(first.schemaVersion, 2);
+    assert.equal(first.schemaVersion, 3);
     assert.equal(first.nodes[0].data.kind, "ai-modify");
     if (first.nodes[0].data.kind !== "ai-modify") throw new Error("unexpected node kind");
     assert.equal(first.nodes[0].data.aspectRatio, "1:1");
@@ -145,6 +145,44 @@ async function main() {
     if (data.kind !== "ai-modify") throw new Error("unexpected node kind");
     assert.equal(data.modelId, "gemini-3.1-flash-image");
     assert.deepEqual(data.modelOptions, { aspectRatio: "16:9", imageSize: "4K" });
+  });
+
+  await test("v2 蒙版节点迁移到统一局部修改并剥离旧处理模式", () => {
+    const legacyMaskFlow = maskFlow(PNG_DATA_URL) as ReturnType<typeof maskFlow> & {
+      nodes: Array<{ data: Record<string, unknown> }>;
+    };
+    legacyMaskFlow.nodes[0].data.maskMode = "preserve";
+    const normalized = validateAndMigrateFlow(legacyMaskFlow);
+    assert.equal(normalized.schemaVersion, 3);
+    assert.equal((normalized.nodes[0].data as Record<string, unknown>).maskMode, undefined);
+  });
+
+  await test("v2 蒙版节点的 8 路历史输入可迁移、保存并再次读取", () => {
+    const legacyMaskFlow = maskFlow(PNG_DATA_URL);
+    for (let index = 0; index < 8; index += 1) {
+      legacyMaskFlow.nodes.push({
+        id: `legacy-ref-${index}`,
+        type: "image-input",
+        position: { x: -200, y: index * 80 },
+        data: {
+          kind: "image-input",
+          label: `历史参考图 ${index + 1}`,
+          status: "idle",
+          imageRole: "reference",
+          imageUrl: PNG_DATA_URL,
+        },
+      } as never);
+      legacyMaskFlow.edges.push({
+        id: `legacy-edge-${index}`,
+        source: `legacy-ref-${index}`,
+        target: "mask",
+      } as never);
+    }
+
+    const migrated = validateAndMigrateFlow(legacyMaskFlow);
+    assert.equal(migrated.schemaVersion, 3);
+    assert.equal(migrated.edges.length, 8);
+    assert.deepEqual(validateAndMigrateFlow(migrated), migrated);
   });
 
   await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {
@@ -203,7 +241,7 @@ async function main() {
     });
 
     assert.deepEqual(normalized, {
-      schemaVersion: 2,
+      schemaVersion: 3,
       nodes: [
         {
           id: "n1",
@@ -253,7 +291,7 @@ async function main() {
     const batch = legacyAiFlow();
     Object.assign(batch.nodes[0].data, { batchSize: 3 });
     assert.throws(() => validateAndMigrateFlow(batch), /batchSize/);
-    const invalidModelOptions = { ...legacyAiFlow(), schemaVersion: 2 };
+    const invalidModelOptions = { ...legacyAiFlow(), schemaVersion: 3 };
     Object.assign(invalidModelOptions.nodes[0].data, {
       aspectRatio: "1:1",
       batchSize: 1,
@@ -379,14 +417,14 @@ async function main() {
       updatedAt: "2026-01-01T00:00:00.000Z",
       flow: legacyAiFlow(),
     };
-    assert.equal(validateAndMigrateFlow(legacyProject.flow).schemaVersion, 2);
+    assert.equal(validateAndMigrateFlow(legacyProject.flow).schemaVersion, 3);
 
     const builtinRoot = "data/templates/builtin";
     const builtinFiles = fs.readdirSync(builtinRoot).filter((name) => name.endsWith(".json"));
     assert.equal(builtinFiles.length, 6, "仓库应包含六份内置模板");
     for (const file of builtinFiles) {
       const value = JSON.parse(fs.readFileSync(path.join(builtinRoot, file), "utf-8")) as { flow: unknown };
-      assert.equal(validateAndMigrateFlow(value.flow).schemaVersion, 2, `${builtinRoot}/${file}`);
+      assert.equal(validateAndMigrateFlow(value.flow).schemaVersion, 3, `${builtinRoot}/${file}`);
     }
     for (const [file, expected] of [
       ["builtin-person-scene-transfer.json", ["subject", "scene"]],
@@ -483,8 +521,8 @@ async function main() {
         schemaVersion: unknown;
         flow: { nodes: Array<{ type: string; data: Record<string, unknown> }> };
       };
-      assert.equal(repaired.schemaVersion, 2);
-      assert.equal(validateAndMigrateFlow(repaired.flow).schemaVersion, 2);
+      assert.equal(repaired.schemaVersion, 3);
+      assert.equal(validateAndMigrateFlow(repaired.flow).schemaVersion, 3);
       for (const node of repaired.flow.nodes.filter((candidate) => candidate.type !== "image-input")) {
         assert.equal(typeof node.data.modelId, "string", `${node.type} 应补 modelId`);
         assert.equal(typeof node.data.modelOptions, "object", `${node.type} 应补 modelOptions`);
@@ -496,7 +534,7 @@ async function main() {
     }
   });
 
-  await test("全新空数据目录生成的六份 v2 内置模板均可读取和校验", () => {
+  await test("全新空数据目录生成的六份 v3 内置模板均可读取和校验", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-fresh-templates-"));
     const originalDataDir = process.env.DATA_DIR;
     try {
@@ -511,8 +549,8 @@ async function main() {
           schemaVersion: unknown;
           flow: unknown;
         };
-        assert.equal(template.schemaVersion, 2, file);
-        assert.equal(validateAndMigrateFlow(template.flow).schemaVersion, 2, file);
+        assert.equal(template.schemaVersion, 3, file);
+        assert.equal(validateAndMigrateFlow(template.flow).schemaVersion, 3, file);
       }
     } finally {
       if (originalDataDir === undefined) delete process.env.DATA_DIR;

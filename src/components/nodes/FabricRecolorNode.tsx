@@ -24,7 +24,6 @@ export function FabricRecolorNode({
 }: NodeProps<Node<FabricRecolorNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const hasFabricInput = useFlowStore((state) =>
     selectActiveEdges(state).some((edge) => edge.target === id && edge.targetHandle === "fabric"),
   );
@@ -216,7 +215,6 @@ export function FabricRecolorNode({
         <RunButton
           status={data.status}
           onClick={() => void runNode(id)}
-          onCancel={() => void cancelNodeRun(id)}
           label="替换面料配色"
           disabled={colors.length === 0 && !hasFabricInput}
         />

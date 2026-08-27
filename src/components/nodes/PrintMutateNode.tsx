@@ -11,7 +11,6 @@ const COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMutateNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const running = isNodeRunActive(data.status);
   const promptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "prompt" },
@@ -48,7 +47,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
           <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} onCancel={() => void cancelNodeRun(id)} label="印花裂变" />
+        <RunButton status={data.status} onClick={() => void runNode(id)} label="印花裂变" />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
       </NodeFrame>

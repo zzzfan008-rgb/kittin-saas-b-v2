@@ -39,6 +39,34 @@ const SECOND_PNG = await sharp({
 }).png().toBuffer();
 const SEED_DATA_URL = `data:image/png;base64,${SEED_PNG.toString("base64")}`;
 const SECOND_DATA_URL = `data:image/png;base64,${SECOND_PNG.toString("base64")}`;
+const MASK_SOURCE_PNG = await sharp({
+  create: { width: 128, height: 128, channels: 3, background: { r: 35, g: 92, b: 165 } },
+}).png().toBuffer();
+const MASK_SOURCE_DATA_URL = `data:image/png;base64,${MASK_SOURCE_PNG.toString("base64")}`;
+const MASK_PIXELS = Buffer.alloc(128 * 128 * 4, 255);
+for (let y = 40; y < 88; y += 1) {
+  for (let x = 40; x < 88; x += 1) MASK_PIXELS[(y * 128 + x) * 4 + 3] = 0;
+}
+const MASK_PNG = await sharp(MASK_PIXELS, { raw: { width: 128, height: 128, channels: 4 } }).png().toBuffer();
+const MASK_DATA_URL = `data:image/png;base64,${MASK_PNG.toString("base64")}`;
+const REPLACE_PIXELS = Buffer.alloc(128 * 128 * 3);
+for (let y = 0; y < 128; y += 1) {
+  for (let x = 0; x < 128; x += 1) {
+    const offset = (y * 128 + x) * 3;
+    const isNewContour = y >= 30 && y < 98 && x >= 18 && x < 110;
+    const color = isNewContour
+      ? { r: 225, g: 42, b: 48 }
+      : { r: 35, g: 92, b: 165 };
+    REPLACE_PIXELS[offset] = color.r;
+    REPLACE_PIXELS[offset + 1] = color.g;
+    REPLACE_PIXELS[offset + 2] = color.b;
+  }
+}
+const REPLACE_PNG = await sharp(REPLACE_PIXELS, {
+  raw: { width: 128, height: 128, channels: 3 },
+}).png().toBuffer();
+const REPLACE_PROVIDER_PNG = await sharp(REPLACE_PNG).resize({ width: 816, height: 816, fit: "fill" }).png().toBuffer();
+const REPLACE_PROVIDER_DATA_URL = `data:image/png;base64,${REPLACE_PROVIDER_PNG.toString("base64")}`;
 fs.writeFileSync(path.join(uploadsDir(), "seed.png"), SEED_PNG);
 
 let passed = 0;
@@ -105,6 +133,7 @@ async function runRecordedAiStep(
   kind: Exclude<NodeKind, "image-input" | "result">,
   params: Record<string, unknown>,
   inputImages: string[],
+  providerImages?: string[],
 ) {
   const calls: RecordedProviderCall[] = [];
   const providerIds: string[] = [];
@@ -118,7 +147,7 @@ async function runRecordedAiStep(
     });
     const count = Math.max(1, request.batchSize ?? 1);
     return {
-      images: Array.from({ length: count }, () => SEED_DATA_URL),
+      images: providerImages ?? Array.from({ length: count }, () => SEED_DATA_URL),
       model: "runner-stub-model",
     };
   };
@@ -167,6 +196,31 @@ async function main() {
     assert.deepStrictEqual(out.upstream?.map((u) => u.nodeId), ["r1", "r2"]);
   });
 
+  await ok("蒙版执行计划统一为版本化局部修改，不再携带旧处理模式", () => {
+    const maskNode = (id: string, legacyMaskMode?: "preserve" | "replace"): FlowNode => ({
+      id,
+      type: "mask-redraw",
+      data: {
+        kind: "mask-redraw",
+        label: "蒙版重绘",
+        status: "idle",
+        prompt: "替换胸前图案",
+        mask: MASK_DATA_URL,
+        maskSourceRef: MASK_SOURCE_DATA_URL,
+        ...(legacyMaskMode ? { maskMode: legacyMaskMode } : {}),
+        outputImages: [],
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      },
+    });
+    const legacyStep = buildExecutionPlan([maskNode("legacy", "preserve")], []).steps[0];
+    const replaceStep = buildExecutionPlan([maskNode("replace", "replace")], []).steps[0];
+    assert.equal(legacyStep.params.maskPipelineVersion, 3);
+    assert.equal(replaceStep.params.maskPipelineVersion, 3);
+    assert.equal(legacyStep.params.maskMode, undefined);
+    assert.equal(replaceStep.params.maskMode, undefined);
+  });
+
   await ok("风格迁移：双参考图按人物、场景的连线顺序传入", () => {
     const transfer = aiNode("transfer", "ai-modify");
     const plan = buildExecutionPlan(
@@ -206,6 +260,36 @@ async function main() {
       includeDownstream: false,
     });
     assert.throws(() => assertPlanInputs(invalid, nineEdges), /at most 8 reference images/);
+  });
+
+  await ok("局部修改在入队前拒绝会占满引导图名额的 8 张用户参考图", () => {
+    const references = Array.from({ length: 8 }, (_, index) => `/api/files/mask-ref-${index + 1}.png`);
+    const upstream = aiNode("mask-upstream", "ai-modify", references);
+    const maskNode: FlowNode = {
+      id: "mask-target",
+      type: "mask-redraw",
+      data: {
+        kind: "mask-redraw",
+        label: "局部修改",
+        status: "idle",
+        prompt: "修改衣袖",
+        mask: MASK_DATA_URL,
+        maskSourceRef: references[0],
+        outputImages: [],
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      } as WorkflowNodeData as FlowNode["data"],
+    };
+    const maskEdge = edge(upstream.id, maskNode.id);
+    const plan = buildExecutionPlan([upstream, maskNode], [maskEdge], {
+      onlyNodeId: maskNode.id,
+      includeDownstream: false,
+    });
+
+    assert.throws(
+      () => assertPlanInputs(plan, [maskEdge]),
+      /at most 7 user reference images/,
+    );
   });
 
   await ok("环检测：A↔B 抛 DagError", () => {
@@ -443,6 +527,92 @@ async function main() {
     assert.strictEqual(result.prompts?.length, 3);
     assert.strictEqual(result.providerRequests, 1);
   });
+
+  await ok("runner 统一局部修改：整图比例、核心非裁切与连续融合贯穿完整链路", async () => {
+    const { calls, providerIds, result } = await runRecordedAiStep(
+      "mask-redraw",
+      {
+        prompt: "在胸前添加红色刺绣并替换旧标识",
+        mask: MASK_DATA_URL,
+        maskSourceRef: MASK_SOURCE_DATA_URL,
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      },
+      [MASK_SOURCE_DATA_URL],
+      [REPLACE_PROVIDER_DATA_URL],
+    );
+    assert.deepStrictEqual(providerIds, ["gpt-image-2"]);
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].method, "edit");
+    assert.strictEqual(calls[0].request.maskMode, undefined);
+    assert.strictEqual(calls[0].request.referenceImages?.length, 2);
+    assert.strictEqual(calls[0].request.referenceImages?.[0], MASK_SOURCE_DATA_URL);
+    assert.notStrictEqual(calls[0].request.referenceImages?.[1], MASK_SOURCE_DATA_URL);
+    assert.match(calls[0].request.prompt, /参考图2[^\n]{0,80}区域引导图/);
+    assert.match(calls[0].request.prompt, /红色[^\n]{0,40}修改核心/);
+    assert.match(calls[0].request.prompt, /金色[^\n]{0,60}缓冲区/);
+    assert.match(calls[0].request.prompt, /(整幅|完整)画面[^\n]{0,80}(构图|比例)/);
+    assert.match(calls[0].request.prompt, /添加、替换、删除或调整/);
+    assert.match(calls[0].request.prompt, /冲突的旧对象、旧包带、旧颜色/);
+    assert.match(calls[0].request.prompt, /完整重建被遮挡的底层服装或背景/);
+    assert.match(calls[0].request.prompt, /禁止用模糊、暗斑、色块、漂浮投影或半透明残影/);
+    assert.match(calls[0].request.prompt, /真实接触并符合整幅画面光源方向的阴影/);
+    assert.match(calls[0].request.prompt, /PNG 完整最终图片/);
+    assert.deepStrictEqual(calls[0].request.modelOptions, { size: "816x816" });
+    assert.notStrictEqual(calls[0].request.mask, MASK_DATA_URL, "模型必须收到扩展后的安全区蒙版");
+    assert.strictEqual(result.images.length, 1);
+    const decoded = await sharp(Buffer.from(result.images[0].split(",")[1], "base64"))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const backgroundOffset = (64 * decoded.info.width + 10) * decoded.info.channels;
+    assert.deepStrictEqual(
+      Array.from(decoded.data.subarray(backgroundOffset, backgroundOffset + 3)),
+      [35, 92, 165],
+      "融合区外必须逐像素保持原色",
+    );
+  });
+
+  await ok("runner 蒙版多参考图：保留用户图号并把区域引导图追加到最后", async () => {
+    const { calls } = await runRecordedAiStep(
+      "mask-redraw",
+      {
+        prompt: "将选中区域修改为图2的手提包",
+        mask: MASK_DATA_URL,
+        maskSourceRef: MASK_SOURCE_DATA_URL,
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      },
+      [MASK_SOURCE_DATA_URL, SECOND_DATA_URL],
+      [REPLACE_PROVIDER_DATA_URL],
+    );
+    const references = calls[0].request.referenceImages ?? [];
+    assert.strictEqual(references.length, 3);
+    assert.strictEqual(references[0], MASK_SOURCE_DATA_URL);
+    assert.strictEqual(references[1], SECOND_DATA_URL, "用户的图2必须原样传给模型");
+    assert.notStrictEqual(references[2], SECOND_DATA_URL, "区域引导图必须追加到所有用户参考图之后");
+    assert.match(calls[0].request.prompt, /参考图2是用户提供的目标内容参考图/);
+    assert.match(calls[0].request.prompt, /最后一张参考图（参考图3）才是区域引导图/);
+    assert.doesNotMatch(calls[0].request.prompt, /参考图2是区域引导图/);
+  });
+
+  await ok("runner 蒙版参考图上限：为内部区域引导图预留一个模型名额", async () => {
+    await assert.rejects(
+      () => runRecordedAiStep(
+        "mask-redraw",
+        {
+          prompt: "替换选中的服装细节",
+          mask: MASK_DATA_URL,
+          maskSourceRef: MASK_SOURCE_DATA_URL,
+          modelId: "gpt-image-2",
+          modelOptions: {},
+        },
+        Array.from({ length: 8 }, (_, index) => index === 0 ? MASK_SOURCE_DATA_URL : SECOND_DATA_URL),
+        [REPLACE_PROVIDER_DATA_URL],
+      ),
+      /accepts at most 7 user reference images/,
+    );
+  });
+
 
   await ok("端到端（无 AI）：result 节点收到上游本次产出", async () => {
     // image-input → result：image-input 执行时产出图片，result 必须收到它

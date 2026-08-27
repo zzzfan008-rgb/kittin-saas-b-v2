@@ -108,7 +108,7 @@ INITIAL_ADMIN_PASSWORD=your-temporary-password
 每个 AI 节点独立保存模型和原生参数。普通图片节点可选择
 `gpt-image-2-vip`、`gemini-3.1-flash-image`、`flux-2-pro`、
 `seedream-5-0-260128` 或 `grok-imagine-image`；`gpt-image-2` 仅用于蒙版
-局部重绘。业务接口先将任务写入 PostgreSQL，再由 Worker 调用 API易同步图片
+局部修改。业务接口先将任务写入 PostgreSQL，再由 Worker 调用 API易同步图片
 端点并立即转存结果。完整契约见 [`docs/ai/apiyi/README.md`](docs/ai/apiyi/README.md)。
 
 内置模板将“人物场景迁移”与“图案风格迁移”分开，避免人物/座椅语义污染

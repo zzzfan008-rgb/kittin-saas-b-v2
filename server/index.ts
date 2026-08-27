@@ -88,7 +88,7 @@ app.use("/api/auth/login", loginRateLimit);
 app.use("/api/auth", authRouter);
 app.use("/api", requireAuth, requirePasswordChanged);
 app.use("/api/generate", aiRateLimit, generateRouter);
-// 仅入队请求消耗 AI 限流额度；状态、SSE 重连和取消必须始终可达。
+// 仅入队请求消耗 AI 限流额度；状态与 SSE 重连必须始终可达。
 app.post("/api/run-plan", aiRateLimit);
 app.use("/api/run-plan", runPlanRouter);
 app.use("/api/files", filesRouter);

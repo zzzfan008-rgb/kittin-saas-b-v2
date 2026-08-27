@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
 import {
   NODE_SPECS,
+  MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   type ExecutionPlan,
   type AIProvider,
@@ -34,7 +35,7 @@ import {
   modelMaxReferenceImages,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
-import { compositeMaskedEdit } from "../lib/maskProcessing";
+import { compositeMaskedEdit, prepareMaskForGeneration } from "../lib/maskProcessing";
 import {
   completeGenerationRecord,
   createGenerationRecord,
@@ -100,6 +101,17 @@ const DEFAULT_PROMPTS: Partial<Record<NodeExecution["kind"], string>> = {
   "ai-modify": "在保持整体版型不变的前提下，优化服装细节设计",
   "fabric-recolor": "保持服装款式、细节、光影与背景不变，仅替换面料质感",
 };
+
+function maskReferenceRolePrompt(userReferenceCount: number): string {
+  const guideIndex = userReferenceCount + 1;
+  if (userReferenceCount <= 1) {
+    return "参考图1是完整原图；最后一张参考图（参考图2）是区域引导图";
+  }
+  const userReferences = userReferenceCount === 2
+    ? "参考图2是用户提供的目标内容参考图"
+    : `参考图2至参考图${userReferenceCount}是用户提供的目标内容参考图`;
+  return `参考图1是完整原图；${userReferences}，用户提示词中的图号始终对应这些用户参考图；最后一张参考图（参考图${guideIndex}）才是区域引导图`;
+}
 
 interface Run {
   id: string;
@@ -222,8 +234,11 @@ async function executeRun(run: Run): Promise<void> {
       (u) => outputs.get(u.nodeId) ?? u.images,
     );
 
-    if (NODE_SPECS[step.kind].providerId && inputImages.length > MAX_REFERENCE_IMAGES) {
-      const message = `Node ${step.nodeId} accepts at most ${MAX_REFERENCE_IMAGES} reference images`;
+    const runtimeInputLimit = step.kind === "mask-redraw"
+      ? MAX_MASK_USER_REFERENCE_IMAGES
+      : MAX_REFERENCE_IMAGES;
+    if (NODE_SPECS[step.kind].providerId && inputImages.length > runtimeInputLimit) {
+      const message = `Node ${step.nodeId} accepts at most ${runtimeInputLimit}${step.kind === "mask-redraw" ? " user" : ""} reference images`;
       await failRun(message, step.nodeId);
       return;
     }
@@ -376,8 +391,11 @@ export async function executeStep(
         referenceImages.push(...(await resolveImageRefs([fabricImageUrl])));
       }
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-      if (referenceImages.length > maxReferences) {
-        throw new Error(`Node ${step.nodeId} accepts at most ${maxReferences} reference images for ${modelId}`);
+      const maxUserReferences = step.kind === "mask-redraw"
+        ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
+        : maxReferences;
+      if (referenceImages.length > maxUserReferences) {
+        throw new Error(`Node ${step.nodeId} accepts at most ${maxUserReferences} user reference images for ${modelId}`);
       }
 
       const extra = ((step.params.prompt as string) ?? "").trim();
@@ -466,6 +484,9 @@ export async function executeStep(
         };
       }
 
+      const maskReferenceRoles = step.kind === "mask-redraw"
+        ? maskReferenceRolePrompt(referenceImages.length)
+        : undefined;
       const prompt =
         step.kind === "upscale"
           ? "将这张服装效果图放大为超高清版本，增强面料纹理、走线与边缘细节，保持原有构图、色彩和光影完全不变"
@@ -473,26 +494,33 @@ export async function executeStep(
             ? "提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用" +
               (extra ? `。补充要求：${extra}` : "")
             : step.kind === "mask-redraw"
-              ? extra
+              ? `目标修改：${extra}。${maskReferenceRoles}，其中红色表示用户涂抹的修改核心，红色已完全遮住旧内容，只用于表达位置；金色表示仅供完整轮廓延展和边缘融合的缓冲区；两者都是修改范围，不是裁切框。请根据用户说明在红色核心内添加、替换、删除或调整内容。凡用户要求替换、删除或改变既有对象时，必须先彻底清除与目标冲突的旧对象、旧包带、旧颜色、旧阴影、旧反光、旧纹理和残留边线，再依据周围连续的面料纹理、颜色、褶皱、缝线和光照完整重建被遮挡的底层服装或背景，然后放入新内容；禁止用模糊、暗斑、色块、漂浮投影或半透明残影遮盖清理区域。只有与新内容真实接触并符合整幅画面光源方向的阴影才可保留。不需要修改的服装结构、面料纹理和光影必须保持。结合整幅画面的构图、服装比例和视觉重量，新内容默认继承目标区域的中心位置与近似占位，除非用户明确要求，不得明显放大、缩小或偏移。只有完整轮廓、褶皱、缝线、阴影、反光和自然遮挡所必需的部分可以进入金色缓冲区，不得沿红色边缘截断，也不得覆盖缓冲区内的文字、独立图案、配饰或其他服装结构。交接处必须匹配原图的面料材质、纹理方向、褶皱、光影、透视、遮挡和清晰度，不得出现重影、透色、硬边或颜色污染。返回与整幅画面同尺寸、同坐标的 PNG 完整最终图片；修改范围以外的画面保持原状。`
               : extra || DEFAULT_PROMPTS[step.kind] || NODE_SPECS[step.kind].description;
-      if (step.kind === "mask-redraw" && !prompt) {
-        throw new Error("蒙版局部重绘必须填写修改说明");
+      if (step.kind === "mask-redraw" && !extra) {
+        throw new Error("局部修改必须填写修改说明");
       }
       const maskReference = step.kind === "mask-redraw" ? step.params.mask : undefined;
       if (step.kind === "mask-redraw" && (typeof maskReference !== "string" || !maskReference)) {
-        throw new Error("蒙版局部重绘必须先保存 PNG 蒙版");
+        throw new Error("局部修改必须先保存 PNG 蒙版");
       }
       const mask = typeof maskReference === "string" ? await normalizeImageRef(maskReference) : undefined;
+      const preparedMask = step.kind === "mask-redraw"
+        ? await prepareMaskForGeneration(referenceImages[0], mask!)
+        : undefined;
+      const providerMask = preparedMask?.mask ?? mask;
+      const providerReferenceImages = preparedMask
+        ? [referenceImages[0], ...referenceImages.slice(1), preparedMask.guide]
+        : referenceImages;
       const request = {
         prompt,
-        referenceImages: referenceImages.length ? referenceImages : undefined,
+        referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
         aspectRatio: step.kind === "sketch-to-render" || step.kind === "ai-modify"
           ? normalizeExactAspectRatio(step.params.aspectRatio)
           : step.params.aspectRatio as string | undefined,
         batchSize: step.params.batchSize as number | undefined,
         imageSize: step.kind === "upscale" ? normalizeUpscaleSize(step.params.imageSize) : undefined,
-        modelOptions,
-        mask,
+        modelOptions: preparedMask ? { ...modelOptions, size: preparedMask.size } : modelOptions,
+        mask: providerMask,
       };
       const requestedCount = step.kind === "sketch-to-render" || step.kind === "ai-modify"
         ? Math.max(1, Math.min(8, Number(step.params.batchSize) || 1))
@@ -504,7 +532,9 @@ export async function executeStep(
         { ...options, nodeId: step.nodeId },
       );
       const providerImages = step.kind === "mask-redraw"
-        ? await Promise.all(result.images.map((image) => compositeMaskedEdit(referenceImages[0], mask!, image)))
+        ? await Promise.all(result.images.map((image) => (
+            compositeMaskedEdit(referenceImages[0], mask!, image)
+          )))
         : result.images;
       const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);
       return {

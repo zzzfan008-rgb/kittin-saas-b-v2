@@ -13,7 +13,7 @@ export type NodeKind =
   | "upscale"            // 高清放大（节点内选择 API易模型，业务侧 2K/4K）
   | "print-extract"      // 印花提取（gpt-image-2，抠出印花平铺展开）
   | "print-mutate"       // 印花裂变（gpt-image-2，1~8 张风格一致变体）
-  | "mask-redraw"        // GPT Image 2 蒙版局部重绘
+  | "mask-redraw"        // GPT Image 2 局部修改
   | "result";            // 结果展示/管理
 
 // ---------- 节点执行状态机 ----------
@@ -30,6 +30,10 @@ export type NodeRunStatus =
 
 /** OpenAI Images Edit 最多支持 16 图；产品端为控制成本与上传体积限制为 8 图。 */
 export const MAX_REFERENCE_IMAGES = 8;
+/** 局部修改会由服务端追加 1 张区域引导图，因此用户最多提供 7 张参考图。 */
+export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
+/** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
+export const MASK_PIPELINE_VERSION = 3;
 export const BATCH_SIZES = [1, 2, 4, 8] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
@@ -42,7 +46,7 @@ export interface BaseNodeData {
 }
 
 export interface ModelSelectableNodeData {
-  /** v0/v1 读取期间可缺省；v2 服务端校验后一定存在。 */
+  /** v0/v1 读取期间可缺省；v2/v3 服务端校验后一定存在。 */
   modelId?: GenerationImageModelId;
   modelOptions?: ImageModelOptions;
 }
@@ -142,10 +146,10 @@ export type WorkflowNodeData =
 
 // ---------- 持久化工作流（项目 / 模板共用）----------
 /**
- * 版本 2 增加节点级模型参数和蒙版节点。读取 v0/v1 时服务端会确定性迁移；
+ * 版本 3 将蒙版节点统一为单一“局部修改”语义。读取 v0/v1/v2 时服务端会确定性迁移；
  * 新版本不得静默降级读取。
  */
-export const WORKFLOW_SCHEMA_VERSION = 2 as const;
+export const WORKFLOW_SCHEMA_VERSION = 3 as const;
 export type WorkflowSchemaVersion = typeof WORKFLOW_SCHEMA_VERSION;
 
 export interface PersistedWorkflowNode {
@@ -339,10 +343,11 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   },
   "mask-redraw": {
     kind: "mask-redraw",
-    title: "蒙版局部重绘",
-    description: "用 GPT Image 2 只修改蒙版选中的区域",
+    title: "局部修改",
+    description: "涂抹需要修改的区域并描述要添加、替换或调整的内容",
     providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
+    // GPT Image 2 最多接收 8 张图，其中最后一张由服务端保留给区域引导图。
+    inputs: MAX_MASK_USER_REFERENCE_IMAGES,
     outputs: "images",
   },
   result: {

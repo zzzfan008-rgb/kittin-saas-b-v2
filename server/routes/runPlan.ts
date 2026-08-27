@@ -13,7 +13,6 @@ import { getRunForUser, type RunEvent } from "../engine/runner";
 import {
   ActiveRunLimitError,
   assertGenerationOwnerActive,
-  cancelDurableRun,
   CLIENT_REQUEST_ID_PATTERN,
   DURABLE_RUN_EVENT_BATCH_SIZE,
   enqueueGenerationRunInTransaction,
@@ -277,15 +276,6 @@ runPlanRouter.get("/:id/events", asyncHandler(async (req, res) => {
     return;
   }
   await streamDurableRunEvents(req.params.id, ownerId, req, res);
-}));
-
-runPlanRouter.post("/:id/cancel", asyncHandler(async (req, res) => {
-  const result = await cancelDurableRun(req.params.id, requestUser(req).id);
-  if (!result) {
-    res.status(404).json({ error: "run not found" });
-    return;
-  }
-  res.json(result);
 }));
 
 /** 刷新后先确认内存中的 Run 仍可恢复，避免对已丢失的 id 无限 SSE 重连。 */

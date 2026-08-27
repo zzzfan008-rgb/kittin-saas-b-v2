@@ -9,8 +9,12 @@ import type {
   NodeKind,
   WorkflowNodeData,
 } from "../../src/types/workflow";
-import { NODE_SPECS } from "../../src/types/workflow";
-import { MAX_REFERENCE_IMAGES } from "../../src/types/workflow";
+import {
+  MASK_PIPELINE_VERSION,
+  MAX_MASK_USER_REFERENCE_IMAGES,
+  MAX_REFERENCE_IMAGES,
+  NODE_SPECS,
+} from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
@@ -58,8 +62,14 @@ export function assertPlanInputs(plan: ExecutionPlan, edges: FlowEdge[]): void {
       executingNodeIds.has(upstream.nodeId) ? ["__runtime_output__"] : upstream.images,
     );
     const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-    if (usableImages.length > maxReferences) {
-      throw new DagError(`Node ${step.nodeId} accepts at most ${maxReferences} reference images for ${modelId}`);
+    const maxUserReferences = step.kind === "mask-redraw"
+      ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
+      : maxReferences;
+    if (usableImages.length > maxUserReferences) {
+      const qualifier = step.kind === "mask-redraw" ? " user" : "";
+      throw new DagError(
+        `Node ${step.nodeId} accepts at most ${maxUserReferences}${qualifier} reference images for ${modelId}`,
+      );
     }
     if (step.kind === "sketch-to-render" && usableImages.length === 0) {
       // sketch-to-render 同时承担文生款式，只有 prompt 时允许无图片执行。
@@ -252,6 +262,7 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
     case "mask-redraw":
       return {
         prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef,
+        maskPipelineVersion: MASK_PIPELINE_VERSION,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":

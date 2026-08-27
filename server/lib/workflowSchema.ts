@@ -193,12 +193,14 @@ function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<s
       return { prompt: "", outputImages: [], savedAsAssets: [], ...raw, ...migratedModelFields(kind, raw) };
     case "print-mutate":
       return { prompt: "", count: 4, outputImages: [], ...raw, ...migratedModelFields(kind, raw) };
-    case "mask-redraw":
+    case "mask-redraw": {
+      const { maskMode: _legacyMaskMode, ...migratedMaskData } = raw;
       return {
-        prompt: "", outputImages: [], ...raw,
+        prompt: "", outputImages: [], ...migratedMaskData,
         modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: defaultImageModelOptions(MASK_REDRAW_MODEL_ID),
       };
+    }
     case "result":
       return { images: [], ...raw };
   }
@@ -287,6 +289,10 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
       optionalString(raw.note, `${path}.note`);
       break;
   }
+  if (kind === "mask-redraw" && Object.hasOwn(raw, "maskMode")) {
+    const { maskMode: _legacyMaskMode, ...normalized } = raw;
+    return normalized as unknown as WorkflowNodeData;
+  }
   return raw as unknown as WorkflowNodeData;
 }
 
@@ -322,11 +328,11 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   return { ...raw, id, source, target } as PersistedWorkflowEdge;
 }
 
-/** Validate untrusted JSON and migrate legacy unversioned/v0/v1 formats to v2. */
+/** Validate untrusted JSON and migrate legacy unversioned/v0/v1/v2 formats to v3. */
 export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   const raw = record(value, "flow");
   const version = raw.schemaVersion;
-  const migrateLegacy = version === undefined || version === 0 || version === 1;
+  const migrateLegacy = version === undefined || version === 0 || version === 1 || version === 2;
   if (!migrateLegacy && version !== WORKFLOW_SCHEMA_VERSION) {
     fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
   }
@@ -353,10 +359,15 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   }
   for (const node of nodes) {
     const incomingCount = edges.filter((edge) => edge.target === node.id).length;
-    if (incomingCount > NODE_SPECS[node.type].inputs) {
+    // v2 曾允许蒙版节点保存 8 路输入。持久化层继续容忍这类历史文档，
+    // 但新建连线和运行前检查仍按 7 张用户参考图限制，提示用户移除一张后再运行。
+    const persistedInputLimit = node.type === "mask-redraw"
+      ? MAX_REFERENCE_IMAGES
+      : NODE_SPECS[node.type].inputs;
+    if (incomingCount > persistedInputLimit) {
       fail(
         "flow.edges",
-        `node ${node.id} accepts at most ${NODE_SPECS[node.type].inputs} incoming image connections`,
+        `node ${node.id} accepts at most ${persistedInputLimit} incoming image connections`,
       );
     }
     if (NODE_SPECS[node.type].providerId && incomingCount > MAX_REFERENCE_IMAGES) {

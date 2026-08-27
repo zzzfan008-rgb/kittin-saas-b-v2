@@ -11,7 +11,6 @@ const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
 export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const promptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "prompt" },
     { multiline: true },
@@ -69,7 +68,7 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
           </label>
         </div>
         <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} preferredAspectRatio={data.aspectRatio} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} onCancel={() => void cancelNodeRun(id)} label={data.label} />
+        <RunButton status={data.status} onClick={() => void runNode(id)} label={data.label} />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
       </NodeFrame>

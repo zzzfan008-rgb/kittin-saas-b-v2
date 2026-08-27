@@ -1,5 +1,5 @@
 export const WORKBENCH_TUTORIAL_KEY = "workbench-onboarding" as const;
-export const WORKBENCH_TUTORIAL_VERSION = "V1.1.0" as const;
+export const WORKBENCH_TUTORIAL_VERSION = "V1.2.0" as const;
 
 export const TUTORIAL_OUTCOMES = ["dismissed", "completed"] as const;
 

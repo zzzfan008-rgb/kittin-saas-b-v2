@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { createLatestMaskLoadGuard } from "@/lib/maskUpload";
+import { adaptiveMaskExpansionRadius, adaptiveMaskFeatherRadius } from "@/lib/maskGeometry";
 
 interface MaskEditorProps {
   source: string;
@@ -36,12 +37,51 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
     if (!mask || !overlay) return;
     const context = overlay.getContext("2d");
     if (!context) return;
+    const selectionLayer = (fillStyle: string) => {
+      const layer = document.createElement("canvas");
+      layer.width = overlay.width;
+      layer.height = overlay.height;
+      const layerContext = layer.getContext("2d");
+      if (!layerContext) return layer;
+      layerContext.fillStyle = fillStyle;
+      layerContext.fillRect(0, 0, layer.width, layer.height);
+      layerContext.globalCompositeOperation = "destination-out";
+      layerContext.drawImage(mask, 0, 0);
+      layerContext.globalCompositeOperation = "source-over";
+      return layer;
+    };
     context.clearRect(0, 0, overlay.width, overlay.height);
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "rgba(239, 68, 68, 0.48)";
-    context.fillRect(0, 0, overlay.width, overlay.height);
-    context.globalCompositeOperation = "destination-out";
-    context.drawImage(mask, 0, 0);
+    const maskContext = mask.getContext("2d");
+    const pixels = maskContext?.getImageData(0, 0, mask.width, mask.height).data;
+    let left = mask.width;
+    let right = -1;
+    let top = mask.height;
+    let bottom = -1;
+    if (pixels) {
+      for (let offset = 3; offset < pixels.length; offset += 4) {
+        if (pixels[offset] > 242) continue;
+        const index = (offset - 3) / 4;
+        const x = index % mask.width;
+        const y = Math.floor(index / mask.width);
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    const extent = right >= left && bottom >= top
+      ? { width: right - left + 1, height: bottom - top + 1 }
+      : { width: 1, height: 1 };
+    const expansionRadius = adaptiveMaskExpansionRadius(overlay.width, overlay.height, extent);
+    const featherRadius = adaptiveMaskFeatherRadius(overlay.width, overlay.height, expansionRadius);
+    if (expansionRadius > 0) {
+      context.save();
+      context.filter = `blur(${Math.max(2, Math.round((expansionRadius + featherRadius) / 2))}px)`;
+      context.drawImage(selectionLayer("rgba(245, 158, 11, 0.3)"), 0, 0);
+      context.restore();
+    }
+    context.drawImage(selectionLayer("rgba(239, 68, 68, 0.48)"), 0, 0);
     context.globalCompositeOperation = "source-over";
   };
 
@@ -188,6 +228,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   const stopDrawing = () => {
     drawingRef.current = false;
     lastPointRef.current = null;
+    renderOverlay();
   };
 
   const clearMask = () => {
@@ -275,7 +316,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   return createPortal(
     <div className="fixed inset-0 z-100 flex flex-col bg-[#0b0b0b]">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#262626] px-4">
-        <strong className="text-sm font-medium text-neutral-100">蒙版局部重绘</strong>
+        <strong className="text-sm font-medium text-neutral-100">局部修改</strong>
         <span className="text-[10px] text-neutral-500">GPT Image 2</span>
         <div className="ml-auto flex items-center gap-1.5">
           <ToolbarButton label="撤销" disabled={saving || !undoStack.length} onClick={undo} />
@@ -293,7 +334,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
           <img
             ref={imageRef}
             src={source}
-            alt="局部重绘原图"
+            alt="局部修改原图"
             onLoad={initializeCanvases}
             onError={() => setError("无法读取原图")}
             className="block max-h-[calc(100vh-132px)] max-w-[calc(100vw-32px)] select-none object-contain"
@@ -326,6 +367,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
             className="accent-gold disabled:opacity-40"
           />
         </label>
+        <span className="text-[10px] text-neutral-600">红色是修改中心，不是裁切框 · 新内容可在金色融合区内完整延展</span>
         {error && <p className="min-w-0 flex-1 truncate text-[10px] text-red-400" title={error}>{error}</p>}
         <button
           type="button"

@@ -15,7 +15,6 @@ export function SketchToRenderNode({
 }: NodeProps<Node<SketchToRenderNodeData>>) {
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const promptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "prompt" },
     { multiline: true },
@@ -73,7 +72,7 @@ export function SketchToRenderNode({
           </label>
         </div>
         <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} preferredAspectRatio={data.aspectRatio} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} onCancel={() => void cancelNodeRun(id)} label="生成效果图" />
+        <RunButton status={data.status} onClick={() => void runNode(id)} label="生成效果图" />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
       </NodeFrame>

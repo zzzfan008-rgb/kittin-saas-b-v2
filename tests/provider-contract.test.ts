@@ -215,18 +215,18 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版且不发送禁用字段", async () => {
+    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
       let calls = 0;
-      let capturedForm: FormData | undefined;
+      const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
         calls += 1;
-        capturedForm = init?.body as FormData;
+        capturedForms.push(init?.body as FormData);
         return Response.json(pngPayload(red));
       });
       try {
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].generate({ prompt: "禁止文生图" }),
-          /只能由蒙版局部重绘节点调用|仅用于带 PNG 蒙版的局部重绘|不支持文生图/,
+          /只能由局部修改节点调用|仅用于带 PNG 蒙版的局部修改|不支持文生图/,
         );
         assert.equal(calls, 0);
 
@@ -273,17 +273,24 @@ async function main(): Promise<void> {
         assert.equal(calls, 0);
 
         await apiyiProviders["gpt-image-2"].edit({
-          prompt: "局部改红", referenceImages: [blue], mask, modelOptions: {},
+          prompt: "局部改红", referenceImages: [blue], mask,
+          modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
-        assert.equal(capturedForm?.get("model"), "gpt-image-2");
-        assert.equal(capturedForm?.get("n"), null);
-        assert.equal(capturedForm?.get("output_format"), "png");
-        assert.equal(capturedForm?.get("response_format"), null);
-        assert.equal(capturedForm?.get("input_fidelity"), null);
-        assert.ok(capturedForm?.get("image[]") instanceof Blob);
-        assert.equal(capturedForm?.get("image"), null);
-        assert.ok(capturedForm?.get("mask") instanceof Blob);
+        assert.equal(capturedForms[0].get("model"), "gpt-image-2");
+        assert.equal(capturedForms[0].get("n"), null);
+        assert.equal(capturedForms[0].get("size"), "1152x576");
+        assert.equal(capturedForms[0].get("output_format"), "png");
+        assert.equal(
+          capturedForms[0].get("background"),
+          "opaque",
+          "统一局部修改必须请求完整不透明画面",
+        );
+        assert.equal(capturedForms[0].get("response_format"), null);
+        assert.equal(capturedForms[0].get("input_fidelity"), null);
+        assert.ok(capturedForms[0].get("image[]") instanceof Blob);
+        assert.equal(capturedForms[0].get("image"), null);
+        assert.ok(capturedForms[0].get("mask") instanceof Blob);
       } finally {
         restoreFetch();
       }

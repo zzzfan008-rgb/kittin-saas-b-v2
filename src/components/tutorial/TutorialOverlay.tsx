@@ -7,6 +7,7 @@ import {
   GitBranchIcon,
   HistoryIcon,
   ImagePlusIcon,
+  PaintbrushIcon,
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,12 @@ const STEPS = [
     description: "在画布上组织处理步骤，在右侧属性面板中调整模型、尺寸、数量和具体要求。",
     icon: GitBranchIcon,
     detail: "节点与连线共同描述执行顺序；保存前可以持续修改，不会因为教程状态改变项目内容。",
+  },
+  {
+    title: "用局部修改完成服装细节设计",
+    description: "涂抹需要修改的大致区域，再描述要添加、替换、删除或调整的内容，不需要选择技术处理模式。",
+    icon: PaintbrushIcon,
+    detail: "红色涂抹区是修改中心而不是裁切框；系统会结合整幅服装自动延展完整轮廓，并严格保护融合区以外的原图。",
   },
   {
     title: "在 Results 中检查每次运行",
@@ -130,7 +137,7 @@ export function TutorialOverlay() {
               欢迎使用服装设计工作台
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-xs leading-relaxed text-[var(--gc-text-muted)]">
-              用三个步骤熟悉从创作入口到结果检查的完整流程。
+              用四个步骤熟悉从创作入口到局部修改和结果检查的完整流程。
             </Dialog.Description>
           </div>
           <Button
