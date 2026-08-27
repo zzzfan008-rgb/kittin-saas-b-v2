@@ -18,7 +18,7 @@
 | 上一阶段 PR | 已合并 | [PR #7](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/7)；PR #4–#7 均已完成用户确认与合并 |
 | 基线提交 | 已确认 | `a0f56aa69cd71e6e139c07fe620c1b007d507baa` |
 | 基线 main CI | 通过 | PR #7 合并后 `origin/main` 已同步到上述基线 |
-| 当前工作分支 | 进行中 | `codex/mask-preserve-composite`；统一局部修改 V3、移除取消能力与教程 V1.2.0 正在收口，待创建 PR |
+| 当前工作分支 | 进行中 | `codex/mask-preserve-composite`；统一局部修改 V3、移除取消能力与教程 V1.2.0 已完成本地收口，[PR #8](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/8) 待 CI 与 Codex Cloud 审核 |
 | GitNexus | 已重建 | Phase C 工作树索引已用 PDG 重建；索引为本地派生产物，未写入仓库 |
 
 ## 阶段进度
