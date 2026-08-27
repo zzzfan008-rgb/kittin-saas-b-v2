@@ -109,7 +109,6 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
   );
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const runNode = useFlowStore((s) => s.runNode);
-  const cancelNodeRun = useFlowStore((s) => s.cancelNodeRun);
   const labelEdit = useCoalescedTextEdit({ kind: "node-data", nodeId, field: "label" });
   const promptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId, field: "prompt" },
@@ -221,7 +220,6 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         <RunButton
           status={d.status}
           onClick={() => void runNode(nodeId)}
-          onCancel={() => void cancelNodeRun(nodeId)}
           label="运行此节点"
         />
       )}

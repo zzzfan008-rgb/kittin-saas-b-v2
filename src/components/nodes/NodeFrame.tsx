@@ -130,38 +130,26 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
 interface RunButtonProps {
   status: NodeRunStatus;
   onClick: () => void;
-  onCancel?: () => void;
   label?: string;
   disabled?: boolean;
 }
 
-export function RunButton({ status, onClick, onCancel, label = "运行", disabled }: RunButtonProps) {
+export function RunButton({ status, onClick, label = "运行", disabled }: RunButtonProps) {
   const active = isNodeRunActive(status);
   const safetyBlockReason = useGenerationSafetyBlockReason();
   const newGenerationBlocked = !active && Boolean(safetyBlockReason);
   return (
-    <div className={active && onCancel ? "grid grid-cols-[1fr_auto] gap-2" : undefined}>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={active || disabled || newGenerationBlocked}
-        title={newGenerationBlocked ? safetyBlockReason ?? undefined : undefined}
-        className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
-          active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
-        }`}
-      >
-        {active ? STATUS_TEXT[status] : newGenerationBlocked ? "生成暂不可用" : label}
-      </button>
-      {active && onCancel && status !== "cancel_requested" && (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="nodrag rounded-md border border-[#3a3226] px-2.5 text-[10px] text-neutral-400 hover:border-red-500/60 hover:text-red-400"
-        >
-          取消
-        </button>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={active || disabled || newGenerationBlocked}
+      title={newGenerationBlocked ? safetyBlockReason ?? undefined : undefined}
+      className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
+        active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
+      }`}
+    >
+      {active ? STATUS_TEXT[status] : newGenerationBlocked ? "生成暂不可用" : label}
+    </button>
   );
 }
 

@@ -11,8 +11,6 @@ import {
 } from "@/store/flowStore";
 import {
   isNodeRunActive,
-  normalizeMaskCompositeMode,
-  type MaskCompositeMode,
   type MaskRedrawNodeData,
 } from "@/types/workflow";
 import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
@@ -29,11 +27,9 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const runNode = useFlowStore((state) => state.runNode);
-  const cancelNodeRun = useFlowStore((state) => state.cancelNodeRun);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
-  const maskMode = normalizeMaskCompositeMode(data.maskMode);
   const readiness = maskRedrawReadiness({
     source,
     mask: data.mask,
@@ -62,12 +58,6 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
     void runNode(id);
   };
 
-  const selectMaskMode = (nextMode: MaskCompositeMode) => {
-    if (readOnly || running || nextMode === maskMode) return;
-    const target = selectActiveDocumentTarget(useFlowStore.getState());
-    updateNodeDataInTab(target, id, { maskMode: nextMode });
-  };
-
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -76,33 +66,9 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <span className="text-neutral-500">图片模型</span>
           <span className="font-mono text-neutral-300">gpt-image-2</span>
         </div>
-        <div className="space-y-1.5">
-          <span className="text-[10px] text-neutral-500">处理方式</span>
-          <div className="grid grid-cols-2 gap-1 rounded-md border border-[#333] bg-[#0f0f0f] p-1" role="group" aria-label="蒙版处理方式">
-            {([
-              ["preserve", "保持原图", "添加印花、刺绣或装饰，保留底色与光影"],
-              ["replace", "替换选区", "改色、去除或重做，选区内容可能整体变化"],
-            ] as const).map(([value, label, description]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={maskMode === value}
-                disabled={readOnly || running}
-                onClick={() => selectMaskMode(value)}
-                className={`nodrag rounded px-2 py-1.5 text-left text-[10px] transition-colors disabled:opacity-40 ${
-                  maskMode === value
-                    ? "bg-gold text-ink"
-                    : "text-neutral-400 hover:bg-[#1a1a1a] hover:text-neutral-200"
-                }`}
-              >
-                <span className="block font-medium">{label}</span>
-                <span className={`mt-0.5 block text-[9px] leading-3 ${maskMode === value ? "text-ink/70" : "text-neutral-600"}`}>
-                  {description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[9px] leading-4 text-neutral-500">
+          涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
+        </p>
         {source ? (
           <img
             src={thumbnailImageUrl(source)}
@@ -149,8 +115,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         <RunButton
           status={data.status}
           onClick={run}
-          onCancel={() => void cancelNodeRun(id)}
-          label="局部重绘"
+          label="生成局部修改"
           disabled={!readiness.canOpenRunAction}
         />
         {running && <Developing />}

@@ -1198,80 +1198,6 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
   }
 });
 
-await test("保存预检期间取消会阻止生成请求", async () => {
-  useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("cancel-preflight", "预检取消"));
-  const requests: string[] = [];
-  let resolveSave: ((response: Response) => void) | undefined;
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (input) => {
-    const url = String(input);
-    requests.push(url);
-    if (url !== "/api/projects") throw new Error(`取消后不应请求：${url}`);
-    return new Promise<Response>((resolve) => { resolveSave = resolve; });
-  };
-
-  try {
-    const running = useFlowStore.getState().runNode("cancel-preflight");
-    assert.equal(requests.length, 1);
-    await useFlowStore.getState().cancelNodeRun("cancel-preflight");
-    assert.equal(
-      activeDocument().nodes.find((node) => node.id === "cancel-preflight")?.data.status,
-      "cancel_requested",
-    );
-    resolveSave?.(Response.json({ ok: true }));
-    await running;
-    assert.deepEqual(requests, ["/api/projects"]);
-    const node = activeDocument().nodes.find((candidate) => candidate.id === "cancel-preflight");
-    assert.equal(node?.data.status, "cancelled");
-    assert.match(node?.data.error ?? "", /调用生图服务前取消/);
-    const result = useFlowStore.getState().recentResults.find(
-      (record) => record.nodeId === "cancel-preflight",
-    );
-    assert.equal(result?.status, "cancelled");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-await test("运行请求已发出但尚未返回 runId 时取消，收到 runId 后立即补发后端取消", async () => {
-  useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("cancel-run-response", "响应窗口取消"));
-  const requests: string[] = [];
-  let resolveRun: ((response: Response) => void) | undefined;
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (input) => {
-    const url = String(input);
-    requests.push(url);
-    if (url === "/api/projects") return Promise.resolve(Response.json({ ok: true }));
-    if (url === "/api/run-plan") {
-      return new Promise<Response>((resolve) => { resolveRun = resolve; });
-    }
-    if (url === "/api/run-plan/cancel-response-run/cancel") {
-      return Promise.resolve(Response.json({ status: "cancelled", finished: true }));
-    }
-    if (url === "/api/run-plan/cancel-response-run") {
-      return Promise.resolve(Response.json({ error: "测试终止状态同步" }, { status: 404 }));
-    }
-    throw new Error(`意外请求：${url}`);
-  };
-
-  try {
-    const running = useFlowStore.getState().runNode("cancel-run-response");
-    for (let index = 0; index < 5 && !resolveRun; index += 1) await Promise.resolve();
-    assert.ok(resolveRun, "应已发出运行请求并等待 runId");
-    await useFlowStore.getState().cancelNodeRun("cancel-run-response");
-    resolveRun(Response.json({ runId: "cancel-response-run", status: "queued" }, { status: 202 }));
-    await running;
-    assert.ok(
-      requests.includes("/api/run-plan/cancel-response-run/cancel"),
-      "runId 返回后必须把等待中的取消送到后端",
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
 await test("网络或网关响应不确定时复用同一请求号，已知 runId 后禁止重复付费", async () => {
   useFlowStore.getState().createBlankTab();
   useFlowStore.getState().addExistingNode(aiNode("idempotent-run", "幂等生成"));
@@ -1354,40 +1280,6 @@ await test("丢失响应后即使参数变化收到 409，也持续复用原付�
     const node = activeDocument().nodes.find((candidate) => candidate.id === "ambiguous-conflict");
     assert.equal(node?.data.status, "outcome_unknown");
     assert.match(node?.data.error ?? "", /旧请求可能已创建任务/);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-await test("取消请求断网不会产生未处理异常或把原任务误判为已取消", async () => {
-  useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("cancel-network", "取消断网"));
-  useFlowStore.getState().setNodeStatus("cancel-network", "running");
-  const document = activeDocument();
-  useFlowStore.setState({
-    recentResults: [{
-      id: "cancel-network-record",
-      image: "",
-      nodeId: "cancel-network",
-      nodeLabel: "取消断网",
-      kind: "ai-modify",
-      projectId: document.projectId,
-      projectName: document.projectName,
-      runId: "cancel-network-run",
-      startedAt: Date.now(),
-      status: "running",
-    }],
-  });
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => {
-    throw new TypeError("取消连接中断");
-  };
-
-  try {
-    await useFlowStore.getState().cancelNodeRun("cancel-network");
-    const node = activeDocument().nodes.find((candidate) => candidate.id === "cancel-network");
-    assert.equal(node?.data.status, "running");
-    assert.match(node?.data.error ?? "", /取消结果未知.*继续同步/);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -425,32 +425,6 @@ async function waitFor(condition: () => boolean, message: string): Promise<void>
   throw new Error(message);
 }
 
-{
-  const previousFetch = globalThis.fetch;
-  const cancelUrls: string[] = [];
-  try {
-    globalThis.fetch = (async (input) => {
-      cancelUrls.push(String(input));
-      return Response.json({ status: "cancel_requested", finished: false });
-    }) as typeof fetch;
-    useFlowStore.setState((state) => ({
-      tabs: state.tabs.map((tab) => (
-        tab.id === state.activeTabId ? { ...tab, projectId: "project-current" } : tab
-      )),
-      recentResults: [
-        { ...queued, id: "wrong-project", projectId: "project-other", runId: "run-other", status: "running" },
-        { ...queued, id: "right-project", projectId: "project-current", runId: "run-current", status: "running" },
-      ],
-    }));
-    await useFlowStore.getState().cancelNodeRun(queued.nodeId);
-    assert.deepEqual(cancelUrls, ["/api/run-plan/run-current/cancel"]);
-    passed += 1;
-    console.log("  ✓ 取消节点运行按当前项目匹配 runId");
-  } finally {
-    globalThis.fetch = previousFetch;
-  }
-}
-
 const originalFetch = globalThis.fetch;
 const originalEventSource = globalThis.EventSource;
 const originalWindow = globalThis.window;

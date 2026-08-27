@@ -10,7 +10,7 @@ export const INITIAL_GENERATION_SAFETY_BLOCK_REASON =
 let blockReason: string | null = INITIAL_GENERATION_SAFETY_BLOCK_REASON;
 
 /**
- * 运行历史尚未完成对账时，只封锁新的付费生成，不影响画布查看、编辑、保存和取消已有任务。
+ * 运行历史尚未完成对账时，只封锁新的付费生成，不影响画布查看、编辑和保存。
  * 该门禁不进入项目快照与撤销栈，避免安全状态污染用户工作流。
  */
 export function setGenerationSafetyBlockReason(reason: string | null): void {

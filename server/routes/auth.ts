@@ -337,7 +337,7 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     return;
   }
   if (outcome.status === "active_runs") {
-    res.status(409).json({ error: "账号仍有生成任务，请先等待任务结束或取消任务后再删除" });
+    res.status(409).json({ error: "账号仍有生成任务，请等待任务结束后再删除" });
     return;
   }
   if (outcome.status === "draft_conflict") {

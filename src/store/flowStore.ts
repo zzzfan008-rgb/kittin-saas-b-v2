@@ -185,7 +185,6 @@ export interface FlowState {
   updateNodeDataInTab: (target: DocumentTarget, id: string, patch: Record<string, unknown>) => void;
   setNodeStatus: (id: string, status: NodeRunStatus, error?: string) => void;
   runNode: (id: string) => Promise<void>;
-  cancelNodeRun: (id: string) => Promise<void>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
   /**
@@ -279,10 +278,6 @@ interface SaveTabResult {
   error?: string;
 }
 
-interface RunPreparation {
-  cancelled: boolean;
-}
-
 class AmbiguousRunSubmissionError extends Error {
   constructor(message: string) {
     super(message);
@@ -293,8 +288,8 @@ class AmbiguousRunSubmissionError extends Error {
 /** 每个页签独立串行保存；切页不会使旧页签的保存响应失效。 */
 const saveQueueByDocument = new Map<string, TabSaveQueue>();
 
-/** 节点处于“保存项目、尚未创建后端 Run”的短暂阶段时，用于去重并支持本地取消。 */
-const runPreparations = new Map<string, RunPreparation>();
+/** 节点处于“保存项目、尚未创建后端 Run”的短暂阶段时用于去重。 */
+const runPreparations = new Set<string>();
 
 /** 传输结果未知时保留原请求号；再次点击只会确认/复用同一后端 Run。 */
 const AMBIGUOUS_RUN_STORAGE_KEY = "garment-canvas-ambiguous-run-requests";
@@ -955,7 +950,7 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
       };
     case "mask-redraw":
       return {
-        ...base, kind, prompt: "", maskMode: "preserve", outputImages: [],
+        ...base, kind, prompt: "", outputImages: [],
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":
@@ -1646,7 +1641,6 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
     case "mask-redraw":
       data.modelId = MASK_REDRAW_MODEL_ID;
       data.modelOptions = {};
-      data.maskMode = input.maskMode === "replace" ? "replace" : "preserve";
       data.prompt = typeof input.prompt === "string" ? input.prompt : "";
       data.outputImages = stringList(input.outputImages);
       if (typeof input.mask !== "string") delete data.mask;
@@ -3155,8 +3149,7 @@ export const useFlowStore = create<FlowState>()(
         const preparationKey = runPreparationKey(target, id);
         const submissionKey = runSubmissionKey(initialDocument.projectId, id);
         if (runPreparations.has(preparationKey)) return;
-        const preparation: RunPreparation = { cancelled: false };
-        runPreparations.set(preparationKey, preparation);
+        runPreparations.add(preparationKey);
         const localStartedAt = Date.now();
         const recordId = nanoid(8);
         const ambiguousClientRequestId = ambiguousRunRequestIds.get(submissionKey);
@@ -3203,23 +3196,6 @@ export const useFlowStore = create<FlowState>()(
           const submissionDocument = createDocumentSnapshot(submissionSnapshot);
           const submissionFlow = documentSnapshotToPersistedWorkflow(submissionDocument);
           const saveResult = await saveTab(target);
-          if (preparation.cancelled) {
-            const event: NodeStatusRunEvent = {
-              type: "node-status",
-              nodeId: id,
-              status: "cancelled",
-              error: "已在调用生图服务前取消",
-              startedAt: localStartedAt,
-              finishedAt: Date.now(),
-            };
-            set((state) => recentResultsPatch(
-              state,
-              applyRunEventToRecentResults(state.recentResults, recordId, event),
-            ));
-            updateTabFromRunEvent(set, target, id, event);
-            terminalRecorded = true;
-            return;
-          }
           if (!saveResult.ok) {
             throw new Error(`项目保存失败，未调用生图服务：${saveResult.error ?? "未知错误"}`);
           }
@@ -3289,35 +3265,7 @@ export const useFlowStore = create<FlowState>()(
               : record,
             ),
           ));
-          if (preparation.cancelled) {
-            try {
-              const cancelResponse = await fetch(
-                `/api/run-plan/${encodeURIComponent(payload.runId)}/cancel`,
-                { method: "POST" },
-              );
-              if (!cancelResponse.ok) {
-                const body = await cancelResponse.json().catch(() => ({}));
-                throw new Error(responseErrorMessage(cancelResponse.status, body));
-              }
-            } catch (cancelError) {
-              const message = cancelError instanceof Error ? cancelError.message : String(cancelError);
-              const event: NodeStatusRunEvent = {
-                type: "node-status",
-                nodeId: id,
-                status: "cancel_requested",
-                error: `取消请求失败：${message}；任务状态将继续同步`,
-                startedAt: localStartedAt,
-              };
-              set((state) => recentResultsPatch(
-                state,
-                applyRunEventToRecentResults(state.recentResults, recordId, event),
-              ));
-              updateTabFromRunEvent(set, target, id, event);
-            }
-          }
-          if (runPreparations.get(preparationKey) === preparation) {
-            runPreparations.delete(preparationKey);
-          }
+          runPreparations.delete(preparationKey);
 
           const runStatus = await fetch(`/api/run-plan/${encodeURIComponent(payload.runId)}`);
           if (!runStatus.ok) {
@@ -3340,8 +3288,8 @@ export const useFlowStore = create<FlowState>()(
         } catch (err) {
           if (!terminalRecorded) {
             const message = err instanceof Error ? err.message : String(err);
-            const status: "cancel_requested" | "retry_wait" | "outcome_unknown" | "error" = knownRunId
-              ? preparation.cancelled ? "cancel_requested" : "retry_wait"
+            const status: "retry_wait" | "outcome_unknown" | "error" = knownRunId
+              ? "retry_wait"
               : err instanceof AmbiguousRunSubmissionError ? "outcome_unknown" : "error";
             const safeMessage = knownRunId
               ? `运行 ${knownRunId} 已创建，但状态同步中断：${message}；请刷新页面继续同步，勿重复提交`
@@ -3363,56 +3311,7 @@ export const useFlowStore = create<FlowState>()(
             updateTabFromRunEvent(set, target, id, event);
           }
         } finally {
-          if (runPreparations.get(preparationKey) === preparation) {
-            runPreparations.delete(preparationKey);
-          }
-        }
-      },
-
-      cancelNodeRun: async (id) => {
-        const state = get();
-        const document = selectActiveDocument(state);
-        const target: DocumentTarget = {
-          tabId: state.activeTabId,
-          projectId: document.projectId,
-          documentEpoch: document.documentEpoch,
-        };
-        const active = state.recentResults.find((record) =>
-          record.nodeId === id &&
-          record.projectId === document.projectId &&
-          isNodeRunActive(record.status),
-        );
-        if (!active?.runId) {
-          const preparation = runPreparations.get(runPreparationKey(target, id));
-          if (!active || !preparation || preparation.cancelled) return;
-          preparation.cancelled = true;
-          const event: NodeStatusRunEvent = {
-            type: "node-status",
-            nodeId: id,
-            status: "cancel_requested",
-            startedAt: active.startedAt,
-          };
-          set((current) => recentResultsPatch(
-            current,
-            applyRunEventToRecentResults(current.recentResults, active.id, event),
-          ));
-          updateTabFromRunEvent(set, target, id, event);
-          return;
-        }
-        try {
-          const response = await fetch(`/api/run-plan/${encodeURIComponent(active.runId)}/cancel`, { method: "POST" });
-          if (response.ok) return;
-          const body = await response.json().catch(() => ({}));
-          throw new Error(responseErrorMessage(response.status, body));
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          runWithoutHistory(() => {
-            updateTabNodes(set, target, (nodes) => nodes.map((node) =>
-              node.id === id
-                ? { ...node, data: { ...node.data, error: `取消结果未知：${message}；任务状态将继续同步` } }
-                : node,
-            ));
-          });
+          runPreparations.delete(preparationKey);
         }
       },
 

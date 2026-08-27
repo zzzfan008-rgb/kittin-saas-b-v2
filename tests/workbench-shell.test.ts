@@ -50,6 +50,12 @@ const contextPanelSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/panels/ContextPanel.tsx"),
   "utf8",
 );
+const nodeFrameSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/nodes/NodeFrame.tsx"),
+  "utf8",
+);
+const flowStoreSource = fs.readFileSync(path.resolve(testRoot, "../src/store/flowStore.ts"), "utf8");
+const runPlanRouteSource = fs.readFileSync(path.resolve(testRoot, "../server/routes/runPlan.ts"), "utf8");
 const workbenchShellRenderSource = shellSource.slice(shellSource.indexOf("export function WorkbenchShell"));
 
 assert.match(combined, /@\/components\/ui\//, "新外壳必须复用已安装的 shadcn 基础组件");
@@ -86,6 +92,10 @@ assert.doesNotMatch(
   /<ReactFlowProvider[\s\S]*?<ResultsPanel/,
   "Results 不应再占用中心画布底部",
 );
+assert.doesNotMatch(nodeFrameSource, /onCancel|>\s*取消\s*</, "生成按钮不得再暴露取消入口");
+assert.doesNotMatch(flowStoreSource, /cancelNodeRun|\/api\/run-plan\/.*\/cancel/, "客户端不得保留任务取消模块");
+assert.doesNotMatch(runPlanRouteSource, /\/:id\/cancel|cancelDurableRun/, "运行 API 不得暴露用户取消端点");
+console.log("  ✓ 生成节点、客户端 Store 与运行 API 均不再暴露取消功能");
 
 for (const { file, source } of sources) {
   assert.doesNotMatch(

@@ -60,20 +60,21 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
 });
 
-test("adding a mask redraw node keeps the canvas mounted and exposes both modes", async ({ page }) => {
+test("adding a local edit node keeps the canvas mounted and exposes one clear workflow", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const nodes = page.locator(".react-flow__node");
   const initialNodeCount = await nodes.count();
 
   await page.getByRole("button", { name: "节点 / 素材" }).click();
-  await page.getByTitle("点击添加蒙版局部重绘，或拖拽到画布指定位置").click();
+  await page.getByTitle("点击添加局部修改，或拖拽到画布指定位置").click();
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "蒙版处理方式" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /保持原图/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /替换选区/ })).toBeVisible();
+  await expect(page.getByText(/涂抹区不是裁切框/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成局部修改" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "蒙版处理方式" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "取消" })).toHaveCount(0);
   await expect(page.getByText("页面出现异常")).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });

@@ -117,7 +117,7 @@ async function test(name: string, fn: () => Promise<void>) {
   console.log(`  ✓ ${name}`);
 }
 
-console.log("V1.1.0 版本化教程回执测试");
+console.log("V1.2.0 版本化教程回执测试");
 
 setWorkbenchTutorialBlocking(true);
 assert.equal(isWorkbenchTutorialBlocking(), true);
@@ -127,7 +127,7 @@ const appSource = fs.readFileSync(path.resolve("src/App.tsx"), "utf8");
 assert.match(appSource, /if \(isWorkbenchTutorialBlocking\(\)\) return;/);
 console.log("  ✓ 教程显示期间阻断工作台全局保存、撤销、复制和粘贴快捷键");
 
-await test("现有账号没有 V1.1.0 回执时必须显示教程", async () => {
+await test("现有账号没有 V1.2.0 回执时必须显示教程", async () => {
   assert.deepEqual(await state("owner"), {
     tutorialKey: WORKBENCH_TUTORIAL_KEY,
     tutorialVersion: WORKBENCH_TUTORIAL_VERSION,
@@ -137,7 +137,7 @@ await test("现有账号没有 V1.1.0 回执时必须显示教程", async () => 
   });
 });
 
-await test("旧版本回执不会跳过 V1.1.0", async () => {
+await test("旧版本回执不会跳过 V1.2.0", async () => {
   await query(`
     INSERT INTO user_tutorial_receipts (
       user_id, tutorial_key, tutorial_version, outcome, acknowledged_at

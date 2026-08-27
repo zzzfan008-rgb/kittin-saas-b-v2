@@ -57,9 +57,13 @@ setup("create an authenticated desktop session", async ({ page }) => {
     await expect(tutorial).toBeHidden();
   } else {
     await expect(tutorial).toBeVisible();
-    await tutorial.getByRole("button", { name: "下一步" }).click();
-    await tutorial.getByRole("button", { name: "下一步" }).click();
-    await tutorial.getByRole("button", { name: "完成教程" }).click();
+    const nextButton = tutorial.getByRole("button", { name: "下一步" });
+    const completeButton = tutorial.getByRole("button", { name: "完成教程" });
+    for (let step = 0; step < 8 && !await completeButton.isVisible(); step += 1) {
+      await nextButton.click();
+    }
+    await expect(completeButton).toBeVisible();
+    await completeButton.click();
   }
   await expect(tutorial).toBeHidden();
   await page.reload();
