@@ -152,6 +152,7 @@ const source = {
         prompt: "袖口改成银色",
         mask: "/api/files/mask.png",
         maskSourceRef: "/api/files/source.png",
+        maskMode: "replace",
         outputImages: ["/api/files/mask-a.png"],
         modelId: "gpt-image-2-vip",
         modelOptions: { size: "2048x2048", secret: true },
@@ -360,7 +361,7 @@ assert.notStrictEqual(
 );
 
 const wire = documentSnapshotToPersistedWorkflow(snapshot);
-assert.equal(wire.schemaVersion, 2);
+assert.equal(wire.schemaVersion, 3);
 assert.deepEqual(wire.nodes, snapshot.nodes.map((node) => ({
   ...node,
   data: { ...node.data, status: "idle" },

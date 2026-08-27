@@ -4,6 +4,7 @@
  */
 import { Router } from "express";
 import {
+  MASK_PIPELINE_VERSION,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
   type ImageGenRequest,
@@ -145,7 +146,13 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   const requestedCount = Math.max(1, Math.min(8, Number(request.batchSize) || 1));
   const user = requestUser(req);
   const resolvedNodeId = nodeId ?? "direct-generate";
-  const resolvedRequest: ImageGenRequest = { ...request, modelOptions };
+  const { maskMode: _legacyMaskMode, ...requestWithoutLegacyMaskMode } = request as ImageGenRequest & {
+    maskMode?: unknown;
+  };
+  const resolvedRequest: ImageGenRequest = {
+    ...requestWithoutLegacyMaskMode,
+    modelOptions,
+  };
   const plan = {
     steps: [{
       nodeId: resolvedNodeId,
@@ -154,7 +161,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
       params: {
         ...resolvedRequest,
         modelId,
-        ...(resolvedKind === "mask-redraw" ? { maskSourceRef } : {}),
+        ...(resolvedKind === "mask-redraw" ? { maskSourceRef, maskPipelineVersion: MASK_PIPELINE_VERSION } : {}),
       },
     }],
   };
@@ -183,7 +190,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
         nodeLabel: nodeLabel ?? "直接生成",
         kind: resolvedKind,
         prompt: request.prompt,
-        parameters: { ...request, modelId, modelOptions } as unknown as Record<string, unknown>,
+        parameters: plan.steps[0].params,
         referenceImages: request.referenceImages,
         requestedCount,
       }, "direct");

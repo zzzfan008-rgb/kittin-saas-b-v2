@@ -2,11 +2,10 @@ import sharp from "sharp";
 import { ProviderError, toDataUrl } from "../providers/base";
 import { withImageProcessingSlot } from "./imageProcessingLimit";
 import { validateImageDataUrl } from "./imageValidation";
-import { maskFeatherSigma, maskSafetyRadius } from "../../src/lib/maskGeometry";
 import {
-  normalizeMaskCompositeMode,
-  type MaskCompositeMode,
-} from "../../src/types/workflow";
+  adaptiveMaskExpansionRadius,
+  adaptiveMaskFeatherRadius,
+} from "../../src/lib/maskGeometry";
 
 export const MAX_GPT_IMAGE_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_MASK_PIXELS = 40_000_000;
@@ -15,8 +14,6 @@ const GPT_IMAGE_MAX_SIDE = 3840;
 const GPT_IMAGE_MIN_PIXELS = 655_360;
 const GPT_IMAGE_MAX_PIXELS = 8_294_400;
 const GPT_IMAGE_MAX_ASPECT_RATIO = 3;
-const PRESERVE_DIFF_LOW = 16;
-const PRESERVE_DIFF_HIGH = 64;
 
 export interface ValidatedMaskPair {
   sourceBuffer: Buffer;
@@ -27,9 +24,22 @@ export interface ValidatedMaskPair {
 
 export interface PreparedMaskGeneration {
   mask: string;
+  /** 最后一张参考图：不透出旧内容的红色核心 + 金色轮廓延展缓冲区。 */
+  guide: string;
   size: string;
   width: number;
   height: number;
+  expansionRadius: number;
+  featherRadius: number;
+}
+
+interface MaskCompositeGeometry {
+  coreAlpha: Buffer;
+  innerAlpha: Buffer;
+  outerAlpha: Buffer;
+  blendAlpha: Buffer;
+  expansionRadius: number;
+  featherRadius: number;
 }
 
 /**
@@ -79,16 +89,23 @@ const SHARP_MASK_INPUT = {
   limitInputPixels: MAX_MASK_PIXELS,
 };
 
-async function editableAlpha(pair: ValidatedMaskPair, feather: boolean): Promise<Buffer> {
-  const radius = maskSafetyRadius(pair.width, pair.height);
+async function editableAlpha(
+  pair: ValidatedMaskPair,
+  options: {
+    expansionRadius?: number;
+    featherSigma?: number;
+    harden?: boolean;
+  } = {},
+): Promise<Buffer> {
+  const radius = options.expansionRadius ?? 0;
   let protectedAlpha = await sharp(pair.maskBuffer, SHARP_MASK_INPUT)
     .extractChannel("alpha")
     .toColourspace("b-w")
     .raw()
     .toBuffer();
   if (radius > 0) {
-    // Sharp/libvips 的形态学操作以暗色为前景；对原蒙版 Alpha 做 dilate，
-    // 会把透明（可编辑）区域向外扩张。显式转回 b-w 可避免 raw 单通道自动升为 sRGB 三通道。
+    // libvips 的 dilate 在这里扩张 Alpha 中的暗色区域；先处理受保护 Alpha，
+    // 再反相为编辑权重，才能得到向外扩张的透明编辑区。
     protectedAlpha = await sharp(protectedAlpha, {
       raw: { width: pair.width, height: pair.height, channels: 1 },
     })
@@ -101,7 +118,12 @@ async function editableAlpha(pair: ValidatedMaskPair, feather: boolean): Promise
   for (let index = 0; index < protectedAlpha.length; index += 1) {
     editAlpha[index] = 255 - protectedAlpha[index];
   }
-  const sigma = feather ? maskFeatherSigma(pair.width, pair.height) : 0;
+  if (options.harden) {
+    for (let index = 0; index < editAlpha.length; index += 1) {
+      editAlpha[index] = editAlpha[index] >= 128 ? 255 : 0;
+    }
+  }
+  const sigma = options.featherSigma ?? 0;
   if (sigma > 0) {
     editAlpha = await sharp(editAlpha, {
       raw: { width: pair.width, height: pair.height, channels: 1 },
@@ -112,6 +134,64 @@ async function editableAlpha(pair: ValidatedMaskPair, feather: boolean): Promise
       .toBuffer();
   }
   return editAlpha;
+}
+
+function selectionExtent(alpha: Buffer, width: number, height: number): { width: number; height: number } {
+  let left = width;
+  let right = -1;
+  let top = height;
+  let bottom = -1;
+  for (let index = 0; index < alpha.length; index += 1) {
+    if (alpha[index] <= 12) continue;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+  }
+  return right >= left && bottom >= top
+    ? { width: right - left + 1, height: bottom - top + 1 }
+    : { width: 1, height: 1 };
+}
+
+async function maskCompositeGeometry(pair: ValidatedMaskPair): Promise<MaskCompositeGeometry> {
+  const coreAlpha = await editableAlpha(pair, { expansionRadius: 0 });
+  const extent = selectionExtent(coreAlpha, pair.width, pair.height);
+  const expansionRadius = adaptiveMaskExpansionRadius(pair.width, pair.height, extent);
+  const featherRadius = adaptiveMaskFeatherRadius(pair.width, pair.height, expansionRadius);
+  const innerAlpha = expansionRadius > 0
+    ? await editableAlpha(pair, { expansionRadius, harden: true })
+    : Buffer.from(coreAlpha);
+  const outerAlpha = featherRadius > 0
+    ? await editableAlpha(pair, { expansionRadius: expansionRadius + featherRadius, harden: true })
+    : Buffer.from(innerAlpha);
+  if (featherRadius <= 0) {
+    return {
+      coreAlpha,
+      innerAlpha,
+      outerAlpha,
+      blendAlpha: Buffer.from(innerAlpha),
+      expansionRadius,
+      featherRadius,
+    };
+  }
+  const blurredInner = await sharp(innerAlpha, {
+    raw: { width: pair.width, height: pair.height, channels: 1 },
+  })
+    .blur(Math.max(0.8, featherRadius / 1.5))
+    .toColourspace("b-w")
+    .raw()
+    .toBuffer();
+  const blendAlpha = Buffer.allocUnsafe(coreAlpha.length);
+  for (let index = 0; index < blendAlpha.length; index += 1) {
+    blendAlpha[index] = innerAlpha[index] >= 128
+      ? 255
+      : outerAlpha[index] >= 128
+        ? Math.max(coreAlpha[index], blurredInner[index])
+        : 0;
+  }
+  return { coreAlpha, innerAlpha, outerAlpha, blendAlpha, expansionRadius, featherRadius };
 }
 
 async function rgbaMaskFromAlpha(
@@ -130,6 +210,44 @@ async function rgbaMaskFromAlpha(
     create: { width, height, channels: 3, background: { r: 255, g: 255, b: 255 } },
   })
     .joinChannel(alphaBuffer, { raw: { width, height, channels: 1 } })
+    .png()
+    .toBuffer();
+}
+
+async function maskRegionGuide(
+  source: Buffer,
+  geometry: MaskCompositeGeometry,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const overlay = Buffer.alloc(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 4;
+    const core = geometry.coreAlpha[index];
+    const inner = geometry.innerAlpha[index];
+    const outer = geometry.outerAlpha[index];
+    if (core > 12) {
+      overlay[offset] = 239;
+      overlay[offset + 1] = 68;
+      overlay[offset + 2] = 68;
+      // 核心只表达“这里需要修改”，不得继续把旧物轮廓、旧阴影或旧颜色
+      // 作为视觉参考喂给模型；完整原图仍由参考图 1 提供上下文。
+      overlay[offset + 3] = 255;
+    } else if (inner > 12) {
+      overlay[offset] = 245;
+      overlay[offset + 1] = 158;
+      overlay[offset + 2] = 11;
+      overlay[offset + 3] = 92;
+    } else if (outer > 12) {
+      overlay[offset] = 245;
+      overlay[offset + 1] = 158;
+      overlay[offset + 2] = 11;
+      overlay[offset + 3] = 48;
+    }
+  }
+  return sharp(source, SHARP_MASK_INPUT)
+    .ensureAlpha()
+    .composite([{ input: overlay, raw: { width, height, channels: 4 }, blend: "over" }])
     .png()
     .toBuffer();
 }
@@ -197,60 +315,90 @@ export async function prepareMaskForGeneration(
 ): Promise<PreparedMaskGeneration> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
   const dimensions = maskGenerationDimensions(pair.width, pair.height);
-  const radius = maskSafetyRadius(pair.width, pair.height);
-  let providerMask = pair.maskBuffer;
-  if (radius > 0) {
-    const expandedEditAlpha = await withImageProcessingSlot(() => editableAlpha(pair, false));
-    providerMask = await withImageProcessingSlot(() => (
-      rgbaMaskFromAlpha(expandedEditAlpha, pair.width, pair.height, true)
-    ));
-  }
+  const geometry = await withImageProcessingSlot(() => maskCompositeGeometry(pair));
+  // 模型获得完整的“核心 + 延展 + 外圈融合”区域；用户涂抹区不会成为硬裁切边界。
+  const providerMask = await withImageProcessingSlot(() => (
+    rgbaMaskFromAlpha(geometry.outerAlpha, pair.width, pair.height, true)
+  ));
+  const guide = await withImageProcessingSlot(() => (
+    maskRegionGuide(pair.sourceBuffer, geometry, pair.width, pair.height)
+  ));
   return {
     mask: toDataUrl(providerMask.toString("base64"), "image/png"),
+    guide: toDataUrl(guide.toString("base64"), "image/png"),
     size: `${dimensions.width}x${dimensions.height}`,
     ...dimensions,
+    expansionRadius: geometry.expansionRadius,
+    featherRadius: geometry.featherRadius,
   };
 }
 
-async function preserveGeneratedLayer(
-  sourceBuffer: Buffer,
-  generatedBuffer: Buffer,
-  editAlpha: Buffer,
+function histogramQuantile(histogram: Uint32Array, count: number, quantile: number, offset = 0): number {
+  if (count <= 0) return 0;
+  const target = Math.max(1, Math.ceil(count * quantile));
+  let seen = 0;
+  for (let index = 0; index < histogram.length; index += 1) {
+    seen += histogram[index];
+    if (seen >= target) return index - offset;
+  }
+  return histogram.length - 1 - offset;
+}
+
+function farFieldCorrection(
+  source: Buffer,
+  generated: Buffer,
+  outerAlpha: Buffer,
+): [number, number, number] {
+  const channelHistograms = [new Uint32Array(511), new Uint32Array(511), new Uint32Array(511)];
+  const pixelCount = outerAlpha.length;
+  const stride = Math.max(1, Math.ceil(pixelCount / 50_000));
+  let samples = 0;
+  for (let index = 0; index < pixelCount; index += stride) {
+    if (outerAlpha[index] !== 0) continue;
+    const offset = index * 4;
+    if (source[offset + 3] < 16 || generated[offset + 3] < 16) continue;
+    for (let channel = 0; channel < 3; channel += 1) {
+      channelHistograms[channel][generated[offset + channel] - source[offset + channel] + 255] += 1;
+    }
+    samples += 1;
+  }
+  return channelHistograms.map((histogram) => (
+    histogramQuantile(histogram, samples, 0.5, 255)
+  )) as [number, number, number];
+}
+
+function correctedChannel(value: number, drift: number): number {
+  return Math.max(0, Math.min(255, value - drift));
+}
+
+async function unifiedGeneratedLayer(
+  source: Buffer,
+  generated: Buffer,
+  geometry: MaskCompositeGeometry,
   width: number,
   height: number,
 ): Promise<Buffer> {
-  const [source, generated] = await Promise.all([
-    sharp(sourceBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer(),
-    sharp(generatedBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer(),
-  ]);
+  const drift = farFieldCorrection(source, generated, geometry.outerAlpha);
   const layer = Buffer.alloc(width * height * 4);
-  let editablePixels = 0;
-  let stronglyChangedPixels = 0;
+  let replacementWeight = 0;
+  let generatedReplacementAlpha = 0;
   for (let index = 0; index < width * height; index += 1) {
     const offset = index * 4;
-    const difference = Math.max(
-      Math.abs(generated[offset] - source[offset]),
-      Math.abs(generated[offset + 1] - source[offset + 1]),
-      Math.abs(generated[offset + 2] - source[offset + 2]),
-    );
-    const differenceAlpha = difference <= PRESERVE_DIFF_LOW
-      ? 0
-      : difference >= PRESERVE_DIFF_HIGH
-        ? 255
-        : Math.round(((difference - PRESERVE_DIFF_LOW) / (PRESERVE_DIFF_HIGH - PRESERVE_DIFF_LOW)) * 255);
-    const alpha = Math.min(generated[offset + 3], differenceAlpha);
-    layer[offset] = generated[offset];
-    layer[offset + 1] = generated[offset + 1];
-    layer[offset + 2] = generated[offset + 2];
-    layer[offset + 3] = alpha;
-    if (editAlpha[index] >= 128) {
-      editablePixels += 1;
-      if (alpha >= 250) stronglyChangedPixels += 1;
-    }
+    const correctedRed = correctedChannel(generated[offset], drift[0]);
+    const correctedGreen = correctedChannel(generated[offset + 1], drift[1]);
+    const correctedBlue = correctedChannel(generated[offset + 2], drift[2]);
+    const coreMix = geometry.coreAlpha[index] / 255;
+    // 核心区必须忠实采用模型的新内容；远场校色只用于防止外围底色漂移。
+    layer[offset] = Math.round(generated[offset] * coreMix + correctedRed * (1 - coreMix));
+    layer[offset + 1] = Math.round(generated[offset + 1] * coreMix + correctedGreen * (1 - coreMix));
+    layer[offset + 2] = Math.round(generated[offset + 2] * coreMix + correctedBlue * (1 - coreMix));
+    layer[offset + 3] = Math.round(geometry.blendAlpha[index] * generated[offset + 3] / 255);
+    replacementWeight += geometry.innerAlpha[index];
+    generatedReplacementAlpha += geometry.innerAlpha[index] * generated[offset + 3];
   }
-  if (editablePixels > 0 && stronglyChangedPixels / editablePixels > 0.92) {
+  if (replacementWeight > 0 && generatedReplacementAlpha / replacementWeight < 250) {
     throw new ProviderError(
-      "保持原图模式检测到选区几乎被整体替换，原图未被覆盖；请缩小选区、调整提示词或改用替换选区模式",
+      "AI 返回的完整修改区仍有透明缺口，已保留原图；请重试",
       502, "gpt-image-2", "invalid_response",
     );
   }
@@ -258,51 +406,40 @@ async function preserveGeneratedLayer(
 }
 
 /**
- * 保持模式只把模型返回的透明修改层叠加到原图；替换模式允许重绘选区。
- * 两种模式都使用扩张并羽化的安全带，避免新内容在核心选区边缘硬截断。
+ * 用户蒙版是修改意图核心，不是裁切框：核心外保留全强度延展区，最外圈再羽化回原图。
+ * 核心与完整延展区采用连续局部画面，清除冲突旧内容并只在最外圈羽化回原图。
  */
 export async function compositeMaskedEdit(
   sourceDataUrl: string,
   maskDataUrl: string,
   generatedDataUrl: string,
-  options: {
-    mode?: MaskCompositeMode;
-    expectedGeneratedSize?: { width: number; height: number };
-  } = {},
 ): Promise<string> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
   const generated = validateImageDataUrl(generatedDataUrl);
-  const mode = normalizeMaskCompositeMode(options.mode);
   return withImageProcessingSlot(async () => {
-    const generatedMeta = await sharp(generated.buffer, {
+    const generatedImage = sharp(generated.buffer, {
       animated: false, failOn: "error", limitInputPixels: MAX_MASK_PIXELS,
-    }).metadata();
-    const expected = options.expectedGeneratedSize ?? { width: pair.width, height: pair.height };
-    if (generatedMeta.width !== expected.width || generatedMeta.height !== expected.height) {
-      throw new ProviderError(
-        `AI 返回图片尺寸与请求不一致（请求 ${expected.width}x${expected.height}，返回 ${generatedMeta.width ?? "?"}x${generatedMeta.height ?? "?"}），无法安全执行蒙版外像素保护`,
-        502, "gpt-image-2", "invalid_response",
-      );
+    });
+    const generatedMeta = await generatedImage.metadata();
+    if (!generatedMeta.width || !generatedMeta.height) {
+      throw new ProviderError("无法读取 AI 返回图片尺寸", 502, "gpt-image-2", "invalid_response");
     }
-    const alignedGenerated = expected.width === pair.width && expected.height === pair.height
-      ? generated.buffer
+    // 输出以整幅画面为坐标系映射回源图；供应商返回尺寸不同不再把修改区当裁切框。
+    const alignedGenerated = generatedMeta.width === pair.width && generatedMeta.height === pair.height
+      ? await generatedImage.ensureAlpha().raw().toBuffer()
       : await sharp(generated.buffer, SHARP_MASK_INPUT)
         .resize({ width: pair.width, height: pair.height, fit: "fill" })
-        .png()
+        .ensureAlpha()
+        .raw()
         .toBuffer();
-    const editAlpha = await editableAlpha(pair, true);
-    const generatedLayer = mode === "preserve"
-      ? await preserveGeneratedLayer(pair.sourceBuffer, alignedGenerated, editAlpha, pair.width, pair.height)
-      : alignedGenerated;
-    const editMask = await rgbaMaskFromAlpha(editAlpha, pair.width, pair.height);
-    const editableLayer = await sharp(generatedLayer)
-      .ensureAlpha()
-      .composite([{ input: editMask, blend: "dest-in" }])
-      .png()
-      .toBuffer();
+    const source = await sharp(pair.sourceBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer();
+    const geometry = await maskCompositeGeometry(pair);
+    const generatedLayer = await unifiedGeneratedLayer(
+      source, alignedGenerated, geometry, pair.width, pair.height,
+    );
     const output = await sharp(pair.sourceBuffer)
       .ensureAlpha()
-      .composite([{ input: editableLayer, blend: "over" }])
+      .composite([{ input: generatedLayer, blend: "over" }])
       .png()
       .toBuffer();
     return toDataUrl(output.toString("base64"), "image/png");

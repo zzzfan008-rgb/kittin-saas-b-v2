@@ -9,8 +9,11 @@ import type {
   NodeKind,
   WorkflowNodeData,
 } from "../../src/types/workflow";
-import { NODE_SPECS } from "../../src/types/workflow";
-import { MAX_REFERENCE_IMAGES } from "../../src/types/workflow";
+import {
+  MASK_PIPELINE_VERSION,
+  MAX_REFERENCE_IMAGES,
+  NODE_SPECS,
+} from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
@@ -251,7 +254,8 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       return { prompt: data.prompt, count: data.count, ...modelFields() };
     case "mask-redraw":
       return {
-        prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef, maskMode: data.maskMode,
+        prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef,
+        maskPipelineVersion: MASK_PIPELINE_VERSION,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":

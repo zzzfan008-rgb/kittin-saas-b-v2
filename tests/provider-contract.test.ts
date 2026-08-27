@@ -226,7 +226,7 @@ async function main(): Promise<void> {
       try {
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].generate({ prompt: "禁止文生图" }),
-          /只能由蒙版局部重绘节点调用|仅用于带 PNG 蒙版的局部重绘|不支持文生图/,
+          /只能由局部修改节点调用|仅用于带 PNG 蒙版的局部修改|不支持文生图/,
         );
         assert.equal(calls, 0);
 
@@ -273,26 +273,24 @@ async function main(): Promise<void> {
         assert.equal(calls, 0);
 
         await apiyiProviders["gpt-image-2"].edit({
-          prompt: "局部改红", referenceImages: [blue], mask, modelOptions: { size: "1152x576" },
+          prompt: "局部改红", referenceImages: [blue], mask,
+          modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
         assert.equal(capturedForms[0].get("model"), "gpt-image-2");
         assert.equal(capturedForms[0].get("n"), null);
         assert.equal(capturedForms[0].get("size"), "1152x576");
         assert.equal(capturedForms[0].get("output_format"), "png");
-        assert.equal(capturedForms[0].get("background"), null);
+        assert.equal(
+          capturedForms[0].get("background"),
+          "opaque",
+          "统一局部修改必须请求完整不透明画面",
+        );
         assert.equal(capturedForms[0].get("response_format"), null);
         assert.equal(capturedForms[0].get("input_fidelity"), null);
         assert.ok(capturedForms[0].get("image[]") instanceof Blob);
         assert.equal(capturedForms[0].get("image"), null);
         assert.ok(capturedForms[0].get("mask") instanceof Blob);
-
-        await apiyiProviders["gpt-image-2"].edit({
-          prompt: "整体替换选区", referenceImages: [blue], mask, maskMode: "replace",
-          modelOptions: { size: "1152x576" },
-        });
-        assert.equal(calls, 2);
-        assert.equal(capturedForms[1].get("background"), null);
       } finally {
         restoreFetch();
       }
@@ -300,7 +298,7 @@ async function main(): Promise<void> {
 
     await test("蒙版外像素由服务端合成硬保护", async () => {
       await validateMaskForSource(blue, mask);
-      const output = await compositeMaskedEdit(blue, mask, red, { mode: "replace" });
+      const output = await compositeMaskedEdit(blue, mask, red);
       const decoded = await sharp(Buffer.from(output.split(",")[1], "base64"))
         .raw()
         .toBuffer({ resolveWithObject: true });

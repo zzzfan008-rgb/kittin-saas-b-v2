@@ -8,7 +8,6 @@ import {
   type PersistedWorkflowNode,
   type WorkflowNodeData,
   BATCH_SIZES,
-  MASK_COMPOSITE_MODES,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -194,13 +193,14 @@ function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<s
       return { prompt: "", outputImages: [], savedAsAssets: [], ...raw, ...migratedModelFields(kind, raw) };
     case "print-mutate":
       return { prompt: "", count: 4, outputImages: [], ...raw, ...migratedModelFields(kind, raw) };
-    case "mask-redraw":
+    case "mask-redraw": {
+      const { maskMode: _legacyMaskMode, ...migratedMaskData } = raw;
       return {
-        prompt: "", outputImages: [], ...raw,
-        maskMode: raw.maskMode === "replace" ? "replace" : "preserve",
+        prompt: "", outputImages: [], ...migratedMaskData,
         modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: defaultImageModelOptions(MASK_REDRAW_MODEL_ID),
       };
+    }
     case "result":
       return { images: [], ...raw };
   }
@@ -280,8 +280,6 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
       break;
     case "mask-redraw":
       stringValue(raw.prompt, `${path}.prompt`);
-      if (raw.maskMode === undefined) raw.maskMode = "preserve";
-      oneOf(raw.maskMode, MASK_COMPOSITE_MODES, `${path}.maskMode`);
       optionalMaskReference(raw.mask, `${path}.mask`);
       optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
       imageReferenceArray(raw.outputImages, `${path}.outputImages`);
@@ -290,6 +288,10 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
       imageReferenceArray(raw.images, `${path}.images`);
       optionalString(raw.note, `${path}.note`);
       break;
+  }
+  if (kind === "mask-redraw" && Object.hasOwn(raw, "maskMode")) {
+    const { maskMode: _legacyMaskMode, ...normalized } = raw;
+    return normalized as unknown as WorkflowNodeData;
   }
   return raw as unknown as WorkflowNodeData;
 }
@@ -326,11 +328,11 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   return { ...raw, id, source, target } as PersistedWorkflowEdge;
 }
 
-/** Validate untrusted JSON and migrate legacy unversioned/v0/v1 formats to v2. */
+/** Validate untrusted JSON and migrate legacy unversioned/v0/v1/v2 formats to v3. */
 export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   const raw = record(value, "flow");
   const version = raw.schemaVersion;
-  const migrateLegacy = version === undefined || version === 0 || version === 1;
+  const migrateLegacy = version === undefined || version === 0 || version === 1 || version === 2;
   if (!migrateLegacy && version !== WORKFLOW_SCHEMA_VERSION) {
     fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
   }

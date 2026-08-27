@@ -427,7 +427,7 @@ function readTemplates(sub: "builtin" | "user"): WorkflowTemplate[] {
 
 function readTemplateFile(filePath: string): WorkflowTemplate {
   const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
-  const isLegacyVersion = raw.schemaVersion === undefined || raw.schemaVersion === 0 || raw.schemaVersion === 1;
+  const isLegacyVersion = raw.schemaVersion === undefined || raw.schemaVersion === 0 || raw.schemaVersion === 1 || raw.schemaVersion === 2;
   if (!isLegacyVersion && raw.schemaVersion !== WORKFLOW_SCHEMA_VERSION) {
     throw new WorkflowValidationError(`unsupported template schemaVersion: ${String(raw.schemaVersion)}`);
   }

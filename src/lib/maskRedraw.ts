@@ -6,7 +6,7 @@ export interface MaskRedrawReadinessInput {
 }
 
 /**
- * 蒙版保存后即可进入“局部重绘”动作；提示词在点击时单独校验并就地提示。
+ * 蒙版保存后即可进入“局部修改”动作；提示词在点击时单独校验并就地提示。
  * 这样按钮状态只表达蒙版是否就绪，不再把缺失原因藏在 disabled 中。
  */
 export function maskRedrawReadiness({

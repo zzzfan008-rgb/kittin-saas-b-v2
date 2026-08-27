@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "reviewedOn": "2026-08-20",
+  "reviewedOn": "2026-08-26",
   "baseUrl": "https://api.apiyi.com",
   "runtime": {
     "upstreamMode": "synchronous",
@@ -27,7 +27,7 @@
     {
       "id": "gpt-image-2",
       "upstreamModelId": "gpt-image-2",
-      "label": "GPT Image 2 局部重绘",
+      "label": "GPT Image 2 局部修改",
       "channel": "official",
       "allowedNodeKinds": ["mask-redraw"],
       "timeoutMs": 360000,
@@ -41,12 +41,25 @@
         "multipleImageField": "image[]",
         "mask": {
           "required": true,
+          "pipelineVersion": 3,
           "mimeTypes": ["image/png"],
           "maxBytes": 4194304,
           "requiresAlpha": true,
           "mustMatchFirstImageDimensions": true,
           "editableAlpha": 0,
-          "preservedAlpha": 255
+          "preservedAlpha": 255,
+          "userSelectionSemantics": "semantic-core-not-crop",
+          "providerExpansionAllowed": true,
+          "finalPixelProtection": "local-adaptive-blend-window"
+        },
+        "background": {
+          "supportedValues": ["auto", "opaque", "transparent"],
+          "transparentStatus": "preview",
+          "transparentOutputFormats": ["png", "webp"],
+          "projectOutputFormat": "png",
+          "projectRequestValue": "opaque",
+          "projectResponseConvention": "full-canvas-edited-image",
+          "projectCompositePolicy": "unified-local-adaptive-blend-with-exact-outside-protection"
         }
       },
       "dimensions": {"multipleOf": 16, "minSide": 16, "maxSide": 3840, "minPixels": 655360, "maxPixels": 8294400, "maxAspectRatio": 3},

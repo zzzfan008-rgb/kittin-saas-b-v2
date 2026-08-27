@@ -1,5 +1,9 @@
 import sharp from "sharp";
-import type { AIProvider, ImageGenRequest, ImageGenResult } from "../../src/types/workflow";
+import {
+  type AIProvider,
+  type ImageGenRequest,
+  type ImageGenResult,
+} from "../../src/types/workflow";
 import {
   defaultImageModelOptions,
   getImageModelContract,
@@ -364,7 +368,7 @@ export async function validateApiyiRequest(
   refs.forEach((ref) => parsedReference(ref, modelId));
   if (modelId === "gpt-image-2") {
     if (mode !== "edit" || !req.mask) {
-      throw new ProviderError("gpt-image-2 仅用于带 PNG 蒙版的局部重绘", 400, modelId, "invalid_request");
+      throw new ProviderError("gpt-image-2 仅用于带 PNG 蒙版的局部修改", 400, modelId, "invalid_request");
     }
     await validateMaskForSource(refs[0], req.mask, modelId);
   } else if (req.mask) {
@@ -380,7 +384,7 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
   let response: Response;
   switch (modelId) {
     case "gpt-image-2":
-      throw new ProviderError("gpt-image-2 只能由蒙版局部重绘节点调用", 400, modelId, "invalid_request");
+      throw new ProviderError("gpt-image-2 只能由局部修改节点调用", 400, modelId, "invalid_request");
     case "gpt-image-2-vip":
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
@@ -452,6 +456,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         appendImages(form, refs, modelId);
         const mask = parseDataUrl(req.mask!);
         form.append("mask", new Blob([new Uint8Array(mask.buffer)], { type: "image/png" }), "mask.png");
+        form.append("background", "opaque");
         form.append("output_format", "png");
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
       });

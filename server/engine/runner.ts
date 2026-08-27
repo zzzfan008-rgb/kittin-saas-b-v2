@@ -11,7 +11,6 @@ import {
   type AIProvider,
   type NodeExecution,
   type NodeRunStatus,
-  normalizeMaskCompositeMode,
 } from "../../src/types/workflow";
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
@@ -101,6 +100,17 @@ const DEFAULT_PROMPTS: Partial<Record<NodeExecution["kind"], string>> = {
   "ai-modify": "在保持整体版型不变的前提下，优化服装细节设计",
   "fabric-recolor": "保持服装款式、细节、光影与背景不变，仅替换面料质感",
 };
+
+function maskReferenceRolePrompt(userReferenceCount: number): string {
+  const guideIndex = userReferenceCount + 1;
+  if (userReferenceCount <= 1) {
+    return "参考图1是完整原图；最后一张参考图（参考图2）是区域引导图";
+  }
+  const userReferences = userReferenceCount === 2
+    ? "参考图2是用户提供的目标内容参考图"
+    : `参考图2至参考图${userReferenceCount}是用户提供的目标内容参考图`;
+  return `参考图1是完整原图；${userReferences}，用户提示词中的图号始终对应这些用户参考图；最后一张参考图（参考图${guideIndex}）才是区域引导图`;
+}
 
 interface Run {
   id: string;
@@ -377,8 +387,11 @@ export async function executeStep(
         referenceImages.push(...(await resolveImageRefs([fabricImageUrl])));
       }
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-      if (referenceImages.length > maxReferences) {
-        throw new Error(`Node ${step.nodeId} accepts at most ${maxReferences} reference images for ${modelId}`);
+      const maxUserReferences = step.kind === "mask-redraw"
+        ? Math.max(1, maxReferences - 1)
+        : maxReferences;
+      if (referenceImages.length > maxUserReferences) {
+        throw new Error(`Node ${step.nodeId} accepts at most ${maxUserReferences} user reference images for ${modelId}`);
       }
 
       const extra = ((step.params.prompt as string) ?? "").trim();
@@ -467,6 +480,9 @@ export async function executeStep(
         };
       }
 
+      const maskReferenceRoles = step.kind === "mask-redraw"
+        ? maskReferenceRolePrompt(referenceImages.length)
+        : undefined;
       const prompt =
         step.kind === "upscale"
           ? "将这张服装效果图放大为超高清版本，增强面料纹理、走线与边缘细节，保持原有构图、色彩和光影完全不变"
@@ -474,31 +490,26 @@ export async function executeStep(
             ? "提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用" +
               (extra ? `。补充要求：${extra}` : "")
             : step.kind === "mask-redraw"
-              ? (() => {
-                  const mode = normalizeMaskCompositeMode(step.params.maskMode);
-                  return mode === "preserve"
-                    ? `在蒙版允许范围内完成以下修改：${extra}。返回完整图片，严格保持原图底色、材质、纹理、褶皱、光影、摄影背景、构图和未指定元素不变，只新增明确要求的视觉内容。新增内容必须完整位于可编辑范围内并预留边缘安全距离，禁止整体重绘或填满选区。`
-                    : `只在蒙版允许范围内完成以下修改：${extra}。保持蒙版外内容不变；需要新增的图案或结构必须完整位于可编辑范围内并预留边缘安全距离，避免主体贴边或被截断。`;
-                })()
+              ? `目标修改：${extra}。${maskReferenceRoles}，其中红色表示用户涂抹的修改核心，红色已完全遮住旧内容，只用于表达位置；金色表示仅供完整轮廓延展和边缘融合的缓冲区；两者都是修改范围，不是裁切框。请根据用户说明在红色核心内添加、替换、删除或调整内容。凡用户要求替换、删除或改变既有对象时，必须先彻底清除与目标冲突的旧对象、旧包带、旧颜色、旧阴影、旧反光、旧纹理和残留边线，再依据周围连续的面料纹理、颜色、褶皱、缝线和光照完整重建被遮挡的底层服装或背景，然后放入新内容；禁止用模糊、暗斑、色块、漂浮投影或半透明残影遮盖清理区域。只有与新内容真实接触并符合整幅画面光源方向的阴影才可保留。不需要修改的服装结构、面料纹理和光影必须保持。结合整幅画面的构图、服装比例和视觉重量，新内容默认继承目标区域的中心位置与近似占位，除非用户明确要求，不得明显放大、缩小或偏移。只有完整轮廓、褶皱、缝线、阴影、反光和自然遮挡所必需的部分可以进入金色缓冲区，不得沿红色边缘截断，也不得覆盖缓冲区内的文字、独立图案、配饰或其他服装结构。交接处必须匹配原图的面料材质、纹理方向、褶皱、光影、透视、遮挡和清晰度，不得出现重影、透色、硬边或颜色污染。返回与整幅画面同尺寸、同坐标的 PNG 完整最终图片；修改范围以外的画面保持原状。`
               : extra || DEFAULT_PROMPTS[step.kind] || NODE_SPECS[step.kind].description;
       if (step.kind === "mask-redraw" && !extra) {
-        throw new Error("蒙版局部重绘必须填写修改说明");
+        throw new Error("局部修改必须填写修改说明");
       }
       const maskReference = step.kind === "mask-redraw" ? step.params.mask : undefined;
       if (step.kind === "mask-redraw" && (typeof maskReference !== "string" || !maskReference)) {
-        throw new Error("蒙版局部重绘必须先保存 PNG 蒙版");
+        throw new Error("局部修改必须先保存 PNG 蒙版");
       }
       const mask = typeof maskReference === "string" ? await normalizeImageRef(maskReference) : undefined;
-      const maskMode = step.kind === "mask-redraw"
-        ? normalizeMaskCompositeMode(step.params.maskMode)
-        : undefined;
       const preparedMask = step.kind === "mask-redraw"
         ? await prepareMaskForGeneration(referenceImages[0], mask!)
         : undefined;
       const providerMask = preparedMask?.mask ?? mask;
+      const providerReferenceImages = preparedMask
+        ? [referenceImages[0], ...referenceImages.slice(1), preparedMask.guide]
+        : referenceImages;
       const request = {
         prompt,
-        referenceImages: referenceImages.length ? referenceImages : undefined,
+        referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
         aspectRatio: step.kind === "sketch-to-render" || step.kind === "ai-modify"
           ? normalizeExactAspectRatio(step.params.aspectRatio)
           : step.params.aspectRatio as string | undefined,
@@ -506,7 +517,6 @@ export async function executeStep(
         imageSize: step.kind === "upscale" ? normalizeUpscaleSize(step.params.imageSize) : undefined,
         modelOptions: preparedMask ? { ...modelOptions, size: preparedMask.size } : modelOptions,
         mask: providerMask,
-        maskMode,
       };
       const requestedCount = step.kind === "sketch-to-render" || step.kind === "ai-modify"
         ? Math.max(1, Math.min(8, Number(step.params.batchSize) || 1))
@@ -519,12 +529,7 @@ export async function executeStep(
       );
       const providerImages = step.kind === "mask-redraw"
         ? await Promise.all(result.images.map((image) => (
-            compositeMaskedEdit(referenceImages[0], mask!, image, {
-              mode: maskMode,
-              expectedGeneratedSize: preparedMask
-                ? { width: preparedMask.width, height: preparedMask.height }
-                : undefined,
-            })
+            compositeMaskedEdit(referenceImages[0], mask!, image)
           )))
         : result.images;
       const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);
