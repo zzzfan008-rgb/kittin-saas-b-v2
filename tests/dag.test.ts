@@ -262,6 +262,36 @@ async function main() {
     assert.throws(() => assertPlanInputs(invalid, nineEdges), /at most 8 reference images/);
   });
 
+  await ok("局部修改在入队前拒绝会占满引导图名额的 8 张用户参考图", () => {
+    const references = Array.from({ length: 8 }, (_, index) => `/api/files/mask-ref-${index + 1}.png`);
+    const upstream = aiNode("mask-upstream", "ai-modify", references);
+    const maskNode: FlowNode = {
+      id: "mask-target",
+      type: "mask-redraw",
+      data: {
+        kind: "mask-redraw",
+        label: "局部修改",
+        status: "idle",
+        prompt: "修改衣袖",
+        mask: MASK_DATA_URL,
+        maskSourceRef: references[0],
+        outputImages: [],
+        modelId: "gpt-image-2",
+        modelOptions: {},
+      } as WorkflowNodeData as FlowNode["data"],
+    };
+    const maskEdge = edge(upstream.id, maskNode.id);
+    const plan = buildExecutionPlan([upstream, maskNode], [maskEdge], {
+      onlyNodeId: maskNode.id,
+      includeDownstream: false,
+    });
+
+    assert.throws(
+      () => assertPlanInputs(plan, [maskEdge]),
+      /at most 7 user reference images/,
+    );
+  });
+
   await ok("环检测：A↔B 抛 DagError", () => {
     assert.throws(
       () => buildExecutionPlan([aiNode("a"), aiNode("b")], [edge("a", "b"), edge("b", "a")]),

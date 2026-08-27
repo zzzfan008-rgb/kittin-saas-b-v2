@@ -654,6 +654,27 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     const parameters = JSON.parse(storedRun?.parameters_json ?? "{}") as Record<string, unknown>;
     assert.equal(parameters.maskMode, undefined);
     assert.equal(parameters.maskPipelineVersion, 3);
+
+    const overLimitResponse = await fetch(`http://127.0.0.1:${address.port}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientRequestId: "direct-mask-over-limit",
+        modelId: "gpt-image-2",
+        kind: "mask-redraw",
+        nodeId: "direct-mask-over-limit",
+        request: {
+          prompt: "局部修改",
+          referenceImages: Array.from({ length: 8 }, () => PNG_DATA_URL),
+          mask: PNG_DATA_URL,
+          modelOptions: {},
+        },
+      }),
+    });
+    const overLimitBody = await overLimitResponse.json() as { error?: string };
+    assert.equal(overLimitResponse.status, 400);
+    assert.match(overLimitBody.error ?? "", /at most 7 user images/);
+
     await database.query("DELETE FROM generation_runs WHERE id = $1", [body.runId]);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

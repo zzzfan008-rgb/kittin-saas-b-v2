@@ -30,6 +30,8 @@ export type NodeRunStatus =
 
 /** OpenAI Images Edit 最多支持 16 图；产品端为控制成本与上传体积限制为 8 图。 */
 export const MAX_REFERENCE_IMAGES = 8;
+/** 局部修改会由服务端追加 1 张区域引导图，因此用户最多提供 7 张参考图。 */
+export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
 export const BATCH_SIZES = [1, 2, 4, 8] as const;
@@ -345,7 +347,7 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     description: "涂抹需要修改的区域并描述要添加、替换或调整的内容",
     providerId: "apiyi",
     // GPT Image 2 最多接收 8 张图，其中最后一张由服务端保留给区域引导图。
-    inputs: MAX_REFERENCE_IMAGES - 1,
+    inputs: MAX_MASK_USER_REFERENCE_IMAGES,
     outputs: "images",
   },
   result: {

@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
 import {
   NODE_SPECS,
+  MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   type ExecutionPlan,
   type AIProvider,
@@ -233,8 +234,11 @@ async function executeRun(run: Run): Promise<void> {
       (u) => outputs.get(u.nodeId) ?? u.images,
     );
 
-    if (NODE_SPECS[step.kind].providerId && inputImages.length > MAX_REFERENCE_IMAGES) {
-      const message = `Node ${step.nodeId} accepts at most ${MAX_REFERENCE_IMAGES} reference images`;
+    const runtimeInputLimit = step.kind === "mask-redraw"
+      ? MAX_MASK_USER_REFERENCE_IMAGES
+      : MAX_REFERENCE_IMAGES;
+    if (NODE_SPECS[step.kind].providerId && inputImages.length > runtimeInputLimit) {
+      const message = `Node ${step.nodeId} accepts at most ${runtimeInputLimit}${step.kind === "mask-redraw" ? " user" : ""} reference images`;
       await failRun(message, step.nodeId);
       return;
     }
@@ -388,7 +392,7 @@ export async function executeStep(
       }
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
       const maxUserReferences = step.kind === "mask-redraw"
-        ? Math.max(1, maxReferences - 1)
+        ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
         : maxReferences;
       if (referenceImages.length > maxUserReferences) {
         throw new Error(`Node ${step.nodeId} accepts at most ${maxUserReferences} user reference images for ${modelId}`);

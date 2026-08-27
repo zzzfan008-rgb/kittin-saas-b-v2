@@ -157,6 +157,34 @@ async function main() {
     assert.equal((normalized.nodes[0].data as Record<string, unknown>).maskMode, undefined);
   });
 
+  await test("v2 蒙版节点的 8 路历史输入可迁移、保存并再次读取", () => {
+    const legacyMaskFlow = maskFlow(PNG_DATA_URL);
+    for (let index = 0; index < 8; index += 1) {
+      legacyMaskFlow.nodes.push({
+        id: `legacy-ref-${index}`,
+        type: "image-input",
+        position: { x: -200, y: index * 80 },
+        data: {
+          kind: "image-input",
+          label: `历史参考图 ${index + 1}`,
+          status: "idle",
+          imageRole: "reference",
+          imageUrl: PNG_DATA_URL,
+        },
+      } as never);
+      legacyMaskFlow.edges.push({
+        id: `legacy-edge-${index}`,
+        source: `legacy-ref-${index}`,
+        target: "mask",
+      } as never);
+    }
+
+    const migrated = validateAndMigrateFlow(legacyMaskFlow);
+    assert.equal(migrated.schemaVersion, 3);
+    assert.equal(migrated.edges.length, 8);
+    assert.deepEqual(validateAndMigrateFlow(migrated), migrated);
+  });
+
   await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {
     const normalized = validateAndMigrateFlow({
       schemaVersion: 2,

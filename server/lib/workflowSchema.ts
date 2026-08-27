@@ -359,10 +359,15 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   }
   for (const node of nodes) {
     const incomingCount = edges.filter((edge) => edge.target === node.id).length;
-    if (incomingCount > NODE_SPECS[node.type].inputs) {
+    // v2 曾允许蒙版节点保存 8 路输入。持久化层继续容忍这类历史文档，
+    // 但新建连线和运行前检查仍按 7 张用户参考图限制，提示用户移除一张后再运行。
+    const persistedInputLimit = node.type === "mask-redraw"
+      ? MAX_REFERENCE_IMAGES
+      : NODE_SPECS[node.type].inputs;
+    if (incomingCount > persistedInputLimit) {
       fail(
         "flow.edges",
-        `node ${node.id} accepts at most ${NODE_SPECS[node.type].inputs} incoming image connections`,
+        `node ${node.id} accepts at most ${persistedInputLimit} incoming image connections`,
       );
     }
     if (NODE_SPECS[node.type].providerId && incomingCount > MAX_REFERENCE_IMAGES) {
