@@ -24,6 +24,10 @@ import { asyncHandler } from "./lib/asyncHandler";
 import { mountProductionFrontend } from "./lib/staticFrontend";
 import type { ErrorRequestHandler } from "express";
 import { startGenerationWorker } from "./engine/runQueue";
+import {
+  migrateLegacyUserTemplateOwners,
+  reconcileUserTemplateAccountMutations,
+} from "./lib/userTemplateLifecycle";
 
 const app = express();
 
@@ -123,6 +127,8 @@ async function start(): Promise<void> {
   await initializeDatabase();
   await pruneExpiredSessions();
   await migrateLegacyData();
+  await migrateLegacyUserTemplateOwners();
+  await reconcileUserTemplateAccountMutations();
   const initialReadiness = await readiness();
   if (!initialReadiness.ok) throw new Error(`Server is not ready: ${JSON.stringify(initialReadiness.checks)}`);
   const sessionPruneTimer = setInterval(() => {

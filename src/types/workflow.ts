@@ -229,6 +229,8 @@ export interface ExecutionPlan {
 export interface WorkflowTemplate {
   schemaVersion: WorkflowSchemaVersion;
   id: string;
+  /** 用户模板所有者；内置模板不设置。服务端据此执行账号隔离。 */
+  ownerId?: string;
   name: string;
   description: string;
   /** 内置模板（随部署预置，不可删） */

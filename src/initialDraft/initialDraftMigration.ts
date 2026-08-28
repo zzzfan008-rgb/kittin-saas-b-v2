@@ -23,6 +23,20 @@ export function bootstrapNeedsFreshProjectIdentity(
   );
 }
 
+/**
+ * 没有可信本地页签时，优先恢复最近正式项目；只有空白初始草稿存在且没有正式项目时，
+ * 才继续进入初始草稿。带有未保存内容的服务端草稿仍由调用方优先恢复。
+ */
+export function shouldRestoreSavedProjectOnStartup(
+  local: ProjectTab | null,
+  server: ServerInitialDraftSnapshot | null,
+  savedProjectCount: number,
+): boolean {
+  return local === null && savedProjectCount > 0 && (
+    server === null || isServerInitialDraftPristine(server)
+  );
+}
+
 /** 只有 Auth owner 已证明时才接管旧本地草稿；已标记的 initial_draft 优先。 */
 export function selectLocalInitialDraftCandidate(
   tabs: ProjectTab[],

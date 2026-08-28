@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { PlusIcon, SaveIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import {
   flushActiveTextEdit,
   projectTabLifecycle,
@@ -7,6 +11,7 @@ import {
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { isNodeRunActive } from "@/types/workflow";
 import { useInitialDraftWorkspace } from "@/initialDraft/InitialDraftWorkspace";
+import { ProjectCenter } from "./ProjectCenter";
 
 function hasRunningNode(tab: ProjectTab): boolean {
   return tab.nodes.some((node) => isNodeRunActive(node.data.status));
@@ -17,9 +22,68 @@ export function ProjectTabs() {
   const activeTabId = useFlowStore((state) => state.activeTabId);
   const switchTab = useFlowStore((state) => state.switchTab);
   const closeTab = useFlowStore((state) => state.closeTab);
-  const createBlankTab = useFlowStore((state) => state.createBlankTab);
+  const saveProject = useFlowStore((state) => state.saveProject);
+  const [projectCenterOpen, setProjectCenterOpen] = useState(false);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
+  const renameComposingRef = useRef(false);
+  const projectNameEdit = useCoalescedTextEdit(
+    editingTabId === activeTabId ? { kind: "project-name" } : null,
+  );
   const runReconciliationBlockReason = useGenerationSafetyBlockReason();
   const { abandon, abandoningTabId } = useInitialDraftWorkspace();
+
+  useEffect(() => {
+    if (!editingTabId) return;
+    const frame = requestAnimationFrame(() => {
+      editingInputRef.current?.focus();
+      editingInputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editingTabId]);
+
+  const finishRename = async (persist: boolean) => {
+    if (renameComposingRef.current) return;
+    projectNameEdit.flush();
+    if (persist) {
+      setRenameError(null);
+      const saved = await saveProject();
+      if (!saved) {
+        setRenameError("保存失败，请检查网络后重试");
+        requestAnimationFrame(() => editingInputRef.current?.focus());
+        return;
+      }
+    }
+    renameComposingRef.current = false;
+    setRenameError(null);
+    setEditingTabId(null);
+  };
+
+  const beginRename = (tab: ProjectTab) => {
+    if (tab.readOnly) return;
+    if (tab.id !== activeTabId) switchTab(tab.id);
+    renameComposingRef.current = false;
+    setRenameError(null);
+    setEditingTabId(tab.id);
+  };
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const composing = event.nativeEvent.isComposing || renameComposingRef.current;
+    if (event.key === "Escape" && !composing) {
+      event.preventDefault();
+      projectNameEdit.cancel();
+      renameComposingRef.current = false;
+      setRenameError(null);
+      setEditingTabId(null);
+      return;
+    }
+    projectNameEdit.bind.onKeyDown(event);
+    if (event.key === "Enter" && !composing) {
+      event.preventDefault();
+      void finishRename(true);
+    }
+  };
 
   const requestClose = async (tab: ProjectTab) => {
     flushActiveTextEdit();
@@ -58,61 +122,122 @@ export function ProjectTabs() {
   };
 
   return (
-    <nav
-      aria-label="项目画布页签"
-      className="gc-panel flex h-9 shrink-0 items-end gap-1 overflow-x-auto border-b border-[#262626] bg-[#101010] px-2 pt-1"
-    >
-      {tabs.map((tab) => {
-        const active = tab.id === activeTabId;
-        const running = hasRunningNode(tab);
-        return (
-          <div
-            key={tab.id}
-            className={`group flex h-8 min-w-[148px] max-w-[240px] items-center rounded-t-md border border-b-0 px-2 transition-colors ${
-              active
-                ? "border-[#343434] bg-[#1a1a1a] text-neutral-100"
-                : "border-transparent bg-[#141414] text-neutral-500 hover:bg-[#191919] hover:text-neutral-300"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => switchTab(tab.id)}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-              title={tab.projectName}
+    <>
+      <nav
+        aria-label="项目画布页签"
+        className="gc-panel flex h-10 min-w-[1024px] shrink-0 items-end gap-1 overflow-x-auto border-b border-[var(--gc-border)] bg-[var(--gc-shell)] px-3 pt-1"
+      >
+        {tabs.map((tab) => {
+          const active = tab.id === activeTabId;
+          const editing = active && editingTabId === tab.id;
+          const running = hasRunningNode(tab);
+          return (
+            <div
+              key={tab.id}
+              className={`group flex h-9 min-w-[172px] max-w-[280px] items-center rounded-t-lg border border-b-0 px-2 transition-colors ${
+                active
+                  ? "border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text)]"
+                  : "border-transparent bg-[var(--gc-panel-soft)] text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel)] hover:text-[var(--gc-text)]"
+              }`}
             >
               <span
-                className={`h-2 w-2 shrink-0 rounded-full ${
+                aria-hidden="true"
+                className={`mr-2 size-2 shrink-0 rounded-full ${
                   running
                     ? "animate-pulse bg-blue-400"
                     : tab.dirty
-                      ? "bg-gold"
-                      : "bg-neutral-700"
+                      ? "bg-[var(--gc-accent)]"
+                      : "bg-neutral-600"
                 }`}
               />
-              <span className="truncate text-[11px]">{tab.projectName}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void requestClose(tab)}
-              disabled={abandoningTabId === tab.id}
-              aria-label={`关闭 ${tab.projectName}`}
-              title="关闭页签"
-              className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-neutral-600 hover:bg-white/5 hover:text-neutral-300 disabled:cursor-wait disabled:opacity-40"
-            >
-              ×
-            </button>
-          </div>
-        );
-      })}
-      <button
-        type="button"
-        onClick={createBlankTab}
-        aria-label="新建空白项目页签"
-        title="新建空白项目"
-        className="mb-1 flex h-7 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-lg text-neutral-500 hover:border-[#333] hover:bg-[#191919] hover:text-gold"
-      >
-        +
-      </button>
-    </nav>
+
+              {editing ? (
+                <div className="relative flex min-w-0 flex-1 items-center rounded-md border border-[var(--gc-accent)] bg-[var(--gc-control)] pl-2">
+                  <input
+                    ref={editingInputRef}
+                    value={tab.projectName}
+                    onChange={projectNameEdit.bind.onChange}
+                    onBlur={(event) => {
+                      projectNameEdit.bind.onBlur(event);
+                      renameComposingRef.current = false;
+                      setRenameError(null);
+                      setEditingTabId(null);
+                    }}
+                    onCompositionStart={(event) => {
+                      renameComposingRef.current = true;
+                      projectNameEdit.bind.onCompositionStart(event);
+                    }}
+                    onCompositionEnd={(event) => {
+                      projectNameEdit.bind.onCompositionEnd(event);
+                      renameComposingRef.current = false;
+                    }}
+                    onKeyDown={handleRenameKeyDown}
+                    onKeyUp={projectNameEdit.bind.onKeyUp}
+                    aria-label="项目名称"
+                    className="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-[var(--gc-text)] outline-hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    disabled={tab.readOnly || tab.saveState === "saving"}
+                    aria-label="保存项目名称和画布"
+                    title="保存（Enter）"
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => void finishRename(true)}
+                    className="rounded-l-none text-[var(--gc-accent)] hover:bg-[var(--gc-panel-hover)]"
+                  >
+                    <SaveIcon aria-hidden="true" className="size-3" />
+                  </Button>
+                  {renameError && (
+                    <span
+                      role="alert"
+                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-[9px] text-red-200 shadow-lg"
+                    >
+                      {renameError}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => switchTab(tab.id)}
+                  onDoubleClick={() => beginRename(tab)}
+                  className="min-w-0 flex-1 truncate text-left text-[11px]"
+                  title={tab.readOnly ? `${tab.projectName}（只读）` : `${tab.projectName} · 双击重命名`}
+                >
+                  {tab.projectName}
+                </button>
+              )}
+
+              {!editing && (
+                <button
+                  type="button"
+                  onClick={() => void requestClose(tab)}
+                  disabled={abandoningTabId === tab.id}
+                  aria-label={`关闭 ${tab.projectName}`}
+                  title="关闭页签"
+                  className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-[var(--gc-text-muted)] hover:bg-white/5 hover:text-[var(--gc-text)] disabled:cursor-wait disabled:opacity-40"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setProjectCenterOpen(true)}
+          aria-label="打开项目中心"
+          title="新建或打开项目"
+          className="mb-1 text-[var(--gc-text-muted)] hover:text-[var(--gc-accent)]"
+        >
+          <PlusIcon aria-hidden="true" className="size-4" />
+        </Button>
+      </nav>
+      <ProjectCenter open={projectCenterOpen} onOpenChange={setProjectCenterOpen} />
+    </>
   );
 }

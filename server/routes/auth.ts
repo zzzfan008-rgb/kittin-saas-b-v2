@@ -16,6 +16,10 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { db, query, queryOne, transaction } from "../lib/database";
 import { hashPassword, validatePassword, verifyPassword } from "../lib/password";
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
+import {
+  prepareUserTemplateAccountMutation,
+  reconcileUserTemplateAccountMutations,
+} from "../lib/userTemplateLifecycle";
 
 export const authRouter = Router();
 
@@ -320,9 +324,25 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
         );
       }
     }
+    const templateMutation = prepareUserTemplateAccountMutation({
+      sourceOwnerId: req.params.id,
+      sourceDeletedAt: nowIso,
+      ...(transferToUserId
+        ? { transferToOwnerId: transferToUserId }
+        : { deletedAt: nowIso, purgeAfter }),
+    });
+    templateMutation.apply();
     await client.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
     await client.query("UPDATE users SET active = 0, deleted_at = $1, updated_at = $1 WHERE id = $2", [nowIso, req.params.id]);
     return { status: "ok" as const };
+  }).catch(async (error) => {
+    await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
+      console.error("[garment-canvas] failed to reconcile user template ownership mutation", reconcileError);
+    });
+    throw error;
+  });
+  await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
+    console.error("[garment-canvas] failed to finalize user template ownership mutation", reconcileError);
   });
   if (outcome.status === "source_changed") {
     res.status(404).json({ error: "用户不存在或状态已变化，请刷新后重试" });

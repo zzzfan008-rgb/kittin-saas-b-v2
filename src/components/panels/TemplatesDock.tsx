@@ -251,7 +251,7 @@ export function TemplatesDock() {
   );
 }
 
-function SaveTemplateForm({
+export function SaveTemplateForm({
   open,
   onOpenChange,
   onSaved,
@@ -319,11 +319,11 @@ function SaveTemplateForm({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/60" />
+        <Dialog.Backdrop className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm" />
         <Dialog.Popup
           initialFocus={initialFocusRef}
           finalFocus={finalFocusRef}
-          className="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-[#262626] bg-[#141414] p-4 shadow-2xl"
+          className="fixed left-1/2 top-1/2 z-[71] w-72 -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-[#262626] bg-[#141414] p-4 shadow-2xl"
         >
         <Dialog.Title className="text-xs font-medium text-neutral-200">存为模板</Dialog.Title>
         <label className="block space-y-1">

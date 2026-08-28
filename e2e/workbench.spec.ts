@@ -60,6 +60,66 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
 });
 
+test("project center separates built-in and user templates and keeps template actions reachable", async ({ page }, testInfo) => {
+  const templateName = `E2E 我的模板 ${testInfo.project.name}`;
+  const createResponse = await page.request.post("/api/templates", {
+    data: {
+      name: templateName,
+      description: "验证我的模板入口、保存入口与删除确认层级",
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [],
+        edges: [],
+      },
+    },
+  });
+  expect(createResponse.ok(), await createResponse.text()).toBeTruthy();
+
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+
+  await center.getByRole("tab", { name: "内置模板" }).click();
+  await expect(center.getByText("文生图（服装设计）", { exact: true })).toBeVisible();
+  await expect(center.getByText(templateName)).toHaveCount(0);
+
+  await center.getByRole("tab", { name: "我的模板" }).click();
+  await expect(center.getByRole("button", { name: "保存当前画布为模板" })).toBeVisible();
+  await expect(center.getByText(templateName)).toBeVisible();
+  await expect(center.getByText("文生图（服装设计）")).toHaveCount(0);
+
+  await center.getByRole("button", { name: "保存当前画布为模板" }).click();
+  const saveDialog = page.getByRole("dialog", { name: "存为模板" });
+  await expect(saveDialog).toBeVisible();
+  await saveDialog.getByRole("button", { name: "取消" }).click();
+  await expect(saveDialog).toBeHidden();
+
+  await center.getByRole("button", { name: `管理模板 ${templateName}` }).click();
+  await page.getByRole("menuitem", { name: "删除模板" }).click();
+  const deleteDialog = page.getByRole("alertdialog", { name: `删除“${templateName}”？` });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "保留模板" }).click();
+  await expect(deleteDialog).toBeHidden();
+  await expect(center.getByText(templateName)).toBeVisible();
+});
+
+test("project center keeps projects usable when template loading fails", async ({ page }) => {
+  await page.route("**/api/templates", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ status: 500, json: { error: "template fixture unavailable" } });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+  await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
+  await expect(center.getByRole("alert")).toContainText("模板 HTTP 500");
+  await expect(center.getByText("正在加载模板")).toHaveCount(0);
+});
+
 test("adding a local edit node keeps the canvas mounted and exposes one clear workflow", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -322,45 +382,20 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
     }
     await route.fallback();
   });
-  const templatesToggle = page.getByRole("button", { name: /模板库/ });
-  await templatesToggle.click();
-  await expect(templatesToggle).toHaveAttribute("aria-expanded", "true");
-  const templatesPanel = page.getByRole("region", { name: "工作流模板" });
-  await expect(templatesPanel).toBeVisible();
-  const templateCards = templatesPanel.getByTitle("从模板新建");
-  await expect(templateCards).toHaveCount(TEMPLATE_FIXTURES.length);
-  await expect(templateCards.first()).toBeVisible();
-  const expectedTemplatesWidth = Math.min(660, canvasRect.width - 16);
-  await expect.poll(async () => (
-    Math.abs((await rect(templatesPanel)).width - expectedTemplatesWidth)
-  )).toBeLessThanOrEqual(1);
-  const templatesPanelRect = await rect(templatesPanel);
-  expectInside(templatesPanelRect, canvasRect);
-  expect(templatesPanelRect.left).toBeGreaterThanOrEqual(canvasRect.left + 7);
-  expect(templatesPanelRect.right).toBeLessThanOrEqual(canvasRect.right - 7);
-  const templatesScroller = templatesPanel.locator('[data-slot="templates-scroll-area"]');
-  expect(await templatesScroller.evaluate(
-    (element) => element.scrollWidth <= element.clientWidth + 1,
-  )).toBe(true);
-  const templateGrid = templatesPanel.locator('[data-slot="templates-grid"]');
-  const expectedTemplateColumns = viewport.width === 1024 ? 2 : 3;
-  expect(await templateGrid.evaluate(
-    (element) => getComputedStyle(element).gridTemplateColumns.split(" ").length,
-  )).toBe(expectedTemplateColumns);
+  const projectCenterToggle = page.getByRole("button", { name: "打开项目中心" });
+  await projectCenterToggle.click();
+  const projectCenter = page.getByRole("dialog", { name: "项目中心" });
+  await expect(projectCenter).toBeVisible();
+  await projectCenter.getByRole("tab", { name: "我的模板" }).click();
+  await expect(projectCenter.getByRole("button", { name: "保存当前画布为模板" })).toBeVisible();
+  const projectCenterRect = await rect(projectCenter);
+  expect(projectCenterRect.left).toBeGreaterThanOrEqual(39);
+  expect(projectCenterRect.right).toBeLessThanOrEqual(viewport.width - 39);
   await testInfo.attach(`desktop-${viewport.width}-both-docks-template`, {
     body: await page.screenshot(),
     contentType: "image/png",
   });
-  const closeTemplates = templatesPanel.getByRole("button", { name: "关闭 Esc" });
-  await closeTemplates.focus();
-  await page.keyboard.press("Escape");
-  await expect(templatesToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(templatesPanel).toHaveCount(0);
-  await expect(templatesToggle).toBeFocused();
-
-  await templatesToggle.click();
-  await expect(templateCards).toHaveCount(TEMPLATE_FIXTURES.length);
-  const saveTemplateButton = templatesPanel.getByRole("button", { name: "当前画布存为模板" });
+  const saveTemplateButton = projectCenter.getByRole("button", { name: "保存当前画布为模板" });
   await saveTemplateButton.click();
   const saveTemplateDialog = page.getByRole("dialog", { name: "存为模板" });
   await expect(saveTemplateDialog).toBeVisible();
@@ -373,7 +408,7 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await expect(saveTemplateName).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(saveTemplateDialog).toHaveCount(0);
-  await expect(templatesPanel).toBeVisible();
+  await expect(projectCenter).toBeVisible();
   await expect(saveTemplateButton).toBeFocused();
 
   // 已关闭会话的延迟响应不得关闭或改写后来重新打开的表单。
@@ -428,9 +463,9 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await currentSaveResponse;
   await expect(saveTemplateDialog).toHaveCount(0);
   await expect(saveTemplateButton).toBeFocused();
-  await templatesPanel.getByRole("button", { name: "关闭 Esc" }).click();
-  await expect(templatesPanel).toHaveCount(0);
-  await expect(templatesToggle).toBeFocused();
+  await projectCenter.getByRole("button", { name: "关闭项目中心" }).click();
+  await expect(projectCenter).toHaveCount(0);
+  await expect(projectCenterToggle).toBeFocused();
 
   await resultsScroller.locator("[data-e2e-scroll-filler='true']").evaluate((element) => element.remove());
   await page.mouse.move(canvasRect.left + canvasRect.width / 2, canvasRect.top + 20);
@@ -474,7 +509,7 @@ test("theme picker reports state and restores focus", async ({ page }) => {
     const trigger = page.getByRole("button", { name: /^切换主题，当前为/ });
     await trigger.click();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
-    await page.getByRole("button", { name: new RegExp(`^${choice.label}`) }).click();
+    await page.getByRole("menuitemradio", { name: new RegExp(`^${choice.label}`) }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", choice.id);
     const updatedTrigger = page.getByRole("button", { name: `切换主题，当前为${choice.label}` });
     await expect(updatedTrigger).toHaveAttribute("aria-expanded", "false");
@@ -485,7 +520,7 @@ test("theme picker reports state and restores focus", async ({ page }) => {
   const trigger = page.getByRole("button", { name: /^切换主题，当前为/ });
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("button", { name: /^简白/ }).focus();
+  await page.getByRole("menuitemradio", { name: /^简白/ }).focus();
   await page.keyboard.press("Escape");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(trigger).toBeFocused();

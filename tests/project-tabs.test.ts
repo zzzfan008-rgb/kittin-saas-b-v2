@@ -1437,7 +1437,6 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
     "utf8",
   );
-
   assert.match(editorSource, /if \(!ready \|\| savingRef\.current\) return/);
   assert.match(editorSource, /onClick=\{onClose\} disabled=\{saving\}/);
   assert.match(editorSource, /aria-disabled=\{saving\}/);
@@ -1463,10 +1462,18 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(topBarSource, /onClick=\{retryTabSessionPersistence\}/);
 });
 
-await test("桌面工作台使用稳定 Dock 且顶栏不再依赖绝对居中", () => {
+await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居中", () => {
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const topBarSource = fs.readFileSync(
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
+    "utf8",
+  );
+  const projectTabsSource = fs.readFileSync(
+    new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url),
+    "utf8",
+  );
+  const projectCenterSource = fs.readFileSync(
+    new URL("../src/components/panels/ProjectCenter.tsx", import.meta.url),
     "utf8",
   );
   const shellSource = fs.readFileSync(
@@ -1483,8 +1490,47 @@ await test("桌面工作台使用稳定 Dock 且顶栏不再依赖绝对居中",
   assert.match(shellSource, /controls=\{LIBRARY_PANEL_ID\}/);
   assert.match(shellSource, /controls=\{INSPECTOR_PANEL_ID\}/);
   assert.match(shellSource, /transition-\[width,visibility\]/);
-  assert.match(topBarSource, /min-w-0 flex-1/);
-  assert.doesNotMatch(topBarSource, /absolute left-1\/2/);
+  assert.match(topBarSource, /grid-cols-\[1fr_auto_1fr\]/);
+  assert.match(topBarSource, /Coin AI - Canvas/);
+  assert.match(topBarSource, /<ThemeSwitcher \/>/);
+  assert.match(topBarSource, /absolute left-full ml-2/);
+  assert.match(topBarSource, /onPointerEnter=[\s\S]*setTimeout\(\(\) => setOpen\(true\), 180\)/);
+  assert.match(topBarSource, /点击图标可固定/);
+  assert.doesNotMatch(topBarSource, /GARMENT CANVAS|ProjectPicker/);
+  assert.doesNotMatch(appSource, /TemplatesDock/);
+  assert.match(projectTabsSource, /<ProjectCenter open=\{projectCenterOpen\}/);
+  assert.match(projectTabsSource, /onDoubleClick=\{\(\) => beginRename\(tab\)\}/);
+  assert.match(projectTabsSource, /aria-label="保存项目名称和画布"/);
+  assert.match(projectTabsSource, /event\.nativeEvent\.isComposing \|\| renameComposingRef\.current/);
+  assert.match(projectTabsSource, /const saved = await saveProject\(\)/);
+  assert.match(projectTabsSource, /if \(!saved\) \{[\s\S]*setRenameError/);
+  assert.match(projectTabsSource, /onBlur=\{\(event\) => \{[\s\S]*setEditingTabId\(null\)/);
+  assert.match(projectTabsSource, /role="alert"/);
+  assert.match(projectCenterSource, /activeSection === "recent"/);
+  assert.match(projectCenterSource, /activeSection === "templates"/);
+  assert.match(projectCenterSource, /"my-templates"/);
+  assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
+  assert.match(projectCenterSource, /if \(template\.builtIn\) return false/);
+  assert.doesNotMatch(projectCenterSource, /projectDetails/);
+  assert.match(projectCenterSource, /Promise\.allSettled\(\[loadProjects\(\), loadTemplates\(\)\]\)/);
+  assert.match(projectCenterSource, /onSaved=\{\(\) => void loadTemplates\(\)\}/);
+  assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
+  assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
+  assert.match(projectCenterSource, /最近项目/);
+  assert.match(projectCenterSource, /内置模板/);
+  assert.match(projectCenterSource, /我的模板/);
+  assert.match(projectCenterSource, /保存当前画布为模板/);
+  assert.match(projectCenterSource, /DELETE/);
+  assert.match(projectCenterSource, /删除后无法恢复；由此模板创建的项目不会受到影响/);
+  assert.match(projectCenterSource, /<Tabs[\s\S]*<TabsTrigger[\s\S]*<Card/);
+  assert.match(projectCenterSource, /<DropdownMenu[\s\S]*<AlertDialog/);
+  assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
+  assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
+  assert.match(projectCenterSource, /SAVE_TEMPLATE_COVER/);
+  assert.ok(
+    fs.existsSync(new URL("../public/assets/project-center/save-template-cover.png", import.meta.url)),
+    "我的模板保存卡必须使用仓库内图片素材",
+  );
 });
 
 console.log(`\n通过 ${passed} 项`);
