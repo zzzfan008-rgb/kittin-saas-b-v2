@@ -82,7 +82,7 @@ export function launchTemplateInNewTab(
 /** 首次任务直接接管唯一初始草稿；普通空白页签仍沿用“从模板新建”语义。 */
 export function launchStarterTemplate(
   template: WorkflowTemplate,
-  mode: Exclude<TemplateLaunchMode, "default">,
+  mode: TemplateLaunchMode = "default",
 ): { tabId: string; projectId: string; landingNodeId?: string } {
   const active = selectActiveDocument(useFlowStore.getState());
   if (projectTabLifecycle(active) !== "initial_draft" || !isPristineProjectTab(active)) {

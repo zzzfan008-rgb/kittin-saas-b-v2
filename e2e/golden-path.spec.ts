@@ -100,8 +100,9 @@ test("upload and text starters complete the isolated first-generation golden pat
   expect(initialDraft.draft?.id).toBeTruthy();
   const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
   await expect(launcher).toBeVisible();
+  await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
 
-  await launcher.getByRole("button", { name: /上传图片开始/ }).click();
+  await launcher.getByRole("button", { name: "使用内置模板：草图→效果图→高清放大" }).click();
   const uploadNode = page.locator(".react-flow__node").filter({ hasText: "图片上传" });
   await expect(uploadNode).toBeVisible();
   const fileInput = uploadNode.locator('input[type="file"]');
@@ -129,7 +130,8 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(projectCenter).toBeVisible();
   await projectCenter.getByRole("button", { name: /新建项目/ }).click();
   await expect(launcher).toBeVisible();
-  await launcher.getByRole("button", { name: /文本生成开始/ }).click();
+  await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
+  await launcher.getByRole("button", { name: "使用内置模板：文生图（服装设计）" }).click();
   const textNode = page.locator(".react-flow__node").filter({ hasText: "文生图" });
   const prompt = textNode.locator("textarea").first();
   await expect(prompt).toBeFocused();
