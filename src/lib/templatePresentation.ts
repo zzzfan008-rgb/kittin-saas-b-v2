@@ -4,10 +4,10 @@
  * changing the template API contract or relying on stale stored thumbnails.
  */
 export const BUILTIN_TEMPLATE_COVERS: Record<string, string> = {
-  "builtin-sketch-upscale": "/assets/project-center/templates/sketch-upscale.png",
-  "builtin-text-to-image": "/assets/project-center/templates/text-to-image.png",
-  "builtin-sketch-recolor": "/assets/project-center/templates/sketch-recolor.png",
-  "builtin-text-recolor": "/assets/project-center/templates/text-recolor.png",
-  "builtin-pattern-style-transfer": "/assets/project-center/templates/pattern-style-transfer.png",
-  "builtin-person-scene-transfer": "/assets/project-center/templates/person-scene-transfer.png",
+  "builtin-sketch-upscale": "/assets/project-center/templates/sketch-upscale.webp",
+  "builtin-text-to-image": "/assets/project-center/templates/text-to-image.webp",
+  "builtin-sketch-recolor": "/assets/project-center/templates/sketch-recolor.webp",
+  "builtin-text-recolor": "/assets/project-center/templates/text-recolor.webp",
+  "builtin-pattern-style-transfer": "/assets/project-center/templates/pattern-style-transfer.webp",
+  "builtin-person-scene-transfer": "/assets/project-center/templates/person-scene-transfer.webp",
 };

@@ -11,7 +11,7 @@
 - 本地路径：`/Users/lionfan/Documents/ChatGPT/无限画布/garment-canvas`。
 - 远程仓库：[GitHub 仓库](https://github.com/zzzfan008-rgb/kittin-saas-b-v2)。
 - 当前分支：`codex/task-launcher-template-gallery`。
-- 代码基线（本交接文档之前）：`7f7897b0246a8676f1bd996a61d144c9b0a97fdd`。
+- 交接前最近一次代码基线：`7f7897b0246a8676f1bd996a61d144c9b0a97fdd`；当前 PR head 必须每次动态查询，不把历史 SHA 当作现状。
 - 当前 PR：[PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)。
 - PR 基线（`main`）：`7d716c194660a09e223781b85eedfd4c27cb0027`。
 - PR 状态：OPEN，未合并；必须得到用户明确确认后才允许合并。
@@ -92,24 +92,24 @@
 
 ### 六个内置模板案例图
 
-已生成并提交六张本地封面，统一使用亚洲年轻女性、韩系简约服装方向，并按具体工作流表达步骤：
+已生成六张本地封面，统一使用亚洲年轻女性、韩系简约服装方向，并按具体工作流表达步骤；历史远程提交曾使用 PNG，当前工作树改为 WebP：
 
 ```text
 public/assets/project-center/templates/
-├── text-to-image.png
-├── text-recolor.png
-├── sketch-recolor.png
-├── sketch-upscale.png
-├── pattern-style-transfer.png
-└── person-scene-transfer.png
+├── text-to-image.webp
+├── text-recolor.webp
+├── sketch-recolor.webp
+├── sketch-upscale.webp
+├── pattern-style-transfer.webp
+└── person-scene-transfer.webp
 ```
 
-最新修正只针对 `text-to-image.png`：
+交接后的本地修正（当前尚未推送到远程 PR head）包括：
 
-- 左侧为放大的纯文字服装生成提示词。
-- 右侧为根据提示词生成的服装效果图。
-- 不再使用三段式中间流程视觉。
-- 其它五张封面、模板工作流和交互逻辑未改变。
+- 六张封面统一转为同尺寸 WebP，保留可读性并显著降低首屏资源体积。
+- 启动器按模板节点类型传递 `upload`/`text` 落地模式；其它调用仍保留 `default`。
+- 黄金路径直接验证文件选择器事件和提示词全选状态。
+- `text-to-image` 的历史视觉修正仍保持：左侧为放大的纯文字提示词，右侧为服装生成图。
 
 ## 4. 当前 PR 与审核状态
 
@@ -119,15 +119,23 @@ PR #10 的提交链：
 2. `efae3fb`：增加流程型模板封面与中文简介。
 3. `40e102d`：按实际工作流刷新六张案例图。
 4. `7f7897b`：修正文生图封面为严格左右两端结构。
+5. `cce4f14`：补充本项目交接文档（该提交是当前远程 PR head，后续仍以实时查询为准）。
 
-Cloud/Codex 已对 `d5958d2`、`40e102d` 给出“未发现重大问题”的历史复审。最新 SHA `7f7897b...` 已通过 PR 评论请求精确复审，但截至本交接时间点还没有新的精确 SHA 复审结果。
+Cloud/Codex 的历史复审曾对 `d5958d2`、`40e102d` 给出“未发现重大问题”。对当前远程 head `cce4f1460c76acca4c1cd740f02e825dbfc1dab5` 的精确复审已返回以下待处理意见：
 
-CodeRabbit 对 PNG 资源因默认路径过滤跳过，并不代表图片已完成审查；后续只需关注资源加载、可读性、包体和视觉回归。
+- P1：启动器卡片没有显式传递模板模式，导致文本模板不会全选提示词、图片模板不会激活文件选择器；本地修复已补上，需推送后再请求当前 head 的精确复审。
+- P2：六张未哈希 PNG 会增加无缓存首屏体积；本地已转换为 WebP，需推送后复审资源加载和视觉质量。
+- P2：`text-to-image` PNG 体积偏大；已由 WebP 处理。
+- P1：交接文档曾硬编码旧 SHA；本文件现改为“历史基线 + 动态查询”规则。
+
+当前没有正式批准评审；CI 在远程 `cce4f146...` 上通过，但不等于本地待推送修复已进入 PR。
+
+CodeRabbit 对原 PNG 资源因默认路径过滤跳过，并不代表图片已完成审查；WebP 变更推送后仍需关注资源加载、可读性、包体和视觉回归。
 
 ### 合并规则
 
 - 不要自行合并 PR #10。
-- 先等待/检查 Cloud 对 `7f7897b0246a8676f1bd996a61d144c9b0a97fdd` 的精确复审。
+- 每次先通过实时 PR API 读取当前 `headRefOid` 与 `baseRefOid`，再请求 Cloud 对该精确 head 复审；历史 SHA 只作历史证据。
 - 给用户报告审核结论、CI 和本地验证后，等待用户明确说“确认合并/批准合并”。
 
 ## 5. 验证命令与已知证据
@@ -154,12 +162,16 @@ npm run test:e2e
 npm start
 ```
 
-最近一次针对当前封面修正已验证：
+本次本地修复的验证证据：
 
-- `npm run build`：通过。
+- `npm run lint`：通过。
+- `npm run check`：通过（包含完整 PostgreSQL 隔离回归套件）。
+- `npm run build`：通过；Web 主包 `848.67 kB` minified / `266.39 kB` gzip，CSS `112.83 kB` / `19.06 kB` gzip；仍有单 chunk >500 kB 的既有警告。
+- `npm run test:e2e`：23/23 通过（含文件选择器事件和提示词全选断言）。
+- 六张 WebP 源资源总计 `1,033,748` bytes，构建产物同值；相对历史 PNG 总计 `11,815,324` bytes，体积减少约 `91.25%`。每张保持 `1586×992`，旧 PNG 已从工作树移除。
 - `git diff --check`：通过。
-- GitNexus `detect_changes`：图片资源变更，没有新的代码符号/流程变更。
-- 工作区在封面修正提交后保持干净；本交接文档自身可能形成后续文档提交。
+- GitNexus 已执行 `analyze --index-only --pdg` 并刷新到当前分支代码基线；`detect_changes` 识别 6 个代码/文档变更文件、9 个受影响流程，风险级别为 HIGH（另有 6 个 WebP 新增与 6 个 PNG 删除资源；主要代码风险来自 TaskLauncher 落地链路，已由上述回归覆盖）。
+- 远程 PR 的 CI 仍只代表 `cce4f146...`；本地修复推送后必须重新查询 head 并重新请求精确复审。
 
 历史 Phase C 验证也已通过：`npm run check`、12/12 桌面 Playwright 黄金路径、PostgreSQL 隔离测试、生产 Web/server 构建和 `npm audit`。
 
@@ -167,8 +179,8 @@ npm start
 
 ### P0：关闭当前 PR 的证据链
 
-1. 查询 PR #10 最新 head/base SHA，确认仍为 `7f7897b...`。
-2. 检查 Cloud 精确复审和 GitHub CI；若有意见，只修复明确问题。
+1. 查询 PR #10 最新 head/base SHA（不要复用本文件中的历史 SHA）。
+2. 推送本地修复后，检查 Cloud 对该精确 head 的复审和 GitHub CI；若有意见，只修复明确问题。
 3. 向用户汇报，再等待明确合并确认。
 
 ### P1：Phase D 结果迭代和桌面视觉验收
@@ -188,7 +200,7 @@ npm start
 
 ### P2：包体和性能（Phase F）
 
-- 记录当前约 756.88 kB minified / 241.37 kB gzip 主包基线。
+- 重新记录当前构建的主包 minified/gzip 基线；交接前一次本地构建观察值约为 848.50 kB / 266.35 kB，且仍有单 chunk >500 kB 警告。
 - 对非首屏 overlay、React、Base UI、XYFlow/D3 和业务模块做测量后再拆包。
 - 目标：初始 JS gzip 总量不高于 210 kB，并消除单 chunk >500 kB 警告。
 - 拆包后验证无 chunk 404、闪烁、状态丢失或 Canvas/Dock/Results 重挂。
@@ -212,10 +224,10 @@ npm start
 3. docs/PROJECT_COMPLETION.md
 4. README.md
 
-当前分支 codex/task-launcher-template-gallery，代码基线为
-7f7897b0246a8676f1bd996a61d144c9b0a97fdd；PR #10 为 OPEN，不能自行合并。
-当前最新改动只修正文生图模板封面 text-to-image.png，严格左右两端结构：
-左侧放大纯文字提示词，右侧服装生成图；其它五张封面和交互逻辑不变。
+当前分支 codex/task-launcher-template-gallery；交接前历史基线为
+7f7897b0246a8676f1bd996a61d144c9b0a97fdd，PR #10 为 OPEN，不能自行合并；当前 head/base 必须实时查询。
+本地待推送修复将六张模板封面改为 WebP，并让启动器按模板类型传递 upload/text 模式；text-to-image 仍保持严格左右两端结构：
+左侧放大纯文字提示词，右侧服装生成图。
 
 继续工作前请：
 - 先查看 git status、PR #10 的精确 base/head SHA 和 Cloud/CI 状态；
@@ -232,11 +244,13 @@ npm start
 
 ## 8. 交接注意事项
 
-- GitNexus 当前索引相对 HEAD 落后约 3 个提交；在进行代码结构分析前刷新索引：
+- GitNexus 索引必须与当前 HEAD 对齐；若状态提示落后，在进行代码结构分析前刷新索引：
 
   ```bash
   node .gitnexus/run.cjs analyze --index-only --pdg
   ```
+
+- 若增量分析报告 `FTS index ... is inconsistent`，可先运行 `gitnexus clean --force`，再运行 `gitnexus analyze --force --pdg` 重建被忽略的本地索引；这不会改动产品工作树。
 
 - `npm run test` 使用隔离 PostgreSQL 测试容器，不要改成在同一工作区手动运行 `docker compose -f compose.test.yaml`。
 - 不要把 `CODEX_REVIEW_HANDOFF*.md` 中的旧基线误认为当前分支基线；本文件和实时 Git/PR 查询优先。

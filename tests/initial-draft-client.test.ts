@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { ProjectTab, ServerInitialDraftSnapshot } from "../src/store/flowStore";
 import {
   applyServerInitialDraftToTab,
@@ -30,6 +30,8 @@ import {
   registerInitialDraftSaveBarrier,
   waitForInitialDraftSyncBeforeFormalSave,
 } from "../src/initialDraft/initialDraftRuntime";
+import { inferTemplateLaunchMode } from "../src/lib/templateLaunch";
+import type { WorkflowTemplate } from "../src/types/workflow";
 
 function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
   return {
@@ -464,8 +466,36 @@ const templateLaunchSource = readFileSync(
   new URL("../src/lib/templateLaunch.ts", import.meta.url),
   "utf8",
 );
+const templatePresentationSource = readFileSync(
+  new URL("../src/lib/templatePresentation.ts", import.meta.url),
+  "utf8",
+);
+function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
+  return {
+    flow: {
+      nodes: kinds.map((kind, index) => ({ id: `node-${index}`, data: { kind } })),
+      edges: [],
+    },
+  } as unknown as Pick<WorkflowTemplate, "flow">;
+}
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image-input"])), "upload");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["sketch-to-render"])), "text");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
+assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
+for (const cover of [
+  "pattern-style-transfer",
+  "person-scene-transfer",
+  "sketch-recolor",
+  "sketch-upscale",
+  "text-recolor",
+  "text-to-image",
+]) {
+  assert.match(templatePresentationSource, new RegExp(`${cover}\\.webp`));
+  assert.ok(existsSync(new URL(`../public/assets/project-center/templates/${cover}.webp`, import.meta.url)));
+}
+assert.doesNotMatch(templatePresentationSource, /project-center\/templates\/[^\n]+\.png/);
 assert.match(taskLauncherSource, /launchStarterTemplate/);
 assert.match(templateLaunchSource, /projectTabLifecycle\(active\) !== "initial_draft"/);
 assert.match(templateLaunchSource, /commitDocumentMutation\(/);
 assert.match(templateLaunchSource, /projectId: active\.projectId/);
-console.log("  ✓ 首次任务复用唯一初始草稿 ID，普通模板新建语义保持独立");
+console.log("  ✓ 首次任务复用唯一初始草稿 ID，并按模板类型落地到上传或文本输入");

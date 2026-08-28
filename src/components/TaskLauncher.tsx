@@ -7,7 +7,7 @@ import { selectActiveProjectIsPristine, useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { BUILTIN_TEMPLATE_COVERS } from "@/lib/templatePresentation";
 import type { WorkflowTemplate } from "@/types/workflow";
-import { launchStarterTemplate } from "@/lib/templateLaunch";
+import { inferTemplateLaunchMode, launchStarterTemplate } from "@/lib/templateLaunch";
 
 const EMPTY_TEMPLATE_COVER = "/assets/project-center/empty-project-cover.jpg";
 
@@ -134,7 +134,7 @@ export function TaskLauncher() {
                 <TemplateCard
                   key={template.id}
                   template={template}
-                  onSelect={() => launchStarterTemplate(template)}
+                  onSelect={() => launchStarterTemplate(template, inferTemplateLaunchMode(template))}
                 />
               ))}
             </div>
