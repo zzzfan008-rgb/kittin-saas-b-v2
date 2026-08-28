@@ -133,6 +133,48 @@ export async function fetchInitialDraft(signal?: AbortSignal): Promise<ServerIni
   return body.draft === null ? null : parseInitialDraft(body.draft);
 }
 
+export interface ServerProjectSummary {
+  id: string;
+  name: string;
+  ownerName?: string;
+  readOnly?: boolean;
+  updatedAt: string;
+}
+
+export interface ServerProjectDetail extends ServerProjectSummary {
+  flow: PersistedWorkflow;
+}
+
+function parseProjectSummary(value: unknown): ServerProjectSummary {
+  if (!value || typeof value !== "object") throw new Error("项目列表响应格式无效");
+  const project = value as Partial<ServerProjectSummary>;
+  if (
+    typeof project.id !== "string" || !project.id ||
+    typeof project.name !== "string" || !project.name ||
+    typeof project.updatedAt !== "string" || !Number.isFinite(Date.parse(project.updatedAt)) ||
+    (project.ownerName !== undefined && typeof project.ownerName !== "string") ||
+    (project.readOnly !== undefined && typeof project.readOnly !== "boolean")
+  ) throw new Error("项目列表响应格式无效");
+  return project as ServerProjectSummary;
+}
+
+export async function fetchSavedProjects(signal?: AbortSignal): Promise<ServerProjectSummary[]> {
+  const response = await fetch("/api/projects", { cache: "no-store", signal });
+  if (!response.ok) throw new Error(`项目列表 HTTP ${response.status}`);
+  const body = await response.json();
+  if (!Array.isArray(body)) throw new Error("项目列表响应格式无效");
+  return body.map(parseProjectSummary);
+}
+
+export async function fetchSavedProject(id: string, signal?: AbortSignal): Promise<ServerProjectDetail> {
+  const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, { cache: "no-store", signal });
+  if (!response.ok) throw new Error(`项目 HTTP ${response.status}`);
+  const body = await response.json();
+  const project = parseProjectSummary(body);
+  if (!isWorkflow(body.flow)) throw new Error("项目详情响应格式无效");
+  return { ...project, flow: body.flow };
+}
+
 export async function bootstrapInitialDraft(input: {
   id: string;
   name?: string;

@@ -15,10 +15,13 @@ import {
   bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
+  shouldRestoreSavedProjectOnStartup,
 } from "../src/initialDraft/initialDraftMigration";
 import { settleInitialDraftBeforeAbandon } from "../src/initialDraft/InitialDraftWorkspace";
 import {
   copyProjectScopedMasks,
+  fetchSavedProject,
+  fetchSavedProjects,
   isServerInitialDraftPristine,
   parseInitialDraft,
   syncInitialDraft,
@@ -101,6 +104,13 @@ const serverOnly = draft();
 assert.equal(decideInitialDraftStartup(placeholder, null, serverOnly).kind, "restore-server");
 console.log("  ✓ 新标签页和重新登录会恢复同一份云端初始项目");
 
+assert.equal(shouldRestoreSavedProjectOnStartup(null, null, 1), true);
+assert.equal(shouldRestoreSavedProjectOnStartup(null, serverOnly, 1), true);
+assert.equal(shouldRestoreSavedProjectOnStartup(null, { ...serverOnly, name: "已修改草稿" }, 1), false);
+assert.equal(shouldRestoreSavedProjectOnStartup(editedLegacy, null, 1), false);
+assert.equal(shouldRestoreSavedProjectOnStartup(null, null, 0), false);
+console.log("  ✓ 已有正式项目时优先恢复最近项目，未保存草稿仍优先保留");
+
 assert.equal(decideInitialDraftStartup(placeholder, editedLegacy, serverOnly).kind, "sync-local");
 console.log("  ✓ 空白云端草稿允许一次性接管可信旧本机修改");
 
@@ -179,6 +189,32 @@ try {
   globalThis.fetch = originalFetch;
 }
 console.log("  ✓ 自动同步携带乐观锁版本");
+
+const projectFlow = persistedWorkflowForProjectTab(tab({ projectId: "saved-project" }));
+globalThis.fetch = async (input) => {
+  if (String(input) === "/api/projects") {
+    return Response.json([{
+      id: "saved-project",
+      name: "最近正式项目",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    }]);
+  }
+  return Response.json({
+    id: "saved-project",
+    name: "最近正式项目",
+    updatedAt: "2026-08-27T00:00:00.000Z",
+    flow: projectFlow,
+  });
+};
+try {
+  const savedProjects = await fetchSavedProjects();
+  assert.equal(savedProjects[0]?.id, "saved-project");
+  const savedProject = await fetchSavedProject("saved-project");
+  assert.equal(savedProject.flow.schemaVersion, projectFlow.schemaVersion);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log("  ✓ 登录恢复可读取最近正式项目及完整画布");
 
 const maskLocal = tab({
   projectId: "mask-source-project",

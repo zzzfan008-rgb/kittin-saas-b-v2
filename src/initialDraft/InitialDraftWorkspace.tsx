@@ -29,6 +29,8 @@ import {
   abandonInitialDraft,
   bootstrapInitialDraft,
   copyProjectScopedMasks,
+  fetchSavedProject,
+  fetchSavedProjects,
   fetchInitialDraft,
   InitialDraftApiError,
   isServerInitialDraftPristine,
@@ -38,6 +40,7 @@ import {
   bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
+  shouldRestoreSavedProjectOnStartup,
 } from "./initialDraftMigration";
 import {
   registerInitialDraftSaveBarrier,
@@ -253,8 +256,34 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       const restored = didRestoreProjectTabSessionWorkspace();
       const ownerVerified = restored && readWorkspaceOwner(window.sessionStorage) === userId;
       const local = selectLocalInitialDraftCandidate(state.tabs, state.activeTabId, ownerVerified);
-      const server = await fetchInitialDraft(signal);
+      // 已验证的会话页签是最精确的恢复点；其中已有正式项目时不要再请求并创建初始空白页。
+      const restoredSavedTab = ownerVerified && state.tabs.some(
+        (tab) => projectTabLifecycle(tab) === "saved",
+      );
+      if (restoredSavedTab) {
+        setGateState("ready");
+        return;
+      }
+      const [server, savedProjects] = await Promise.all([
+        fetchInitialDraft(signal),
+        fetchSavedProjects(signal),
+      ]);
       if (signal.aborted) return;
+      if (shouldRestoreSavedProjectOnStartup(local, server, savedProjects.length)) {
+        const summary = savedProjects[0];
+        if (!summary) throw new Error("项目列表为空，请刷新后重试");
+        const detail = await fetchSavedProject(summary.id, signal);
+        if (signal.aborted) return;
+        useFlowStore.getState().openFlowTab({
+          projectId: detail.id,
+          projectName: detail.name,
+          nodes: detail.flow.nodes as never,
+          edges: detail.flow.edges as never,
+          readOnly: detail.readOnly ?? false,
+        });
+        setGateState("ready");
+        return;
+      }
       let decision = decideInitialDraftStartup(placeholder, local, server);
 
       if (decision.kind === "bootstrap-pristine" || decision.kind === "bootstrap-local") {
