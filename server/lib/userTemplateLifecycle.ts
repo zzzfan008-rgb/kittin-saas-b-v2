@@ -27,6 +27,78 @@ function readMetadata(filePath: string): StoredTemplateMetadata {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as StoredTemplateMetadata;
 }
 
+interface MutationJournal {
+  id: string;
+  sourceOwnerId: string;
+  transferToOwnerId?: string;
+  sourceDeletedAt: string;
+  deletedAt?: string;
+  purgeAfter?: string;
+  changes: Array<{ filePath: string; before: StoredTemplateMetadata; after: StoredTemplateMetadata }>;
+}
+
+function mutationDir(): string {
+  const dir = path.join(config.dataDir(), "templates", ".account-mutations");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function mutationJournalPath(id: string): string {
+  return path.join(mutationDir(), `${id}.json`);
+}
+
+function writeMutationJournal(journal: MutationJournal): string {
+  const filePath = mutationJournalPath(journal.id);
+  writeJsonAtomicSync(filePath, journal);
+  return filePath;
+}
+
+function applyMutationChanges(journal: MutationJournal): void {
+  for (const change of journal.changes) writeJsonAtomicSync(change.filePath, change.after);
+}
+
+function restoreMutationChanges(journal: MutationJournal): void {
+  for (const change of journal.changes) writeJsonAtomicSync(change.filePath, change.before);
+}
+
+function mutationCommitted(journal: MutationJournal, source: { active: number; deleted_at: string | null } | undefined): boolean | undefined {
+  if (!source) return undefined;
+  if (source.deleted_at === journal.sourceDeletedAt) return true;
+  if (source.active === 1 && source.deleted_at === null) return false;
+  return undefined;
+}
+
+/**
+ * 文件系统没有 PostgreSQL 的事务语义，因此账号变更先写入可恢复 journal。
+ * 启动时以 users 行的已提交状态为事实来源：已删除账号完成文件变更，仍活跃账号
+ * 恢复快照。journal 在完成后删除，崩溃后重复执行也是幂等的。
+ */
+export async function reconcileUserTemplateAccountMutations(): Promise<number> {
+  const dir = mutationDir();
+  let reconciled = 0;
+  for (const fileName of fs.readdirSync(dir)) {
+    if (!fileName.endsWith(".json")) continue;
+    const journalPath = path.join(dir, fileName);
+    try {
+      const journal = JSON.parse(fs.readFileSync(journalPath, "utf8")) as MutationJournal;
+      if (!journal.id || !journal.sourceOwnerId || !Array.isArray(journal.changes)) throw new Error("invalid template mutation journal");
+      const source = await queryOne<{ active: number; deleted_at: string | null }>(
+        "SELECT active, deleted_at FROM users WHERE id = $1",
+        [journal.sourceOwnerId],
+      );
+      const committed = mutationCommitted(journal, source);
+      if (committed === undefined) continue;
+      if (committed) applyMutationChanges(journal);
+      else restoreMutationChanges(journal);
+      fs.unlinkSync(journalPath);
+      reconciled += 1;
+    } catch (error) {
+      console.error(`[garment-canvas] failed to reconcile user template mutation ${fileName}`, error);
+    }
+  }
+  return reconciled;
+}
+
 /**
  * 旧版用户模板没有 ownerId。升级时把它们确定性归属给最早创建的有效管理员
  * （历史单账号部署的原始账号），避免升级后模板突然消失。若没有管理员，则回退
@@ -75,7 +147,6 @@ export function purgeExpiredUserTemplates(nowIso = new Date().toISOString()): nu
 export interface UserTemplateAccountMutation {
   readonly changedCount: number;
   apply(): void;
-  rollback(): void;
 }
 
 /**
@@ -85,6 +156,7 @@ export interface UserTemplateAccountMutation {
 export function prepareUserTemplateAccountMutation(input: {
   sourceOwnerId: string;
   transferToOwnerId?: string;
+  sourceDeletedAt: string;
   deletedAt?: string;
   purgeAfter?: string;
 }): UserTemplateAccountMutation {
@@ -102,24 +174,21 @@ export function prepareUserTemplateAccountMutation(input: {
     }
   }
 
-  let applied = false;
-  const rollback = () => {
-    if (!applied) return;
-    for (const change of changes) writeJsonAtomicSync(change.filePath, change.before);
-    applied = false;
+  const journal: MutationJournal = {
+    id: `account-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 10)}`,
+    sourceOwnerId: input.sourceOwnerId,
+    ...(input.transferToOwnerId ? { transferToOwnerId: input.transferToOwnerId } : {}),
+    sourceDeletedAt: input.sourceDeletedAt,
+    ...(input.deletedAt ? { deletedAt: input.deletedAt } : {}),
+    ...(input.purgeAfter ? { purgeAfter: input.purgeAfter } : {}),
+    changes,
   };
   return {
     changedCount: changes.length,
     apply() {
-      try {
-        for (const change of changes) writeJsonAtomicSync(change.filePath, change.after);
-        applied = true;
-      } catch (error) {
-        applied = true;
-        rollback();
-        throw error;
-      }
+      if (changes.length === 0) return;
+      writeMutationJournal(journal);
+      applyMutationChanges(journal);
     },
-    rollback,
   };
 }

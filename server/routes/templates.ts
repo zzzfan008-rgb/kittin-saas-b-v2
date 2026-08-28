@@ -18,7 +18,7 @@ import { thumbnailUrlForImage } from "../lib/fileStore";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { transaction } from "../lib/database";
-import { lockActiveOwner } from "../lib/ownerMutation";
+import { lockActiveOwner, lockActiveOwnerMutation } from "../lib/ownerMutation";
 import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
 import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "../../src/types/workflow";
 import {
@@ -561,7 +561,7 @@ templatesRouter.post("/", asyncHandler(async (req, res) => {
   }
 }));
 
-templatesRouter.delete("/:id", (req, res) => {
+templatesRouter.delete("/:id", asyncHandler(async (req, res) => {
   const currentUser = requestUser(req);
   const id = req.params.id;
   if (fs.existsSync(templatePath("builtin", id))) {
@@ -573,19 +573,48 @@ templatesRouter.delete("/:id", (req, res) => {
     res.status(404).json({ error: "template not found" });
     return;
   }
+  let ownerId: string | undefined;
   try {
-    const template = readTemplateFile(filePath);
-    if (template.deletedAt) {
-      res.status(404).json({ error: "template not found" });
-      return;
-    }
-    if (template.ownerId !== currentUser.id && currentUser.role !== "admin") {
-      res.status(404).json({ error: "template not found" });
-      return;
-    }
-    fs.unlinkSync(filePath);
-    res.json({ ok: true });
+    ownerId = readTemplateFile(filePath).ownerId;
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    res.status(err instanceof WorkflowValidationError ? 422 : 500).json({ error: err instanceof Error ? err.message : String(err) });
+    return;
   }
-});
+  if (!ownerId) {
+    res.status(409).json({ error: "模板归属待迁移，请先重启服务" });
+    return;
+  }
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const outcome = await transaction(async (client) => {
+      if (!await lockActiveOwnerMutation(client, ownerId as string)) {
+        return { status: "owner_unavailable" as const };
+      }
+      if (!fs.existsSync(filePath)) return { status: "not_found" as const };
+      const template = readTemplateFile(filePath);
+      if (template.ownerId !== ownerId) {
+        return { status: "owner_changed" as const, ownerId: template.ownerId };
+      }
+      if (template.deletedAt) return { status: "not_found" as const };
+      if (template.ownerId !== currentUser.id && currentUser.role !== "admin") {
+        return { status: "not_found" as const };
+      }
+      fs.unlinkSync(filePath);
+      return { status: "deleted" as const };
+    });
+    if (outcome.status === "owner_changed" && outcome.ownerId) {
+      ownerId = outcome.ownerId;
+      continue;
+    }
+    if (outcome.status === "owner_unavailable") {
+      res.status(409).json({ error: "账号状态已变化，请刷新后重试" });
+      return;
+    }
+    if (outcome.status === "not_found") {
+      res.status(404).json({ error: "template not found" });
+      return;
+    }
+    res.json({ ok: true });
+    return;
+  }
+  res.status(409).json({ error: "模板归属正在变化，请刷新后重试" });
+}));

@@ -18,7 +18,7 @@ import { hashPassword, validatePassword, verifyPassword } from "../lib/password"
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 import {
   prepareUserTemplateAccountMutation,
-  type UserTemplateAccountMutation,
+  reconcileUserTemplateAccountMutations,
 } from "../lib/userTemplateLifecycle";
 
 export const authRouter = Router();
@@ -224,7 +224,6 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const purgeAfter = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString();
-  let templateMutation: UserTemplateAccountMutation | undefined;
   const outcome = await transaction(async (client) => {
     // 所有新生成任务先持有 owner 用户共享锁；账号变更按 id 稳定取得排他锁，
     // 保证请求要么先完整入队并随后被转移/回收，要么在账号变更后被拒绝。
@@ -325,8 +324,9 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
         );
       }
     }
-    templateMutation = prepareUserTemplateAccountMutation({
+    const templateMutation = prepareUserTemplateAccountMutation({
       sourceOwnerId: req.params.id,
+      sourceDeletedAt: nowIso,
       ...(transferToUserId
         ? { transferToOwnerId: transferToUserId }
         : { deletedAt: nowIso, purgeAfter }),
@@ -335,13 +335,14 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     await client.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
     await client.query("UPDATE users SET active = 0, deleted_at = $1, updated_at = $1 WHERE id = $2", [nowIso, req.params.id]);
     return { status: "ok" as const };
-  }).catch((error) => {
-    try {
-      templateMutation?.rollback();
-    } catch (rollbackError) {
-      console.error("[garment-canvas] failed to roll back user template ownership mutation", rollbackError);
-    }
+  }).catch(async (error) => {
+    await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
+      console.error("[garment-canvas] failed to reconcile user template ownership mutation", reconcileError);
+    });
     throw error;
+  });
+  await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
+    console.error("[garment-canvas] failed to finalize user template ownership mutation", reconcileError);
   });
   if (outcome.status === "source_changed") {
     res.status(404).json({ error: "用户不存在或状态已变化，请刷新后重试" });

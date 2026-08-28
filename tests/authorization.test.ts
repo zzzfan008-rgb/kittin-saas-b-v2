@@ -32,7 +32,11 @@ const {
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
 const { templatesRouter } = await import("../server/routes/templates");
-const { migrateLegacyUserTemplateOwners } = await import("../server/lib/userTemplateLifecycle");
+const {
+  migrateLegacyUserTemplateOwners,
+  prepareUserTemplateAccountMutation,
+  reconcileUserTemplateAccountMutations,
+} = await import("../server/lib/userTemplateLifecycle");
 
 const users: Record<string, AuthUser> = {
   owner: {
@@ -350,6 +354,68 @@ await test("账号转移、15 天回收与到期清理同步覆盖用户模板",
     assert.equal(fs.existsSync(templateFile), false);
   } finally {
     if (templateId) fs.rmSync(path.join(legacyTemplateDir, `${templateId}.json`), { force: true });
+    await query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [[source.id, target.id]]);
+    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[source.id, target.id]]);
+    delete users[sourceKey];
+    delete users[targetKey];
+  }
+});
+
+await test("模板账号 journal 可在数据库回滚或提交后恢复文件状态", async () => {
+  const sourceKey = "templateJournalSource";
+  const targetKey = "templateJournalTarget";
+  const source: AuthUser = {
+    id: "template-journal-source", accountId: sourceKey, displayName: "模板 journal 源账号",
+    role: "user", mustChangePassword: false,
+  };
+  const target: AuthUser = {
+    id: "template-journal-target", accountId: targetKey, displayName: "模板 journal 目标账号",
+    role: "user", mustChangePassword: false,
+  };
+  users[sourceKey] = source;
+  users[targetKey] = target;
+  await query(`
+    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
+    VALUES
+      ($1, $2, $3, 'user', 'test-only', 1, $7, $7),
+      ($4, $5, $6, 'user', 'test-only', 1, $7, $7)
+  `, [source.id, source.accountId, source.displayName, target.id, target.accountId, target.displayName, now]);
+
+  const templateId = "template-journal-recovery";
+  const templateFile = path.join(legacyTemplateDir, `${templateId}.json`);
+  const original = {
+    schemaVersion: 3,
+    id: templateId,
+    ownerId: source.id,
+    name: "journal 恢复模板",
+    description: "",
+    flow: flow(),
+    createdAt: now,
+  };
+  try {
+    fs.writeFileSync(templateFile, JSON.stringify(original));
+    const rollbackMutation = prepareUserTemplateAccountMutation({
+      sourceOwnerId: source.id,
+      transferToOwnerId: target.id,
+      sourceDeletedAt: "2099-01-01T00:00:00.000Z",
+    });
+    rollbackMutation.apply();
+    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, target.id);
+    await reconcileUserTemplateAccountMutations();
+    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, source.id);
+
+    const commitMutation = prepareUserTemplateAccountMutation({
+      sourceOwnerId: source.id,
+      transferToOwnerId: target.id,
+      sourceDeletedAt: now,
+    });
+    commitMutation.apply();
+    await query("UPDATE users SET active = 0, deleted_at = $1 WHERE id = $2", [now, source.id]);
+    await reconcileUserTemplateAccountMutations();
+    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, target.id);
+    assert.equal(fs.readdirSync(path.join(temp, "templates", ".account-mutations")).filter((name) => name.endsWith(".json")).length, 0);
+  } finally {
+    fs.rmSync(templateFile, { force: true });
     await query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [[source.id, target.id]]);
     await query("DELETE FROM users WHERE id = ANY($1::text[])", [[source.id, target.id]]);
     delete users[sourceKey];
