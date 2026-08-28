@@ -15,6 +15,7 @@
 - 当前 PR：[PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)。
 - PR 基线（`main`）：`7d716c194660a09e223781b85eedfd4c27cb0027`。
 - PR 状态：OPEN，未合并；必须得到用户明确确认后才允许合并。
+- 当前审核流程：用户已明确要求后续不再等待或触发 Codex Cloud 审核；本地测试、GitNexus、CI、精确 head/base 核对和用户合并确认门禁保持不变。
 
 ### 产品硬约束
 
@@ -122,22 +123,22 @@ PR #10 的提交链：
 5. `cce4f14`：补充本项目交接文档（该提交是当前远程 PR head，后续仍以实时查询为准）。
 6. 后续修正：启动器与项目中心按模板节点类型传递 `upload`/`text` 模式；六张封面统一使用 WebP，并补齐前端与桌面回归断言。
 
-Cloud/Codex 的历史复审曾对 `d5958d2`、`40e102d` 给出“未发现重大问题”。对历史远程 head `cce4f1460c76acca4c1cd740f02e825dbfc1dab5` 的精确复审曾返回以下待处理意见；对应修正已完成并推送，新的 head 必须重新查询并复审：
+Cloud/Codex 的历史复审曾对 `d5958d2`、`40e102d` 给出“未发现重大问题”。对历史远程 head `cce4f1460c76acca4c1cd740f02e825dbfc1dab5` 的精确复审曾返回以下待处理意见；对应修正已完成并推送。以下仅作历史证据，不构成当前审核门禁：
 
 - P1：启动器卡片没有显式传递模板模式，导致文本模板不会全选提示词、图片模板不会激活文件选择器；修复已推送，待新 head 的精确复审确认。
 - P2：六张未哈希 PNG 会增加无缓存首屏体积；已转换为 WebP，待新 head 复审资源加载和视觉质量。
 - P2：`text-to-image` PNG 体积偏大；已由 WebP 处理。
 - P1：交接文档曾硬编码旧 SHA；本文件现改为“历史基线 + 动态查询”规则。
 
-当前没有正式批准评审；历史 CI 在 `cce4f146...` 上通过，最新 head 的 CI 与复审必须以实时查询结果为准。
+历史 CI 在 `cce4f146...` 上通过；当前 head 的 CI 必须以实时查询结果为准，Codex Cloud 不再作为当前门禁。
 
 CodeRabbit 对原 PNG 资源因默认路径过滤跳过，并不代表图片已完成审查；WebP 变更推送后仍需关注资源加载、可读性、包体和视觉回归。
 
 ### 合并规则
 
 - 不要自行合并 PR #10。
-- 每次先通过实时 PR API 读取当前 `headRefOid` 与 `baseRefOid`，再请求 Cloud 对该精确 head 复审；历史 SHA 只作历史证据。
-- 给用户报告审核结论、CI 和本地验证后，等待用户明确说“确认合并/批准合并”。
+- 每次先通过实时 PR API 读取当前 `headRefOid` 与 `baseRefOid`；历史 SHA 只作历史证据，不再请求 Cloud 复审。
+- 给用户报告 CI、GitNexus 和本地验证后，等待用户明确说“确认合并/批准合并”。
 
 ## 5. 验证命令与已知证据
 
@@ -178,10 +179,10 @@ npm start
 
 ## 6. 下一阶段优先级
 
-### P0：关闭当前 PR 的证据链
+### P0：关闭当前 PR 的本地证据链
 
 1. 查询 PR #10 最新 head/base SHA（不要复用本文件中的历史 SHA）。
-2. 推送本地修复后，检查 Cloud 对该精确 head 的复审和 GitHub CI；若有意见，只修复明确问题。
+2. 推送本地修复后，检查 GitHub CI；若有明确 CI 或本地回归问题，只修复明确问题。
 3. 向用户汇报，再等待明确合并确认。
 
 ### P1：Phase D 结果迭代和桌面视觉验收
@@ -210,7 +211,7 @@ npm start
 
 - 更新 README、环境变量、管理员安装、macOS 部署、备份恢复、迁移、故障、安全和桌面矩阵。
 - 保持 `.env.example` 是公开配置契约；私有 `.env` 只在本机使用。
-- 发布候选必须包含摘要、风险/回滚、测试矩阵、视觉证据、包体、GitNexus、CI 和 Cloud Review。
+- 发布候选必须包含摘要、风险/回滚、测试矩阵、视觉证据、包体、GitNexus 和 CI；不再要求 Cloud Review。
 - 用户明确确认后才合并到 `main`；合并后再次确认 main CI。
 
 ## 7. 开新对话时可直接使用的启动提示词
@@ -231,7 +232,7 @@ npm start
 左侧放大纯文字提示词，右侧服装生成图。
 
 继续工作前请：
-- 先查看 git status、PR #10 的精确 base/head SHA 和 Cloud/CI 状态；
+- 先查看 git status、PR #10 的精确 base/head SHA 和 CI 状态；
 - 如需修改代码，先用 GitNexus query/context/impact 做结构和影响分析；
 - 任何 UI 或交互逻辑修改先给我方案，等待我确认后再编辑；
 - 运行 npm run check、npm run build 和相应桌面回归；
@@ -239,7 +240,7 @@ npm start
 - 不要泄露或提交 .env、GITHUB_PAT、AI 密钥和运行数据；
 - 不要自行合并 PR，必须等我明确确认。
 
-当前建议从 P0 开始：检查 PR #10 最新精确 Cloud Review，然后推进 Phase D
+当前建议从 P0 开始：检查 PR #10 最新精确 head/base 与 CI，然后推进 Phase D
 结果迭代与三主题桌面视觉验收。
 ```
 
