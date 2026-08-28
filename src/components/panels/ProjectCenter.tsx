@@ -38,7 +38,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { thumbnailImageUrl } from "@/lib/images";
-import { launchTemplateInNewTab } from "@/lib/templateLaunch";
+import { inferTemplateLaunchMode, launchTemplateInNewTab } from "@/lib/templateLaunch";
 import { BUILTIN_TEMPLATE_COVERS } from "@/lib/templatePresentation";
 import {
   projectTabLifecycle,
@@ -297,7 +297,7 @@ export function ProjectCenter({
   };
 
   const openTemplate = (template: WorkflowTemplate) => {
-    launchTemplateInNewTab(template);
+    launchTemplateInNewTab(template, inferTemplateLaunchMode(template));
     onOpenChange(false);
   };
 

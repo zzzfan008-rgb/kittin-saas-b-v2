@@ -1511,6 +1511,8 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectCenterSource, /"my-templates"/);
   assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
   assert.match(projectCenterSource, /if \(template\.builtIn\) return false/);
+  assert.match(projectCenterSource, /inferTemplateLaunchMode\(template\)/);
+  assert.match(projectCenterSource, /launchTemplateInNewTab\(template,\s*inferTemplateLaunchMode\(template\)\)/);
   assert.doesNotMatch(projectCenterSource, /projectDetails/);
   assert.match(projectCenterSource, /Promise\.allSettled\(\[loadProjects\(\), loadTemplates\(\)\]\)/);
   assert.match(projectCenterSource, /onSaved=\{\(\) => void loadTemplates\(\)\}/);
