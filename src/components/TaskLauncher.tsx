@@ -12,7 +12,7 @@ import { launchStarterTemplate } from "@/lib/templateLaunch";
 const EMPTY_TEMPLATE_COVER = "/assets/project-center/empty-project-cover.jpg";
 
 function templateCover(template: WorkflowTemplate): string {
-  return template.thumbnail ?? BUILTIN_TEMPLATE_COVERS[template.id] ?? EMPTY_TEMPLATE_COVER;
+  return BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? EMPTY_TEMPLATE_COVER;
 }
 
 function TemplateCover({ template }: { template: WorkflowTemplate }) {

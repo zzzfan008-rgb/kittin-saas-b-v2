@@ -453,7 +453,7 @@ export function ProjectCenter({
               {templatesLoading ? <TemplateSkeletons /> : (
                 <div className="grid grid-cols-4 gap-4">
                 {filteredTemplates.map((template) => {
-                  const image = template.thumbnail ?? BUILTIN_TEMPLATE_COVERS[template.id] ?? flowPreviewImage(template.flow);
+                  const image = BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? flowPreviewImage(template.flow);
                   return (
                     <CardFrame key={template.id}>
                       <button
@@ -508,7 +508,7 @@ export function ProjectCenter({
                   </CardFrame>
 
                   {filteredMyTemplates.map((template) => {
-                    const image = template.thumbnail ?? BUILTIN_TEMPLATE_COVERS[template.id] ?? flowPreviewImage(template.flow);
+                    const image = BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? flowPreviewImage(template.flow);
                     return (
                       <CardFrame key={template.id}>
                         <div className="relative overflow-hidden">
