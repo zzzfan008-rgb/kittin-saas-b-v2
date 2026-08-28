@@ -164,6 +164,16 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(textResult).toBeVisible();
   await expect(uploadResult).toBeVisible();
 
+  const textResultCard = results.locator('article:has(img[alt="文生图"])');
+  await textResultCard.hover();
+  await expect(textResultCard.locator('button[title="查看"]')).toBeVisible();
+  await expect(textResultCard.locator('button[title="加入对比"]')).toBeVisible();
+  await expect(textResultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
+  const textInputNodesBefore = await page.locator(".react-flow__node").filter({ hasText: "文生图" }).count();
+  await textResultCard.locator('button[title="设为输入"]').click();
+  await expect(page.locator(".react-flow__node").filter({ hasText: "文生图" })).toHaveCount(textInputNodesBefore + 1);
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+
   await textResult.click();
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
   await page.keyboard.press("Escape");

@@ -1535,4 +1535,19 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   );
 });
 
+await test("最近生成成功卡显式提供查看、对比、下载与设为输入动作", () => {
+  const resultsPanelSource = fs.readFileSync(
+    new URL("../src/components/panels/ResultsPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\}`\}/);
+  assert.match(resultsPanelSource, /aria-label=\{`\$\{compareIds\.includes\(r\.id\) \? "取消" : "加入"\}对比 \$\{r\.nodeLabel\}`\}/);
+  assert.match(resultsPanelSource, /href=\{r\.image\}[\s\S]*download/);
+  assert.match(resultsPanelSource, /aria-label=\{`将 \$\{r\.nodeLabel\} 设为输入，继续处理`\}/);
+  assert.match(resultsPanelSource, /state\.addAssetNode\(\s*\{ name: r\.nodeLabel, image: r\.image \}/);
+  assert.match(resultsPanelSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
+  assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
+  assert.match(resultsPanelSource, /r\.status !== "success"/);
+});
+
 console.log(`\n通过 ${passed} 项`);
