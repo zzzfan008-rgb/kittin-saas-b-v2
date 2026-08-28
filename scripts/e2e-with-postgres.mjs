@@ -61,6 +61,33 @@ async function main() {
     ...process.env,
     COMPOSE_PROJECT_NAME: composeProjectName,
   };
+  let cleanupDone = false;
+
+  const cleanup = () => {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    try {
+      spawnSync("docker", [...compose, "down", "--volumes", "--remove-orphans"], {
+        stdio: "inherit",
+        env: composeEnv,
+      });
+    } catch (cleanupError) {
+      console.warn(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
+    }
+    try {
+      rmSync(dataDir, { recursive: true, force: true });
+      releaseLock();
+    } catch (cleanupError) {
+      console.warn(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
+    }
+  };
+
+  const terminate = (signal) => {
+    cleanup();
+    process.exitCode = signal === "SIGINT" ? 130 : 143;
+  };
+  process.once("SIGINT", () => terminate("SIGINT"));
+  process.once("SIGTERM", () => terminate("SIGTERM"));
 
   try {
     run("docker", [...compose, "down", "--volumes", "--remove-orphans"], { env: composeEnv });
@@ -109,12 +136,7 @@ async function main() {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   } finally {
-    spawnSync("docker", [...compose, "down", "--volumes", "--remove-orphans"], {
-      stdio: "inherit",
-      env: composeEnv,
-    });
-    rmSync(dataDir, { recursive: true, force: true });
-    releaseLock();
+    cleanup();
   }
 }
 

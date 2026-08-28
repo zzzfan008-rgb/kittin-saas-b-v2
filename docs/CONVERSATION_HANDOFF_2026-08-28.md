@@ -10,11 +10,11 @@
 - 仓库：`zzzfan008-rgb/kittin-saas-b-v2`。
 - 本地路径：`/Users/lionfan/Documents/ChatGPT/无限画布/garment-canvas`。
 - 远程仓库：[GitHub 仓库](https://github.com/zzzfan008-rgb/kittin-saas-b-v2)。
-- 当前分支：`codex/task-launcher-template-gallery`。
-- 交接前最近一次代码基线：`7f7897b0246a8676f1bd996a61d144c9b0a97fdd`；当前 PR head 必须每次动态查询，不把历史 SHA 当作现状。
+- 当前分支：`codex/phase-e-production-smoke`。
+- 当前代码基线：`origin/main@9ca0fd18d38e09b471651aff9924cd0329a484d1`；历史 SHA 仅作背景，不作为现状判断。
 - 当前 PR：[PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)。
-- PR 基线（`main`）：`7d716c194660a09e223781b85eedfd4c27cb0027`。
-- PR 状态：OPEN，未合并；必须得到用户明确确认后才允许合并。
+- PR 基线（`main`）：`9ca0fd18d38e09b471651aff9924cd0329a484d1`。
+- PR 状态：PR #10 已在用户授权后 squash merge；合并提交为 `9ca0fd18d38e09b471651aff9924cd0329a484d1`。
 - 当前审核流程：用户已明确要求后续不再等待或触发 Codex Cloud 审核；本地测试、GitNexus、CI、精确 head/base 核对和用户合并确认门禁保持不变。
 
 ### 产品硬约束
@@ -136,9 +136,8 @@ CodeRabbit 对原 PNG 资源因默认路径过滤跳过，并不代表图片已�
 
 ### 合并规则
 
-- 不要自行合并 PR #10。
-- 每次先通过实时 PR API 读取当前 `headRefOid` 与 `baseRefOid`；历史 SHA 只作历史证据，不再请求 Cloud 复审。
-- 给用户报告 CI、GitNexus 和本地验证后，等待用户明确说“确认合并/批准合并”。
+- 新 PR 仍需实时核对 `headRefOid`、`baseRefOid`、本地测试、GitNexus 与 GitHub CI；历史 SHA 只作历史证据。
+- 不再请求或等待 Codex Cloud Review；合并、打 tag、发布和部署仍需用户明确确认。
 
 ## 5. 验证命令与已知证据
 
@@ -179,11 +178,12 @@ npm start
 
 ## 6. 下一阶段优先级
 
-### P0：关闭当前 PR 的本地证据链
+### P0：推进 Phase E 生产证据链
 
-1. 查询 PR #10 最新 head/base SHA（不要复用本文件中的历史 SHA）。
-2. 推送本地修复后，检查 GitHub CI；若有明确 CI 或本地回归问题，只修复明确问题。
-3. 向用户汇报，再等待明确合并确认。
+1. 先构建 `dist` / `dist-server`，再用隔离 PostgreSQL、DATA_DIR 和 dummy AI 启动生产服务。
+2. 用 Playwright 验证哈希 JS/CSS、登录、工作台、模板、静态路由和 SPA fallback。
+3. 将 production smoke 与生产构建接入 CI，并验证 SIGINT/SIGTERM 清理。
+4. 当前 `npm run test:e2e:production` 与 `npm run check`、`npm run build` 均已通过，准备复核脚本清理边界后提交给你确认下一步。
 
 ### P1：Phase D 结果迭代和桌面视觉验收
 
