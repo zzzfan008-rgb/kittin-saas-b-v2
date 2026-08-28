@@ -100,13 +100,22 @@ test("upload and text starters complete the isolated first-generation golden pat
   expect(initialDraft.draft?.id).toBeTruthy();
   const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
   await expect(launcher).toBeVisible();
+  await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
+  const coverImages = launcher.locator('img[aria-hidden="true"]');
+  await expect(coverImages).toHaveCount(6);
+  await expect.poll(() => coverImages.evaluateAll((images) => images.filter((image) => {
+    if (!(image instanceof HTMLImageElement)) return false;
+    return image.currentSrc.endsWith(".webp") && image.naturalWidth > 0;
+  }).length)).toBe(6);
 
-  await launcher.getByRole("button", { name: /上传图片开始/ }).click();
+  const uploadFileChooser = page.waitForEvent("filechooser");
+  await launcher.getByRole("button", { name: "使用内置模板：草图→效果图→高清放大" }).click();
+  const fileChooser = await uploadFileChooser;
   const uploadNode = page.locator(".react-flow__node").filter({ hasText: "图片上传" });
   await expect(uploadNode).toBeVisible();
   const fileInput = uploadNode.locator('input[type="file"]');
   await expect(fileInput).toBeFocused();
-  await fileInput.setInputFiles({ name: "starter.png", mimeType: "image/png", buffer: uploadImage });
+  await fileChooser.setFiles({ name: "starter.png", mimeType: "image/png", buffer: uploadImage });
   await expect(uploadNode.getByAltText("已上传图片")).toBeVisible();
 
   const uploadGenerateNode = page.locator(".react-flow__node").filter({ hasText: "草图→效果图" });
@@ -129,10 +138,18 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(projectCenter).toBeVisible();
   await projectCenter.getByRole("button", { name: /新建项目/ }).click();
   await expect(launcher).toBeVisible();
-  await launcher.getByRole("button", { name: /文本生成开始/ }).click();
+  await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
+  await launcher.getByRole("button", { name: "使用内置模板：文生图（服装设计）" }).click();
   const textNode = page.locator(".react-flow__node").filter({ hasText: "文生图" });
   const prompt = textNode.locator("textarea").first();
   await expect(prompt).toBeFocused();
+  await expect.poll(() => page.evaluate(() => {
+    const control = document.activeElement;
+    return control instanceof HTMLTextAreaElement &&
+      control.value.length > 0 &&
+      control.selectionStart === 0 &&
+      control.selectionEnd === control.value.length;
+  })).toBe(true);
   await prompt.fill("极简黑白通勤女装，写实摄影，浅灰背景");
   await textNode.getByRole("button", { name: "生成效果图" }).click();
   await expect(textNode.getByTitle("成功")).toBeVisible();
@@ -146,6 +163,16 @@ test("upload and text starters complete the isolated first-generation golden pat
   const uploadResult = results.getByAltText("草图→效果图");
   await expect(textResult).toBeVisible();
   await expect(uploadResult).toBeVisible();
+
+  const textResultCard = results.locator('article:has(img[alt="文生图"])');
+  await textResultCard.hover();
+  await expect(textResultCard.locator('button[title="查看"]')).toBeVisible();
+  await expect(textResultCard.locator('button[title="加入对比"]')).toBeVisible();
+  await expect(textResultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
+  const textInputNodesBefore = await page.locator(".react-flow__node").filter({ hasText: "文生图" }).count();
+  await textResultCard.locator('button[title="设为输入"]').click();
+  await expect(page.locator(".react-flow__node").filter({ hasText: "文生图" })).toHaveCount(textInputNodesBefore + 1);
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
 
   await textResult.click();
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();

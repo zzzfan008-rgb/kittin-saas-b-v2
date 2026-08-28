@@ -1,6 +1,7 @@
 import {
   selectActiveCompareIds,
   selectActiveSelectedResultId,
+  selectActiveNodes,
   useFlowStore,
 } from "@/store/flowStore";
 import { OPEN_COMPARE_EVENT } from "@/components/CompareOverlay";
@@ -8,6 +9,7 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
+import { requestCanvasLanding } from "@/lib/canvasLanding";
 
 interface ResultsPanelProps {
   hasMore?: boolean;
@@ -30,7 +32,35 @@ export function ResultsPanel({
   const compareIds = useFlowStore(selectActiveCompareIds);
   const toggleCompareId = useFlowStore((s) => s.toggleCompareId);
   const openViewer = useFlowStore((s) => s.openViewer);
+  const activeTabReadOnly = useFlowStore(
+    (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
+  );
   const resultCardClass = "aspect-square min-w-0 w-full";
+
+  const viewResult = (r: (typeof recentResults)[number]) => {
+    setSelectedResultId(r.id);
+    openViewer({
+      url: r.image,
+      title: r.nodeLabel,
+      prompt: r.prompt,
+      meta: `${r.model ?? ""} · ${(((r.finishedAt ?? r.startedAt) - r.startedAt) / 1000).toFixed(1)}s · ${new Date(r.finishedAt ?? r.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
+    });
+  };
+
+  const continueWithResult = (r: (typeof recentResults)[number]) => {
+    const state = useFlowStore.getState();
+    const tab = state.tabs.find((item) => item.id === state.activeTabId);
+    if (!tab || tab.readOnly) return;
+    const nodes = selectActiveNodes(state);
+    const minX = Math.min(0, ...nodes.map((node) => node.position.x));
+    const nodeId = state.addAssetNode(
+      { name: r.nodeLabel, image: r.image },
+      { x: minX - 320, y: nodes.length * 40 },
+    );
+    if (nodeId) {
+      requestCanvasLanding({ tabId: tab.id, nodeId, fitView: false });
+    }
+  };
 
   return (
     <section
@@ -107,22 +137,8 @@ export function ResultsPanel({
                     </span>
                   </button>
                 ) : (
-                  <button
+                  <article
                     key={r.id}
-                    type="button"
-                    onClick={(e) => {
-                      if (e.ctrlKey || e.metaKey) {
-                        toggleCompareId(r.id);
-                      } else {
-                        setSelectedResultId(r.id);
-                        openViewer({
-                          url: r.image,
-                          title: r.nodeLabel,
-                          prompt: r.prompt,
-                          meta: `${r.model ?? ""} · ${(((r.finishedAt ?? r.startedAt) - r.startedAt) / 1000).toFixed(1)}s · ${new Date(r.finishedAt ?? r.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
-                        });
-                      }
-                    }}
                     className={`group relative ${resultCardClass} overflow-hidden rounded-md border bg-[#0f0f0f] ${
                       compareIds.includes(r.id)
                         ? "border-gold ring-2 ring-gold/70"
@@ -131,19 +147,82 @@ export function ResultsPanel({
                           : "border-[#262626] hover:border-gold/60"
                     }`}
                   >
-                    <img
-                      src={r.thumbnail ?? thumbnailImageUrl(r.image)}
-                      alt={r.nodeLabel}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          toggleCompareId(r.id);
+                        } else {
+                          viewResult(r);
+                        }
+                      }}
+                      aria-label={`查看 ${r.nodeLabel}`}
+                      className="absolute inset-0 h-full w-full cursor-zoom-in focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold"
+                    >
+                      <img
+                        src={r.thumbnail ?? thumbnailImageUrl(r.image)}
+                        alt={r.nodeLabel}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    </button>
                     {compareIds.includes(r.id) && (
                       <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[9px] font-bold text-ink">
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}
-                  </button>
+                    <div className="absolute inset-x-0 bottom-0 grid grid-cols-4 gap-1 bg-black/75 p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          viewResult(r);
+                        }}
+                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label={`查看 ${r.nodeLabel}`}
+                        title="查看"
+                      >
+                        查看
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompareId(r.id);
+                        }}
+                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        aria-label={`${compareIds.includes(r.id) ? "取消" : "加入"}对比 ${r.nodeLabel}`}
+                        aria-pressed={compareIds.includes(r.id)}
+                        title={compareIds.includes(r.id) ? "取消对比" : "加入对比"}
+                      >
+                        {compareIds.includes(r.id) ? "取消" : "对比"}
+                      </button>
+                      <a
+                        href={r.image}
+                        download
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-sm px-0.5 py-1 text-center text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        aria-label={`下载 ${r.nodeLabel}`}
+                        title="下载"
+                      >
+                        下载
+                      </a>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          continueWithResult(r);
+                        }}
+                        disabled={activeTabReadOnly}
+                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        aria-label={`将 ${r.nodeLabel} 设为输入，继续处理`}
+                        title={activeTabReadOnly ? "当前项目只读" : "设为输入"}
+                      >
+                        输入
+                      </button>
+                    </div>
+                  </article>
                 ),
               )}
               {hasMore && onLoadMore && (

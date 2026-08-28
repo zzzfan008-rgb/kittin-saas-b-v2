@@ -14,6 +14,26 @@ import { requestCanvasLanding } from "@/lib/canvasLanding";
 
 export type TemplateLaunchMode = "default" | "upload" | "text";
 
+/**
+ * Pick the first interaction a built-in template needs after it is opened.
+ *
+ * The default mode remains available for callers that intentionally want the
+ * generic "first missing parameter" landing behavior.  Launcher cards use
+ * this helper so an image workflow opens its file input and a text workflow
+ * selects its starter prompt for immediate replacement.
+ */
+export function inferTemplateLaunchMode(
+  template: Pick<WorkflowTemplate, "flow">,
+): TemplateLaunchMode {
+  if (template.flow.nodes.some((node) => node.data.kind === "image-input")) {
+    return "upload";
+  }
+  if (template.flow.nodes.some((node) => node.data.kind === "sketch-to-render")) {
+    return "text";
+  }
+  return "default";
+}
+
 function isMissingParameter(data: WorkflowNodeData): boolean {
   if (data.kind === "image-input") return !data.imageUrl;
   if (
@@ -82,7 +102,7 @@ export function launchTemplateInNewTab(
 /** 首次任务直接接管唯一初始草稿；普通空白页签仍沿用“从模板新建”语义。 */
 export function launchStarterTemplate(
   template: WorkflowTemplate,
-  mode: Exclude<TemplateLaunchMode, "default">,
+  mode: TemplateLaunchMode = "default",
 ): { tabId: string; projectId: string; landingNodeId?: string } {
   const active = selectActiveDocument(useFlowStore.getState());
   if (projectTabLifecycle(active) !== "initial_draft" || !isPristineProjectTab(active)) {
