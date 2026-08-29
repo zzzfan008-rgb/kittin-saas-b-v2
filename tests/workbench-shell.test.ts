@@ -36,7 +36,14 @@ state = workbenchUiReducer(state, { type: "toggle-inspector" });
 assert.deepEqual(state, { libraryOpen: true, inspectorOpen: true });
 state = workbenchUiReducer(state, { type: "toggle-library" });
 assert.deepEqual(state, { libraryOpen: false, inspectorOpen: true });
-console.log("  ✓ 外壳 reducer 只管理两个桌面 Dock 的开合状态");
+state = workbenchUiReducer(state, { type: "toggle-library", exclusive: true });
+assert.deepEqual(state, { libraryOpen: true, inspectorOpen: false });
+state = workbenchUiReducer(state, { type: "toggle-inspector", exclusive: true });
+assert.deepEqual(state, { libraryOpen: false, inspectorOpen: true });
+state = { libraryOpen: true, inspectorOpen: true };
+state = workbenchUiReducer(state, { type: "enforce-exclusive" });
+assert.deepEqual(state, { libraryOpen: false, inspectorOpen: true });
+console.log("  ✓ 外壳 reducer 在窄桌面互斥 Dock，并保持宽桌面双开能力");
 
 const relative = (file: string) => path.relative(path.resolve(testRoot, ".."), file);
 const sources = files.map((file) => ({ file, source: fs.readFileSync(file, "utf8") }));
@@ -44,6 +51,10 @@ const combined = sources.map(({ source }) => source).join("\n");
 const appSource = fs.readFileSync(path.resolve(testRoot, "../src/App.tsx"), "utf8");
 const shellSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/workbench/WorkbenchShell.tsx"),
+  "utf8",
+);
+const canvasFlowSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/CanvasFlow.tsx"),
   "utf8",
 );
 const contextPanelSource = fs.readFileSync(
@@ -61,6 +72,14 @@ const workbenchShellRenderSource = shellSource.slice(shellSource.indexOf("export
 assert.match(combined, /@\/components\/ui\//, "新外壳必须复用已安装的 shadcn 基础组件");
 assert.match(combined, /aria-(?:label|labelledby|expanded|controls)/, "新外壳的交互入口必须提供可感知名称或状态");
 assert.match(combined, /transition-\[width,visibility\]/, "桌面 Dock 应通过占位宽度开合，避免遮挡画布控件与结果");
+assert.match(shellSource, /DOCK_EXCLUSIVE_MEDIA = "\(max-width: 1279px\)"/, "1024 桌面宽度必须互斥左右 Dock");
+assert.match(canvasFlowSource, /new ResizeObserver/, "Dock 改变画布尺寸时必须监听容器几何变化");
+assert.match(
+  canvasFlowSource,
+  /x: viewport\.x \+ delta\.width \/ 2/,
+  "Dock 开合必须维持画布中心对应的世界坐标",
+);
+assert.match(canvasFlowSource, /compactMinimap \? 128 : 200/, "窄画布必须缩小 MiniMap");
 assert.doesNotMatch(combined, /absolute inset-y-0 (?:left|right)-0/, "桌面业务面板不得覆盖画布控件与结果");
 assert.equal(
   (workbenchShellRenderSource.match(/\{children\}/g) ?? []).length,

@@ -1548,6 +1548,8 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
   assert.match(resultsPanelSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
   assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
   assert.match(resultsPanelSource, /r\.status !== "success"/);
+  assert.match(resultsPanelSource, /grid-cols-2/);
+  assert.match(resultsPanelSource, /text-\[var\(--gc-media-overlay-text\)\]/);
 });
 
 console.log(`\n通过 ${passed} 项`);

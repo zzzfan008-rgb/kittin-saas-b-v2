@@ -54,6 +54,29 @@ function expectInside(child: Rect, parent: Rect) {
   expect(child.bottom).toBeLessThanOrEqual(parent.bottom + 1);
 }
 
+async function flowCenter(canvas: Locator): Promise<{ x: number; y: number }> {
+  return canvas.evaluate((element) => {
+    const viewport = element.querySelector<HTMLElement>(".react-flow__viewport");
+    if (!viewport) throw new Error("React Flow viewport is missing");
+    const canvasRect = element.getBoundingClientRect();
+    const transform = new DOMMatrixReadOnly(getComputedStyle(viewport).transform);
+    return {
+      x: (canvasRect.width / 2 - transform.e) / transform.a,
+      y: (canvasRect.height / 2 - transform.f) / transform.d,
+    };
+  });
+}
+
+async function expectFlowCenter(
+  canvas: Locator,
+  expected: { x: number; y: number },
+) {
+  await expect.poll(async () => {
+    const current = await flowCenter(canvas);
+    return Math.max(Math.abs(current.x - expected.x), Math.abs(current.y - expected.y));
+  }).toBeLessThanOrEqual(1);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
@@ -230,6 +253,8 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   const originalTransform = await page.locator(".react-flow__viewport").evaluate(
     (element) => getComputedStyle(element).transform,
   );
+  const originalFlowCenter = await flowCenter(canvas);
+  const docksCanShare = viewport.width >= 1280;
 
   await expect(leftToggle).toHaveAttribute("aria-expanded", "false");
   await expect(rightToggle).toHaveAttribute("aria-expanded", "false");
@@ -255,7 +280,10 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   const rightOnlyCanvasRect = await rect(canvas);
   expect(Math.abs(rightOnlyCanvasRect.right - (await rect(rightPanel)).left)).toBeLessThanOrEqual(1);
   expectInside(await rect(page.locator(".react-flow__controls")), rightOnlyCanvasRect);
-  expectInside(await rect(page.locator(".react-flow__minimap")), rightOnlyCanvasRect);
+  const rightOnlyMinimapRect = await rect(page.locator(".react-flow__minimap"));
+  expectInside(rightOnlyMinimapRect, rightOnlyCanvasRect);
+  expect(rightOnlyMinimapRect.width).toBe(rightOnlyCanvasRect.width < 760 ? 128 : 200);
+  await expectFlowCenter(canvas, originalFlowCenter);
 
   // 两个 Tab Panel 必须保持挂载；切换与 Dock 关闭不能丢失 Results DOM/滚动状态。
   const propertiesTab = page.getByRole("tab", { name: "属性" });
@@ -323,7 +351,7 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await rightToggle.click();
   await expectWidth(rightPanel, 0);
 
-  // 左侧单开：Tab 应进入节点库；随后验证双 Dock 的完整几何。
+  // 左侧单开：Tab 应进入节点库；随后按桌面宽度验证互斥或双 Dock 几何。
   await leftToggle.click();
   await expect(leftToggle).toBeFocused();
   await expect(leftToggle).toHaveAttribute("aria-expanded", "true");
@@ -344,17 +372,24 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await rightToggle.click();
   await expectInert(rightPanel, false);
   await expectWidth(rightPanel, 320);
-  await expectWidth(canvas, viewport.width - 656);
+  await expectInert(leftPanel, !docksCanShare);
+  await expectWidth(leftPanel, docksCanShare ? 240 : 0);
+  await expectWidth(canvas, viewport.width - (docksCanShare ? 656 : 416));
 
   const leftPanelRect = await rect(leftPanel);
   const canvasRect = await rect(canvas);
   const rightPanelRect = await rect(rightPanel);
-  expect(Math.abs(leftPanelRect.right - canvasRect.left)).toBeLessThanOrEqual(1);
+  if (docksCanShare) {
+    expect(Math.abs(leftPanelRect.right - canvasRect.left)).toBeLessThanOrEqual(1);
+  }
   expect(Math.abs(canvasRect.right - rightPanelRect.left)).toBeLessThanOrEqual(1);
   expectInside(await rect(page.locator(".react-flow__controls")), canvasRect);
-  expectInside(await rect(page.locator(".react-flow__minimap")), canvasRect);
+  const minimapRect = await rect(page.locator(".react-flow__minimap"));
+  expectInside(minimapRect, canvasRect);
+  expect(minimapRect.width).toBe(canvasRect.width < 760 ? 128 : 200);
+  await expectFlowCenter(canvas, originalFlowCenter);
 
-  // 模板浮层必须按双 Dock 后的中心宽度收缩，不能被画布容器裁切。
+  // 模板浮层必须按当前 Dock 后的中心宽度收缩，不能被画布容器裁切。
   const releaseTemplateSaves: Array<() => void> = [];
   const templateSaveGates = Array.from({ length: 3 }, () => new Promise<void>((resolve) => {
     releaseTemplateSaves.push(resolve);
@@ -391,7 +426,7 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   const projectCenterRect = await rect(projectCenter);
   expect(projectCenterRect.left).toBeGreaterThanOrEqual(39);
   expect(projectCenterRect.right).toBeLessThanOrEqual(viewport.width - 39);
-  await testInfo.attach(`desktop-${viewport.width}-both-docks-template`, {
+  await testInfo.attach(`desktop-${viewport.width}-dock-layout-template`, {
     body: await page.screenshot(),
     contentType: "image/png",
   });
@@ -471,7 +506,7 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await page.mouse.move(canvasRect.left + canvasRect.width / 2, canvasRect.top + 20);
   await page.waitForTimeout(300);
 
-  await testInfo.attach(`desktop-${viewport.width}-both-docks`, {
+  await testInfo.attach(`desktop-${viewport.width}-dock-layout`, {
     body: await page.screenshot(),
     contentType: "image/png",
   });
@@ -481,13 +516,20 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   await expect(rightPanel).toHaveAttribute("aria-hidden", "true");
   await expectInert(rightPanel, true);
   await expectWidth(rightPanel, 0);
-  await expectWidth(canvas, viewport.width - 336);
+  await expectWidth(canvas, viewport.width - (docksCanShare ? 336 : 96));
 
-  await leftToggle.click();
-  await expect(leftToggle).toBeFocused();
-  await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
-  await expectInert(leftPanel, true);
-  await expectWidth(leftPanel, 0);
+  if (docksCanShare) {
+    await leftToggle.click();
+    await expect(leftToggle).toBeFocused();
+    await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
+    await expectInert(leftPanel, true);
+    await expectWidth(leftPanel, 0);
+  } else {
+    await expect(leftToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
+    await expectInert(leftPanel, true);
+    await expectWidth(leftPanel, 0);
+  }
   await expectWidth(canvas, viewport.width - 96);
   await page.keyboard.press("Tab");
   expect(await leftPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);

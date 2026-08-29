@@ -157,11 +157,16 @@ export function CanvasFlow() {
   const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
   const activeTabId = useFlowStore((s) => s.activeTabId);
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, getViewport, screenToFlowPosition, setViewport } = useReactFlow();
   const nodesInitialized = useNodesInitialized();
   const [landingVersion, setLandingVersion] = useState(0);
+  const [compactMinimap, setCompactMinimap] = useState(false);
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const canvasSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const pendingResizeDeltaRef = useRef({ width: 0, height: 0 });
+  const resizeFrameRef = useRef<number | null>(null);
   const dragTransactionRef = useRef<DragHistoryTransactionRef>({
     current: null,
     startedAt: null,
@@ -171,6 +176,52 @@ export function CanvasFlow() {
     () => registerDragInterruptionHandlers(dragTransactionRef, window),
     [],
   );
+
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const nextSize = {
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      };
+      setCompactMinimap(nextSize.width < 760);
+
+      const previousSize = canvasSizeRef.current;
+      canvasSizeRef.current = nextSize;
+      if (!previousSize) return;
+
+      pendingResizeDeltaRef.current.width += nextSize.width - previousSize.width;
+      pendingResizeDeltaRef.current.height += nextSize.height - previousSize.height;
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        const delta = pendingResizeDeltaRef.current;
+        pendingResizeDeltaRef.current = { width: 0, height: 0 };
+        if (delta.width === 0 && delta.height === 0) return;
+        const viewport = getViewport();
+        void setViewport(
+          {
+            ...viewport,
+            x: viewport.x + delta.width / 2,
+            y: viewport.y + delta.height / 2,
+          },
+          { duration: 0 },
+        );
+      });
+    });
+
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = null;
+      canvasSizeRef.current = null;
+      pendingResizeDeltaRef.current = { width: 0, height: 0 };
+    };
+  }, [getViewport, setViewport]);
 
   useEffect(() => {
     const onLanding = (event: Event) => {
@@ -216,7 +267,7 @@ export function CanvasFlow() {
   );
 
   return (
-    <div className="min-h-0 flex-1">
+    <div ref={canvasContainerRef} className="min-h-0 flex-1">
       <ReactFlow
         aria-label="工作流画布"
         nodes={nodes}
@@ -255,6 +306,10 @@ export function CanvasFlow() {
           bgColor={minimap.bg}
           nodeColor={minimap.node}
           maskColor={minimap.mask}
+          style={{
+            width: compactMinimap ? 128 : 200,
+            height: compactMinimap ? 96 : 150,
+          }}
           pannable
           zoomable
         />

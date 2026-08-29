@@ -36,6 +36,8 @@ export function ResultsPanel({
     (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
   );
   const resultCardClass = "aspect-square min-w-0 w-full";
+  const resultActionClass =
+    "rounded-sm px-1 py-1 text-[10px] font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
   const viewResult = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
@@ -172,14 +174,14 @@ export function ResultsPanel({
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 grid grid-cols-4 gap-1 bg-black/75 p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    <div className="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-1 bg-black/75 p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           viewResult(r);
                         }}
-                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45"
+                        className={resultActionClass}
                         aria-label={`查看 ${r.nodeLabel}`}
                         title="查看"
                       >
@@ -191,7 +193,7 @@ export function ResultsPanel({
                           e.stopPropagation();
                           toggleCompareId(r.id);
                         }}
-                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        className={resultActionClass}
                         aria-label={`${compareIds.includes(r.id) ? "取消" : "加入"}对比 ${r.nodeLabel}`}
                         aria-pressed={compareIds.includes(r.id)}
                         title={compareIds.includes(r.id) ? "取消对比" : "加入对比"}
@@ -202,7 +204,7 @@ export function ResultsPanel({
                         href={r.image}
                         download
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded-sm px-0.5 py-1 text-center text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        className={resultActionClass}
                         aria-label={`下载 ${r.nodeLabel}`}
                         title="下载"
                       >
@@ -215,7 +217,7 @@ export function ResultsPanel({
                           continueWithResult(r);
                         }}
                         disabled={activeTabReadOnly}
-                        className="rounded-sm px-0.5 py-1 text-[9px] text-neutral-200 hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold"
+                        className={resultActionClass}
                         aria-label={`将 ${r.nodeLabel} 设为输入，继续处理`}
                         title={activeTabReadOnly ? "当前项目只读" : "设为输入"}
                       >

@@ -4,8 +4,9 @@ export interface WorkbenchUiState {
 }
 
 export type WorkbenchUiAction =
-  | { type: "toggle-library" }
-  | { type: "toggle-inspector" };
+  | { type: "toggle-library"; exclusive?: boolean }
+  | { type: "toggle-inspector"; exclusive?: boolean }
+  | { type: "enforce-exclusive" };
 
 export const INITIAL_WORKBENCH_UI_STATE: WorkbenchUiState = {
   libraryOpen: false,
@@ -22,10 +23,22 @@ export function workbenchUiReducer(
   action: WorkbenchUiAction,
 ): WorkbenchUiState {
   switch (action.type) {
-    case "toggle-library":
-      return { ...state, libraryOpen: !state.libraryOpen };
-    case "toggle-inspector":
-      return { ...state, inspectorOpen: !state.inspectorOpen };
+    case "toggle-library": {
+      const libraryOpen = !state.libraryOpen;
+      return libraryOpen && action.exclusive
+        ? { libraryOpen: true, inspectorOpen: false }
+        : { ...state, libraryOpen };
+    }
+    case "toggle-inspector": {
+      const inspectorOpen = !state.inspectorOpen;
+      return inspectorOpen && action.exclusive
+        ? { libraryOpen: false, inspectorOpen: true }
+        : { ...state, inspectorOpen };
+    }
+    case "enforce-exclusive":
+      return state.libraryOpen && state.inspectorOpen
+        ? { libraryOpen: false, inspectorOpen: true }
+        : state;
     default:
       return state;
   }
