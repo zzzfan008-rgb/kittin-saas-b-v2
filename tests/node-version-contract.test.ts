@@ -33,7 +33,13 @@ assert.match(
 );
 
 assert.equal(read(".nvmrc").trim(), "22.20.0", ".nvmrc 必须固定最低受支持版本");
-assert.match(read(".github/workflows/ci.yml"), /node-version:\s*22\.20\.0/);
+const ciWorkflow = read(".github/workflows/ci.yml");
+assert.match(ciWorkflow, /node-version:\s*22\.20\.0/);
+assert.match(
+  ciWorkflow,
+  /uses:\s*actions\/upload-artifact@v7/,
+  "CI artifact upload must use the Node.js 24-based upload-artifact v7 action",
+);
 const dockerfile = read("Dockerfile");
 const nodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
 assert.ok(nodeImages.length > 0, "Dockerfile 必须声明 Node.js 基础镜像");
