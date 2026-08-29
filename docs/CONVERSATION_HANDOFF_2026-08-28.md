@@ -12,9 +12,9 @@
 - 远程仓库：[GitHub 仓库](https://github.com/zzzfan008-rgb/kittin-saas-b-v2)。
 - 当前分支：`codex/phase-e-production-smoke`。
 - 当前代码基线：`origin/main@9ca0fd18d38e09b471651aff9924cd0329a484d1`；历史 SHA 仅作背景，不作为现状判断。
-- 当前 PR：[PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)。
+- 当前 PR：[PR #11](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/11)；当前 head 必须通过实时 PR API 查询。
 - PR 基线（`main`）：`9ca0fd18d38e09b471651aff9924cd0329a484d1`。
-- PR 状态：PR #10 已在用户授权后 squash merge；合并提交为 `9ca0fd18d38e09b471651aff9924cd0329a484d1`。
+- PR 状态：OPEN、MERGEABLE；Phase E 代码头 `50e119a960c75a06264c7db3b3e687754e950c22` 的 GitHub CI 与 CodeRabbit 已通过，最终合并仍需用户单独授权。
 - 当前审核流程：用户已明确要求后续不再等待或触发 Codex Cloud 审核；本地测试、GitNexus、CI、精确 head/base 核对和用户合并确认门禁保持不变。
 
 ### 产品硬约束
@@ -183,7 +183,7 @@ npm start
 1. 先构建 `dist` / `dist-server`，再用隔离 PostgreSQL、DATA_DIR 和 dummy AI 启动生产服务。
 2. 用 Playwright 验证哈希 JS/CSS、登录、工作台、模板、静态路由和 SPA fallback。
 3. 将 production smoke 与生产构建接入 CI，并验证 SIGINT/SIGTERM 清理。
-4. 当前 `npm run test:e2e:production` 与 `npm run check`、`npm run build` 均已通过，准备复核脚本清理边界后提交给你确认下一步。
+4. 当前 `npm run test:e2e:production`、`npm run check`、`npm run build` 与 PR #11 首个代码头 CI 均已通过；等待用户单独授权合并。
 
 ### P1：Phase D 结果迭代和桌面视觉验收
 
