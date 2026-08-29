@@ -1529,6 +1529,8 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
   assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
   assert.match(projectCenterSource, /SAVE_TEMPLATE_COVER/);
+  assert.match(projectCenterSource, /PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4"/);
+  assert.match(projectCenterSource, /PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-\[var\(--gc-text\)\]"/);
   assert.ok(
     fs.existsSync(new URL("../public/assets/project-center/save-template-cover.png", import.meta.url)),
     "我的模板保存卡必须使用仓库内图片素材",

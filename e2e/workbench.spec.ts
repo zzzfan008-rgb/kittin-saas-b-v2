@@ -24,6 +24,91 @@ const TEMPLATE_FIXTURES = Array.from({ length: 3 }, (_, index) => ({
   flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] },
 })) satisfies WorkflowTemplate[];
 
+const PROJECT_CENTER_PROJECT_FIXTURES = Array.from({ length: 5 }, (_, index) => ({
+  id: `e2e-project-${index + 1}`,
+  name: `超长项目名称 ${index + 1} · 用于验证单元长度折行在不同分辨率下的稳定展示`,
+  ownerName: "E2E 演示用户",
+  readOnly: index === 0,
+  updatedAt: "2026-08-24T00:00:00.000Z",
+}));
+
+const PROJECT_CENTER_TEMPLATE_FIXTURES: Array<WorkflowTemplate> = [
+  {
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    id: "e2e-template-builtin-1",
+    name: "超长内置模板示例 1",
+    description: "用于验证 3 列/4 列切换时模板卡片标题双行截断的稳定效果",
+    builtIn: true,
+    createdAt: "2026-08-24T00:00:00.000Z",
+    flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] },
+  },
+  {
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    id: "e2e-template-builtin-2",
+    name: "内置模板示例 2",
+    description: "快速创建一个基础画布与节点",
+    builtIn: true,
+    createdAt: "2026-08-24T00:00:01.000Z",
+    flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] },
+  },
+  {
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    id: "e2e-template-my-1",
+    name: "超长自建模板名称 1",
+    description: "用于验证我的模板卡片标题与动作区域在窄列下依然可见且不溢出",
+    builtIn: false,
+    createdAt: "2026-08-24T00:00:02.000Z",
+    flow: { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] },
+  },
+];
+
+const RESULTS_DENSITY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+
+const RESULTS_DENSITY_FIXTURES = [
+  {
+    id: "e2e-result-success",
+    runId: "e2e-run-success",
+    image: RESULTS_DENSITY_IMAGE,
+    thumbnail: RESULTS_DENSITY_IMAGE,
+    nodeId: "node-success",
+    nodeLabel: "超长成功结果卡片标题 · 用于验证双列布局下动作按钮可读性",
+    kind: "sketch-to-render" as const,
+    projectId: "e2e-project-1",
+    projectName: "演示项目",
+    prompt: "检查结果卡片动作与布局",
+    model: "gpt-image-2",
+    startedAt: 1760000000000,
+    finishedAt: 1760000001000,
+    status: "success" as const,
+    ownerName: "E2E 演示用户",
+  },
+  {
+    id: "e2e-result-failed",
+    runId: "e2e-run-failed",
+    image: RESULTS_DENSITY_IMAGE,
+    nodeId: "node-failed",
+    nodeLabel: "失败结果测试",
+    kind: "sketch-to-render" as const,
+    projectId: "e2e-project-2",
+    prompt: "失败演示",
+    startedAt: 1760000002000,
+    status: "error" as const,
+    error: "演示错误",
+  },
+  {
+    id: "e2e-result-unknown",
+    runId: "e2e-run-unknown",
+    image: RESULTS_DENSITY_IMAGE,
+    nodeId: "node-unknown",
+    nodeLabel: "未知状态结果测试",
+    kind: "sketch-to-render" as const,
+    projectId: "e2e-project-3",
+    prompt: "未知演示",
+    startedAt: 1760000003000,
+    status: "outcome_unknown" as const,
+  },
+];
+
 async function rect(locator: Locator): Promise<Rect> {
   return locator.evaluate((element) => {
     const box = element.getBoundingClientRect();
@@ -52,6 +137,31 @@ function expectInside(child: Rect, parent: Rect) {
   expect(child.right).toBeLessThanOrEqual(parent.right + 1);
   expect(child.top).toBeGreaterThanOrEqual(parent.top - 1);
   expect(child.bottom).toBeLessThanOrEqual(parent.bottom + 1);
+}
+
+async function gridColumnCount(locator: Locator): Promise<number> {
+  return locator.evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+  ));
+}
+
+async function expectGridColumns(locator: Locator, count: number) {
+  await expect(locator).toBeVisible();
+  await expect.poll(async () => gridColumnCount(locator)).toBe(count);
+}
+
+async function expectTwoLineTitle(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const metrics = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      height: element.getBoundingClientRect().height,
+      lineClamp: style.webkitLineClamp,
+    };
+  });
+  expect(metrics.lineClamp).toBe("2");
+  expect(metrics.height).toBeGreaterThanOrEqual(31);
+  expect(metrics.height).toBeLessThanOrEqual(33);
 }
 
 async function flowCenter(canvas: Locator): Promise<{ x: number; y: number }> {
@@ -141,6 +251,149 @@ test("project center keeps projects usable when template loading fails", async (
   await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
   await expect(center.getByRole("alert")).toContainText("模板 HTTP 500");
   await expect(center.getByText("正在加载模板")).toHaveCount(0);
+});
+
+test("results and project center follow desktop density for cards", async ({ page }) => {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("Desktop viewport is required");
+  const expectedProjectColumns = viewport.width >= 1280 ? 4 : 3;
+
+  await page.route("**/api/history*", async (route) => {
+    const method = route.request().method();
+    const pathname = new URL(route.request().url()).pathname;
+    if (method !== "GET") {
+      await route.fallback();
+      return;
+    }
+    if (pathname === "/api/history/active") {
+      await route.fulfill({
+        json: { records: [], nextCursor: null, hasMore: false },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: { records: RESULTS_DENSITY_FIXTURES, nextCursor: null, hasMore: false },
+    });
+  });
+  await page.route("**/api/projects", (route) => {
+    if (route.request().method() !== "GET") {
+      route.fallback();
+      return;
+    }
+    route.fulfill({ json: PROJECT_CENTER_PROJECT_FIXTURES });
+  });
+  await page.route("**/api/templates", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ json: PROJECT_CENTER_TEMPLATE_FIXTURES });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.reload();
+  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
+
+  const rightToggle = page.getByRole("button", { name: "属性 / 结果" });
+  await rightToggle.click();
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  const resultsRegion = page.getByRole("region", { name: "最近生成" });
+  await expect(resultsRegion).toBeVisible();
+
+  const resultsGrid = resultsRegion.locator("div.grid.grid-cols-2.gap-2");
+  await expect(resultsGrid).toHaveCount(1);
+  await expectGridColumns(resultsGrid, 2);
+
+  const resultsScroller = resultsRegion.locator(".overflow-y-auto");
+  const resultCards = resultsGrid.locator(":scope > *");
+  const visibleResults = await resultCards.count();
+  expect(visibleResults).toBeGreaterThanOrEqual(1);
+  await expect(resultsRegion.getByRole("img", { name: "超长成功结果卡片标题 · 用于验证双列布局下动作按钮可读性" })).toBeVisible();
+  await expect(resultsRegion).toContainText("失败结果测试");
+  await expect(resultsRegion).toContainText("未知状态结果测试");
+  const firstSuccessCard = resultsGrid.locator("article").first();
+  await expect(firstSuccessCard).toBeVisible();
+  await firstSuccessCard.hover();
+  const compareButton = firstSuccessCard.locator('button[title="加入对比"]');
+  const viewButton = firstSuccessCard.locator('button[title="查看"]');
+  const downloadButton = firstSuccessCard.locator('a[title="下载"]');
+  const applyButton = firstSuccessCard.locator('button[title="设为输入"]');
+  await expect(compareButton).toBeVisible();
+  await expect(viewButton).toBeVisible();
+  await expect(downloadButton).toBeVisible();
+  await expect(applyButton).toBeVisible();
+
+  const resultsRect = await rect(resultsScroller);
+  await expectInside(await rect(firstSuccessCard), resultsRect);
+
+  await viewButton.click();
+  const viewerHint = page.getByText(/滚轮缩放 100%/);
+  await expect(viewerHint).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewerHint).toBeHidden();
+
+  await compareButton.click();
+  await expect(firstSuccessCard.locator('button[title="取消对比"]')).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await downloadButton.click();
+  await download;
+
+  const nodeCountBeforeApply = await page.locator(".react-flow__node").count();
+  await applyButton.click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountBeforeApply + 1);
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  await expect(resultsRegion).toBeVisible();
+
+  const themes = [
+    { label: "简白", id: "white" },
+    { label: "护眼绿", id: "eye" },
+    { label: "经典暗金", id: "current" },
+  ];
+  for (const theme of themes) {
+    const themeTrigger = page.getByRole("button", { name: /^切换主题，当前为/ });
+    await themeTrigger.click();
+    await page.getByRole("menuitemradio", { name: new RegExp(`^${theme.label}`) }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
+    await expectGridColumns(resultsGrid, 2);
+
+    await page.getByRole("button", { name: "打开项目中心" }).click();
+    const center = page.getByRole("dialog", { name: "项目中心" });
+    await expect(center).toBeVisible();
+    const activeGrid = () => center.getByRole("tabpanel").locator(".grid").first();
+
+    await center.getByRole("tab", { name: "最近项目" }).click();
+    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    if (theme.id === "white") {
+      await expectTwoLineTitle(center.getByText(PROJECT_CENTER_PROJECT_FIXTURES[0].name, { exact: true }));
+      const projectCardHeights = await center.getByRole("button", { name: /^超长项目名称/ }).evaluateAll(
+        (elements) => elements.map((element) => element.getBoundingClientRect().height),
+      );
+      expect(projectCardHeights).toHaveLength(PROJECT_CENTER_PROJECT_FIXTURES.length);
+      expect(Math.max(...projectCardHeights) - Math.min(...projectCardHeights)).toBeLessThanOrEqual(1);
+    }
+
+    await center.getByRole("tab", { name: "内置模板" }).click();
+    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    if (theme.id === "white") {
+      await expectTwoLineTitle(center.getByText(PROJECT_CENTER_TEMPLATE_FIXTURES[0].name, { exact: true }));
+    }
+
+    await center.getByRole("tab", { name: "我的模板" }).click();
+    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    if (theme.id === "white") {
+      await expectTwoLineTitle(center.getByText(PROJECT_CENTER_TEMPLATE_FIXTURES[2].name, { exact: true }));
+    }
+
+    const projectGridRects = await activeGrid().boundingBox();
+    if (!projectGridRects) throw new Error("Project center grid is missing");
+    const projectCards = activeGrid().locator(":scope > *");
+    for (let index = 0; index < Math.min(await projectCards.count(), 8); index += 1) {
+      const cardRect = await rect(projectCards.nth(index));
+      expect(cardRect.left).toBeGreaterThanOrEqual(projectGridRects.x - 1);
+      expect(cardRect.right).toBeLessThanOrEqual(projectGridRects.x + projectGridRects.width + 1);
+    }
+    await center.getByRole("button", { name: "关闭项目中心" }).click();
+  }
 });
 
 test("adding a local edit node keeps the canvas mounted and exposes one clear workflow", async ({ page }) => {

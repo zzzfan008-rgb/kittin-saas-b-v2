@@ -65,6 +65,8 @@ interface ProjectDetail extends ProjectSummary {
 const NEW_PROJECT_COVER = "/assets/project-center/new-project-cover.jpg";
 const EMPTY_PROJECT_COVER = "/assets/project-center/empty-project-cover.jpg";
 const SAVE_TEMPLATE_COVER = "/assets/project-center/save-template-cover.png";
+const PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4";
+const PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-[var(--gc-text)]";
 
 function flowPreviewImage(flow: { nodes: unknown[] }): string | undefined {
   for (const rawNode of [...flow.nodes].reverse()) {
@@ -128,7 +130,7 @@ function CardFrame({ children }: { children: ReactNode }) {
 
 function TemplateSkeletons() {
   return (
-    <div aria-label="正在加载模板" className="grid grid-cols-4 gap-4">
+    <div aria-label="正在加载模板" className={PROJECT_CENTER_CARD_GRID_CLASS}>
       {Array.from({ length: 8 }, (_, index) => (
         <Card key={index} size="sm" className="gap-3 border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] py-0 ring-0">
           <Skeleton className="aspect-[16/10] w-full rounded-none bg-[var(--gc-panel-hover)]" />
@@ -387,61 +389,67 @@ export function ProjectCenter({
             )}
 
             <TabsContent value="recent" className="min-h-0 overflow-y-auto p-7">
-              {projectsLoading ? <TemplateSkeletons /> : (
-                <div className="grid grid-cols-4 gap-4">
-                <CardFrame>
-                  <button type="button" onClick={createProject} className="block w-full text-left">
-                    <div className="relative overflow-hidden">
-                      <ProjectCover src={NEW_PROJECT_COVER} fallback={NEW_PROJECT_COVER} alt="新建项目" />
-                      <span className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-sm">
-                        <PlusIcon aria-hidden="true" className="size-4" />
-                      </span>
-                    </div>
-                    <span className="block p-3">
-                      <span className="block text-xs font-semibold text-[var(--gc-accent)]">新建项目</span>
-                      <span className="mt-1 block text-[10px] text-[var(--gc-text-muted)]">从空白服装画布开始</span>
-                    </span>
-                  </button>
-                </CardFrame>
-
-                {initialDraft && (
+              {projectsLoading ? (
+                <TemplateSkeletons />
+              ) : (
+                <div className={PROJECT_CENTER_CARD_GRID_CLASS}>
                   <CardFrame>
-                    <button type="button" onClick={() => continueDraft(initialDraft)} className="block w-full text-left">
-                      <ProjectCover
-                        src={flowPreviewImage(initialDraft)}
-                        alt={initialDraft.projectName}
-                      />
-                      <span className="block p-3">
-                        <span className="flex items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--gc-text)]">继续草稿</span>
-                          <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">自动保存</span>
+                    <button type="button" onClick={createProject} className="block w-full text-left">
+                      <div className="relative overflow-hidden">
+                        <ProjectCover src={NEW_PROJECT_COVER} fallback={NEW_PROJECT_COVER} alt="新建项目" />
+                        <span className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-sm">
+                          <PlusIcon aria-hidden="true" className="size-4" />
                         </span>
-                        <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">{initialDraft.projectName}</span>
+                      </div>
+                      <span className="block p-3">
+                        <span className="block text-xs font-semibold text-[var(--gc-accent)]">新建项目</span>
+                        <span className="mt-1 block text-[10px] text-[var(--gc-text-muted)]">从空白服装画布开始</span>
                       </span>
                     </button>
                   </CardFrame>
-                )}
 
-                {filteredProjects.map((project) => {
-                  const openTab = tabs.find((tab) => tab.projectId === project.id);
-                  return (
-                    <CardFrame key={project.id}>
-                      <button type="button" onClick={() => void openProject(project)} className="block w-full text-left">
-                        <ProjectCover alt={project.name} />
+                  {initialDraft && (
+                    <CardFrame>
+                      <button type="button" onClick={() => continueDraft(initialDraft)} className="block w-full text-left">
+                        <ProjectCover
+                          src={flowPreviewImage(initialDraft)}
+                          alt={initialDraft.projectName}
+                        />
                         <span className="block p-3">
                           <span className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--gc-text)]">{project.name}</span>
-                            {openTab && <span className="shrink-0 text-[8px] text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                            <span className={PROJECT_CENTER_TITLE_CLASS}>继续草稿</span>
+                            <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">自动保存</span>
                           </span>
-                          <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">
-                            {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
-                            最后编辑 {formatUpdatedAt(project.updatedAt)}
-                          </span>
+                          <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">{initialDraft.projectName}</span>
                         </span>
                       </button>
                     </CardFrame>
-                  );
-                })}
+                  )}
+
+                  {filteredProjects.map((project) => {
+                    const openTab = tabs.find((tab) => tab.projectId === project.id);
+                    return (
+                      <CardFrame key={project.id}>
+                        <button
+                          type="button"
+                          onClick={() => void openProject(project)}
+                          className="block w-full text-left"
+                        >
+                          <ProjectCover alt={project.name} />
+                          <span className="block p-3">
+                            <span className="flex items-center gap-2">
+                              <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                              {openTab && <span className="shrink-0 text-[8px] text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                            </span>
+                            <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">
+                              {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
+                              最后编辑 {formatUpdatedAt(project.updatedAt)}
+                            </span>
+                          </span>
+                        </button>
+                      </CardFrame>
+                    );
+                  })}
                 </div>
               )}
               {!projectsLoading && filteredProjects.length === 0 && !initialDraft && (
@@ -450,33 +458,35 @@ export function ProjectCenter({
             </TabsContent>
 
             <TabsContent value="templates" className="min-h-0 overflow-y-auto p-7">
-              {templatesLoading ? <TemplateSkeletons /> : (
-                <div className="grid grid-cols-4 gap-4">
-                {filteredTemplates.map((template) => {
-                  const image = BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? flowPreviewImage(template.flow);
-                  return (
-                    <CardFrame key={template.id}>
-                      <button
-                        type="button"
-                        onClick={() => openTemplate(template)}
-                        className="block w-full text-left"
-                      >
-                        <ProjectCover src={image} alt={template.name} />
-                        <span className="block p-3">
-                          <span className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--gc-text)]">{template.name}</span>
-                            <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">
-                              内置
+              {templatesLoading ? (
+                <TemplateSkeletons />
+              ) : (
+                <div className={PROJECT_CENTER_CARD_GRID_CLASS}>
+                  {filteredTemplates.map((template) => {
+                    const image = BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? flowPreviewImage(template.flow);
+                    return (
+                      <CardFrame key={template.id}>
+                        <button
+                          type="button"
+                          onClick={() => openTemplate(template)}
+                          className="block w-full text-left"
+                        >
+                          <ProjectCover src={image} alt={template.name} />
+                          <span className="block p-3">
+                            <span className="flex items-center gap-2">
+                              <span className={PROJECT_CENTER_TITLE_CLASS}>{template.name}</span>
+                              <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">
+                                内置
+                              </span>
+                            </span>
+                            <span className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
+                              {template.description || "从此工作流模板创建一个新项目"}
                             </span>
                           </span>
-                          <span className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
-                            {template.description || "从此工作流模板创建一个新项目"}
-                          </span>
-                        </span>
-                      </button>
-                    </CardFrame>
-                  );
-                })}
+                        </button>
+                      </CardFrame>
+                    );
+                  })}
                 </div>
               )}
               {!templatesLoading && filteredTemplates.length === 0 && (
@@ -486,7 +496,7 @@ export function ProjectCenter({
 
             <TabsContent value="my-templates" className="min-h-0 overflow-y-auto p-7">
               {templatesLoading ? <TemplateSkeletons /> : (
-                <div className="grid grid-cols-4 gap-4">
+                <div className={PROJECT_CENTER_CARD_GRID_CLASS}>
                   <CardFrame>
                     <button
                       ref={saveTemplateButtonRef}
@@ -539,7 +549,11 @@ export function ProjectCenter({
                         </div>
                         <div className="p-3">
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => openTemplate(template)} className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-[var(--gc-text)] hover:text-[var(--gc-accent)]">
+                            <button
+                              type="button"
+                              onClick={() => openTemplate(template)}
+                              className={`${PROJECT_CENTER_TITLE_CLASS} text-left hover:text-[var(--gc-accent)]`}
+                            >
                               {template.name}
                             </button>
                             <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">我的</span>
