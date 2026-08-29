@@ -1,5 +1,9 @@
 # Garment Canvas
 
+Garment Canvas 是面向服装设计师的桌面工作流画布，覆盖图片输入、模板建图、AI 生成、局部修改、项目页签、跨项目 Results 与素材管理。最低支持宽度为 1024 CSS px，主要验收宽度为 1280 与 1440；不提供移动端专用布局。
+
+生产部署、macOS 常驻运行、完整环境变量、管理员初始化、备份恢复、PostgreSQL/SQLite 迁移、故障处理和安全基线见 [`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md)。发布前使用 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，最新三主题桌面视觉证据见 [`docs/PHASE_D_VISUAL_ACCEPTANCE.md`](docs/PHASE_D_VISUAL_ACCEPTANCE.md)。
+
 ## Docker 启动（推荐）
 
 要求 Docker Desktop / Docker Engine + Compose。先复制 `.env.example` 为私有
@@ -9,7 +13,9 @@
 docker compose up -d --build --wait
 ```
 
-网页默认为 `http://localhost:3002`。PostgreSQL 18 数据保存在 Docker 命名卷
+复制当前 `.env.example` 后网页默认为 `http://localhost:3001`；Compose 容器内仍监听
+3002，宿主机端口由私有 `.env` 的 `PORT` 决定，未设置 `PORT` 时才回退到 3002。
+PostgreSQL 18 数据保存在 Docker 命名卷
 `garment-canvas_postgres_data`，上传和生成文件仍保存在 `data/`。
 
 PostgreSQL 18 官方镜像的卷挂载点是 `/var/lib/postgresql`。从 17 升级时不能直接
@@ -103,7 +109,8 @@ INITIAL_ADMIN_PASSWORD=your-temporary-password
 `APIYI_API_KEY`，且 `APIYI_BASE_URL` 必须为 HTTPS。该检查不会主动调用
 外部模型，不会产生费用。
 
-生成和工作流执行接口使用进程内限流：同一 IP 每分钟最多请求 5 次；服务重启后计数重置。
+生成、工作流入队和 AI 诊断探测共用进程内限流：同一 IP 每分钟最多请求 100 次；
+登录接口单独限制为每分钟 10 次。服务重启后计数重置，多实例部署需要集中式限流。
 
 每个 AI 节点独立保存模型和原生参数。普通图片节点可选择
 `gpt-image-2-vip`、`gemini-3.1-flash-image`、`flux-2-pro`、

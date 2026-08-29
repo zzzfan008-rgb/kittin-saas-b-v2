@@ -43,7 +43,9 @@ temp/
 # Test and local demo outputs
 .playwright/
 playwright-report/
+playwright-report-production/
 test-results/
+test-results-production/
 test-*.png
 test-*.jpg
 shot-*.png

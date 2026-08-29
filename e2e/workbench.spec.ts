@@ -388,7 +388,11 @@ test("results and project center follow desktop density for cards", async ({ pag
     if (!projectGridRects) throw new Error("Project center grid is missing");
     const projectCards = activeGrid().locator(":scope > *");
     for (let index = 0; index < Math.min(await projectCards.count(), 8); index += 1) {
-      const cardRect = await rect(projectCards.nth(index));
+      const projectCard = projectCards.nth(index);
+      // Base UI updates the selected tab synchronously, but Chromium can expose the
+      // new panel to role queries one frame before its descendants have layout.
+      await expect(projectCard).toBeVisible();
+      const cardRect = await rect(projectCard);
       expect(cardRect.left).toBeGreaterThanOrEqual(projectGridRects.x - 1);
       expect(cardRect.right).toBeLessThanOrEqual(projectGridRects.x + projectGridRects.width + 1);
     }
