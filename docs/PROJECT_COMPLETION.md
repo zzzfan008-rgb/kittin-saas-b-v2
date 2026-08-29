@@ -16,10 +16,10 @@
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
 | 最终阶段 PR | 已合并 | [PR #17](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/17)；Phase G 发布准备已经用户明确授权合并 |
-| 当前 main 提交 | 已确认 | `c23f4174865dda827f969219e035f55c3038a2e8` |
-| 当前 main CI | 通过 | [PR #17 合并后 main CI 33269171028](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33269171028) 全部通过 |
-| 当前收口分支 | 进行中 | `codex/release-closeout`；从精确 `origin/main@c23f4174865dda827f969219e035f55c3038a2e8` 仅回填交付证据 |
-| GitNexus | 已重建 | Phase G 候选对 `fbdff19193bff4dbdbc8b33dc416bcea1aa451d4` 使用 PDG 完整重建并保持索引对齐；精确比较为 low、41 个已索引变更符号、7 个已索引文件、0 条受影响流程 |
+| Phase G 合并提交 | 已确认 | `c23f4174865dda827f969219e035f55c3038a2e8` |
+| Phase G 合并后 main CI | 通过 | [PR #17 合并后 main CI 33269171028](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33269171028) 全部通过 |
+| 证据收口 | 已提交 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 从精确 `main@c23f4174865dda827f969219e035f55c3038a2e8` 仅回填交付证据，不改变产品或生产行为 |
+| Phase G GitNexus 影响评估 | 已记录 | 候选 `fbdff19193bff4dbdbc8b33dc416bcea1aa451d4` 相对其精确 base 的结果为 low、41 个已索引变更符号、7 个已索引文件、0 条受影响流程 |
 
 ## 阶段进度
 
