@@ -7,6 +7,13 @@ function parseBundledAssets(html: string) {
 }
 
 test("production bundle serves hashed assets and the authenticated desktop shell", async ({ page, request }) => {
+  const failedScriptResponses: string[] = [];
+  page.on("response", (assetResponse) => {
+    if (assetResponse.request().resourceType() === "script" && assetResponse.status() >= 400) {
+      failedScriptResponses.push(`${assetResponse.status()} ${assetResponse.url()}`);
+    }
+  });
+
   const health = await request.get("/api/health");
   expect(health.ok()).toBeTruthy();
   expect(await health.json()).toEqual({ ok: true, status: "alive" });
@@ -40,6 +47,7 @@ test("production bundle serves hashed assets and the authenticated desktop shell
   await center.getByRole("tab", { name: "内置模板" }).click();
   await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
   await center.getByRole("button", { name: "关闭项目中心" }).click();
+  expect(failedScriptResponses, "lazy production chunks should load without HTTP errors").toEqual([]);
 });
 
 test("production smoke covers static fallback route", async ({ page, request }) => {

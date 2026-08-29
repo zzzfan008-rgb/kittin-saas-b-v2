@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { PlusIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -11,7 +11,11 @@ import {
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { isNodeRunActive } from "@/types/workflow";
 import { useInitialDraftWorkspace } from "@/initialDraft/InitialDraftWorkspace";
-import { ProjectCenter } from "./ProjectCenter";
+
+const loadProjectCenter = () => import("./ProjectCenter");
+const LazyProjectCenter = lazy(() => loadProjectCenter().then((module) => ({
+  default: module.ProjectCenter,
+})));
 
 function hasRunningNode(tab: ProjectTab): boolean {
   return tab.nodes.some((node) => isNodeRunActive(node.data.status));
@@ -24,6 +28,7 @@ export function ProjectTabs() {
   const closeTab = useFlowStore((state) => state.closeTab);
   const saveProject = useFlowStore((state) => state.saveProject);
   const [projectCenterOpen, setProjectCenterOpen] = useState(false);
+  const [projectCenterRequested, setProjectCenterRequested] = useState(false);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
@@ -229,7 +234,12 @@ export function ProjectTabs() {
           type="button"
           variant="ghost"
           size="icon-sm"
-          onClick={() => setProjectCenterOpen(true)}
+          onFocus={() => void loadProjectCenter()}
+          onPointerEnter={() => void loadProjectCenter()}
+          onClick={() => {
+            setProjectCenterRequested(true);
+            setProjectCenterOpen(true);
+          }}
           aria-label="打开项目中心"
           title="新建或打开项目"
           className="mb-1 text-[var(--gc-text-muted)] hover:text-[var(--gc-accent)]"
@@ -237,7 +247,11 @@ export function ProjectTabs() {
           <PlusIcon aria-hidden="true" className="size-4" />
         </Button>
       </nav>
-      <ProjectCenter open={projectCenterOpen} onOpenChange={setProjectCenterOpen} />
+      {projectCenterRequested && (
+        <Suspense fallback={null}>
+          <LazyProjectCenter open={projectCenterOpen} onOpenChange={setProjectCenterOpen} />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from "./session";
 import { suppressWorkspaceUnloadWarning } from "@/lib/workspaceUnload";
 import { suspendProjectTabSessionPersistence } from "@/lib/tabSessionStorage";
-import { didRestoreProjectTabSessionWorkspace } from "@/store/flowStore";
+import { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 
 export interface CurrentUser {
   id: string;

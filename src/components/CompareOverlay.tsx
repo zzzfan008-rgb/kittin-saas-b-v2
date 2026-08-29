@@ -1,8 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { selectActiveCompareIds, useFlowStore } from "@/store/flowStore";
-
-/** ResultsPanel「对比 N 张」按钮派发此事件来打开对比浮层 */
-export const OPEN_COMPARE_EVENT = "garment:open-compare";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString("zh-CN", {
@@ -13,49 +10,39 @@ function formatTime(ts: number): string {
 }
 
 /** 多变体并排对比浮层：compareIds >= 2 时可打开，横向并排 2~4 张大图 */
-export function CompareOverlay() {
+export function CompareOverlay({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const compareIds = useFlowStore(selectActiveCompareIds);
   const recentResults = useFlowStore((s) => s.recentResults);
   const clearCompare = useFlowStore((s) => s.clearCompare);
-  const [open, setOpen] = useState(false);
 
   const items = compareIds
     .map((id) => recentResults.find((r) => r.id === id))
     .filter((r): r is NonNullable<typeof r> => Boolean(r && r.status === "success" && r.image));
 
-  // 监听「对比 N 张」按钮事件打开浮层；对比项不足时自动关闭
   useEffect(() => {
-    const onOpen = () => setOpen(true);
-    window.addEventListener(OPEN_COMPARE_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_COMPARE_EVENT, onOpen);
-  }, []);
-
-  useEffect(() => {
-    if (items.length < 2) setOpen(false);
-  }, [items.length]);
-
-  // Esc 退出对比
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        clearCompare();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, clearCompare]);
+    if (items.length < 2) onOpenChange(false);
+  }, [items.length, onOpenChange]);
 
   if (!open || items.length < 2) return null;
 
   const close = () => {
-    setOpen(false);
+    onOpenChange(false);
     clearCompare();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-xs">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="结果对比"
+      className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-xs"
+    >
       <div className="flex items-center justify-between px-6 py-4">
         <span className="text-xs font-medium tracking-widest text-neutral-400">
           对比 {items.length} 张

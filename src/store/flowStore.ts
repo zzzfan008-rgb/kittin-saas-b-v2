@@ -12,6 +12,11 @@ import {
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
+  markProjectTabSessionWorkspaceRestored,
+} from "@/lib/workspaceRestoreState";
+
+export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
+import {
   NODE_SPECS,
   isNodeRunActive,
   isNodeRunTerminal,
@@ -1841,14 +1846,9 @@ export function readTabSessionSnapshotResult(
 
 let initialTabSessionReadResult: TabSessionReadResult | undefined;
 
-/** Auth ownership binding uses this to reject a restored in-memory draft when
- * Storage becomes unreadable between module bootstrap and `/me`. */
-export function didRestoreProjectTabSessionWorkspace(): boolean {
-  return initialTabSessionReadResult?.snapshot !== undefined;
-}
-
 function loadTabSession(): { tabs: ProjectTab[]; activeTabId: string } | undefined {
   initialTabSessionReadResult = readTabSessionSnapshotResult(window.sessionStorage);
+  markProjectTabSessionWorkspaceRestored(initialTabSessionReadResult.snapshot !== undefined);
   return initialTabSessionReadResult.snapshot;
 }
 

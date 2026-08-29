@@ -186,8 +186,10 @@ test("upload and text starters complete the isolated first-generation golden pat
   await uploadResultCard.hover();
   await uploadResultCard.locator('button[title="加入对比"]').click();
   await results.getByRole("button", { name: "对比 2 张" }).click();
-  await expect(page.getByText("对比 2 张").first()).toBeVisible();
+  const compareDialog = page.getByRole("dialog", { name: "结果对比" });
+  await expect(compareDialog).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(compareDialog).toHaveCount(0);
 
   for (const theme of ["white", "eye", "current"] as const) {
     await page.evaluate((value) => {

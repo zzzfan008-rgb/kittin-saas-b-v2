@@ -53,5 +53,31 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      manifest: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+              return "vendor-react";
+            }
+            if (/[\\/]node_modules[\\/](@xyflow|d3-|internmap|delaunator|robust-predicates)/.test(id)) {
+              return "vendor-flow";
+            }
+            if (/[\\/]node_modules[\\/](@base-ui|@floating-ui)[\\/]/.test(id)) {
+              return "vendor-ui";
+            }
+            if (/[\\/]node_modules[\\/](zustand|zundo|nanoid)[\\/]/.test(id)) {
+              return "vendor-state";
+            }
+            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
+              return "vendor-icons";
+            }
+            return undefined;
+          },
+        },
+      },
+    },
   };
 });

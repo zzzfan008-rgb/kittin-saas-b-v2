@@ -4,7 +4,7 @@ import {
   selectActiveNodes,
   useFlowStore,
 } from "@/store/flowStore";
-import { OPEN_COMPARE_EVENT } from "@/components/CompareOverlay";
+import { OPEN_COMPARE_EVENT } from "@/lib/overlayEvents";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";

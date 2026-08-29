@@ -41,15 +41,6 @@ export function ImageViewer() {
     return () => img.removeEventListener("wheel", onWheel);
   }, [viewer]);
 
-  useEffect(() => {
-    if (!viewer) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeViewer();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [viewer, closeViewer]);
-
   if (!viewer) return null;
 
   const saveAsAsset = async () => {

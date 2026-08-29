@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useFlowStore,
-  type DocumentTarget,
 } from "@/store/flowStore";
 import type { Asset } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
-
-/** 图片上传节点「从素材库选择」派发此事件来打开选择器 */
-export const OPEN_ASSET_PICKER_EVENT = "garment:open-asset-picker";
-
-export interface AssetPickerRequest {
-  target: DocumentTarget;
-  nodeId: string;
-}
+import type { AssetPickerRequest } from "@/lib/overlayEvents";
 
 const CATEGORY_TABS = [
   ["all", "全部"],
@@ -26,9 +18,14 @@ type CategoryFilter = (typeof CATEGORY_TABS)[number][0];
 const PAGE_SIZE = 20;
 
 /** 素材库选择浮层：按分类筛选 + 名称搜索，选中后写回目标图片上传节点 */
-export function AssetPickerOverlay() {
+export function AssetPickerOverlay({
+  request,
+  onRequestChange,
+}: {
+  request: AssetPickerRequest;
+  onRequestChange: (request: AssetPickerRequest | null) => void;
+}) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
-  const [target, setTarget] = useState<AssetPickerRequest | null>(null);
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -37,19 +34,6 @@ export function AssetPickerOverlay() {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
-
-  useEffect(() => {
-    const onOpen = (event: Event) => {
-      const detail = (event as CustomEvent<AssetPickerRequest>).detail;
-      if (!detail?.target || !detail?.nodeId) return;
-      setTarget(detail);
-      setCategory("all");
-      setSearch("");
-      setDebouncedSearch("");
-    };
-    window.addEventListener(OPEN_ASSET_PICKER_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_ASSET_PICKER_EVENT, onOpen);
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -90,37 +74,22 @@ export function AssetPickerOverlay() {
 
   // 打开、切换分类或搜索词变化时都从第一页重新拉取
   useEffect(() => {
-    if (!target) {
-      requestGeneration.current += 1;
-      return;
-    }
     void load(0);
-  }, [target, load]);
-
-  useEffect(() => {
-    if (!target) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setTarget(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [target]);
-
-  if (!target) return null;
+  }, [request, load]);
 
   const pick = (asset: Asset) => {
-    updateNodeDataInTab(target.target, target.nodeId, {
+    updateNodeDataInTab(request.target, request.nodeId, {
       imageUrl: asset.image,
       status: "success",
       error: undefined,
     });
-    setTarget(null);
+    onRequestChange(null);
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs"
-      onClick={() => setTarget(null)}
+      onClick={() => onRequestChange(null)}
     >
       <div
         className="flex max-h-[80vh] w-[min(680px,90vw)] flex-col rounded-lg border border-[#262626] bg-[#141414]"
@@ -130,7 +99,7 @@ export function AssetPickerOverlay() {
           <span className="text-xs font-medium tracking-widest text-neutral-400">从素材库选择</span>
           <button
             type="button"
-            onClick={() => setTarget(null)}
+            onClick={() => onRequestChange(null)}
             className="rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-500 hover:border-gold/50 hover:text-gold"
           >
             关闭
