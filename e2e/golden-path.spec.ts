@@ -165,7 +165,10 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(uploadResult).toBeVisible();
 
   const textResultCard = results.locator('article:has(img[alt="文生图"])');
+  const uploadResultCard = results.locator('article:has(img[alt="草图→效果图"])');
   await textResultCard.hover();
+  const actionBar = textResultCard.locator('div.absolute.inset-x-0.bottom-0');
+  await expect(actionBar).toHaveClass(/grid-cols-2/);
   await expect(textResultCard.locator('button[title="查看"]')).toBeVisible();
   await expect(textResultCard.locator('button[title="加入对比"]')).toBeVisible();
   await expect(textResultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
@@ -174,16 +177,29 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(page.locator(".react-flow__node").filter({ hasText: "文生图" })).toHaveCount(textInputNodesBefore + 1);
   await page.getByRole("tab", { name: "结果 / 记录" }).click();
 
-  await textResult.click();
+  await textResultCard.locator('button[title="查看"]').click();
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
 
-  await textResult.click({ modifiers: ["Meta"] });
-  await uploadResult.click({ modifiers: ["Meta"] });
+  await textResultCard.locator('button[title="加入对比"]').click();
+  await uploadResultCard.hover();
+  await uploadResultCard.locator('button[title="加入对比"]').click();
   await results.getByRole("button", { name: "对比 2 张" }).click();
   await expect(page.getByText("对比 2 张").first()).toBeVisible();
   await page.keyboard.press("Escape");
+
+  for (const theme of ["white", "eye", "current"] as const) {
+    await page.evaluate((value) => {
+      document.documentElement.setAttribute("data-theme", value);
+    }, theme);
+    await textResultCard.hover();
+    const viewColor = await textResultCard.locator('button[title="查看"]').evaluate((element) => getComputedStyle(element).color);
+    expect(viewColor).toMatch(/rgb\(244, 244, 244\)/);
+    await textResultCard.locator('button[title="查看"]').focus();
+    const inputColor = await textResultCard.locator('button[title="设为输入"]').evaluate((element) => getComputedStyle(element).color);
+    expect(inputColor).toMatch(/rgb\(244, 244, 244\)/);
+  }
 
   const canvasNodes = page.locator(".react-flow__node");
   const nodeCountBeforeLibraryClick = await canvasNodes.count();

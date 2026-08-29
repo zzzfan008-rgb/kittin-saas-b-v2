@@ -1,4 +1,4 @@
-import { useReducer, type ReactNode } from "react";
+import { useEffect, useReducer, useSyncExternalStore, type ReactNode } from "react";
 import {
   LibraryBigIcon,
   SlidersHorizontalIcon,
@@ -18,6 +18,17 @@ import {
 
 const LIBRARY_PANEL_ID = "workbench-library-panel";
 const INSPECTOR_PANEL_ID = "workbench-inspector-panel";
+const DOCK_EXCLUSIVE_MEDIA = "(max-width: 1279px)";
+
+function subscribeDockExclusivity(onChange: () => void): () => void {
+  const media = window.matchMedia(DOCK_EXCLUSIVE_MEDIA);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function dockExclusivitySnapshot(): boolean {
+  return window.matchMedia(DOCK_EXCLUSIVE_MEDIA).matches;
+}
 
 interface WorkbenchShellProps {
   library: ReactNode;
@@ -63,6 +74,17 @@ function RailButton({ label, controls, active, side, onClick, icon }: RailButton
  */
 export function WorkbenchShell({ library, inspector, children }: WorkbenchShellProps) {
   const [state, dispatch] = useReducer(workbenchUiReducer, INITIAL_WORKBENCH_UI_STATE);
+  const exclusiveDocks = useSyncExternalStore(
+    subscribeDockExclusivity,
+    dockExclusivitySnapshot,
+    () => false,
+  );
+
+  useEffect(() => {
+    if (exclusiveDocks && state.libraryOpen && state.inspectorOpen) {
+      dispatch({ type: "enforce-exclusive" });
+    }
+  }, [exclusiveDocks, state.inspectorOpen, state.libraryOpen]);
 
   return (
     <TooltipProvider delay={250}>
@@ -76,7 +98,7 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
             controls={LIBRARY_PANEL_ID}
             active={state.libraryOpen}
             side="left"
-            onClick={() => dispatch({ type: "toggle-library" })}
+            onClick={() => dispatch({ type: "toggle-library", exclusive: exclusiveDocks })}
             icon={<LibraryBigIcon aria-hidden="true" />}
           />
         </nav>
@@ -126,7 +148,7 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
             controls={INSPECTOR_PANEL_ID}
             active={state.inspectorOpen}
             side="right"
-            onClick={() => dispatch({ type: "toggle-inspector" })}
+            onClick={() => dispatch({ type: "toggle-inspector", exclusive: exclusiveDocks })}
             icon={<SlidersHorizontalIcon aria-hidden="true" />}
           />
         </nav>
