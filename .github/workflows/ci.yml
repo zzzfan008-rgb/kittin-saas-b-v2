@@ -49,6 +49,9 @@ jobs:
       - name: Build production bundles
         run: npm run build
 
+      - name: Run production browser smoke
+        run: node scripts/e2e-production-smoke.mjs --skip-build
+
       - name: Upload browser regression report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -57,5 +60,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            playwright-report-production/
+            test-results-production/
           if-no-files-found: ignore
           retention-days: 14
