@@ -15,9 +15,9 @@ test("production bundle serves hashed assets and the authenticated desktop shell
   expect(ready.ok()).toBeTruthy();
   expect((await ready.json()).mode).toBe("full");
 
-  const response = await page.goto("/", { waitUntil: "domcontentloaded" });
-  expect(response?.ok()).toBeTruthy();
-  const html = await page.content();
+  const response = await request.get("/", { headers: { accept: "text/html" } });
+  expect(response.ok()).toBeTruthy();
+  const html = await response.text();
   const assets = parseBundledAssets(html);
   expect(assets.js, "production html should expose hashed js bundle").toMatch(/\/assets\/[^"]+-[A-Za-z0-9_-]{8,}\.js$/);
   expect(assets.css, "production html should expose hashed css bundle").toMatch(/\/assets\/[^"]+-[A-Za-z0-9_-]{8,}\.css$/);
