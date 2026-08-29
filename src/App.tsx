@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
@@ -20,15 +20,10 @@ import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
 import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
 import { ContextPanel } from "@/components/panels/ContextPanel";
-import { CompareOverlay } from "@/components/CompareOverlay";
-import { ImageViewer } from "@/components/ImageViewer";
-import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { TaskLauncher } from "@/components/TaskLauncher";
 import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
-import { useAuth } from "@/auth/AuthContext";
-import { ChangePasswordPage, LoginPage, SessionEndedPage } from "@/auth/LoginPage";
 import {
   isWorkspaceUnloadWarningSuppressed,
   shouldWarnBeforeWorkspaceUnload,
@@ -39,6 +34,21 @@ import {
   InitialDraftWorkspace,
 } from "@/initialDraft/InitialDraftWorkspace";
 import { isInitialDraftInteractionBlocking } from "@/initialDraft/initialDraftRuntime";
+import {
+  OPEN_ASSET_PICKER_EVENT,
+  OPEN_COMPARE_EVENT,
+  type AssetPickerRequest,
+} from "@/lib/overlayEvents";
+
+const LazyCompareOverlay = lazy(() => import("@/components/CompareOverlay").then((module) => ({
+  default: module.CompareOverlay,
+})));
+const LazyImageViewer = lazy(() => import("@/components/ImageViewer").then((module) => ({
+  default: module.ImageViewer,
+})));
+const LazyAssetPickerOverlay = lazy(() => import("@/components/AssetPickerOverlay").then((module) => ({
+  default: module.AssetPickerOverlay,
+})));
 
 /** 剪贴板里的节点快照（仅内存，跨项目/刷新不保留） */
 let nodeClipboard: { data: FlowNode["data"]; type: string } | null = null;
@@ -132,18 +142,9 @@ function useGlobalShortcuts() {
   }, [undo, redo, saveProject]);
 }
 
-export default function App() {
-  const { user, loading, sessionEndReason, acknowledgeSessionEnd } = useAuth();
-  if (loading) {
-    return <div className="flex h-full items-center justify-center bg-[#101214] text-xs text-neutral-500">正在验证登录状态…</div>;
-  }
-  if (sessionEndReason === "replaced") {
-    return <SessionEndedPage onContinue={acknowledgeSessionEnd} />;
-  }
-  if (!user) return <LoginPage />;
-  if (user.mustChangePassword) return <ChangePasswordPage />;
+export default function App({ userId }: { userId: string }) {
   return (
-    <InitialDraftWorkspace userId={user.id}>
+    <InitialDraftWorkspace userId={userId}>
       <Workspace />
     </InitialDraftWorkspace>
   );
@@ -159,6 +160,42 @@ function Workspace() {
   const [initialHistoryAttempt, setInitialHistoryAttempt] = useState(0);
   const historyPageSize = 20;
   const historyBefore = useRef(Date.now()).current;
+  const viewerOpen = useFlowStore((state) => state.viewer !== null);
+  const closeViewer = useFlowStore((state) => state.closeViewer);
+  const clearCompare = useFlowStore((state) => state.clearCompare);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [assetPickerRequest, setAssetPickerRequest] = useState<AssetPickerRequest | null>(null);
+
+  useEffect(() => {
+    const openCompare = () => setCompareOpen(true);
+    const openAssetPicker = (event: Event) => {
+      const request = (event as CustomEvent<AssetPickerRequest>).detail;
+      if (request?.target && request.nodeId) setAssetPickerRequest(request);
+    };
+    window.addEventListener(OPEN_COMPARE_EVENT, openCompare);
+    window.addEventListener(OPEN_ASSET_PICKER_EVENT, openAssetPicker);
+    return () => {
+      window.removeEventListener(OPEN_COMPARE_EVENT, openCompare);
+      window.removeEventListener(OPEN_ASSET_PICKER_EVENT, openAssetPicker);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!assetPickerRequest && !viewerOpen && !compareOpen) return;
+    const closeActiveOverlay = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (assetPickerRequest) {
+        setAssetPickerRequest(null);
+      } else if (viewerOpen) {
+        closeViewer();
+      } else if (compareOpen) {
+        setCompareOpen(false);
+        clearCompare();
+      }
+    };
+    window.addEventListener("keydown", closeActiveOverlay);
+    return () => window.removeEventListener("keydown", closeActiveOverlay);
+  }, [assetPickerRequest, clearCompare, closeViewer, compareOpen, viewerOpen]);
 
   useEffect(() => {
     setGenerationSafetyBlockReason(
@@ -306,10 +343,33 @@ function Workspace() {
           </ReactFlowProvider>
         </div>
       </WorkbenchShell>
-      <CompareOverlay />
-      <ImageViewer />
-      <AssetPickerOverlay />
+      {compareOpen && (
+        <Suspense fallback={<OverlayLoadingStatus label="正在打开结果对比…" />}>
+          <LazyCompareOverlay open onOpenChange={setCompareOpen} />
+        </Suspense>
+      )}
+      {viewerOpen && (
+        <Suspense fallback={<OverlayLoadingStatus label="正在打开图片…" />}>
+          <LazyImageViewer />
+        </Suspense>
+      )}
+      {assetPickerRequest && (
+        <Suspense fallback={<OverlayLoadingStatus label="正在打开素材库…" />}>
+          <LazyAssetPickerOverlay
+            request={assetPickerRequest}
+            onRequestChange={setAssetPickerRequest}
+          />
+        </Suspense>
+      )}
       <TutorialOverlay />
+    </div>
+  );
+}
+
+function OverlayLoadingStatus({ label }: { label: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 text-xs text-neutral-400 backdrop-blur-xs">
+      <span role="status">{label}</span>
     </div>
   );
 }

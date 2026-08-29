@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveDocumentTarget, useFlowStore } from "@/store/flowStore";
 import type { ImageInputNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
-import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/components/AssetPickerOverlay";
+import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { NodeFrame, inputClass } from "./NodeFrame";
 
 interface NormalizedUploadResponse {

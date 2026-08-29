@@ -1498,7 +1498,9 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(topBarSource, /点击图标可固定/);
   assert.doesNotMatch(topBarSource, /GARMENT CANVAS|ProjectPicker/);
   assert.doesNotMatch(appSource, /TemplatesDock/);
-  assert.match(projectTabsSource, /<ProjectCenter open=\{projectCenterOpen\}/);
+  assert.match(projectTabsSource, /<LazyProjectCenter open=\{projectCenterOpen\}/);
+  assert.match(projectTabsSource, /onFocus=\{\(\) => void loadProjectCenter\(\)\}/);
+  assert.match(projectTabsSource, /onPointerEnter=\{\(\) => void loadProjectCenter\(\)\}/);
   assert.match(projectTabsSource, /onDoubleClick=\{\(\) => beginRename\(tab\)\}/);
   assert.match(projectTabsSource, /aria-label="保存项目名称和画布"/);
   assert.match(projectTabsSource, /event\.nativeEvent\.isComposing \|\| renameComposingRef\.current/);
