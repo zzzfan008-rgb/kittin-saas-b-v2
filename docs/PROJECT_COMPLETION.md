@@ -15,11 +15,11 @@
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 上一阶段 PR | 已合并 | [PR #15](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/15)；Phase D 桌面密度收口已经用户授权合并 |
-| 基线提交 | 已确认 | `b512150390751eed99172a4432200b5f0035751f` |
-| 基线 main CI | 通过 | [PR #15 合并后 main CI 33263814918](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33263814918) 通过 |
-| 当前工作分支 | 进行中 | `codex/phase-f-bundle-performance`；从精确 `origin/main@b512150390751eed99172a4432200b5f0035751f` 开始 Phase F |
-| GitNexus | 已重建 | 2026-08-30 对当前 Phase F 工作树使用 PDG 增量重建；19,748 节点、43,781 边、266 聚类、300 流程 |
+| 上一阶段 PR | 已合并 | [PR #16](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/16)；Phase F 性能与包体收口已经用户授权合并 |
+| 基线提交 | 已确认 | `3dc6a1dc8b54b4ee2596f5f484471328380edafc` |
+| 基线 main CI | 通过 | [PR #16 合并后 main CI 33266794035](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266794035) 通过 |
+| 当前工作分支 | 进行中 | `codex/phase-g-release-readiness`；从精确 `origin/main@3dc6a1dc8b54b4ee2596f5f484471328380edafc` 开始 Phase G |
+| GitNexus | 已重建 | 2026-08-30 清理损坏的 FTS 索引后，对 `3dc6a1d` 使用 PDG 完整重建；19,748 节点、43,781 边、266 聚类、300 流程 |
 
 ## 阶段进度
 
@@ -30,10 +30,10 @@
 | A 状态正确性与撤销事务 | 已完成 | 文档事务、运行态隔离、拖拽单步撤销、canonical selection、失效结果引用清理 | [PR #2](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2) | [实现终态](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32755048012)与[合并后 main](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32802751095)通过 | [最终精确头审查](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/2#issuecomment-5398788404)无重大问题 |
 | B 文档与持久化边界 | 已完成 | `DocumentSnapshot`、活动文档单一数据源、草稿隔离、持久化节流 | [PR #3](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3) | [最终代码头 CI 32836676937](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32836676937) 与[合并后 main CI 32847496614](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32847496614)通过 | B1–B3 独立本地审计 APPROVE；[最终代码头 Cloud Review](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/3#issuecomment-5409048696) 无重大问题，5 个线程全部解决 |
 | C 首次生成黄金路径 | 已完成 | pristine 启动器、模板 fit/聚焦、点击添加/快捷建图、隔离生成 E2E | [PR #4](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4) | [最终代码头 CI 32854643883](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/32854643883) 通过 | [最终代码头精确复审](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/4#issuecomment-5411293171)无重大问题；2 个 P2 线程已解决 |
-| D 结果迭代与桌面体验 | 已完成 | 显式结果动作、三主题 × 三宽度、键盘与焦点、桌面 Dock 与卡片密度 | [PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)、[PR #14](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/14)、[PR #15](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/15) | [最新合并后 main CI](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33263814918) 通过 | 不适用（当前流程不再使用 Cloud Review） |
-| E 生产产物与 CI | 已完成 | production Playwright smoke、CI 顺序、runner 信号清理、导航竞态修正 | [PR #11](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/11)、[PR #12](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/12)、[PR #13](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/13) | [最新合并后 main CI](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33263814918) 通过 | 不适用（当前流程不再使用 Cloud Review） |
-| F 性能与包体 | 待用户视觉确认 | lazy boundary、稳定 vendor 拆包、初始 gzip 预算、CI 体积门禁 | — | 本地完整回归已通过，远程 CI 待推送 | 本机 `gemma4:e4b` 分组复审完成；无有效 P0–P3 阻塞项 |
-| G 文档与发布准备 | 未开始 | 部署/恢复/安全文档、发布候选 PR、最终审计与用户确认 | — | — | — |
+| D 结果迭代与桌面体验 | 已完成（证据补录中） | 显式结果动作、三主题 × 三宽度、键盘与焦点、桌面 Dock 与卡片密度 | [PR #10](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/10)、[PR #14](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/14)、[PR #15](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/15) | [最新合并后 main CI](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266794035) 通过 | Phase G 补齐三主题 × 三宽度和键盘/焦点证据 |
+| E 生产产物与 CI | 已完成 | production Playwright smoke、CI 顺序、runner 信号清理、导航竞态修正 | [PR #11](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/11)、[PR #12](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/12)、[PR #13](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/13) | [最新合并后 main CI](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266794035) 通过 | 不适用（当前流程不再使用 Cloud Review） |
+| F 性能与包体 | 已完成 | lazy boundary、稳定 vendor 拆包、初始 gzip 预算、CI 体积门禁 | [PR #16](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/16) | [PR head CI 33266192802](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266192802) 与[合并后 main CI 33266794035](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266794035)通过 | 本机 `gemma4:e4b` 精确 SHA 分组复审无有效 P0–P3 阻塞项；CodeRabbit 通过 |
+| G 文档与发布准备 | 进行中 | 部署/恢复/安全文档、发布候选 PR、最终审计与用户确认 | — | 基线 main CI 通过 | 当前分支 `codex/phase-g-release-readiness` |
 
 ## 验收清单
 
@@ -93,10 +93,12 @@ Cloud Review 精确复审继续指出 1 个 P2：首次保存失败会进入 `sa
 ### D. 结果迭代与桌面体验
 
 - [x] 结果卡显式提供查看、对比、下载、继续处理/设为输入。
-- [ ] 项目、节点、状态、失败原因和未知结果清晰可辨。
-- [ ] current / white / eye × 1024 / 1280 / 1440 视觉回归有保存证据。
-- [ ] Tab、Escape、焦点恢复、Dialog/Popover focus trap、React Flow 快捷键隔离、Dock inert 通过。
+- [x] 项目、节点、状态、失败原因和未知结果清晰可辨。
+- [x] current / white / eye × 1024 / 1280 / 1440 视觉回归有保存证据。
+- [x] Tab、Escape、焦点恢复、Dialog/Popover focus trap、React Flow 快捷键隔离、Dock inert 通过。
 - [ ] 使用内置浏览器完成登录后的人工视觉验收。
+
+Phase D 证据补录：2026-08-30 在 `main@3dc6a1d` 的已登录本地工作台完成三主题 × 三宽度矩阵，逐张检查画布、节点、Dock、MiniMap 与 Results；另行验证成功、失败、结果未知、查看、对比、下载、继续处理、主题菜单、快捷键说明、Project Center 焦点循环、Escape 焦点恢复和 1024 Dock 互斥。截图与交互记录见 [`PHASE_D_VISUAL_ACCEPTANCE.md`](PHASE_D_VISUAL_ACCEPTANCE.md)。本轮未发现必须修改的 UI；最终用户视觉确认保留到发布候选门禁。
 
 ### E. 生产产物与 CI
 
@@ -121,12 +123,14 @@ Phase F 本地证据：基线为单主包 851.73 kB / gzip 267.33 kB；收口后
 
 ### G. 文档与发布准备
 
-- [ ] README、环境变量、管理员安装、macOS 部署、备份恢复、迁移、故障、安全和桌面矩阵更新。
-- [ ] 首次安装、登录、改密、项目恢复、任务恢复和失败处理流程明确。
-- [ ] `dist` / `dist-server` 不受版本控制；Docker/macOS/CI 现场构建。
-- [ ] `npm audit` 无未处置高危漏洞。
+- [x] README、环境变量、管理员安装、macOS 部署、备份恢复、迁移、故障、安全和桌面矩阵更新。
+- [x] 首次安装、登录、改密、项目恢复、任务恢复和失败处理流程明确，并由隔离认证/恢复回归覆盖。
+- [x] `dist` / `dist-server` 和 Playwright 报告不受版本控制；Docker/macOS/CI 现场构建。
+- [x] `npm audit` 无未处置高危漏洞。
 - [ ] 发布候选 PR 附摘要、风险/回滚、测试矩阵、视觉证据、包体、GitNexus、CI 与本地精确 SHA 复审。
 - [ ] 用户明确确认最终合并后，main 合并后 CI 再次成功。
+
+Phase G 本地证据：2026-08-30 新增部署运维手册、发布清单和 Phase D 视觉证据，校正 Compose 宿主机端口与进程内限流说明。`npm ci`、`npm audit`（0 漏洞）、`npm run check`、`npm run build` 与 production smoke 3/3 通过；桌面 E2E 首轮在 1440 项目中心 Tab 切换后过早读取卡片几何，出现 1 项测试同步失败，增加卡片可见同步点后全量重跑 26/26 通过，未修改产品 UI。另以一次性 PostgreSQL 18 容器和 `/tmp` 目录完成 dump→新库 restore 与 `DATA_DIR` 归档→恢复校验，随后清理全部隔离资源。全程仅使用 dummy/stub AI。
 
 ## 每阶段门禁与证据
 
@@ -134,17 +138,18 @@ Phase F 本地证据：基线为单主包 851.73 kB / gzip 267.33 kB；收口后
 
 | 门禁 | 最新结果 | 证据/备注 |
 | --- | --- | --- |
-| `npm ci` | 通过 | 2026-08-24；依赖安装完成，未使用真实 AI 配置 |
+| `npm ci` | 通过 | 2026-08-30；重新安装 482 个包，未使用真实 AI 配置 |
 | `npm test` | 通过 | 2026-08-30；隔离 PostgreSQL 全套回归，包含包体预算与懒加载边界契约；仅使用 dummy/stub AI |
 | `npm run test:e2e` | 通过 | 26/26；1024、1280、1440 桌面项目、独立黄金路径、初始项目恢复；临时 PostgreSQL + dummy/stub AI |
-| production browser smoke | 本地通过 | 2026-08-30 `npm run test:e2e:production` 3/3；真实哈希产物、动态 chunk、项目中心与 SPA fallback；Phase F 远程 CI 待推送 |
-| `npm run build` | 通过 | 2026-08-30；Web + server；初始 JS gzip 148,497 bytes，11 个 JS chunk，最大 194.27 kB，无 >500 kB 警告 |
+| production browser smoke | 本地与 CI 通过 | 2026-08-30 `npm run test:e2e:production` 3/3；真实哈希产物、动态 chunk、项目中心与 SPA fallback；PR head 与合并后 main CI 均通过 |
+| `npm run build` | 通过 | 2026-08-30 Phase G 重跑；Web + server；初始 JS gzip 148,048 bytes，11 个 JS chunk，最大 194.27 kB，无 >500 kB 警告 |
 | `npm audit` | 通过 | `found 0 vulnerabilities` |
 | `git diff --check` | 通过 | 2026-08-30；未发现空白错误，`dist` / `dist-server` 仍为忽略产物 |
-| GitNexus `detect_changes` | 已执行 | 2026-08-30 Phase F 差异为 high：30 个已索引变更符号、8 条受影响流程、15 个已索引文件；Workspace / ProjectTabs 边界由全量回归、三宽度 E2E 与 production smoke 覆盖 |
-| GitHub CI | Phase F 待推送 | 基线 [main CI 33263814918](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33263814918) 通过；当前 Phase F 尚未经用户“通过”授权推送 |
-| 本地模型复审 | 已完成 | 2026-08-30 使用本机 Ollama `gemma4:e4b` 分组复审；有效结论为认证/会话与受控浮层 `APPROVE`，其余候选项经源码、契约测试和已通过 E2E 复核为误报；最终无有效 P0–P3 阻塞项，不触发或等待 Codex Cloud |
-| 视觉证据 | 待采集 | Phase D：3 主题 × 3 宽度 |
+| 隔离恢复演练 | 通过 | 一次性 PostgreSQL 18 容器完成 custom dump→新库 restore；临时 `DATA_DIR` 完成 tar→restore 与逐文件一致性校验；当前服务与真实数据未触碰，隔离资源已清理 |
+| GitNexus `detect_changes` | 已执行 | 2026-08-30 对提交候选与 `origin/main` 精确比较：low，41 个已索引变更符号、7 个已索引文件、0 条受影响流程；其余内容为 11 张证据截图 |
+| GitHub CI | Phase F 已合并且 main 通过 | [PR head CI 33266192802](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266192802) 与[合并后 main CI 33266794035](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33266794035) 均通过；合并提交 `3dc6a1d` |
+| 本地模型复审 | Phase G 预提交通过 | 2026-08-30 本机 Ollama `gemma4:e4b` 对暂存候选返回 `APPROVE`，无有效 P0–P3；推送后仍须对精确 head SHA 复审，不触发或等待 Codex Cloud |
+| 视觉证据 | 已采集，待用户最终确认 | Phase D：3 主题 × 3 宽度共 9 张工作台截图，另含失败/未知 Results 证据；见 [`PHASE_D_VISUAL_ACCEPTANCE.md`](PHASE_D_VISUAL_ACCEPTANCE.md) |
 
 ## 已知风险与决策日志
 
