@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **garment-canvas** (7300 symbols, 15964 relationships, 208 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **kittin-saas-b-v2** (19639 symbols, 43580 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -26,10 +26,10 @@ This project is indexed by GitNexus as **garment-canvas** (7300 symbols, 15964 r
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/garment-canvas/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/garment-canvas/clusters` | All functional areas |
-| `gitnexus://repo/garment-canvas/processes` | All execution flows |
-| `gitnexus://repo/garment-canvas/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/kittin-saas-b-v2/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/kittin-saas-b-v2/clusters` | All functional areas |
+| `gitnexus://repo/kittin-saas-b-v2/processes` | All execution flows |
+| `gitnexus://repo/kittin-saas-b-v2/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
@@ -44,64 +44,105 @@ This project is indexed by GitNexus as **garment-canvas** (7300 symbols, 15964 r
 
 <!-- gitnexus:end -->
 
-# Garment Canvas — Shared Project Rules
+# Garment Canvas — Current Project Rules
 
-## Project Baseline
+This file is the single source of truth for current project rules. Dated handoffs,
+completion ledgers, review notes, and screenshots are historical evidence only. If
+they conflict with this file, follow this file and the user's latest explicit
+instruction, then verify drift-prone repository and release state live.
 
-- Use Node.js 22.20.0 or newer. The application is TypeScript with React 19, Vite 6, Express 4, and PostgreSQL 18.
-- Treat Garment Canvas as a desktop-only web product. The supported viewport starts at 1024 CSS pixels; use 1280px and 1440px as the primary layout and visual-regression widths.
-- Mobile and touch-specific adaptation is outside the product contract. Do not add mobile navigation, mobile-only interaction patterns, or mobile visual-regression scope unless the user explicitly changes this rule. Existing narrow-screen fallbacks are best-effort only and must not drive desktop architecture.
-- Treat PostgreSQL as the production source of truth. SQLite support exists only for legacy import and migration verification.
-- Use the existing npm scripts: `npm run lint` for type-checking, `npm run test` for the isolated PostgreSQL regression suite, `npm run check` for both, and `npm run build` for production bundles.
-- The PostgreSQL test runner assigns a stable Docker Compose project to each worktree, cleans crash leftovers before starting, and rejects concurrent runs in the same worktree. Different worktrees remain isolated. Do not replace it with direct `docker compose -f compose.test.yaml` lifecycle commands in agent workflows.
-- Keep generated output, runtime data, private `.env`/`.env.local` files, secrets, uploads, database dumps, and credentials out of commits and agent output. The tracked `.env.example` remains the public configuration contract.
+## 1. Product Scope
 
-## Security and Data Invariants
+- Garment Canvas is a desktop-only web product. The supported minimum width is
+  1024 CSS pixels; 1280px and 1440px are the primary acceptance widths.
+- Do not add mobile navigation, mobile-only layouts, touch-only interactions, or
+  mobile regression scope unless the user explicitly changes the product contract.
+- Use Node.js 22.20.0 or newer. PostgreSQL 18 is the production source of truth;
+  SQLite exists only for legacy import and migration verification.
 
-- Keep `/api/health`, `/api/ready`, login, and session-check behavior intentionally separated from authenticated application routes. Do not weaken `requireAuth`, `requirePasswordChanged`, or `requireAdmin` coverage.
-- Preserve one active device session per account, hashed session tokens, replacement-session reporting, secure cookie attributes, and session revocation after password, account, or administrator changes.
-- Enforce owner/admin checks on projects, files, assets, history, usage, and generated output. For cross-resource lookups, prefer a non-disclosing `404` when revealing existence would leak private data.
-- Validate image identifiers, MIME/extension, decoded size, and local image references before filesystem access. Prevent path traversal and never expose arbitrary local or remote URLs.
-- Keep multi-table ownership transfers, destructive account actions, session replacement, and reference updates transactional. Preserve the 15-day recovery behavior and referenced-asset deletion guards.
-- Never expose AI gateway keys to the client or logs. Require HTTPS gateway configuration, retain request limits and reference-image ordering, and do not call paid providers from automated tests.
-- Preserve workflow schema compatibility, node/edge migration behavior, the maximum of eight ordered reference images, and non-stretching output resize semantics.
+## 2. UI and Interaction Rules
 
-## Change Workflow
+- Every new or modified general-purpose UI surface must use the project's local
+  shadcn components in `src/components/ui/`. This includes buttons, tabs, dialogs,
+  alert dialogs, menus, cards, sheets, tooltips, skeletons, and equivalent standard
+  controls. Do not hand-roll a second implementation of an available primitive.
+- When no matching primitive exists, add or extend a project-local shadcn primitive,
+  then compose the product-specific component from it. Canvas mechanics that have
+  no shadcn equivalent may continue to use React Flow and domain code, but their
+  visible standard controls must still be composed from shadcn primitives.
+- A scoped UI change should migrate any equivalent hand-rolled controls it touches;
+  unrelated legacy UI is not a reason for a broad rewrite.
+- shadcn components own presentation, accessibility, and controlled component
+  behavior only. Business state remains in the existing Store/domain layer. Theme
+  ownership remains `data-theme` plus `--gc-*` variables; do not create a second
+  theme source of truth.
+- Preserve keyboard operation, visible focus, accessible names/states, reduced-motion
+  behavior, and focus restoration for every changed interaction.
+- Before editing UI or interaction code, present the concrete behavior and layout
+  proposal to the user and wait for explicit confirmation. Read-only audits,
+  screenshots, impact analysis, and proposal writing do not require confirmation.
 
-- Inspect the relevant execution flow and tests before proposing a change. Use GitNexus `impact` before editing a function, class, method, route contract, or shared type.
-- Prefer the smallest evidence-backed patch. Do not combine security/correctness fixes with cosmetic cleanup, broad rewrites, dependency upgrades, or unrelated formatting.
-- Add or update regression coverage for every behavior change. Tests must demonstrate the failure before the fix when practical.
-- For auth, authorization, storage, migration, provider, workflow, or API-contract changes, run the matching focused test file before the full suite.
-- Before handoff, run `npm run check`, `npm run build`, and GitNexus `detect_changes`. Report any unavailable test or degraded graph result explicitly.
+## 3. Results and Document Boundaries
 
-## Git and Agent Collaboration
+- Results must not be removed, hidden behind a degraded path, or weakened. Preserve
+  cross-project run recovery, success, failure, unknown-result handling, view,
+  compare, download, and continued processing / set-as-input flows.
+- Keep `ProjectTab[]` as the canonical document source and preserve the strict
+  `DocumentSnapshot` boundary. Selection, viewer/compare state, runtime state,
+  React Flow measurements, and temporary UI state do not belong in project data.
+- Async save, run, upload, asset, and mask writes must remain bound to the initiating
+  `tabId + projectId + documentEpoch`. Do not let late responses write into a new
+  document occupying the same tab container.
+- UI panel open/closed state remains local UI state and must not enter document
+  history, session persistence, or the business Store.
 
-- Claude may edit only inside a linked worktree created for its task. A read-only audit may run in the primary worktree, but it must not change files there.
-- The project hook enforces a conservative Bash allowlist in the primary worktree. If it blocks a command, use Read/Grep/GitNexus or restart in a linked worktree; do not bypass or disable the hook.
-- Treat the hook as a defense against accidental agent actions, not an adversarial security sandbox. Its worktree path check covers `Write`, `Edit`, and `NotebookEdit`, not paths reached by Bash subprocesses; Bash started in a linked worktree can still address another checkout by absolute path. Shell indirection and child processes cannot be completely classified from a command string; use an OS-level sandbox or read-only mount when running untrusted agents.
-- Claude may create local commits on its worktree branch. It must never push, create a PR, merge, rebase, cherry-pick, force-reset, or clean the repository.
-- Worktrees share the primary checkout's `node_modules` for speed. Never run dependency installation or update commands from Claude; report lockfile or dependency changes for Codex to handle in an isolated dependency workflow.
-- Codex reviews `BASE_COMMIT..CLAUDE_COMMIT`, reruns impact analysis and tests, and decides whether to adopt, rewrite, or reject each change. Never cherry-pick a Claude commit without reviewing its diff and evidence.
-- Every Claude handoff must include `BASE_COMMIT`, worktree path, branch, commit IDs, findings, tests run, affected flows, residual risks, and requested Codex review focus.
-- Refresh stale GitNexus data with `node .gitnexus/run.cjs analyze --index-only --pdg`; keep `--index-only` so generated context does not overwrite these shared rules.
+## 4. Security and Data Invariants
 
-## Codex application-audit handoff (2026-08-18)
+- Keep `/api/health`, `/api/ready`, login, and session checks intentionally separate
+  from authenticated routes. Do not weaken `requireAuth`, `requirePasswordChanged`,
+  or `requireAdmin` coverage.
+- Preserve one active device session per account, hashed tokens, secure cookie
+  attributes, replacement-session reporting, and revocation after account changes.
+- Enforce owner/admin checks on projects, files, assets, history, usage, and output.
+  Prefer a non-disclosing `404` when revealing resource existence would leak data.
+- Validate image identifiers, MIME/extension, decoded size, and local references
+  before filesystem access. Prevent traversal and arbitrary local/remote URL access.
+- Keep destructive multi-table operations and ownership/reference updates
+  transactional. Preserve recovery windows and referenced-asset deletion guards.
+- Never expose AI gateway keys to clients or logs. Retain provider request limits,
+  reference-image ordering, and non-stretching resize semantics. Automated tests
+  must not call paid or real AI providers unless the user explicitly authorizes it.
 
-- Branch/worktree: `codex/fix-app-review` in `.claude/worktrees/fix-app-review`, based on `main` commit `7859749`.
-- Source reviewed: `CODEX_REVIEW_HANDOFF_APP.md`; findings were reproduced against current code rather than applied blindly.
-- Confirmed and fixed: G1–G4, G6–G8, A1–A2, A4–A6, D1–D6, F1–F2, F4–F5, F7–F9.
-- Key behavior changes:
-  - DAG generation records settle once per whole run, aggregate successful provider requests, and clean files from failed runs.
-  - SSE consumers require a target-node terminal event, reject stale sequence numbers, and preflight run liveness.
-  - Legacy assets are insert-only; existing ownership/scope is never overwritten.
-  - Active account IDs use a partial unique index so soft-deleted login names can be reused.
-  - Forced-password admins cannot call account-management routes before changing the temporary password.
-  - Asset creation validates file access; deletion/reference writes use row locks; deleted listings and history deletion do not leak other users' data.
-  - Initial history merges optimistic records, and pagination is pinned to a stable `before` snapshot.
-- Product decisions implemented after the initial audit:
-  - G5: direct generation and DAG generation now share an 8-image maximum; sketch/render and AI-modify expose 1/2/4/8 choices end to end.
-  - A3: files, generation runs, and usage events receive the same 15-day tombstones as projects/assets; expiry removes database rows plus stored image files.
-  - F3: the product limit remains connection-count based (maximum 8 incoming connections), and each image-upload node has one singular `imageUrl`/single-file picker.
-  - F6: queued/running tabs cannot be closed, so the active SSE can always write results back to the canvas.
-  - F10/F11: selecting a fifth comparison image shows an explicit limit message; queued buttons are disabled and labelled `排队中…` across all AI nodes.
-- Validation completed: `npm run check` passed, `npm run build` passed, and GitNexus compare-mode change detection reviewed the expected generation/provider/auth/history/asset flows (overall graph risk: CRITICAL because shared Provider and SSE hubs changed).
+## 5. Change and Verification Workflow
+
+- Inspect relevant flows and tests first. Run GitNexus `impact` before editing a
+  function, class, method, route contract, or shared type; warn before proceeding
+  when risk is HIGH or CRITICAL.
+- Prefer the smallest evidence-backed patch. Do not mix UI work with unrelated
+  security fixes, architecture rewrites, dependency upgrades, or formatting churn.
+- Add or update regression coverage for each behavior change. For desktop UI, assert
+  rendered geometry and interactions at 1024, 1280, and 1440 rather than class names.
+- Use the existing scripts: `npm run lint`, `npm run test`, `npm run check`, and
+  `npm run build`. The isolated PostgreSQL runner owns test Compose lifecycle; do
+  not replace it with ad-hoc direct Compose commands.
+- Before delivery or commit, run the relevant focused tests, `npm run check`,
+  `npm run build`, `git diff --check`, and GitNexus `detect_changes`. Report any
+  unavailable or degraded gate instead of treating it as passed.
+
+## 6. Git, Review, and Release Gates
+
+- Preserve unrelated user changes in a dirty worktree. Do not force-reset, clean,
+  rebase, or overwrite work that is outside the requested scope.
+- The user message `通过` authorizes committing and pushing the approved batch plus
+  a local exact-SHA review using the configured local review model. It does not
+  authorize merging to `main`, tagging, releasing, or deploying.
+- Do not trigger or wait for Codex Cloud review. The current review path is local
+  tests, GitNexus, CI where applicable, exact head/base verification, local-model
+  review, and the user's explicit approval.
+- Merging a PR, tagging, publishing a release, and deploying each require explicit
+  user authorization. Never merge automatically.
+- Keep `.env`, `.env.local`, PATs, provider keys, credentials, uploads, database
+  dumps, `data/`, `dist/`, `dist-server/`, and other runtime/generated output out of
+  commits and agent output. `.env.example` remains the public configuration contract.
+- Historical audit details belong in `CODEX_REVIEW_HANDOFF_APP.md` and dated docs,
+  not in this current-rule file.

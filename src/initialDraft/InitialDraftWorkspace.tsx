@@ -10,6 +10,7 @@ import {
 } from "react";
 import { AlertTriangleIcon, CloudIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { readWorkspaceOwner } from "@/auth/session";
 import {
   applyServerInitialDraftToTab,
@@ -544,25 +545,26 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
 
 export function InitialDraftSyncNotice() {
   const { syncState, syncError, retrySync } = useInitialDraftWorkspace();
-  if (syncState === "idle" && !syncError) return null;
+  if (syncState !== "error") {
+    return syncState === "syncing" ? (
+      <span role="status" aria-live="polite" className="sr-only">
+        正在同步未保存项目
+      </span>
+    ) : null;
+  }
   return (
-    <div
-      role={syncState === "error" ? "alert" : "status"}
-      className="gc-panel flex min-h-9 shrink-0 items-center justify-center gap-3 border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 py-1.5 text-center"
+    <Card
+      role="alert"
+      size="sm"
+      className="gc-panel shrink-0 gap-0 rounded-none border-x-0 border-t-0 border-[var(--gc-border)] bg-[var(--gc-panel)] py-0 ring-0"
     >
-      {syncState === "syncing" ? (
-        <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin text-gold" />
-      ) : (
+      <CardContent className="flex min-h-9 items-center justify-center gap-3 px-3 py-1.5 text-center">
         <CloudIcon aria-hidden="true" className="size-3.5 text-amber-300" />
-      )}
-      <p className={`text-[10px] ${syncState === "error" ? "text-amber-300" : "text-[var(--gc-text-muted)]"}`}>
-        {syncState === "syncing"
-          ? "正在同步未保存项目…"
-          : `云端草稿同步失败；本机内容已保留。${syncError ?? ""}`}
-      </p>
-      {syncState === "error" && (
+        <p className="text-[10px] text-amber-300">
+          云端草稿同步失败；本机内容已保留。{syncError ?? ""}
+        </p>
         <Button type="button" variant="outline" size="sm" onClick={retrySync}>重试同步</Button>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

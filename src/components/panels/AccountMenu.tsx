@@ -1,5 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, type CurrentUser } from "@/auth/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ImageModelId } from "@/types/imageModels";
 
 interface ManagedUser extends CurrentUser {
@@ -38,40 +45,49 @@ type AccountPanelTab = "usage" | "users" | "diagnostics";
 
 export function AccountMenu() {
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
   const [panel, setPanel] = useState<AccountPanelTab | null>(null);
-  const root = useRef<HTMLDivElement>(null);
   if (!user) return null;
 
   return (
-    <div ref={root} className="relative">
-      <button type="button" onClick={() => setOpen((value) => !value)}
-        aria-label={`账户菜单：${user.displayName}`}
-        title={`账户菜单：${user.displayName}`}
-        className="flex h-8 w-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-0 text-[10px] text-(--gc-text-muted) hover:border-(--gc-accent) sm:h-auto sm:w-auto sm:px-3 sm:py-1.5">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[9px] font-semibold text-white">
-          {user.displayName.slice(0, 1)}
-        </span>
-        <span className="hidden sm:inline">{user.displayName}</span>
-      </button>
-      {open && (
-        <div className="fixed right-2 top-12 z-50 w-44 rounded-lg border border-(--gc-border) bg-(--gc-panel) p-1.5 shadow-xl sm:absolute sm:right-0 sm:top-full sm:mt-1.5">
-          <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
-            onClick={() => { setPanel("usage"); setOpen(false); }}>消耗记录</button>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          type="button"
+          aria-label={`账户菜单：${user.displayName}`}
+          title={`账户菜单：${user.displayName}`}
+          className="flex h-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-3 py-1.5 text-[10px] text-(--gc-text-muted) outline-hidden transition-colors hover:border-(--gc-accent) focus-visible:ring-2 focus-visible:ring-(--gc-accent)/50"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[9px] font-semibold text-white">
+            {user.displayName.slice(0, 1)}
+          </span>
+          <span>{user.displayName}</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          sideOffset={6}
+          className="w-44 border border-(--gc-border) bg-(--gc-panel) p-1.5 text-(--gc-text) ring-0"
+        >
+          <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("usage")}>
+            消耗记录
+          </DropdownMenuItem>
           {user.role === "admin" && (
             <>
-              <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
-                onClick={() => { setPanel("users"); setOpen(false); }}>用户管理</button>
-              <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] hover:bg-(--gc-panel-hover)"
-                onClick={() => { setPanel("diagnostics"); setOpen(false); }}>AI 服务诊断</button>
+              <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("users")}>
+                用户管理
+              </DropdownMenuItem>
+              <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("diagnostics")}>
+                AI 服务诊断
+              </DropdownMenuItem>
             </>
           )}
-          <button className="w-full rounded-sm px-2.5 py-2 text-left text-[11px] text-red-400 hover:bg-red-950/20"
-            onClick={() => void logout()}>退出登录</button>
-        </div>
-      )}
+          <DropdownMenuSeparator className="bg-(--gc-border)" />
+          <DropdownMenuItem variant="destructive" className="px-2.5 py-2 text-[11px]" onClick={() => void logout()}>
+            退出登录
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {panel && <AccountPanel initialTab={panel} onClose={() => setPanel(null)} />}
-    </div>
+    </>
   );
 }
 

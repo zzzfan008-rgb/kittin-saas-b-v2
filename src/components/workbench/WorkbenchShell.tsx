@@ -1,9 +1,7 @@
-import { useEffect, useReducer, useSyncExternalStore, type ReactNode } from "react";
-import {
-  LibraryBigIcon,
-  SlidersHorizontalIcon,
-} from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { useReducer, type ReactNode } from "react";
+import { LibraryBigIcon, SlidersHorizontalIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -18,17 +16,6 @@ import {
 
 const LIBRARY_PANEL_ID = "workbench-library-panel";
 const INSPECTOR_PANEL_ID = "workbench-inspector-panel";
-const DOCK_EXCLUSIVE_MEDIA = "(max-width: 1279px)";
-
-function subscribeDockExclusivity(onChange: () => void): () => void {
-  const media = window.matchMedia(DOCK_EXCLUSIVE_MEDIA);
-  media.addEventListener("change", onChange);
-  return () => media.removeEventListener("change", onChange);
-}
-
-function dockExclusivitySnapshot(): boolean {
-  return window.matchMedia(DOCK_EXCLUSIVE_MEDIA).matches;
-}
 
 interface WorkbenchShellProps {
   library: ReactNode;
@@ -40,82 +27,122 @@ interface RailButtonProps {
   label: string;
   controls: string;
   active: boolean;
-  side: "left" | "right";
   onClick: () => void;
   icon: ReactNode;
 }
 
-function RailButton({ label, controls, active, side, onClick, icon }: RailButtonProps) {
+function RailButton({ label, controls, active, onClick, icon }: RailButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger
-        type="button"
-        aria-label={label}
-        aria-controls={controls}
-        aria-expanded={active}
-        aria-pressed={active}
-        onClick={onClick}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "icon-lg" }),
-          "text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]",
-          active && "bg-[var(--gc-panel-hover)] text-[var(--gc-accent)]",
+        render={(
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            aria-label={label}
+            aria-controls={controls}
+            aria-expanded={active}
+            aria-pressed={active}
+            onClick={onClick}
+            className={cn(
+              "text-[var(--gc-text-muted)] shadow-sm hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]",
+              active && "bg-[var(--gc-panel-hover)] text-[var(--gc-accent)]",
+            )}
+          />
         )}
       >
         {icon}
       </TooltipTrigger>
-      <TooltipContent side={side === "left" ? "right" : "left"}>{label}</TooltipContent>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
 }
 
 /**
- * 桌面工作台始终保持同一棵中心内容树。两侧 Dock 仅通过占位宽度
- * 开合，不覆盖画布，也不重建 React Flow 或面板业务子树。
+ * 桌面工作台始终保持同一棵中心内容树。左侧浮动入口控制唯一占位 Dock，
+ * 面板开合不覆盖画布，也不重建 React Flow、节点库或 Results 业务子树。
  */
 export function WorkbenchShell({ library, inspector, children }: WorkbenchShellProps) {
   const [state, dispatch] = useReducer(workbenchUiReducer, INITIAL_WORKBENCH_UI_STATE);
-  const exclusiveDocks = useSyncExternalStore(
-    subscribeDockExclusivity,
-    dockExclusivitySnapshot,
-    () => false,
-  );
-
-  useEffect(() => {
-    if (exclusiveDocks && state.libraryOpen && state.inspectorOpen) {
-      dispatch({ type: "enforce-exclusive" });
-    }
-  }, [exclusiveDocks, state.inspectorOpen, state.libraryOpen]);
+  const libraryOpen = state.activePanel === "library";
+  const inspectorOpen = state.activePanel === "inspector";
+  const panelOpen = state.activePanel !== null;
 
   return (
     <TooltipProvider delay={250}>
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <nav
           aria-label="工作台左侧工具"
-          className="gc-panel relative z-40 flex w-12 shrink-0 flex-col items-center border-r border-[var(--gc-border)] bg-[var(--gc-panel)] py-2"
+          className={cn(
+            "absolute top-3 z-40 flex flex-col items-start gap-2 transition-[left] duration-200 motion-reduce:transition-none",
+            panelOpen ? "left-[20.75rem]" : "left-3",
+          )}
         >
-          <RailButton
-            label="节点 / 素材"
-            controls={LIBRARY_PANEL_ID}
-            active={state.libraryOpen}
-            side="left"
-            onClick={() => dispatch({ type: "toggle-library", exclusive: exclusiveDocks })}
-            icon={<LibraryBigIcon aria-hidden="true" />}
-          />
+          <Card
+            size="sm"
+            className="gc-panel gap-0 rounded-xl bg-[var(--gc-panel)] p-1 py-1 shadow-lg ring-1 ring-[var(--gc-border)]"
+          >
+            <RailButton
+              label="节点库"
+              controls={LIBRARY_PANEL_ID}
+              active={libraryOpen}
+              onClick={() => dispatch({ type: "toggle-panel", panel: "library" })}
+              icon={<LibraryBigIcon aria-hidden="true" />}
+            />
+          </Card>
+
+          <Card
+            size="sm"
+            className="gc-panel gap-0 rounded-xl bg-[var(--gc-panel)] p-1 py-1 shadow-lg ring-1 ring-[var(--gc-border)]"
+          >
+            <RailButton
+              label="属性 / 结果"
+              controls={INSPECTOR_PANEL_ID}
+              active={inspectorOpen}
+              onClick={() => dispatch({ type: "toggle-panel", panel: "inspector" })}
+              icon={<SlidersHorizontalIcon aria-hidden="true" />}
+            />
+          </Card>
         </nav>
 
         <aside
-          id={LIBRARY_PANEL_ID}
-          aria-label="节点 / 素材"
-          aria-hidden={!state.libraryOpen}
-          inert={!state.libraryOpen}
+          aria-label="工作台左侧面板"
+          aria-hidden={!panelOpen}
+          inert={!panelOpen}
           className={cn(
             "gc-panel relative z-30 flex w-0 shrink-0 overflow-hidden bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none",
-            state.libraryOpen
-              ? "visible w-60 border-r border-[var(--gc-border)]"
+            panelOpen
+              ? "visible w-80 border-r border-[var(--gc-border)]"
               : "invisible w-0 border-r-0",
           )}
         >
-          <div className="flex h-full min-h-0 w-60 shrink-0">{library}</div>
+          <div className="relative h-full min-h-0 w-80 shrink-0">
+            <section
+              id={LIBRARY_PANEL_ID}
+              aria-label="节点库"
+              aria-hidden={!libraryOpen}
+              inert={!libraryOpen}
+              className={cn(
+                "absolute inset-0 flex min-h-0 transition-[opacity,visibility] duration-150 motion-reduce:transition-none",
+                libraryOpen ? "visible opacity-100" : "invisible opacity-0",
+              )}
+            >
+              {library}
+            </section>
+            <section
+              id={INSPECTOR_PANEL_ID}
+              aria-label="属性 / 结果"
+              aria-hidden={!inspectorOpen}
+              inert={!inspectorOpen}
+              className={cn(
+                "absolute inset-0 flex min-h-0 transition-[opacity,visibility] duration-150 motion-reduce:transition-none",
+                inspectorOpen ? "visible opacity-100" : "invisible opacity-0",
+              )}
+            >
+              {inspector}
+            </section>
+          </div>
         </aside>
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -123,35 +150,6 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
             {children}
           </div>
         </div>
-
-        <aside
-          id={INSPECTOR_PANEL_ID}
-          aria-label="属性 / 结果"
-          aria-hidden={!state.inspectorOpen}
-          inert={!state.inspectorOpen}
-          className={cn(
-            "gc-panel relative z-30 flex w-0 shrink-0 overflow-hidden bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none",
-            state.inspectorOpen
-              ? "visible w-80 border-l border-[var(--gc-border)]"
-              : "invisible w-0 border-l-0",
-          )}
-        >
-          <div className="flex h-full min-h-0 w-80 shrink-0">{inspector}</div>
-        </aside>
-
-        <nav
-          aria-label="工作台右侧工具"
-          className="gc-panel relative z-40 flex w-12 shrink-0 flex-col items-center border-l border-[var(--gc-border)] bg-[var(--gc-panel)] py-2"
-        >
-          <RailButton
-            label="属性 / 结果"
-            controls={INSPECTOR_PANEL_ID}
-            active={state.inspectorOpen}
-            side="right"
-            onClick={() => dispatch({ type: "toggle-inspector", exclusive: exclusiveDocks })}
-            icon={<SlidersHorizontalIcon aria-hidden="true" />}
-          />
-        </nav>
       </div>
     </TooltipProvider>
   );

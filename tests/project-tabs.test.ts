@@ -5,6 +5,7 @@ import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
 import { imageModelAspectRatioPatch } from "../src/types/imageModels";
 import type { Edge } from "@xyflow/react";
 import {
+  addExistingNodes,
   applyRunEventToTab,
   beginHistoryTransaction,
   beginMaskWork,
@@ -254,8 +255,39 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
     new URL("../src/components/panels/NodeLibraryPanel.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(librarySource, /addAssetNode\(asset,/);
+  assert.doesNotMatch(
+    librarySource,
+    /addAssetNode\(asset,|AssetList|\/api\/assets/,
+    "独立节点库不再承担素材管理，但 Store 的原子素材节点 action 仍需保持可用",
+  );
   assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
+});
+
+await test("多选节点批量粘贴只产生一次文档提交与撤销记录", () => {
+  const baseline = imageNode("batch-copy-baseline", "批量复制基准");
+  useFlowStore.getState().openFlowTab({
+    projectId: "batch-copy-project",
+    projectName: "批量复制测试",
+    nodes: [baseline],
+    edges: [],
+  });
+  const beforeRevision = activeDocument().revision;
+  const additions = [
+    imageNode("batch-copy-a", "副本 A"),
+    imageNode("batch-copy-b", "副本 B"),
+  ].map((node, index) => ({
+    ...node,
+    position: { x: 80 + index * 120, y: 60 + index * 40 },
+  }));
+
+  assert.deepEqual(addExistingNodes(additions), ["batch-copy-a", "batch-copy-b"]);
+  assert.equal(activeDocument().nodes.length, 3);
+  assert.deepEqual(activeDocument().selectedNodeIds, ["batch-copy-a", "batch-copy-b"]);
+  assert.equal(activeDocument().revision, beforeRevision + 1);
+
+  useFlowStore.getState().undo();
+  assert.deepEqual(activeDocument().nodes.map((node) => node.id), [baseline.id]);
+  assert.equal(activeDocument().selectedNodeIds.length, 0);
 });
 
 await test("空白项目启动器只在从未持久化的 pristine 文档中生效", async () => {
@@ -1494,8 +1526,11 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(topBarSource, /Coin AI - Canvas/);
   assert.match(topBarSource, /<ThemeSwitcher \/>/);
   assert.match(topBarSource, /absolute left-full ml-2/);
-  assert.match(topBarSource, /onPointerEnter=[\s\S]*setTimeout\(\(\) => setOpen\(true\), 180\)/);
-  assert.match(topBarSource, /点击图标可固定/);
+  assert.match(topBarSource, /<DropdownMenu>/);
+  assert.match(topBarSource, /aria-label="查看快捷键"/);
+  assert.match(topBarSource, /className="w-56 min-w-56/);
+  assert.match(topBarSource, /<DropdownMenuShortcut/);
+  assert.doesNotMatch(topBarSource, /onPointerEnter|点击图标可固定|setTimeout\(/);
   assert.doesNotMatch(topBarSource, /GARMENT CANVAS|ProjectPicker/);
   assert.doesNotMatch(appSource, /TemplatesDock/);
   assert.match(projectTabsSource, /<LazyProjectCenter open=\{projectCenterOpen\}/);

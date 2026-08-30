@@ -2,13 +2,14 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import {
+  addExistingNodes,
   flushActiveTextEdit,
   flushTabSessionPersistence,
   reconcileRunHistory,
   recentResultsPatch,
   resumeRecentResults,
   selectActiveNodes,
-  selectActivePrimarySelectedNodeId,
+  selectActiveSelectedNodeIds,
   selectHasDirtyTabs,
   trimRecentResults,
   useFlowStore,
@@ -39,6 +40,7 @@ import {
   OPEN_COMPARE_EVENT,
   type AssetPickerRequest,
 } from "@/lib/overlayEvents";
+import { requestCanvasZoom } from "@/lib/keyboardShortcuts";
 
 const LazyCompareOverlay = lazy(() => import("@/components/CompareOverlay").then((module) => ({
   default: module.CompareOverlay,
@@ -50,8 +52,71 @@ const LazyAssetPickerOverlay = lazy(() => import("@/components/AssetPickerOverla
   default: module.AssetPickerOverlay,
 })));
 
-/** 剪贴板里的节点快照（仅内存，跨项目/刷新不保留） */
-let nodeClipboard: { data: FlowNode["data"]; type: string } | null = null;
+interface NodeClipboardEntry {
+  data: FlowNode["data"];
+  type: string;
+  offset: { x: number; y: number };
+}
+
+/** 剪贴板里的节点快照（仅内存，跨项目/刷新不保留，不复制连线）。 */
+let nodeClipboard: NodeClipboardEntry[] | null = null;
+
+function copySelectedNodesToClipboard(): boolean {
+  const state = useFlowStore.getState();
+  const nodes = selectActiveNodes(state);
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const selectedNodes = selectActiveSelectedNodeIds(state)
+    .map((id) => nodesById.get(id))
+    .filter((node): node is FlowNode => Boolean(node));
+  if (selectedNodes.length === 0) return false;
+  const origin = {
+    x: Math.min(...selectedNodes.map((node) => node.position.x)),
+    y: Math.min(...selectedNodes.map((node) => node.position.y)),
+  };
+  nodeClipboard = selectedNodes.map((node) => ({
+    data: JSON.parse(JSON.stringify(node.data)) as FlowNode["data"],
+    type: node.type ?? node.data.kind,
+    offset: {
+      x: node.position.x - origin.x,
+      y: node.position.y - origin.y,
+    },
+  }));
+  return true;
+}
+
+function pasteClipboardNodes(): string[] {
+  if (!nodeClipboard?.length) return [];
+  const state = useFlowStore.getState();
+  const nodes = selectActiveNodes(state);
+  const selectedIds = new Set(selectActiveSelectedNodeIds(state));
+  const selectedNodes = nodes.filter((node) => selectedIds.has(node.id));
+  const anchorNodes = selectedNodes.length > 0
+    ? selectedNodes
+    : nodes.length > 0
+      ? [nodes[nodes.length - 1]]
+      : [];
+  const origin = anchorNodes.length > 0
+    ? {
+        x: Math.min(...anchorNodes.map((node) => node.position.x)) + 40,
+        y: Math.min(...anchorNodes.map((node) => node.position.y)) + 40,
+      }
+    : { x: 0, y: 0 };
+  const additions = nodeClipboard.map((entry) => {
+    const data = JSON.parse(JSON.stringify(entry.data)) as FlowNode["data"];
+    data.status = "idle";
+    data.error = undefined;
+    return {
+      id: nanoid(8),
+      type: entry.type,
+      position: {
+        x: origin.x + entry.offset.x,
+        y: origin.y + entry.offset.y,
+      },
+      data,
+    } satisfies FlowNode;
+  });
+  return addExistingNodes(additions);
+}
 
 interface HistoryPage {
   records: RecentResult[];
@@ -83,10 +148,14 @@ function useGlobalShortcuts() {
       // 蒙版编辑器使用独立撤销栈；打开或上传期间不能让全局快捷键修改底层画布。
       if (useFlowStore.getState().pendingMaskWorkCount > 0) return;
       const key = e.key.toLowerCase();
-      // 输入框内的组合键留给原生文本编辑
+      // 可编辑文本内的组合键留给原生编辑；range 仍应响应画布缩放快捷键。
       const target = e.target as HTMLElement | null;
       const inTextField =
-        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+        target && (
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          (target.tagName === "INPUT" && (target as HTMLInputElement).type !== "range")
+        );
       if (key === "s") {
         e.preventDefault();
         void saveProject();
@@ -94,47 +163,31 @@ function useGlobalShortcuts() {
       }
       if (inTextField) return;
 
-      if (key === "z" && e.shiftKey) {
+      if ((key === "z" && e.shiftKey) || key === "y") {
         e.preventDefault();
         redo();
       } else if (key === "z") {
         e.preventDefault();
         undo();
+      } else if (key === "+" || key === "=" || key === "add") {
+        e.preventDefault();
+        requestCanvasZoom("in");
+      } else if (key === "-" || key === "_" || key === "subtract") {
+        e.preventDefault();
+        requestCanvasZoom("out");
       } else if (key === "c") {
-        // 复制选中节点（不带连线，避免悬空边）
-        const state = useFlowStore.getState();
-        const nodes = selectActiveNodes(state);
-        const selectedNodeId = selectActivePrimarySelectedNodeId(state);
-        const node = nodes.find((n) => n.id === selectedNodeId);
-        if (node) {
-          nodeClipboard = {
-            data: JSON.parse(JSON.stringify(node.data)) as FlowNode["data"],
-            type: node.type ?? node.data.kind,
-          };
-        }
+        copySelectedNodesToClipboard();
       } else if (key === "v") {
-        // 粘贴：在副本右侧偏移落位，状态复位
-        if (!nodeClipboard) return;
+        if (!nodeClipboard?.length) return;
+        e.preventDefault();
+        pasteClipboardNodes();
+      } else if (key === "d") {
+        e.preventDefault();
+        if (copySelectedNodesToClipboard()) pasteClipboardNodes();
+      } else if (key === "a") {
         e.preventDefault();
         const state = useFlowStore.getState();
-        const nodes = selectActiveNodes(state);
-        const data = JSON.parse(JSON.stringify(nodeClipboard.data)) as FlowNode["data"];
-        data.status = "idle";
-        data.error = undefined;
-        const anchor =
-          nodes.find((n) => n.id === selectActivePrimarySelectedNodeId(state)) ??
-          nodes[nodes.length - 1];
-        const position = anchor
-          ? { x: anchor.position.x + 40, y: anchor.position.y + 40 }
-          : { x: 0, y: 0 };
-        const id = nanoid(8);
-        const newNode: FlowNode = {
-          id,
-          type: nodeClipboard.type,
-          position,
-          data,
-        };
-        useFlowStore.getState().addExistingNode(newNode);
+        state.setSelectedNodeIds(selectActiveNodes(state).map((node) => node.id));
       }
     };
     window.addEventListener("keydown", onKeyDown);

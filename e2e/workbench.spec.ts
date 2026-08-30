@@ -293,8 +293,8 @@ test("results and project center follow desktop density for cards", async ({ pag
   await page.reload();
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
 
-  const rightToggle = page.getByRole("button", { name: "属性 / 结果" });
-  await rightToggle.click();
+  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
+  await contextToggle.click();
   await page.getByRole("tab", { name: "结果 / 记录" }).click();
   const resultsRegion = page.getByRole("region", { name: "最近生成" });
   await expect(resultsRegion).toBeVisible();
@@ -406,7 +406,7 @@ test("adding a local edit node keeps the canvas mounted and exposes one clear wo
   const nodes = page.locator(".react-flow__node");
   const initialNodeCount = await nodes.count();
 
-  await page.getByRole("button", { name: "节点 / 素材" }).click();
+  await page.getByRole("button", { name: "节点库" }).click();
   await page.getByTitle("点击添加局部修改，或拖拽到画布指定位置").click();
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
@@ -431,17 +431,33 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   await expect(node).toBeVisible();
   await expect(nodeHeader).toBeVisible();
 
+  // 悬停反馈不得移动节点；否则 React Flow 加上 dragging 类时会瞬间跳回原位。
+  await nodeHeader.hover();
+  await expect.poll(
+    () => node.evaluate((element) => getComputedStyle(element).translate),
+  ).toBe("none");
+
   // React Flow 的 .selected 投影必须与 store 的 canonical selection 同步。
   await nodeHeader.click();
   await expect(node).toHaveClass(/\bselected\b/);
   await expect(selectedNodes).toHaveCount(1);
 
-  // Clipboard and Inspector share the same derived primary selection. The pasted
-  // node becomes the sole selection, and one undo removes the whole paste action.
+  // 全选、复制与粘贴共用 canonical selection。批量粘贴只形成一次撤销记录。
+  await page.keyboard.press(`${modifier}+a`);
+  await expect(selectedNodes).toHaveCount(initialNodeCount);
   await page.keyboard.press(`${modifier}+c`);
   await page.keyboard.press(`${modifier}+v`);
-  await expect(nodes).toHaveCount(initialNodeCount + 1);
-  await expect(selectedNodes).toHaveCount(1);
+  await expect(nodes).toHaveCount(initialNodeCount * 2);
+  await expect(selectedNodes).toHaveCount(initialNodeCount);
+  await page.keyboard.press(`${modifier}+z`);
+  await expect(nodes).toHaveCount(initialNodeCount);
+  await expect(selectedNodes).toHaveCount(0);
+
+  // 主修饰键 + D 复用同一原子批量复制路径。
+  await page.keyboard.press(`${modifier}+a`);
+  await page.keyboard.press(`${modifier}+d`);
+  await expect(nodes).toHaveCount(initialNodeCount * 2);
+  await expect(selectedNodes).toHaveCount(initialNodeCount);
   await page.keyboard.press(`${modifier}+z`);
   await expect(nodes).toHaveCount(initialNodeCount);
   await expect(selectedNodes).toHaveCount(0);
@@ -466,7 +482,26 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   await page.mouse.move(pointer.x, pointer.y);
   await page.mouse.down();
   await page.mouse.move(pointer.x + dragDelta.x, pointer.y + dragDelta.y, { steps: 12 });
+  const beforeRelease = await node.boundingBox();
+  const viewportBeforeRelease = await page.locator(".react-flow__viewport").evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  if (!beforeRelease) throw new Error("Dragged workflow node disappeared before pointer release");
   await page.mouse.up();
+  const immediatelyAfterRelease = await node.boundingBox();
+  await page.waitForTimeout(250);
+  const settledAfterRelease = await node.boundingBox();
+  const viewportAfterRelease = await page.locator(".react-flow__viewport").evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  if (!immediatelyAfterRelease || !settledAfterRelease) {
+    throw new Error("Dragged workflow node disappeared after pointer release");
+  }
+  expect(Math.abs(immediatelyAfterRelease.x - beforeRelease.x)).toBeLessThan(1);
+  expect(Math.abs(immediatelyAfterRelease.y - beforeRelease.y)).toBeLessThan(1);
+  expect(Math.abs(settledAfterRelease.x - beforeRelease.x)).toBeLessThan(1);
+  expect(Math.abs(settledAfterRelease.y - beforeRelease.y)).toBeLessThan(1);
+  expect(viewportAfterRelease).toBe(viewportBeforeRelease);
 
   // React Flow 会先跨过内部拖拽阈值，最终位移无需等于指针位移，但必须明显移动。
   await expect.poll(async () => {
@@ -488,58 +523,114 @@ test("node drag is one undo transaction and selection stays canonical", async ({
     () => node.evaluate((element) => (element as HTMLElement).style.transform),
   ).toBe(startTransform);
 
-  await page.keyboard.press(`${modifier}+Shift+z`);
+  await page.keyboard.press(process.platform === "darwin" ? `${modifier}+Shift+z` : `${modifier}+y`);
   await expect.poll(
     () => node.evaluate((element) => (element as HTMLElement).style.transform),
   ).toBe(endTransform);
 });
 
-test("docks preserve canvas identity, geometry, focus, and results", async ({ page }, testInfo) => {
+test("dragging a node near the canvas edge never auto-pans the viewport", async ({ page }) => {
+  const nodeHeader = page.locator(".react-flow__node").first().locator(".gc-node-header");
+  const pane = page.locator(".react-flow__pane");
+  const viewport = page.locator(".react-flow__viewport");
+
+  await expect(nodeHeader).toBeVisible();
+  const handle = await nodeHeader.boundingBox();
+  const paneBox = await pane.boundingBox();
+  if (!handle || !paneBox) throw new Error("Workflow node or React Flow pane is missing");
+
+  const initialViewport = await viewport.evaluate((element) => getComputedStyle(element).transform);
+  await page.mouse.move(handle.x + Math.min(24, handle.width / 2), handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(paneBox.x + paneBox.width - 8, handle.y + handle.height / 2, { steps: 16 });
+  await page.waitForTimeout(250);
+  const viewportWhileDragging = await viewport.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const viewportAfterRelease = await viewport.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+
+  expect(viewportWhileDragging).toBe(initialViewport);
+  expect(viewportAfterRelease).toBe(initialViewport);
+});
+
+test("left dock and horizontal zoom controls preserve canvas identity, geometry, focus, and results", async ({ page }, testInfo) => {
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Desktop viewport is required");
+  const modifier = process.platform === "darwin" ? "Meta" : "Control";
 
-  const leftToggle = page.getByRole("button", { name: "节点 / 素材" });
-  const rightToggle = page.getByRole("button", { name: "属性 / 结果" });
-  const leftRail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  const rightRail = page.getByRole("navigation", { name: "工作台右侧工具" });
-  const leftPanel = page.locator("#workbench-library-panel");
-  const rightPanel = page.locator("#workbench-inspector-panel");
+  const libraryToggle = page.getByRole("button", { name: "节点库" });
+  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
+  const floatingRail = page.getByRole("navigation", { name: "工作台左侧工具" });
+  const dock = page.locator('aside[aria-label="工作台左侧面板"]');
+  const libraryPanel = page.locator("#workbench-library-panel");
+  const contextPanel = page.locator("#workbench-inspector-panel");
   const canvas = page.getByRole("application", { name: "工作流画布" });
+  const zoomControls = page.getByTestId("canvas-zoom-controls");
+  const zoomSlider = page.getByRole("slider", { name: "画布缩放比例" });
+  const zoomOutput = zoomControls.locator("output");
   const originalCanvas = await canvas.elementHandle();
   if (!originalCanvas) throw new Error("Canvas element is missing");
   const originalTransform = await page.locator(".react-flow__viewport").evaluate(
     (element) => getComputedStyle(element).transform,
   );
   const originalFlowCenter = await flowCenter(canvas);
-  const docksCanShare = viewport.width >= 1280;
+  await expect(libraryToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(dock).toHaveAttribute("aria-hidden", "true");
+  await expectInert(dock, true);
+  await expectWidth(dock, 0);
+  await expect(floatingRail).toBeVisible();
+  await expectWidth(canvas, viewport.width);
 
-  await expect(leftToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(rightToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
-  await expect(rightPanel).toHaveAttribute("aria-hidden", "true");
-  await expectInert(leftPanel, true);
-  await expectInert(rightPanel, true);
-  await expectWidth(leftPanel, 0);
-  await expectWidth(rightPanel, 0);
-  await expectWidth(leftRail, 48);
-  await expectWidth(rightRail, 48);
-  await expectWidth(canvas, viewport.width - 96);
+  const closedCanvasRect = await rect(canvas);
+  const zoomControlsRect = await rect(zoomControls);
+  expectInside(zoomControlsRect, closedCanvasRect);
+  expect(zoomControlsRect.width).toBeGreaterThan(zoomControlsRect.height * 3);
+  await expect(zoomOutput).toHaveText("100%");
+  await zoomSlider.fill("125");
+  await expect(zoomOutput).toHaveText("125%");
+  await zoomSlider.fill("100");
+  await expect(zoomOutput).toHaveText("100%");
 
-  // 右侧单开：不能覆盖画布、Controls 或 MiniMap。
-  await rightToggle.click();
-  await expect(rightToggle).toBeFocused();
-  await expect(rightToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(rightPanel).toHaveAttribute("aria-hidden", "false");
-  await expectInert(rightPanel, false);
-  await expectWidth(rightPanel, 320);
-  await expectWidth(canvas, viewport.width - 416);
+  await page.keyboard.press(`${modifier}+=`);
+  await expect(zoomOutput).toHaveText("120%");
+  await page.keyboard.press(`${modifier}+-`);
+  await expect(zoomOutput).toHaveText("100%");
 
-  const rightOnlyCanvasRect = await rect(canvas);
-  expect(Math.abs(rightOnlyCanvasRect.right - (await rect(rightPanel)).left)).toBeLessThanOrEqual(1);
-  expectInside(await rect(page.locator(".react-flow__controls")), rightOnlyCanvasRect);
-  const rightOnlyMinimapRect = await rect(page.locator(".react-flow__minimap"));
-  expectInside(rightOnlyMinimapRect, rightOnlyCanvasRect);
-  expect(rightOnlyMinimapRect.width).toBe(rightOnlyCanvasRect.width < 760 ? 128 : 200);
+  const shortcutTrigger = page.getByRole("button", { name: "查看快捷键" });
+  const shortcutMenu = page.locator("#workbench-shortcuts");
+  await shortcutTrigger.click();
+  await expect(shortcutMenu).toBeVisible();
+  await expectWidth(shortcutMenu, 224);
+  await expect(shortcutMenu).toContainText(process.platform === "darwin" ? "macOS" : "Windows");
+  await expect(shortcutMenu).toContainText("移动画布");
+  await expect(shortcutMenu).toContainText(process.platform === "darwin" ? "⌘ +" : "Ctrl +");
+  await expect(shortcutMenu).toContainText(process.platform === "darwin" ? "⇧⌘ Z" : "Ctrl Y");
+  await page.keyboard.press("Escape");
+  await expect(shortcutMenu).toBeHidden();
+  await expect(shortcutTrigger).toBeFocused();
+
+  // 属性与结果迁移到唯一左侧 Dock，不能覆盖横向缩放条或 MiniMap。
+  await contextToggle.click();
+  await expect(contextToggle).toBeFocused();
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(dock).toHaveAttribute("aria-hidden", "false");
+  await expectInert(dock, false);
+  await expect(contextPanel).toHaveAttribute("aria-hidden", "false");
+  await expectInert(contextPanel, false);
+  await expectWidth(dock, 320);
+  await expectWidth(canvas, viewport.width - 320);
+
+  const contextCanvasRect = await rect(canvas);
+  expect(Math.abs((await rect(dock)).right - contextCanvasRect.left)).toBeLessThanOrEqual(1);
+  expectInside(await rect(zoomControls), contextCanvasRect);
+  const contextMinimapRect = await rect(page.locator(".react-flow__minimap"));
+  expectInside(contextMinimapRect, contextCanvasRect);
+  expect(contextMinimapRect.width).toBe(contextCanvasRect.width < 760 ? 128 : 200);
   await expectFlowCenter(canvas, originalFlowCenter);
 
   // 两个 Tab Panel 必须保持挂载；切换与 Dock 关闭不能丢失 Results DOM/滚动状态。
@@ -588,59 +679,58 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
   expect(await resultsRegion.evaluate((current, original) => current === original, originalResultsRegion)).toBe(true);
   await expect.poll(async () => resultsScroller.evaluate((element) => element.scrollTop)).toBe(37);
 
-  await rightToggle.click();
-  await expect(rightPanel).toHaveAttribute("aria-hidden", "true");
-  await expectInert(rightPanel, true);
-  await expectWidth(rightPanel, 0);
-  await expectWidth(canvas, viewport.width - 96);
+  await contextToggle.click();
+  await expect(dock).toHaveAttribute("aria-hidden", "true");
+  await expectInert(dock, true);
+  await expectWidth(dock, 0);
+  await expectWidth(canvas, viewport.width);
   await page.keyboard.press("Shift+Tab");
-  const rightClosedFocus = await rightPanel.evaluate((panel) => ({
+  const contextClosedFocus = await contextPanel.evaluate((panel) => ({
     inside: panel.contains(document.activeElement),
     tag: document.activeElement?.tagName,
   }));
-  expect(rightClosedFocus.inside).toBe(false);
-  expect(rightClosedFocus.tag).not.toBe("BODY");
+  expect(contextClosedFocus.inside).toBe(false);
+  expect(contextClosedFocus.tag).not.toBe("BODY");
 
-  await rightToggle.click();
+  await contextToggle.click();
   await expect(resultsPanel).toBeVisible();
   expect(await resultsRegion.evaluate((current, original) => current === original, originalResultsRegion)).toBe(true);
   await expect.poll(async () => resultsScroller.evaluate((element) => element.scrollTop)).toBe(37);
-  await rightToggle.click();
-  await expectWidth(rightPanel, 0);
 
-  // 左侧单开：Tab 应进入节点库；随后按桌面宽度验证互斥或双 Dock 几何。
-  await leftToggle.click();
-  await expect(leftToggle).toBeFocused();
-  await expect(leftToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(leftPanel).toHaveAttribute("aria-hidden", "false");
-  await expectInert(leftPanel, false);
-  await expectWidth(leftPanel, 240);
-  await expectWidth(canvas, viewport.width - 336);
+  // 节点库使用独立浮动按钮，并与上下文面板复用同一个左侧 Dock。
+  await libraryToggle.click();
+  await expect(libraryToggle).toBeFocused();
+  await expect(libraryToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(libraryPanel).toHaveAttribute("aria-hidden", "false");
+  await expectInert(libraryPanel, false);
+  await expect(contextPanel).toHaveAttribute("aria-hidden", "true");
+  await expectInert(contextPanel, true);
+  await expectWidth(dock, 320);
+  await expectWidth(canvas, viewport.width - 320);
+  await expect(libraryPanel.getByRole("button", { name: "素材库" })).toHaveCount(0);
+  const libraryButtons = libraryPanel.getByRole("button");
+  await libraryButtons.first().focus();
+  await expect(libraryButtons.first()).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "节点库" })).toBeFocused();
+  await expect(libraryButtons.nth(1)).toBeFocused();
   const sessionBeforeDomFocus = await page.evaluate(() => (
     window.sessionStorage.getItem("garment-canvas-project-tabs")
   ));
-  await leftToggle.focus();
+  await libraryToggle.focus();
   await expect.poll(() => page.evaluate(() => (
     window.sessionStorage.getItem("garment-canvas-project-tabs")
   ))).toBe(sessionBeforeDomFocus);
 
-  await rightToggle.click();
-  await expectInert(rightPanel, false);
-  await expectWidth(rightPanel, 320);
-  await expectInert(leftPanel, !docksCanShare);
-  await expectWidth(leftPanel, docksCanShare ? 240 : 0);
-  await expectWidth(canvas, viewport.width - (docksCanShare ? 656 : 416));
+  await contextToggle.click();
+  await expectInert(contextPanel, false);
+  await expectInert(libraryPanel, true);
+  await expectWidth(dock, 320);
+  await expectWidth(canvas, viewport.width - 320);
 
-  const leftPanelRect = await rect(leftPanel);
   const canvasRect = await rect(canvas);
-  const rightPanelRect = await rect(rightPanel);
-  if (docksCanShare) {
-    expect(Math.abs(leftPanelRect.right - canvasRect.left)).toBeLessThanOrEqual(1);
-  }
-  expect(Math.abs(canvasRect.right - rightPanelRect.left)).toBeLessThanOrEqual(1);
-  expectInside(await rect(page.locator(".react-flow__controls")), canvasRect);
+  expect(Math.abs((await rect(dock)).right - canvasRect.left)).toBeLessThanOrEqual(1);
+  expectInside(await rect(zoomControls), canvasRect);
   const minimapRect = await rect(page.locator(".react-flow__minimap"));
   expectInside(minimapRect, canvasRect);
   expect(minimapRect.width).toBe(canvasRect.width < 760 ? 128 : 200);
@@ -768,28 +858,15 @@ test("docks preserve canvas identity, geometry, focus, and results", async ({ pa
     contentType: "image/png",
   });
 
-  await rightToggle.click();
-  await expect(rightToggle).toBeFocused();
-  await expect(rightPanel).toHaveAttribute("aria-hidden", "true");
-  await expectInert(rightPanel, true);
-  await expectWidth(rightPanel, 0);
-  await expectWidth(canvas, viewport.width - (docksCanShare ? 336 : 96));
-
-  if (docksCanShare) {
-    await leftToggle.click();
-    await expect(leftToggle).toBeFocused();
-    await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
-    await expectInert(leftPanel, true);
-    await expectWidth(leftPanel, 0);
-  } else {
-    await expect(leftToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(leftPanel).toHaveAttribute("aria-hidden", "true");
-    await expectInert(leftPanel, true);
-    await expectWidth(leftPanel, 0);
-  }
-  await expectWidth(canvas, viewport.width - 96);
+  await contextToggle.click();
+  await expect(contextToggle).toBeFocused();
+  await expect(dock).toHaveAttribute("aria-hidden", "true");
+  await expectInert(dock, true);
+  await expectWidth(dock, 0);
+  await expectWidth(canvas, viewport.width);
   await page.keyboard.press("Tab");
-  expect(await leftPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
+  expect(await libraryPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
+  expect(await contextPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
 
   expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
   await expect.poll(async () => page.locator(".react-flow__viewport").evaluate(

@@ -18,7 +18,7 @@ interface ResultsPanelProps {
   className?: string;
 }
 
-/** 右侧上下文 Dock 中的跨项目结果与运行记录。 */
+/** 左侧上下文 Dock 中的跨项目结果与运行记录。 */
 export function ResultsPanel({
   hasMore = false,
   loadingMore = false,
