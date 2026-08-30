@@ -1,17 +1,13 @@
 export interface WorkbenchUiState {
-  libraryOpen: boolean;
-  inspectorOpen: boolean;
+  activePanel: "library" | "inspector" | null;
 }
 
 export type WorkbenchUiAction =
-  | { type: "toggle-library"; exclusive?: boolean }
-  | { type: "toggle-inspector"; exclusive?: boolean }
-  | { type: "enforce-exclusive" };
+  | { type: "toggle-panel"; panel: "library" | "inspector" };
 
 export const INITIAL_WORKBENCH_UI_STATE: WorkbenchUiState = {
-  libraryOpen: false,
-  // 首屏优先保留画布空间，需要属性或结果时再展开上下文 Dock。
-  inspectorOpen: false,
+  // 首屏优先保留画布空间，需要节点、属性或结果时再展开左侧 Dock。
+  activePanel: null,
 };
 
 /**
@@ -23,22 +19,8 @@ export function workbenchUiReducer(
   action: WorkbenchUiAction,
 ): WorkbenchUiState {
   switch (action.type) {
-    case "toggle-library": {
-      const libraryOpen = !state.libraryOpen;
-      return libraryOpen && action.exclusive
-        ? { libraryOpen: true, inspectorOpen: false }
-        : { ...state, libraryOpen };
-    }
-    case "toggle-inspector": {
-      const inspectorOpen = !state.inspectorOpen;
-      return inspectorOpen && action.exclusive
-        ? { libraryOpen: false, inspectorOpen: true }
-        : { ...state, inspectorOpen };
-    }
-    case "enforce-exclusive":
-      return state.libraryOpen && state.inspectorOpen
-        ? { libraryOpen: false, inspectorOpen: true }
-        : state;
+    case "toggle-panel":
+      return { activePanel: state.activePanel === action.panel ? null : action.panel };
     default:
       return state;
   }

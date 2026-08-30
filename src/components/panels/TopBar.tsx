@@ -1,6 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { CircleHelpIcon, KeyboardIcon, PaletteIcon } from "lucide-react";
+import { useState } from "react";
+import { ChevronDownIcon, CircleHelpIcon, KeyboardIcon, PaletteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   retryTabSessionPersistence,
   selectActiveReadOnly,
@@ -8,9 +19,13 @@ import {
 } from "@/store/flowStore";
 import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
 import { OPEN_TUTORIAL_EVENT } from "@/tutorials/tutorialRuntime";
+import {
+  detectDesktopShortcutPlatform,
+  workbenchShortcutRows,
+  type WorkbenchShortcutRow,
+} from "@/lib/keyboardShortcuts";
 import { AccountMenu } from "./AccountMenu";
 
-const THEME_PICKER_ID = "theme-picker-options";
 const SHORTCUTS_PANEL_ID = "workbench-shortcuts";
 
 function themePreviewColors(theme: ThemeId) {
@@ -44,204 +59,113 @@ function ThemeMiniature({ theme }: { theme: ThemeId }) {
 function ThemeSwitcher() {
   const [theme, switchTheme] = useTheme();
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const current = THEMES.find((item) => item.id === theme) ?? THEMES[0];
 
-  const closeAndRestoreFocus = () => {
-    setOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  const selectTheme = (value: string) => {
+    if (THEMES.some((item) => item.id === value)) {
+      switchTheme(value as ThemeId);
+      setOpen(false);
+    }
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
-        event.preventDefault();
-        closeAndRestoreFocus();
-      }
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <div
-      ref={rootRef}
-      className="relative"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) setOpen(false);
-      }}
-    >
-      <Button
-        ref={triggerRef}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
         type="button"
-        variant="outline"
-        size="sm"
         aria-label={`切换主题，当前为${current.label}`}
-        aria-controls={THEME_PICKER_ID}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="h-8 min-w-32 justify-between border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] text-[var(--gc-text)] hover:border-[var(--gc-accent)]"
+        className="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] font-medium text-[var(--gc-text)] outline-hidden transition-colors hover:border-[var(--gc-accent)] focus-visible:ring-2 focus-visible:ring-[var(--gc-accent)]/50"
       >
         <PaletteIcon aria-hidden="true" className="size-3.5 text-[var(--gc-accent)]" />
         <span>{current.label}</span>
-        <span aria-hidden="true" className="text-[9px] text-[var(--gc-text-muted)]">{open ? "▲" : "▼"}</span>
-      </Button>
-
-      {open && (
-        <div
-          id={THEME_PICKER_ID}
-          role="menu"
-          aria-label="主题"
-          className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 shadow-2xl shadow-black/60"
-        >
-          <p className="px-2 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">主题</p>
-          <div className="space-y-1">
-            {THEMES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={theme === item.id}
-                onClick={() => {
-                  switchTheme(item.id);
-                  closeAndRestoreFocus();
-                }}
-                className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors ${
-                  theme === item.id
-                    ? "border-[var(--gc-accent)] bg-[var(--gc-panel-hover)]"
-                    : "border-transparent hover:border-[var(--gc-border)] hover:bg-[var(--gc-panel-hover)]"
-                }`}
-              >
-                <ThemeMiniature theme={item.id} />
-                <span className="min-w-0 flex-1">
-                  <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
-                    {item.label}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[9px] text-[var(--gc-text-muted)]">{item.desc}</span>
+        <ChevronDownIcon aria-hidden="true" className="size-3 text-[var(--gc-text-muted)]" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="center"
+        sideOffset={8}
+        className="w-64 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 text-[var(--gc-text)] shadow-2xl shadow-black/60 ring-0"
+      >
+        <DropdownMenuRadioGroup value={theme} onValueChange={selectTheme} className="space-y-1">
+          <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
+            主题
+          </DropdownMenuLabel>
+          {THEMES.map((item) => (
+            <DropdownMenuRadioItem
+              key={item.id}
+              value={item.id}
+              className="gap-3 border border-transparent p-2 pr-8 text-left text-[var(--gc-text)] focus:border-[var(--gc-border)] focus:bg-[var(--gc-panel-hover)] data-checked:border-[var(--gc-accent)] data-checked:bg-[var(--gc-panel-hover)]"
+            >
+              <ThemeMiniature theme={item.id} />
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
+                  {item.label}
                 </span>
-                {theme === item.id && <span className="text-xs text-[var(--gc-accent)]">✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+                <span className="mt-0.5 block truncate text-[9px] text-[var(--gc-text-muted)]">{item.desc}</span>
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function ShortcutKey({ children }: { children: string }) {
+function ShortcutRow({ label, shortcut }: WorkbenchShortcutRow) {
   return (
-    <kbd className="min-w-6 rounded border border-[var(--gc-border)] bg-[var(--gc-control)] px-1.5 py-0.5 text-center font-mono text-[9px] leading-4 text-[var(--gc-text)] shadow-sm">
-      {children}
-    </kbd>
+    <div className="flex min-h-8 items-center justify-between gap-3 rounded-md px-2 text-[11px] text-[var(--gc-text)] hover:bg-[var(--gc-panel-hover)]">
+      <span>{label}</span>
+      <DropdownMenuShortcut className="shrink-0 text-[10px] tracking-normal text-[var(--gc-text-muted)]">
+        {shortcut}
+      </DropdownMenuShortcut>
+    </div>
   );
 }
 
 function ShortcutMenu() {
-  const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const openTimer = useRef<number | null>(null);
-  const closeTimer = useRef<number | null>(null);
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-  const command = isMac ? "⌘" : "Ctrl";
-
-  const clearTimers = () => {
-    if (openTimer.current !== null) window.clearTimeout(openTimer.current);
-    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
-    openTimer.current = null;
-    closeTimer.current = null;
-  };
-
-  useEffect(() => () => clearTimers(), []);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setPinned(false);
-      setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  const shortcuts = [
-    { label: "保存", keys: [command, "S"] },
-    { label: "撤销", keys: [command, "Z"] },
-    { label: "重做", keys: isMac ? ["⇧", command, "Z"] : [command, "Shift", "Z"] },
-    { label: "复制节点", keys: [command, "C"] },
-    { label: "粘贴节点", keys: [command, "V"] },
-    { label: "删除节点", keys: [isMac ? "⌫" : "Delete"] },
-    { label: "关闭浮层", keys: ["Esc"] },
-  ];
+  const platform = detectDesktopShortcutPlatform();
+  const shortcuts = workbenchShortcutRows(platform);
+  const canvasShortcuts = shortcuts.slice(0, -2);
+  const projectShortcuts = shortcuts.slice(-2);
 
   return (
-    <div
-      className="relative"
-      onPointerEnter={() => {
-        clearTimers();
-        if (!open) openTimer.current = window.setTimeout(() => setOpen(true), 180);
-      }}
-      onPointerLeave={() => {
-        clearTimers();
-        if (!pinned) closeTimer.current = window.setTimeout(() => setOpen(false), 150);
-      }}
-      onFocusCapture={() => setOpen(true)}
-      onBlurCapture={(event) => {
-        if (!pinned && !event.currentTarget.contains(event.relatedTarget as globalThis.Node | null)) setOpen(false);
-      }}
-    >
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        aria-label="查看快捷键"
-        aria-controls={SHORTCUTS_PANEL_ID}
-        aria-expanded={open}
-        aria-pressed={pinned}
-        title="快捷键"
-        onClick={() => {
-          const nextPinned = !pinned;
-          setPinned(nextPinned);
-          setOpen(nextPinned);
-        }}
-        className="border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] hover:text-[var(--gc-text)]"
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={(
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            aria-label="查看快捷键"
+            aria-controls={SHORTCUTS_PANEL_ID}
+            title="快捷键"
+            className="border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text-muted)] hover:border-[var(--gc-accent)] hover:text-[var(--gc-text)]"
+          />
+        )}
       >
         <KeyboardIcon aria-hidden="true" className="size-4" />
-      </Button>
-
-      {open && (
-        <div
-          id={SHORTCUTS_PANEL_ID}
-          role="region"
-          aria-label="快捷键说明"
-          className="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 shadow-2xl shadow-black/60"
-        >
-          <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-2 pb-2 pt-1">
-            <span className="text-[11px] font-semibold text-[var(--gc-text)]">快捷键</span>
-            <span className="text-[9px] text-[var(--gc-text-muted)]">{pinned ? "已固定" : "点击图标可固定"}</span>
-          </div>
-          <div className="pt-1">
-            {shortcuts.map((shortcut) => (
-              <div key={shortcut.label} className="flex min-h-9 items-center justify-between gap-4 rounded-md px-2 hover:bg-[var(--gc-panel-hover)]">
-                <span className="text-[10px] text-[var(--gc-text-muted)]">{shortcut.label}</span>
-                <span className="flex items-center gap-1">
-                  {shortcut.keys.map((key, index) => <ShortcutKey key={`${shortcut.label}-${index}`}>{key}</ShortcutKey>)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        id={SHORTCUTS_PANEL_ID}
+        aria-label="快捷键说明"
+        align="center"
+        sideOffset={8}
+        className="w-56 min-w-56 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-1.5 text-[var(--gc-text)] shadow-2xl shadow-black/60 ring-0"
+      >
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-2 pb-1.5 pt-1 text-[11px] font-semibold text-[var(--gc-accent)]">
+            {platform === "macos" ? "macOS" : "Windows"}
+          </DropdownMenuLabel>
+          {canvasShortcuts.map((shortcut) => (
+            <ShortcutRow key={shortcut.label} {...shortcut} />
+          ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator className="mx-1 bg-[var(--gc-border)]" />
+        <DropdownMenuGroup>
+          {projectShortcuts.map((shortcut) => (
+            <ShortcutRow key={shortcut.label} {...shortcut} />
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

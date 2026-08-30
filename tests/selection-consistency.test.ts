@@ -371,24 +371,20 @@ test("实时页签切换恢复各自 canonical selection 与 primary", () => {
   );
 });
 
-test("复制与属性消费者共用 primary selector", () => {
+test("复制读取 canonical 多选集合，属性面板保持 primary selector", () => {
   reset();
   useFlowStore.getState().onNodesChange([{ id: "b", type: "select", selected: true }]);
   useFlowStore.getState().onNodesChange([{ id: "a", type: "select", selected: true }]);
   const state = activeDocument();
   const inspectorNodeId = selectPrimarySelectedNodeId(state);
-  const copyTarget = state.nodes.find(
-    (candidate) => candidate.id === selectPrimarySelectedNodeId(state),
-  );
   assert.equal(inspectorNodeId, "a", "Inspector selector 必须指向最后增选的节点");
-  assert.equal(copyTarget?.id, "a", "复制目标必须与 Inspector 的 primary 一致");
 
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const inspectorSource = fs.readFileSync(
     new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(appSource, /selectActivePrimarySelectedNodeId/);
+  assert.match(appSource, /selectActiveSelectedNodeIds/);
   assert.match(inspectorSource, /useFlowStore\(selectActivePrimarySelectedNodeId\)/);
   assert.doesNotMatch(appSource, /getState\(\)\.selectedNodeId/);
 });

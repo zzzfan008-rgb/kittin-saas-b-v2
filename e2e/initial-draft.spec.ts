@@ -50,12 +50,32 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   expect(initial).not.toBeNull();
   if (!initial) throw new Error("Initial draft was not bootstrapped");
 
+  let draftSyncRequests = 0;
+  await page.route("**/api/projects/initial-draft/*", async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.fallback();
+      return;
+    }
+    draftSyncRequests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.continue();
+  });
+  const canvas = page.getByRole("application", { name: "工作流画布" });
+  const canvasBeforeSync = await canvas.boundingBox();
+  if (!canvasBeforeSync) throw new Error("Initial draft canvas is missing");
+
   const editedName = `E2E 未保存草稿 ${Date.now()}`;
   const projectName = await beginRename(page);
   await projectName.fill(editedName);
   await projectName.blur();
   await expect(projectName).toBeHidden();
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
+  await expect.poll(() => draftSyncRequests, { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect(page.getByText("正在同步未保存项目…")).toHaveCount(0);
+  const canvasDuringSync = await canvas.boundingBox();
+  if (!canvasDuringSync) throw new Error("Initial draft canvas disappeared during sync");
+  expect(Math.abs(canvasDuringSync.y - canvasBeforeSync.y)).toBeLessThan(1);
+  expect(Math.abs(canvasDuringSync.height - canvasBeforeSync.height)).toBeLessThan(1);
   await expect.poll(async () => (await readDraft())?.name).toBe(editedName);
   const synchronized = await readDraft();
   expect(synchronized?.id).toBe(initial.id);
@@ -73,7 +93,7 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   await secondPage.close();
 
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
-  await page.getByRole("button", { name: "退出登录" }).click();
+  await page.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(page.getByRole("heading", { name: "登录服装设计工作台" })).toBeVisible();
   await page.getByRole("textbox", { name: "账号" }).fill(accountId);
   await page.getByLabel("密码").fill(password);
@@ -124,7 +144,7 @@ test("relogin opens the latest saved project instead of bootstrapping a blank pa
     await route.fallback();
   });
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
-  await page.getByRole("button", { name: "退出登录" }).click();
+  await page.getByRole("menuitem", { name: "退出登录" }).click();
   await expect(page.getByRole("heading", { name: "登录服装设计工作台" })).toBeVisible();
   await page.getByRole("textbox", { name: "账号" }).fill(accountId);
   await page.getByLabel("密码").fill(password);
