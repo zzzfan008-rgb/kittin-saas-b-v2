@@ -671,6 +671,29 @@ export function commitDocumentMutation(mutation: DocumentMutation): boolean {
   return commitDocumentMutationWithSet(useFlowStore.setState, mutation);
 }
 
+/** 原子加入一组完整节点；复制多选节点时只写一次 revision 与撤销记录。 */
+export function addExistingNodes(nodes: FlowNode[]): string[] {
+  if (nodes.length === 0) return [];
+  let addedIds: string[] = [];
+  const changed = commitDocumentMutation((tab) => {
+    if (tab.readOnly) return {};
+    const knownIds = new Set(tab.nodes.map((node) => node.id));
+    const additions = nodes.filter((node) => {
+      if (knownIds.has(node.id)) return false;
+      knownIds.add(node.id);
+      return true;
+    });
+    if (additions.length === 0) return {};
+    addedIds = additions.map((node) => node.id);
+    const nextNodes = [...tab.nodes, ...additions];
+    return {
+      ...normalizeNodeSelection(nextNodes, addedIds),
+      selectedResultId: null,
+    };
+  });
+  return changed ? addedIds : [];
+}
+
 /** 开始一组实时可见、但只在结束时写入一次历史与 revision 的文档事务。 */
 export function beginHistoryTransaction(
   label = "document-transaction",

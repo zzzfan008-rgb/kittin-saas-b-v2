@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
-  Controls,
   useNodesInitialized,
   useReactFlow,
   type NodeChange,
@@ -28,6 +27,8 @@ import {
   peekCanvasLanding,
   type CanvasLandingIntent,
 } from "@/lib/canvasLanding";
+import { CanvasZoomControls } from "./CanvasZoomControls";
+import { detectDesktopShortcutPlatform } from "@/lib/keyboardShortcuts";
 
 export const DND_MIME = "application/garment-node";
 
@@ -163,6 +164,7 @@ export function CanvasFlow() {
   const [compactMinimap, setCompactMinimap] = useState(false);
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
+  const multiSelectionKeyCode = detectDesktopShortcutPlatform() === "macos" ? "Meta" : "Control";
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const canvasSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pendingResizeDeltaRef = useRef({ width: 0, height: 0 });
@@ -294,7 +296,9 @@ export function CanvasFlow() {
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         selectionOnDrag
+        multiSelectionKeyCode={multiSelectionKeyCode}
         panOnDrag={[1, 2]}
+        autoPanOnNodeDrag={false}
         defaultViewport={{ x: 100, y: 200, zoom: 1 }}
         proOptions={{ hideAttribution: true }}
         edgeTypes={edgeTypes}
@@ -313,7 +317,7 @@ export function CanvasFlow() {
           pannable
           zoomable
         />
-        <Controls position="bottom-left" showInteractive={false} />
+        <CanvasZoomControls />
       </ReactFlow>
     </div>
   );

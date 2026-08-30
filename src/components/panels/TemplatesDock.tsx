@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { Edge } from "@xyflow/react";
-import { Dialog } from "@base-ui/react/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { selectActiveDocument, useFlowStore, type FlowNode } from "@/store/flowStore";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { WorkflowMini } from "./WorkflowMini";
@@ -317,54 +325,55 @@ export function SaveTemplateForm({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm" />
-        <Dialog.Popup
-          initialFocus={initialFocusRef}
-          finalFocus={finalFocusRef}
-          className="fixed left-1/2 top-1/2 z-[71] w-72 -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-[#262626] bg-[#141414] p-4 shadow-2xl"
-        >
-        <Dialog.Title className="text-xs font-medium text-neutral-200">存为模板</Dialog.Title>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        initialFocus={initialFocusRef}
+        finalFocus={finalFocusRef}
+        showCloseButton={false}
+        overlayClassName="z-[70] bg-black/75 backdrop-blur-sm"
+        className="z-[71] w-80 max-w-[calc(100vw-4rem)] gap-3 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-4 text-[var(--gc-text)] shadow-2xl ring-0"
+      >
+        <div>
+          <DialogTitle className="text-sm font-medium text-[var(--gc-text)]">存为模板</DialogTitle>
+          <DialogDescription className="mt-1 text-[10px] text-[var(--gc-text-muted)]">
+            保存当前节点、连线和参数配置，供之后快速复用。
+          </DialogDescription>
+        </div>
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">名称</span>
+          <span className="text-[10px] text-[var(--gc-text-muted)]">名称</span>
           <input
             ref={initialFocusRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="如：草图→改款→放大 标准流"
-            className="w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden"
+            className="w-full rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">描述</span>
+          <span className="text-[10px] text-[var(--gc-text-muted)]">描述</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="这个模板适用于什么场景"
-            className="w-full resize-none rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden"
+            className="w-full resize-none rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
           />
         </label>
-        {error && <p className="text-[10px] text-red-400">{error}</p>}
-        <div className="flex gap-2">
-          <Dialog.Close
-            type="button"
-            className="flex-1 rounded-md border border-[#262626] px-2 py-1.5 text-xs text-neutral-400 hover:text-neutral-200"
-          >
+        {error && <p role="alert" className="text-[10px] text-red-400">{error}</p>}
+        <DialogFooter className="border-[var(--gc-border)] bg-[var(--gc-panel-soft)]">
+          <DialogClose render={<Button type="button" variant="outline" />}>
             取消
-          </Dialog.Close>
-          <button
+          </DialogClose>
+          <Button
             type="button"
             onClick={() => void submit()}
             disabled={submitting}
-            className="flex-1 rounded-md bg-gold px-2 py-1.5 text-xs font-medium text-ink hover:opacity-90 disabled:opacity-40"
+            className="bg-[var(--gc-accent)] text-[var(--gc-primary-foreground)] hover:opacity-90"
           >
             {submitting ? "保存中…" : "保存"}
-          </button>
-        </div>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

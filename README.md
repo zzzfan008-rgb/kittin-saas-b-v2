@@ -2,6 +2,8 @@
 
 Garment Canvas 是面向服装设计师的桌面工作流画布，覆盖图片输入、模板建图、AI 生成、局部修改、项目页签、跨项目 Results 与素材管理。最低支持宽度为 1024 CSS px，主要验收宽度为 1280 与 1440；不提供移动端专用布局。
 
+当前项目硬规则、UI/shadcn 边界、验证流程与发布门禁以 [`AGENTS.md`](AGENTS.md) 为唯一规则源；日期交接和完成度台账只记录历史状态与证据。
+
 生产部署、macOS 常驻运行、完整环境变量、管理员初始化、备份恢复、PostgreSQL/SQLite 迁移、故障处理和安全基线见 [`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md)。发布前使用 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，最新三主题桌面视觉证据见 [`docs/PHASE_D_VISUAL_ACCEPTANCE.md`](docs/PHASE_D_VISUAL_ACCEPTANCE.md)。
 
 ## Docker 启动（推荐）

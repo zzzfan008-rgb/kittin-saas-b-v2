@@ -205,8 +205,8 @@ test("upload and text starters complete the isolated first-generation golden pat
 
   const canvasNodes = page.locator(".react-flow__node");
   const nodeCountBeforeLibraryClick = await canvasNodes.count();
-  await page.getByRole("button", { name: "节点 / 素材" }).click();
-  const library = page.getByRole("complementary", { name: "节点 / 素材" });
+  await page.getByRole("button", { name: "节点库" }).click();
+  const library = page.getByRole("region", { name: "节点库" });
   await library.getByRole("button", { name: /AI 改款/ }).click();
   await expect(canvasNodes).toHaveCount(nodeCountBeforeLibraryClick + 1);
   const clickedNode = canvasNodes.filter({ hasText: "AI 改款" });
