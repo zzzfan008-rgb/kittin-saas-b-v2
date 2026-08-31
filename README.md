@@ -37,6 +37,12 @@ npm ci
 npm run dev
 ```
 
+`npm run dev` 会先自动执行 `npm run dev:check`：核对 Node.js 版本、5173/后端端口
+占用、PostgreSQL 连通性、Docker Engine 和 Vite API 代理目标。预检只读取连接状态，
+不会停止进程、启动容器、修改数据库或调用 AI。若提示旧 Vite/API 端口冲突，应先停止
+旧开发进程；若 PostgreSQL 不可达，按提示重新执行
+`docker compose up -d postgres --wait`。也可单独运行 `npm run dev:check` 排查环境。
+
 前端开发服务器默认为 `http://localhost:5173`，API 默认为
 `http://localhost:3001`，本机 Node 通过 `POSTGRES_HOST_PORT`（默认 54329）连接容器。
 Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`

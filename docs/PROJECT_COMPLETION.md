@@ -20,9 +20,10 @@
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
 | 最新产品/UI PR | 已合并 | [PR #19](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/19)；shadcn 桌面工作台、缩放/快捷键与拖拽稳定性已经用户明确授权合并 |
-| 当前 main 提交 | 已确认 | `bb89795b632af04e48c3246af6ada33245c7fdd4` |
-| 最新合并后 main CI | 通过 | [PR #19 合并后 main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543) 全部通过 |
-| 证据收口 | 进行中 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已同步精确 `main@bb89795b632af04e48c3246af6ada33245c7fdd4`，仅更新交付证据，不新增产品或生产行为 |
+| 当前 main 提交 | 已确认 | `a6282818bf0f29f8217c473e6f1a55a13b58b276`（合并 PR #18 的文档收口提交） |
+| 最新合并后 main CI | 通过 | [main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726) 在精确 `a6282818bf0f29f8217c473e6f1a55a13b58b276` 全部通过 |
+| 证据收口 | 已完成 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，仅更新交付证据，不新增产品或生产行为 |
+| 首个版本发布 | 已完成 | [`v0.1.0`](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 已于 2026-08-30 发布，annotated tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`；生产部署仍需单独授权 |
 | 最新审查证据 | 已记录 | PR #19 候选 `c8d99866d06468868920b684e90da6e367e66995` 的 GitNexus 累计变更风险为 high（66 个变更符号、11 条受影响流程）；定向影响为 low，29/29 桌面回归、完整 `npm run check`、本机 Gemma 三组精确 SHA 复审与 CodeRabbit 均通过 |
 
 ## 阶段进度
@@ -138,7 +139,7 @@ Phase F 本地证据：基线为单主包 851.73 kB / gzip 267.33 kB；收口后
 
 Phase G 本地证据：2026-08-30 新增部署运维手册、发布清单和 Phase D 视觉证据，校正 Compose 宿主机端口与进程内限流说明。`npm ci`、`npm audit`（0 漏洞）、`npm run check`、`npm run build` 与 production smoke 3/3 通过；桌面 E2E 首轮在 1440 项目中心 Tab 切换后过早读取卡片几何，出现 1 项测试同步失败，增加卡片可见同步点后全量重跑 26/26 通过，未修改产品 UI。另以一次性 PostgreSQL 18 容器和 `/tmp` 目录完成 dump→新库 restore 与 `DATA_DIR` 归档→恢复校验，随后清理全部隔离资源。发布候选 `fbdff19193bff4dbdbc8b33dc416bcea1aa451d4` 经本机 `gemma4:e4b` 精确复审为 `APPROVE`，PR head CI 通过；用户明确授权后，PR #17 合并为 `c23f4174865dda827f969219e035f55c3038a2e8`，新的 main CI 33269171028 再次成功。全程仅使用 dummy/stub AI。
 
-Phase G 完成后的 PR #19 属于已确认的桌面 UI 收口，不改变部署、恢复、安全、数据库或 AI Provider 边界；其最新产品基线、回归、审查与合并后 CI 证据由 PR #18 回填。Tag、GitHub Release 与生产部署仍分别等待用户授权。
+Phase G 完成后的 PR #19 属于已确认的桌面 UI 收口，不改变部署、恢复、安全、数据库或 AI Provider 边界；其最新产品基线、回归、审查与合并后 CI 证据由 PR #18 回填。PR #18 随后合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，main CI 33315734726 通过；用户另行授权的 `v0.1.0` tag 与 GitHub Release 已精确发布在该提交。生产部署仍等待单独授权。
 
 ## 每阶段门禁与证据
 
@@ -155,7 +156,7 @@ Phase G 完成后的 PR #19 属于已确认的桌面 UI 收口，不改变部署
 | `git diff --check` | 通过 | 2026-08-30；未发现空白错误，`dist` / `dist-server` 仍为忽略产物 |
 | 隔离恢复演练 | 通过 | 一次性 PostgreSQL 18 容器完成 custom dump→新库 restore；临时 `DATA_DIR` 完成 tar→restore 与逐文件一致性校验；当前服务与真实数据未触碰，隔离资源已清理 |
 | GitNexus `detect_changes` | 已执行 | Phase G 候选为 low；PR #19 累计变更为 high（66 个变更符号、11 条受影响流程），CanvasFlow 与初始草稿同步提示的定向影响均为 low；风险由 29/29 桌面回归和完整隔离测试覆盖 |
-| GitHub CI | 最新产品 main 通过 | [PR #19 head CI 33312678619](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33312678619) 与[合并后 main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543) 均通过；合并提交 `bb89795b632af04e48c3246af6ada33245c7fdd4` |
+| GitHub CI | 当前 main 通过 | [PR #19 head CI 33312678619](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33312678619)、[产品合并后 main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543) 与[文档收口后 main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726) 均通过；当前 main 为 `a6282818bf0f29f8217c473e6f1a55a13b58b276` |
 | 本地模型复审 | 最新产品精确 SHA 通过 | 2026-08-30 本机 Ollama `gemma4:e4b` 对精确 `c23f4174865dda827f969219e035f55c3038a2e8...c8d99866d06468868920b684e90da6e367e66995` 分三组返回 `APPROVED`，无有效 P0–P3；未触发或等待 Codex Cloud |
 | 视觉证据 | 已采集并经用户确认 | Phase D 的三主题 × 三宽度共 9 张工作台截图及失败/未知 Results 证据继续保留；PR #19 的最新 Dock、缩放、快捷键与拖拽修正另由已登录本地服务逐项确认 |
 
