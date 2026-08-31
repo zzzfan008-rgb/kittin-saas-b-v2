@@ -56,6 +56,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.login-brand-title {
+  font-family:
+    "Helvetica Neue",
+    "Avenir Next",
+    "Inter",
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
 :root {
   --gc-media-overlay-text: #f4f4f4;
 }
