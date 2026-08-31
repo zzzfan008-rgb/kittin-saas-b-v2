@@ -69,12 +69,14 @@ function checkSelectedDiff(selection) {
   }
 }
 
-function output(command, args) {
-  const result = spawnSync(command, args, { encoding: "utf8" });
+function output(command, args, options = {}) {
+  const result = spawnSync(command, args, { encoding: "utf8", ...options });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     process.stderr.write(result.stderr || "");
-    process.exit(result.status ?? 1);
+    const error = new Error(`${command} ${args.join(" ")} exited with ${result.status ?? 1}`);
+    error.exitCode = result.status ?? 1;
+    throw error;
   }
   return result.stdout.trim();
 }
@@ -85,8 +87,14 @@ function succeeds(command, args) {
   return result.status === 0;
 }
 
+function gitNexusOutput(args) {
+  return output("gitnexus", args, {
+    env: { ...process.env, GITNEXUS_LANG: "en" },
+  });
+}
+
 function verifyGitNexus(selection) {
-  const status = output("gitnexus", ["status"]);
+  const status = gitNexusOutput(["status"]);
   if (!/Status:\s+.*up-to-date/.test(status)) {
     throw new Error(`GitNexus 索引未与当前 HEAD 对齐：\n${status}`);
   }
@@ -99,7 +107,7 @@ function verifyGitNexus(selection) {
     process.cwd(),
   ];
   if (selection.finalEvidence) args.push("--base-ref", selection.baseSha);
-  const evidence = output("gitnexus", args);
+  const evidence = gitNexusOutput(args);
   if (!/^Changes: .+$/m.test(evidence) || !/^Affected processes: \d+$/m.test(evidence) || !/^Risk level: .+$/m.test(evidence)) {
     throw new Error(`GitNexus detect-changes 未返回完整的可验证证据：\n${evidence}`);
   }

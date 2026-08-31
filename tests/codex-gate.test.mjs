@@ -71,6 +71,7 @@ if [ -z "$review_json" ]; then
   review_json='{"verdict":"pass","summary":"ok","findings":[],"gitnexus":{"status":"pass","evidence":"test"}}'
 fi
 printf '%s\\n' "$review_json" > "$out"
+if [ -n "$GATE_BREAK_REPO" ]; then mv "$GATE_BREAK_REPO/.git" "$GATE_BREAK_REPO/.git-broken"; fi
 `,
   );
   writeFileSync(
@@ -78,10 +79,16 @@ printf '%s\\n' "$review_json" > "$out"
     `#!/bin/sh
 if [ -n "$GATE_GITNEXUS_LOG" ]; then printf '%s\\n' "$*" >> "$GATE_GITNEXUS_LOG"; fi
 if [ -n "$GATE_GITNEXUS_EXIT" ]; then exit "$GATE_GITNEXUS_EXIT"; fi
-if [ "$1" = "status" ]; then
-  printf '%s\\n' 'Indexed commit: test' 'Current commit: test' 'Status: ✅ up-to-date'
+if [ "$GITNEXUS_LANG" = "en" ]; then
+  if [ "$1" = "status" ]; then
+    printf '%s\\n' 'Indexed commit: test' 'Current commit: test' 'Status: ✅ up-to-date'
+  else
+    printf '%s\\n' 'Changes: 1 files, 1 symbols' 'Affected processes: 0' 'Risk level: low'
+  fi
+elif [ "$1" = "status" ]; then
+  printf '%s\\n' '索引提交: test' '当前提交: test' '状态: ✅ 已是最新'
 else
-  printf '%s\\n' 'Changes: 1 files, 1 symbols' 'Affected processes: 0' 'Risk level: low'
+  printf '%s\\n' '变更：1 个文件，1 个符号' '受影响流程：0' '风险等级：low'
 fi
 `,
   );
@@ -173,6 +180,7 @@ function runGate(f, ...args) {
   f.env.GATE_NPM_LOG = npmLog;
   f.env.GATE_GITNEXUS_LOG = gitNexusLog;
   f.env.GATE_CODEX_LOG = codexLog;
+  f.env.GITNEXUS_LANG = "zh-CN";
   const result = runGate(f, "--base", f.base);
   assert.equal(result.status, 0, `最终 clean-HEAD 门禁应通过：${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
@@ -262,6 +270,15 @@ for (const review of [
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.notEqual(result.status, 0, "Codex 进程失败必须阻断门禁");
   assert.deepEqual(gateTempDirs(), before, "Codex 进程失败后必须清理门禁临时目录");
+}
+
+{
+  const f = fixture();
+  const before = gateTempDirs();
+  f.env.GATE_BREAK_REPO = f.root;
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "Codex 审查后的 Git 读取失败必须阻断门禁");
+  assert.deepEqual(gateTempDirs(), before, "审查后的 Git 读取失败仍必须清理门禁临时目录");
 }
 
 const roots = [...fixtureRoots];
