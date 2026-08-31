@@ -28,7 +28,7 @@ npm run gate:codex -- --base origin/main
 
 ## 3. 架构与审查
 
-- [x] GitNexus 索引与当前未提交候选及 `d942885c57fcf97c5f18821ee94c7f3f720e6cac` 对齐，并使用 PDG 构建。
+- [x] GitNexus 索引与当前已提交候选及 `d942885c57fcf97c5f18821ee94c7f3f720e6cac` 对齐，并使用 PDG 构建；最终候选 head 由门禁启动时的 `git rev-parse HEAD` 精确锁定。
 - [x] `detect_changes` 已记录：Phase G 候选为 low；后续 PR #19 累计变更为 high（66 个变更符号、11 条受影响流程），CanvasFlow 与初始草稿同步提示的定向影响均为 low，并由完整回归覆盖。
 - [x] 本机 Ollama `gemma4:e4b` 对 PR #19 精确 `c23f4174865dda827f969219e035f55c3038a2e8...c8d99866d06468868920b684e90da6e367e66995` 分三组复审，全部 `APPROVED`，无有效 P0–P3 阻断项。
 - [x] 不触发或等待 Codex Cloud；本机模型复审绑定精确 PR head SHA。

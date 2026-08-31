@@ -26,7 +26,7 @@
 | 证据收口 | 已完成 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，仅更新交付证据，不新增产品或生产行为 |
 | 首个版本发布 | 已完成 | [`v0.1.0`](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 已于 2026-08-30 发布，annotated tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`；生产部署仍需单独授权 |
 | 最新已闭环审查证据 | 已记录 | PR #19 候选 `c8d99866d06468868920b684e90da6e367e66995` 的 GitNexus 累计变更风险为 high（66 个变更符号、11 条受影响流程）；定向影响为 low，29/29 桌面回归、完整 `npm run check`、本机 Gemma 三组精确 SHA 复审与 CodeRabbit 均通过 |
-| 当前门禁候选 | 待审查 | `codex/codex-local-gate` 基于 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`，尚未提交或创建 PR；必须先通过未提交预审，再以干净工作树运行精确 base/head 完整门禁 |
+| 当前门禁候选 | 待审查 | `codex/codex-local-gate` 已提交，精确 base 为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；候选 head 以门禁启动时解析并锁定的 `git rev-parse HEAD` 为准（提交内不硬编码自身 SHA，避免循环引用），尚未推送或创建 PR，完整门禁通过后再交付 |
 | 当前门禁规则 | 已切换 | GitHub Actions 因账户计费/额度无法启动而退役；新候选运行 `npm run gate:codex`，由确定性本地套件加 Codex 配置的默认模型审查精确 diff，任何 P0-P3 有效问题阻断 |
 
 ## 阶段进度

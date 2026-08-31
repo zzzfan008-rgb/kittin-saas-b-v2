@@ -45,7 +45,10 @@ function fixture({ requiredNodeVersion = process.versions.node } = {}) {
     `const REQUIRED_NODE_VERSION = ${JSON.stringify(requiredNodeVersion)};`,
   );
   writeFileSync(join(root, "scripts/codex-gate.mjs"), gateSource);
-  writeFileSync(join(root, ".gitignore"), ".gate-npm-log\n.gate-gitnexus-log\n");
+  writeFileSync(
+    join(root, ".gitignore"),
+    ".gate-npm-log\n.gate-gitnexus-log\n.gate-codex-log\n",
+  );
   writeFileSync(join(root, "tracked.txt"), "initial\n");
   writeFileSync(
     join(bin, "npm"),
@@ -55,6 +58,9 @@ function fixture({ requiredNodeVersion = process.versions.node } = {}) {
     join(bin, "codex"),
     `#!/bin/sh
 out=""
+if [ -n "$GATE_CODEX_LOG" ]; then
+  for arg in "$@"; do printf '%s\\n' "$arg" >> "$GATE_CODEX_LOG"; done
+fi
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then out="$2"; shift 2; else shift; fi
 done
@@ -163,8 +169,10 @@ function runGate(f, ...args) {
   git(f.root, "commit", "-qm", "candidate");
   const npmLog = join(f.root, ".gate-npm-log");
   const gitNexusLog = join(f.root, ".gate-gitnexus-log");
+  const codexLog = join(f.root, ".gate-codex-log");
   f.env.GATE_NPM_LOG = npmLog;
   f.env.GATE_GITNEXUS_LOG = gitNexusLog;
+  f.env.GATE_CODEX_LOG = codexLog;
   const result = runGate(f, "--base", f.base);
   assert.equal(result.status, 0, `最终 clean-HEAD 门禁应通过：${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
@@ -177,6 +185,14 @@ function runGate(f, ...args) {
     ["status", `detect-changes --scope compare --repo ${realpathSync(f.root)} --base-ref ${f.base}`],
     "完整门禁必须独立验证 GitNexus 索引并绑定所选 base..HEAD 范围",
   );
+  const codexArgs = readFileSync(codexLog, "utf8").trim().split("\n");
+  const approvalIndex = codexArgs.indexOf("--ask-for-approval");
+  const sandboxIndex = codexArgs.indexOf("--sandbox");
+  const schemaIndex = codexArgs.indexOf("--output-schema");
+  assert.equal(codexArgs[approvalIndex + 1], "never", "Codex 审查必须禁用交互式授权");
+  assert.equal(codexArgs[sandboxIndex + 1], "read-only", "Codex 审查必须使用只读沙箱");
+  assert.ok(schemaIndex >= 0 && codexArgs[schemaIndex + 1], "Codex 审查必须提供输出 schema");
+  assert.ok(!codexArgs.includes("--model"), "Codex 审查不得覆盖用户配置的默认模型");
 }
 
 {
