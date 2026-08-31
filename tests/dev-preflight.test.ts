@@ -50,6 +50,7 @@ const healthy = assessPreflight(defaults, {
   webPortOpen: false,
   apiPortOpen: false,
   databasePortOpen: true,
+  databaseQueryOk: true,
   dockerReachable: true,
 });
 assert.deepEqual(healthy.blockers, []);
@@ -59,6 +60,7 @@ const blocked = assessPreflight(defaults, {
   webPortOpen: true,
   apiPortOpen: true,
   databasePortOpen: false,
+  databaseQueryOk: false,
   dockerReachable: false,
   proxyHealthStatus: 200,
   proxyReadyStatus: 503,
@@ -67,5 +69,15 @@ assert.equal(blocked.blockers.length, 3);
 assert.equal(blocked.blockers.some((item) => item.includes("Vite")), true);
 assert.equal(blocked.blockers.some((item) => item.includes("PostgreSQL")), true);
 assert.equal(blocked.warnings.some((item) => item.includes("ready")), true);
+
+const authenticationBlocked = assessPreflight(defaults, {
+  webPortOpen: false,
+  apiPortOpen: false,
+  databasePortOpen: true,
+  databaseQueryOk: false,
+  dockerReachable: true,
+});
+assert.equal(authenticationBlocked.blockers.length, 1);
+assert.equal(authenticationBlocked.blockers[0]?.includes("认证或查询失败"), true);
 
 console.log("  ✓ 版本、端口、代理目标与阻断/提示分类均通过");

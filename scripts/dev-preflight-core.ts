@@ -16,6 +16,7 @@ export interface PreflightObservations {
   webPortOpen: boolean;
   apiPortOpen: boolean;
   databasePortOpen: boolean;
+  databaseQueryOk: boolean;
   dockerReachable: boolean;
   proxyHealthStatus?: number;
   proxyReadyStatus?: number;
@@ -118,6 +119,10 @@ export function assessPreflight(
   if (!observations.databasePortOpen) {
     blockers.push(
       `PostgreSQL ${config.databaseHost}:${config.databasePort} 不可达；先运行 docker compose up -d postgres --wait`,
+    );
+  } else if (!observations.databaseQueryOk) {
+    blockers.push(
+      "PostgreSQL 端口可达但认证或查询失败；请核对 DATABASE_URL/PG* 凭据与目标数据库",
     );
   }
 

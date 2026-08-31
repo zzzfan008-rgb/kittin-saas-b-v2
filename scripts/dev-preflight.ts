@@ -1,6 +1,7 @@
 import net from "node:net";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import pg from "pg";
 import { config as serverConfig } from "../server/config";
 import {
   assessPreflight,
@@ -9,6 +10,7 @@ import {
 } from "./dev-preflight-core";
 
 const execFileAsync = promisify(execFile);
+const { Client } = pg;
 
 async function portIsOpen(host: string, port: number, timeoutMs = 900): Promise<boolean> {
   return new Promise((resolve) => {
@@ -48,6 +50,31 @@ async function dockerIsReachable(): Promise<boolean> {
   }
 }
 
+async function databaseQueryIsReady(): Promise<boolean> {
+  const connectionString = serverConfig.databaseUrl();
+  const client = new Client({
+    ...(connectionString
+      ? { connectionString }
+      : {
+          host: serverConfig.databaseHost(),
+          port: serverConfig.databasePort(),
+          database: serverConfig.databaseName(),
+          user: serverConfig.databaseUser(),
+          password: serverConfig.databasePassword(),
+        }),
+    connectionTimeoutMillis: 2_500,
+  });
+  try {
+    await client.connect();
+    await client.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
 async function main(): Promise<void> {
   // 导入 server/config 会加载项目根目录的私有 .env；这里只读取非敏感连接参数。
   const runtimeEnv = {
@@ -62,11 +89,12 @@ async function main(): Promise<void> {
     ? "127.0.0.1"
     : preflight.databaseHost;
 
-  const [webPortOpen, apiPortOpen, databasePortOpen, dockerReachable, proxyHealthStatus, proxyReadyStatus] =
+  const [webPortOpen, apiPortOpen, databasePortOpen, databaseQueryOk, dockerReachable, proxyHealthStatus, proxyReadyStatus] =
     await Promise.all([
       portIsOpen("127.0.0.1", preflight.webPort),
       portIsOpen("127.0.0.1", preflight.apiPort),
       portIsOpen(databaseConnectHost, preflight.databasePort),
+      databaseQueryIsReady(),
       dockerIsReachable(),
       httpStatus(`${proxyBase}/api/health`),
       httpStatus(`${proxyBase}/api/ready`),
@@ -76,6 +104,7 @@ async function main(): Promise<void> {
     webPortOpen,
     apiPortOpen,
     databasePortOpen,
+    databaseQueryOk,
     dockerReachable,
     proxyHealthStatus,
     proxyReadyStatus,
