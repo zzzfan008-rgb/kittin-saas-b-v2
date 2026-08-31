@@ -52,6 +52,22 @@ Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
 `npm run test` 会自动启动隔离的临时 PostgreSQL 容器，运行全部回归后删除测试容器和卷；
 测试数据不会污染正式数据。
 
+未提交改动先运行只读预审；固定候选提交并保持干净工作树后，再运行完整本地门禁替代
+GitHub Actions：
+
+```bash
+npm run gate:codex -- --uncommitted --review-only
+
+# 候选提交后
+nvm use
+npm run gate:codex -- --base origin/main
+```
+
+门禁先运行完整确定性检查、桌面 E2E、生产构建和 production smoke，再调用
+结构化 `codex exec` 审查精确差异。命令不指定模型，始终使用当前 Codex 配置的默认模型；
+任何 P0-P3 有效问题都会令门禁失败。为覆盖最低支持版本兼容性，门禁只接受
+`.nvmrc` 固定的 Node.js 22.20.0；审查单个提交可改用 `--commit SHA`。
+
 桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
 请求。首次运行先安装 Chromium，然后执行：
 
