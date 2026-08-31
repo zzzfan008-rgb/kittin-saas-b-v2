@@ -53,11 +53,14 @@ PR #19 另由本机 `gemma4:e4b` 对精确 `c23f4174865dda827f969219e035f55c3038
 - [x] PR head CI 成功，审查评论和线程全部处置。
 - [x] 用户明确授权后才合并；“通过”只授权当前约定的推送与复审，不代替最终合并授权。
 - [x] 合并后单独记录 `MERGED` 状态、main merge SHA 和新的 main CI；CI 未结束时不得宣称发布门禁完成。
-- [ ] tag、GitHub Release、生产部署、数据库恢复或密钥轮换均取得单独授权。
+- [x] 用户另行授权的 `v0.1.0` annotated tag 与 GitHub Release 已发布，tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`。
+- [ ] 生产部署、生产数据库恢复或密钥轮换均取得各自的单独授权。
 
 Phase G 发布候选记录：PR [#17](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/17) 的 base 为 `3dc6a1dc8b54b4ee2596f5f484471328380edafc`，head 为 `fbdff19193bff4dbdbc8b33dc416bcea1aa451d4`；[PR head CI 33268687680](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33268687680)通过。用户明确授权后，PR 合并为 `c23f4174865dda827f969219e035f55c3038a2e8`，[main CI 33269171028](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33269171028)再次成功。CodeRabbit 因免费额度限制未产出代码审查，不计作复审证据；有效复审证据为本机 Gemma、GitNexus 与 CI。
 
 最新产品基线记录：PR [#19](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/19) 的 base 为 `c23f4174865dda827f969219e035f55c3038a2e8`，head 为 `c8d99866d06468868920b684e90da6e367e66995`；[PR head CI 33312678619](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33312678619)和 CodeRabbit 均通过。用户明确授权后，PR 合并为 `bb89795b632af04e48c3246af6ada33245c7fdd4`，[main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543)再次成功。PR #18 仅回填该版本证据，不新增产品行为。
+
+发布收口记录：PR [#18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 随后合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，[main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726)成功。用户另行授权后，[`v0.1.0` GitHub Release](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 于 2026-08-30 发布；annotated tag 解引用后精确指向该 main 提交。生产部署和生产数据操作尚未执行。
 
 ## 6. 回滚信息
 
