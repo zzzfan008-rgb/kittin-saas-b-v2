@@ -21,13 +21,14 @@
 | --- | --- | --- |
 | 最新产品/UI PR | 已合并 | [PR #20](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/20) 已合并为 `c34336fa61d409eea1933917091cedbfec1126f0`；登录页视觉与交互改造进入 `main` |
 | 最新维护 PR | 已合并 | [PR #21](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/21) 已合并为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；加入本地开发预检与 PostgreSQL 读校验 |
-| 当前 main 提交 | 已确认 | 本地 `main`、`origin/main`、当前门禁分支 base 与 GitHub 远端 `main` 均为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`（2026-09-01 复核） |
+| 最新门禁 PR | 已合并 | [PR #22](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/22) 以 `d942885c57fcf97c5f18821ee94c7f3f720e6cac` 为 base、`246a258bdad108c0c49853fb5804e811768c468a` 为 head，已 squash-merge 为 `4701280af93cea8a62df6c2799ba5f1b425829ce`；GitHub Actions 门禁由本地 Codex 门禁替代 |
+| 当前 main 提交 | 已确认 | 本地 `main`、刷新后的 `origin/main` 与 GitHub 远端 `main` 均为 `4701280af93cea8a62df6c2799ba5f1b425829ce`（2026-09-01 复核） |
 | GitHub Actions 状态 | 已退役 | PR #20 的 Test and build 在 `2ac4419d4ca66f749d39cf41ec7bc628707bbcfc` 成功；PR #21 的运行在启动阶段失败，不能作为代码结论。后续候选改用本地 Codex 门禁 |
 | 证据收口 | 已完成 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，仅更新交付证据，不新增产品或生产行为 |
 | 首个版本发布 | 已完成 | [`v0.1.0`](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 已于 2026-08-30 发布，annotated tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`；生产部署仍需单独授权 |
 | 最新已闭环审查证据 | 已记录 | PR #19 候选 `c8d99866d06468868920b684e90da6e367e66995` 的 GitNexus 累计变更风险为 high（66 个变更符号、11 条受影响流程）；定向影响为 low，29/29 桌面回归、完整 `npm run check`、本机 Gemma 三组精确 SHA 复审与 CodeRabbit 均通过 |
-| 当前门禁候选 | 待审查 | `codex/codex-local-gate` 已提交，精确 base 为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；候选 head 以门禁启动时解析并锁定的 `git rev-parse HEAD` 为准（提交内不硬编码自身 SHA，避免循环引用），尚未推送或创建 PR，完整门禁通过后再交付 |
-| 当前门禁规则 | 已切换 | GitHub Actions 因账户计费/额度无法启动而退役；新候选运行 `npm run gate:codex`，由确定性本地套件加 Codex 配置的默认模型审查精确 diff，任何 P0-P3 有效问题阻断 |
+| 当前门禁候选 | 已完成 | `codex/codex-local-gate` 的精确 head `246a258bdad108c0c49853fb5804e811768c468a` 已通过完整门禁并经 PR #22 合并；合并后 `main@4701280af93cea8a62df6c2799ba5f1b425829ce` 的确定性套件再次通过，默认 Codex 模型复审补跑以退出码 0 返回 `pass` |
+| 当前门禁规则 | 已验证 | GitHub Actions 因账户计费/额度无法启动而退役；后续候选运行 `npm run gate:codex`，由确定性本地套件加 Codex 配置的默认模型审查精确 diff，任何 P0-P3 有效问题阻断 |
 
 ## 阶段进度
 
@@ -150,17 +151,17 @@ Phase G 完成后的 PR #19 属于已确认的桌面 UI 收口，不改变部署
 
 | 门禁 | 最新结果 | 证据/备注 |
 | --- | --- | --- |
-| `npm ci` | 通过 | 2026-08-30；重新安装 482 个包，未使用真实 AI 配置 |
-| `npm test` | 通过 | 2026-08-30；隔离 PostgreSQL 全套回归，包含包体预算与懒加载边界契约；仅使用 dummy/stub AI |
-| `npm run test:e2e` | 通过 | PR #19 与合并后 main CI 均为 29/29；覆盖 1024、1280、1440 桌面项目、独立黄金路径、初始项目恢复与拖拽/同步提示稳定性；临时 PostgreSQL + dummy/stub AI |
-| production browser smoke | 本地与 CI 通过 | 2026-08-30 最新 main CI 的 production smoke 3/3；真实哈希产物、动态 chunk、项目中心与 SPA fallback 均通过 |
-| `npm run build` | 通过 | 2026-08-30 `main@bb89795` CI；Web + server；初始 JS gzip 148,617 bytes，11 个 JS chunk，最大 194.27 kB，无 >500 kB 警告 |
-| `npm audit` | 通过 | `found 0 vulnerabilities` |
-| `git diff --check` | 通过 | 2026-08-30；未发现空白错误，`dist` / `dist-server` 仍为忽略产物 |
+| `npm ci` | 通过 | 2026-09-01 `main@4701280` 合并后门禁；安装 482 个包、审计 483 个包，未使用真实 AI 配置 |
+| `npm test` | 通过 | 2026-09-01 `main@4701280` 合并后门禁；隔离 PostgreSQL 全套回归，包含包体预算、懒加载边界与 Codex 门禁行为契约；仅使用 dummy/stub AI |
+| `npm run test:e2e` | 通过 | 2026-09-01 `main@4701280` 合并后门禁为 30/30；覆盖 1024、1280、1440 桌面项目、登录、独立黄金路径、初始项目恢复与拖拽/同步提示稳定性；临时 PostgreSQL + dummy/stub AI |
+| production browser smoke | 本地通过 | 2026-09-01 `main@4701280` 合并后门禁的 production smoke 3/3；真实哈希产物、动态 chunk、项目中心与 SPA fallback 均通过 |
+| `npm run build` | 通过 | 2026-09-01 `main@4701280` 合并后门禁；Web + server；PR #22 精确 head 的初始 JS gzip 为 147,188 / 210,000 bytes |
+| `npm audit` | 通过 | 2026-09-01 `main@4701280` 合并后门禁：`found 0 vulnerabilities` |
+| `git diff --check` | 通过 | 2026-09-01；精确候选差异与合并后提交均未发现空白错误，`dist` / `dist-server` 仍为忽略产物 |
 | 隔离恢复演练 | 通过 | 一次性 PostgreSQL 18 容器完成 custom dump→新库 restore；临时 `DATA_DIR` 完成 tar→restore 与逐文件一致性校验；当前服务与真实数据未触碰，隔离资源已清理 |
-| GitNexus `detect_changes` | 已执行 | Phase G 候选为 low；PR #19 累计变更为 high（66 个变更符号、11 条受影响流程），CanvasFlow 与初始草稿同步提示的定向影响均为 low；风险由 29/29 桌面回归和完整隔离测试覆盖 |
-| GitHub CI | 当前 main 通过 | [PR #19 head CI 33312678619](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33312678619)、[产品合并后 main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543) 与[文档收口后 main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726) 均通过；当前 main 为 `a6282818bf0f29f8217c473e6f1a55a13b58b276` |
-| 本地模型复审 | 最新产品精确 SHA 通过 | 2026-08-30 本机 Ollama `gemma4:e4b` 对精确 `c23f4174865dda827f969219e035f55c3038a2e8...c8d99866d06468868920b684e90da6e367e66995` 分三组返回 `APPROVED`，无有效 P0–P3；未触发或等待 Codex Cloud |
+| GitNexus `detect_changes` | 已执行 | 2026-09-01 `main@4701280` 索引已同步；对 `d942885...4701280` 的比较为 8 个索引文件、64 个变更符号、0 条受影响流程、low risk，并由 30/30 桌面回归和完整隔离测试覆盖 |
+| GitHub CI | 已退役 | 历史上 [PR #19 head CI 33312678619](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33312678619)、[产品合并后 main CI 33313563543](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33313563543) 与[文档收口后 main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726) 均通过；PR #22 起不再把 GitHub Actions 作为当前 main 的门禁证据 |
+| 本地模型复审 | 当前 main 精确 SHA 通过 | 2026-09-01 Codex 配置的默认模型对 `d942885...4701280` 精确差异返回 `pass`、0 个 P0-P3 findings；GitNexus 同步返回 pass；未触发或等待 Codex Cloud |
 | 视觉证据 | 已采集并经用户确认 | Phase D 的三主题 × 三宽度共 9 张工作台截图及失败/未知 Results 证据继续保留；PR #19 的最新 Dock、缩放、快捷键与拖拽修正另由已登录本地服务逐项确认 |
 
 ## 已知风险与决策日志
@@ -191,6 +192,7 @@ Phase G 完成后的 PR #19 属于已确认的桌面 UI 收口，不改变部署
 | 2026-08-25 | 恢复页签的活动任务锁 | 纯文档草稿不会持久化 runtime status，因此历史/活动任务对账完成前不能相信节点的 idle。冷启动安全门同时封锁新付费运行和页签关闭；同步失败保持 fail-closed，重试成功后统一解锁。 |
 | 2026-08-25 | 首次生成任务落地 | pristine 启动器只识别从未编辑的初始空白项目；任务和模板始终新建页签，避免覆盖现有画布。一次性 landing 意图只驻留内存，在节点尺寸就绪后执行 fit/聚焦，不进入文档、撤销或草稿。 |
 | 2026-08-25 | Results 保留边界 | Phase C 只增加启动、建图和黄金路径，不移动或削弱跨项目 Results；失败、未知状态、恢复、查看与对比继续由现有全局记录和回归保护。显式结果后续动作留在 Phase D 完善。 |
+| 2026-09-01 | GitHub Actions 门禁退役 | PR #22 将门禁切换为精确 SHA 绑定的本地确定性套件、GitNexus 和 Codex 默认模型结构化复审；合并后 `main@4701280` 已完成确定性复跑与退出码 0 的模型复审补跑。 |
 
 ## 更新规则
 
