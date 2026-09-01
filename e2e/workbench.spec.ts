@@ -359,10 +359,13 @@ test("results and project center follow desktop density for cards", async ({ pag
     await page.getByRole("button", { name: "打开项目中心" }).click();
     const center = page.getByRole("dialog", { name: "项目中心" });
     await expect(center).toBeVisible();
-    const activeGrid = () => center.getByRole("tabpanel").locator(".grid").first();
+    const sectionGrid = (name: string) => (
+      center.getByRole("tabpanel", { name }).locator(":scope > .grid").first()
+    );
 
     await center.getByRole("tab", { name: "最近项目" }).click();
-    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    const recentGrid = sectionGrid("最近项目");
+    await expectGridColumns(recentGrid, expectedProjectColumns);
     if (theme.id === "white") {
       await expectTwoLineTitle(center.getByText(PROJECT_CENTER_PROJECT_FIXTURES[0].name, { exact: true }));
       const projectCardHeights = await center.getByRole("button", { name: /^超长项目名称/ }).evaluateAll(
@@ -373,29 +376,30 @@ test("results and project center follow desktop density for cards", async ({ pag
     }
 
     await center.getByRole("tab", { name: "内置模板" }).click();
-    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    const builtinTemplatesGrid = sectionGrid("内置模板");
+    await expectGridColumns(builtinTemplatesGrid, expectedProjectColumns);
     if (theme.id === "white") {
       await expectTwoLineTitle(center.getByText(PROJECT_CENTER_TEMPLATE_FIXTURES[0].name, { exact: true }));
     }
 
     await center.getByRole("tab", { name: "我的模板" }).click();
-    await expectGridColumns(activeGrid(), expectedProjectColumns);
+    const myTemplatesGrid = sectionGrid("我的模板");
+    await expectGridColumns(myTemplatesGrid, expectedProjectColumns);
     if (theme.id === "white") {
       await expectTwoLineTitle(center.getByText(PROJECT_CENTER_TEMPLATE_FIXTURES[2].name, { exact: true }));
     }
 
-    const projectGridRects = await activeGrid().boundingBox();
-    if (!projectGridRects) throw new Error("Project center grid is missing");
-    const projectCards = activeGrid().locator(":scope > *");
-    for (let index = 0; index < Math.min(await projectCards.count(), 8); index += 1) {
-      const projectCard = projectCards.nth(index);
-      // Base UI updates the selected tab synchronously, but Chromium can expose the
-      // new panel to role queries one frame before its descendants have layout.
-      await expect(projectCard).toBeVisible();
-      const cardRect = await rect(projectCard);
-      expect(cardRect.left).toBeGreaterThanOrEqual(projectGridRects.x - 1);
-      expect(cardRect.right).toBeLessThanOrEqual(projectGridRects.x + projectGridRects.width + 1);
-    }
+    // Read the named panel's grid and children atomically: during a Base UI tab
+    // transition a generic "first tabpanel" locator can re-resolve to the outgoing
+    // panel between separate visibility and geometry reads.
+    await expect.poll(async () => myTemplatesGrid.evaluate((grid) => {
+      const gridRect = grid.getBoundingClientRect();
+      const cards = Array.from(grid.children).slice(0, 8);
+      return cards.length > 0 && cards.every((card) => {
+        const cardRect = card.getBoundingClientRect();
+        return cardRect.left >= gridRect.left - 1 && cardRect.right <= gridRect.right + 1;
+      });
+    })).toBe(true);
     await center.getByRole("button", { name: "关闭项目中心" }).click();
   }
 });
