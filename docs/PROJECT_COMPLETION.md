@@ -12,19 +12,22 @@
 - 不建设移动端、触控专用布局、视频/音频生成或通用 AI 聊天伙伴。
 - 不发送真实 AI 请求；自动化使用 dummy key、不可达 AI 地址或显式 stub。
 - 保留登录、单设备会话、项目页签、生成队列、SSE 恢复、防重复计费、未知结果保护、跨项目 Results、查看、对比、素材、模板与三主题。
-- 每个阶段使用 `codex/` 分支和独立 PR。可自动推送、创建 PR、运行 CI；合并、打 tag、发布和部署必须等待用户确认。Garment Canvas 当前不再触发或等待 Codex Cloud Review。
+- 每个阶段使用 `codex/` 分支和独立 PR。GitHub Actions 不再作为门禁；当前门禁为本地确定性测试、GitNexus、精确 SHA 核对和使用 Codex 默认模型的 `npm run gate:codex`。合并、打 tag、发布和部署必须等待用户确认，且不触发或等待 Codex Cloud Review。
 - GitHub 操作仅使用项目本地 `.env` 中的 `GITHUB_PAT`；不得提交或输出密钥。
 
 ## 当前基线
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 最新产品/UI PR | 已合并 | [PR #19](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/19)；shadcn 桌面工作台、缩放/快捷键与拖拽稳定性已经用户明确授权合并 |
-| 当前 main 提交 | 已确认 | `a6282818bf0f29f8217c473e6f1a55a13b58b276`（合并 PR #18 的文档收口提交） |
-| 最新合并后 main CI | 通过 | [main CI 33315734726](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/actions/runs/33315734726) 在精确 `a6282818bf0f29f8217c473e6f1a55a13b58b276` 全部通过 |
+| 最新产品/UI PR | 已合并 | [PR #20](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/20) 已合并为 `c34336fa61d409eea1933917091cedbfec1126f0`；登录页视觉与交互改造进入 `main` |
+| 最新维护 PR | 已合并 | [PR #21](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/21) 已合并为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；加入本地开发预检与 PostgreSQL 读校验 |
+| 当前 main 提交 | 已确认 | 本地 `main`、`origin/main`、当前门禁分支 base 与 GitHub 远端 `main` 均为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`（2026-09-01 复核） |
+| GitHub Actions 状态 | 已退役 | PR #20 的 Test and build 在 `2ac4419d4ca66f749d39cf41ec7bc628707bbcfc` 成功；PR #21 的运行在启动阶段失败，不能作为代码结论。后续候选改用本地 Codex 门禁 |
 | 证据收口 | 已完成 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，仅更新交付证据，不新增产品或生产行为 |
 | 首个版本发布 | 已完成 | [`v0.1.0`](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 已于 2026-08-30 发布，annotated tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`；生产部署仍需单独授权 |
-| 最新审查证据 | 已记录 | PR #19 候选 `c8d99866d06468868920b684e90da6e367e66995` 的 GitNexus 累计变更风险为 high（66 个变更符号、11 条受影响流程）；定向影响为 low，29/29 桌面回归、完整 `npm run check`、本机 Gemma 三组精确 SHA 复审与 CodeRabbit 均通过 |
+| 最新已闭环审查证据 | 已记录 | PR #19 候选 `c8d99866d06468868920b684e90da6e367e66995` 的 GitNexus 累计变更风险为 high（66 个变更符号、11 条受影响流程）；定向影响为 low，29/29 桌面回归、完整 `npm run check`、本机 Gemma 三组精确 SHA 复审与 CodeRabbit 均通过 |
+| 当前门禁候选 | 待审查 | `codex/codex-local-gate` 已提交，精确 base 为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；候选 head 以门禁启动时解析并锁定的 `git rev-parse HEAD` 为准（提交内不硬编码自身 SHA，避免循环引用），尚未推送或创建 PR，完整门禁通过后再交付 |
+| 当前门禁规则 | 已切换 | GitHub Actions 因账户计费/额度无法启动而退役；新候选运行 `npm run gate:codex`，由确定性本地套件加 Codex 配置的默认模型审查精确 diff，任何 P0-P3 有效问题阻断 |
 
 ## 阶段进度
 

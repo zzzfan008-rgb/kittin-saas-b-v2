@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **kittin-saas-b-v2** (19639 symbols, 43580 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **kittin-saas-b-v2** (20066 symbols, 44471 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -128,6 +128,12 @@ instruction, then verify drift-prone repository and release state live.
 - Before delivery or commit, run the relevant focused tests, `npm run check`,
   `npm run build`, `git diff --check`, and GitNexus `detect_changes`. Report any
   unavailable or degraded gate instead of treating it as passed.
+- GitHub Actions is not a project gate. Run `npm run gate:codex -- --base origin/main`
+  for a feature branch, or select an exact commit with `--commit SHA`. This runs the
+  deterministic local suites on the exact minimum Node.js version pinned by `.nvmrc`,
+  then a structured `codex exec` review without a model override, so the user's
+  configured Codex default model is used. Any actionable P0-P3 finding blocks
+  delivery. Record the exact base/head and the local result in the PR.
 
 ## 6. Git, Review, and Release Gates
 
@@ -136,9 +142,9 @@ instruction, then verify drift-prone repository and release state live.
 - The user message `通过` authorizes committing and pushing the approved batch plus
   a local exact-SHA review using the configured local review model. It does not
   authorize merging to `main`, tagging, releasing, or deploying.
-- Do not trigger or wait for Codex Cloud review. The current review path is local
-  tests, GitNexus, CI where applicable, exact head/base verification, local-model
-  review, and the user's explicit approval.
+- Do not trigger or wait for Codex Cloud review. The current review path is the
+  local Codex gate, GitNexus, exact head/base verification, and the user's explicit
+  approval. GitHub Actions and CodeRabbit are not required evidence.
 - Merging a PR, tagging, publishing a release, and deploying each require explicit
   user authorization. Never merge automatically.
 - Keep `.env`, `.env.local`, PATs, provider keys, credentials, uploads, database

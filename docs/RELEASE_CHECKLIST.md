@@ -1,13 +1,13 @@
 # Garment Canvas 发布候选清单
 
-只有本清单完成、发布候选 PR 经用户明确确认合并、且合并后 `main` CI 成功，项目才进入可发布状态。打 tag、部署和生产数据操作仍需单独授权。
+只有本清单完成、发布候选精确 SHA 的本地 Codex 门禁通过，且 PR 经用户明确确认合并，项目才进入可发布状态。GitHub Actions 不再作为门禁；打 tag、部署和生产数据操作仍需单独授权。
 
 ## 1. 精确版本与范围
 
-- [x] 工作分支以最新 `origin/main` 精确 SHA 为 base，工作树无无关改动。
-- [x] PR head SHA、base SHA、分支名和提交范围已复核。
+- [x] 当前门禁候选分支 `codex/codex-local-gate` 以 `origin/main@d942885c57fcf97c5f18821ee94c7f3f720e6cac` 为精确 base，工作树仅包含本批门禁与证据改动。
+- [ ] 当前候选固定提交后，复核 PR head SHA、base SHA、分支名和提交范围。
 - [x] `.env`、密钥、数据库 dump、上传文件、`data/`、`dist/`、`dist-server/` 均未进入候选差异。
-- [x] PR 摘要明确列出功能范围、不做的范围、已知风险和回滚方案。
+- [ ] PR 创建后，摘要明确列出功能范围、不做的范围、已知风险和回滚方案。
 
 ## 2. 本地门禁
 
@@ -19,6 +19,7 @@ npm run test:e2e
 npm run build
 npm run test:e2e:production
 git diff --check
+npm run gate:codex -- --base origin/main
 ```
 
 - [x] 所有测试使用隔离 PostgreSQL、临时 `DATA_DIR` 与 dummy/stub AI。
@@ -27,10 +28,11 @@ git diff --check
 
 ## 3. 架构与审查
 
-- [x] GitNexus 索引与候选 head 对齐，并使用 PDG 构建。
+- [x] GitNexus 索引与当前已提交候选及 `d942885c57fcf97c5f18821ee94c7f3f720e6cac` 对齐，并使用 PDG 构建；最终候选 head 由门禁启动时的 `git rev-parse HEAD` 精确锁定。
 - [x] `detect_changes` 已记录：Phase G 候选为 low；后续 PR #19 累计变更为 high（66 个变更符号、11 条受影响流程），CanvasFlow 与初始草稿同步提示的定向影响均为 low，并由完整回归覆盖。
 - [x] 本机 Ollama `gemma4:e4b` 对 PR #19 精确 `c23f4174865dda827f969219e035f55c3038a2e8...c8d99866d06468868920b684e90da6e367e66995` 分三组复审，全部 `APPROVED`，无有效 P0–P3 阻断项。
 - [x] 不触发或等待 Codex Cloud；本机模型复审绑定精确 PR head SHA。
+- [ ] 当前候选使用 Codex 配置的默认模型完成 `npm run gate:codex`，无 P0-P3 有效问题。
 
 ## 4. 桌面与恢复验收
 
@@ -49,10 +51,10 @@ PR #19 另由本机 `gemma4:e4b` 对精确 `c23f4174865dda827f969219e035f55c3038
 
 ## 5. PR、合并与发布
 
-- [x] 发布候选 PR 附测试矩阵、视觉证据、包体、GitNexus、精确 SHA 复审、风险和回滚说明。
-- [x] PR head CI 成功，审查评论和线程全部处置。
+- [ ] 当前门禁候选 PR 附测试矩阵、GitNexus、精确 SHA 复审、风险和回滚说明。
+- [ ] PR 精确 head 的本地 Codex 门禁通过，审查问题和线程全部处置。
 - [x] 用户明确授权后才合并；“通过”只授权当前约定的推送与复审，不代替最终合并授权。
-- [x] 合并后单独记录 `MERGED` 状态、main merge SHA 和新的 main CI；CI 未结束时不得宣称发布门禁完成。
+- [ ] 合并后单独记录 `MERGED` 状态与 main merge SHA，并对该精确提交运行本地 Codex 门禁；门禁未完成时不得宣称发布证据闭环。
 - [x] 用户另行授权的 `v0.1.0` annotated tag 与 GitHub Release 已发布，tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`。
 - [ ] 生产部署、生产数据库恢复或密钥轮换均取得各自的单独授权。
 

@@ -33,12 +33,28 @@ assert.match(
 );
 
 assert.equal(read(".nvmrc").trim(), "22.20.0", ".nvmrc 必须固定最低受支持版本");
-const ciWorkflow = read(".github/workflows/ci.yml");
-assert.match(ciWorkflow, /node-version:\s*22\.20\.0/);
+assert.equal(
+  fs.existsSync(new URL("../.github/workflows/ci.yml", import.meta.url)),
+  false,
+  "GitHub Actions CI 已由本地 Codex 门禁替代",
+);
+const codexGate = read("scripts/codex-gate.mjs");
 assert.match(
-  ciWorkflow,
-  /uses:\s*actions\/upload-artifact@v7/,
-  "CI artifact upload must use the Node.js 24-based upload-artifact v7 action",
+  codexGate,
+  /const REQUIRED_NODE_VERSION = "22\.20\.0";/,
+  "Codex 门禁必须在最低支持的 Node.js 22.20.0 上运行完整套件",
+);
+assert.match(codexGate, /run\("npm", \["run", "check"\]\)/);
+assert.match(codexGate, /run\("npm", \["run", "test:e2e"\]\)/);
+assert.match(
+  codexGate,
+  /"codex", \[[\s\S]*?"exec",\s*"--ephemeral"/,
+  "本地门禁必须调用结构化 Codex exec 审查",
+);
+assert.doesNotMatch(
+  codexGate,
+  /run\("codex", \[[\s\S]*?"--model"/,
+  "Codex 门禁必须使用用户配置的默认模型",
 );
 const dockerfile = read("Dockerfile");
 const nodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
@@ -48,4 +64,4 @@ assert.ok(
   `Dockerfile 中所有 Node.js 基础镜像必须使用 22.x，实际为：${nodeImages.join(", ")}`,
 );
 
-console.log("  ✓ package、文档、安装器与 CI 统一为 Node.js 22.20+，Docker 保持 22.x 安全更新");
+console.log("  ✓ package、文档、安装器与本地 Codex 门禁统一为 Node.js 22.20+，Docker 保持 22.x 安全更新");
