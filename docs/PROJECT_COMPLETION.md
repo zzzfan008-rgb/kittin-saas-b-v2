@@ -22,7 +22,7 @@
 | 最新产品/UI PR | 已合并 | [PR #20](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/20) 已合并为 `c34336fa61d409eea1933917091cedbfec1126f0`；登录页视觉与交互改造进入 `main` |
 | 最新维护 PR | 已合并 | [PR #21](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/21) 已合并为 `d942885c57fcf97c5f18821ee94c7f3f720e6cac`；加入本地开发预检与 PostgreSQL 读校验 |
 | 最新门禁 PR | 已合并 | [PR #22](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/22) 以 `d942885c57fcf97c5f18821ee94c7f3f720e6cac` 为 base、`246a258bdad108c0c49853fb5804e811768c468a` 为 head，已 squash-merge 为 `4701280af93cea8a62df6c2799ba5f1b425829ce`；GitHub Actions 门禁由本地 Codex 门禁替代 |
-| 当前 main 提交 | 已确认 | 本地 `main`、刷新后的 `origin/main` 与 GitHub 远端 `main` 均为 `4701280af93cea8a62df6c2799ba5f1b425829ce`（2026-09-01 复核） |
+| PR #23 合并前 main 基线 | 已确认 | PR #23 创建与合并前，本地 `main`、刷新后的 `origin/main` 与 GitHub 远端 `main` 均为 `4701280af93cea8a62df6c2799ba5f1b425829ce`（2026-09-01 复核） |
 | GitHub Actions 状态 | 已退役 | PR #20 的 Test and build 在 `2ac4419d4ca66f749d39cf41ec7bc628707bbcfc` 成功；PR #21 的运行在启动阶段失败，不能作为代码结论。后续候选改用本地 Codex 门禁 |
 | 证据收口 | 已完成 | [PR #18](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/pull/18) 已合并为 `a6282818bf0f29f8217c473e6f1a55a13b58b276`，仅更新交付证据，不新增产品或生产行为 |
 | 首个版本发布 | 已完成 | [`v0.1.0`](https://github.com/zzzfan008-rgb/kittin-saas-b-v2/releases/tag/v0.1.0) 已于 2026-08-30 发布，annotated tag 解引用后精确指向 `a6282818bf0f29f8217c473e6f1a55a13b58b276`；生产部署仍需单独授权 |
