@@ -397,7 +397,15 @@ test("results and project center follow desktop density for cards", async ({ pag
       const cards = Array.from(grid.children).slice(0, 8);
       return cards.length > 0 && cards.every((card) => {
         const cardRect = card.getBoundingClientRect();
-        return cardRect.left >= gridRect.left - 1 && cardRect.right <= gridRect.right + 1;
+        const cardStyle = getComputedStyle(card);
+        const visible = cardRect.width > 0
+          && cardRect.height > 0
+          && cardStyle.visibility !== "hidden";
+        return visible
+          && cardRect.left >= gridRect.left - 1
+          && cardRect.right <= gridRect.right + 1
+          && cardRect.top >= gridRect.top - 1
+          && cardRect.bottom <= gridRect.bottom + 1;
       });
     })).toBe(true);
     await center.getByRole("button", { name: "关闭项目中心" }).click();
