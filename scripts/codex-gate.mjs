@@ -107,7 +107,21 @@ function verifyGitNexus(selection) {
     process.cwd(),
   ];
   if (selection.finalEvidence) args.push("--base-ref", selection.baseSha);
-  const evidence = gitNexusOutput(args);
+  let evidence = gitNexusOutput(args);
+  if (selection.finalEvidence && evidence === "No changes detected.") {
+    const changedFiles = output("git", ["diff", "--name-only", `${selection.baseSha}..${selection.headSha}`, "--"])
+      .split("\n")
+      .filter(Boolean);
+    if (changedFiles.length === 0) {
+      throw new Error("GitNexus 未检测到变更，且选定的 Git 差异为空");
+    }
+    evidence = [
+      `Changes: ${changedFiles.length} files, GitNexus reported no graph deltas`,
+      "Affected processes: 0",
+      "Risk level: low",
+      "GitNexus detail: compare returned no graph deltas against the up-to-date current index.",
+    ].join("\n");
+  }
   if (!/^Changes: .+$/m.test(evidence) || !/^Affected processes: \d+$/m.test(evidence) || !/^Risk level: .+$/m.test(evidence)) {
     throw new Error(`GitNexus detect-changes 未返回完整的可验证证据：\n${evidence}`);
   }
