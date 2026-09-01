@@ -82,6 +82,8 @@ if [ -n "$GATE_GITNEXUS_EXIT" ]; then exit "$GATE_GITNEXUS_EXIT"; fi
 if [ "$GITNEXUS_LANG" = "en" ]; then
   if [ "$1" = "status" ]; then
     printf '%s\\n' 'Indexed commit: test' 'Current commit: test' 'Status: ✅ up-to-date'
+  elif [ -n "$GATE_GITNEXUS_NO_CHANGES" ]; then
+    printf '%s\\n' 'No changes detected.'
   else
     printf '%s\\n' 'Changes: 1 files, 1 symbols' 'Affected processes: 0' 'Risk level: low'
   fi
@@ -201,6 +203,36 @@ function runGate(f, ...args) {
   assert.equal(codexArgs[sandboxIndex + 1], "read-only", "Codex 审查必须使用只读沙箱");
   assert.ok(schemaIndex >= 0 && codexArgs[schemaIndex + 1], "Codex 审查必须提供输出 schema");
   assert.ok(!codexArgs.includes("--model"), "Codex 审查不得覆盖用户配置的默认模型");
+}
+
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "graph-neutral candidate\n");
+  git(f.root, "add", "tracked.txt");
+  git(f.root, "commit", "-qm", "graph-neutral candidate");
+  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
+  const result = runGate(f, "--base", f.base, "--review-only");
+  assert.equal(result.status, 0, `非空精确差异可以规范化无图增量证据：${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /Changes: 1 files, GitNexus reported no graph deltas/);
+  assert.match(result.stdout, /Affected processes: 0/);
+  assert.match(result.stdout, /Risk level: low/);
+}
+
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "uncommitted graph-neutral candidate\n");
+  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "--uncommitted 不得借用精确差异的无图增量分支放行");
+}
+
+{
+  const f = fixture();
+  git(f.root, "commit", "--allow-empty", "-qm", "empty candidate");
+  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
+  const result = runGate(f, "--base", f.base, "--review-only");
+  assert.notEqual(result.status, 0, "GitNexus 无图增量时，空精确差异仍必须失败");
+  assert.match(result.stderr, /选定的 Git 差异为空/);
 }
 
 {
