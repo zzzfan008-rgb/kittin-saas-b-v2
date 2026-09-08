@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T11:09:24.073Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "ac3e1e8ff7ee32d69c993a17b80a8a83e45d8db5ebcc576a42e7cefccf6271e6",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "图片 API 最佳实践 GPT Image 2 蒙版 gpt-image-2-vip Gemini 3.1 Flash Image FLUX.2 Pro Seedream 5.0 参考图 参数 比例 超时 重试 费用",
+  "affectedPaths": [
+    "docs/ai/apiyi/change-scope.json",
+    "docs/ai/evaluation/README.md",
+    "docs/ai/evaluation/evaluation-manifest-v1.json",
+    "package.json",
+    "scripts/evaluation-manifest.ts",
+    "server/lib/evaluationPromotion.ts",
+    "tests/evaluation-manifest.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 生图/编辑",
+      "sha256": "2ed97c1500398dc939bd6b77e8e121227ef3906b1ae6a794658f1e75f967fdd0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 Image Generation API - OpenAI's Latest Image API",
+      "sha256": "3ee5fbcf25449b1c23fb4479d678ac3ba075e6533b04d23e586a390589c7c80f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 图像生成 API - OpenAI 当下最新图片 API",
+      "sha256": "7f61739c18a3b163a725d69d5268521531af7df6234bc5b27c548a59d970a694"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All 生图/编辑",
+      "sha256": "e52de5e1c5676a35eda112fa4be9e4fdb015e3f829ecb46f8603f420c0336d63"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2 生图/编辑",
+      "sha256": "ed653fdc134c607049eda8ec5aae83f605e66b176609a3ca1994278d59ee9988"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "title": "图片编辑 API 参考",
+      "sha256": "bdff0e86d802ea1498a5b4e2cc14fc6af60460579942a22884a6996347a1c09f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-api-best-practices.md",
+      "pageLocalPath": "pages/api-capabilities/image-api-best-practices.md",
+      "title": "图片 API 调用须知与最佳实践",
+      "sha256": "e3c70183eb5bf2dc23e23363ad52a1da218a3f15d1214711b0cebde50f856c1a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/ecosystem/coze-gptimage2-plugin",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "pageLocalPath": "pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "title": "GPT Image 2 Coze 插件",
+      "sha256": "9cac91b7f7f7ec35eafe8c2686332f334a0391597f22bf66ba3fc5a565b5d462"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/archive",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/archive.md",
+      "pageLocalPath": "pages/live/archive.md",
+      "title": "实时动态归档",
+      "sha256": "0a6eb4e1ff7ac9951bf673e9da1471a6a93eeea70b4f6720081e074334a23805"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP Image Gen/Editing",
+      "sha256": "97fc5fbf511a01bfed1c90d8b743e7731cd823a0fb0c2acd9a76342c8ebdf16d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-05/gemini-image-preview-stable",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-05/gemini-image-preview-stable.md",
+      "pageLocalPath": "pages/en/live/2026-05/gemini-image-preview-stable.md",
+      "title": "gemini-3-pro-image-preview / gemini-3.1-flash-image-preview running stably today",
+      "sha256": "6a3800f6d6e56d70b4da5618b6ce5819eb4006248789f8138cf4ed7a80597755"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedream-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedream-image/overview.md",
+      "title": "Seedream 生图/编辑",
+      "sha256": "a0c84cf7d8cf2b4e736fd03392eb36a6db2604eeb2207fc9578f7f0922a476da"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 官转 vs 官逆 对比",
+      "sha256": "88ac0e551b204efb2b506542aae02847e70ca8fce54b87c6cab5eabf83287c2e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-image-preview-stable",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gemini-image-preview-stable.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-image-preview-stable.md",
+      "title": "gemini-3-pro-image-preview / gemini-3.1-flash-image-preview 今日平稳运行",
+      "sha256": "4abd7810aa9e91781469fb28dcef5cc38abf0b3364f0b921bfab1d423a65a23e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-all/image-edit.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-all/image-edit.md",
+      "title": "图片编辑 API 参考",
+      "sha256": "d7721c9c62e893e672390f2eee66ee80d11ff50c3be5221a8a3758461b385834"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-07/gpt-image-2-vip-images-api-ready",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-07/gpt-image-2-vip-images-api-ready.md",
+      "pageLocalPath": "pages/en/live/2026-07/gpt-image-2-vip-images-api-ready.md",
+      "title": "gpt-image-2-vip Capacity Restored · Images API Endpoint Remains Recommended",
+      "sha256": "90b46e2338c307249d5cabe3d64bc0954581be6d9dbae0e1913a93fbbf4825bf"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP Генерация/редактирование изображений",
+      "sha256": "c38d0ee053b850a65af7abfab6ac40df75e8bc1c18a6a845d8bb0e3d6c97ed3d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/gemini-3-5-flash-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/gemini-3-5-flash-launch.md",
+      "pageLocalPath": "pages/news/gemini-3-5-flash-launch.md",
+      "title": "Gemini 3.5 Flash 正式上线：Flash 击败 Pro",
+      "sha256": "d76381df0b2bb1a0996f19c73689ab1d4e695159a541e27024531570f07d1adb"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/gpt-image-2-vip-images-api-ready",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-07/gpt-image-2-vip-images-api-ready.md",
+      "pageLocalPath": "pages/live/2026-07/gpt-image-2-vip-images-api-ready.md",
+      "title": "gpt-image-2-vip 资源已补充 · 推荐统一使用 Images API 端点",
+      "sha256": "0e8ac908579360d4814c6aa7d24324f38bd2c85a406b9d3a057fe858e9bf8dba"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 画像生成/編集",
+      "sha256": "d0c32d560d2a83e2b57abb0c1350109f15ab9d63a085d0fd78f4e5df6e3f9924"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ko/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ko/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 이미지 생성/편집",
+      "sha256": "7b767501a6f2663cd9879666482685a50942df6bb07b35dadda767d5af08b813"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 生圖/編輯",
+      "sha256": "8f5d1a9a9843576bbba0dab06e599354c6350f579374b2d1b3b08b1c852b22b0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-image/overview.md",
+      "title": "Nano Banana Pro 图片生成",
+      "sha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gemini-3-5-flash-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gemini-3-5-flash-launch.md",
+      "pageLocalPath": "pages/en/news/gemini-3-5-flash-launch.md",
+      "title": "Gemini 3.5 Flash Launch: Flash Beats Pro",
+      "sha256": "0a67356b9ef8e1187f3a24000fc4dc8da2595f77a142a0d79b64bede9e0f7c05"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gpt-image-2-all-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gpt-image-2-all-launch.md",
+      "pageLocalPath": "pages/en/news/gpt-image-2-all-launch.md",
+      "title": "gpt-image-2-all Launch: $0.03/image GPT Reverse-Engineered Image Model",
+      "sha256": "e16d196a8fe835879862af4d7c0f1ef6b7121248066b31cabd80f50a093f2f49"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gemini-3-flash-preview-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gemini-3-flash-preview-launch.md",
+      "pageLocalPath": "pages/en/news/gemini-3-flash-preview-launch.md",
+      "title": "Gemini 3 Flash Preview Launches: Pro-Level Performance at Flash Speed",
+      "sha256": "a34ea354ec3d4ac0eb7cafe51cd3a1947c75d5a60f18c065958268a347af33f6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/scenarios/ecosystem/apiyi-gpt-image-skills",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/scenarios/ecosystem/apiyi-gpt-image-skills.md",
+      "pageLocalPath": "pages/en/scenarios/ecosystem/apiyi-gpt-image-skills.md",
+      "title": "APIYI GPT-Image 2 Image-Gen Skills",
+      "sha256": "a0e00b26d5a7af32ee9f47354dd826bd625bc000fe7da5be5b8553ad6318e3dd"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/gpt-image-2-images-api-recommended",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-07/gpt-image-2-images-api-recommended.md",
+      "pageLocalPath": "pages/live/2026-07/gpt-image-2-images-api-recommended.md",
+      "title": "gpt-image-2-vip / -all 推荐使用 Images API 端点出图",
+      "sha256": "ef96a289ad28f08f2ccaf25d4a5ac1880399338ea3cdd78301ab5841a1ddbd0c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/image-edit.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/image-edit.md",
+      "title": "图片编辑 API 参考",
+      "sha256": "da73585e328b3fb282bb61053219f0743b653ae4da737295ff0064fe98a349d0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-07/gpt-image-2-images-api-recommended",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-07/gpt-image-2-images-api-recommended.md",
+      "pageLocalPath": "pages/en/live/2026-07/gpt-image-2-images-api-recommended.md",
+      "title": "gpt-image-2-vip / -all: Use the Images API Endpoints",
+      "sha256": "2c4d40dd9ecee87feda5db95cabdc51e51b9c34227e1b3bbae1602501d0140a5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-1-5",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-1-5.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-1-5.md",
+      "title": "GPT-Image-1.5 Image Generation API",
+      "sha256": "f8bc08f6293c219dabe88c7a86b661d6725d3d4129550f1a06b768c3fc43fc74"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/scenarios/ecosystem/apiyi-gpt-image-skills",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/scenarios/ecosystem/apiyi-gpt-image-skills.md",
+      "pageLocalPath": "pages/ru/scenarios/ecosystem/apiyi-gpt-image-skills.md",
+      "title": "APIYI GPT-Image 2 Image-Gen Skills",
+      "sha256": "5f8776eff658f3a493d5abe4daa062885bb4fc73caedee34bf9169b89e18d052"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedream-image/image-edit.md",
+      "pageLocalPath": "pages/api-capabilities/seedream-image/image-edit.md",
+      "title": "图片编辑 API 参考",
+      "sha256": "1b83db2c465fd5259c1a2e116fa2b2585471d67da0c900ee583ed656ff2fab55"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/gemini-3-flash-preview-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/gemini-3-flash-preview-launch.md",
+      "pageLocalPath": "pages/news/gemini-3-flash-preview-launch.md",
+      "title": "Gemini 3 Flash Preview 震撼发布：Pro 级性能，Flash 级速度",
+      "sha256": "8786b328a92c3b03b8925464d1f6db4b68822394534e466312e6095136144ecf"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All Image Gen/Editing",
+      "sha256": "6c0f039ea1b89f89432e4cf4380770d5f715d7812ff4b782fd98750622712fc3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "1bf1b8479fd31e53b71bdef1a5bbe5f3a4e6f7e40ac6e6139c13ea7b4605e9ff"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/text-to-image",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "title": "Text-to-Image API Reference",
+      "sha256": "71e3dbd9fa4c21c8c3c580422930188fed1dea30b1d429095c6b0c86e2e27098"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2-vip/text-to-image",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "title": "Справочник API Text-to-Image",
+      "sha256": "7166f8794dd8b8ca004a8ca7aec3d8562ad08b9f7b6d7cd515f03510a6b419af"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 Official vs Reverse",
+      "sha256": "43155e903edc186554db65f37a419b41c4da8debc10142e109e4762499b3aaf1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 Официальный vs реверс",
+      "sha256": "55cc745d62d317bd3886f1f62ca5b6a66a6653a1ac566a4cdb235fa5f9645211"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "title": "对话式 API 参考",
+      "sha256": "abbde033ecd02f702ebcffdc462cde90d20e57400dcf3690fc636b2d44bc75dc"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 公式版 vs リバース版",
+      "sha256": "44608211f769b1cb067be8f182361f423ad1b1a2b645f8b786da4f1e4db11318"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ko/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/ko/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 공식 vs 리버스",
+      "sha256": "fa41bd4fc793109a9a64f769f064e4e9fc458f48e2a53184011d1abaf7adc507"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2-vip/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "title": "圖片編輯 API 參考",
+      "sha256": "a172e70b9df6145fc7f4a295cdfaa35797e1db4cb0f79cdb3df651eb1afb3a5f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 官轉 vs 官逆 對比",
+      "sha256": "4433e5efae6849e217b7cfa9d1802496b19361c2ce9bac89c86cbfd34d7862fa"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "title": "文生图 API 参考",
+      "sha256": "7a39b7f014135fba139ff65816714df76aea6da51263ffb049881f66d1a1d6c6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-05/gemini-3-5-flash",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-05/gemini-3-5-flash.md",
+      "pageLocalPath": "pages/en/live/2026-05/gemini-3-5-flash.md",
+      "title": "Gemini 3.5 Flash launches: Flash beats Gemini 3.1 Pro",
+      "sha256": "45b70527c7940bf6cf4d8a42efb42c2e47b5245415e51774f2f21245cfb5b09f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-connection-drops",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-connection-drops.md",
+      "pageLocalPath": "pages/api-capabilities/image-connection-drops.md",
+      "title": "图片 API 连接中断排查",
+      "sha256": "eec5fdb92e50314d5aaa67edcf98d2eb3f7faaa50e7b57d12185294bbe745e76"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gemini-3-1-flash-lite-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gemini-3-1-flash-lite-launch.md",
+      "pageLocalPath": "pages/en/news/gemini-3-1-flash-lite-launch.md",
+      "title": "Gemini 3.1 Flash Lite Goes GA: The Sweet Spot for High-Throughput Agents & Low-Latency Workloads",
+      "sha256": "2fc8734c12f9b1fc57afa6de0c0c9f0fdf5ee31310bc11481ad10e990421774b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-3-5-flash",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gemini-3-5-flash.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-3-5-flash.md",
+      "title": "Gemini 3.5 Flash 上线：Flash 反超 Gemini 3.1 Pro",
+      "sha256": "acde544fb54620e81b82dd1e72a11a9615497f0a9a9027ef2e1604670833317f"
+    }
+  ],
+  "decisionSummary": "采用方案 A：离线固定 25 个独立基础评估单元；只选 9 个 model×mode 代表单元作为未来首批连通性探针且证据仅属于各自精确单元；自动重试、补样和当前付费授权均为 0；真实调用需另行绑定干净 exact SHA、素材哈希、当前价格与逐 case 授权；新增清单脚本及测试纳入 API易知识库强制变更范围。",
+  "unresolvedChoices": []
+}

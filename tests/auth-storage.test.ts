@@ -24,6 +24,36 @@ const {
   completeGenerationRecord, createGenerationRecord, failGenerationRecord, registerGeneratedFiles,
 } = await import("../server/lib/generationRecords");
 const { createRun } = await import("../server/engine/runner");
+const { buildGarmentPrompt, requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
+const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
+const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
+
+const storageGenerateVariant = requireGarmentPromptVariant({
+  familyId: "fashion-lookbook",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "sketch-to-render",
+  mode: "generate",
+});
+promotePromptVariantForTest(storageGenerateVariant);
+const storageGenerateProfile = getModelParameterProfile(storageGenerateVariant.parameterProfileId)!;
+const storageGenerateParameters = materializeModelParameterProfile(storageGenerateProfile);
+
+function boundStorageGenerateParams(intent: string): Record<string, unknown> {
+  return {
+    prompt: buildGarmentPrompt(storageGenerateVariant.variantId, intent),
+    promptVariantId: storageGenerateVariant.variantId,
+    promptFamilyId: storageGenerateVariant.familyId,
+    parameterProfileId: storageGenerateVariant.parameterProfileId,
+    contractHash: storageGenerateVariant.contractHash,
+    evaluationVersion: storageGenerateVariant.evaluationVersion,
+    postprocessVersion: storageGenerateProfile.postprocess.version,
+    operationMode: storageGenerateVariant.mode,
+    modelId: storageGenerateVariant.modelId,
+    modelOptions: storageGenerateParameters.modelOptions,
+    aspectRatio: storageGenerateParameters.aspectRatio,
+    batchSize: storageGenerateParameters.batchSize,
+  };
+}
 
 let passed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -644,7 +674,8 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     userId: String(admin.id), nodeId: "node", nodeLabel: "AI 改款", kind: "ai-modify", requestedCount: 2,
   }, 1000);
   await completeGenerationRecord({
-    runId: "run-success", images: ["/api/files/a.png"], model: "stub", providerRequests: 3,
+    runId: "run-success", images: ["/api/files/a.png"],
+    providerImages: ["/api/files/a-provider.png"], model: "stub", providerRequests: 3,
     startedAt: 1000, finishedAt: 2000,
   });
   await createGenerationRecord("run-failure", {
@@ -686,7 +717,7 @@ function plan(...steps: ExecutionPlan["steps"]): ExecutionPlan {
 await test("运行在前置节点失败时会结束记录而不是永久 queued", async () => {
   const run = await createRun(
     plan(
-      { nodeId: "upstream", kind: "ai-modify", inputImages: [], params: {} },
+      { nodeId: "upstream", kind: "ai-modify", inputImages: [], params: { operationMode: "edit" } },
       { nodeId: "target", kind: "result", inputImages: [], params: {} },
     ),
     String(admin.id),
@@ -703,7 +734,7 @@ await test("下游失败不会让已提前完成的目标记录假 success", asy
       { nodeId: "target", kind: "image-input", inputImages: [], params: {} },
       {
         nodeId: "downstream", kind: "ai-modify", inputImages: [],
-        upstream: [{ nodeId: "target", images: [] }], params: {},
+        upstream: [{ nodeId: "target", images: [] }], params: { operationMode: "edit" },
       },
     ),
     String(admin.id),
@@ -722,8 +753,14 @@ await test("成功的多 AI 节点按整次运行汇总 provider_requests", asyn
   try {
     const run = await createRun(
       plan(
-        { nodeId: "first", kind: "sketch-to-render", inputImages: [], params: {} },
-        { nodeId: "second", kind: "sketch-to-render", inputImages: [], params: {} },
+        {
+          nodeId: "first", kind: "sketch-to-render", inputImages: [],
+          params: boundStorageGenerateParams("生成第一张效果图"),
+        },
+        {
+          nodeId: "second", kind: "sketch-to-render", inputImages: [],
+          params: boundStorageGenerateParams("生成第二张效果图"),
+        },
         { nodeId: "target", kind: "result", inputImages: [], upstream: [
           { nodeId: "first", images: [] }, { nodeId: "second", images: [] },
         ], params: {} },
@@ -742,11 +779,14 @@ await test("成功的多 AI 节点按整次运行汇总 provider_requests", asyn
     const filesBeforeFailedRun = new Set(fs.readdirSync(uploads));
     const failed = await createRun(
       plan(
-        { nodeId: "paid-upstream", kind: "sketch-to-render", inputImages: [], params: {} },
+        {
+          nodeId: "paid-upstream", kind: "sketch-to-render", inputImages: [],
+          params: boundStorageGenerateParams("生成上游效果图"),
+        },
         {
           nodeId: "too-many-inputs", kind: "ai-modify", inputImages: [],
           upstream: Array.from({ length: 9 }, () => ({ nodeId: "paid-upstream", images: [] })),
-          params: {},
+          params: { operationMode: "edit" },
         },
       ),
       String(admin.id),
@@ -759,10 +799,15 @@ await test("成功的多 AI 节点按整次运行汇总 provider_requests", asyn
     assert.equal((await queryOne<{ status: string }>(
       "SELECT status FROM generation_runs WHERE id = $1", [failed.id],
     ))?.status, "error");
-    assert.equal((await queryOne<{ count: number }>(
-      "SELECT COUNT(*)::int AS count FROM files WHERE run_id = $1", [failed.id],
-    ))?.count, 0);
-    assert.deepEqual(new Set(fs.readdirSync(uploads)), filesBeforeFailedRun);
+    const failedEvidence = await query<{ id: string; source_type: string }>(
+      "SELECT id, source_type FROM files WHERE run_id = $1 ORDER BY id", [failed.id],
+    );
+    assert.equal(failedEvidence.length, 1, "下游失败后必须保留已付费上游的 Provider 原图");
+    assert.equal(failedEvidence[0]?.source_type, "provider-original");
+    assert.deepEqual(
+      new Set(fs.readdirSync(uploads)),
+      new Set([...filesBeforeFailedRun, failedEvidence[0]!.id]),
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

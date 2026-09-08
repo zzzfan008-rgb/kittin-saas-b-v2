@@ -12,27 +12,38 @@ const packageJson = JSON.parse(read("package.json")) as {
 };
 assert.equal(
   packageJson.engines?.node,
-  ">=22.20.0",
-  "package engines 必须声明 Node.js 22.20.0+",
+  ">=24.20.0",
+  "package engines 必须声明 Node.js 24.20.0+",
 );
 
 for (const documentationPath of ["AGENTS.md", "README.md", "deploy/macos/README-MACMINI.md"]) {
   assert.match(
     read(documentationPath),
-    /Node\.js 22\.20\.0 (?:or newer|或更高版本)/,
+    /Node\.js 24\.20\.0 (?:or newer|或更高版本)/,
     `${documentationPath} 必须与 package engines 的 Node.js 下限一致`,
   );
 }
-
-const installer = read("deploy/macos/install.command");
-assert.match(installer, /Node\.js 22\.20\.0\+ is required/);
 assert.match(
-  installer,
-  /major > 22 \|\| \(major === 22 && minor >= 20\)/,
-  "macOS 安装器必须拒绝 Node.js 22.20 以下版本",
+  read("README.md"),
+  /Node\.js 24\.20\.0 是 `\.nvmrc` 固定的最低\s+可复现基线；门禁接受 24\.20\.0 及更高兼容版本/,
+  "README 必须明确 .nvmrc 是最低可复现基线，而不是 Node.js 上限",
 );
 
-assert.equal(read(".nvmrc").trim(), "22.20.0", ".nvmrc 必须固定最低受支持版本");
+const installer = read("deploy/macos/install.command");
+assert.match(
+  installer,
+  /MACOS_MAJOR < 13 \|\| \(MACOS_MAJOR == 13 && MACOS_MINOR < 5\)/,
+  "macOS 安装器必须拒绝低于 13.5 的系统",
+);
+assert.match(installer, /macOS 13\.5\+ is required/);
+assert.match(installer, /Node\.js 24\.20\.0\+ is required/);
+assert.match(
+  installer,
+  /major > 24 \|\| \(major === 24 && minor >= 20\)/,
+  "macOS 安装器必须拒绝 Node.js 24.20 以下版本",
+);
+
+assert.equal(read(".nvmrc").trim(), "24.20.0", ".nvmrc 必须固定最低受支持版本");
 assert.equal(
   fs.existsSync(new URL("../.github/workflows/ci.yml", import.meta.url)),
   false,
@@ -41,14 +52,24 @@ assert.equal(
 const codexGate = read("scripts/codex-gate.mjs");
 assert.match(
   codexGate,
-  /const REQUIRED_NODE_VERSION = "22\.20\.0";/,
-  "Codex 门禁必须在最低支持的 Node.js 22.20.0 上运行完整套件",
+  /const REQUIRED_NODE_VERSION = "24\.20\.0";/,
+  "Codex 门禁必须声明 Node.js 24.20.0 最低运行基线",
+);
+assert.match(
+  codexGate,
+  /function nodeVersionAtLeast\(version, minimumVersion = REQUIRED_NODE_VERSION\)/,
+  "Codex 门禁必须支持高于 Node.js 24.20.0 的运行时",
+);
+assert.match(
+  codexGate,
+  /!nodeVersionAtLeast\(process\.versions\.node\)/,
+  "Codex 门禁必须按最低版本比较而不是精确匹配",
 );
 assert.match(codexGate, /run\("npm", \["run", "check"\]\)/);
 assert.match(codexGate, /run\("npm", \["run", "test:e2e"\]\)/);
 assert.match(
   codexGate,
-  /"codex", \[[\s\S]*?"exec",\s*"--ephemeral"/,
+  /run\("codex", \[[\s\S]*?"exec",[\s\S]*?"--ephemeral"/,
   "本地门禁必须调用结构化 Codex exec 审查",
 );
 assert.doesNotMatch(
@@ -60,8 +81,108 @@ const dockerfile = read("Dockerfile");
 const nodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
 assert.ok(nodeImages.length > 0, "Dockerfile 必须声明 Node.js 基础镜像");
 assert.ok(
-  nodeImages.every((image) => image.startsWith("22-")),
-  `Dockerfile 中所有 Node.js 基础镜像必须使用 22.x，实际为：${nodeImages.join(", ")}`,
+  nodeImages.every((image) => image === "24.20.0-bookworm-slim"),
+  `Dockerfile 中所有 Node.js 基础镜像必须固定为 24.20.0-bookworm-slim，实际为：${nodeImages.join(", ")}`,
+);
+assert.match(
+  dockerfile,
+  /^ARG GARMENT_CANVAS_BUILD_CODE_SHA=""$/m,
+  "构建阶段必须显式接收付费评估代码 SHA",
+);
+assert.match(
+  dockerfile,
+  /node scripts\/write-build-identity\.mjs \/app\/\.garment-canvas-build-identity\.json "\$GARMENT_CANVAS_BUILD_CODE_SHA"/,
+  "构建阶段必须把独立代码身份写入固定镜像文件",
+);
+assert.match(
+  dockerfile,
+  /RUN --mount=type=secret,id=evaluation_release_registry,required=false/,
+  "Docker 构建必须把可选外置 registry 作为只读 BuildKit secret，而不是复制进 build context",
+);
+assert.match(
+  dockerfile,
+  /GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_PATH=\/run\/secrets\/evaluation_release_registry/,
+  "Vite 与服务端构建只能从 BuildKit secret 的显式绝对路径读取非空 registry",
+);
+assert.match(
+  dockerfile,
+  /COPY --from=build \/app\/\.garment-canvas-build-identity\.json \.\/\.garment-canvas-build-identity\.json/,
+  "运行镜像必须复制不可由运行时环境变量生成的构建身份文件",
+);
+assert.doesNotMatch(
+  dockerfile,
+  /^(?:ARG|ENV)[^\n]*GARMENT_CANVAS_CODE_SHA/m,
+  "运行镜像不得把 GARMENT_CANVAS_CODE_SHA 烘焙成可冒充构建身份的环境变量",
+);
+assert.doesNotMatch(
+  dockerfile,
+  /\bgit\s+rev-parse\b|\bapt-get\s+install[^\n]*\bgit\b|^COPY\s+\.git(?:\s|$)/m,
+  "Docker 运行时不得依赖 Git 或复制 .git 来推断付费评估代码 SHA",
+);
+const runtimeStage = dockerfile.slice(
+  dockerfile.indexOf("FROM node:24.20.0-bookworm-slim AS runtime"),
+);
+assert.match(
+  runtimeStage,
+  /chown -R root:root \/app\s+\\\n\s+&& chmod -R a-w \/app/,
+  "运行镜像必须把代码、bundle、依赖与构建身份固定为 root-owned 且对 node 不可写",
+);
+assert.match(
+  runtimeStage,
+  /chown node:node \/app\/data\s+\\\n\s+&& chmod 0750 \/app\/data/,
+  "运行镜像只能把持久数据目录交给 node 用户写入",
+);
+assert.doesNotMatch(
+  runtimeStage,
+  /(?:chown|COPY[^\n]*--chown=)(?:[^\n]*\s)?node(?::node)?\s+\/app(?:\s|\\|$)/,
+  "运行镜像不得让 node 用户拥有整个 /app",
+);
+assert.ok(
+  runtimeStage.indexOf("chmod 0750 /app/data") < runtimeStage.indexOf("USER node"),
+  "切换到 node 用户前必须先完成只读代码树与可写数据目录权限收敛",
+);
+const compose = read("compose.yaml");
+assert.match(
+  compose,
+  /args:\s*\n\s+GARMENT_CANVAS_BUILD_CODE_SHA: \$\{GARMENT_CANVAS_BUILD_CODE_SHA:-\}/,
+  "Compose 构建必须把独立构建 SHA 显式传入镜像身份生成步骤",
+);
+assert.match(
+  compose,
+  /GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256: \$\{GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256:-\}/,
+  "Compose 构建必须显式传入外置发布包 SHA",
+);
+assert.match(
+  compose,
+  /GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256: \$\{GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256:-\}/,
+  "Compose 构建必须显式传入 registry 原始文件 SHA",
+);
+const evaluationCompose = read("compose.evaluation-release.yaml");
+assert.match(evaluationCompose, /source: evaluation_release_registry\s+target: evaluation_release_registry/);
+assert.match(
+  evaluationCompose,
+  /source: \$\{GARMENT_CANVAS_EVALUATION_RELEASE_HOST_DIR:\?[^}]+\}\s+target: \/run\/garment-canvas\/evaluation-release\s+read_only: true/,
+  "外置评估发布包运行时只能通过显式宿主机绝对目录只读挂载",
+);
+assert.match(
+  evaluationCompose,
+  /file: \$\{GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SOURCE:\?[^}]+\}/,
+  "评估 Compose override 必须要求显式外置 registry 文件",
+);
+assert.match(
+  evaluationCompose,
+  /GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_PATH: \/run\/garment-canvas\/evaluation-release\/prompt-release-registry\.json/,
+  "容器只能从只读发布包的固定 registry 路径加载受审发布",
+);
+assert.match(
+  read(".dockerignore"),
+  /^\.garment-canvas-build-identity\.json$/m,
+  "Docker build context 不得注入仓库侧伪造的构建身份文件",
+);
+assert.match(
+  read(".dockerignore"),
+  /^data\/evaluation-release\/$/m,
+  "外置发布包不得进入普通 Docker build context",
 );
 
-console.log("  ✓ package、文档、安装器与本地 Codex 门禁统一为 Node.js 22.20+，Docker 保持 22.x 安全更新");
+console.log("  ✓ Node.js、Docker 构建身份与仅 /app/data 可写契约通过");

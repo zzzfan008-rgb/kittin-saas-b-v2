@@ -25,6 +25,15 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+MACOS_VERSION="$(/usr/bin/sw_vers -productVersion)"
+MACOS_MAJOR="${MACOS_VERSION%%.*}"
+MACOS_REMAINDER="${MACOS_VERSION#*.}"
+MACOS_MINOR="${MACOS_REMAINDER%%.*}"
+if (( MACOS_MAJOR < 13 || (MACOS_MAJOR == 13 && MACOS_MINOR < 5) )); then
+  print -u2 "macOS 13.5+ is required; found macOS $MACOS_VERSION."
+  exit 1
+fi
+
 if [[ ! -f "$SOURCE_DIR/app/dist/index.html" ]] ||
    [[ ! -f "$SOURCE_DIR/app/dist-server/index.js" ]] ||
    [[ ! -f "$SOURCE_DIR/app/package-lock.json" ]]; then
@@ -44,7 +53,7 @@ if [[ -f "$SOURCE_DIR/FILE-SHA256SUMS.txt" ]]; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  print -u2 "Node.js 22.20.0+ is required. Install it first from https://nodejs.org/"
+  print -u2 "Node.js 24.20.0+ is required. Install it first from https://nodejs.org/"
   exit 1
 fi
 
@@ -53,9 +62,9 @@ if [[ "$NODE_PATH" != /* ]]; then
   print -u2 "Node.js executable must resolve to an absolute path; found: $NODE_PATH"
   exit 1
 fi
-NODE_SUPPORTED="$("$NODE_PATH" -p 'const [major, minor] = process.versions.node.split(".").map(Number); major > 22 || (major === 22 && minor >= 20) ? "yes" : "no"')"
+NODE_SUPPORTED="$("$NODE_PATH" -p 'const [major, minor] = process.versions.node.split(".").map(Number); major > 24 || (major === 24 && minor >= 20) ? "yes" : "no"')"
 if [[ "$NODE_SUPPORTED" != "yes" ]]; then
-  print -u2 "Node.js 22.20.0+ is required; found $("$NODE_PATH" -v)."
+  print -u2 "Node.js 24.20.0+ is required; found $("$NODE_PATH" -v)."
   exit 1
 fi
 

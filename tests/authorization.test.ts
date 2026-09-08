@@ -5,6 +5,7 @@ import path from "node:path";
 import express, { type Request } from "express";
 import type { AddressInfo } from "node:net";
 import type { AuthenticatedRequest, AuthUser } from "../server/lib/auth";
+import type { ExecutionPlan } from "../src/types/workflow";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-authorization-"));
@@ -20,7 +21,7 @@ const { createSession, SESSION_COOKIE } = await import("../server/lib/auth");
 const { createRun } = await import("../server/engine/runner");
 const { buildExecutionPlan } = await import("../server/engine/dag");
 const { authRouter } = await import("../server/routes/auth");
-const { runPlanRouter } = await import("../server/routes/runPlan");
+const { runPlanRouter, staticImageReferencesForPlan } = await import("../server/routes/runPlan");
 const { generateRouter } = await import("../server/routes/generate");
 const { assetsRouter } = await import("../server/routes/assets");
 const { filesRouter } = await import("../server/routes/files");
@@ -37,6 +38,37 @@ const {
   prepareUserTemplateAccountMutation,
   reconcileUserTemplateAccountMutations,
 } = await import("../server/lib/userTemplateLifecycle");
+const {
+  buildGarmentPrompt,
+  requireGarmentPromptVariant,
+} = await import("../src/lib/garmentPromptPresets");
+const {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} = await import("../src/types/modelParameterProfiles");
+const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
+
+const generationVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gemini-3.1-flash-image",
+  nodeKind: "sketch-to-render",
+  mode: "generate",
+});
+const editVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "ai-modify",
+  mode: "edit",
+});
+// Route authorization tests need accepted jobs without changing production status.
+// Mutate only this isolated process's catalog objects to model already-reviewed evidence.
+for (const variant of [generationVariant, editVariant]) {
+  promotePromptVariantForTest(variant);
+}
+const generationProfile = getModelParameterProfile(generationVariant.parameterProfileId)!;
+const generationParameters = materializeModelParameterProfile(generationProfile);
+const editProfile = getModelParameterProfile(editVariant.parameterProfileId)!;
+const editParameters = materializeModelParameterProfile(editProfile);
 
 const users: Record<string, AuthUser> = {
   owner: {
@@ -65,6 +97,7 @@ const users: Record<string, AuthUser> = {
 let passed = 0;
 const PNG_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const TRUNCATED_PNG_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
 async function test(name: string, fn: () => void | Promise<void>) {
   await fn();
   passed += 1;
@@ -92,7 +125,7 @@ function flow(images: string[] = []) {
 
 function generationFlow(prompt: string) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     nodes: [{
       id: "generate",
       type: "sketch-to-render",
@@ -102,9 +135,16 @@ function generationFlow(prompt: string) {
         label: "生成效果图",
         status: "idle",
         modelId: "gemini-3.1-flash-image",
-        modelOptions: { aspectRatio: "1:1", imageSize: "1K" },
-        prompt,
-        aspectRatio: "1:1",
+        modelOptions: generationParameters.modelOptions,
+        operationMode: "generate",
+        prompt: buildGarmentPrompt(generationVariant.variantId, prompt),
+        promptVariantId: generationVariant.variantId,
+        promptFamilyId: generationVariant.familyId,
+        parameterProfileId: generationVariant.parameterProfileId,
+        contractHash: generationVariant.contractHash,
+        evaluationVersion: generationVariant.evaluationVersion,
+        postprocessVersion: generationProfile.postprocess.version,
+        aspectRatio: generationParameters.aspectRatio,
         batchSize: 1,
         outputImages: [],
       },
@@ -115,7 +155,7 @@ function generationFlow(prompt: string) {
 
 function editFlow(imageUrl: string) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 6,
     nodes: [
       {
         id: "source",
@@ -125,7 +165,8 @@ function editFlow(imageUrl: string) {
           kind: "image-input",
           label: "原图",
           status: "idle",
-          imageRole: "default",
+          imageRole: "garment_full",
+          roleNeedsConfirmation: false,
           imageUrl,
         },
       },
@@ -138,15 +179,94 @@ function editFlow(imageUrl: string) {
           label: "改款",
           status: "idle",
           modelId: "gpt-image-2-vip",
-          modelOptions: { size: "2048x2048" },
-          prompt: "改成短袖",
-          aspectRatio: "1:1",
+          modelOptions: editParameters.modelOptions,
+          operationMode: "edit",
+          prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
+          promptVariantId: editVariant.variantId,
+          promptFamilyId: editVariant.familyId,
+          parameterProfileId: editVariant.parameterProfileId,
+          contractHash: editVariant.contractHash,
+          evaluationVersion: editVariant.evaluationVersion,
+          postprocessVersion: editProfile.postprocess.version,
+          aspectRatio: editParameters.aspectRatio,
           batchSize: 1,
           outputImages: [],
         },
       },
     ],
-    edges: [{ id: "source-edit", source: "source", target: "edit" }],
+    edges: [{
+      id: "source-edit",
+      source: "source",
+      target: "edit",
+      data: {
+        role: "garment_full",
+        roleNeedsConfirmation: false,
+      },
+    }],
+  };
+}
+
+function independentEditFlow(firstImageUrl: string, secondImageUrl: string) {
+  const first = editFlow(firstImageUrl);
+  const second = editFlow(secondImageUrl);
+  return {
+    schemaVersion: 6,
+    nodes: [
+      { ...first.nodes[0], id: "source-a" },
+      { ...first.nodes[1], id: "edit-a" },
+      { ...second.nodes[0], id: "source-b" },
+      { ...second.nodes[1], id: "edit-b" },
+    ],
+    edges: [
+      { ...first.edges[0], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
+      { ...second.edges[0], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
+    ],
+  };
+}
+
+function branchedEditFlow(imageUrl: string) {
+  const base = editFlow(imageUrl);
+  const firstEdit = { ...base.nodes[1], id: "edit-a" };
+  const secondEdit = {
+    ...base.nodes[1],
+    id: "edit-b",
+    position: { x: 320, y: 240 },
+  };
+  return {
+    schemaVersion: 6,
+    nodes: [base.nodes[0], firstEdit, secondEdit],
+    edges: [
+      { ...base.edges[0], id: "source-edit-a", target: "edit-a" },
+      { ...base.edges[0], id: "source-edit-b", target: "edit-b" },
+    ],
+  };
+}
+
+function chainedEditFlow(sourceImageUrl: string, savedFirstOutput: string) {
+  const base = editFlow(sourceImageUrl);
+  const firstEdit = {
+    ...base.nodes[1],
+    id: "edit-first",
+    data: { ...base.nodes[1].data, outputImages: [savedFirstOutput] },
+  };
+  const secondEdit = {
+    ...base.nodes[1],
+    id: "edit-second",
+    position: { x: 640, y: 0 },
+    data: { ...base.nodes[1].data, outputImages: [] },
+  };
+  return {
+    schemaVersion: 6,
+    nodes: [base.nodes[0], firstEdit, secondEdit],
+    edges: [
+      { ...base.edges[0], id: "source-edit-first", target: "edit-first" },
+      {
+        ...base.edges[0],
+        id: "edit-first-edit-second",
+        source: "edit-first",
+        target: "edit-second",
+      },
+    ],
   };
 }
 
@@ -244,13 +364,33 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
     request: {
-      prompt: "改成短袖",
-      aspectRatio: "1:1",
+      prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
+      promptVariantId: editVariant.variantId,
+      promptFamilyId: editVariant.familyId,
+      parameterProfileId: editVariant.parameterProfileId,
+      contractHash: editVariant.contractHash,
+      evaluationVersion: editVariant.evaluationVersion,
+      postprocessVersion: editProfile.postprocess.version,
+      operationMode: "edit",
+      aspectRatio: editParameters.aspectRatio,
       batchSize: 1,
-      referenceImages: [referenceImage],
-      modelOptions: { size: "2048x2048" },
+      references: [{
+        dataUrl: referenceImage,
+        role: "garment_full",
+        order: 0,
+        assetSha256: "a".repeat(64),
+        roleNeedsConfirmation: false,
+      }],
+      modelOptions: editParameters.modelOptions,
     },
   };
+}
+
+function writeTestPng(id: string): void {
+  fs.writeFileSync(
+    path.join(uploadsDir(), id),
+    Buffer.from(PNG_DATA_URL.slice(PNG_DATA_URL.indexOf(",") + 1), "base64"),
+  );
 }
 
 console.log("运行任务与素材引用授权回归测试");
@@ -635,6 +775,7 @@ await query(`
     ('private.png', $2, 'legacy', $3),
     ('own-private.png', $1, 'legacy', $3)
 `, [users.owner.id, users.other.id, now]);
+for (const id of ["shared.png", "private.png", "own-private.png"]) writeTestPng(id);
 await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
   VALUES
@@ -751,7 +892,56 @@ await test("运行必须绑定项目，且他人与管理员都不能运行项�
         ...flow(), projectId: "owner-project", clientRequestId: `forbidden-${actor}-request`,
       }),
     });
-    assert.equal(denied.status, 403, `${actor}: ${await denied.text()}`);
+    assert.equal(denied.status, 403, actor);
+    assert.deepEqual(await denied.json(), {
+      error: "管理员只能查看其他用户项目，不能运行或修改",
+    }, actor);
+  }
+});
+
+await test("真实评估必须只执行显式 onlyNodeId，且禁止扩展到下游节点", async () => {
+  const originalFlag = process.env.ENABLE_PAID_EVALUATION_RUNS;
+  process.env.ENABLE_PAID_EVALUATION_RUNS = "true";
+  const evaluation = {
+    caseId: "route-scope-case",
+    sampleId: "route-scope-sample",
+    authorizationId: "route-scope-authorization",
+    campaignId: "route-scope-campaign",
+    slotId: "route-scope-slot",
+  };
+  try {
+    const missingTarget = await request("/run-plan", "admin", {
+      method: "POST",
+      body: JSON.stringify({
+        ...generationFlow("真实评估必须显式选中节点"),
+        projectId: "scope-not-read-before-rejection",
+        clientRequestId: "evaluation-missing-only-node",
+        evaluation,
+      }),
+    });
+    assert.equal(missingTarget.status, 400);
+    assert.match(await missingTarget.text(), /onlyNodeId/);
+
+    const downstream = await request("/run-plan", "admin", {
+      method: "POST",
+      body: JSON.stringify({
+        ...generationFlow("真实评估不得执行下游"),
+        onlyNodeId: "generate",
+        includeDownstream: true,
+        projectId: "scope-not-read-before-rejection",
+        clientRequestId: "evaluation-downstream-blocked",
+        evaluation: { ...evaluation, caseId: "route-downstream-case" },
+      }),
+    });
+    assert.equal(downstream.status, 400);
+    assert.match(await downstream.text(), /不得执行下游节点/);
+    assert.equal((await queryOne<{ count: number }>(`
+      SELECT COUNT(*)::int AS count FROM generation_runs
+      WHERE client_request_id IN ('evaluation-missing-only-node','evaluation-downstream-blocked')
+    `))?.count, 0);
+  } finally {
+    if (originalFlag === undefined) delete process.env.ENABLE_PAID_EVALUATION_RUNS;
+    else process.env.ENABLE_PAID_EVALUATION_RUNS = originalFlag;
   }
 });
 
@@ -767,6 +957,561 @@ await test("同 ID 项目不能被其他账号覆盖", async () => {
   assert.equal(row?.owner_id, users.owner.id);
   assert.equal(row?.name, "Owner Project");
   assert.deepEqual(JSON.parse(row?.flow_json ?? "{}"), flow());
+});
+
+await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归一化后落库", async () => {
+  const invalidFlow = editFlow(PNG_DATA_URL);
+  invalidFlow.nodes[1].data.modelOptions = {
+    ...invalidFlow.nodes[1].data.modelOptions,
+    quality: "high",
+  } as never;
+  const response = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "invalid-model-options-project",
+      name: "非法模型参数",
+      flow: invalidFlow,
+    }),
+  });
+  const responseText = await response.text();
+  assert.equal(response.status, 400, responseText);
+  assert.match(responseText, /quality/);
+  assert.equal(
+    await queryOne("SELECT id FROM projects WHERE id = 'invalid-model-options-project'"),
+    undefined,
+  );
+});
+
+await test("直连生成在入队前拒绝未知 modelOptions", async () => {
+  const before = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  const body = directGenerateBody(PNG_DATA_URL);
+  body.request.modelOptions = {
+    ...body.request.modelOptions,
+    quality: "high",
+  } as never;
+  const response = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const responseText = await response.text();
+  assert.equal(response.status, 400, responseText);
+  assert.match(responseText, /quality/);
+  const after = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  assert.equal(after, before);
+});
+
+await test("直连生成对缺失、true 和旧数组参考角色失败关闭且零入队", async () => {
+  const clientRequestIds = [
+    "direct-unconfirmed-role-missing",
+    "direct-unconfirmed-role-true",
+    "direct-unconfirmed-role-legacy",
+  ];
+  for (const [index, clientRequestId] of clientRequestIds.entries()) {
+    const body = directGenerateBody(PNG_DATA_URL, undefined, clientRequestId);
+    const requestBody = body.request as typeof body.request & {
+      referenceImages?: string[];
+      references?: typeof body.request.references;
+    };
+    if (index === 0) {
+      delete (requestBody.references![0] as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
+    } else if (index === 1) {
+      requestBody.references![0].roleNeedsConfirmation = true;
+    } else {
+      requestBody.referenceImages = [PNG_DATA_URL];
+      delete (requestBody as { references?: typeof body.request.references }).references;
+    }
+    const response = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json() as {
+      error?: string;
+      code?: string;
+      references?: Array<{ order: number; sourceNodeId?: string; reason: string }>;
+    };
+    assert.equal(response.status, 400, clientRequestId);
+    assert.deepEqual(payload, {
+      error: "参考图角色尚未全部确认",
+      code: "reference-role-unconfirmed",
+      references: [{ order: 0, reason: "roleNeedsConfirmation is not false" }],
+    }, clientRequestId);
+  }
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [clientRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [clientRequestIds]))?.count, 0);
+});
+
+await test("直连生成保留非法角色与 order 的结构化明细，损坏 JSON 确定返回 400", async () => {
+  const invalidRoleId = "direct-invalid-reference-role";
+  const invalidRoleBody = directGenerateBody(PNG_DATA_URL, undefined, invalidRoleId);
+  invalidRoleBody.request.references[0].role = "unsupported-role" as never;
+  const invalidRoleResponse = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(invalidRoleBody),
+  });
+  assert.equal(invalidRoleResponse.status, 400);
+  assert.deepEqual(await invalidRoleResponse.json(), {
+    error: "参考图角色或顺序无效。",
+    code: "reference-role-invalid",
+    references: [{
+      order: 0,
+      reason: "references[0].role must be a supported reference role",
+    }],
+  });
+
+  const invalidOrderId = "direct-invalid-reference-order";
+  const invalidOrderBody = directGenerateBody(PNG_DATA_URL, undefined, invalidOrderId);
+  invalidOrderBody.request.references[0].order = 1;
+  const invalidOrderResponse = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(invalidOrderBody),
+  });
+  assert.equal(invalidOrderResponse.status, 400);
+  assert.deepEqual(await invalidOrderResponse.json(), {
+    error: "参考图角色或顺序无效。",
+    code: "reference-role-invalid",
+    references: [{
+      order: 0,
+      reason: "references[0].order must be a safe integer equal to 0",
+    }],
+  });
+
+  const malformedCases = [
+    {
+      clientRequestId: "direct-reference-array-object",
+      mutate: (requestBody: Record<string, unknown>) => { requestBody.references = {}; },
+      error: "request references must be an array",
+    },
+    {
+      clientRequestId: "direct-reference-null-entry",
+      mutate: (requestBody: Record<string, unknown>) => { requestBody.references = [null]; },
+      error: "request references[0] must be an object",
+    },
+    {
+      clientRequestId: "direct-legacy-reference-string",
+      mutate: (requestBody: Record<string, unknown>) => {
+        delete requestBody.references;
+        requestBody.referenceImages = "abc";
+      },
+      error: "request referenceImages must be an array",
+    },
+  ];
+  for (const testCase of malformedCases) {
+    const body = directGenerateBody(PNG_DATA_URL, undefined, testCase.clientRequestId);
+    testCase.mutate(body.request as unknown as Record<string, unknown>);
+    const response = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 400, testCase.clientRequestId);
+    assert.deepEqual(await response.json(), { error: testCase.error }, testCase.clientRequestId);
+  }
+
+  const clientRequestIds = [
+    invalidRoleId,
+    invalidOrderId,
+    ...malformedCases.map((testCase) => testCase.clientRequestId),
+  ];
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [clientRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [clientRequestIds]))?.count, 0);
+});
+
+await test("画布运行对迁移后待确认连线返回同一结构化 400 且零入队", async () => {
+  const pendingFlow = editFlow(PNG_DATA_URL);
+  pendingFlow.schemaVersion = 5;
+  delete (pendingFlow.edges[0].data as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
+  const save = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "pending-reference-role-project",
+      name: "待确认参考角色",
+      flow: pendingFlow,
+    }),
+  });
+  assert.equal(save.status, 200, await save.text());
+  const savedProject = await queryOne<{ flow_json: string }>(
+    "SELECT flow_json FROM projects WHERE id = 'pending-reference-role-project'",
+  );
+  assert.ok(savedProject);
+  const savedFlow = JSON.parse(savedProject.flow_json) as ReturnType<typeof editFlow>;
+  assert.equal(savedFlow.edges[0].data.roleNeedsConfirmation, true);
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...savedFlow,
+      onlyNodeId: "edit",
+      projectId: "pending-reference-role-project",
+      clientRequestId: "workflow-unconfirmed-role",
+    }),
+  });
+  const payload = await response.json() as {
+    error?: string;
+    code?: string;
+    references?: Array<{ order: number; sourceNodeId?: string; reason: string }>;
+  };
+  assert.equal(response.status, 400);
+  assert.deepEqual(payload, {
+    error: "参考图角色尚未全部确认",
+    code: "reference-role-unconfirmed",
+    references: [{
+      order: 0,
+      sourceNodeId: "source",
+      reason: "roleNeedsConfirmation is not false",
+    }],
+  });
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = 'workflow-unconfirmed-role'
+  `))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = 'workflow-unconfirmed-role'
+    )
+  `))?.count, 0);
+});
+
+await test("run-plan 保留显式确认参考角色的普通 edit 正向入队", async () => {
+  const confirmedFlow = editFlow(PNG_DATA_URL);
+  const save = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "confirmed-reference-role-project",
+      name: "已确认参考角色项目",
+      flow: confirmedFlow,
+    }),
+  });
+  assert.equal(save.status, 200, await save.text());
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...confirmedFlow,
+      onlyNodeId: "edit",
+      projectId: "confirmed-reference-role-project",
+      clientRequestId: "workflow-confirmed-reference-role",
+    }),
+  });
+  const payload = await response.json() as { runId?: string; error?: string };
+  assert.equal(response.status, 202, payload.error);
+  assert.ok(payload.runId);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = 'workflow-confirmed-reference-role'
+  `))?.count, 1);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id = $1
+  `, [payload.runId]))?.count, 1);
+});
+
+await test("run-plan 仅对已授权且 topology 一致的 v6 提交映射参考角色错误", async () => {
+  const savedFlow = editFlow(PNG_DATA_URL);
+  const generatedSource = {
+    ...structuredClone(savedFlow.nodes[1]),
+    id: "generated-source",
+    position: { x: 160, y: 180 },
+    data: {
+      ...structuredClone(savedFlow.nodes[1].data),
+      label: "两张已生成参考图",
+      outputImages: [PNG_DATA_URL, PNG_DATA_URL],
+    },
+  };
+  savedFlow.nodes.splice(1, 0, generatedSource);
+  savedFlow.edges.push({
+    id: "generated-edit",
+    source: "generated-source",
+    target: "edit",
+    data: { role: "fabric", roleNeedsConfirmation: false },
+  });
+  const save = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "strict-reference-role-project",
+      name: "严格参考角色项目",
+      flow: savedFlow,
+    }),
+  });
+  assert.equal(save.status, 200, await save.text());
+  const persisted = await queryOne<{ flow_json: string }>(
+    "SELECT flow_json FROM projects WHERE id = 'strict-reference-role-project'",
+  );
+  assert.ok(persisted);
+  const canonicalFlow = JSON.parse(persisted.flow_json) as ReturnType<typeof editFlow>;
+
+  const cases: Array<{
+    clientRequestId: string;
+    mutate: (flow: ReturnType<typeof editFlow>) => void;
+    expected: {
+      error: string;
+      code: string;
+      references: Array<{ order: number; sourceNodeId: string; reason: string }>;
+    };
+  }> = [
+    {
+      clientRequestId: "workflow-invalid-reference-role",
+      mutate: (flow) => { flow.edges[1].data.role = "unsupported-role" as never; },
+      expected: {
+        error: "参考图角色或顺序无效。",
+        code: "reference-role-invalid",
+        references: [1, 2].map((order) => ({
+          order,
+          sourceNodeId: "generated-source",
+          reason: `references[${order}].role must be a supported reference role`,
+        })),
+      },
+    },
+    {
+      clientRequestId: "workflow-missing-reference-confirmation",
+      mutate: (flow) => {
+        delete (flow.edges[1].data as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
+      },
+      expected: {
+        error: "参考图角色尚未全部确认",
+        code: "reference-role-unconfirmed",
+        references: [1, 2].map((order) => ({
+          order,
+          sourceNodeId: "generated-source",
+          reason: "roleNeedsConfirmation is not false",
+        })),
+      },
+    },
+    {
+      clientRequestId: "workflow-invalid-reference-confirmation",
+      mutate: (flow) => {
+        flow.edges[1].data.roleNeedsConfirmation = "false" as never;
+      },
+      expected: {
+        error: "参考图角色或顺序无效。",
+        code: "reference-role-invalid",
+        references: [1, 2].map((order) => ({
+          order,
+          sourceNodeId: "generated-source",
+          reason: `references[${order}].roleNeedsConfirmation must be a boolean`,
+        })),
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const submitted = structuredClone(canonicalFlow);
+    testCase.mutate(submitted);
+    const response = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        ...submitted,
+        onlyNodeId: "edit",
+        projectId: "strict-reference-role-project",
+        clientRequestId: testCase.clientRequestId,
+      }),
+    });
+    assert.equal(response.status, 400, testCase.clientRequestId);
+    assert.deepEqual(await response.json(), testCase.expected, testCase.clientRequestId);
+  }
+
+  const invalidRole = structuredClone(canonicalFlow);
+  invalidRole.edges[1].data.role = "unsupported-role" as never;
+  const wholePlan = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidRole,
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-invalid-reference-role-whole-plan",
+    }),
+  });
+  assert.equal(wholePlan.status, 400);
+  assert.deepEqual(await wholePlan.json(), cases[0].expected);
+
+  const downstream = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidRole,
+      onlyNodeId: "generated-source",
+      includeDownstream: true,
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-invalid-reference-role-downstream",
+    }),
+  });
+  assert.equal(downstream.status, 400);
+  assert.deepEqual(await downstream.json(), cases[0].expected);
+
+  const handleDriftRequestIds: string[] = [];
+  for (const handle of ["sourceHandle", "targetHandle"] as const) {
+    const handleDrift = structuredClone(canonicalFlow);
+    (handleDrift.edges[1] as unknown as Record<typeof handle, string>)[handle] = "fabric";
+    const clientRequestId = `workflow-reference-${handle}-drift`;
+    handleDriftRequestIds.push(clientRequestId);
+    const response = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        ...handleDrift,
+        onlyNodeId: "edit",
+        projectId: "strict-reference-role-project",
+        clientRequestId,
+      }),
+    });
+    assert.equal(response.status, 409, handle);
+    assert.deepEqual(await response.json(), {
+      error: "画布尚未保存或已在其他位置更新，请保存后重试",
+    }, handle);
+  }
+
+  const denied = await request("/run-plan", "other", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidRole,
+      onlyNodeId: "edit",
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-invalid-reference-non-owner",
+    }),
+  });
+  assert.equal(denied.status, 403);
+  assert.deepEqual(await denied.json(), {
+    error: "管理员只能查看其他用户项目，不能运行或修改",
+  });
+
+  const forgedTopology = structuredClone(invalidRole);
+  forgedTopology.edges[1].source = "source";
+  const forged = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...forgedTopology,
+      onlyNodeId: "edit",
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-invalid-reference-forged-topology",
+    }),
+  });
+  assert.equal(forged.status, 400);
+  assert.deepEqual(await forged.json(), {
+    error: "flow.edges[1].data.role: must be one of: identity, pose_composition, garment_top, garment_bottom, garment_full, fabric, accessory, styling_only, background, generic",
+  });
+
+  const invalidRoleWithHandleDrift = structuredClone(invalidRole);
+  (invalidRoleWithHandleDrift.edges[1] as unknown as { targetHandle?: string }).targetHandle = "fabric";
+  const invalidHandleTopology = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidRoleWithHandleDrift,
+      onlyNodeId: "edit",
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-invalid-reference-role-handle-drift",
+    }),
+  });
+  assert.equal(invalidHandleTopology.status, 400);
+  assert.deepEqual(await invalidHandleTopology.json(), {
+    error: "flow.edges[1].data.role: must be one of: identity, pose_composition, garment_top, garment_bottom, garment_full, fabric, accessory, styling_only, background, generic",
+  });
+
+  const reordered = structuredClone(canonicalFlow);
+  reordered.edges.reverse();
+  const reorderConflict = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...reordered,
+      onlyNodeId: "edit",
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-reference-edge-reordered",
+    }),
+  });
+  assert.equal(reorderConflict.status, 409, await reorderConflict.text());
+
+  const damagedSavedFlow = structuredClone(canonicalFlow);
+  damagedSavedFlow.edges[1].data.roleNeedsConfirmation = "false" as never;
+  await query(
+    "UPDATE projects SET flow_json = $1 WHERE id = 'strict-reference-role-project'",
+    [JSON.stringify(damagedSavedFlow)],
+  );
+  const damaged = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidRole,
+      onlyNodeId: "edit",
+      projectId: "strict-reference-role-project",
+      clientRequestId: "workflow-damaged-saved-reference-role",
+    }),
+  });
+  assert.equal(damaged.status, 400);
+  assert.deepEqual(await damaged.json(), {
+    error: "flow.edges[1].data.roleNeedsConfirmation: must be a boolean",
+  });
+
+  const clientRequestIds = [
+    ...cases.map((testCase) => testCase.clientRequestId),
+    "workflow-invalid-reference-role-whole-plan",
+    "workflow-invalid-reference-role-downstream",
+    ...handleDriftRequestIds,
+    "workflow-invalid-reference-non-owner",
+    "workflow-invalid-reference-forged-topology",
+    "workflow-invalid-reference-role-handle-drift",
+    "workflow-reference-edge-reordered",
+    "workflow-damaged-saved-reference-role",
+  ];
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [clientRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [clientRequestIds]))?.count, 0);
+});
+
+await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且零入队", async () => {
+  const savedFlow = generationFlow("严格参数项目");
+  const save = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      id: "strict-model-options-run-project",
+      name: "严格参数项目",
+      flow: savedFlow,
+    }),
+  });
+  assert.equal(save.status, 200, await save.text());
+
+  const invalidSubmittedFlow = structuredClone(savedFlow);
+  invalidSubmittedFlow.nodes[0].data.modelId = "gpt-image-2-vip" as never;
+  invalidSubmittedFlow.nodes[0].data.modelOptions = {
+    size: "2048x2048",
+    quality: "high",
+  } as never;
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...invalidSubmittedFlow,
+      onlyNodeId: "generate",
+      projectId: "strict-model-options-run-project",
+      clientRequestId: "invalid-model-options-run-plan",
+    }),
+  });
+  const responseText = await response.text();
+  assert.equal(response.status, 400, responseText);
+  assert.match(responseText, /quality/);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = 'invalid-model-options-run-plan'
+  `))?.count, 0);
 });
 
 await test("运行只接受当前已保存画布，且项目名称以服务端为准", async () => {
@@ -814,7 +1559,10 @@ await test("运行只接受当前已保存画布，且项目名称以服务端�
     [payload.runId],
   );
   assert.equal(row?.project_name, "服务端项目名");
-  assert.equal((JSON.parse(row?.parameters_json ?? "{}") as { prompt?: string }).prompt, "已保存提示词");
+  assert.equal(
+    (JSON.parse(row?.parameters_json ?? "{}") as { prompt?: string }).prompt,
+    buildGarmentPrompt(generationVariant.variantId, "已保存提示词"),
+  );
 
   const replay = await request("/run-plan", "owner", {
     method: "POST",
@@ -867,6 +1615,7 @@ await test("项目保存与运行都拒绝引用他人的私有文件", async ()
     INSERT INTO files (id, owner_id, source_type, created_at)
     VALUES ('other-secret.png', $1, 'upload', $2)
   `, [users.other.id, now]);
+  writeTestPng("other-secret.png");
   const unsafeFlow = editFlow("/api/files/other-secret.png");
   const deniedSave = await request("/projects", "owner", {
     method: "POST",
@@ -888,10 +1637,20 @@ await test("项目保存与运行都拒绝引用他人的私有文件", async ()
       clientRequestId: "legacy-unsafe-request",
     }),
   });
-  assert.equal(deniedRun.status, 403, await deniedRun.text());
+  assert.equal(deniedRun.status, 403);
+  assert.deepEqual(await deniedRun.json(), {
+    error: "参考图不可用，请重新选择后再试",
+    code: "reference-image-unavailable",
+    references: [{
+      order: 0,
+      sourceNodeId: "source",
+      targetNodeId: "edit",
+      reason: "reference image is unavailable",
+    }],
+  });
 });
 
-await test("不存在或已软删除的本地文件不能进入项目或运行队列", async () => {
+await test("不可用本地文件返回同一结构化 403，且不能进入运行队列", async () => {
   const missingFlow = editFlow("/api/files/missing-image.png");
   const missingSave = await request("/projects", "owner", {
     method: "POST",
@@ -903,6 +1662,7 @@ await test("不存在或已软删除的本地文件不能进入项目或运行�
     INSERT INTO files (id, owner_id, source_type, created_at, deleted_at, purge_after)
     VALUES ('deleted-image.png', $1, 'upload', $2, $2, $3)
   `, [users.owner.id, now, new Date(Date.now() + 86_400_000).toISOString()]);
+  writeTestPng("deleted-image.png");
   const deletedFlow = editFlow("/api/files/deleted-image.png");
   const deletedSave = await request("/projects", "owner", {
     method: "POST",
@@ -910,9 +1670,28 @@ await test("不存在或已软删除的本地文件不能进入项目或运行�
   });
   assert.equal(deletedSave.status, 403, await deletedSave.text());
 
+  await query(`
+    INSERT INTO files (id, owner_id, source_type, created_at)
+    VALUES
+      ('metadata-only-image.png', $1, 'upload', $2),
+      ('unreadable-image.png', $1, 'upload', $2),
+      ('truncated-image.png', $1, 'upload', $2)
+  `, [users.owner.id, now]);
+  fs.writeFileSync(path.join(uploadsDir(), "unreadable-image.png"), "not an image");
+  fs.writeFileSync(
+    path.join(uploadsDir(), "truncated-image.png"),
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  );
+  const metadataOnlyFlow = editFlow("/api/files/metadata-only-image.png");
+  const unreadableFlow = editFlow("/api/files/unreadable-image.png");
+  const truncatedFlow = editFlow("/api/files/truncated-image.png");
+
   for (const [projectId, projectFlow] of [
     ["legacy-missing-file", missingFlow],
     ["legacy-deleted-file", deletedFlow],
+    ["legacy-metadata-only-file", metadataOnlyFlow],
+    ["legacy-unreadable-file", unreadableFlow],
+    ["legacy-truncated-file", truncatedFlow],
   ] as const) {
     await query(`
       INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
@@ -927,8 +1706,487 @@ await test("不存在或已软删除的本地文件不能进入项目或运行�
         clientRequestId: `${projectId}-request`,
       }),
     });
-    assert.equal(response.status, 403, await response.text());
+    assert.equal(response.status, 403, projectId);
+    assert.deepEqual(await response.json(), {
+      error: "参考图不可用，请重新选择后再试",
+      code: "reference-image-unavailable",
+      references: [{
+        order: 0,
+        sourceNodeId: "source",
+        targetNodeId: "edit",
+        reason: "reference image is unavailable",
+      }],
+    }, projectId);
   }
+  const rejectedRequestIds = [
+    "legacy-missing-file-request",
+    "legacy-deleted-file-request",
+    "legacy-metadata-only-file-request",
+    "legacy-unreadable-file-request",
+    "legacy-truncated-file-request",
+  ];
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [rejectedRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [rejectedRequestIds]))?.count, 0);
+});
+
+await test("run-plan 在入队前拒绝 HTTP(S) 静态参考图并保留目标归因", async () => {
+  const projectId = "remote-reference-project";
+  const clientRequestId = "remote-reference-request";
+  const remoteFlow = editFlow("https://cdn.example/reference.png?token=temporary");
+  const saved = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: projectId, name: "远程参考图", flow: remoteFlow }),
+  });
+  assert.equal(saved.status, 200, await saved.text());
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...remoteFlow,
+      onlyNodeId: "edit",
+      projectId,
+      clientRequestId,
+    }),
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 403, JSON.stringify(payload));
+  assert.deepEqual(payload, {
+    error: "远程参考图不能直接用于生成，请先上传或导入后再试",
+    code: "reference-image-unavailable",
+    references: [{
+      order: 0,
+      sourceNodeId: "source",
+      targetNodeId: "edit",
+      reason: "remote reference must be uploaded or imported before generation",
+    }],
+  });
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
+  `, [clientRequestId]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (SELECT id FROM generation_runs WHERE client_request_id = $1)
+  `, [clientRequestId]))?.count, 0);
+});
+
+await test("多 Provider 计划会报告非目标步骤的静态不可用引用", async () => {
+  const projectId = "multi-step-static-reference";
+  const clientRequestId = "multi-step-static-reference-request";
+  const projectFlow = independentEditFlow(
+    "/api/files/missing-image.png",
+    "/api/files/own-private.png",
+  );
+  await query(`
+    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+    VALUES ($1, $2, '多步静态引用', $3, $4, $4)
+  `, [projectId, users.owner.id, JSON.stringify(projectFlow), now]);
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...projectFlow,
+      projectId,
+      clientRequestId,
+    }),
+  });
+  const responsePayload = await response.json();
+  assert.equal(response.status, 403, JSON.stringify(responsePayload));
+  assert.deepEqual(responsePayload, {
+    error: "参考图不可用，请重新选择后再试",
+    code: "reference-image-unavailable",
+    references: [{
+      order: 0,
+      sourceNodeId: "source-a",
+      targetNodeId: "edit-a",
+      reason: "reference image is unavailable",
+    }],
+  });
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
+  `, [clientRequestId]))?.count, 0);
+});
+
+await test("run-plan 静态引用投影穿透 result 并保留动态输出占位顺序", () => {
+  const plan: ExecutionPlan = {
+    steps: [
+      {
+        nodeId: "static-source",
+        kind: "image-input",
+        inputImages: [],
+        upstream: [],
+        params: { imageUrl: "/api/files/actual-static.png" },
+      },
+      {
+        nodeId: "provider-a",
+        kind: "sketch-to-render",
+        inputImages: [],
+        upstream: [],
+        params: {},
+      },
+      {
+        nodeId: "bridge-result",
+        kind: "result",
+        inputImages: [
+          "/api/files/stale-provider.png",
+          "/api/files/stale-static.png",
+        ],
+        upstream: [
+          { nodeId: "provider-a", images: ["/api/files/stale-provider.png"] },
+          { nodeId: "static-source", images: ["/api/files/stale-static.png"] },
+        ],
+        params: {},
+      },
+      {
+        nodeId: "provider-b",
+        kind: "ai-modify",
+        inputImages: [
+          "/api/files/stale-result-provider.png",
+          "/api/files/stale-result-static.png",
+        ],
+        upstream: [{
+          nodeId: "bridge-result",
+          images: [
+            "/api/files/stale-result-provider.png",
+            "/api/files/stale-result-static.png",
+          ],
+        }],
+        params: {},
+      },
+    ],
+  };
+
+  assert.deepEqual(staticImageReferencesForPlan(plan), [{
+    imageRef: "/api/files/actual-static.png",
+    order: 1,
+    sourceNodeId: "bridge-result",
+    targetNodeId: "provider-b",
+  }]);
+
+  const inputOnlyPlan: ExecutionPlan = {
+    steps: [{
+      nodeId: "input-only-provider",
+      kind: "ai-modify",
+      inputImages: ["/api/files/input-only-static.png"],
+      inputReferences: [{
+        imageRef: "/api/files/input-only-static.png",
+        role: "garment_full",
+        order: 0,
+        sourceNodeId: "persisted-source",
+        roleNeedsConfirmation: false,
+      }],
+      params: {},
+    }],
+  };
+  assert.deepEqual(staticImageReferencesForPlan(inputOnlyPlan), [{
+    imageRef: "/api/files/input-only-static.png",
+    order: 0,
+    sourceNodeId: "persisted-source",
+    targetNodeId: "input-only-provider",
+  }]);
+
+  const auxiliaryPlan: ExecutionPlan = {
+    steps: [
+      {
+        nodeId: "fabric-provider",
+        kind: "fabric-recolor",
+        inputImages: ["/api/files/fabric-base.png"],
+        inputReferences: [{
+          imageRef: "/api/files/fabric-base.png",
+          role: "garment_full",
+          order: 0,
+          sourceNodeId: "fabric-base-source",
+          roleNeedsConfirmation: false,
+        }],
+        params: { fabricImageUrl: "https://references.example/fabric.png" },
+      },
+      {
+        nodeId: "mask-provider",
+        kind: "mask-redraw",
+        inputImages: ["/api/files/mask-base.png"],
+        inputReferences: [{
+          imageRef: "/api/files/mask-base.png",
+          role: "garment_full",
+          order: 0,
+          sourceNodeId: "mask-base-source",
+          roleNeedsConfirmation: false,
+        }],
+        params: { mask: "https://references.example/mask.png" },
+      },
+    ],
+  };
+  assert.deepEqual(staticImageReferencesForPlan(auxiliaryPlan), [
+    {
+      imageRef: "/api/files/fabric-base.png",
+      order: 0,
+      sourceNodeId: "fabric-base-source",
+      targetNodeId: "fabric-provider",
+    },
+    {
+      imageRef: "https://references.example/fabric.png",
+      order: 1,
+      sourceNodeId: "fabric-provider",
+      targetNodeId: "fabric-provider",
+    },
+    {
+      imageRef: "/api/files/mask-base.png",
+      order: 0,
+      sourceNodeId: "mask-base-source",
+      targetNodeId: "mask-provider",
+    },
+    {
+      imageRef: "https://references.example/mask.png",
+      order: 1,
+      sourceNodeId: "mask-provider",
+      targetNodeId: "mask-provider",
+    },
+  ], "面料与蒙版辅助引用也必须进入同一静态准入序列");
+});
+
+await test("同一静态来源输入多个 Provider 时失败证据可唯一归因", async () => {
+  const projectId = "branched-static-reference";
+  const clientRequestId = "branched-static-reference-request";
+  const projectFlow = branchedEditFlow("/api/files/missing-image.png");
+  await query(`
+    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
+    VALUES ($1, $2, '分支静态引用', $3, $4, $4)
+  `, [projectId, users.owner.id, JSON.stringify(projectFlow), now]);
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({ ...projectFlow, projectId, clientRequestId }),
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 403, JSON.stringify(payload));
+  assert.deepEqual(payload, {
+    error: "参考图不可用，请重新选择后再试",
+    code: "reference-image-unavailable",
+    references: [
+      {
+        order: 0,
+        sourceNodeId: "source",
+        targetNodeId: "edit-a",
+        reason: "reference image is unavailable",
+      },
+      {
+        order: 0,
+        sourceNodeId: "source",
+        targetNodeId: "edit-b",
+        reason: "reference image is unavailable",
+      },
+    ],
+  });
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
+  `, [clientRequestId]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (SELECT id FROM generation_runs WHERE client_request_id = $1)
+  `, [clientRequestId]))?.count, 0);
+});
+
+await test("run-plan 在入队前真解码实际静态 inline 图片", async () => {
+  const projectId = "truncated-inline-reference";
+  const clientRequestId = "truncated-inline-reference-request";
+  const projectFlow = editFlow(TRUNCATED_PNG_DATA_URL);
+  const saved = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: projectId, name: "截断 inline 图片", flow: projectFlow }),
+  });
+  assert.equal(saved.status, 200, await saved.text());
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...projectFlow,
+      onlyNodeId: "edit",
+      projectId,
+      clientRequestId,
+    }),
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 403, JSON.stringify(payload));
+  assert.deepEqual(payload, {
+    error: "参考图不可用，请重新选择后再试",
+    code: "reference-image-unavailable",
+    references: [{
+      order: 0,
+      sourceNodeId: "source",
+      targetNodeId: "edit",
+      reason: "reference image is unavailable",
+    }],
+  });
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
+  `, [clientRequestId]))?.count, 0);
+});
+
+await test("同一轮上游 Provider 会替换的旧输出快照不阻断入队", async () => {
+  const projectId = "provider-snapshot-replaced";
+  const clientRequestId = "provider-snapshot-replaced-request";
+  const projectFlow = chainedEditFlow(
+    "/api/files/own-private.png",
+    "/api/files/metadata-only-image.png",
+  );
+  const saved = await request("/projects", "owner", {
+    method: "POST",
+    body: JSON.stringify({ id: projectId, name: "Provider 快照替换", flow: projectFlow }),
+  });
+  assert.equal(saved.status, 200, await saved.text());
+
+  const response = await request("/run-plan", "owner", {
+    method: "POST",
+    body: JSON.stringify({
+      ...projectFlow,
+      projectId,
+      clientRequestId,
+    }),
+  });
+  const payload = await response.json() as { runId?: string; error?: string };
+  assert.equal(response.status, 202, payload.error);
+  assert.ok(payload.runId, payload.error);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
+  `, [clientRequestId]))?.count, 1);
+});
+
+await test("直连生成在授权和入队前拒绝任何 evaluation payload", async () => {
+  const before = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  for (const [index, evaluation] of [
+    null,
+    {
+      caseId: "direct-evaluation-case",
+      sampleId: "direct-evaluation-sample",
+      authorizationId: "direct-evaluation-authorization",
+    },
+  ].entries()) {
+    const body = {
+      ...directGenerateBody(PNG_DATA_URL, undefined, `direct-evaluation-rejected-${index}`),
+      evaluation,
+    };
+    const response = await request("/generate", "admin", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    const responseText = await response.text();
+    assert.equal(response.status, 400, responseText);
+    assert.match(responseText, /\/api\/run-plan/);
+    assert.match(responseText, /onlyNodeId/);
+  }
+  const after = (await queryOne<{ count: number }>(
+    "SELECT COUNT(*)::int AS count FROM generation_runs",
+  ))?.count ?? 0;
+  assert.equal(after, before);
+});
+
+await test("直连生成在入队前拒绝非图片引用与不安全 sourceNodeId", async () => {
+  const clientRequestIds: string[] = [];
+  for (const [index, reference] of [
+    "../../etc/passwd",
+    "file:///etc/passwd",
+    "data:image/png;base64,not-base64",
+    TRUNCATED_PNG_DATA_URL,
+    "/api/files/nested/other-secret.png",
+    "https://[invalid",
+  ].entries()) {
+    const clientRequestId = `direct-invalid-image-ref-${index}`;
+    clientRequestIds.push(clientRequestId);
+    const response = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(directGenerateBody(reference, undefined, clientRequestId)),
+    });
+    assert.equal(response.status, 400, `${reference}: ${await response.text()}`);
+  }
+
+  const sourceNodeRequestId = "direct-invalid-source-node";
+  clientRequestIds.push(sourceNodeRequestId);
+  const unsafeSourceNode = directGenerateBody(PNG_DATA_URL, undefined, sourceNodeRequestId);
+  (unsafeSourceNode.request.references[0] as { sourceNodeId?: string }).sourceNodeId = "../../forged-node";
+  const unsafeSourceNodeResponse = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(unsafeSourceNode),
+  });
+  assert.equal(unsafeSourceNodeResponse.status, 400, await unsafeSourceNodeResponse.text());
+
+  const nonStringRequestId = "direct-invalid-non-string-reference";
+  clientRequestIds.push(nonStringRequestId);
+  const nonStringReference = directGenerateBody(PNG_DATA_URL, undefined, nonStringRequestId);
+  delete (nonStringReference.request as { references?: unknown }).references;
+  (nonStringReference.request as { referenceImages?: unknown }).referenceImages = [123];
+  const nonStringResponse = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(nonStringReference),
+  });
+  assert.equal(nonStringResponse.status, 400, await nonStringResponse.text());
+
+  const fabricRequestId = "direct-invalid-fabric-reference";
+  clientRequestIds.push(fabricRequestId);
+  const unsafeFabricReference = directGenerateBody(PNG_DATA_URL, undefined, fabricRequestId);
+  unsafeFabricReference.kind = "fabric-recolor";
+  (unsafeFabricReference.request as { fabricImageUrl?: unknown }).fabricImageUrl = "../../fabric.png";
+  const unsafeFabricResponse = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(unsafeFabricReference),
+  });
+  assert.equal(unsafeFabricResponse.status, 400, await unsafeFabricResponse.text());
+
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [clientRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [clientRequestIds]))?.count, 0);
+});
+
+await test("直连生成在入队前拒绝 HTTP(S) 参考图并要求先上传或导入", async () => {
+  const clientRequestIds = [
+    "direct-remote-http",
+    "direct-remote-https",
+    "direct-remote-normalized-url",
+  ];
+  for (const [index, reference] of [
+    "http://images.example/reference.png",
+    "https://cdn.example/reference.png?token=temporary",
+    "https:\t//images.example/reference.png",
+  ].entries()) {
+    const response = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(directGenerateBody(reference, undefined, clientRequestIds[index])),
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 403, JSON.stringify(payload));
+    assert.deepEqual(payload, {
+      error: "远程参考图不能直接用于生成，请先上传或导入后再试",
+      code: "reference-image-unavailable",
+      references: [{
+        order: 0,
+        reason: "remote reference must be uploaded or imported before generation",
+      }],
+    });
+  }
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE client_request_id = ANY($1::text[])
+  `, [clientRequestIds]))?.count, 0);
+  assert.equal((await queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_jobs
+    WHERE run_id IN (
+      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
+    )
+  `, [clientRequestIds]))?.count, 0);
 });
 
 await test("直连生成复用项目与文件授权，且不信任客户端项目名称", async () => {
@@ -942,6 +2200,22 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
     body: JSON.stringify(missingRequestIdBody),
   });
   assert.equal(missingRequestId.status, 400, await missingRequestId.text());
+
+  const missingKindBody = directGenerateBody(PNG_DATA_URL);
+  delete (missingKindBody as { kind?: string }).kind;
+  const missingKind = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(missingKindBody),
+  });
+  assert.equal(missingKind.status, 400, await missingKind.text());
+
+  const missingOptionsBody = directGenerateBody(PNG_DATA_URL);
+  delete (missingOptionsBody.request as { modelOptions?: unknown }).modelOptions;
+  const missingOptions = await request("/generate", "owner", {
+    method: "POST",
+    body: JSON.stringify(missingOptionsBody),
+  });
+  assert.equal(missingOptions.status, 400, await missingOptions.text());
 
   const accepted = await request("/generate", "owner", {
     method: "POST",
@@ -978,7 +2252,7 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
     "run-persisted-project",
     "direct-project-request",
   );
-  changedBody.request.prompt = "同请求号的另一份语义";
+  changedBody.request.prompt = buildGarmentPrompt(editVariant.variantId, "同请求号的另一份语义");
   const conflict = await request("/generate", "owner", {
     method: "POST",
     body: JSON.stringify(changedBody),
@@ -993,19 +2267,60 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
       "direct-forbidden-project",
     )),
   });
-  assert.equal(otherProject.status, 403, await otherProject.text());
+  assert.equal(otherProject.status, 403);
+  assert.deepEqual(await otherProject.json(), {
+    error: "无权把直接生成任务写入此项目",
+  });
 
   for (const [index, ref] of [
     "/api/files/other-secret.png",
-    "/api/files/nested/other-secret.png",
     "/api/files/missing-image.png",
     "/api/files/deleted-image.png",
+    "/api/files/metadata-only-image.png",
+    "/api/files/unreadable-image.png",
+    "/api/files/truncated-image.png",
   ].entries()) {
     const denied = await request("/generate", "owner", {
       method: "POST",
       body: JSON.stringify(directGenerateBody(ref, undefined, `direct-denied-${index}`)),
     });
-    assert.equal(denied.status, 403, `${ref}: ${await denied.text()}`);
+    assert.equal(denied.status, 403, ref);
+    assert.deepEqual(await denied.json(), {
+      error: "参考图不可用，请重新选择后再试",
+      code: "reference-image-unavailable",
+      references: [{ order: 0, reason: "reference image is unavailable" }],
+    }, ref);
+  }
+
+  const duplicateBody = directGenerateBody(
+    "/api/files/missing-image.png",
+    undefined,
+    "direct-denied-duplicate",
+  );
+  duplicateBody.request.references.push({
+    ...duplicateBody.request.references[0],
+    order: 1,
+  });
+  promotePromptVariantForTest(editVariant, "verified", [
+    { order: 0, role: "garment_full" },
+    { order: 1, role: "garment_full" },
+  ]);
+  try {
+    const duplicateDenied = await request("/generate", "owner", {
+      method: "POST",
+      body: JSON.stringify(duplicateBody),
+    });
+    assert.equal(duplicateDenied.status, 403);
+    assert.deepEqual(await duplicateDenied.json(), {
+      error: "参考图不可用，请重新选择后再试",
+      code: "reference-image-unavailable",
+      references: [
+        { order: 0, reason: "reference image is unavailable" },
+        { order: 1, reason: "reference image is unavailable" },
+      ],
+    });
+  } finally {
+    promotePromptVariantForTest(editVariant);
   }
 
   const shared = await request("/generate", "other", {

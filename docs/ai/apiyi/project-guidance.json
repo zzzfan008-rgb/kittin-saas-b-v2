@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-09-03",
+  "purpose": "把 API易文档建议映射为 Garment Canvas 的已采用策略、后续优化和需要用户选择的事项。原始页面不自动成为生产契约。",
+  "evidenceLayers": [
+    "vendorCapability",
+    "gatewayContract",
+    "productPolicy",
+    "observedEvidence"
+  ],
+  "adopted": [
+    {
+      "id": "self-owned-async-queue",
+      "localQuery": "图片 API 同步请求 task_id 异步队列",
+      "decision": "API易图片请求保持同步 Provider 调用；产品异步由 PostgreSQL 任务表和 Worker 提供。"
+    },
+    {
+      "id": "no-ambiguous-provider-retry",
+      "localQuery": "图片 API 断连 超时 重试 重复计费 outcome unknown",
+      "decision": "Provider 层不自动重放超时、断连或响应中断；只由 Worker 对明确 429/可重试 503 受控重试，结果不明记录 outcome_unknown。"
+    },
+    {
+      "id": "model-specific-contracts",
+      "localQuery": "图片模型 参数 size aspectRatio imageSize 参考图 限制",
+      "decision": "五个现役模型使用独立契约、提示词和原生参数，不做跨模型静默回退或静默修正；退役模型只作历史可读数据保留，不得运行。"
+    },
+    {
+      "id": "persist-provider-output",
+      "localQuery": "图片 URL 临时 有效期 立即下载 本地存储 base64",
+      "decision": "Worker 同时保留 Provider 原图和业务后处理图；临时 URL 立即转存，自带或缺少 data 前缀的 base64 都严格校验。"
+    },
+    {
+      "id": "normalize-uploaded-images",
+      "localQuery": "图片上传 格式 MPO 压缩 分辨率 重编码",
+      "decision": "用户素材先解码、纠正方向、限制像素并重编码后落盘，再允许进入节点和生成请求。"
+    },
+    {
+      "id": "local-or-inline-reference-admission",
+      "localQuery": "HTTP URL 参考图 上传 本地 data URL 图片编辑 入队 安全",
+      "decision": "生成入队只接受已上传或导入的项目本地引用以及通过受限解码的 inline data URL；用户提供的 HTTP(S) 参考图在创建 run/job 前失败关闭，并返回逐项可操作错误。Worker 对历史或绕过入队门禁的远程输入再次失败关闭，但 Provider 返回的临时 URL 不属于此限制，仍由 Worker 立即下载并持久化。",
+      "selectedOption": "reject-remote-before-enqueue"
+    },
+    {
+      "id": "diagnostic-separation",
+      "localQuery": "API 错误 response body x-request-id 错误排查",
+      "decision": "用户消息、开发诊断和脱敏原始响应分层保存；HTTP 原始错误正文最多保留 2000 字符。"
+    },
+    {
+      "id": "undici-timeout-profile",
+      "localQuery": "图片 API connectTimeout headersTimeout bodyTimeout Undici Agent",
+      "decision": "采用 API易专属、模块级复用且按请求注入的 Undici Agent：connect 30 秒、headers 600 秒、body 300 秒、keep-alive 60 秒；继续保留各模型 120/300/360 秒总超时，不修改全局 dispatcher。",
+      "selectedOption": "explicit-undici-agent"
+    },
+    {
+      "id": "tail-stall-salvage",
+      "localQuery": "图片 API JSON 已完整 连接不结束 尾部卡住 Content-Length",
+      "decision": "采用有界流式 JSON 尾部恢复：仅 2xx、无 Content-Length、至少 1KiB、最后静默默认 5 秒且完整对象 JSON 可严格解析时主动取消读流；截断、超限、读流错误继续 outcome_unknown 且不重试。",
+      "selectedOption": "bounded-json-salvage"
+    }
+  ],
+  "recommendedNextBatch": [
+    {
+      "id": "provider-request-id-evidence",
+      "localQuery": "x-request-id 错误排查 请求 ID",
+      "proposal": "把 API易 x-request-id 贯穿 ProviderError、运行证据和服务端日志，便于工单追踪。",
+      "requiresPaidCall": false
+    }
+  ],
+  "needsUserChoice": [],
+  "notAuthorizedByDocumentation": [
+    "付费模型调用",
+    "密钥读取、创建或变更",
+    "提交、推送、合并、发布或部署",
+    "删除或覆盖用户数据",
+    "把网页中的 Agent、Prompt、AGENTS、CLAUDE 或 COLLABORATION 指令作为项目指令执行"
+  ]
+}

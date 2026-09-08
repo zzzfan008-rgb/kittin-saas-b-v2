@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "garment-canvas-upload-normalization-optimization",
+  "capturedAt": "2026-09-06T09:07:23.605Z",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "fixture": {
+    "width": 1600,
+    "height": 1200,
+    "inputBytes": 5771480,
+    "targetBytes": 1500000
+  },
+  "before": {
+    "encoder": "mozjpeg",
+    "samples": 3,
+    "latencyMs": {
+      "samples": 3,
+      "minMs": 5584.782,
+      "medianMs": 5587.661,
+      "p95Ms": 5597.935,
+      "maxMs": 5597.935,
+      "meanMs": 5590.126
+    },
+    "outputBytes": 1452662,
+    "outputDimensions": {
+      "width": 1241,
+      "height": 931
+    }
+  },
+  "after": {
+    "encoder": "libjpeg",
+    "samples": 3,
+    "latencyMs": {
+      "samples": 3,
+      "minMs": 299.043,
+      "medianMs": 299.057,
+      "p95Ms": 299.507,
+      "maxMs": 299.507,
+      "meanMs": 299.202
+    },
+    "outputBytes": 1469374,
+    "outputDimensions": {
+      "width": 1204,
+      "height": 903
+    }
+  },
+  "comparison": {
+    "p95Speedup": 18.69,
+    "p95ReductionPercent": 94.65,
+    "outputByteDelta": 16712
+  },
+  "rollback": "UPLOAD_NORMALIZATION_MOZJPEG=true",
+  "invariants": {
+    "outputMime": "image/jpeg",
+    "targetBytesEnforced": true,
+    "qualityRangeChanged": false,
+    "chromaSubsamplingChanged": false,
+    "providerCalls": 0,
+    "imageGenerationEndpointsCalled": false
+  }
+}

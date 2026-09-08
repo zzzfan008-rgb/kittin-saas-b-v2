@@ -2,12 +2,19 @@ import {
   WORKFLOW_SCHEMA_VERSION,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
+  LEGACY_IMAGE_ROLE_VALUES,
+  REFERENCE_ROLE_VALUES,
   type NodeKind,
   type PersistedWorkflow,
   type PersistedWorkflowEdge,
   type PersistedWorkflowNode,
+  type ReferenceEdgeData,
   type WorkflowNodeData,
   BATCH_SIZES,
+  IMAGE_OPERATION_MODE_VALUES,
+  allowedOperationModesForNode,
+  defaultOperationModeForNode,
+  resolveReferenceEdgeData,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -19,11 +26,29 @@ import {
   MASK_REDRAW_MODEL_ID,
   defaultImageModelOptions,
   getImageModelContract,
-  imageModelOptionsError,
+  imageModelOptionsErrorForOperation,
   isImageModelId,
   isModelAllowedForNode,
-  normalizeImageModelOptions,
+  normalizeImageModelOptionsForOperation,
 } from "../../src/types/imageModels";
+
+function retiredModelIdForMigration(
+  kind: NodeKind,
+  raw: Record<string, unknown>,
+): string | undefined {
+  if (typeof raw.retiredModelId === "string" && raw.retiredModelId.trim()) {
+    return raw.retiredModelId;
+  }
+  if (
+    kind !== "mask-redraw"
+    && typeof raw.modelId === "string"
+    && raw.modelId.trim()
+    && (!isImageModelId(raw.modelId) || !isModelAllowedForNode(raw.modelId, kind))
+  ) {
+    return raw.modelId;
+  }
+  return undefined;
+}
 
 const NODE_KINDS: readonly NodeKind[] = [
   "image-input",
@@ -40,7 +65,7 @@ const STATUSES = [
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
 ] as const;
-const IMAGE_ROLES = ["default", "sketch", "garment", "fabric", "reference"] as const;
+const IMAGE_ROLES = [...REFERENCE_ROLE_VALUES, ...LEGACY_IMAGE_ROLE_VALUES] as const;
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
 const IMAGE_SIZES = ["2K", "4K"] as const;
 export const MAX_WORKFLOW_NODES = 500;
@@ -59,6 +84,38 @@ export class WorkflowValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "WorkflowValidationError";
+  }
+}
+
+export type WorkflowReferenceRoleValidationField =
+  | "data"
+  | "role"
+  | "roleNeedsConfirmation";
+
+export class WorkflowReferenceRoleValidationError extends WorkflowValidationError {
+  readonly edgeIndex: number;
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string;
+  readonly field: WorkflowReferenceRoleValidationField;
+  readonly issueKind: "missing" | "invalid";
+
+  constructor(
+    message: string,
+    details: {
+      edgeIndex: number;
+      sourceNodeId: string;
+      targetNodeId: string;
+      field: WorkflowReferenceRoleValidationField;
+      issueKind: "missing" | "invalid";
+    },
+  ) {
+    super(message);
+    this.name = "WorkflowReferenceRoleValidationError";
+    this.edgeIndex = details.edgeIndex;
+    this.sourceNodeId = details.sourceNodeId;
+    this.targetNodeId = details.targetNodeId;
+    this.field = details.field;
+    this.issueKind = details.issueKind;
   }
 }
 
@@ -164,9 +221,51 @@ function migratedModelFields(
   const requested = isImageModelId(raw.modelId) && isModelAllowedForNode(raw.modelId, kind)
     ? raw.modelId
     : kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+  const retiredModelId = retiredModelIdForMigration(kind, raw);
+  const allowedModes = allowedOperationModesForNode(kind);
+  const operationMode = allowedModes.includes(raw.operationMode as never)
+    ? raw.operationMode as "generate" | "edit" | "mask-edit"
+    : defaultOperationModeForNode(kind)!;
   return {
     modelId: requested,
-    modelOptions: normalizeImageModelOptions(requested, raw.modelOptions, preferredAspectRatio),
+    ...(retiredModelId ? {
+      retiredModelId,
+      modelSelectionNeedsConfirmation: true,
+      promptVariantId: undefined,
+      promptFamilyId: undefined,
+      parameterProfileId: undefined,
+      contractHash: undefined,
+      evaluationVersion: undefined,
+      postprocessVersion: undefined,
+    } : {
+      modelSelectionNeedsConfirmation: raw.modelSelectionNeedsConfirmation === true,
+    }),
+    modelOptions: kind === "mask-redraw"
+      ? {}
+      : normalizeImageModelOptionsForOperation(
+          requested,
+          raw.modelOptions,
+          preferredAspectRatio,
+          operationMode,
+        ),
+  };
+}
+
+function migratedOperationFields(
+  kind: NodeKind,
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const allowed = allowedOperationModesForNode(kind);
+  if (allowed.length === 0) return {};
+  const hasExplicitMode = IMAGE_OPERATION_MODE_VALUES.includes(raw.operationMode as never)
+    && allowed.includes(raw.operationMode as never);
+  const operationMode = hasExplicitMode ? raw.operationMode : defaultOperationModeForNode(kind);
+  return {
+    operationMode,
+    // Only the historically ambiguous dual-mode node requires a user decision.
+    operationModeNeedsConfirmation: hasExplicitMode
+      ? raw.operationModeNeedsConfirmation === true
+      : kind === "sketch-to-render",
   };
 }
 
@@ -174,31 +273,52 @@ function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<s
   // v0/v1 文件保留现有值，只补后来新增且运行时依赖的确定性默认字段。
   switch (kind) {
     case "image-input":
-      return { imageRole: "default", ...raw };
+      return {
+        ...raw,
+        imageRole: raw.imageRole ?? "generic",
+        roleNeedsConfirmation: raw.roleNeedsConfirmation === false ? false : true,
+      };
     case "sketch-to-render":
       return {
         prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
-        ...raw, ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "3:4"),
+        ...raw,
+        ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "3:4"),
+        ...migratedOperationFields(kind, raw),
       };
     case "ai-modify":
       return {
         prompt: "", aspectRatio: "1:1", batchSize: 1, outputImages: [],
-        ...raw, ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "1:1"),
+        ...raw,
+        ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "1:1"),
+        ...migratedOperationFields(kind, raw),
       };
     case "fabric-recolor":
-      return { colors: [], prompt: "", outputImages: [], ...raw, ...migratedModelFields(kind, raw) };
+      return {
+        colors: [], prompt: "", outputImages: [], ...raw,
+        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
+      };
     case "upscale":
-      return { imageSize: "2K", outputImages: [], ...raw, ...migratedModelFields(kind, raw) };
+      return {
+        imageSize: "2K", outputImages: [], ...raw,
+        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
+      };
     case "print-extract":
-      return { prompt: "", outputImages: [], savedAsAssets: [], ...raw, ...migratedModelFields(kind, raw) };
+      return {
+        prompt: "", outputImages: [], savedAsAssets: [], ...raw,
+        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
+      };
     case "print-mutate":
-      return { prompt: "", count: 4, outputImages: [], ...raw, ...migratedModelFields(kind, raw) };
+      return {
+        prompt: "", count: 4, outputImages: [], ...raw,
+        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
+      };
     case "mask-redraw": {
       const { maskMode: _legacyMaskMode, ...migratedMaskData } = raw;
       return {
         prompt: "", outputImages: [], ...migratedMaskData,
         modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: defaultImageModelOptions(MASK_REDRAW_MODEL_ID),
+        ...migratedOperationFields(kind, raw),
       };
     }
     case "result":
@@ -212,18 +332,65 @@ function validateModelSelection(kind: NodeKind, raw: Record<string, unknown>, pa
   if (!isModelAllowedForNode(raw.modelId, kind)) {
     fail(`${path}.modelId`, `${raw.modelId} is not allowed for ${kind}`);
   }
+  const allowedModes = allowedOperationModesForNode(kind);
+  if (!allowedModes.includes(raw.operationMode as never)) {
+    fail(`${path}.operationMode`, `must be one of: ${allowedModes.join(", ")}`);
+  }
+  if (raw.operationModeNeedsConfirmation !== undefined && typeof raw.operationModeNeedsConfirmation !== "boolean") {
+    fail(`${path}.operationModeNeedsConfirmation`, "must be a boolean when present");
+  }
+  if (raw.modelSelectionNeedsConfirmation !== undefined && typeof raw.modelSelectionNeedsConfirmation !== "boolean") {
+    fail(`${path}.modelSelectionNeedsConfirmation`, "must be a boolean when present");
+  }
+  const retiredModelId = optionalString(raw.retiredModelId, `${path}.retiredModelId`);
+  if (retiredModelId !== undefined && !retiredModelId.trim()) {
+    fail(`${path}.retiredModelId`, "must not be empty");
+  }
+  if (retiredModelId !== undefined && raw.modelSelectionNeedsConfirmation !== true) {
+    fail(`${path}.modelSelectionNeedsConfirmation`, "must be true while retiredModelId is present");
+  }
+  if (
+    retiredModelId !== undefined
+    && [
+      "promptVariantId",
+      "promptFamilyId",
+      "parameterProfileId",
+      "contractHash",
+      "evaluationVersion",
+      "postprocessVersion",
+    ].some((field) => raw[field] !== undefined)
+  ) {
+    fail(path, "retired models must not retain prompt, parameter, contract, evaluation, or postprocess bindings");
+  }
+  for (const field of [
+    "promptVariantId",
+    "promptFamilyId",
+    "parameterProfileId",
+    "evaluationVersion",
+    "postprocessVersion",
+  ]) {
+    optionalString(raw[field], `${path}.${field}`);
+  }
+  const contractHash = optionalString(raw.contractHash, `${path}.contractHash`);
+  if (contractHash !== undefined && !/^sha256:[a-f0-9]{64}$/.test(contractHash)) {
+    fail(`${path}.contractHash`, "must be a sha256: prefixed lowercase SHA-256");
+  }
   const inputOptions = raw.modelOptions;
-  const normalizedOptions = normalizeImageModelOptions(raw.modelId, inputOptions);
-  const supportedOptions =
-    typeof inputOptions === "object" && inputOptions !== null && !Array.isArray(inputOptions)
-      ? Object.fromEntries(
-          Object.entries(inputOptions).filter(([key]) => (
-            Object.hasOwn(normalizedOptions, key)
-          )),
-        )
-      : inputOptions;
-  const optionsError = imageModelOptionsError(raw.modelId, supportedOptions);
+  const optionsError = imageModelOptionsErrorForOperation(
+    raw.modelId,
+    inputOptions,
+    raw.operationMode as "generate" | "edit" | "mask-edit",
+  );
   if (optionsError) fail(`${path}.modelOptions`, optionsError);
+  if (
+    kind === "mask-redraw"
+    && typeof inputOptions === "object"
+    && inputOptions !== null
+    && !Array.isArray(inputOptions)
+    && Object.keys(inputOptions as Record<string, unknown>).length > 0
+  ) {
+    fail(`${path}.modelOptions`, "must be empty; mask output size is derived from the source image at runtime");
+  }
 }
 
 function validateData(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
@@ -243,6 +410,9 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
   switch (kind) {
     case "image-input":
       oneOf(raw.imageRole, IMAGE_ROLES, `${path}.imageRole`);
+      if (typeof raw.roleNeedsConfirmation !== "boolean") {
+        fail(`${path}.roleNeedsConfirmation`, "must be a boolean");
+      }
       optionalImageReference(raw.imageUrl, `${path}.imageUrl`);
       break;
     case "sketch-to-render":
@@ -314,7 +484,58 @@ function validateNode(value: unknown, index: number, migrateLegacy: boolean): Pe
   return { ...raw, id, type, position: { ...position, x: position.x as number, y: position.y as number }, data } as PersistedWorkflowNode;
 }
 
-function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
+function validateReferenceEdgeData(
+  value: unknown,
+  edgeIndex: number,
+  sourceNodeId: string,
+  targetNodeId: string,
+): ReferenceEdgeData {
+  const path = `flow.edges[${edgeIndex}].data`;
+  const failReferenceRole = (
+    field: WorkflowReferenceRoleValidationField,
+    issueKind: "missing" | "invalid",
+    fieldPath: string,
+    message: string,
+  ): never => {
+    throw new WorkflowReferenceRoleValidationError(`${fieldPath}: ${message}`, {
+      edgeIndex,
+      sourceNodeId,
+      targetNodeId,
+      field,
+      issueKind,
+    });
+  };
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    failReferenceRole("data", value === undefined ? "missing" : "invalid", path, "must be an object");
+  }
+  const raw = value as Record<string, unknown>;
+  if (!REFERENCE_ROLE_VALUES.includes(raw.role as ReferenceEdgeData["role"])) {
+    failReferenceRole(
+      "role",
+      raw.role === undefined ? "missing" : "invalid",
+      `${path}.role`,
+      `must be one of: ${REFERENCE_ROLE_VALUES.join(", ")}`,
+    );
+  }
+  const role = raw.role as ReferenceEdgeData["role"];
+  if (typeof raw.roleNeedsConfirmation !== "boolean") {
+    failReferenceRole(
+      "roleNeedsConfirmation",
+      raw.roleNeedsConfirmation === undefined ? "missing" : "invalid",
+      `${path}.roleNeedsConfirmation`,
+      "must be a boolean",
+    );
+  }
+  return { role, roleNeedsConfirmation: raw.roleNeedsConfirmation as boolean };
+}
+
+function validateEdge(
+  value: unknown,
+  index: number,
+  migrateLegacy: boolean,
+  sourceDataByNodeId: ReadonlyMap<string, WorkflowNodeData>,
+  targetDataByNodeId: ReadonlyMap<string, WorkflowNodeData>,
+): PersistedWorkflowEdge {
   const path = `flow.edges[${index}]`;
   const raw = record(value, path);
   const id = stringValue(raw.id, `${path}.id`, { nonEmpty: true });
@@ -325,14 +546,28 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   if (!SAFE_ID.test(target)) fail(`${path}.target`, "must be a valid node id");
   if (raw.sourceHandle !== undefined && raw.sourceHandle !== null) stringValue(raw.sourceHandle, `${path}.sourceHandle`);
   if (raw.targetHandle !== undefined && raw.targetHandle !== null) stringValue(raw.targetHandle, `${path}.targetHandle`);
-  return { ...raw, id, source, target } as PersistedWorkflowEdge;
+  const data = migrateLegacy
+    ? resolveReferenceEdgeData(
+      raw.data,
+      sourceDataByNodeId.get(source),
+      targetDataByNodeId.get(target)?.kind,
+      typeof raw.targetHandle === "string" ? raw.targetHandle : null,
+    )
+    : validateReferenceEdgeData(raw.data, index, source, target);
+  return { ...raw, id, source, target, data } as PersistedWorkflowEdge;
 }
 
-/** Validate untrusted JSON and migrate legacy unversioned/v0/v1/v2 formats to v3. */
+/** Validate untrusted JSON and migrate legacy unversioned/v0-v5 formats to v6. */
 export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   const raw = record(value, "flow");
   const version = raw.schemaVersion;
-  const migrateLegacy = version === undefined || version === 0 || version === 1 || version === 2;
+  const migrateLegacy = version === undefined
+    || version === 0
+    || version === 1
+    || version === 2
+    || version === 3
+    || version === 4
+    || version === 5;
   if (!migrateLegacy && version !== WORKFLOW_SCHEMA_VERSION) {
     fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
   }
@@ -344,7 +579,15 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
 
   const nodes = raw.nodes.map((node, index) => validateNode(node, index, migrateLegacy));
-  const edges = raw.edges.map(validateEdge);
+  const sourceDataByNodeId = new Map(nodes.map((node) => [node.id, node.data]));
+  const targetDataByNodeId = sourceDataByNodeId;
+  const edges = raw.edges.map((edge, index) => validateEdge(
+    edge,
+    index,
+    migrateLegacy,
+    sourceDataByNodeId,
+    targetDataByNodeId,
+  ));
   const nodeIds = new Set<string>();
   for (const node of nodes) {
     if (nodeIds.has(node.id)) fail("flow.nodes", `duplicate node id: ${node.id}`);

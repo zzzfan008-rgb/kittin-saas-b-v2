@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "apiyi-model-catalog-20260903T031129Z",
+  "kind": "gateway-model-catalog",
+  "capturedAt": "2026-09-03T03:11:29Z",
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "baseHost": "api.apiyi.com",
+    "authentication": "configured-project-token",
+    "requestCount": 1,
+    "retryCount": 0,
+    "paidProviderCalls": 0
+  },
+  "response": {
+    "httpStatus": 200,
+    "modelCount": 269,
+    "countScope": "canonical-unique-model-ids",
+    "hashScope": "sha256-canonical-model-id-set-v1",
+    "canonicalModelIdSetSha256": "bc6fffe606c2419d00bccec2f27c70835def3f77f5f0608276d94959f459879f",
+    "rawExportRetainedInRepository": false,
+    "rawExportPolicy": "The account-scoped full model list remains outside the repository; this record retains only its canonical hash, the six product-ID checks, and non-substitutable name matches relevant to the missing ID."
+  },
+  "expectedGatewayModelIds": [
+    {
+      "id": "gpt-image-2",
+      "present": true
+    },
+    {
+      "id": "gpt-image-2-vip",
+      "present": true
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "present": true
+    },
+    {
+      "id": "flux-2-pro",
+      "present": true
+    },
+    {
+      "id": "seedream-5-0-260128",
+      "present": true
+    },
+    {
+      "id": "grok-imagine-image",
+      "present": false
+    }
+  ],
+  "missingExpectedIds": [
+    "grok-imagine-image"
+  ],
+  "imageModelAliasCandidatesForMissingIds": [],
+  "nonImageNameMatches": [
+    "grok-4.20-0309-non-reasoning",
+    "grok-4.20-0309-reasoning",
+    "grok-4.20-beta",
+    "grok-4.20-multi-agent-0309",
+    "grok-4.20-multi-agent-beta-0309",
+    "grok-4.3",
+    "grok-4.5",
+    "grok-4.6",
+    "grok-build-0.1",
+    "grok-code-fast",
+    "grok-code-fast-1"
+  ],
+  "comparisonToPrevious": {
+    "previousEvidenceId": "apiyi-model-catalog-20260902T150417Z",
+    "previousModelCount": 272,
+    "modelCountDelta": -3,
+    "modelCountDeltaPercent": -1.1,
+    "canonicalModelIdSetSha256Changed": true,
+    "sixModelPresenceChanged": false,
+    "missingExpectedIdsChanged": false
+  },
+  "qualityAssessment": {
+    "intendedUse": "Configured-token release admission and model-catalog drift evidence only.",
+    "observationGrain": "One authenticated, account-scoped APIYI model-catalog response.",
+    "requiredModelCoverage": {
+      "present": 5,
+      "required": 6,
+      "ratio": 0.8333333333
+    },
+    "validity": "HTTP 200 returned a model data collection from which a canonical unique ID set and SHA-256 were computed.",
+    "consistency": "The exact grok-imagine-image ID remains absent while the current local APIYI Grok documentation advertises it.",
+    "temporalDrift": "The canonical catalog changed from 272 to 269 IDs and its hash changed, while exact six-model coverage remained 5 of 6.",
+    "severity": "critical-release-blocker",
+    "confidence": "High for this configured token's observed catalog view; insufficient for APIYI-wide availability or endpoint success."
+  },
+  "interpretation": {
+    "scope": "configured-token-observed-view",
+    "catalogPresenceDoesNotProveEndpointSuccess": true,
+    "catalogAbsenceDoesNotProveGlobalGatewayRemoval": true,
+    "tokenWhitelistOrAccountGroupMayAffectResults": true,
+    "documentConflict": "The current local APIYI Grok documentation advertises grok-imagine-image, but this authenticated catalog view does not list that ID.",
+    "automaticAliasSubstitutionAllowed": false,
+    "automaticContractUpdateAllowed": false
+  },
+  "limitations": [
+    "The raw account-scoped export is not retained in the repository, so this record cannot identify which three catalog IDs disappeared between snapshots.",
+    "The catalog response does not prove image generation, editing, billing, or output semantics for any listed model.",
+    "The non-image Grok name matches are not compatible image-model aliases and must not be substituted."
+  ],
+  "releaseDecision": "blocked",
+  "requiredNextStep": "Confirm the configured token whitelist/account group and APIYI availability of the exact grok-imagine-image gateway ID, then obtain a fresh reviewed catalog export. Do not probe the paid generation endpoint until separately authorized."
+}

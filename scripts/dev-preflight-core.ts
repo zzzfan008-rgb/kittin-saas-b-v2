@@ -1,6 +1,6 @@
 import { resolveApiProxyTarget } from "../vite.config";
 
-export const MINIMUM_NODE_VERSION = [22, 20, 0] as const;
+export const MINIMUM_NODE_VERSION = [24, 20, 0] as const;
 export const DEFAULT_WEB_PORT = 5173;
 
 export interface PreflightConfig {
@@ -108,7 +108,7 @@ export function assessPreflight(
   const notes: string[] = [];
 
   if (!nodeVersionAtLeast(config.nodeVersion)) {
-    blockers.push(`Node.js ${config.nodeVersion} 低于项目要求的 22.20.0`);
+    blockers.push(`Node.js ${config.nodeVersion} 低于项目要求的 24.20.0`);
   }
   if (observations.webPortOpen) {
     blockers.push(`前端端口 ${config.webPort} 已被占用；请停止旧 Vite 进程后重试`);

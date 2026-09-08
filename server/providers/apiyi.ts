@@ -3,32 +3,41 @@ import {
   type AIProvider,
   type ImageGenRequest,
   type ImageGenResult,
+  type ImageOperationMode,
 } from "../../src/types/workflow";
 import {
   defaultImageModelOptions,
   getImageModelContract,
-  imageModelOptionsError,
-  modelMaximumImagesPerRequest,
+  imageModelOptionsErrorForOperation,
   modelMaxReferenceImages,
   type ImageModelId,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { config } from "../config";
 import { validateMaskForSource } from "../lib/maskProcessing";
-import { detectImageMime, validateImageDataUrl } from "../lib/imageValidation";
+import { detectImageMime, MAX_IMAGE_BYTES, validateImageDataUrl } from "../lib/imageValidation";
 import { withImageProcessingSlot } from "../lib/imageProcessingLimit";
 import {
+  referenceDataUrls,
+  referenceInputIssues,
+  referenceInputsError,
+} from "../../src/lib/referenceInputs";
+import {
   fetchWithRetry,
+  inspectProviderTransportFailure,
   parseDataUrl,
   ProviderError,
   providerErrorFromMessage,
+  providerRequestIdFromResponse,
   toDataUrl,
 } from "./base";
+import { getApiyiDispatcher, readApiyiJsonResponse } from "./apiyiTransport";
 
 const PROVIDER_RESPONSE_PIXEL_LIMIT = 40_000_000;
 const REFERENCE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const FLUX_MAX_INPUT_PIXELS = 20_000_000;
 const FLUX_MAX_INPUT_BYTES = 20 * 1024 * 1024;
+const PROVIDER_JSON_OVERHEAD_BYTES = 1024 * 1024;
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -38,13 +47,27 @@ function record(value: unknown): Record<string, unknown> | undefined {
 
 function requestOptions(modelId: ImageModelId, req: ImageGenRequest): ImageModelOptions {
   const options = req.modelOptions ?? defaultImageModelOptions(modelId, req.aspectRatio);
-  const error = imageModelOptionsError(modelId, options);
+  const error = imageModelOptionsErrorForOperation(modelId, options, req.operationMode);
   if (error) throw new ProviderError(`模型参数无效：${error}`, 400, modelId, "invalid_request");
   return options;
 }
 
 function referenceData(req: ImageGenRequest, modelId: ImageModelId): string[] {
-  const refs = req.referenceImages ?? [];
+  const structuredError = referenceInputsError(req);
+  if (structuredError) {
+    throw new ProviderError(`参考图契约无效：${structuredError}`, 400, modelId, "invalid_request");
+  }
+  const unresolvedRoleIssue = referenceInputIssues(req.references)
+    .find((issue) => issue.code === "reference-role-unconfirmed");
+  if (unresolvedRoleIssue) {
+    throw new ProviderError(
+      `参考图角色未确认：${unresolvedRoleIssue.reason}`,
+      400,
+      modelId,
+      "invalid_request",
+    );
+  }
+  const refs = referenceDataUrls(req);
   const max = modelMaxReferenceImages(modelId);
   if (refs.length > max) {
     throw new ProviderError(`${modelId} 最多支持 ${max} 张参考图`, 400, modelId, "invalid_request");
@@ -173,17 +196,58 @@ async function fetchApiyi(
     providerId: modelId,
     timeoutMs: config.aiTimeoutMs(timeout),
     maxRetries: 0,
+    dispatcherFactory: getApiyiDispatcher,
   });
 }
 
-async function readJson(response: Response, modelId: ImageModelId): Promise<unknown> {
+function providerJsonLimit(expectedImages: number): number {
+  const base64BytesPerImage = 4 * Math.ceil(MAX_IMAGE_BYTES / 3);
+  return PROVIDER_JSON_OVERHEAD_BYTES + Math.max(1, expectedImages) * base64BytesPerImage;
+}
+
+async function readJson(
+  response: Response,
+  modelId: ImageModelId,
+  expectedImages = 1,
+): Promise<unknown> {
   try {
-    return await response.json();
+    return await readApiyiJsonResponse(response, modelId, {
+      maxBytes: providerJsonLimit(expectedImages),
+    });
   } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    const failure = inspectProviderTransportFailure(error);
     throw new ProviderError(
-      "AI 响应中断或不完整，结果可能已经生成；系统不会自动重试",
-      502, modelId, "outcome_unknown",
-      error instanceof Error ? error.message : String(error),
+      failure.timedOut
+        ? "AI 响应体读取超时，结果可能已经生成；系统不会自动重试"
+        : "AI 响应中断或不完整，结果可能已经生成；系统不会自动重试",
+      failure.timedOut ? 504 : 502,
+      modelId,
+      "outcome_unknown",
+      failure.diagnostic,
+    );
+  }
+}
+
+async function parseApiyiImageResult(
+  response: Response,
+  parse: () => Promise<ImageGenResult>,
+): Promise<ImageGenResult> {
+  const requestId = providerRequestIdFromResponse(response);
+  try {
+    const result = await parse();
+    return requestId ? { ...result, providerRequestId: requestId } : result;
+  } catch (error) {
+    if (!(error instanceof ProviderError)) throw error;
+    const resolvedRequestId = requestId ?? error.requestId;
+    if (resolvedRequestId === error.requestId) throw error;
+    throw new ProviderError(
+      error.message,
+      error.status,
+      error.providerId,
+      error.category,
+      error.diagnostic,
+      resolvedRequestId,
     );
   }
 }
@@ -220,6 +284,9 @@ async function base64Image(
       buffer = Buffer.from(value, "base64");
       if (!buffer.length || buffer.toString("base64") !== value) {
         throw new ProviderError("AI 服务返回了损坏的图片数据", 502, modelId, "invalid_response");
+      }
+      if (buffer.byteLength > MAX_IMAGE_BYTES) {
+        throw new ProviderError("AI 服务返回图片超过 20MB 上限", 502, modelId, "invalid_response");
       }
       const detected = detectImageMime(buffer);
       if (!detected) {
@@ -354,12 +421,21 @@ async function geminiInlineData(dataUrl: string, modelId: ImageModelId): Promise
 export async function validateApiyiRequest(
   modelId: ImageModelId,
   req: ImageGenRequest,
-  mode: "generate" | "edit",
+  mode: ImageOperationMode,
 ): Promise<void> {
   if (!req.prompt.trim()) throw new ProviderError("提示词不能为空", 400, modelId, "invalid_request");
+  if (mode !== req.operationMode) {
+    throw new ProviderError("显式 operationMode 与 Provider 调用方法不一致", 400, modelId, "invalid_request");
+  }
+  if (req.operationMode === "mask-edit" && modelId !== "gpt-image-2") {
+    throw new ProviderError(`${modelId} 不支持 mask-edit 模式`, 400, modelId, "invalid_request");
+  }
+  if (modelId === "gpt-image-2" && req.operationMode !== "mask-edit") {
+    throw new ProviderError("gpt-image-2 首版仅支持 mask-edit 模式", 400, modelId, "invalid_request");
+  }
   requestOptions(modelId, req);
   const refs = referenceData(req, modelId);
-  if (mode === "edit" && refs.length === 0) {
+  if (mode !== "generate" && refs.length === 0) {
     throw new ProviderError("编辑模式至少需要一张参考图", 400, modelId, "invalid_request");
   }
   if (mode === "generate" && refs.length > 0) {
@@ -367,7 +443,7 @@ export async function validateApiyiRequest(
   }
   refs.forEach((ref) => parsedReference(ref, modelId));
   if (modelId === "gpt-image-2") {
-    if (mode !== "edit" || !req.mask) {
+    if (mode !== "mask-edit" || !req.mask) {
       throw new ProviderError("gpt-image-2 仅用于带 PNG 蒙版的局部修改", 400, modelId, "invalid_request");
     }
     await validateMaskForSource(refs[0], req.mask, modelId);
@@ -377,7 +453,10 @@ export async function validateApiyiRequest(
 }
 
 async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageGenResult> {
-  await validateApiyiRequest(modelId, req, "generate");
+  if (req.operationMode !== "generate") {
+    throw new ProviderError("Provider generate 只接受 generate 模式", 400, modelId, "invalid_request");
+  }
+  await validateApiyiRequest(modelId, req, req.operationMode);
   const contract = getImageModelContract(modelId);
   if (!contract.generation) throw new ProviderError(`${modelId} 不支持文生图`, 400, modelId, "invalid_request");
   const options = requestOptions(modelId, req);
@@ -391,7 +470,10 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
         body: JSON.stringify({ model: upstreamModelId(modelId), prompt: req.prompt, size: options.size }),
       }));
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
+        model: modelId,
+      }));
     case "gemini-3.1-flash-image":
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
@@ -403,7 +485,10 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
           } },
         }),
       }));
-      return { images: await parseGeminiImages(await readJson(response, modelId), modelId), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseGeminiImages(await readJson(response, modelId), modelId),
+        model: modelId,
+      }));
     case "flux-2-pro":
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
@@ -413,7 +498,10 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
           output_format: options.outputFormat,
         }),
       }));
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { urlOnly: true, maxImages: 1 }), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { urlOnly: true, maxImages: 1 }),
+        model: modelId,
+      }));
     case "seedream-5-0-260128": {
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
@@ -423,28 +511,26 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
           watermark: false, sequential_image_generation: "disabled",
         }),
       }));
-      const parsed = await parseOpenAiImageResponse(await readJson(response, modelId), modelId, { requireOutputSize: true });
-      return { ...parsed, model: modelId };
+      return parseApiyiImageResult(response, async () => {
+        const parsed = await parseOpenAiImageResponse(
+          await readJson(response, modelId),
+          modelId,
+          { requireOutputSize: true },
+        );
+        return { ...parsed, model: modelId };
+      });
     }
-    case "grok-imagine-image":
-      response = await fetchApiyi(modelId, contract.generation.path, () => ({
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
-        body: JSON.stringify({
-          model: upstreamModelId(modelId), prompt: req.prompt, aspect_ratio: options.aspectRatio, resolution: options.resolution,
-          n: Math.max(1, Math.min(req.batchSize ?? 1, modelMaximumImagesPerRequest(modelId))),
-          response_format: "b64_json",
-        }),
-      }));
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 10 }), model: modelId };
   }
 }
 
 async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageGenResult> {
-  await validateApiyiRequest(modelId, req, "edit");
+  if (req.operationMode === "generate") {
+    throw new ProviderError("Provider edit 只接受 edit 或 mask-edit 模式", 400, modelId, "invalid_request");
+  }
+  await validateApiyiRequest(modelId, req, req.operationMode);
   const contract = getImageModelContract(modelId);
   const options = requestOptions(modelId, req);
-  const refs = req.referenceImages!;
+  const refs = referenceData(req, modelId);
   let response: Response;
   switch (modelId) {
     case "gpt-image-2": {
@@ -460,7 +546,10 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         form.append("output_format", "png");
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
       });
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
+        model: modelId,
+      }));
     }
     case "gpt-image-2-vip": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
@@ -471,7 +560,10 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         appendImages(form, refs, modelId);
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
       });
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
+        model: modelId,
+      }));
     }
     case "gemini-3.1-flash-image": {
       const parts = [{ text: req.prompt }, ...await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)))];
@@ -485,7 +577,10 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
           } },
         }),
       }));
-      return { images: await parseGeminiImages(await readJson(response, modelId), modelId), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseGeminiImages(await readJson(response, modelId), modelId),
+        model: modelId,
+      }));
     }
     case "flux-2-pro": {
       const adaptedRefs = await Promise.all(refs.map(adaptFluxReference));
@@ -500,7 +595,10 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
           output_format: options.outputFormat, ...inputImages,
         }),
       }));
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { urlOnly: true, maxImages: 1 }), model: modelId };
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { urlOnly: true, maxImages: 1 }),
+        model: modelId,
+      }));
     }
     case "seedream-5-0-260128": {
       response = await fetchApiyi(modelId, contract.edit.path, () => ({
@@ -511,19 +609,14 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
           watermark: false, sequential_image_generation: "disabled",
         }),
       }));
-      const parsed = await parseOpenAiImageResponse(await readJson(response, modelId), modelId, { requireOutputSize: true });
-      return { ...parsed, model: modelId };
-    }
-    case "grok-imagine-image": {
-      response = await fetchApiyi(modelId, contract.edit.path, () => {
-        const form = new FormData();
-        form.append("model", upstreamModelId(modelId));
-        form.append("prompt", req.prompt);
-        form.append("response_format", "b64_json");
-        appendImages(form, refs, modelId);
-        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
+      return parseApiyiImageResult(response, async () => {
+        const parsed = await parseOpenAiImageResponse(
+          await readJson(response, modelId),
+          modelId,
+          { requireOutputSize: true },
+        );
+        return { ...parsed, model: modelId };
       });
-      return { images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 10 }), model: modelId };
     }
   }
 }
@@ -540,6 +633,6 @@ export function createApiyiProvider(modelId: ImageModelId): AIProvider {
 export const apiyiProviders = Object.fromEntries(
   ([
     "gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image",
-    "flux-2-pro", "seedream-5-0-260128", "grok-imagine-image",
+    "flux-2-pro", "seedream-5-0-260128",
   ] as const).map((modelId) => [modelId, createApiyiProvider(modelId)]),
 ) as Record<ImageModelId, AIProvider>;

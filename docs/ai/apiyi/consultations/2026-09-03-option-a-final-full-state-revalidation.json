@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T11:13:35.182Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "c797b4d93728983683b8f2d84d13802e780583f4219b291140330534c4aaed99",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "图片模型本地知识库 五模型独立契约 参考图角色 参数 评估证据 同步调用 超时 重试 计费 安全",
+  "affectedPaths": [
+    ".dockerignore",
+    ".env.example",
+    "AGENTS.md",
+    "Dockerfile",
+    "compose.evaluation-release.yaml",
+    "compose.yaml",
+    "docs/DEPLOYMENT_AND_OPERATIONS.md",
+    "docs/ai/apiyi/README.md",
+    "docs/ai/apiyi/async-runtime.md",
+    "docs/ai/apiyi/evidence/2026-09-02-model-catalog-probe.json",
+    "docs/ai/apiyi/evidence/2026-09-03-five-model-catalog-review.json",
+    "docs/ai/apiyi/evidence/2026-09-03-model-catalog-probe.json",
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/model-knowledge.json",
+    "docs/ai/apiyi/models/flux-2-pro.md",
+    "docs/ai/apiyi/models/gemini-3.1-flash-image.md",
+    "docs/ai/apiyi/models/gpt-image-2-vip.md",
+    "docs/ai/apiyi/models/gpt-image-2.md",
+    "docs/ai/apiyi/models/grok-imagine-image.md",
+    "docs/ai/apiyi/models/seedream-5-0-260128.md",
+    "docs/ai/apiyi/project-guidance.json",
+    "docs/ai/apiyi/reviews/2026-09-02-contract-rebuild.md",
+    "docs/ai/apiyi/reviews/2026-09-03-five-model-catalog-review.md",
+    "docs/ai/apiyi/reviews/2026-09-03-five-model-scope.md",
+    "docs/ai/apiyi/reviews/2026-09-03-model-catalog-drift.md",
+    "docs/ai/apiyi/site/README.md",
+    "docs/ai/apiyi/site/current.json",
+    "docs/ai/apiyi/sources.json",
+    "docs/ai/evaluation/evaluation-plan-v1.json",
+    "docs/ai/evaluation/evaluation-plan-v2.json",
+    "docs/ai/evaluation/golden-set-v1.json",
+    "docs/ai/evaluation/prompt-release-registry.json",
+    "e2e/golden-path.spec.ts",
+    "e2e/workbench.spec.ts",
+    "package-lock.json",
+    "scripts/apiyi-docs.mjs",
+    "scripts/apiyi-kb.mjs",
+    "scripts/build-server.ts",
+    "scripts/codex-gate.mjs",
+    "scripts/evaluation-authorize.ts",
+    "scripts/evaluation-release-preflight.ts",
+    "scripts/evaluation-review.ts",
+    "scripts/lib/apiyi-knowledge-base.mjs",
+    "scripts/write-build-identity.mjs",
+    "server/config.ts",
+    "server/engine/dag.ts",
+    "server/engine/runQueue.ts",
+    "server/engine/runner.ts",
+    "server/index.ts",
+    "server/lib/database.ts",
+    "server/lib/evaluationAuthorizationLedger.ts",
+    "server/lib/evaluationCodeIdentity.ts",
+    "server/lib/evaluationEvidence.ts",
+    "server/lib/evaluationEvidenceStore.ts",
+    "server/lib/evaluationReleaseBuild.ts",
+    "server/lib/evaluationReleaseBundle.ts",
+    "server/lib/evaluationReleaseRuntime.ts",
+    "server/lib/evaluationReviewLedger.ts",
+    "server/lib/evaluationRunPolicy.ts",
+    "server/lib/fileStore.ts",
+    "server/lib/generationRecords.ts",
+    "server/lib/imageReferenceAccess.ts",
+    "server/lib/imageValidation.ts",
+    "server/lib/referenceRolePrompt.ts",
+    "server/lib/workflowSchema.ts",
+    "server/providers/apiyi.ts",
+    "server/providers/apiyiTransport.ts",
+    "server/providers/base.ts",
+    "server/providers/exact.ts",
+    "server/routes/aiDiagnostics.ts",
+    "server/routes/generate.ts",
+    "server/routes/history.ts",
+    "server/routes/runPlan.ts",
+    "server/routes/templates.ts",
+    "src/components/ImageViewer.tsx",
+    "src/components/TaskLauncher.tsx",
+    "src/components/nodes/AiModifyNode.tsx",
+    "src/components/nodes/FabricRecolorNode.tsx",
+    "src/components/nodes/ImageInputNode.tsx",
+    "src/components/nodes/MaskRedrawNode.tsx",
+    "src/components/nodes/ModelControls.tsx",
+    "src/components/nodes/NodeFrame.tsx",
+    "src/components/nodes/PrintExtractNode.tsx",
+    "src/components/nodes/PrintMutateNode.tsx",
+    "src/components/nodes/SketchToRenderNode.tsx",
+    "src/components/nodes/UpscaleNode.tsx",
+    "src/components/panels/InspectorPanel.tsx",
+    "src/components/panels/NodeLibraryPanel.tsx",
+    "src/components/panels/ProjectCenter.tsx",
+    "src/components/panels/ResultsPanel.tsx",
+    "src/components/panels/TemplatesDock.tsx",
+    "src/hooks/usePromptRunAdmission.ts",
+    "src/lib/documentSnapshot.ts",
+    "src/lib/garmentPromptPresets.ts",
+    "src/lib/nodeProductPolicy.ts",
+    "src/lib/promptEvaluation.ts",
+    "src/lib/promptEvaluationRelease.ts",
+    "src/lib/promptEvaluationReleaseRegistry.ts",
+    "src/lib/promptRunAdmission.ts",
+    "src/lib/promptRuntimeShutdown.ts",
+    "src/lib/providerPromptRenderer.ts",
+    "src/lib/referenceInputs.ts",
+    "src/lib/referenceRoles.ts",
+    "src/store/flowStore.ts",
+    "src/types/imageModels.ts",
+    "src/types/modelParameterProfiles.ts",
+    "src/types/promptEvaluation.ts",
+    "src/types/retiredImageModels.ts",
+    "src/types/workflow.ts",
+    "tests/apiyi-docs.test.ts",
+    "tests/apiyi-knowledge-base.test.mjs",
+    "tests/apiyi-transport.test.ts",
+    "tests/auth-storage.test.ts",
+    "tests/authorization.test.ts",
+    "tests/dag.test.ts",
+    "tests/document-snapshot.test.ts",
+    "tests/evaluation-authorization-ledger.test.ts",
+    "tests/evaluation-authorize-cli.test.ts",
+    "tests/evaluation-budget.test.ts",
+    "tests/evaluation-code-identity.test.ts",
+    "tests/evaluation-evidence.test.ts",
+    "tests/evaluation-plan.test.ts",
+    "tests/evaluation-promotion.test.ts",
+    "tests/evaluation-release-build.test.ts",
+    "tests/evaluation-release-preflight.test.ts",
+    "tests/evaluation-release-runtime.test.ts",
+    "tests/evaluation-review-cli.test.ts",
+    "tests/evaluation-review-ledger.test.ts",
+    "tests/evaluation-run-policy.test.ts",
+    "tests/exact-generation.test.ts",
+    "tests/flow-history.test.ts",
+    "tests/model-parameter-profiles.test.ts",
+    "tests/node-product-policy.test.ts",
+    "tests/node-version-contract.test.ts",
+    "tests/project-tabs-session.test.ts",
+    "tests/project-tabs.test.ts",
+    "tests/prompt-evaluation-release.test.ts",
+    "tests/prompt-evaluation.test.ts",
+    "tests/prompt-presets.test.ts",
+    "tests/prompt-run-admission.test.ts",
+    "tests/promptReleaseTestSupport.ts",
+    "tests/provider-contract.test.ts",
+    "tests/provider-retry.test.ts",
+    "tests/reference-inputs.test.ts",
+    "tests/run-queue.test.ts",
+    "tests/schema-migrations.test.ts",
+    "tests/sqlite-postgres-migration.test.ts",
+    "tests/upload-image-normalization.test.ts",
+    "tests/workflow-schema.test.ts",
+    "vite.config.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-08/gpt-image-2-vip-429-retry",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-08/gpt-image-2-vip-429-retry.md",
+      "pageLocalPath": "pages/live/2026-08/gpt-image-2-vip-429-retry.md",
+      "title": "gpt-image-2-vip 存在饱和，429 可重试、内容安全无需重试",
+      "sha256": "ab04bf2e4c67dcb3e06670a86908c5a0f0cf7e236b5372ab7eb04f9dbe70f188"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/archive",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/archive.md",
+      "pageLocalPath": "pages/live/archive.md",
+      "title": "实时动态归档",
+      "sha256": "0a6eb4e1ff7ac9951bf673e9da1471a6a93eeea70b4f6720081e074334a23805"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/timeout-configuration",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/timeout-configuration.md",
+      "pageLocalPath": "pages/faq/timeout-configuration.md",
+      "title": "如何避免接口超时？",
+      "sha256": "5ee8da9b63525c41cc2ca372ef6e02888866725ba4e2de9116d66782ecb1cd89"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/veo-3-1-official/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/veo-3-1-official/overview.md",
+      "pageLocalPath": "pages/api-capabilities/veo-3-1-official/overview.md",
+      "title": "VEO 3.1 Official 视频生成",
+      "sha256": "402b2714f1a4c4807f826dc210b1fefcad786a2bc4c9fdfd59d2d172d832175e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/grok-imagine-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/grok-imagine-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/grok-imagine-image/overview.md",
+      "title": "Grok Imagine 2 生图/编辑",
+      "sha256": "0e6d8fdd1ea3eca0225eea43182d655ba6d68d8c7bc644492c8a54ae8727b74a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/ecosystem/coze-gptimage2-plugin",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "pageLocalPath": "pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "title": "GPT Image 2 Coze 插件",
+      "sha256": "9cac91b7f7f7ec35eafe8c2686332f334a0391597f22bf66ba3fc5a565b5d462"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-connection-drops",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-connection-drops.md",
+      "pageLocalPath": "pages/api-capabilities/image-connection-drops.md",
+      "title": "图片 API 连接中断排查",
+      "sha256": "eec5fdb92e50314d5aaa67edcf98d2eb3f7faaa50e7b57d12185294bbe745e76"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2 生图/编辑",
+      "sha256": "ed653fdc134c607049eda8ec5aae83f605e66b176609a3ca1994278d59ee9988"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gpt-image-2-500-disclosure",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gpt-image-2-500-disclosure.md",
+      "pageLocalPath": "pages/live/2026-05/gpt-image-2-500-disclosure.md",
+      "title": "gpt-image-2-all / vip 安全 500 错误直接披露 · 去掉内部重试",
+      "sha256": "6e263f51cbc4c6893ac48763f941b62ac998b965fb9253acb5035df5eafa89ed"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All 生图/编辑",
+      "sha256": "e52de5e1c5676a35eda112fa4be9e4fdb015e3f829ecb46f8603f420c0336d63"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedream-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedream-image/overview.md",
+      "title": "Seedream 生图/编辑",
+      "sha256": "a0c84cf7d8cf2b4e736fd03392eb36a6db2604eeb2207fc9578f7f0922a476da"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 生图/编辑",
+      "sha256": "2ed97c1500398dc939bd6b77e8e121227ef3906b1ae6a794658f1e75f967fdd0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 视频生成",
+      "sha256": "6cfb74f5750a6aa90881bd2963c7cf823a9b7f5c95db29979394d465cb1da49f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-async-queue",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-async-queue.md",
+      "pageLocalPath": "pages/api-capabilities/image-async-queue.md",
+      "title": "图片 API 接入实践：自实现异步队列",
+      "sha256": "d17d4154af3f4cfb5df4e0972a4b26f69be47ca0643773dcdb76d14b423e42d5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/log-billing-explained",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/log-billing-explained.md",
+      "pageLocalPath": "pages/faq/log-billing-explained.md",
+      "title": "怎么看懂日志里的计费金额？",
+      "sha256": "521c019879926f9a34b6dc65d2d6f504e6bec15d2667ee960646b0543568260d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/data-security",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/data-security.md",
+      "pageLocalPath": "pages/faq/data-security.md",
+      "title": "API易如何保障数据安全？",
+      "sha256": "b0e9530c90fb67664598079799bbe9a452ccf5e7739cd3ac0d1db9e2eaeb4c43"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/cache-billing",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/cache-billing.md",
+      "pageLocalPath": "pages/faq/cache-billing.md",
+      "title": "API易支持缓存计费吗？",
+      "sha256": "cf5b6af58cc6970ce4e409523a29e481b93e7ba12ee92f23f3fcfcdce5435c78"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-api-best-practices.md",
+      "pageLocalPath": "pages/api-capabilities/image-api-best-practices.md",
+      "title": "图片 API 调用须知与最佳实践",
+      "sha256": "e3c70183eb5bf2dc23e23363ad52a1da218a3f15d1214711b0cebde50f856c1a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/token-billing-modes",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/token-billing-modes.md",
+      "pageLocalPath": "pages/faq/token-billing-modes.md",
+      "title": "令牌的按量优先/按次计费有什么区别？",
+      "sha256": "5b8ee84c7926e6e55762c801cd6d49e338b163a44046e9e7ba94261ae228ae69"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/data-security",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/data-security.md",
+      "pageLocalPath": "pages/zh-Hant/faq/data-security.md",
+      "title": "API易如何保障資料安全？",
+      "sha256": "37401fdae48578fde4736331929425d358a90c27c90201791b5855f7601c81e2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/grok/prompt-caching",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/grok/prompt-caching.md",
+      "pageLocalPath": "pages/api-capabilities/grok/prompt-caching.md",
+      "title": "Grok Prompt Caching 缓存计费指南",
+      "sha256": "4b8d70bbbbea1180c8a3b6dae7d500a248fea7866485396b89279193feb860fd"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-2-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-2-image/overview.md",
+      "title": "Nano Banana 2 生图/编辑",
+      "sha256": "d3469a7e4587c9b23582e3e461c30364bf1af0a58f8118171bc0e010dd2be844"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-manual/error-reporting",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-manual/error-reporting.md",
+      "pageLocalPath": "pages/api-manual/error-reporting.md",
+      "title": "接口错误信息留存指南",
+      "sha256": "1813be9c61f1c393f82165531a980cbb00e83d75afe18c53d7c8eff2f632e224"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/image-tail-stall",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/image-tail-stall.md",
+      "pageLocalPath": "pages/api-capabilities/image-tail-stall.md",
+      "title": "出图请求传完却不返回的兼容处理",
+      "sha256": "8f5f898c6d1700494d9e96006fb4f829d301656a482ff4fb635d62644436895f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/wan/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/wan/overview.md",
+      "pageLocalPath": "pages/api-capabilities/wan/overview.md",
+      "title": "Wan 视频生成（阿里云通义万相）",
+      "sha256": "2dfeb37d0e48c9d7c36733c4642774d51cfa62c78a8041073763d55543affe74"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/happyhorse/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/happyhorse/overview.md",
+      "pageLocalPath": "pages/api-capabilities/happyhorse/overview.md",
+      "title": "HappyHorse 视频生成（阿里云）",
+      "sha256": "17e40145c6d766e7646ef138f0c7f05eeb02394b83acb98f296867d98f55cb6c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-dev-guide",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-dev-guide.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-dev-guide.md",
+      "title": "Nano Banana 系列开发指南",
+      "sha256": "98f74b1b9c948fbc713f9aa4b30f8e1af3c2c084f1c1b78d0fbaef93b7230b1c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/log-query",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/log-query.md",
+      "pageLocalPath": "pages/api-capabilities/log-query.md",
+      "title": "日志查询 API",
+      "sha256": "9b3465210db98d5e6aa8ff4d3603878095cbe567edadf74a18da4ebaef8059c2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-lite-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-lite-image/overview.md",
+      "title": "Nano Banana Lite 生图/编辑",
+      "sha256": "64ddee2dd8a225e3ce40c852f778e928bea3bb808dcf47cdcef89ffed61aac27"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/gpt-image-2-all-timeout-300s",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-07/gpt-image-2-all-timeout-300s.md",
+      "pageLocalPath": "pages/live/2026-07/gpt-image-2-all-timeout-300s.md",
+      "title": "gpt-image-2-all 偶现 300s 超时说明",
+      "sha256": "5969018da093b0830359e855c20cf53f06e06b522d8e9857bf07da6b0f5f6bc5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/kimi-k3-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/kimi-k3-launch.md",
+      "pageLocalPath": "pages/news/kimi-k3-launch.md",
+      "title": "Kimi K3 上线：2.8 万亿参数开源之最",
+      "sha256": "80f5014a564fda0dcb95154a7a6c127eeb1e3cf5955c836fdd285a761882f3b0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/flux/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/flux/overview.md",
+      "pageLocalPath": "pages/api-capabilities/flux/overview.md",
+      "title": "FLUX 生图/编辑",
+      "sha256": "1fc1c26bcaebc3de7d81e0bba95f457537babf223bf99a3a7cc32a90745984e3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/content-safety",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/content-safety.md",
+      "pageLocalPath": "pages/faq/content-safety.md",
+      "title": "内容安全如何合规性？",
+      "sha256": "10ce487de4ad0937e33759c7fbadf7f38d27d97220c06168ffddd8d02208e82d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/content-safety",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/content-safety.md",
+      "pageLocalPath": "pages/zh-Hant/faq/content-safety.md",
+      "title": "內容安全如何合規性？",
+      "sha256": "ce91605b2893de861e26853090fe3dc66027873c77af30eb27bea2658f1b56a7"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/openai/prompt-caching",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/openai/prompt-caching.md",
+      "pageLocalPath": "pages/api-capabilities/openai/prompt-caching.md",
+      "title": "OpenAI Prompt Caching 缓存计费指南",
+      "sha256": "261814e7cfa1fc72cb6d39159137ae49afad6f3173f349e5790471db98b716e8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/website-502-error",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/website-502-error.md",
+      "pageLocalPath": "pages/faq/website-502-error.md",
+      "title": "网站或接口返回 502 怎么办？",
+      "sha256": "166a1f64564e0b8723cbe0a7c31263c20a670bc2a7b77f66d5bd4579b82224f2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/qwen-3-8-max-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/qwen-3-8-max-launch.md",
+      "pageLocalPath": "pages/news/qwen-3-8-max-launch.md",
+      "title": "Qwen3.8-Max 上线：2.4T 参数、1M 上下文，比官网便宜 17.5%",
+      "sha256": "4ba0684a4f60e44a3915ecb55b3f2edcf078659d581becf672fd3f490ffcb168"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gemini/prompt-caching",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gemini/prompt-caching.md",
+      "pageLocalPath": "pages/api-capabilities/gemini/prompt-caching.md",
+      "title": "Gemini 隐式缓存计费指南",
+      "sha256": "de7daf195b1b2219189e4f94ac0fd3b0a3a3cf6dbbbe9fd42124ffb22c2338f2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/faq/content-safety",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/faq/content-safety.md",
+      "pageLocalPath": "pages/ja/faq/content-safety.md",
+      "title": "コンテンツの安全性とコンプライアンスはどのように確保されますか?",
+      "sha256": "6146707fc2f00e2c994c2099c6ed454eb935f92617c533733a266af8f4a87edf"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/mimo-v2-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/mimo-v2-launch.md",
+      "pageLocalPath": "pages/news/mimo-v2-launch.md",
+      "title": "MiMo-V2 系列上线：小米万亿参数智能体模型，性能逼近 Opus 4.6",
+      "sha256": "b24a93fae77cac1d9b0a385c5f117f8c4ca3401d8770050eba42a7e1fecc1fb5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-image/overview.md",
+      "title": "Nano Banana Pro 图片生成",
+      "sha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/gpt-image-2-vip-4k-quality-restored",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-07/gpt-image-2-vip-4k-quality-restored.md",
+      "pageLocalPath": "pages/live/2026-07/gpt-image-2-vip-4k-quality-restored.md",
+      "title": "gpt-image-2-vip 恢复支持 4K 输出与 quality 参数",
+      "sha256": "d92e3500dfb15ce5d78dc70a9e0a1322ed63e5a31d18b5b6b97adebcbb0fce09"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/minimax-m2-7-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/minimax-m2-7-launch.md",
+      "pageLocalPath": "pages/news/minimax-m2-7-launch.md",
+      "title": "MiniMax-M2.7 上线：10B 参数的自进化智能体模型，性价比惊人",
+      "sha256": "25598a1fe38406636339129569cc67744c7a0dfc10a3c7f96110146a88a077ab"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/qwen-3-6/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/qwen-3-6/overview.md",
+      "pageLocalPath": "pages/api-capabilities/qwen-3-6/overview.md",
+      "title": "Qwen3.6 系列文本模型（历史版本）",
+      "sha256": "fd08e68ffc640af278d7f0a402f44a0bb6f75775b23962786e74b70ea3329bbc"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-03/model-status-0319-1600",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-03/model-status-0319-1600.md",
+      "pageLocalPath": "pages/live/2026-03/model-status-0319-1600.md",
+      "title": "技巧分享：受谷歌算力波动影响，建议将 Nano Banana Pro 和 2 的 API 超时时间 …",
+      "sha256": "c7cbf5b7c022c824ff0143f01e50c4333d64e3142909cfcd21d4611fdf7b2813"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-3-1-pro-preview-google-quota",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gemini-3-1-pro-preview-google-quota.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-3-1-pro-preview-google-quota.md",
+      "title": "gemini-3.1-pro-preview 偶发超时：谷歌原厂算力吃紧报 429",
+      "sha256": "08e247b54337d14e03e0471874124011273c558c39eb59def605b3be06a7c422"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/gpt-image-2-all-reissue-complete",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-07/gpt-image-2-all-reissue-complete.md",
+      "pageLocalPath": "pages/live/2026-07/gpt-image-2-all-reissue-complete.md",
+      "title": "gpt-image-2-all 超时补发完成：540 名用户合计加赠 $850 额度",
+      "sha256": "3d441ad61951b4831e2de890b428458d263003f345fcbae42dfaf458fb699169"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-08/gpt-image-2-transparent-background",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-08/gpt-image-2-transparent-background.md",
+      "pageLocalPath": "pages/live/2026-08/gpt-image-2-transparent-background.md",
+      "title": "gpt-image-2 支持透明背景，一个参数直接出带 alpha 通道的 PNG",
+      "sha256": "889337b39323cf3c3fd8c08860a9a27e53dd4d4e74f36d8b04294ef7ec2079d8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 官转 vs 官逆 对比",
+      "sha256": "88ac0e551b204efb2b506542aae02847e70ca8fce54b87c6cab5eabf83287c2e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-06/gpt-image-2-vip-error-disclose",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-06/gpt-image-2-vip-error-disclose.md",
+      "pageLocalPath": "pages/live/2026-06/gpt-image-2-vip-error-disclose.md",
+      "title": "gpt-image-2-vip 已恢复 · 调整报错机制：500 系统错误直接披露不再重试",
+      "sha256": "42ff6936f8290e77290f251f90f9a0c3a5f9a6cbd38195ce294db87f3e2525f6"
+    }
+  ],
+  "decisionSummary": "基于已人工确认的五模型目录基线、已选择的方案 A 与本地 API易全站快照，对当前全部受约束差异作最终整体验证：五模型保持独立契约和提示词；Grok 维持退役；参考图角色、Provider 原图、运行准入与发布证据继续失败关闭；方案 A 固定 25 个独立评估单元和仅属于自身的 9 个未来首批探针；自动重试、补样及当前付费授权均为 0；真实调用、发布、提交与推送均未授权。",
+  "unresolvedChoices": []
+}

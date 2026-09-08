@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from "react";
-import { isNodeRunActive, type NodeRunStatus } from "@/types/workflow";
+import { isNodeRunActive, type NodeKind, type NodeRunStatus } from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 
 const STATUS_STYLE: Record<NodeRunStatus, string> = {
   idle: "bg-neutral-500",
@@ -132,24 +133,60 @@ interface RunButtonProps {
   onClick: () => void;
   label?: string;
   disabled?: boolean;
+  disabledReason?: string;
+  disabledLabel?: string;
 }
 
-export function RunButton({ status, onClick, label = "运行", disabled }: RunButtonProps) {
+export function RunButton({
+  status,
+  onClick,
+  label = "运行",
+  disabled,
+  disabledReason,
+  disabledLabel = "未验证不可运行",
+}: RunButtonProps) {
   const active = isNodeRunActive(status);
   const safetyBlockReason = useGenerationSafetyBlockReason();
   const newGenerationBlocked = !active && Boolean(safetyBlockReason);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={active || disabled || newGenerationBlocked}
-      title={newGenerationBlocked ? safetyBlockReason ?? undefined : undefined}
-      className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
-        active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
-      }`}
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={active || disabled || Boolean(disabledReason) || newGenerationBlocked}
+        title={newGenerationBlocked ? safetyBlockReason ?? undefined : disabledReason}
+        className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
+          active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
+        }`}
+      >
+        {active
+          ? STATUS_TEXT[status]
+          : newGenerationBlocked
+            ? "生成暂不可用"
+            : disabledReason
+              ? disabledLabel
+              : label}
+      </button>
+      {!active && !newGenerationBlocked && disabledReason && (
+        <p className="text-[9px] leading-relaxed text-amber-400">{disabledReason}</p>
+      )}
+    </div>
+  );
+}
+
+/** Visible phase-one policy marker for historical nodes that remain editable. */
+export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
+  const policy = nodeProductPolicy(kind);
+  if (policy.paidRunAllowed) return null;
+  return (
+    <div
+      role="note"
+      data-product-support="unsupported"
+      className="rounded-md border border-amber-700/50 bg-amber-950/25 px-2 py-1.5 text-[9px] leading-relaxed text-amber-300"
     >
-      {active ? STATUS_TEXT[status] : newGenerationBlocked ? "生成暂不可用" : label}
-    </button>
+      <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
+      <p className="mt-0.5">{policy.reason}</p>
+    </div>
   );
 }
 

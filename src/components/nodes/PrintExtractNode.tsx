@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type PrintExtractNodeData } from "@/types/workflow";
-import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
+import { NodeFrame, NodeProductPolicyNotice, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import { savePrintOutputAsAsset } from "@/lib/printAsset";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 
 export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExtractNodeData>>) {
   const runNode = useFlowStore((s) => s.runNode);
   const running = isNodeRunActive(data.status);
+  const admission = usePromptRunAdmission(id, data);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saved = data.savedAsAssets ?? [];
@@ -35,6 +37,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
     <>
       <Handle type="target" position={Position.Left} />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
+        <NodeProductPolicyNotice kind={data.kind} />
         <label className="block space-y-1">
           <span className="text-[10px] text-neutral-500">补充说明</span>
           <textarea
@@ -46,8 +49,14 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
           />
           <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
-        <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} label="提取印花" />
+        <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} disabled={running} referenceRows={admission.referenceRows} />
+        <RunButton
+          status={data.status}
+          onClick={() => void runNode(id)}
+          label="提取印花"
+          disabledReason={admission.allowed ? undefined : admission.reason}
+          disabledLabel="首版暂不支持"
+        />
         {running && <Developing />}
         <ImageGrid
           images={data.outputImages}

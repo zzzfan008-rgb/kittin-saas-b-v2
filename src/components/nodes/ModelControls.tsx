@@ -1,5 +1,10 @@
-import { useFlowStore } from "@/store/flowStore";
+import { selectActiveDocumentTarget, useFlowStore } from "@/store/flowStore";
+import { useShallow } from "zustand/react/shallow";
 import { inputClass } from "./NodeFrame";
+import {
+  ReferenceRoleSummary,
+  type ReferenceRoleSummaryReference,
+} from "./ReferenceRoleSummary";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   GENERATION_IMAGE_MODEL_IDS,
@@ -10,23 +15,30 @@ import {
   type GenerationImageModelId,
   type ImageModelOptions,
 } from "@/types/imageModels";
-
 interface ModelControlsProps {
   nodeId: string;
   modelId?: GenerationImageModelId;
+  retiredModelId?: string;
   modelOptions?: ImageModelOptions;
   preferredAspectRatio?: string;
   disabled?: boolean;
+  referenceRows?: readonly ReferenceRoleSummaryReference[];
 }
 
 export function ModelControls({
   nodeId,
   modelId = DEFAULT_GENERATION_MODEL_ID,
+  retiredModelId,
   modelOptions,
   preferredAspectRatio = "1:1",
   disabled = false,
+  referenceRows,
 }: ModelControlsProps) {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
+  const documentTarget = useFlowStore(useShallow(selectActiveDocumentTarget));
+  const updateEdgeReferenceRoleInTab = useFlowStore((state) => state.updateEdgeReferenceRoleInTab);
+  const moveReferenceEdgeInTab = useFlowStore((state) => state.moveReferenceEdgeInTab);
+  const removeReferenceEdgeInTab = useFlowStore((state) => state.removeReferenceEdgeInTab);
   const options = normalizeImageModelOptions(modelId, modelOptions, preferredAspectRatio);
   const updateOptions = (patch: Partial<ImageModelOptions>) => {
     updateNodeData(nodeId, { modelOptions: { ...options, ...patch }, error: undefined });
@@ -36,26 +48,40 @@ export function ModelControls({
     <div className="space-y-2 border-t border-[#262626] pt-2">
       <label className="block space-y-1">
         <span className="text-[10px] text-neutral-500">图片模型</span>
+        {retiredModelId && (
+          <span role="alert" className="block rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-300">
+            原模型 {retiredModelId} 已退出产品范围，系统没有自动换模。请手动选择一个新模型后再配置提示词与参数。
+          </span>
+        )}
         <select
-          value={modelId}
+          value={retiredModelId ? "" : modelId}
           disabled={disabled}
           onChange={(event) => {
             const next = event.target.value as GenerationImageModelId;
             updateNodeData(nodeId, {
               modelId: next,
+              retiredModelId: undefined,
+              modelSelectionNeedsConfirmation: false,
               modelOptions: defaultImageModelOptions(next, preferredAspectRatio),
+              promptVariantId: undefined,
+              promptFamilyId: undefined,
+              parameterProfileId: undefined,
+              contractHash: undefined,
+              evaluationVersion: undefined,
+              postprocessVersion: undefined,
               error: undefined,
             });
           }}
           className={inputClass}
         >
+          {retiredModelId && <option value="" disabled>{retiredModelId}（已停用，请重新选择）</option>}
           {GENERATION_IMAGE_MODEL_IDS.map((id) => (
             <option key={id} value={id}>{imageModelLabel(id)}</option>
           ))}
         </select>
       </label>
 
-      {modelId === "gpt-image-2-vip" && (
+      {!retiredModelId && modelId === "gpt-image-2-vip" && (
         <SelectOption
           label="输出尺寸"
           value={options.size ?? "auto"}
@@ -65,7 +91,7 @@ export function ModelControls({
         />
       )}
 
-      {modelId === "gemini-3.1-flash-image" && (
+      {!retiredModelId && modelId === "gemini-3.1-flash-image" && (
         <div className="grid grid-cols-2 gap-2">
           <SelectOption
             label="原生比例"
@@ -84,7 +110,7 @@ export function ModelControls({
         </div>
       )}
 
-      {modelId === "flux-2-pro" && (
+      {!retiredModelId && modelId === "flux-2-pro" && (
         <div className="grid grid-cols-2 gap-2">
           <NumberOption
             label="宽度" value={options.width ?? 2048} disabled={disabled}
@@ -106,7 +132,7 @@ export function ModelControls({
         </div>
       )}
 
-      {modelId === "seedream-5-0-260128" && (
+      {!retiredModelId && modelId === "seedream-5-0-260128" && (
         <SelectOption
           label="原生尺寸"
           value={options.size ?? "2K"}
@@ -116,24 +142,22 @@ export function ModelControls({
         />
       )}
 
-      {modelId === "grok-imagine-image" && (
-        <div className="grid grid-cols-2 gap-2">
-          <SelectOption
-            label="原生比例"
-            value={options.aspectRatio ?? "1:1"}
-            values={getImageModelContract(modelId).aspectRatios ?? []}
-            disabled={disabled}
-            onChange={(value) => updateOptions({ aspectRatio: value })}
-          />
-          <SelectOption
-            label="分辨率"
-            value={options.resolution ?? "2k"}
-            values={getImageModelContract(modelId).resolutions ?? []}
-            disabled={disabled}
-            onChange={(value) => updateOptions({ resolution: value })}
-          />
-        </div>
+      {referenceRows && referenceRows.length > 0 && (
+        <ReferenceRoleSummary
+          references={referenceRows}
+          disabled={disabled}
+          onRoleChange={(reference, role) => {
+            if (reference.edgeId) updateEdgeReferenceRoleInTab(documentTarget, reference.edgeId, role);
+          }}
+          onMove={(reference, direction) => {
+            if (reference.edgeId) moveReferenceEdgeInTab(documentTarget, reference.edgeId, direction);
+          }}
+          onRemove={(reference) => {
+            if (reference.edgeId) removeReferenceEdgeInTab(documentTarget, reference.edgeId);
+          }}
+        />
       )}
+
     </div>
   );
 }

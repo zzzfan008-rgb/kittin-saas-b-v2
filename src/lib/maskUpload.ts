@@ -1,3 +1,5 @@
+import { apiErrorMessage } from "@/lib/apiErrors";
+
 export interface MaskDraftUploadRequest {
   dataUrl: string;
   sourceRef: string;
@@ -44,7 +46,9 @@ export async function uploadMaskDraft(
     body: JSON.stringify(request),
   });
   const body = await response.json().catch(() => ({})) as Partial<MaskDraftUploadResponse> & { error?: string };
-  if (!response.ok) throw new Error(body.error || `蒙版保存失败 HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(response.status, body, `蒙版保存失败 HTTP ${response.status}`));
+  }
   if (
     body.preserved !== true || body.mimeType !== "image/png" ||
     typeof body.id !== "string" || !body.id ||

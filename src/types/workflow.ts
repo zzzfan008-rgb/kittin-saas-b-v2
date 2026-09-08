@@ -3,6 +3,13 @@
  * 无限画布 + 节点 DAG + 节点级图片模型选择。
  */
 import type { GenerationImageModelId, ImageModelOptions } from "./imageModels";
+import {
+  IMAGE_OPERATION_MODE_VALUES,
+  type ImageOperationMode,
+} from "./imageOperations";
+
+export { IMAGE_OPERATION_MODE_VALUES } from "./imageOperations";
+export type { ImageOperationMode } from "./imageOperations";
 
 // ---------- 节点类型 ----------
 export type NodeKind =
@@ -37,6 +44,160 @@ export const MASK_PIPELINE_VERSION = 3;
 export const BATCH_SIZES = [1, 2, 4, 8] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
+// ---------- 显式生成模式 ----------
+/**
+ * 模式是节点契约，不得在运行时根据是否带参考图临时推断。
+ * sketch-to-render 同时承担文生图与草图编辑，必须由用户明确选择；其余节点语义固定。
+ */
+export function allowedOperationModesForNode(kind: NodeKind): readonly ImageOperationMode[] {
+  switch (kind) {
+    case "sketch-to-render":
+      return ["generate", "edit"];
+    case "ai-modify":
+    case "fabric-recolor":
+    case "upscale":
+    case "print-extract":
+    case "print-mutate":
+      return ["edit"];
+    case "mask-redraw":
+      return ["mask-edit"];
+    case "image-input":
+    case "result":
+      return [];
+  }
+}
+
+export function defaultOperationModeForNode(kind: NodeKind): ImageOperationMode | undefined {
+  if (kind === "sketch-to-render") return "generate";
+  return allowedOperationModesForNode(kind)[0];
+}
+
+// ---------- 参考图角色与可追溯输入 ----------
+export const REFERENCE_ROLE_VALUES = [
+  "identity",
+  "pose_composition",
+  "garment_top",
+  "garment_bottom",
+  "garment_full",
+  "fabric",
+  "accessory",
+  "styling_only",
+  "background",
+  "generic",
+] as const;
+export type ReferenceRole = (typeof REFERENCE_ROLE_VALUES)[number];
+
+/** Target handles whose semantics are fixed by the receiving node. */
+const DEDICATED_REFERENCE_HANDLE_ROLES: Partial<
+  Record<NodeKind, Readonly<Record<string, ReferenceRole>>>
+> = {
+  "fabric-recolor": {
+    garment: "garment_full",
+    fabric: "fabric",
+  },
+};
+
+export function referenceRoleForTargetHandle(
+  targetKind: NodeKind | undefined,
+  targetHandle: string | null | undefined,
+): ReferenceRole | undefined {
+  if (!targetKind || !targetHandle) return undefined;
+  return DEDICATED_REFERENCE_HANDLE_ROLES[targetKind]?.[targetHandle];
+}
+
+/** v0-v3 画布中的含糊角色只用于迁移，不可直接当作新角色使用。 */
+export const LEGACY_IMAGE_ROLE_VALUES = ["default", "sketch", "garment", "reference"] as const;
+export type LegacyImageRole = (typeof LEGACY_IMAGE_ROLE_VALUES)[number];
+export type ImageInputRole = ReferenceRole | LegacyImageRole;
+
+export function isReferenceRole(value: unknown): value is ReferenceRole {
+  return typeof value === "string" && (REFERENCE_ROLE_VALUES as readonly string[]).includes(value);
+}
+
+/**
+ * 旧角色只做保守映射，一律保留“待确认”。新角色也必须有显式 false
+ * 才表示用户已确认，避免旧项目在迁移时被误判。
+ */
+export function normalizeImageInputReferenceRole(
+  value: unknown,
+  roleNeedsConfirmation: unknown,
+): { role: ReferenceRole; roleNeedsConfirmation: boolean } {
+  const confirmed = roleNeedsConfirmation === false;
+  if (isReferenceRole(value)) return { role: value, roleNeedsConfirmation: !confirmed };
+  switch (value) {
+    case "sketch":
+      return { role: "pose_composition", roleNeedsConfirmation: true };
+    case "garment":
+      return { role: "garment_full", roleNeedsConfirmation: true };
+    case "default":
+    case "reference":
+    default:
+      return { role: "generic", roleNeedsConfirmation: true };
+  }
+}
+
+/**
+ * One graph edge is one explicit reference-role assignment. The same source
+ * node may therefore serve different roles for different target nodes.
+ */
+export interface ReferenceEdgeData extends Record<string, unknown> {
+  role: ReferenceRole;
+  roleNeedsConfirmation: boolean;
+}
+
+/**
+ * Resolve an edge conservatively. Explicit edge data always wins. A missing
+ * edge role may use an already-confirmed image-input role as its creation or
+ * migration default; every other legacy/malformed edge remains pending.
+ */
+export function resolveReferenceEdgeData(
+  value: unknown,
+  sourceData?: WorkflowNodeData,
+  targetKind?: NodeKind,
+  targetHandle?: string | null,
+): ReferenceEdgeData {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const raw = value as Record<string, unknown>;
+    if (Object.hasOwn(raw, "role")) {
+      return isReferenceRole(raw.role)
+        ? { role: raw.role, roleNeedsConfirmation: raw.roleNeedsConfirmation !== false }
+      : { role: "generic", roleNeedsConfirmation: true };
+    }
+  }
+  const fixedRole = referenceRoleForTargetHandle(targetKind, targetHandle);
+  if (fixedRole) return { role: fixedRole, roleNeedsConfirmation: false };
+  if (sourceData?.kind === "image-input") {
+    return normalizeImageInputReferenceRole(
+      sourceData.imageRole,
+      sourceData.roleNeedsConfirmation,
+    );
+  }
+  return { role: "generic", roleNeedsConfirmation: true };
+}
+
+/** Provider 收到的已解析参考图；dataUrl 必须与 assetSha256 对应。 */
+export interface ReferenceImageInput {
+  dataUrl: string;
+  role: ReferenceRole;
+  order: number;
+  assetSha256: string;
+  sourceNodeId?: string;
+  /** 只有显式 false 表示已确认；缺失、true 或含糊输入都必须失败关闭。 */
+  roleNeedsConfirmation?: boolean;
+}
+
+/** 持久化历史证据不包含 base64 正文，避免数据库与 API 载荷膨胀。 */
+export type ReferenceImageEvidence = Omit<ReferenceImageInput, "dataUrl">;
+
+/** DAG 计划中的轻量引用；运行时解析为 ReferenceImageInput。 */
+export interface ReferenceImageSource {
+  imageRef: string;
+  role: ReferenceRole;
+  order: number;
+  sourceNodeId?: string;
+  roleNeedsConfirmation?: boolean;
+}
+
 // ---------- 节点数据（存 React Flow node.data）----------
 export interface BaseNodeData {
   label: string;
@@ -48,7 +209,22 @@ export interface BaseNodeData {
 export interface ModelSelectableNodeData {
   /** v0/v1 读取期间可缺省；v2/v3 服务端校验后一定存在。 */
   modelId?: GenerationImageModelId;
+  /** 历史项目中的退役/未知模型原值；仅用于提示用户手动重选，绝不发送给 Provider。 */
+  retiredModelId?: string;
+  /** 只要历史模型尚未由用户重选，运行时必须失败关闭。 */
+  modelSelectionNeedsConfirmation?: boolean;
   modelOptions?: ImageModelOptions;
+  /** 持久化、可审计的模式；运行时不得根据输入数量改写。 */
+  operationMode: Exclude<ImageOperationMode, "mask-edit">;
+  /** 旧版含糊节点只有在用户确认模式后才能执行。 */
+  operationModeNeedsConfirmation?: boolean;
+  /** 仅在用户确认应用一个精确变体时写入；模型/契约变化后由评估门禁判为未验证。 */
+  promptVariantId?: string;
+  promptFamilyId?: string;
+  parameterProfileId?: string;
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  postprocessVersion?: string;
 }
 
 export function isNodeRunActive(status: NodeRunStatus): boolean {
@@ -63,7 +239,9 @@ export interface ImageInputNodeData extends BaseNodeData {
   kind: "image-input";
   /** dataURL 或 /api/files/xxx 路径 */
   imageUrl?: string;
-  imageRole: "default" | "sketch" | "garment" | "fabric" | "reference";
+  imageRole: ImageInputRole;
+  /** 旧项目不能可靠推断角色；用户在画布重新选择后才置 false。 */
+  roleNeedsConfirmation?: boolean;
 }
 
 export interface SketchToRenderNodeData extends BaseNodeData, ModelSelectableNodeData {
@@ -117,8 +295,17 @@ export interface PrintMutateNodeData extends BaseNodeData, ModelSelectableNodeDa
   outputImages: string[];
 }
 
-export interface MaskRedrawNodeData extends BaseNodeData {
+export interface MaskRedrawNodeData extends BaseNodeData, Pick<ModelSelectableNodeData,
+  | "promptVariantId"
+  | "promptFamilyId"
+  | "parameterProfileId"
+  | "contractHash"
+  | "evaluationVersion"
+  | "postprocessVersion"
+> {
   kind: "mask-redraw";
+  operationMode: "mask-edit";
+  operationModeNeedsConfirmation?: false;
   modelId: "gpt-image-2";
   modelOptions: ImageModelOptions;
   prompt: string;
@@ -146,10 +333,10 @@ export type WorkflowNodeData =
 
 // ---------- 持久化工作流（项目 / 模板共用）----------
 /**
- * 版本 3 将蒙版节点统一为单一“局部修改”语义。读取 v0/v1/v2 时服务端会确定性迁移；
+ * 版本 6 为退役模型保留只读哨兵并要求手动重选。读取 v0-v5 时服务端会保守迁移；
  * 新版本不得静默降级读取。
  */
-export const WORKFLOW_SCHEMA_VERSION = 3 as const;
+export const WORKFLOW_SCHEMA_VERSION = 6 as const;
 export type WorkflowSchemaVersion = typeof WORKFLOW_SCHEMA_VERSION;
 
 export interface PersistedWorkflowNode {
@@ -166,6 +353,7 @@ export interface PersistedWorkflowEdge {
   target: string;
   sourceHandle?: string | null;
   targetHandle?: string | null;
+  data: ReferenceEdgeData;
   [key: string]: unknown;
 }
 
@@ -179,7 +367,22 @@ export interface PersistedWorkflow {
 /** 所有 AI 调用必须经此接口，禁止业务代码直连第三方 SDK */
 export interface ImageGenRequest {
   prompt: string;
+  /** Exact reviewed prompt/evaluation binding; direct calls are fail-closed without it. */
+  promptVariantId?: string;
+  promptFamilyId?: string;
+  parameterProfileId?: string;
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  postprocessVersion?: string;
+  /** 显式调用模式；Provider 路由不得根据参考图数组临时推断。 */
+  operationMode: ImageOperationMode;
+  /**
+   * 新的可追溯参考图契约。Provider 按 order 转换为各自协议；
+   * 不得根据数组位置静默推断人物或服装语义。
+   */
+  references?: ReferenceImageInput[];
   /** 参考图（dataURL 数组，按连线顺序，最多 8 张） */
+  /** @deprecated 仅供旧客户端与迁移期读取；新代码应同时生成 references。 */
   referenceImages?: string[];
   aspectRatio?: string;
   batchSize?: number;
@@ -197,11 +400,13 @@ export interface ImageGenResult {
   usageNote?: string;
   /** 上游声明的逐图实际输出尺寸；顺序与 images 一致，未知项为 null。 */
   providerOutputSizes?: Array<string | null>;
+  /** 仅在服务端 Provider 证据链中传递，绝不写入用户运行记录或返回浏览器。 */
+  providerRequestId?: string;
 }
 
 export interface AIProvider {
   readonly id: string;                 // API易模型 ID；与本地模型知识库一致
-  validate?(req: ImageGenRequest, mode: "generate" | "edit"): void | Promise<void>;
+  validate?(req: ImageGenRequest, mode: ImageOperationMode): void | Promise<void>;
   generate(req: ImageGenRequest): Promise<ImageGenResult>;
   edit(req: ImageGenRequest): Promise<ImageGenResult>;
 }
@@ -212,11 +417,18 @@ export interface NodeExecution {
   kind: NodeKind;
   /** 上游传入的图片（按边顺序，计划期静态快照） */
   inputImages: string[];
+  /** 与 inputImages 对齐的角色快照；供单节点重跑和历史证据使用。 */
+  inputReferences?: ReferenceImageSource[];
   /**
    * 上游依赖（按边顺序）：运行时优先取本次 Run 中该上游的产出，
    * 上游不在执行范围（单节点重跑）时回退到 images 快照。
    */
-  upstream?: { nodeId: string; images: string[] }[];
+  upstream?: {
+    nodeId: string;
+    images: string[];
+    referenceRole?: ReferenceRole;
+    roleNeedsConfirmation?: boolean;
+  }[];
   params: Record<string, unknown>;
 }
 

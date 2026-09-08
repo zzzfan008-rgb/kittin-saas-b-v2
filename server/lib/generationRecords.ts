@@ -2,6 +2,11 @@ import { nanoid } from "nanoid";
 import path from "node:path";
 import { query, queryOne, transaction } from "./database";
 import { deleteStoredImage } from "./fileStore";
+import type {
+  ReferenceImageEvidence,
+  ReferenceImageInput,
+  ReferenceImageSource,
+} from "../../src/types/workflow";
 
 export interface GenerationRecordContext {
   userId: string;
@@ -15,6 +20,7 @@ export interface GenerationRecordContext {
   prompt?: string;
   parameters?: Record<string, unknown>;
   referenceImages?: string[];
+  referenceInputs?: Array<ReferenceImageInput | ReferenceImageSource>;
   requestedCount: number;
 }
 
@@ -22,13 +28,14 @@ export async function createGenerationRecord(runId: string, context: GenerationR
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, project_id, project_name, node_id, node_label, kind, prompt,
-      parameters_json, reference_images_json, requested_count, status, started_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'queued', $12)
+      parameters_json, reference_images_json, reference_inputs_json,
+      requested_count, status, started_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'queued', $13)
   `, [
     runId, context.userId, context.projectId ?? null, context.projectName ?? null,
     context.nodeId, context.nodeLabel, context.kind, context.prompt ?? null,
     JSON.stringify(context.parameters ?? {}), JSON.stringify(context.referenceImages ?? []),
-    context.requestedCount, startedAt,
+    JSON.stringify(context.referenceInputs ?? []), context.requestedCount, startedAt,
   ]);
 }
 
@@ -42,6 +49,7 @@ export async function registerGeneratedFiles(
   nodeId: string,
   images: string[],
   createdAt: number,
+  sourceType: "generated" | "provider-original" = "generated",
 ): Promise<void> {
   const createdAtIso = new Date(createdAt).toISOString();
   await transaction(async (client) => {
@@ -49,9 +57,12 @@ export async function registerGeneratedFiles(
       if (!image.startsWith("/api/files/")) continue;
       await client.query(`
         INSERT INTO files (id, owner_id, source_type, project_id, node_id, run_id, created_at)
-        VALUES ($1, $2, 'generated', $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (id) DO NOTHING
-      `, [path.basename(image), context.userId, context.projectId ?? null, nodeId, runId, createdAtIso]);
+      `, [
+        path.basename(image), context.userId, sourceType, context.projectId ?? null,
+        nodeId, runId, createdAtIso,
+      ]);
     }
   });
 }
@@ -59,6 +70,8 @@ export async function registerGeneratedFiles(
 export async function completeGenerationRecord(args: {
   runId: string;
   images: string[];
+  providerImages?: string[];
+  references?: ReferenceImageInput[];
   prompts?: string[];
   providerOutputSizes?: Array<string | null>;
   failures?: Array<{ prompt?: string; error: string }>;
@@ -67,6 +80,21 @@ export async function completeGenerationRecord(args: {
   startedAt: number;
   finishedAt: number;
 }): Promise<void> {
+  if (args.images.length === 0) throw new Error("successful generation record requires at least one business output");
+  if (args.providerImages && args.providerImages.length > 0 && args.providerImages.length !== args.images.length) {
+    throw new Error("successful generation record requires one Provider original per business output");
+  }
+  if (args.providerRequests > 0 && args.providerImages?.length !== args.images.length) {
+    throw new Error("paid successful generation record requires one Provider original per business output");
+  }
+  const providerImages = args.providerImages ?? [];
+  const referenceEvidence: ReferenceImageEvidence[] = (args.references ?? []).map((reference) => ({
+    role: reference.role,
+    order: reference.order,
+    assetSha256: reference.assetSha256,
+    ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
+    roleNeedsConfirmation: reference.roleNeedsConfirmation !== false,
+  }));
   await transaction(async (client) => {
     const run = await queryOne<{ owner_id: string; project_id: string | null; node_id: string }>(
       "SELECT owner_id, project_id, node_id FROM generation_runs WHERE id = $1 FOR UPDATE",
@@ -75,14 +103,26 @@ export async function completeGenerationRecord(args: {
     );
     if (!run) return;
     await client.query("DELETE FROM generation_outputs WHERE run_id = $1", [args.runId]);
+    for (const providerImage of providerImages) {
+      if (!providerImage.startsWith("/api/files/")) continue;
+      await client.query(`
+        INSERT INTO files (id, owner_id, source_type, project_id, node_id, run_id, created_at)
+        VALUES ($1, $2, 'provider-original', $3, $4, $5, $6)
+        ON CONFLICT (id) DO NOTHING
+      `, [
+        path.basename(providerImage), run.owner_id, run.project_id, run.node_id,
+        args.runId, new Date(args.finishedAt).toISOString(),
+      ]);
+    }
     for (const [index, image] of args.images.entries()) {
       await client.query(`
         INSERT INTO generation_outputs (
-          id, run_id, image, prompt, provider_output_size, status, error, created_at
-        ) VALUES ($1, $2, $3, $4, $5, 'success', NULL, $6)
+          id, run_id, image, provider_image, prompt, provider_output_size, status, error, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'success', NULL, $7)
       `, [
-        nanoid(12), args.runId, image, args.prompts?.[index] ?? null,
-        args.providerOutputSizes?.[index] ?? null, args.finishedAt + index,
+        nanoid(12), args.runId, image, args.providerImages?.[index] ?? null,
+        args.prompts?.[index] ?? null, args.providerOutputSizes?.[index] ?? null,
+        args.finishedAt + index,
       ]);
       if (image.startsWith("/api/files/")) {
         await client.query(`
@@ -101,8 +141,11 @@ export async function completeGenerationRecord(args: {
     const warning = args.failures?.length ? `${args.failures.length} 个生成任务失败` : null;
     await client.query(`
       UPDATE generation_runs SET status = 'success', successful_count = $1, provider_requests = $2,
-        model = $3, error = $4, finished_at = $5 WHERE id = $6
-    `, [args.images.length, args.providerRequests, args.model ?? null, warning, args.finishedAt, args.runId]);
+        model = $3, error = $4, finished_at = $5, reference_inputs_json = $6 WHERE id = $7
+    `, [
+      args.images.length, args.providerRequests, args.model ?? null, warning, args.finishedAt,
+      JSON.stringify(referenceEvidence), args.runId,
+    ]);
     if (args.images.length > 0) {
       await client.query(`
         INSERT INTO usage_events (
@@ -127,7 +170,7 @@ export async function completeGenerationRecord(args: {
 export async function failGenerationRecord(runId: string, error: string, finishedAt: number): Promise<void> {
   const generatedFileIds = await transaction(async (client) => {
     const files = await client.query<{ id: string }>(
-      "SELECT id FROM files WHERE run_id = $1 FOR UPDATE",
+      "SELECT id FROM files WHERE run_id = $1 AND source_type <> 'provider-original' FOR UPDATE",
       [runId],
     );
     await client.query("UPDATE generation_runs SET status = 'error', error = $1, finished_at = $2 WHERE id = $3", [
@@ -138,7 +181,7 @@ export async function failGenerationRecord(runId: string, error: string, finishe
       INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
       SELECT $1, id, '', 'error', $2, $3 FROM generation_runs WHERE id = $4
     `, [nanoid(12), error, finishedAt, runId]);
-    await client.query("DELETE FROM files WHERE run_id = $1", [runId]);
+    await client.query("DELETE FROM files WHERE run_id = $1 AND source_type <> 'provider-original'", [runId]);
     return files.rows.map((row) => row.id);
   });
   generatedFileIds.forEach(deleteStoredImage);

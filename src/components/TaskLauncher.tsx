@@ -8,6 +8,7 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { BUILTIN_TEMPLATE_COVERS } from "@/lib/templatePresentation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { inferTemplateLaunchMode, launchStarterTemplate } from "@/lib/templateLaunch";
+import { templateProductPolicy } from "@/lib/nodeProductPolicy";
 
 const EMPTY_TEMPLATE_COVER = "/assets/project-center/empty-project-cover.jpg";
 
@@ -32,18 +33,28 @@ function TemplateCover({ template }: { template: WorkflowTemplate }) {
 }
 
 function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSelect: () => void }) {
+  const productPolicy = templateProductPolicy(template);
+  const unavailable = !productPolicy.launchAllowed;
+  const reasonId = `starter-template-policy-${template.id}`;
   return (
     <Card size="sm" className="group gap-0 overflow-hidden border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] py-0 text-[var(--gc-text)] ring-0 transition-colors hover:border-[var(--gc-accent)]">
       <button
         type="button"
         onClick={onSelect}
-        className="block w-full text-left"
+        disabled={unavailable}
+        title={productPolicy.reason}
+        aria-describedby={unavailable ? reasonId : undefined}
+        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-75"
         aria-label={`使用内置模板：${template.name}`}
       >
         <div className="relative overflow-hidden">
           <TemplateCover template={template} />
-          <span className="absolute right-3 top-3 rounded border border-white/30 bg-black/55 px-1.5 py-0.5 text-[8px] text-white backdrop-blur-sm">
-            内置
+          <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[8px] backdrop-blur-sm ${
+            unavailable
+              ? "border-amber-400/60 bg-amber-950/80 text-amber-200"
+              : "border-white/30 bg-black/55 text-white"
+          }`}>
+            {unavailable ? "unsupported" : "内置"}
           </span>
         </div>
         <span className="block p-3">
@@ -51,6 +62,11 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
           <span className="mt-1 block min-h-8 line-clamp-2 text-[10px] leading-4 text-[var(--gc-text-muted)]">
             {template.description || "从此工作流模板创建一个新项目"}
           </span>
+          {unavailable && (
+            <span id={reasonId} className="mt-1 block text-[9px] leading-relaxed text-amber-500">
+              {productPolicy.reason}
+            </span>
+          )}
         </span>
       </button>
     </Card>

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "apiyi-five-model-catalog-review-20260903T081222094Z",
+  "kind": "gateway-model-catalog",
+  "capturedAt": "2026-09-03T08:12:22.094Z",
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "baseHost": "api.apiyi.com",
+    "authentication": "configured-project-token",
+    "requestCount": 1,
+    "retryCount": 0,
+    "paidProviderCalls": 0
+  },
+  "response": {
+    "httpStatus": 200,
+    "rawExportByteLength": 61434,
+    "rawExportFileSha256": "8d60eafb6460fe97964289d6b8284eecf775af9db01b8f25abad1d11e985fc68",
+    "rawExportRetainedInRepository": false,
+    "rawExportPolicy": "The exact raw /v1/models response remains outside Git and must be supplied from the controlled external file when a contract check is produced.",
+    "modelCount": 269,
+    "countScope": "canonical-unique-model-ids",
+    "hashScope": "sha256-canonical-model-id-set-v1",
+    "canonicalModelIdSetSha256": "bc6fffe606c2419d00bccec2f27c70835def3f77f5f0608276d94959f459879f"
+  },
+  "expectedGatewayModelIds": [
+    { "id": "gpt-image-2", "present": true },
+    { "id": "gpt-image-2-vip", "present": true },
+    { "id": "gemini-3.1-flash-image", "present": true },
+    { "id": "flux-2-pro", "present": true },
+    { "id": "seedream-5-0-260128", "present": true }
+  ],
+  "missingExpectedIds": [],
+  "humanReview": {
+    "scope": "current-five-model-product-catalog-baseline",
+    "independentReviewCompleted": true,
+    "explicitUserApproval": true,
+    "approvedAt": "2026-09-03T08:22:05Z",
+    "approvalStatement": "确认以上五模型人工复核基线。",
+    "decision": "approved"
+  },
+  "qualityAssessment": {
+    "observationGrain": "One authenticated, account-scoped APIYI model-catalog response.",
+    "requiredModelCoverage": {
+      "present": 5,
+      "required": 5,
+      "ratio": 1
+    },
+    "validity": "HTTP 200 returned a model data collection whose raw bytes, canonical unique ID count, canonical ID-set fingerprint, and exact five-model presence were independently reviewed.",
+    "confidence": "High for this configured token's captured catalog view; insufficient for generation, editing, output quality, billing, or APIYI-wide availability."
+  },
+  "interpretation": {
+    "scope": "configured-token-observed-view",
+    "catalogPresenceDoesNotProveEndpointSuccess": true,
+    "catalogPresenceDoesNotProveGenerationOrEditQuality": true,
+    "catalogPresenceDoesNotProveBillingSemantics": true,
+    "automaticAliasSubstitutionAllowed": false,
+    "automaticContractUpdateAllowed": false
+  },
+  "limitations": [
+    "The raw account-scoped export remains outside Git; this repository record preserves only the reviewed metadata and fingerprints.",
+    "Catalog presence does not verify image generation, image editing, output quality, billing, or retry semantics.",
+    "All five model observedEvidence statuses remain unverified until their separate evaluation evidence and promotion gates pass."
+  ],
+  "releaseDecision": "catalog-baseline-approved-release-not-ready",
+  "requiredNextStep": "Supply the exact external raw export to contract-check, then complete model evaluation evidence, promotion, and clean exact-SHA release gates before any release-readiness claim."
+}

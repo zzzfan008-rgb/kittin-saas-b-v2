@@ -230,6 +230,8 @@ const maskLocal = tab({
       status: "idle",
       modelId: "gpt-image-2",
       modelOptions: {},
+      operationMode: "mask-edit",
+      operationModeNeedsConfirmation: false,
       prompt: "改色",
       mask: "/api/files/source-mask.png",
       outputImages: [],

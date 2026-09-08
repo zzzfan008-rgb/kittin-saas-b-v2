@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-02T15:09:36.676Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "248f006216f668bf6caf2de22e4a3225f615644491eee9c75ed42aa00354cb78",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "v1/models 模型目录 令牌白名单 Grok 缺失 observedEvidence 发布阻断",
+  "affectedPaths": [
+    "docs/ai/apiyi/README.md",
+    "docs/ai/apiyi/evidence/2026-09-02-model-catalog-probe.json",
+    "docs/ai/apiyi/model-knowledge.json",
+    "docs/ai/apiyi/reviews/2026-09-02-contract-rebuild.md"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/grok-imagine-2-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/grok-imagine-2-launch.md",
+      "pageLocalPath": "pages/en/news/grok-imagine-2-launch.md",
+      "title": "Grok Imagine 2 Image Models Launch: Full Test Results",
+      "sha256": "2d3154779429f638513d7e0cd5f278e2d1f32bf32676627e684d9d5f3b1cd6d0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok-imagine-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "title": "Grok Imagine 2 Image Gen & Editing",
+      "sha256": "46c66b8f7f12b6d65f2efd81990b7438c50d01b63f46c15ff3c3fda6db660177"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/base-url-config",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/base-url-config.md",
+      "pageLocalPath": "pages/en/faq/base-url-config.md",
+      "title": "How to Configure Base URL? Differences Between /v1, Root Domain, and /v1beta",
+      "sha256": "962af2f1474a6bbae879b03361ac4db2abc36c8123f2cbb2d9b9f2b018deb331"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-08/grok-imagine-2-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-08/grok-imagine-2-launch.md",
+      "pageLocalPath": "pages/en/live/2026-08/grok-imagine-2-launch.md",
+      "title": "Grok Imagine 2 Image Models Are Live, 2K Lands Near 64% of List",
+      "sha256": "1ea0722095317f704efee47cc82c3ba3133d1a757db127d6c7658c709b22d8bb"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/models/grok-4-5",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/models/grok-4-5.md",
+      "pageLocalPath": "pages/en/models/grok-4-5.md",
+      "title": "Grok 4.5",
+      "sha256": "802d4cd1896f1bd6c32dd5a7e83dabc3b6819196513d9773f5bd2d059d364e3d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/models/grok-4-6",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/models/grok-4-6.md",
+      "pageLocalPath": "pages/en/models/grok-4-6.md",
+      "title": "Grok 4.6",
+      "sha256": "d69379d0a2a4b1f57e30e33c8b24ae31d3be11d8395896b8cd5a5e4797875128"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-08/grok-4-6-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-08/grok-4-6-launch.md",
+      "pageLocalPath": "pages/en/live/2026-08/grok-4-6-launch.md",
+      "title": "Grok 4.6 Is Live at Official Pricing, 20% Off on the GrokOfficial Group",
+      "sha256": "4882ce085f30964980037fda61fada1a6743ce32a311a73f62b790e5b86991f8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/models/grok-4-3",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/models/grok-4-3.md",
+      "pageLocalPath": "pages/en/models/grok-4-3.md",
+      "title": "Grok 4.3",
+      "sha256": "a7bbd41ee67765819a2ff51bebe242ce418c93b8a547050746d8e94d4b09439f"
+    }
+  ],
+  "decisionSummary": "记录配置令牌对 GET /v1/models 的零付费只读实证：272 个模型中当前六模型精确 ID 仅 5 个存在，grok-imagine-image 缺失且没有 Grok 图片候选别名。该证据只进入 observedEvidence 和审查记录，保持全部变体 unverified、发布阻断，不写 reviewedExportSha256、不修改网关模型 ID，也不发生成请求。",
+  "unresolvedChoices": []
+}

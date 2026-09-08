@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-09-04",
+  "status": "fail-closed",
+  "findings": [
+    {
+      "id": "AUDIT-P0-001",
+      "severity": "P0",
+      "area": "release-environment",
+      "location": "package.json engines; tests/node-version-contract.test.ts",
+      "claim": "当前 Node.js v26.4.0 不符合候选发布基线 22.20.0，环境证据不能作为最终发布环境证据。",
+      "evidence": [
+        "package.json: engines.node >=22.20.0",
+        "当前 node --version 输出 v26.4.0",
+        "tests/node-version-contract.test.ts"
+      ],
+      "impact": "无法证明构建、运行时和门禁在声明的发布基线上一致。",
+      "disposition": "defer",
+      "remediationBatch": "Batch P0",
+      "verification": [
+        "切换到 Node.js 22.20.0",
+        "npm run lint",
+        "npm run check",
+        "npm run build",
+        "npm run gate:codex -- --base origin/main"
+      ],
+      "state": "open"
+    },
+    {
+      "id": "AUDIT-P0-002",
+      "severity": "P0",
+      "area": "release-evidence",
+      "location": "scripts/evaluation-release-preflight.ts; compose.evaluation-release.yaml",
+      "claim": "评估发布外置证据目录未配置，评估发布闭包不完整。",
+      "evidence": [
+        "npm run evaluation:release:preflight 输出 external evaluation release directory missing",
+        "docs/ai/evaluation/evaluation-manifest-v1.json status=planned-no-paid-runs",
+        "评估目录检查结果 evaluation_external_dir=missing"
+      ],
+      "impact": "无法证明评估代码身份、授权、原始输出、账单对账和运行时投影完整，必须阻断发布。",
+      "disposition": "defer",
+      "remediationBatch": "Batch P0",
+      "verification": [
+        "配置受控外置评估目录",
+        "npm run evaluation:release:preflight",
+        "npm run evaluation:manifest:check",
+        "npm run gate:codex -- --uncommitted"
+      ],
+      "state": "open"
+    },
+    {
+      "id": "AUDIT-P0-003",
+      "severity": "P0",
+      "area": "release-review",
+      "location": "scripts/codex-gate.mjs final read-only review stage",
+      "claim": "Node 22.20.0 的未提交候选门禁已完成确定性阶段，最新只读审查返回 verdict=fail 和一个可操作 P1 迁移回归；修复后尚未取得 verdict=pass、findings=[] 的持久回执。",
+      "evidence": [
+        "npm run gate:codex -- --uncommitted 使用 Node 22.20.0 启动并通过确定性阶段",
+        "最新审查输出 verdict=fail、gitnexus.status=pass",
+        "唯一 finding 指向 server/lib/workflowSchema.ts 的 legacy image-input roleNeedsConfirmation 默认值覆盖顺序",
+        "修复后 npx tsx tests/workflow-schema.test.ts 通过 32 项",
+        "scripts/codex-gate.mjs 仍在 finally 中删除临时 review-result.json",
+        "修复后完整 gate 回执 codex-gate-09fa979820419a1026088c5a4dc2e15a1b9d2528fcef275de5a9190ef56c6140.json：spawnSync codex ETIMEDOUT，findings=[]，gitnexus.status=degraded",
+        "30 分钟 review-only 重跑回执 codex-gate-c4892ad987b4880abc4e469aa8314e230f3aa8938cef6bb52a41ba8482938f0f.json：同样未产生结构化 reviewer 结果",
+        "后续 60 分钟 review-only 重跑回执 codex-gate-1d88c334609120bf86f4d0e569185459cab86b4f26d6654e39427cacc227708d.json：reviewOnly=true、verdict=fail、findings=[]、gitnexus.status=degraded，原因仍为 spawnSync codex ETIMEDOUT"
+      ],
+      "impact": "没有可审计的最终 review pass receipt，无法证明当前 87 文件候选具备发布资格。",
+      "disposition": "defer",
+      "remediationBatch": "Batch P0",
+      "verification": [
+        "将 reviewer JSON 和门禁元数据持久化到 Git 工作树外的受控证据目录",
+        "重新运行 npm run gate:codex -- --uncommitted",
+        "如 reviewer 仍超时，保留完整 fail-closed 回执并修复或拆分复核执行问题；不得将超时视为通过",
+        "保留 reviewer JSON、退出码和完整门禁日志",
+        "仅在 verdict=pass 且 findings=[] 时关闭该 finding"
+      ],
+      "state": "open"
+    },
+    {
+      "id": "AUDIT-P1-001",
+      "severity": "P1",
+      "area": "route-evidence",
+      "location": "server/index.ts mounted API routes; server/routes/generate.ts; server/routes/templates.ts",
+      "claim": "GitNexus 对部分挂载写入路由不能提供完整 api_impact/shape_check 证据，需要人工补齐路由、权限和响应 shape 记录。",
+      "evidence": [
+        "GitNexus route mapping does not fully reverse /api/generate and /api/templates",
+        "server/index.ts mounts the affected routers",
+        "相关 authorization.test.ts coverage passes for ownership and admin boundaries"
+      ],
+      "impact": "证据覆盖率不足会阻止发布，但目前没有证实的授权越权或响应契约漏洞。",
+      "disposition": "accept",
+      "remediationBatch": "Batch P0",
+      "verification": [
+        "对每个挂载写路由人工记录 middleware、owner check、response keys",
+        "docs/audit/2026-09-04/route-authorization-shapes.json",
+        "npm run lint",
+        "相关 authorization.test.ts 定向测试",
+        "GitNexus detect_changes"
+      ],
+      "state": "closed-with-evidence"
+    },
+    {
+      "id": "AUDIT-P1-002",
+      "severity": "P1",
+      "area": "usage-csv",
+      "location": "server/routes/usage.ts",
+      "claim": "CSV/XSS 静态告警经实际响应语义复核后，当前实现是下载附件并包含公式注入防护，不应定性为已证实 XSS。",
+      "evidence": [
+        "server/routes/usage.ts sets text/csv, attachment Content-Disposition and X-Content-Type-Options: nosniff",
+        "tests/authorization.test.ts asserts UTF-8 BOM, formula-prefix neutralization and download headers",
+        "no HTML response path was identified in the CSV branch"
+      ],
+      "impact": "保留该 finding 的人工复核记录，避免静态工具误报被当成漏洞；若响应头或转义逻辑变化，必须重新复核。",
+      "disposition": "accept",
+      "remediationBatch": "Batch P0",
+      "verification": [
+        "运行 usage CSV 定向授权测试",
+        "检查 Content-Type、Content-Disposition、nosniff",
+        "检查 =、+、-、@ 公式前缀转义"
+      ],
+      "state": "closed-with-evidence"
+    },
+    {
+      "id": "AUDIT-P1-003",
+      "severity": "P1",
+      "area": "provider-and-async-boundary",
+      "location": "server/engine/runQueue.ts; server/providers/apiyiTransport.ts; src/store/flowStore.ts",
+      "claim": "当前实现已加入 document target、Provider 原图保留、outcome_unknown 和 no-retry 评估约束；需要最终串行测试收据确认没有回归。",
+      "evidence": [
+        "tests/active-document-boundary.test.ts",
+        "tests/apiyi-transport.test.ts",
+        "tests/provider-contract.test.ts",
+        "tests/run-queue.test.ts",
+        "tests/flow-history.test.ts"
+      ],
+      "impact": "核心边界已有实现和定向覆盖，但在最终门禁重跑前不能宣称闭环。",
+      "disposition": "accept",
+      "remediationBatch": "Batch P1",
+      "verification": [
+        "npm run test:suite（串行）",
+        "npm run check",
+        "npm run build",
+        "npm run gate:codex -- --uncommitted"
+      ],
+      "state": "closed-with-evidence"
+    },
+    {
+      "id": "AUDIT-P1-004",
+      "severity": "P1",
+      "area": "legacy-workflow-migration",
+      "location": "server/lib/workflowSchema.ts migrateNodeData(image-input)",
+      "claim": "旧 v0/v1 image-input 缺少 roleNeedsConfirmation 时，迁移默认值曾被后置 raw 展开覆盖，导致旧工作流无法升级到 v6。",
+      "evidence": [
+        "Codex gate finding: Legacy image-input migrations drop the confirmation default",
+        "GitNexus impact(migrateNodeData) risk=LOW，直接影响 validateNode/模板初始化链路",
+        "迁移现在先保留 raw，再显式补 imageRole 和 roleNeedsConfirmation",
+        "npx tsx tests/workflow-schema.test.ts 通过 32 项，包含 legacyV0Workflow 确定性迁移"
+      ],
+      "impact": "未修复时历史项目和内置模板可能无法读取；修复后旧角色仍保守进入待确认状态，不会绕过运行准入。",
+      "disposition": "fix",
+      "remediationBatch": "Batch P1",
+      "verification": [
+        "npx tsx tests/workflow-schema.test.ts",
+        "npm run check",
+        "npm run gate:codex -- --uncommitted"
+      ],
+      "state": "closed-with-regression-test"
+    },
+    {
+      "id": "AUDIT-P2-001",
+      "severity": "P2",
+      "area": "complexity",
+      "location": "src/store/flowStore.ts; server/lib/database.ts; server/engine/runQueue.ts; server/engine/runner.ts; scripts/evaluation-review.ts",
+      "claim": "这些模块职责较重、变更耦合高，适合在 P0/P1 证据闭包后按领域边界拆分；当前没有证据表明应立即重写。",
+      "evidence": [
+        "GitNexus impact on saveTab, runNode, claimNextJob and migrate",
+        "当前工作树对上述模块存在大范围变更",
+        "specs/002-whole-project-audit/plan.md architecture boundaries"
+      ],
+      "impact": "继续在高耦合模块上叠加功能会扩大回归面和后续维护成本。",
+      "disposition": "redesign",
+      "remediationBatch": "Batch P2",
+      "verification": [
+        "先建立复杂度、调用量和性能基线",
+        "为拆分提供旧接口映射和回滚开关",
+        "运行 GitNexus impact 与兼容性测试"
+      ],
+      "state": "planned"
+    },
+    {
+      "id": "AUDIT-P3-001",
+      "severity": "P3",
+      "area": "type-boundary-and-ui",
+      "location": "src/types/imageModels.ts; src/types/workflow.ts; large React panels and node components",
+      "claim": "类型边界和 UI 巨型组件需要在行为稳定后再整理；构建与运行时加载证据暂未显示循环依赖导致的实际故障。",
+      "evidence": [
+        "npm run lint and npm run build previously pass",
+        "tests/workflow-schema.test.ts",
+        "tests/static-frontend.test.ts",
+        "specs/002-whole-project-audit/contracts/document-boundary.md"
+      ],
+      "impact": "过早拆分会复制业务状态或引入第二事实源，风险高于当前维护收益。",
+      "disposition": "defer",
+      "remediationBatch": "Batch P3",
+      "verification": [
+        "在 P2 完成后执行类型依赖和 UI 行为边界分析",
+        "Playwright 1024/1280/1440 CSS px",
+        "保持领域状态只由现有 store/领域模块持有"
+      ],
+      "state": "planned"
+    }
+  ]
+}

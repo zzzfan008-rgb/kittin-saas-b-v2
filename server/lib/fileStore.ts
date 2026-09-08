@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import dns from "node:dns/promises";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import http from "node:http";
 import https from "node:https";
 import { nanoid } from "nanoid";
@@ -20,7 +20,10 @@ import {
   isLocalImageReference,
   validateImageDataUrl,
 } from "./imageValidation";
-import { normalizeUploadImageDataUrl } from "./uploadImageNormalization";
+import {
+  normalizeUploadImageDataUrl,
+  UPLOAD_MAX_INPUT_PIXELS,
+} from "./uploadImageNormalization";
 
 const MAX_THUMBNAIL_INPUT_PIXELS = 40_000_000;
 
@@ -181,6 +184,76 @@ export function resolveToDataUrl(ref: string): string {
   return `data:${mime};base64,${base64}`;
 }
 
+async function verifyDecodableImageBuffer(buffer: Buffer): Promise<void> {
+  const inputOptions = {
+    animated: false,
+    failOn: "error" as const,
+    limitInputPixels: UPLOAD_MAX_INPUT_PIXELS,
+    sequentialRead: true,
+  };
+  const metadata = await sharp(buffer, inputOptions).metadata();
+  if (
+    !metadata.width
+    || !metadata.height
+    || metadata.width * metadata.height > UPLOAD_MAX_INPUT_PIXELS
+  ) {
+    throw new Error("image dimensions are invalid");
+  }
+  // metadata() parses the container; forcing a tiny raw output also makes
+  // libvips decode pixels so truncated/corrupt files fail before enqueue.
+  await sharp(buffer, inputOptions)
+    .resize({ width: 1, height: 1, fit: "fill" })
+    .raw()
+    .toBuffer();
+}
+
+/** Strict parse plus bounded real decode for an inline image at admission. */
+export async function verifyImageDataUrlForAdmission(dataUrl: unknown): Promise<void> {
+  await withImageProcessingSlot(async () => {
+    const { buffer } = validateImageDataUrl(dataUrl);
+    await verifyDecodableImageBuffer(buffer);
+  });
+}
+
+/**
+ * Read-only admission check for a stored image. The open file handle pins the
+ * inode while size, signature and decode checks run, and O_NOFOLLOW rejects a
+ * symlink swapped into the uploads directory. Keep callers serial (or tightly
+ * bounded) while holding database locks; this deliberately never creates a
+ * Base64 copy of the image.
+ */
+export async function verifyStoredImageFile(ref: string): Promise<void> {
+  if (!isLocalImageReference(ref)) throw new Error("invalid local image reference");
+  const id = ref.slice("/api/files/".length);
+  const expectedMime = EXT_MIME[path.extname(id).slice(1).toLowerCase()];
+  if (!expectedMime) throw new Error("unsupported referenced file type");
+
+  const filePath = path.join(uploadsDir(), id);
+  await withImageProcessingSlot(async () => {
+    let handle: fs.promises.FileHandle | undefined;
+    try {
+      handle = await fs.promises.open(
+        filePath,
+        fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+      );
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_IMAGE_BYTES) {
+        throw new Error("stored image size is invalid");
+      }
+
+      const buffer = await handle.readFile();
+      if (buffer.byteLength !== stat.size || buffer.byteLength > MAX_IMAGE_BYTES) {
+        throw new Error("stored image changed while being verified");
+      }
+      const mime = detectImageMime(buffer);
+      if (!mime || mime !== expectedMime) throw new Error("stored image signature is invalid");
+      await verifyDecodableImageBuffer(buffer);
+    } finally {
+      await handle?.close();
+    }
+  });
+}
+
 export function mimeOfFile(id: string): string {
   const ext = path.extname(id).slice(1).toLowerCase();
   return EXT_MIME[ext] ?? "image/png";
@@ -285,6 +358,16 @@ async function defaultHostLookup(hostname: string): Promise<readonly string[]> {
   return (await dns.lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address);
 }
 
+/** Preserve a validated DNS answer while honoring Node's single/all lookup callback contract. */
+export function createPinnedLookup(address: string): LookupFunction {
+  const family = isIP(address);
+  if (family !== 4 && family !== 6) throw new Error(`invalid pinned IP address: ${address}`);
+  return (_hostname, options, callback) => {
+    if (options.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+}
+
 /**
  * 生产连接器：校验后固定连接到本次 DNS 解析出的 global 地址，并用原 hostname 做
  * Host/SNI。这样校验与真正连接之间不会再次解析域名，关闭 DNS rebinding 的 TOCTOU。
@@ -302,7 +385,7 @@ async function pinnedFetch(
         method: "GET",
         headers: { accept: "image/*", host: u.host },
         signal: init.signal ?? undefined,
-        lookup: (_hostname, _options, callback) => callback(null, address, isIP(address) as 4 | 6),
+        lookup: createPinnedLookup(address),
         ...(u.protocol === "https:" ? { servername: u.hostname } : {}),
       },
       (response) => {

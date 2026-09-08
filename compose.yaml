@@ -23,6 +23,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GARMENT_CANVAS_BUILD_CODE_SHA: ${GARMENT_CANVAS_BUILD_CODE_SHA:-}
+        GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256: ${GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256:-}
+        GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256: ${GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256:-}
     restart: unless-stopped
     env_file:
       - path: .env

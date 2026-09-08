@@ -37,12 +37,16 @@ function run(command, args, options = {}) {
   if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
 }
 
-function runNpmScript(script, env) {
+function runNpmScript(script, env, args = []) {
   if (process.env.npm_execpath) {
-    run(process.execPath, [process.env.npm_execpath, "run", script], { env });
+    run(process.execPath, [process.env.npm_execpath, "run", script, ...(args.length ? ["--", ...args] : [])], { env });
     return;
   }
-  run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script], { env });
+  run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script, ...(args.length ? ["--", ...args] : [])], { env });
+}
+
+export function playwrightArgsFromCli(args) {
+  return args.filter((arg) => arg !== "--skip-build");
 }
 
 async function main() {
@@ -125,9 +129,11 @@ async function main() {
       GENERATION_WORKER_POLL_MS: "60000",
       NO_PROXY: "127.0.0.1,localhost",
       GITHUB_PAT: "",
+      GARMENT_CANVAS_BUILD_CODE_SHA: "0123456789abcdef0123456789abcdef01234567",
+      GARMENT_CANVAS_CODE_SHA: "0123456789abcdef0123456789abcdef01234567",
     };
 
-    runNpmScript("test:e2e:run", e2eEnv);
+    runNpmScript("test:e2e:run", e2eEnv, playwrightArgsFromCli(process.argv.slice(2)));
   } catch (error) {
     spawnSync("docker", [...compose, "logs", "--no-color"], {
       stdio: "inherit",

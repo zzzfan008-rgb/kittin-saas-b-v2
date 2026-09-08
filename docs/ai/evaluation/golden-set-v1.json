@@ -1,0 +1,30 @@
+{
+  "version": "garment-gold-v1",
+  "description": "固定 24 个服装业务样本。每个评估单位都必须使用同一组样本；参考图资产按该单位保留顺序、数量与重复的 referenceRoleProfile 提供。",
+  "samples": [
+    {"id":"garment-gold-01","brief":"黑色蕾丝高领长袖上衣与米白宽腿裤","riskFocus":["黑色蕾丝纹理","高领轮廓","黑白边缘"]},
+    {"id":"garment-gold-02","brief":"米白真丝衬衫与黑色直筒西裤","riskFocus":["真丝高光","浅色不过曝","门襟结构"]},
+    {"id":"garment-gold-03","brief":"棕色羊毛西装与同色阔腿裤","riskFocus":["羊毛纹理","同色层次","西装版型"]},
+    {"id":"garment-gold-04","brief":"靛蓝原色牛仔夹克与牛仔裤","riskFocus":["车线","金属扣","靛蓝色准"]},
+    {"id":"garment-gold-05","brief":"红色针织连衣裙","riskFocus":["针织纹理","红色溢出","贴体轮廓"]},
+    {"id":"garment-gold-06","brief":"浅灰羊绒大衣与高领针织衫","riskFocus":["绒面质感","叠穿边界","长款垂坠"]},
+    {"id":"garment-gold-07","brief":"黑色皮夹克与白色棉质背心","riskFocus":["皮革反光","材质区分","深浅边缘"]},
+    {"id":"garment-gold-08","brief":"碎花雪纺长裙","riskFocus":["小图案一致性","雪纺透明层","裙摆动态"]},
+    {"id":"garment-gold-09","brief":"卡其色工装连体裤","riskFocus":["口袋数量","腰带结构","工装比例"]},
+    {"id":"garment-gold-10","brief":"白色立体褶裥衬衫","riskFocus":["白色层次","褶裥连续性","袖口结构"]},
+    {"id":"garment-gold-11","brief":"墨绿色丝绒西装裙","riskFocus":["丝绒方向光","深绿色准","翻领结构"]},
+    {"id":"garment-gold-12","brief":"银色亮片晚礼服","riskFocus":["亮片密度","高光控制","人体边缘"]},
+    {"id":"garment-gold-13","brief":"藏蓝条纹商务西装","riskFocus":["细条纹连续","左右对称","套装一致"]},
+    {"id":"garment-gold-14","brief":"米色亚麻通勤连衣裙","riskFocus":["亚麻结节","自然褶皱","米色色准"]},
+    {"id":"garment-gold-15","brief":"黑白千鸟格短外套与半裙","riskFocus":["格纹连续","接缝对花","两件套一致"]},
+    {"id":"garment-gold-16","brief":"粉色欧根纱泡泡袖上衣","riskFocus":["透明层次","泡泡袖体积","肤色污染"]},
+    {"id":"garment-gold-17","brief":"白色羽绒服与灰色运动裤","riskFocus":["绗缝分区","蓬松体积","白色细节"]},
+    {"id":"garment-gold-18","brief":"橙色防水机能夹克","riskFocus":["防水面料","拉链与压胶线","高饱和色"]},
+    {"id":"garment-gold-19","brief":"紫色缎面吊带裙与薄纱罩衫","riskFocus":["缎面与薄纱区分","叠穿边界","肩带完整"]},
+    {"id":"garment-gold-20","brief":"黑色不对称剪裁礼服","riskFocus":["不对称结构","黑色暗部","人体遮挡"]},
+    {"id":"garment-gold-21","brief":"蓝白印花棉质衬衫裙","riskFocus":["印花位置","棉布质感","纽扣数量"]},
+    {"id":"garment-gold-22","brief":"驼色麂皮流苏外套","riskFocus":["麂皮哑光","流苏数量与方向","驼色色准"]},
+    {"id":"garment-gold-23","brief":"绿色粗花呢短外套与短裤","riskFocus":["粗花呢颗粒","毛边细节","套装同材质"]},
+    {"id":"garment-gold-24","brief":"白底黑色波点复古连衣裙","riskFocus":["波点数量稳定","白底洁净","复古廓形"]}
+  ]
+}

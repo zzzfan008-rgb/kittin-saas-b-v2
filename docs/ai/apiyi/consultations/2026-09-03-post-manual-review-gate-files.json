@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T15:25:54.151Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "d2e75ed41b5ea450da2b1da3a48b00c6a3b7489613454ebf76b531c034a2dcfd",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "API易 变更门禁 AGENTS.md scripts/codex-gate.mjs 当前快照凭证与离线检查",
+  "affectedPaths": [
+    "AGENTS.md",
+    "scripts/codex-gate.mjs"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/qwen-3-6-opensource-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/qwen-3-6-opensource-launch.md",
+      "pageLocalPath": "pages/news/qwen-3-6-opensource-launch.md",
+      "title": "Qwen3.6 开源双模上线：API易官转托管 · 免租卡",
+      "sha256": "c51467bd1b17d97269603d51eeb788fbdda57e2ff5b537112c9787c67114aed6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/server-location",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/server-location.md",
+      "pageLocalPath": "pages/faq/server-location.md",
+      "title": "API易的服务器在哪里？应该选择什么服务器？",
+      "sha256": "1716897ebcfe5cd0c321239d5029d85dd47ff4cb42357fe092cd264ae71ee2e8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/server-location",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/server-location.md",
+      "pageLocalPath": "pages/zh-Hant/faq/server-location.md",
+      "title": "API易的伺服器在哪裡？應該選擇什麼伺服器？",
+      "sha256": "cd0b107e98f2eae746156b32df860e624029bb9b63330f78f35c722661a254aa"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/index.md",
+      "pageLocalPath": "pages/index.md",
+      "title": "API易 - 企业级 AI 大模型 API 中转站",
+      "sha256": "6af095feae4446e1e86633ac8e17da853b7aa6351be12f922c83b2425263f167"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant.md",
+      "pageLocalPath": "pages/zh-Hant.md",
+      "title": "API易 - 企業級 AI 大模型 API 中轉站",
+      "sha256": "1deecdd8ee9f3b5d1fc304146f50c463bf740cc356dcad3f32a3b6eca2685b58"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/balance-validity-period",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/balance-validity-period.md",
+      "pageLocalPath": "pages/faq/balance-validity-period.md",
+      "title": "API易的余额会过期吗？余额有效期是多久？",
+      "sha256": "189576ab648e7758383f6972acc91ffe035cd5681e22bf7ef2e22eb5cca739b5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/enterprise-trust",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/enterprise-trust.md",
+      "pageLocalPath": "pages/faq/enterprise-trust.md",
+      "title": "API易 的企业服务值得信任吗？模型保真吗？",
+      "sha256": "25d8715960a8708fab4cec603b41bb724af193fe8230396bb52e3d5ddb91c11e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/balance-validity-period",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/balance-validity-period.md",
+      "pageLocalPath": "pages/zh-Hant/faq/balance-validity-period.md",
+      "title": "API易的餘額會過期嗎？餘額有效期是多久？",
+      "sha256": "c51fe700fb7fc6865720239164471575c574b8e84dd4d9f7872ebea066004bc6"
+    }
+  ],
+  "decisionSummary": "为当前 API易 相关变更补齐不可变门禁文件的本地知识库凭证；继续要求目录人工基线、离线契约、评估清单与完整发布条件全部满足后才可放行，且本轮不调用任何图片生成或编辑端点。",
+  "unresolvedChoices": []
+}

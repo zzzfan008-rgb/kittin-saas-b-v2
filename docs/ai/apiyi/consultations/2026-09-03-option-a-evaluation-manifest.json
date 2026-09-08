@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T11:04:07.493Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "398abb046dc171ef39a279d3eec3bf1cd8632943768073c1159a2b6e41fb8869",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "GPT Image 2 VIP Gemini 3.1 Flash Image FLUX.2 Pro Seedream 5.0 图片评估 参考图顺序 参数 画幅 同步调用 重试 计费",
+  "affectedPaths": [
+    "docs/ai/evaluation/README.md",
+    "docs/ai/evaluation/evaluation-manifest-v1.json",
+    "package.json",
+    "scripts/evaluation-manifest.ts",
+    "server/lib/evaluationPromotion.ts",
+    "tests/evaluation-manifest.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-05/gemini-image-preview-stable",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-05/gemini-image-preview-stable.md",
+      "pageLocalPath": "pages/en/live/2026-05/gemini-image-preview-stable.md",
+      "title": "gemini-3-pro-image-preview / gemini-3.1-flash-image-preview running stably today",
+      "sha256": "6a3800f6d6e56d70b4da5618b6ce5819eb4006248789f8138cf4ed7a80597755"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-image-preview-stable",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gemini-image-preview-stable.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-image-preview-stable.md",
+      "title": "gemini-3-pro-image-preview / gemini-3.1-flash-image-preview 今日平稳运行",
+      "sha256": "4abd7810aa9e91781469fb28dcef5cc38abf0b3364f0b921bfab1d423a65a23e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 生图/编辑",
+      "sha256": "2ed97c1500398dc939bd6b77e8e121227ef3906b1ae6a794658f1e75f967fdd0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP Image Gen/Editing",
+      "sha256": "97fc5fbf511a01bfed1c90d8b743e7731cd823a0fb0c2acd9a76342c8ebdf16d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All 生图/编辑",
+      "sha256": "e52de5e1c5676a35eda112fa4be9e4fdb015e3f829ecb46f8603f420c0336d63"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gpt-image-2-all-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gpt-image-2-all-launch.md",
+      "pageLocalPath": "pages/en/news/gpt-image-2-all-launch.md",
+      "title": "gpt-image-2-all Launch: $0.03/image GPT Reverse-Engineered Image Model",
+      "sha256": "e16d196a8fe835879862af4d7c0f1ef6b7121248066b31cabd80f50a093f2f49"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-05/gemini-3-5-flash",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-05/gemini-3-5-flash.md",
+      "pageLocalPath": "pages/en/live/2026-05/gemini-3-5-flash.md",
+      "title": "Gemini 3.5 Flash launches: Flash beats Gemini 3.1 Pro",
+      "sha256": "45b70527c7940bf6cf4d8a42efb42c2e47b5245415e51774f2f21245cfb5b09f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-3-5-flash",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-05/gemini-3-5-flash.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-3-5-flash.md",
+      "title": "Gemini 3.5 Flash 上线：Flash 反超 Gemini 3.1 Pro",
+      "sha256": "acde544fb54620e81b82dd1e72a11a9615497f0a9a9027ef2e1604670833317f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/gemini-3-5-flash-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/gemini-3-5-flash-launch.md",
+      "pageLocalPath": "pages/news/gemini-3-5-flash-launch.md",
+      "title": "Gemini 3.5 Flash 正式上线：Flash 击败 Pro",
+      "sha256": "d76381df0b2bb1a0996f19c73689ab1d4e695159a541e27024531570f07d1adb"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2 官转 vs 官逆 对比",
+      "sha256": "88ac0e551b204efb2b506542aae02847e70ca8fce54b87c6cab5eabf83287c2e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-08/gpt-image-2-vip-429-retry",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-08/gpt-image-2-vip-429-retry.md",
+      "pageLocalPath": "pages/live/2026-08/gpt-image-2-vip-429-retry.md",
+      "title": "gpt-image-2-vip 存在饱和，429 可重试、内容安全无需重试",
+      "sha256": "ab04bf2e4c67dcb3e06670a86908c5a0f0cf7e236b5372ab7eb04f9dbe70f188"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-06/gemini-3-1-flash-lite-replaced",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-06/gemini-3-1-flash-lite-replaced.md",
+      "pageLocalPath": "pages/en/live/2026-06/gemini-3-1-flash-lite-replaced.md",
+      "title": "gemini-3.1-flash-lite-preview transparently replaced by gemini-3.1-flash-lite",
+      "sha256": "5e6bc6eb5750fc307d74e9191e9319dd1997a0c4acb25ca721f9d87832cc35f1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gemini-3-5-flash-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gemini-3-5-flash-launch.md",
+      "pageLocalPath": "pages/en/news/gemini-3-5-flash-launch.md",
+      "title": "Gemini 3.5 Flash Launch: Flash Beats Pro",
+      "sha256": "0a67356b9ef8e1187f3a24000fc4dc8da2595f77a142a0d79b64bede9e0f7c05"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-06/gemini-3-1-flash-lite-replaced",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-06/gemini-3-1-flash-lite-replaced.md",
+      "pageLocalPath": "pages/live/2026-06/gemini-3-1-flash-lite-replaced.md",
+      "title": "gemini-3.1-flash-lite-preview 已透明替换为 gemini-3.1-flash-lite",
+      "sha256": "f962d53b8a521840d3f9574048e4c4e972830b5fd742282b1220be05b4a7ba60"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gemini-3-flash-preview-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/gemini-3-flash-preview-launch.md",
+      "pageLocalPath": "pages/en/news/gemini-3-flash-preview-launch.md",
+      "title": "Gemini 3 Flash Preview Launches: Pro-Level Performance at Flash Speed",
+      "sha256": "a34ea354ec3d4ac0eb7cafe51cd3a1947c75d5a60f18c065958268a347af33f6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/ecosystem/coze-gptimage2-plugin",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "pageLocalPath": "pages/scenarios/ecosystem/coze-gptimage2-plugin.md",
+      "title": "GPT Image 2 Coze 插件",
+      "sha256": "9cac91b7f7f7ec35eafe8c2686332f334a0391597f22bf66ba3fc5a565b5d462"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/archive",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/archive.md",
+      "pageLocalPath": "pages/live/archive.md",
+      "title": "实时动态归档",
+      "sha256": "0a6eb4e1ff7ac9951bf673e9da1471a6a93eeea70b4f6720081e074334a23805"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-06/gpt-image-2-vip-recovered",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/live/2026-06/gpt-image-2-vip-recovered.md",
+      "pageLocalPath": "pages/en/live/2026-06/gpt-image-2-vip-recovered.md",
+      "title": "gpt-image-2-vip back to normal · recommend wiring up official-relay gpt-image-2 as backup",
+      "sha256": "17ddad0e038697f941d3e855f0daa175cecce77b05472112fa2f1ec102f88655"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-06/gpt-image-2-vip-recovered",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-06/gpt-image-2-vip-recovered.md",
+      "pageLocalPath": "pages/live/2026-06/gpt-image-2-vip-recovered.md",
+      "title": "gpt-image-2-vip 已恢复正常 · 建议接上官转正式版 gpt-image-2 备用",
+      "sha256": "7749545abc41d8d8cc08a0ad852e8f79462ef9025b173c9baf938fb3aaecec04"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP Генерация/редактирование изображений",
+      "sha256": "c38d0ee053b850a65af7abfab6ac40df75e8bc1c18a6a845d8bb0e3d6c97ed3d"
+    }
+  ],
+  "decisionSummary": "方案 A：逐一固定 25 个提示词基础评估单元，首批只选择四个普通模型的 commerce-hero generate/edit 与 GPT Image 2 mask-edit 共 9 个最低复杂度探针。参考角色顺序、当前版本向量、业务画幅和 release-vector 哈希全部离线绑定；证据不得跨单位或跨阶段复用；自动重试和补样均为 0；清单授权付费调用数为 0，真实运行仍需当前价格、干净 exact SHA、素材哈希及逐 case 授权。",
+  "unresolvedChoices": []
+}

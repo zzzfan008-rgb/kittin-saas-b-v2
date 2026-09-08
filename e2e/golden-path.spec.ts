@@ -22,7 +22,46 @@ function postBody<T>(request: Request): T | null {
   return request.postDataJSON() as T;
 }
 
-test("upload and text starters complete the isolated first-generation golden path", async ({ page }) => {
+async function installTestOnlyReviewedTextVariant(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(async () => {
+    const promptCatalogPath = "/src/lib/garmentPromptPresets.ts";
+    const releasePath = "/src/lib/promptEvaluationRelease.ts";
+    const registryPath = "/src/lib/promptEvaluationReleaseRegistry.ts";
+    const [catalog, releaseTools, registry] = await Promise.all([
+      import(/* @vite-ignore */ promptCatalogPath),
+      import(/* @vite-ignore */ releasePath),
+      import(/* @vite-ignore */ registryPath),
+    ]);
+    const codeSha = "0123456789abcdef0123456789abcdef01234567";
+    (globalThis as unknown as {
+      process?: { env?: Record<string, string> };
+    }).process = { env: { GARMENT_CANVAS_CODE_SHA: codeSha } };
+    const variant = catalog.getGarmentPromptVariant({
+      familyId: "commerce-hero",
+      modelId: "gpt-image-2-vip",
+      nodeKind: "sketch-to-render",
+      mode: "generate",
+    });
+    if (!variant) throw new Error("Missing E2E prompt variant");
+    variant.supportStatus = "verified";
+    const releases = registry.PROMPT_EVALUATION_RELEASES as unknown as Array<unknown>;
+    releases.push(releaseTools.createPromptEvaluationReleaseSnapshot(
+      variant,
+      [],
+      "verified",
+      "e2e-test-only-evidence",
+      {
+        evaluationStage: "formal-validation",
+        evidenceArtifactSha256: "0".repeat(64),
+        gateReceiptSha256: "0".repeat(64),
+        evaluationUnitKey: `sha256:${"0".repeat(64)}`,
+        codeSha,
+      },
+    ));
+  });
+}
+
+test("unverified upload stays blocked while a test-reviewed text starter completes the isolated golden path", async ({ page }) => {
   const uploadImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
@@ -99,6 +138,12 @@ test("upload and text starters complete the isolated first-generation golden pat
   const initialDraft = await initialDraftResponse.json() as { draft?: { id?: string } };
   expect(initialDraft.draft?.id).toBeTruthy();
   const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
+  if (!await launcher.isVisible()) {
+    await page.getByRole("button", { name: "打开项目中心" }).click();
+    const center = page.getByRole("dialog", { name: "项目中心" });
+    await expect(center).toBeVisible();
+    await center.getByRole("button", { name: "新建项目" }).click();
+  }
   await expect(launcher).toBeVisible();
   await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
   const coverImages = launcher.locator('img[aria-hidden="true"]');
@@ -108,30 +153,19 @@ test("upload and text starters complete the isolated first-generation golden pat
     return image.currentSrc.endsWith(".webp") && image.naturalWidth > 0;
   }).length)).toBe(6);
 
-  const uploadFileChooser = page.waitForEvent("filechooser");
-  await launcher.getByRole("button", { name: "使用内置模板：草图→效果图→高清放大" }).click();
-  const fileChooser = await uploadFileChooser;
-  const uploadNode = page.locator(".react-flow__node").filter({ hasText: "图片上传" });
+  await launcher.getByRole("button", { name: "使用内置模板：图案风格迁移（图案→参考风格）" }).click();
+  const uploadNode = page.getByTestId("rf__node-pattern");
   await expect(uploadNode).toBeVisible();
-  const fileInput = uploadNode.locator('input[type="file"]');
-  await expect(fileInput).toBeFocused();
+  const uploadFileChooser = page.waitForEvent("filechooser");
+  await uploadNode.getByRole("button", { name: "上传图片" }).click();
+  const fileChooser = await uploadFileChooser;
   await fileChooser.setFiles({ name: "starter.png", mimeType: "image/png", buffer: uploadImage });
   await expect(uploadNode.getByAltText("已上传图片")).toBeVisible();
 
-  const uploadGenerateNode = page.locator(".react-flow__node").filter({ hasText: "草图→效果图" });
-  await uploadGenerateNode.getByRole("button", { name: "生成效果图" }).click();
-  await expect(uploadGenerateNode.getByTitle("成功")).toBeVisible();
-  await expect.poll(() => runs.length).toBe(1);
-  await expect.poll(() => saves.length).toBe(1);
-  expect(saves[0].id).toBe(initialDraft.draft?.id);
-  expect(runs[0].nodes).toEqual(saves[0].flow.nodes);
-  expect(runs[0].edges).toEqual(saves[0].flow.edges);
-
-  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
-  await contextToggle.click();
-  await page.getByRole("tab", { name: "结果 / 记录" }).click();
-  const results = page.getByRole("region", { name: "最近生成" });
-  await expect(results.getByAltText("草图→效果图")).toBeVisible();
+  const uploadGenerateNode = page.getByTestId("rf__node-transfer");
+  await expect(uploadGenerateNode.getByRole("button", { name: "未验证不可运行" })).toBeDisabled();
+  await expect(uploadGenerateNode.getByText(/参考图角色尚未全部确认|没有绑定当前版本的独立提示词变体/)).toBeVisible();
+  expect(runs).toHaveLength(0);
 
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const projectCenter = page.getByRole("dialog", { name: "项目中心" });
@@ -139,6 +173,7 @@ test("upload and text starters complete the isolated first-generation golden pat
   await projectCenter.getByRole("button", { name: /新建项目/ }).click();
   await expect(launcher).toBeVisible();
   await expect(launcher.getByRole("button", { name: /使用内置模板：/ })).toHaveCount(6);
+  await installTestOnlyReviewedTextVariant(page);
   await launcher.getByRole("button", { name: "使用内置模板：文生图（服装设计）" }).click();
   const textNode = page.locator(".react-flow__node").filter({ hasText: "文生图" });
   const prompt = textNode.locator("textarea").first();
@@ -151,21 +186,27 @@ test("upload and text starters complete the isolated first-generation golden pat
       control.selectionEnd === control.value.length;
   })).toBe(true);
   await prompt.fill("极简黑白通勤女装，写实摄影，浅灰背景");
+
+  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
+  await contextToggle.click();
+  const properties = page.getByRole("tabpanel", { name: "属性" });
+  await properties.getByRole("button", { name: "服装提示词预设" }).click();
+  await properties.getByRole("button", { name: /电商主图/ }).click();
+  await properties.getByRole("button", { name: "确认应用" }).click();
+
   await textNode.getByRole("button", { name: "生成效果图" }).click();
   await expect(textNode.getByTitle("成功")).toBeVisible();
-  await expect.poll(() => runs.length).toBe(2);
-  await expect.poll(() => saves.length).toBe(2);
-  expect(runs[1].nodes).toEqual(saves[1].flow.nodes);
-  expect(runs[1].edges).toEqual(saves[1].flow.edges);
+  await expect.poll(() => runs.length).toBe(1);
+  await expect.poll(() => saves.length).toBe(1);
+  expect(runs[0].nodes).toEqual(saves[0].flow.nodes);
+  expect(runs[0].edges).toEqual(saves[0].flow.edges);
 
   await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  const results = page.getByRole("region", { name: "最近生成" });
   const textResult = results.getByAltText("文生图");
-  const uploadResult = results.getByAltText("草图→效果图");
   await expect(textResult).toBeVisible();
-  await expect(uploadResult).toBeVisible();
 
   const textResultCard = results.locator('article:has(img[alt="文生图"])');
-  const uploadResultCard = results.locator('article:has(img[alt="草图→效果图"])');
   await textResultCard.hover();
   const actionBar = textResultCard.locator('div.absolute.inset-x-0.bottom-0');
   await expect(actionBar).toHaveClass(/grid-cols-2/);
@@ -181,15 +222,6 @@ test("upload and text starters complete the isolated first-generation golden pat
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
-
-  await textResultCard.locator('button[title="加入对比"]').click();
-  await uploadResultCard.hover();
-  await uploadResultCard.locator('button[title="加入对比"]').click();
-  await results.getByRole("button", { name: "对比 2 张" }).click();
-  const compareDialog = page.getByRole("dialog", { name: "结果对比" });
-  await expect(compareDialog).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(compareDialog).toHaveCount(0);
 
   for (const theme of ["white", "eye", "current"] as const) {
     await page.evaluate((value) => {

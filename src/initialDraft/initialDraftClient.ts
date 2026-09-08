@@ -1,5 +1,6 @@
 import type { PersistedWorkflow } from "@/types/workflow";
 import type { ServerInitialDraftSnapshot } from "@/store/flowStore";
+import { apiErrorMessage } from "@/lib/apiErrors";
 import { nanoid } from "nanoid";
 
 export class InitialDraftApiError extends Error {
@@ -8,7 +9,7 @@ export class InitialDraftApiError extends Error {
   readonly currentDraftId?: string;
 
   constructor(status: number, body: Record<string, unknown>) {
-    super(typeof body.error === "string" ? body.error : `HTTP ${status}`);
+    super(apiErrorMessage(status, body));
     this.name = "InitialDraftApiError";
     this.status = status;
     if (typeof body.currentRevision === "number") this.currentRevision = body.currentRevision;

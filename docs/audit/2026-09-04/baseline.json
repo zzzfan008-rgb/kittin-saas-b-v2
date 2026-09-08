@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-04T14:16:51Z",
+  "repository": "/Users/lionfan/Documents/ChatGPT/无限画布/garment-canvas",
+  "branch": "codex/p0-provider-download-and-p2-presets",
+  "headSha": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "originMainSha": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "worktreeScope": "all tracked and untracked candidate changes; no cleanup, reset, overwrite, or forced reorganization",
+  "trackedChangedFiles": 88,
+  "insertions": 11157,
+  "deletions": 921,
+  "untrackedStatusEntries": 87,
+  "untrackedFilesystemFiles": 2745,
+  "deletedTrackedFiles": 1,
+  "lastReconciledAt": "2026-09-04",
+  "environment": {
+    "node": "v26.4.0",
+    "requiredNodeContract": ">=22.20.0; project release baseline 22.20.0",
+    "npm": "11.18.0",
+    "docker": "Docker version 29.6.1, build 8900f1d330",
+    "postgresImage": "postgres:18-alpine",
+    "postgresContainer": "garment-canvas-postgres-1 healthy",
+    "appContainer": "garment-canvas-app-1 exited (137); not used as release evidence"
+  },
+  "databaseFactSource": {
+    "production": "PostgreSQL 18",
+    "migrationCompatibility": "SQLite test-only",
+    "composePostgresStatus": "healthy",
+    "schemaEvidence": [
+      "tests/schema-migrations.test.ts",
+      "tests/sqlite-postgres-migration.test.ts",
+      "server/lib/database.ts"
+    ]
+  },
+  "externalEvidence": [
+    {
+      "path": "/Users/lionfan/Documents/ChatGPT/无限画布/_external/apiyi-model-catalog/2026-09-03Tmanual-review-v1-models.json",
+      "sha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+      "bytes": 61774,
+      "purpose": "Exact raw authenticated GET /v1/models response; retained outside Git"
+    }
+  ],
+  "apiyiModelCatalog": {
+    "endpoint": "GET /v1/models",
+    "capturedAt": "2026-09-03T13:22:48.000Z",
+    "httpStatus": 200,
+    "canonicalUniqueModelCount": 271,
+    "expectedGatewayModelIds": [
+      "gpt-image-2",
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "observedExpectedModelIds": [
+      "gpt-image-2",
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "missingExpectedModelIds": [],
+    "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
+    "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+    "status": "verified-catalog-only-release-not-ready",
+    "paidProviderCalls": 0,
+    "imageGenerationOrEditCalls": 0,
+    "evidenceRefs": [
+      "docs/ai/apiyi/evidence/2026-09-03-manual-model-catalog-review.json",
+      "docs/ai/apiyi/model-knowledge.json",
+      "docs/ai/apiyi/sources.json"
+    ]
+  },
+  "checks": [
+    {
+      "command": "bash .specify/scripts/bash/check-prerequisites.sh --json --require-spec --require-tasks --include-tasks",
+      "status": "pass",
+      "evidence": "FEATURE_DIR resolved to specs/002-whole-project-audit"
+    },
+    {
+      "command": "npm run docs:apiyi:kb:check",
+      "status": "pass",
+      "evidence": "Local API易 knowledge base and reviewed catalog metadata validate offline"
+    },
+    {
+      "command": "node scripts/apiyi-docs.mjs check --offline",
+      "status": "pass",
+      "evidence": "API易 contract source fingerprints validate without network or image endpoints"
+    },
+    {
+      "command": "npm run evaluation:node-matrix:check",
+      "status": "pass",
+      "evidence": "Active node/model/prompt parameter matrix validates"
+    },
+    {
+      "command": "npm run evaluation:manifest:check",
+      "status": "pass",
+      "evidence": "Evaluation manifest and release vectors validate offline"
+    },
+    {
+      "command": "node tests/codex-gate.test.mjs",
+      "status": "pass",
+      "evidence": "Codex gate behavior tests pass in isolated execution"
+    },
+    {
+      "command": "npm run check",
+      "status": "pass",
+      "evidence": "Serial rerun passed: TypeScript, production Web build, isolated PostgreSQL test suite and all focused auth/document/DAG/queue/Provider/migration/evidence tests"
+    },
+    {
+      "command": "npm run build",
+      "status": "pass",
+      "evidence": "Production Web and server bundles built; CSS and bundle budgets passed"
+    },
+    {
+      "command": "git diff --check",
+      "status": "pass",
+      "evidence": "Tracked candidate diff has no whitespace errors"
+    },
+    {
+      "command": "GitNexus impact",
+      "status": "pass",
+      "evidence": "Exact impact checks completed for saveTab, claimNextJob and migrate; runNode required file/symbol disambiguation and is covered by focused tests"
+    },
+    {
+      "command": "GitNexus detect_changes",
+      "status": "pass",
+      "evidence": "Index up-to-date; 87 changed files, 153 affected symbols and critical aggregate risk recorded for the broad candidate"
+    },
+    {
+      "command": "npm run evaluation:release:preflight",
+      "status": "blocked",
+      "evidence": "GARMENT_CANVAS_EVALUATION_RELEASE_HOST_DIR is required; no external evaluation release directory was created"
+    },
+    {
+      "command": "npm run gate:codex -- --base origin/main",
+      "status": "blocked",
+      "evidence": "Candidate is uncommitted; base comparison is not a valid final release receipt"
+    },
+    {
+      "command": "npm run gate:codex -- --uncommitted",
+      "status": "blocked",
+      "evidence": "Current Node.js v26.4.0 does not satisfy the exact v22.20.0 runtime required by the complete gate"
+    },
+    {
+      "command": "npm run gate:codex -- --uncommitted (Node 22.20.0 rerun)",
+      "status": "fail-closed",
+      "evidence": "Deterministic stages passed, but the final read-only reviewer returned only a degraded placeholder verdict=fail and did not write a result file; the reviewer was terminated after remaining idle"
+    }
+  ],
+  "gitNexus": {
+    "repository": "kittin-saas-b-v2",
+    "indexedCommit": "b9b051f",
+    "status": "degraded",
+    "degradedEvidence": "The final gate reviewer could not produce a durable JSON result and returned a placeholder fail verdict; no pass receipt exists",
+    "coverageLimitation": "Mounted routes such as /api/generate and /api/templates are not fully reversed by api_impact; this is recorded as an evidence coverage gap, not a confirmed business vulnerability"
+  },
+  "releaseDecision": "fail-closed",
+  "releaseBlockers": [
+    "Node runtime does not match the project release baseline 22.20.0",
+    "Evaluation release external evidence directory is missing",
+    "Final origin/main gate cannot be validly run on an uncommitted worktree",
+    "Final read-only gate review is degraded and has no durable pass receipt",
+    "Some mounted write routes require manual route and response-shape evidence because GitNexus coverage is incomplete"
+  ],
+  "scopeNotes": [
+    "No image generation or image editing endpoint was called during this audit",
+    "API易 checks are conditional on API易-related contract, provider, model, prompt, evidence, or release changes",
+    "The raw model export is not copied into the repository or release package"
+  ]
+}

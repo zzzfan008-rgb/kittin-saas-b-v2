@@ -706,7 +706,12 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
     nodeId: "normalization-gate",
     kind: "print-extract",
     inputImages: [`/api/files/${legacyId}`],
-    params: { prompt: "提取主图案" },
+    params: {
+      prompt: "提取主图案",
+      operationMode: "edit",
+      modelId: "flux-2-pro",
+      modelOptions: { width: 1024, height: 1024, outputFormat: "png" },
+    },
   };
   await executeStep(step, step.inputImages, () => provider);
   assert.equal(paidCalls, 1);

@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T08:26:14.659Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "4901f3322901ffb1bde57c604953f92080f01f13afb252da028bb34ede0accb7",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "/v1/models 模型目录 人工复核 reviewed baseline 完整 ID 集合 哈希 漂移",
+  "affectedPaths": [
+    "docs/DEPLOYMENT_AND_OPERATIONS.md",
+    "docs/ai/apiyi/README.md",
+    "docs/ai/apiyi/evidence/2026-09-03-five-model-catalog-review.json",
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/model-knowledge.json",
+    "docs/ai/apiyi/reviews/2026-09-03-five-model-catalog-review.md",
+    "docs/ai/apiyi/sources.json",
+    "docs/ai/evaluation/README.md",
+    "tests/apiyi-docs.test.ts",
+    "tests/evaluation-review-cli.test.ts",
+    "tests/provider-contract.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/image-video-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/image-video-models.md",
+      "pageLocalPath": "pages/en/api-capabilities/image-video-models.md",
+      "title": "Image & Video Generation Models",
+      "sha256": "c81a2b722a2dfc83d39e5df6e3e0dd540e0b7dbde1183037ff3e6a9b41f7af15"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/google-ai-studio-usage-guide",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/google-ai-studio-usage-guide.md",
+      "pageLocalPath": "pages/en/news/google-ai-studio-usage-guide.md",
+      "title": "Google AI Studio Usage Guide: 3 Ways to Access Gemini Models Easily",
+      "sha256": "2582ae63efc51e33c16e6ece43b2c45885bd2b42a20ee471dbcc7da4ed73884e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/base-url-config",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/base-url-config.md",
+      "pageLocalPath": "pages/en/faq/base-url-config.md",
+      "title": "How to Configure Base URL? Differences Between /v1, Root Domain, and /v1beta",
+      "sha256": "962af2f1474a6bbae879b03361ac4db2abc36c8123f2cbb2d9b9f2b018deb331"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/native",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/openai/native.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/native.md",
+      "title": "OpenAI Responses API Native Guide",
+      "sha256": "9e1c246ab545254c10a5490afe2b12980e921b6b543d6e381cb421bceb7ff441"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/veo-3-1-official/text-to-video",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/veo-3-1-official/text-to-video.md",
+      "pageLocalPath": "pages/en/api-capabilities/veo-3-1-official/text-to-video.md",
+      "title": "VEO 3.1 Official Text-to-Video API",
+      "sha256": "f390249f604fe846ca6fcfdfb377b3daad34f2619d58cc860d0f7594ea6c0e6d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/scenarios/chat/obsidian-copilot",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/scenarios/chat/obsidian-copilot.md",
+      "pageLocalPath": "pages/en/scenarios/chat/obsidian-copilot.md",
+      "title": "Obsidian Copilot",
+      "sha256": "b12b81f6e204859e9cdcc0ada6451d79e854dbb728c85b3a086578e040530ff3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-reference/models/list-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-reference/models/list-models.md",
+      "pageLocalPath": "pages/en/api-reference/models/list-models.md",
+      "title": "List Models",
+      "sha256": "e3b5e3244f8f959dcb513a4493c7ee4e4684afaf4d4200e5fa72d867d0bf1641"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/invalid-api-key",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/invalid-api-key.md",
+      "pageLocalPath": "pages/en/faq/invalid-api-key.md",
+      "title": "Why is my API Key invalid?",
+      "sha256": "3c6e252fba6ee573d5f8c4aec5aac4ff19e4d91af0821230d140fcaf53fee546"
+    }
+  ],
+  "decisionSummary": "用户已明确批准 2026-09-03T08:12:22.094Z 的完整 API易 GET /v1/models 原始导出；采用 sha256-canonical-model-id-set-v1 指纹 bc6fffe606c2419d00bccec2f27c70835def3f77f5f0608276d94959f459879f，同步五模型 baseline 并重算契约哈希。目录存在只证明当前配置令牌的 ID 可见性；全部模型继续 unverified，不进行付费调用、发布、提交或推送。",
+  "unresolvedChoices": []
+}

@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "artifactType": "garment-canvas-performance-baseline",
+  "capturedAt": "2026-09-06T08:36:05.750Z",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpuModel": "Apple M4",
+    "logicalCpuCount": 10,
+    "totalMemoryBytes": 17179869184
+  },
+  "git": {
+    "head": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+    "branch": "codex/p0-provider-download-and-p2-presets",
+    "dirty": true
+  },
+  "queue": {
+    "workload": {
+      "runs": 100,
+      "jobs": 500,
+      "measuredClaims": 20
+    },
+    "claimLatencyMs": {
+      "samples": 20,
+      "minMs": 2.97,
+      "medianMs": 3.24,
+      "p95Ms": 3.481,
+      "maxMs": 3.684,
+      "meanMs": 3.243
+    },
+    "queryCountPerClaim": {
+      "min": 9,
+      "median": 9,
+      "p95": 9,
+      "max": 9
+    },
+    "plan": {
+      "rootNodeType": "Limit",
+      "executionTimeMs": 0.07,
+      "sortNodeCount": 0,
+      "nodeTypes": [
+        "Limit",
+        "LockRows",
+        "Nested Loop",
+        "Index Scan",
+        "Memoize"
+      ]
+    }
+  },
+  "database": {
+    "operation": "transaction(BEGIN + SELECT 1 + COMMIT)",
+    "samples": 30,
+    "transactionRoundTripLatencyMs": {
+      "samples": 30,
+      "minMs": 0.6,
+      "medianMs": 0.759,
+      "p95Ms": 1.753,
+      "maxMs": 1.964,
+      "meanMs": 0.865
+    },
+    "queriesPerTransaction": 3
+  },
+  "imageProcessing": {
+    "operation": "normalizeUploadImageDataUrl",
+    "fixture": {
+      "width": 1600,
+      "height": 1200,
+      "inputBytes": 5771480,
+      "samples": 7
+    },
+    "normalizedBytes": 1452662,
+    "normalizationLatencyMs": {
+      "samples": 7,
+      "minMs": 5595.289,
+      "medianMs": 5604.567,
+      "p95Ms": 5625.232,
+      "maxMs": 5625.232,
+      "meanMs": 5605.901
+    },
+    "peakRssDeltaBytes": 27049984,
+    "peakExternalDeltaBytes": 14799271
+  },
+  "desktopRendering": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "nodeCount": 100,
+    "samples": 7,
+    "commitToStablePaintMs": {
+      "samples": 7,
+      "minMs": 161.4,
+      "medianMs": 163.5,
+      "p95Ms": 245.8,
+      "maxMs": 245.8,
+      "meanMs": 195.457
+    },
+    "peakJsHeapUsedBytes": 44700000,
+    "navigation": {
+      "domContentLoadedMs": 83.20000000298023,
+      "loadEventMs": 84.20000000298023,
+      "transferSizeBytes": 3458,
+      "decodedBodySizeBytes": 3158
+    }
+  },
+  "bundle": {
+    "budgets": {
+      "initialGzipBytes": 210000,
+      "singleChunkBytes": 500000
+    },
+    "totals": {
+      "initialGzipBytes": 164400,
+      "initialBytes": 515288,
+      "chunkCount": 13
+    },
+    "initialChunks": [
+      {
+        "file": "assets/index-BF2vlR_G.js",
+        "bytes": 133346,
+        "gzipBytes": 42234
+      },
+      {
+        "file": "assets/vendor-flow-0WQD0T1H.js",
+        "bytes": 184089,
+        "gzipBytes": 60011
+      },
+      {
+        "file": "assets/vendor-react-Dd-WIYDx.js",
+        "bytes": 194272,
+        "gzipBytes": 60738
+      },
+      {
+        "file": "assets/vendor-state-2Z-CWW7O.js",
+        "bytes": 3581,
+        "gzipBytes": 1417
+      }
+    ],
+    "allChunks": [
+      {
+        "file": "assets/App-BDeAzS0-.js",
+        "bytes": 176884,
+        "gzipBytes": 53377
+      },
+      {
+        "file": "assets/AssetPickerOverlay-B4ad4tbB.js",
+        "bytes": 4491,
+        "gzipBytes": 1985
+      },
+      {
+        "file": "assets/CompareOverlay-aIK0_Vh9.js",
+        "bytes": 2138,
+        "gzipBytes": 1042
+      },
+      {
+        "file": "assets/ImageViewer-DC87pIjL.js",
+        "bytes": 7953,
+        "gzipBytes": 3317
+      },
+      {
+        "file": "assets/LoginPage-S9AgkIvc.js",
+        "bytes": 10447,
+        "gzipBytes": 3925
+      },
+      {
+        "file": "assets/ProjectCenter-DXdx5p2L.js",
+        "bytes": 22964,
+        "gzipBytes": 6381
+      },
+      {
+        "file": "assets/button-BtR1W7Yb.js",
+        "bytes": 30925,
+        "gzipBytes": 9797
+      },
+      {
+        "file": "assets/index-BF2vlR_G.js",
+        "bytes": 133346,
+        "gzipBytes": 42234
+      },
+      {
+        "file": "assets/vendor-flow-0WQD0T1H.js",
+        "bytes": 184089,
+        "gzipBytes": 60011
+      },
+      {
+        "file": "assets/vendor-icons-D4QxFeyF.js",
+        "bytes": 14276,
+        "gzipBytes": 3330
+      },
+      {
+        "file": "assets/vendor-react-Dd-WIYDx.js",
+        "bytes": 194272,
+        "gzipBytes": 60738
+      },
+      {
+        "file": "assets/vendor-state-2Z-CWW7O.js",
+        "bytes": 3581,
+        "gzipBytes": 1417
+      },
+      {
+        "file": "assets/vendor-ui-B6ekPYOl.js",
+        "bytes": 213471,
+        "gzipBytes": 72108
+      }
+    ]
+  },
+  "interpretation": {
+    "purpose": "Measured comparison baseline for T031/T032; not a release pass by itself.",
+    "providerCalls": 0,
+    "imageGenerationEndpointsCalled": false,
+    "thresholdsFrozen": false
+  }
+}

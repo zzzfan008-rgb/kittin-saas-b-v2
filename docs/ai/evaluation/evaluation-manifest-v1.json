@@ -1,0 +1,1010 @@
+{
+  "schemaVersion": 1,
+  "version": "garment-base-evaluation-manifest-v1",
+  "sourcePlanVersion": "garment-evaluation-plan-v2",
+  "sourcePlanSha256": "sha256:680c9905a97490dafbbd2cec7598ce0509422448e3eb9b1c048624f3d31a38b5",
+  "status": "planned-no-paid-runs",
+  "option": "A",
+  "authorization": {
+    "paidProviderCallsAuthorized": 0,
+    "requiresSeparatePerCaseAuthorization": true,
+    "codeShaBound": false
+  },
+  "evidencePolicy": {
+    "evidenceReuseAcrossUnits": false,
+    "evidenceReuseAcrossStages": false,
+    "automaticRetries": 0,
+    "supplementalSamplesPerStage": 0,
+    "invalidOrUnknownAction": "stop-and-require-new-authorization"
+  },
+  "recommendationBaseline": {
+    "status": "blocked-pending-reviewed-definition",
+    "detachedBaselineScoresAccepted": false,
+    "pairedCandidateBaselineCasesRequired": true
+  },
+  "paidCampaign": {
+    "status": "ready",
+    "manifestIsExecutionAuthorization": false,
+    "immutableStageSlotsRequired": true,
+    "gateMustLoadCompleteCampaignFromLedger": true
+  },
+  "stageRequestCaps": [
+    {
+      "stageId": "provider-probe",
+      "incrementalSamples": 1,
+      "maxProviderRequestsPerSample": 1,
+      "requestsPerUnit": 1
+    },
+    {
+      "stageId": "internal-experiment",
+      "incrementalSamples": 8,
+      "maxProviderRequestsPerSample": 1,
+      "requestsPerUnit": 8
+    },
+    {
+      "stageId": "formal-validation",
+      "incrementalSamples": 24,
+      "maxProviderRequestsPerSample": 1,
+      "requestsPerUnit": 24
+    },
+    {
+      "stageId": "recommendation",
+      "incrementalSamples": 50,
+      "maxProviderRequestsPerSample": 2,
+      "requestsPerUnit": 100
+    }
+  ],
+  "requestCaps": {
+    "perBaseUnitFullLifecycle": 133,
+    "initialPilotConnectivity": 9,
+    "initialPilotFullLifecycle": 1197,
+    "allBaseUnitsFullLifecycle": 3325
+  },
+  "representativeProbePilot": {
+    "status": "awaiting-separate-paid-authorization",
+    "selectionPolicy": "commerce-hero-minimum-reference-complexity-plus-gpt-image-2-mask",
+    "unitIds": [
+      "commerce-hero.gpt-image-2-vip.generate.v1",
+      "commerce-hero.gpt-image-2-vip.edit.v1",
+      "commerce-hero.gemini-3.1-flash-image.generate.v1",
+      "commerce-hero.gemini-3.1-flash-image.edit.v1",
+      "commerce-hero.flux-2-pro.generate.v1",
+      "commerce-hero.flux-2-pro.edit.v1",
+      "commerce-hero.seedream-5-0-260128.generate.v1",
+      "commerce-hero.seedream-5-0-260128.edit.v1",
+      "mask-local-edit.gpt-image-2.mask-edit.v1"
+    ],
+    "unselectedBaseUnitsRemainUnverified": true
+  },
+  "requiredBeforePaidRun": [
+    "clean-exact-code-sha",
+    "sample-and-case-ids",
+    "resolved-local-assets-and-sha256",
+    "current-per-request-prices-and-currency",
+    "immutable-campaign-stage-ledger",
+    "explicit-per-case-authorizations"
+  ],
+  "baseUnits": [
+    {
+      "unitId": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:cbd4ccf41ecac0f6f876bb4bfff21e0a9e8d9e024d454944824ddc6bb537a8b8"
+    },
+    {
+      "unitId": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "identity"
+          },
+          {
+            "order": 1,
+            "role": "pose_composition"
+          },
+          {
+            "order": 2,
+            "role": "garment_top"
+          },
+          {
+            "order": 3,
+            "role": "garment_bottom"
+          }
+        ],
+        "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:32a1a75df527133b748d84348c5f50a299f3035d06efbcb4f2b26bbf3899ca77"
+    },
+    {
+      "unitId": "commerce-hero.gpt-image-2-vip.generate.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.gpt-image-2-vip.generate.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.gpt-image-2-vip.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gpt-image-2-vip:commerce-hero:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.gpt-image-2-vip.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:7962940aa7acd514cf3536946dbcc3053c4ce0a9377df002e3f0562913f8487d"
+    },
+    {
+      "unitId": "commerce-hero.gpt-image-2-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.gpt-image-2-vip.edit.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.gpt-image-2-vip.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "gpt-image-2-vip:commerce-hero:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.gpt-image-2-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:06947a6d7089f261f9e202b89f392492fa14dfa6c4f0d9ae9cd312bc09f0cdbc"
+    },
+    {
+      "unitId": "design-sheet.gpt-image-2-vip.generate.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.gpt-image-2-vip.generate.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.gpt-image-2-vip.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gpt-image-2-vip:design-sheet:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.gpt-image-2-vip.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:370606d29e71c7d81411f239b9ff272ce1e8ce1525c7a5eabe12e501a8e98b27"
+    },
+    {
+      "unitId": "design-sheet.gpt-image-2-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.gpt-image-2-vip.edit.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.gpt-image-2-vip.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gpt-image-2-vip",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "gpt-image-2-vip:design-sheet:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.gpt-image-2-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+        "resolvedModelVersion": "gpt-image-2-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:f02ed5a952f2574cd71f6899b0cf4e6824c435a074c012c231e4ad5d71a5ceb1"
+    },
+    {
+      "unitId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:eeba9d17b5ac82397d001e70cb443bb31badc61420252a85c28df249569f741f"
+    },
+    {
+      "unitId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "identity"
+          },
+          {
+            "order": 1,
+            "role": "pose_composition"
+          },
+          {
+            "order": 2,
+            "role": "garment_top"
+          },
+          {
+            "order": 3,
+            "role": "garment_bottom"
+          }
+        ],
+        "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:09183afc6bd65f7a84480ca12a2e6d608b87294b8e5a1fc04dc1f7d8b5599683"
+    },
+    {
+      "unitId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.gemini-3.1-flash-image.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.gemini-3.1-flash-image.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:3b6300e75d16979521d16fe0762461ab6b022eabb68eb2ada80019cbc670b71c"
+    },
+    {
+      "unitId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:23acc1ce7c7c53ed68b18588c787fc40480fa451436ead40d183ebe34b5cedf3"
+    },
+    {
+      "unitId": "design-sheet.gemini-3.1-flash-image.generate.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.gemini-3.1-flash-image.generate.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.gemini-3.1-flash-image.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "gemini-3.1-flash-image:design-sheet:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.gemini-3.1-flash-image.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:473ca5885f9b89ab70c42ade77c4f846023a5118e6d1f298066c2cd88025bded"
+    },
+    {
+      "unitId": "design-sheet.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.gemini-3.1-flash-image.edit.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "gemini-3.1-flash-image:design-sheet:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:ee3ab6d6ad965874f461817dc4d76be08943af78c304e08ccf4156d93cac1686"
+    },
+    {
+      "unitId": "fashion-lookbook.flux-2-pro.generate.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.flux-2-pro.generate.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.flux-2-pro.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "flux-2-pro",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "flux-2-pro:fashion-lookbook:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.flux-2-pro.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:e638163d87dddce3ada81239b37b514640579764f6815772a064e5ef8d7643e9"
+    },
+    {
+      "unitId": "fashion-lookbook.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.flux-2-pro.edit.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.flux-2-pro.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "identity"
+          },
+          {
+            "order": 1,
+            "role": "pose_composition"
+          },
+          {
+            "order": 2,
+            "role": "garment_top"
+          },
+          {
+            "order": 3,
+            "role": "garment_bottom"
+          }
+        ],
+        "parameterProfileId": "flux-2-pro:fashion-lookbook:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:c289230f12ecc0dc4eeaf00348bc7d305ff92f6ae90489b0a1c70ed3cd1c6c9b"
+    },
+    {
+      "unitId": "commerce-hero.flux-2-pro.generate.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.flux-2-pro.generate.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.flux-2-pro.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "flux-2-pro",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "flux-2-pro:commerce-hero:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.flux-2-pro.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:21ffd850dbd8376ca76809cfed8a29028a08afc60ce37194fd0905723e48f332"
+    },
+    {
+      "unitId": "commerce-hero.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.flux-2-pro.edit.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.flux-2-pro.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "flux-2-pro:commerce-hero:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:7b95c40e7be0db34025912a3cf5af9d7bc3f693cb657f580ac8f3a6dad00f504"
+    },
+    {
+      "unitId": "design-sheet.flux-2-pro.generate.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.flux-2-pro.generate.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.flux-2-pro.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "flux-2-pro",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "flux-2-pro:design-sheet:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.flux-2-pro.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:da0bdb7fb40b509d3b4ab98a3bd80562c87f8859dadc25481b31d8fa14f5e5af"
+    },
+    {
+      "unitId": "design-sheet.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.flux-2-pro.edit.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.flux-2-pro.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "flux-2-pro:design-sheet:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:aa3befadf2d9958d0b072aa83d630331b24f9013a677375cabcdf9c634070f16"
+    },
+    {
+      "unitId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.seedream-5-0-260128.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.seedream-5-0-260128.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:d3d0f62e9eb072a0b3686cd4086cfae4aa75d9807f40f5600606677952577139"
+    },
+    {
+      "unitId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "fashion-lookbook",
+        "promptVariantId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
+        "presetId": "fashion-lookbook",
+        "presetVersion": "fashion-lookbook.seedream-5-0-260128.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "identity"
+          },
+          {
+            "order": 1,
+            "role": "pose_composition"
+          },
+          {
+            "order": 2,
+            "role": "garment_top"
+          },
+          {
+            "order": 3,
+            "role": "garment_bottom"
+          }
+        ],
+        "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fashion-lookbook.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "3:4",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:0276c53c4c557596d1d849482f1321a0ba6b3e8c88d36d42a2620027cf1f21c4"
+    },
+    {
+      "unitId": "commerce-hero.seedream-5-0-260128.generate.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.seedream-5-0-260128.generate.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.seedream-5-0-260128.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "seedream-5-0-260128:commerce-hero:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.seedream-5-0-260128.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:e51548c4eb64f149c3905204c8ff3a9316b8be6dec1d5ee8961d9f7b765c2351"
+    },
+    {
+      "unitId": "commerce-hero.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "commerce-hero",
+        "promptVariantId": "commerce-hero.seedream-5-0-260128.edit.v1",
+        "presetId": "commerce-hero",
+        "presetVersion": "commerce-hero.seedream-5-0-260128.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "seedream-5-0-260128:commerce-hero:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "commerce-hero.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:47da1db71f441d11e87e756ccf5acdd2d1666f94e384a3a6f9f828a22701a426"
+    },
+    {
+      "unitId": "design-sheet.seedream-5-0-260128.generate.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.seedream-5-0-260128.generate.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.seedream-5-0-260128.generate.v1",
+        "nodeKind": "sketch-to-render",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "generate",
+        "referenceRoleProfile": [],
+        "parameterProfileId": "seedream-5-0-260128:design-sheet:generate:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.seedream-5-0-260128.generate.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:9679904d4d584b256a5f6b259beeecab73146537f41bef300c11bed1657322b0"
+    },
+    {
+      "unitId": "design-sheet.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "design-sheet",
+        "promptVariantId": "design-sheet.seedream-5-0-260128.edit.v1",
+        "presetId": "design-sheet",
+        "presetVersion": "design-sheet.seedream-5-0-260128.edit.v1",
+        "nodeKind": "ai-modify",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          }
+        ],
+        "parameterProfileId": "seedream-5-0-260128:design-sheet:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "design-sheet.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "4:3",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:a1c4305d325f9d8db8ce862ca20c25705b1491601d2fd80e159232549f78409f"
+    },
+    {
+      "unitId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+      "unit": {
+        "taskFamilyId": "mask-local-edit",
+        "promptVariantId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+        "presetId": "mask-local-edit",
+        "presetVersion": "mask-local-edit.gpt-image-2.mask-edit.v1",
+        "nodeKind": "mask-redraw",
+        "modelId": "gpt-image-2",
+        "operationMode": "mask-edit",
+        "referenceRoleProfile": [
+          {
+            "order": 0,
+            "role": "garment_full"
+          },
+          {
+            "order": 1,
+            "role": "generic"
+          },
+          {
+            "order": 2,
+            "role": "mask"
+          }
+        ],
+        "parameterProfileId": "gpt-image-2:mask-local-edit:mask-edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "mask-local-edit.gpt-image-2.mask-edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:ba3586e5f7b4db85fbfe839f5c5da4a07181c2b2c8a0253a99576563ce2c8b57",
+        "resolvedModelVersion": "gpt-image-2",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v3",
+        "providerPromptRendererHash": "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "mask-composite-png-v3",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:c63fecce747caaf687bbca08a0b15f73d0f3302311246436917d77856cb5665a"
+    }
+  ]
+}

@@ -29,7 +29,7 @@ SQLite 文件会保留，便于回退核对。
 
 ## 本地开发
 
-要求 Node.js 22.20.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
+要求 Node.js 24.20.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
 
 ```bash
 docker compose up -d postgres --wait
@@ -65,8 +65,8 @@ npm run gate:codex -- --base origin/main
 
 门禁先运行完整确定性检查、桌面 E2E、生产构建和 production smoke，再调用
 结构化 `codex exec` 审查精确差异。命令不指定模型，始终使用当前 Codex 配置的默认模型；
-任何 P0-P3 有效问题都会令门禁失败。为覆盖最低支持版本兼容性，门禁只接受
-`.nvmrc` 固定的 Node.js 22.20.0；审查单个提交可改用 `--commit SHA`。
+任何 P0-P3 有效问题都会令门禁失败。Node.js 24.20.0 是 `.nvmrc` 固定的最低
+可复现基线；门禁接受 24.20.0 及更高兼容版本。审查单个提交可改用 `--commit SHA`。
 
 桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
 请求。首次运行先安装 Chromium，然后执行：
@@ -138,9 +138,10 @@ INITIAL_ADMIN_PASSWORD=your-temporary-password
 
 每个 AI 节点独立保存模型和原生参数。普通图片节点可选择
 `gpt-image-2-vip`、`gemini-3.1-flash-image`、`flux-2-pro`、
-`seedream-5-0-260128` 或 `grok-imagine-image`；`gpt-image-2` 仅用于蒙版
+`seedream-5-0-260128`；`gpt-image-2` 仅用于蒙版
 局部修改。业务接口先将任务写入 PostgreSQL，再由 Worker 调用 API易同步图片
 端点并立即转存结果。完整契约见 [`docs/ai/apiyi/README.md`](docs/ai/apiyi/README.md)。
+已有项目中的退役模型 ID 只作历史可读字段保留，不能新选择、运行、评估或进入 Provider 队列。
 
 内置模板将“人物场景迁移”与“图案风格迁移”分开，避免人物/座椅语义污染
 印花图案处理。

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T09:13:12.629Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "51e699b39f0abb69da53d1b40d753833c28c263f69bfd8fd616cf8b131f29907",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "/v1/models exact raw response bytes SHA-256 model list contract release drift",
+  "affectedPaths": [
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/sources.json",
+    "scripts/apiyi-docs.mjs",
+    "scripts/evaluation-review.ts",
+    "server/lib/evaluationPromotion.ts",
+    "server/lib/evaluationReleaseBundle.ts",
+    "server/lib/evaluationReleaseRuntime.ts",
+    "src/types/imageModels.ts",
+    "tests/apiyi-docs.test.ts",
+    "tests/evaluation-promotion.test.ts",
+    "tests/evaluation-release-runtime.test.ts",
+    "tests/evaluation-review-cli.test.ts",
+    "tests/provider-contract.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-reference/models/list-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-reference/models/list-models.md",
+      "pageLocalPath": "pages/en/api-reference/models/list-models.md",
+      "title": "List Models",
+      "sha256": "e3b5e3244f8f959dcb513a4493c7ee4e4684afaf4d4200e5fa72d867d0bf1641"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-reference/models/list-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-reference/models/list-models.md",
+      "pageLocalPath": "pages/api-reference/models/list-models.md",
+      "title": "List Models",
+      "sha256": "0114ee132cbe7b00101ef0edb93f0080cfcd1327ac92b0820574431869ad6e64"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/models.md",
+      "pageLocalPath": "pages/en/models.md",
+      "title": "Model Pricing Directory",
+      "sha256": "5d4e23d6e1882a007356ffe16a46e7fb6bfb4cec5c605c083cf60ec8cbb83998"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/model-info",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/model-info.md",
+      "pageLocalPath": "pages/en/api-capabilities/model-info.md",
+      "title": "Popular Models",
+      "sha256": "ce20ab8cd10e33640b5327d58fcadf8f4fd91ef7dc62a1de660afd724b2e08ef"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/token-model-whitelist",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/token-model-whitelist.md",
+      "pageLocalPath": "pages/en/faq/token-model-whitelist.md",
+      "title": "Do I Need to Set Available Models for Tokens?",
+      "sha256": "6bd0b406b44a650e36f47dc563f145b43b25825395515d8417bbd9f6ff05004f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/grok-imagine-2-launch",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/grok-imagine-2-launch.md",
+      "pageLocalPath": "pages/en/news/grok-imagine-2-launch.md",
+      "title": "Grok Imagine 2 Image Models Launch: Full Test Results",
+      "sha256": "2d3154779429f638513d7e0cd5f278e2d1f32bf32676627e684d9d5f3b1cd6d0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/deprecated-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/deprecated-models.md",
+      "pageLocalPath": "pages/en/api-capabilities/deprecated-models.md",
+      "title": "Deprecated Models",
+      "sha256": "736f7e7b88d31914e06647995da05d2e9f38ccf3e66d07527e5ad3ef039dc0da"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/responses-migration",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/openai/responses-migration.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/responses-migration.md",
+      "title": "Choosing an Endpoint: Migrating GPT-5.4+ to Responses",
+      "sha256": "cc965c74fcffc3dda95285b548266d194258f53edff1f7e904003b1aedcf38e5"
+    }
+  ],
+  "decisionSummary": "按已人工批准的五模型目录基线，同时保留规范化 ID 集 SHA-256 与原始 /v1/models 文件字节 SHA-256；文档检查、contract-check 制品校验和运行时发布闭包均要求批准 raw SHA、契约自报 SHA 与实际保留文件 SHA 完全一致，ID 集相同但原始字节不同也失败关闭；本轮不调用 Provider、不自动更新模型契约。",
+  "unresolvedChoices": []
+}

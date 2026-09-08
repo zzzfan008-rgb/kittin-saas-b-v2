@@ -11,6 +11,7 @@ import {
 import { DND_MIME } from "../CanvasFlow";
 import { cn } from "@/lib/utils";
 import { requestCanvasLanding } from "@/lib/canvasLanding";
+import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 
 const KIND_ORDER: NodeKind[] = [
   "image-input",
@@ -81,6 +82,8 @@ function NodeList() {
     <div className="flex-1 space-y-2 overflow-y-auto p-3">
       {KIND_ORDER.map((kind) => {
         const spec = NODE_SPECS[kind];
+        const productPolicy = nodeProductPolicy(kind);
+        const unavailable = !productPolicy.canCreate;
         return (
           <Card
             key={kind}
@@ -90,19 +93,38 @@ function NodeList() {
             <Button
               type="button"
               variant="ghost"
-              draggable
-              onClick={() => addByClick(kind)}
+              draggable={!unavailable}
+              disabled={unavailable}
+              aria-describedby={unavailable ? `node-policy-${kind}` : undefined}
+              onClick={() => {
+                if (!unavailable) addByClick(kind);
+              }}
               onDragStart={(event) => {
+                if (unavailable) return;
                 event.dataTransfer.setData(DND_MIME, kind);
                 event.dataTransfer.effectAllowed = "move";
               }}
-              title={`点击添加${spec.title}，或拖拽到画布指定位置`}
-              className="h-auto w-full cursor-grab select-none flex-col items-start gap-1 rounded-lg p-2.5 text-left whitespace-normal text-[var(--gc-node-text)] hover:bg-[var(--gc-node-inner-hover)] hover:text-[var(--gc-node-text)] active:cursor-grabbing"
+              title={unavailable
+                ? productPolicy.reason
+                : `点击添加${spec.title}，或拖拽到画布指定位置`}
+              className="h-auto w-full cursor-grab select-none flex-col items-start gap-1 rounded-lg p-2.5 text-left whitespace-normal text-[var(--gc-node-text)] hover:bg-[var(--gc-node-inner-hover)] hover:text-[var(--gc-node-text)] active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <span className="text-xs font-medium text-[var(--gc-node-text)]">{spec.title}</span>
+              <span className="flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]">
+                <span>{spec.title}</span>
+                {unavailable && (
+                  <span className="shrink-0 rounded border border-amber-600/50 px-1 py-0.5 text-[8px] font-medium text-amber-400">
+                    unsupported
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
                 {spec.description}
               </span>
+              {unavailable && (
+                <span id={`node-policy-${kind}`} className="text-[9px] leading-relaxed text-amber-500">
+                  首版尚无独立提示词、参数档案和真实评估，暂不可新建或付费运行。
+                </span>
+              )}
             </Button>
           </Card>
         );

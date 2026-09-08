@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-03T13:22:48.000Z",
+  "runtimeContractFile": "model-contracts.json",
+  "sourceManifestFile": "sources.json",
+  "reviewedModelCatalogBaseline": {
+    "evidenceId": "apiyi-manual-model-catalog-review-20260903T132248000Z",
+    "capturedAt": "2026-09-03T13:22:48.000Z",
+    "expectedGatewayModelIds": [
+      "gpt-image-2",
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "requiredModelCoverage": {"present": 5, "required": 5},
+    "modelCount": 271,
+    "rawExportByteLength": 61774,
+    "rawExportFileSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+    "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+    "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
+    "reviewDecision": "approved-by-explicit-user-confirmation-after-independent-review",
+    "rawExportRetainedInGit": false,
+    "scopeLimitation": "Catalog presence does not verify generation, editing, quality, billing, or release readiness."
+  },
+  "releaseState": "unverified-requires-real-evaluation",
+  "conflictPolicy": "API易与厂商文档冲突时按 gatewayContract 调用，记录冲突并降为 unverified，直到真实探针闭环。",
+  "layerRules": {
+    "vendorCapability": "只记录厂商官方能力与提示词方法。",
+    "gatewayContract": "唯一决定 API易请求字段和错误语义的层。",
+    "productPolicy": "必须是 gatewayContract 的严格子集，不得扩大引用数或枚举。",
+    "observedEvidence": "只接受有代码 SHA、契约哈希、请求与账单对账的真实记录。"
+  },
+  "models": [
+    {
+      "id": "gpt-image-2",
+      "aliases": ["GPT Image 2", "GPT Image 2 局部修改"],
+      "vendorCapability": {
+        "vendor": "OpenAI",
+        "vendorModelId": "gpt-image-2",
+        "sourceIds": ["openai-image-generation"],
+        "modes": ["generate", "edit", "mask-edit"],
+        "documentedReferenceLimit": 16,
+        "notes": ["上游普通生成能力不会自动进入产品范围。"]
+      },
+      "gatewayContract": {
+        "gatewayModelId": "gpt-image-2",
+        "channel": "official",
+        "sourceIds": ["apiyi-gpt-image-2-overview", "apiyi-gpt-image-2-edit", "apiyi-gpt-image-2-mask"],
+        "modes": ["generate", "edit", "mask-edit"],
+        "endpoints": {"generate": "/v1/images/generations", "edit": "/v1/images/edits", "mask-edit": "/v1/images/edits"},
+        "maxReferences": 16,
+        "outputFields": ["b64_json"],
+        "errors": {"ambiguousTransportFailure": "outcome_unknown", "input_fidelity": "must-not-send"}
+      },
+      "productPolicy": {
+        "allowedNodeKinds": ["mask-redraw"],
+        "modes": ["mask-edit"],
+        "maxUserReferences": 7,
+        "systemGuideImages": 1,
+        "maxTotalReferences": 8,
+        "requiresMask": true,
+        "maskMimeType": "image/png",
+        "dynamicPixelDimensions": true,
+        "mustNotSend": ["input_fidelity", "response_format", "n"],
+        "postprocess": "local-adaptive-blend-window"
+      },
+      "observedEvidence": {
+        "status": "unverified",
+        "acceptedEvidenceIds": [],
+        "catalogEvidenceIds": ["apiyi-model-catalog-20260902T150417Z", "apiyi-model-catalog-20260903T031129Z", "apiyi-five-model-catalog-review-20260903T081222094Z", "apiyi-manual-model-catalog-review-20260903T132248000Z"],
+        "legacySignals": [],
+        "blockingReason": "本契约版本尚无专用 no-retry 真实评估证据。"
+      }
+    },
+    {
+      "id": "gpt-image-2-vip",
+      "aliases": ["GPT Image 2 VIP"],
+      "vendorCapability": {
+        "vendor": null,
+        "vendorModelId": null,
+        "sourceIds": [],
+        "modes": [],
+        "notes": ["API易特有线路，不得冒充 OpenAI 官转或由 OpenAI 文档补齐契约。"]
+      },
+      "gatewayContract": {
+        "gatewayModelId": "gpt-image-2-vip",
+        "channel": "reverse-codex",
+        "sourceIds": ["apiyi-gpt-image-2-vip-overview", "apiyi-gpt-image-2-vip-generate", "apiyi-gpt-image-2-vip-edit"],
+        "modes": ["generate", "edit"],
+        "endpoints": {"generate": "/v1/images/generations", "edit": "/v1/images/edits"},
+        "maxReferences": 8,
+        "sizeValues": 31,
+        "outputFields": ["b64_json", "url"],
+        "errors": {"ambiguousTransportFailure": "outcome_unknown"}
+      },
+      "productPolicy": {
+        "allowedNodeKinds": ["image-generation"],
+        "modes": ["generate", "edit"],
+        "maxUserReferences": 8,
+        "maxTotalReferences": 8,
+        "sizePolicy": "auto-or-reviewed-thirty-size-list",
+        "mustNotSend": ["quality", "n", "aspect_ratio"],
+        "postprocess": "persist-provider-original-before-business-output"
+      },
+      "observedEvidence": {
+        "status": "unverified",
+        "acceptedEvidenceIds": [],
+        "catalogEvidenceIds": ["apiyi-model-catalog-20260902T150417Z", "apiyi-model-catalog-20260903T031129Z", "apiyi-five-model-catalog-review-20260903T081222094Z", "apiyi-manual-model-catalog-review-20260903T132248000Z"],
+        "legacySignals": ["historical-browser-timeout-outcome-unknown"],
+        "blockingReason": "历史超时不是通过证据，且未完成账单对账。"
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-image",
+      "aliases": ["Gemini 3.1 Flash Image", "gemini-3.1-flash-image-preview", "Nano Banana 2"],
+      "vendorCapability": {
+        "vendor": "Google",
+        "vendorModelId": "gemini-3.1-flash-image",
+        "sourceIds": ["google-gemini-image-generation"],
+        "modes": ["generate", "edit"],
+        "documentedReferenceLimit": 14,
+        "notes": ["上游 14 图能力不扩大产品 8 图上限。"]
+      },
+      "gatewayContract": {
+        "gatewayModelId": "gemini-3.1-flash-image",
+        "channel": "official",
+        "sourceIds": ["apiyi-gemini-overview", "apiyi-gemini-generate", "apiyi-gemini-edit"],
+        "modes": ["generate", "edit"],
+        "endpoints": {"generate": "/v1beta/models/{model}:generateContent", "edit": "/v1beta/models/{model}:generateContent"},
+        "maxReferences": 14,
+        "aspectRatios": ["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+        "imageSizes": ["512", "1K", "2K", "4K"],
+        "outputFields": ["candidates[].content.parts[].inlineData"],
+        "errors": {"http200WithoutImage": "deterministic-empty-output", "ambiguousTransportFailure": "outcome_unknown"}
+      },
+      "productPolicy": {
+        "allowedNodeKinds": ["image-generation"],
+        "modes": ["generate", "edit"],
+        "maxUserReferences": 8,
+        "maxTotalReferences": 8,
+        "nativeFraming": ["aspectRatio", "imageSize"],
+        "mustScanAllResponseParts": true,
+        "postprocess": "persist-provider-original-before-business-output"
+      },
+      "observedEvidence": {
+        "status": "unverified",
+        "acceptedEvidenceIds": [],
+        "catalogEvidenceIds": ["apiyi-model-catalog-20260902T150417Z", "apiyi-model-catalog-20260903T031129Z", "apiyi-five-model-catalog-review-20260903T081222094Z", "apiyi-manual-model-catalog-review-20260903T132248000Z"],
+        "legacySignals": ["historical-browser-success"],
+        "blockingReason": "历史成功只是线索，不包含当前契约哈希和评分。"
+      }
+    },
+    {
+      "id": "flux-2-pro",
+      "aliases": ["FLUX.2 Pro", "flux-2-pro"],
+      "vendorCapability": {
+        "vendor": "Black Forest Labs",
+        "vendorModelId": "flux-2-pro",
+        "sourceIds": ["bfl-flux2-prompting"],
+        "modes": ["generate", "edit"],
+        "notes": ["厂商文档的扩展能力不自动进入 API易请求。"]
+      },
+      "gatewayContract": {
+        "gatewayModelId": "flux-2-pro",
+        "channel": "official",
+        "sourceIds": ["apiyi-flux-overview", "apiyi-flux-generate", "apiyi-flux-edit"],
+        "modes": ["generate", "edit"],
+        "endpoints": {"generate": "/v1/images/generations", "edit": "/v1/images/generations"},
+        "maxReferences": 8,
+        "dimensions": {"multipleOf": 16, "minSide": 64, "maxPixels": 4194304},
+        "outputFormats": ["jpeg", "png"],
+        "outputFields": ["url"],
+        "temporaryUrlTtlSeconds": 600,
+        "errors": {"ambiguousTransportFailure": "outcome_unknown"}
+      },
+      "productPolicy": {
+        "allowedNodeKinds": ["image-generation"],
+        "modes": ["generate", "edit"],
+        "maxUserReferences": 8,
+        "maxTotalReferences": 8,
+        "nativeFraming": ["width", "height"],
+        "mustNotSend": ["n"],
+        "postprocess": "download-url-immediately-and-preserve-original"
+      },
+      "observedEvidence": {
+        "status": "unverified",
+        "acceptedEvidenceIds": [],
+        "catalogEvidenceIds": ["apiyi-model-catalog-20260902T150417Z", "apiyi-model-catalog-20260903T031129Z", "apiyi-five-model-catalog-review-20260903T081222094Z", "apiyi-manual-model-catalog-review-20260903T132248000Z"],
+        "legacySignals": ["historical-browser-failure"],
+        "blockingReason": "历史失败需在当前契约下重新诊断，不能推断当前不可用。"
+      }
+    },
+    {
+      "id": "seedream-5-0-260128",
+      "aliases": ["Seedream 5.0", "seedream-5-0-260128"],
+      "vendorCapability": {
+        "vendor": "BytePlus",
+        "vendorModelId": "seedream-5-0-260128",
+        "sourceIds": ["byteplus-seedream-image"],
+        "modes": ["generate", "edit"],
+        "notes": ["上游扩展尺寸或序列生成不扩大 API易当前 2K/3K 契约。"]
+      },
+      "gatewayContract": {
+        "gatewayModelId": "seedream-5-0-260128",
+        "channel": "official",
+        "sourceIds": ["apiyi-seedream-overview", "apiyi-seedream-generate", "apiyi-seedream-edit"],
+        "modes": ["generate", "edit"],
+        "endpoints": {"generate": "/v1/images/generations", "edit": "/v1/images/generations"},
+        "maxReferences": 10,
+        "sizes": ["2K", "3K"],
+        "nativeAspectRatio": false,
+        "outputFields": ["url", "b64_json", "size"],
+        "errors": {"ambiguousTransportFailure": "outcome_unknown"}
+      },
+      "productPolicy": {
+        "allowedNodeKinds": ["image-generation"],
+        "modes": ["generate", "edit"],
+        "maxUserReferences": 8,
+        "maxTotalReferences": 8,
+        "nativeFraming": ["size"],
+        "sizes": ["2K", "3K"],
+        "mustNotSend": ["n", "aspect_ratio"],
+        "recordActualOutputSize": true,
+        "postprocess": "persist-provider-original-before-business-output"
+      },
+      "observedEvidence": {
+        "status": "unverified",
+        "acceptedEvidenceIds": [],
+        "catalogEvidenceIds": ["apiyi-model-catalog-20260902T150417Z", "apiyi-model-catalog-20260903T031129Z", "apiyi-five-model-catalog-review-20260903T081222094Z", "apiyi-manual-model-catalog-review-20260903T132248000Z"],
+        "legacySignals": ["historical-browser-success"],
+        "blockingReason": "历史成功不是当前版本的评估证据。"
+      }
+    }
+  ]
+}

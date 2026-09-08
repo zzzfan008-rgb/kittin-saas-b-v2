@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-04",
+  "repository": "kittin-saas-b-v2",
+  "scope": "Changed write routes in the candidate worktree",
+  "globalMiddleware": {
+    "mount": "/api",
+    "authentication": "requireAuth",
+    "passwordState": "requirePasswordChanged",
+    "evidence": [
+      "server/index.ts mounts requireAuth and requirePasswordChanged before all protected API routers",
+      "tests/authorization.test.ts covers unauthenticated and password-state boundaries"
+    ]
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/run-plan",
+      "handler": "server/routes/runPlan.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged", "aiRateLimit"],
+      "authorization": [
+        "requestUser(req) establishes the authenticated account",
+        "assertGenerationOwnerActive locks the active owner state",
+        "projects lookup requires owner_id = current user and lifecycle = saved",
+        "project row is held FOR SHARE through plan validation and enqueue",
+        "assertImageReferencesAccessible checks stored references against the current owner"
+      ],
+      "successResponse": {"status": 202, "keys": ["runId", "status"]},
+      "errorResponseKeys": ["error"],
+      "gitnexus": {
+        "apiImpact": "PASS_WITH_LOW_CONFIDENCE_CONSUMER_ATTRIBUTION",
+        "shapeCheck": "MISMATCH_LOW_CONFIDENCE",
+        "note": "flowStore fetches multiple routes; reported consumer fields are not attributable to this POST route"
+      },
+      "tests": [
+        "tests/authorization.test.ts",
+        "tests/run-queue.test.ts",
+        "tests/active-document-boundary.test.ts",
+        "tests/project-tabs.test.ts"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/generate",
+      "handler": "server/routes/generate.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged", "aiRateLimit"],
+      "authorization": [
+        "requestUser(req) establishes the authenticated account before enqueue",
+        "projectId, when supplied, must resolve to a saved project owned by the current user",
+        "assertGenerationOwnerActive prevents enqueue for inactive or deleted owners",
+        "assertImageReferencesAccessible checks local file references against the current owner",
+        "assertNoRemoteImageReferencesAtAdmission rejects remote references before payment work",
+        "direct paid requests require an explicit node kind and never accept evaluation payloads"
+      ],
+      "successResponse": {"status": 202, "keys": ["runId", "status"]},
+      "errorResponseKeys": ["error", "code", "references"],
+      "gitnexus": {
+        "apiImpact": "UNAVAILABLE_MOUNTED_ROUTE",
+        "shapeCheck": "UNAVAILABLE_MOUNTED_ROUTE",
+        "note": "GitNexus did not reverse the mounted /api/generate POST route; manual source evidence is authoritative for this closure"
+      },
+      "tests": [
+        "tests/authorization.test.ts",
+        "tests/exact-generation.test.ts",
+        "tests/provider-contract.test.ts",
+        "tests/provider-retry.test.ts",
+        "tests/active-document-boundary.test.ts"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/templates",
+      "handler": "server/routes/templates.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged"],
+      "authorization": [
+        "created template ownerId is always currentUser.id",
+        "owner activity is checked inside the transaction before atomic file publication",
+        "thumbnail must be a local /api/files reference",
+        "flow is validated and migrated before publication"
+      ],
+      "successResponse": {"status": 200, "keys": ["ok", "id"]},
+      "errorResponseKeys": ["error"],
+      "gitnexus": {
+        "apiImpact": "UNAVAILABLE_MOUNTED_ROUTE",
+        "shapeCheck": "UNAVAILABLE_MOUNTED_ROUTE",
+        "note": "GitNexus did not reverse the mounted /api/templates POST route; source and authorization tests provide manual closure"
+      },
+      "tests": ["tests/authorization.test.ts", "tests/workflow-schema.test.ts"]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/templates/:id",
+      "handler": "server/routes/templates.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged"],
+      "authorization": [
+        "builtin templates are immutable",
+        "user template ownership is checked inside a transaction",
+        "admin may manage another user's template only after owner-state locking",
+        "ownership changes retry up to three times and otherwise fail closed"
+      ],
+      "successResponse": {"status": 200, "keys": ["ok"]},
+      "errorResponseKeys": ["error"],
+      "gitnexus": {
+        "apiImpact": "UNAVAILABLE_MOUNTED_ROUTE",
+        "shapeCheck": "UNAVAILABLE_MOUNTED_ROUTE"
+      },
+      "tests": ["tests/authorization.test.ts"]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/history/:id",
+      "handler": "server/routes/history.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged"],
+      "authorization": [
+        "generation output is joined to its run and requires run.owner_id = current user",
+        "owner activity is locked before deletion",
+        "the run is soft-deleted only after its final output is removed"
+      ],
+      "successResponse": {"status": 200, "keys": ["ok"]},
+      "errorResponseKeys": ["error"],
+      "gitnexus": {
+        "apiImpact": "UNAVAILABLE_MOUNTED_ROUTE",
+        "shapeCheck": "UNAVAILABLE_MOUNTED_ROUTE",
+        "note": "GitNexus route index exposes /api/history GET but not the mounted DELETE child route"
+      },
+      "tests": ["tests/authorization.test.ts", "tests/recent-results.test.ts"]
+    },
+    {
+      "method": "POST",
+      "path": "/api/ai-diagnostics/probe",
+      "handler": "server/routes/aiDiagnostics.ts",
+      "middleware": ["requireAuth", "requirePasswordChanged", "requireAdmin", "probeRateLimit"],
+      "authorization": [
+        "router-level requireAdmin protects diagnostics and probes",
+        "providerId and mode are restricted to the active model catalog and supported probe modes"
+      ],
+      "successResponse": {"status": 200, "keys": ["ok", "providerId", "mode", "model", "imageCount", "durationMs"]},
+      "errorResponseKeys": ["ok", "providerId", "mode", "error", "category", "durationMs"],
+      "gitnexus": {
+        "apiImpact": "PASS",
+        "shapeCheck": "NO_CONSUMERS"
+      },
+      "tests": ["tests/authorization.test.ts", "tests/provider-contract.test.ts"]
+    }
+  ],
+  "decision": "no confirmed authorization or response-shape defect; mounted-route reverse mapping remains an evidence limitation and is fail-closed until a final gate accepts this record"
+}

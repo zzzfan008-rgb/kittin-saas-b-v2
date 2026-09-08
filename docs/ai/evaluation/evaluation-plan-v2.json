@@ -1,0 +1,108 @@
+{
+  "version": "garment-evaluation-plan-v2",
+  "supersedes": "garment-evaluation-plan-v1",
+  "scopeReview": "../apiyi/reviews/2026-09-03-five-model-scope.md",
+  "status": "unverified-no-paid-runs",
+  "taskFamilies": ["fashion-lookbook", "commerce-hero", "design-sheet", "mask-local-edit"],
+  "fairComparison": {
+    "modelIds": [
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "outputCount": 1,
+    "businessAspectRatio": "1:1",
+    "maximumReferenceImages": 4,
+    "sameAssetsAndReferenceOrder": true,
+    "persistProviderOriginalAndPostprocessed": true,
+    "separateGenerateAndEdit": true
+  },
+  "scenarioAxes": [
+    {
+      "id": "text-generate",
+      "operationMode": "generate",
+      "referenceRoleProfile": [],
+      "purpose": "文生图指令遵循与基础服装忠实度"
+    },
+    {
+      "id": "single-image-edit",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["garment_full"],
+      "purpose": "单图改图与非目标保持"
+    },
+    {
+      "id": "multi-image-role-isolation",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["identity", "pose_composition", "garment_top", "garment_bottom"],
+      "purpose": "四图角色隔离，阻断身份、姿势与上下装串用"
+    },
+    {
+      "id": "reference-order-permutation",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["identity", "garment_full", "styling_only", "background"],
+      "purpose": "在角色不变时置换图片顺序，检查协议转换与模型顺序敏感性"
+    },
+    {
+      "id": "complex-material",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["garment_full", "fabric"],
+      "purpose": "真丝、丝绒、亮片、羊毛、麂皮等材质忠实度"
+    },
+    {
+      "id": "lace-and-print",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["identity", "garment_full"],
+      "purpose": "蕾丝透视层次、印花位置、接缝连续性与色准"
+    },
+    {
+      "id": "occlusion-and-nontarget-preservation",
+      "operationMode": "edit",
+      "referenceRoleProfile": ["identity", "pose_composition", "garment_full", "accessory"],
+      "purpose": "遮挡恢复、肢体边界与未指定区域保持"
+    }
+  ],
+  "capabilityExtensions": [
+    {
+      "id": "five-to-eight-reference-images",
+      "modelIds": [
+        "gpt-image-2-vip",
+        "gemini-3.1-flash-image",
+        "flux-2-pro",
+        "seedream-5-0-260128"
+      ],
+      "operationMode": "edit",
+      "referenceCounts": [5, 8],
+      "outputCount": 1
+    },
+    {
+      "id": "gpt-image-2-mask-edit",
+      "modelIds": ["gpt-image-2"],
+      "operationMode": "mask-edit",
+      "referenceCounts": [1, 4, 7],
+      "systemGuideImages": 1,
+      "outputCount": 1
+    },
+    {
+      "id": "model-native-high-resolution",
+      "modelIds": [
+        "gpt-image-2",
+        "gpt-image-2-vip",
+        "gemini-3.1-flash-image",
+        "flux-2-pro",
+        "seedream-5-0-260128"
+      ],
+      "operationMode": "model-specific",
+      "requireExplicitParameterProfile": true,
+      "recordActualProviderDimensions": true
+    }
+  ],
+  "rules": {
+    "fixedOperationMode": true,
+    "noRetry": true,
+    "stopOnOutcomeUnknown": true,
+    "diagnosticApiIsNotProductAcceptance": true,
+    "productAcceptanceUsesCanvasAndDag": true,
+    "oldObservedResultsAreNotPassingEvidence": true
+  }
+}
