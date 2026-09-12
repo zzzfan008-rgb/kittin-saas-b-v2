@@ -7,15 +7,15 @@ import {
 
 console.log("本地开发启动预检契约测试");
 
-assert.equal(nodeVersionAtLeast("v22.20.0"), true);
-assert.equal(nodeVersionAtLeast("22.21.0"), true);
-assert.equal(nodeVersionAtLeast("23.0.0"), true);
-assert.equal(nodeVersionAtLeast("22.19.9"), false);
+assert.equal(nodeVersionAtLeast("v24.20.0"), true);
+assert.equal(nodeVersionAtLeast("24.21.0"), true);
+assert.equal(nodeVersionAtLeast("25.0.0"), true);
+assert.equal(nodeVersionAtLeast("24.19.9"), false);
 assert.equal(nodeVersionAtLeast("invalid"), false);
 
-const defaults = buildPreflightConfig({}, "v22.20.0");
+const defaults = buildPreflightConfig({}, "v24.20.0");
 assert.deepEqual(defaults, {
-  nodeVersion: "v22.20.0",
+  nodeVersion: "v24.20.0",
   webPort: 5173,
   apiPort: 3001,
   apiProxyTarget: "http://localhost:3001",

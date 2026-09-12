@@ -5,6 +5,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  resolveEvaluationCodeIdentity,
+  type EvaluationCodeIdentity,
+} from "./lib/evaluationCodeIdentity";
+import { assertEvaluationCampaignReady } from "./lib/evaluationCampaign";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** 项目根目录（server/ 的上一级） */
@@ -39,6 +44,24 @@ function required(name: string): string {
   return v;
 }
 
+/**
+ * Resolve and reject an unsafe paid-evaluation identity before database setup
+ * or Worker startup. Git worktrees must be clean; packaged runtimes must match
+ * their immutable build identity.
+ */
+export function assertPaidEvaluationStartupConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  repoCwd = ROOT_DIR,
+): EvaluationCodeIdentity | undefined {
+  if (env.ENABLE_PAID_EVALUATION_RUNS !== "true") return undefined;
+  const identity = resolveEvaluationCodeIdentity(repoCwd, env);
+  if (identity.dirty) {
+    throw new Error("paid evaluation requires a clean Git worktree at the exact GARMENT_CANVAS_CODE_SHA");
+  }
+  assertEvaluationCampaignReady();
+  return identity;
+}
+
 export const config = {
   /** API易图片接口；路径由本地模型知识库逐模型声明。 */
   apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.apiyi.com").replace(/\/+$/, ""),
@@ -65,6 +88,17 @@ export const config = {
 
   /** AI 调用超时（中转站网关限制，可配） */
   aiTimeoutMs: (fallback = 300_000) => Number(process.env.AI_TIMEOUT_MS ?? fallback),
+
+  /** API易完整 JSON 尾部卡住时的安全收尾开关；显式 false/0/off 可回退旧行为。 */
+  apiyiTailStallSalvageEnabled: () => {
+    const value = (process.env.APIYI_TAIL_STALL_SALVAGE ?? "true").trim().toLowerCase();
+    return value !== "false" && value !== "0" && value !== "off";
+  },
+  /** 最后一块数据后的宽限期，仅用于完整 JSON 探测，不替代 body/总超时。 */
+  apiyiTailStallGraceMs: () => {
+    const value = Number(process.env.APIYI_TAIL_STALL_GRACE_MS ?? 5_000);
+    return Number.isFinite(value) ? Math.max(1_000, Math.min(30_000, Math.round(value))) : 5_000;
+  },
 
   /** 不发外部请求的 AI 配置就绪检查，供 readiness 使用。 */
   aiConfigReady: () => {

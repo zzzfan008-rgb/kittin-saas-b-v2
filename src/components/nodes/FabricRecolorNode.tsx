@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveEdges, useFlowStore } from "@/store/flowStore";
 import { useCustomColors } from "@/store/customColors";
 import { isNodeRunActive, type FabricRecolorNodeData } from "@/types/workflow";
-import { NodeFrame, RunButton, Developing } from "./NodeFrame";
+import { NodeFrame, NodeProductPolicyNotice, RunButton, Developing } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import {
@@ -13,6 +13,7 @@ import {
   nameOfColor,
   normalizeHex,
 } from "@/lib/colors";
+import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 
 const MAX_COLORS = 8;
 const CUSTOM_CATEGORY_ID = "custom";
@@ -28,6 +29,7 @@ export function FabricRecolorNode({
     selectActiveEdges(state).some((edge) => edge.target === id && edge.targetHandle === "fabric"),
   );
   const running = isNodeRunActive(data.status);
+  const admission = usePromptRunAdmission(id, data);
 
   const colors = data.colors ?? [];
   const [hexInput, setHexInput] = useState("");
@@ -92,6 +94,7 @@ export function FabricRecolorNode({
         title="面料图输入"
       />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
+        <NodeProductPolicyNotice kind={data.kind} />
         <div className="rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-[10px] leading-relaxed text-neutral-500">
           左侧输入口：上 = 款式/补充参考，下 = 面料参考；总计最多 8 图
         </div>
@@ -211,12 +214,14 @@ export function FabricRecolorNode({
           )}
         </div>
 
-        <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} disabled={running} />
+        <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} disabled={running} referenceRows={admission.referenceRows} />
         <RunButton
           status={data.status}
           onClick={() => void runNode(id)}
           label="替换面料配色"
           disabled={colors.length === 0 && !hasFabricInput}
+          disabledReason={admission.allowed ? undefined : admission.reason}
+          disabledLabel="首版暂不支持"
         />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />

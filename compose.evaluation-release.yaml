@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      secrets:
+        - source: evaluation_release_registry
+          target: evaluation_release_registry
+    environment:
+      GARMENT_CANVAS_EVALUATION_RELEASE_DIR: /run/garment-canvas/evaluation-release
+      GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256: ${GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256:?请设置受审发布包 SHA-256}
+      GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256: ${GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256:?请设置 registry 原始文件 SHA-256}
+      GARMENT_CANVAS_CODE_SHA: ${GARMENT_CANVAS_CODE_SHA:?请设置受审代码 SHA}
+      # 宿主机 registry 路径只供 BuildKit secret 使用，不能成为容器内信任输入。
+      GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_PATH: /run/garment-canvas/evaluation-release/prompt-release-registry.json
+    volumes:
+      - type: bind
+        source: ${GARMENT_CANVAS_EVALUATION_RELEASE_HOST_DIR:?请设置外置只读发布包绝对目录}
+        target: /run/garment-canvas/evaluation-release
+        read_only: true
+
+secrets:
+  evaluation_release_registry:
+    file: ${GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SOURCE:?请设置外置 registry.json 绝对路径}

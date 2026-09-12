@@ -1,10 +1,53 @@
 import { useEffect, useRef, useState } from "react";
-import { selectActiveSelectedResultId, useFlowStore } from "@/store/flowStore";
+import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
+import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
+import { getReferenceRoleDefinition } from "@/lib/referenceRoles";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 2;
+
+export function ReferenceEvidenceList({
+  images,
+  evidence,
+}: {
+  images: readonly string[];
+  evidence: unknown;
+}) {
+  const normalizedEvidence = normalizeReferenceImageEvidence(evidence, images.length);
+  return (
+    <div className="mt-4">
+      <p className="text-[10px] text-neutral-500">参考图 · {images.length} 张</p>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {images.map((image, index) => {
+          const item = normalizedEvidence[index]!;
+          const roleLabel = getReferenceRoleDefinition(item.role).label;
+          const stateLabel = item.evidenceState === "confirmed"
+            ? "已确认"
+            : item.evidenceState === "legacy" ? "历史证据，待复核" : "证据不可用，待复核";
+          return (
+            <div key={`${image}-${index}`} className="min-w-0">
+              <img
+                src={thumbnailImageUrl(image)}
+                alt={`参考图 ${item.order + 1}：${roleLabel}`}
+                loading="lazy"
+                decoding="async"
+                className="aspect-square w-full rounded-sm border border-[#333] object-cover"
+              />
+              <p className="mt-1 truncate text-[8px] text-neutral-500">
+                {item.order + 1}. {roleLabel} · {stateLabel}
+              </p>
+              {item.sourceNodeId && (
+                <p className="truncate text-[8px] text-neutral-600">来源：{item.sourceNodeId}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /**
  * 全局图片查看器：单击任意图片弹出，
@@ -13,8 +56,11 @@ const MAX_SCALE = 2;
  */
 export function ImageViewer() {
   const viewer = useFlowStore((s) => s.viewer);
-  const selectedResultId = useFlowStore(selectActiveSelectedResultId);
-  const record = useFlowStore((s) => s.recentResults.find((item) => item.id === selectedResultId));
+  const record = useFlowStore((s) => (
+    s.viewer?.resultId
+      ? s.recentResults.find((item) => item.id === s.viewer?.resultId)
+      : undefined
+  ));
   const closeViewer = useFlowStore((s) => s.closeViewer);
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();
   const [scale, setScale] = useState(1);
@@ -42,6 +88,9 @@ export function ImageViewer() {
   }, [viewer]);
 
   if (!viewer) return null;
+  const providerOriginals = record?.providerImages?.length
+    ? record.providerImages
+    : record?.providerImage ? [record.providerImage] : [];
 
   const saveAsAsset = async () => {
     setAssetState("saving");
@@ -114,7 +163,21 @@ export function ImageViewer() {
           ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-neutral-500">{label}</dt><dd className="text-right text-neutral-300">{value}</dd></div>)}
         </dl>
         {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-white">复制提示词</button></div>}
-        {record?.referenceImages && record.referenceImages.length > 0 && <div className="mt-4"><p className="text-[10px] text-neutral-500">参考图 · {record.referenceImages.length} 张</p><div className="mt-2 grid grid-cols-4 gap-2">{record.referenceImages.map((image, index) => <img key={`${image}-${index}`} src={thumbnailImageUrl(image)} alt={`参考图 ${index + 1}`} loading="lazy" decoding="async" className="aspect-square w-full rounded-sm border border-[#333] object-cover" />)}</div></div>}
+        {providerOriginals.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[10px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {providerOriginals.map((image, index) => (
+                <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
+                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[#333] object-contain" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+        {record?.referenceImages && record.referenceImages.length > 0 && (
+          <ReferenceEvidenceList images={record.referenceImages} evidence={record.referenceInputs} />
+        )}
         {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[#2b2b2b] p-3 text-[10px] text-neutral-400"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
         <div className="mt-5 flex flex-wrap gap-2">

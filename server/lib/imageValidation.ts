@@ -79,3 +79,14 @@ export function isLocalImageReference(value: unknown): value is string {
   if (typeof value !== "string") return false;
   return /^\/api\/files\/[A-Za-z0-9_-]{1,128}\.(?:png|jpe?g|webp|gif)$/.test(value);
 }
+
+/** User-supplied remote references must be imported before generation admission. */
+export function isRemoteImageReference(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}

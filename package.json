@@ -1,11 +1,15 @@
 {
   "name": "garment-canvas",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Garment design collaboration SaaS - infinite canvas + node workflow (P0 MVP)",
   "type": "module",
   "engines": {
-    "node": ">=22.20.0"
+    "node": ">=24.20.0"
+  },
+  "overrides": {
+    "fast-uri": "3.1.7",
+    "qs": "6.16.0"
   },
   "scripts": {
     "predev": "npm run dev:check",
@@ -15,7 +19,7 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "npm run build:web && npm run build:server",
     "build:web": "tsc -b && vite build && node scripts/verify-built-css.mjs && node scripts/verify-bundle-budget.mjs",
-    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=dist-server/index.js",
+    "build:server": "tsx scripts/build-server.ts",
     "start": "NODE_ENV=production node dist-server/index.js",
     "lint": "tsc --noEmit",
     "check": "npm run lint && npm run build:web && npm run test",
@@ -24,7 +28,21 @@
     "test:e2e:production": "node scripts/e2e-production-smoke.mjs",
     "test:e2e:run": "playwright test",
     "gate:codex": "node scripts/codex-gate.mjs",
-    "test:suite": "node tests/test-runner-isolation.test.mjs && node tests/bundle-budget.test.mjs && node tests/bundle-boundaries.test.mjs && node tests/e2e-safety.test.mjs && node tests/claude-guardrail-hook.test.mjs && node tests/codex-gate.test.mjs && tsx tests/node-version-contract.test.ts && tsx tests/vite-proxy-config.test.ts && tsx tests/dev-preflight.test.ts && tsx tests/theme-contract.test.ts && tsx tests/generation-safety.test.ts && tsx tests/workbench-shell.test.ts && tsx tests/dag.test.ts && tsx tests/document-snapshot.test.ts && tsx tests/active-document-boundary.test.ts && tsx tests/workflow-schema.test.ts && tsx tests/provider-contract.test.ts && tsx tests/mask-processing.test.ts && tsx tests/provider-retry.test.ts && tsx tests/exact-generation.test.ts && tsx tests/upload-image-normalization.test.ts && tsx tests/image-input-node.test.ts && tsx tests/mask-upload.test.ts && tsx tests/static-frontend.test.ts && tsx tests/sqlite-postgres-migration.test.ts && tsx tests/auth-storage.test.ts && tsx tests/auth-client.test.ts && tsx tests/authorization.test.ts && tsx tests/tutorials.test.ts && tsx tests/schema-migrations.test.ts && tsx tests/run-queue.test.ts && tsx tests/recent-results.test.ts && tsx tests/project-tabs-session.test.ts && tsx tests/initial-draft-client.test.ts && tsx tests/flow-history.test.ts && tsx tests/text-edit-coalescing.test.ts && tsx tests/selection-consistency.test.ts && tsx tests/project-tabs.test.ts && tsx tests/result-export.test.ts",
+    "docs:apiyi:check": "node scripts/apiyi-docs.mjs check",
+    "docs:apiyi:refresh": "node scripts/apiyi-docs.mjs refresh",
+    "docs:apiyi:kb:sync": "node scripts/apiyi-kb.mjs sync",
+    "docs:apiyi:kb:check": "node scripts/apiyi-kb.mjs check",
+    "docs:apiyi:search": "node scripts/apiyi-kb.mjs search",
+    "docs:apiyi:lookup": "node scripts/apiyi-kb.mjs lookup",
+    "docs:apiyi:guard": "node scripts/apiyi-kb.mjs guard",
+    "evaluation:authorize": "tsx scripts/evaluation-authorize.ts",
+    "evaluation:manifest:check": "tsx scripts/evaluation-manifest.ts",
+    "evaluation:review": "tsx scripts/evaluation-review.ts",
+    "evaluation:release:preflight": "tsx scripts/evaluation-release-preflight.ts",
+    "evaluation:node-matrix:check": "tsx scripts/node-prompt-parameter-matrix.ts",
+    "audit:performance-baseline": "tsx scripts/performance-baseline.ts",
+    "audit:upload-normalization": "tsx scripts/upload-normalization-benchmark.ts",
+    "test:suite": "node tests/test-runner-isolation.test.mjs && node tests/bundle-budget.test.mjs && node tests/bundle-boundaries.test.mjs && node tests/e2e-safety.test.mjs && node tests/claude-guardrail-hook.test.mjs && node tests/spec-kit-skills.test.mjs && node tests/codex-gate.test.mjs && node tests/apiyi-knowledge-base.test.mjs && tsx tests/node-version-contract.test.ts && tsx tests/dependency-security-contract.test.ts && tsx tests/performance-baseline-contract.test.ts && tsx tests/module-facade-contract.test.ts && tsx tests/upload-normalization-config.test.ts && tsx tests/upload-normalization-optimization-evidence.test.ts && tsx tests/vite-proxy-config.test.ts && tsx tests/dev-preflight.test.ts && tsx tests/theme-contract.test.ts && tsx tests/generation-safety.test.ts && tsx tests/workbench-shell.test.ts && tsx tests/apiyi-docs.test.ts && tsx tests/model-parameter-profiles.test.ts && tsx tests/node-prompt-parameter-matrix.test.ts && tsx tests/reference-role-catalog.test.ts && tsx tests/reference-role-summary.test.ts && tsx tests/prompt-evaluation.test.ts && tsx tests/evaluation-budget.test.ts && tsx tests/evaluation-plan.test.ts && tsx tests/evaluation-manifest.test.ts && tsx tests/evaluation-evidence.test.ts && tsx tests/evaluation-code-identity.test.ts && tsx tests/evaluation-release-build.test.ts && tsx tests/evaluation-release-runtime.test.ts && tsx tests/evaluation-release-preflight.test.ts && tsx tests/evaluation-promotion.test.ts && tsx tests/evaluation-review-cli.test.ts && tsx tests/evaluation-authorize-cli.test.ts && tsx tests/evaluation-authorization-ledger.test.ts && tsx tests/evaluation-campaign.test.ts && tsx tests/reference-inputs.test.ts && tsx tests/prompt-presets.test.ts && tsx tests/prompt-preset-ui.test.ts && tsx tests/prompt-evaluation-release.test.ts && tsx tests/prompt-run-admission.test.ts && tsx tests/node-product-policy.test.ts && tsx tests/evaluation-run-policy.test.ts && tsx tests/dag.test.ts && tsx tests/document-snapshot.test.ts && tsx tests/active-document-boundary.test.ts && tsx tests/workflow-schema.test.ts && tsx tests/apiyi-transport.test.ts && tsx tests/provider-contract.test.ts && tsx tests/mask-processing.test.ts && tsx tests/provider-retry.test.ts && tsx tests/exact-generation.test.ts && tsx tests/upload-image-normalization.test.ts && tsx tests/image-input-node.test.ts && tsx tests/mask-upload.test.ts && tsx tests/static-frontend.test.ts && tsx tests/sqlite-postgres-migration.test.ts && tsx tests/auth-storage.test.ts && tsx tests/auth-client.test.ts && tsx tests/authorization.test.ts && tsx tests/tutorials.test.ts && tsx tests/schema-migrations.test.ts && tsx tests/run-queue.test.ts && tsx tests/recent-results.test.ts && tsx tests/image-viewer-reference-evidence.test.ts && tsx tests/project-tabs-session.test.ts && tsx tests/initial-draft-client.test.ts && tsx tests/flow-history.test.ts && tsx tests/text-edit-coalescing.test.ts && tsx tests/selection-consistency.test.ts && tsx tests/project-tabs.test.ts && tsx tests/result-export.test.ts && tsx tests/evaluation-review-ledger.test.ts",
     "docker:up": "docker compose up -d --build --wait",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app postgres"
@@ -42,6 +60,7 @@
     "pg": "^8.23.0",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
+    "undici": "8.10.1",
     "zundo": "^2.2.0",
     "zustand": "^5.0.3"
   },
@@ -51,7 +70,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.13.3",
     "@types/pg": "^8.21.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

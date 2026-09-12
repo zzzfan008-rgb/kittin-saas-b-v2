@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-04T19:13:55.692Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "599cd4a4f16ad28841e38a8798b160c8f116bb3b3d735513b7ddd19d97938f02",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "Codex 总门禁如何调用 API易 知识库守卫并排除不可变站点快照",
+  "affectedPaths": [
+    "scripts/codex-gate.mjs"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "8e43bf7d8d777b13dafdb11ead00c5731b1d1bdec42ee65333a55e797aa5431f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/zh-Hant/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "292e2819c7e632c7f560f97c7019cf76647babe2944bd56d555ea5ec5ed92bbf"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-04/codex-cli-docs-updated",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/live/2026-04/codex-cli-docs-updated.md",
+      "pageLocalPath": "pages/live/2026-04/codex-cli-docs-updated.md",
+      "title": "Codex 接入 API易 文档已更新，接入更简单",
+      "sha256": "8fceb782f251ff7a418cf284c9bda8549ecf4aecf81e384d6f8215ef8d392d98"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/en/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "97aa7d9978a56cfbffd886e958f266fb78a7a71ff5e1db28dbdb36acb1dfb336"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/ja/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "5325a38d1219b6de700dd06d63eb612098d0ebb4ec39e419d03a91133cdc7840"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ko/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/ko/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "b2b5989b65aee9431406f7d308187dd9e24a4ddabe227935b476c286636680d7"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/scenarios/programming/codex-cli",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ru/scenarios/programming/codex-cli.md",
+      "pageLocalPath": "pages/ru/scenarios/programming/codex-cli.md",
+      "title": "OpenAI Codex",
+      "sha256": "add5fae87f8d67cb09461e57c3597e2db313b9451cefe172bfc7d062cef2090c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/codex-claudecode-default-groups",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/codex-claudecode-default-groups.md",
+      "pageLocalPath": "pages/en/faq/codex-claudecode-default-groups.md",
+      "title": "How Do the Codex, ClaudeCode, and Default Groups Differ?",
+      "sha256": "9e2ab6fdfd372c6bd94307540509a8f7a5547c1b194f22049ff060d3fadf65d2"
+    }
+  ],
+  "decisionSummary": "保留总门禁对 API易 相关变更的条件式本地守卫；守卫只验证当前快照、相关路径和有效咨询凭证，不调用任何付费 Provider 或图片生成/编辑端点；不可变 API易站点快照仅由知识库校验，不参与工作树空白检查。",
+  "unresolvedChoices": []
+}

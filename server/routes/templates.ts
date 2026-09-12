@@ -20,7 +20,11 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { transaction } from "../lib/database";
 import { lockActiveOwner, lockActiveOwnerMutation } from "../lib/ownerMutation";
 import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
-import { WORKFLOW_SCHEMA_VERSION, type WorkflowTemplate } from "../../src/types/workflow";
+import {
+  WORKFLOW_SCHEMA_VERSION,
+  type ReferenceRole,
+  type WorkflowTemplate,
+} from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
@@ -46,6 +50,10 @@ function templatePath(sub: "builtin" | "user", id: string): string {
 // ---------- 内置模板（flow 为 React Flow 格式，data 默认值同前端 flowStore.defaultNodeData）----------
 const BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
 
+function confirmedReferenceEdgeData(role: ReferenceRole) {
+  return { role, roleNeedsConfirmation: false } as const;
+}
+
 function builtinTemplates(): WorkflowTemplate[] {
   return [
     {
@@ -62,7 +70,10 @@ function builtinTemplates(): WorkflowTemplate[] {
             id: "n1",
             type: "image-input",
             position: { x: 0, y: 0 },
-            data: { kind: "image-input", label: "图片上传", status: "idle", imageRole: "sketch" },
+            data: {
+              kind: "image-input", label: "图片上传", status: "idle",
+              imageRole: "pose_composition", roleNeedsConfirmation: false,
+            },
           },
           {
             id: "n2",
@@ -76,6 +87,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -92,6 +105,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "1:1",
               batchSize: 1,
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
             },
@@ -107,15 +122,26 @@ function builtinTemplates(): WorkflowTemplate[] {
               colors: [],
               prompt: "",
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
         edges: [
-          { id: "e1", source: "n1", target: "n2" },
-          { id: "e2", source: "n2", target: "n3" },
-          { id: "e3", source: "n3", target: "n4", targetHandle: "garment" },
+          {
+            id: "e1", source: "n1", target: "n2",
+            data: confirmedReferenceEdgeData("pose_composition"),
+          },
+          {
+            id: "e2", source: "n2", target: "n3",
+            data: confirmedReferenceEdgeData("garment_full"),
+          },
+          {
+            id: "e3", source: "n3", target: "n4", targetHandle: "garment",
+            data: confirmedReferenceEdgeData("garment_full"),
+          },
         ],
       },
     },
@@ -133,7 +159,10 @@ function builtinTemplates(): WorkflowTemplate[] {
             id: "n1",
             type: "image-input",
             position: { x: 0, y: 0 },
-            data: { kind: "image-input", label: "图片上传", status: "idle", imageRole: "sketch" },
+            data: {
+              kind: "image-input", label: "图片上传", status: "idle",
+              imageRole: "pose_composition", roleNeedsConfirmation: false,
+            },
           },
           {
             id: "n2",
@@ -147,6 +176,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -161,14 +192,22 @@ function builtinTemplates(): WorkflowTemplate[] {
               status: "idle",
               imageSize: "2K",
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
         edges: [
-          { id: "e1", source: "n1", target: "n2" },
-          { id: "e2", source: "n2", target: "n3" },
+          {
+            id: "e1", source: "n1", target: "n2",
+            data: confirmedReferenceEdgeData("pose_composition"),
+          },
+          {
+            id: "e2", source: "n2", target: "n3",
+            data: confirmedReferenceEdgeData("garment_full"),
+          },
         ],
       },
     },
@@ -194,6 +233,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "generate",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -209,12 +250,17 @@ function builtinTemplates(): WorkflowTemplate[] {
               colors: [],
               prompt: "",
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
             },
           },
         ],
-        edges: [{ id: "e1", source: "n1", target: "n2", targetHandle: "garment" }],
+        edges: [{
+          id: "e1", source: "n1", target: "n2", targetHandle: "garment",
+          data: confirmedReferenceEdgeData("garment_full"),
+        }],
       },
     },
     {
@@ -239,6 +285,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "generate",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -256,7 +304,10 @@ function builtinTemplates(): WorkflowTemplate[] {
             },
           },
         ],
-        edges: [{ id: "generate-to-result", source: "generate", target: "result" }],
+        edges: [{
+          id: "generate-to-result", source: "generate", target: "result",
+          data: confirmedReferenceEdgeData("generic"),
+        }],
       },
     },
     {
@@ -277,7 +328,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图1 · 人物主体",
               status: "idle",
-              imageRole: "garment",
+              imageRole: "identity",
+              roleNeedsConfirmation: false,
             },
           },
           {
@@ -288,7 +340,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图2 · 场景背景",
               status: "idle",
-              imageRole: "reference",
+              imageRole: "background",
+              roleNeedsConfirmation: false,
             },
           },
           {
@@ -303,6 +356,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -321,9 +376,18 @@ function builtinTemplates(): WorkflowTemplate[] {
           },
         ],
         edges: [
-          { id: "subject-to-transfer", source: "subject", target: "transfer" },
-          { id: "scene-to-transfer", source: "scene", target: "transfer" },
-          { id: "transfer-to-result", source: "transfer", target: "result" },
+          {
+            id: "subject-to-transfer", source: "subject", target: "transfer",
+            data: confirmedReferenceEdgeData("identity"),
+          },
+          {
+            id: "scene-to-transfer", source: "scene", target: "transfer",
+            data: confirmedReferenceEdgeData("background"),
+          },
+          {
+            id: "transfer-to-result", source: "transfer", target: "result",
+            data: confirmedReferenceEdgeData("generic"),
+          },
         ],
       },
     },
@@ -345,7 +409,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图1 · 原始图案",
               status: "idle",
-              imageRole: "garment",
+              imageRole: "garment_full",
+              roleNeedsConfirmation: false,
             },
           },
           {
@@ -356,7 +421,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图2 · 风格参考",
               status: "idle",
-              imageRole: "reference",
+              imageRole: "styling_only",
+              roleNeedsConfirmation: false,
             },
           },
           {
@@ -371,6 +437,8 @@ function builtinTemplates(): WorkflowTemplate[] {
               aspectRatio: "3:4",
               batchSize: 1,
               outputImages: [],
+              operationMode: "edit",
+              operationModeNeedsConfirmation: false,
               modelId: DEFAULT_GENERATION_MODEL_ID,
               modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
             },
@@ -389,9 +457,18 @@ function builtinTemplates(): WorkflowTemplate[] {
           },
         ],
         edges: [
-          { id: "pattern-to-transfer", source: "pattern", target: "transfer" },
-          { id: "style-to-transfer", source: "style", target: "transfer" },
-          { id: "transfer-to-result", source: "transfer", target: "result" },
+          {
+            id: "pattern-to-transfer", source: "pattern", target: "transfer",
+            data: confirmedReferenceEdgeData("garment_full"),
+          },
+          {
+            id: "style-to-transfer", source: "style", target: "transfer",
+            data: confirmedReferenceEdgeData("styling_only"),
+          },
+          {
+            id: "transfer-to-result", source: "transfer", target: "result",
+            data: confirmedReferenceEdgeData("generic"),
+          },
         ],
       },
     },
@@ -440,7 +517,13 @@ function readTemplates(sub: "builtin" | "user"): StoredWorkflowTemplate[] {
 
 function readTemplateFile(filePath: string): StoredWorkflowTemplate {
   const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
-  const isLegacyVersion = raw.schemaVersion === undefined || raw.schemaVersion === 0 || raw.schemaVersion === 1 || raw.schemaVersion === 2;
+  const isLegacyVersion = raw.schemaVersion === undefined
+    || raw.schemaVersion === 0
+    || raw.schemaVersion === 1
+    || raw.schemaVersion === 2
+    || raw.schemaVersion === 3
+    || raw.schemaVersion === 4
+    || raw.schemaVersion === 5;
   if (!isLegacyVersion && raw.schemaVersion !== WORKFLOW_SCHEMA_VERSION) {
     throw new WorkflowValidationError(`unsupported template schemaVersion: ${String(raw.schemaVersion)}`);
   }

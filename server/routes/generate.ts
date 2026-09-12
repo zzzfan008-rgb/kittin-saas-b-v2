@@ -8,8 +8,11 @@ import {
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
+  IMAGE_OPERATION_MODE_VALUES,
+  allowedOperationModesForNode,
   type ImageGenRequest,
   type NodeKind,
+  type ReferenceImageSource,
 } from "../../src/types/workflow";
 import { postProcessGeneratedOutputImages } from "../engine/runner";
 import { EXACT_ASPECT_DIMENSIONS } from "../lib/imagePostProcessing";
@@ -24,17 +27,30 @@ import {
   GenerationRequestConflictError,
 } from "../engine/runQueue";
 import { queryOne, transaction } from "../lib/database";
+import { isLocalImageReference } from "../lib/imageValidation";
 import {
+  assertNoRemoteImageReferencesAtAdmission,
   assertImageReferencesAccessible,
+  imageReferenceAccessFailurePayload,
   ImageReferenceAccessError,
+  type ImageReferenceAccessEvidence,
 } from "../lib/imageReferenceAccess";
 import {
-  defaultImageModelOptions,
-  imageModelOptionsError,
+  imageModelOptionsErrorForOperation,
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
 } from "../../src/types/imageModels";
+import {
+  referenceDataUrls,
+  referenceInputsTransportError,
+} from "../../src/lib/referenceInputs";
+import {
+  evaluatePromptRunAdmission,
+  promptRunAdmissionFailurePayload,
+  promptRunAdmissionInputFromParams,
+  type PromptRunReferenceSnapshot,
+} from "../../src/lib/promptRunAdmission";
 
 export const generateRouter = Router();
 
@@ -43,6 +59,49 @@ export type DirectGenerateKind = Exclude<NodeKind, "image-input" | "result">;
 export type DirectGenerateValidation =
   | { ok: true; kind?: DirectGenerateKind }
   | { ok: false; error: string };
+
+const DIRECT_REFERENCE_SOURCE_NODE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+function directImageReferenceError(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value || value !== value.trim()) {
+    return "must be a valid image reference";
+  }
+  if (value.startsWith("data:")) {
+    // Strict Base64, MIME/magic and real decode checks run asynchronously in
+    // the globally bounded image-processing slot below.
+    return undefined;
+  }
+  if (value.startsWith("/api/files/")) {
+    return isLocalImageReference(value)
+      ? undefined
+      : "must be a valid image dataURL, local /api/files reference, or http(s) URL";
+  }
+  try {
+    const url = new URL(value);
+    if (
+      (url.protocol === "http:" || url.protocol === "https:")
+      && url.hostname
+      && !url.username
+      && !url.password
+    ) {
+      return undefined;
+    }
+  } catch {
+    // Collapse parser details so callers cannot distinguish internal handling.
+  }
+  return "must be a valid image dataURL, local /api/files reference, or http(s) URL";
+}
+
+function directMaskReferenceError(value: string): string | undefined {
+  if (value.startsWith("data:")) {
+    return /^data:image\/png;base64,/i.test(value)
+      ? undefined
+      : "must be an inline PNG dataURL or local /api/files/*.png reference";
+  }
+  return isLocalImageReference(value) && value.toLowerCase().endsWith(".png")
+    ? undefined
+    : "must be an inline PNG dataURL or local /api/files/*.png reference";
+}
 
 function isDirectGenerateKind(value: unknown): value is DirectGenerateKind {
   if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(NODE_SPECS, value)) return false;
@@ -54,10 +113,27 @@ export function validateDirectGenerateRequest(
   kind: unknown,
   request: ImageGenRequest,
 ): DirectGenerateValidation {
-  // Backward compatibility: legacy direct callers did not send a node kind.
-  if (kind === undefined) return { ok: true };
+  const referencesError = referenceInputsTransportError(request);
+  if (referencesError) return { ok: false, error: `request ${referencesError}` };
+  const referenceImages = referenceDataUrls(request);
+  if (!IMAGE_OPERATION_MODE_VALUES.includes(request.operationMode as never)) {
+    return { ok: false, error: "request.operationMode must be generate, edit, or mask-edit" };
+  }
+  if (request.operationMode === "generate" && referenceImages.length > 0) {
+    return { ok: false, error: "generate mode cannot contain reference images" };
+  }
+  if (request.operationMode !== "generate" && referenceImages.length === 0) {
+    return { ok: false, error: `${request.operationMode} mode requires at least one reference image` };
+  }
+  if (kind === undefined) {
+    return { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" };
+  }
   if (!isDirectGenerateKind(kind)) {
     return { ok: false, error: "kind must identify a supported AI node" };
+  }
+  const allowedModes = allowedOperationModesForNode(kind);
+  if (!allowedModes.includes(request.operationMode)) {
+    return { ok: false, error: `${kind} operationMode must be one of: ${allowedModes.join(", ")}` };
   }
   if (kind === "sketch-to-render" || kind === "ai-modify") {
     if (
@@ -75,7 +151,7 @@ export function validateDirectGenerateRequest(
   }
   if (
     kind === "mask-redraw"
-    && (request.referenceImages?.length ?? 0) > MAX_MASK_USER_REFERENCE_IMAGES
+    && referenceImages.length > MAX_MASK_USER_REFERENCE_IMAGES
   ) {
     return {
       ok: false,
@@ -100,6 +176,12 @@ export function postProcessDirectGenerateImages(
 }
 
 generateRouter.post("/", asyncHandler(async (req, res) => {
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "evaluation")) {
+    res.status(400).json({
+      error: "真实评估只能通过 /api/run-plan 并显式提交 onlyNodeId；/api/generate 不接受 evaluation payload",
+    });
+    return;
+  }
   const {
     providerId, modelId: requestedModelId, request, projectId, nodeId, nodeLabel, kind, clientRequestId,
   } = req.body as {
@@ -121,12 +203,54 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     res.status(400).json({ error: validation.error });
     return;
   }
-  const resolvedKind = validation.kind ?? (modelId === "gpt-image-2" ? "mask-redraw" : "sketch-to-render");
+  const resolvedKind = validation.kind;
+  if (!resolvedKind) {
+    res.status(400).json({ error: "kind is required" });
+    return;
+  }
+  const submittedReferenceImages = referenceDataUrls(request);
+  for (const [index, reference] of submittedReferenceImages.entries()) {
+    const referenceError = directImageReferenceError(reference);
+    if (referenceError) {
+      res.status(400).json({ error: `request reference image ${index} ${referenceError}` });
+      return;
+    }
+  }
+  for (const [index, reference] of (request.references ?? []).entries()) {
+    if (
+      reference.sourceNodeId !== undefined
+      && !DIRECT_REFERENCE_SOURCE_NODE_ID_PATTERN.test(reference.sourceNodeId)
+    ) {
+      res.status(400).json({
+        error: `request references[${index}].sourceNodeId must be a safe node identifier`,
+      });
+      return;
+    }
+  }
+  if (resolvedKind === "mask-redraw" && typeof request.mask === "string") {
+    const maskError = directMaskReferenceError(request.mask);
+    if (maskError) {
+      res.status(400).json({ error: `request.mask ${maskError}` });
+      return;
+    }
+  }
+  const fabricImageUrl = (request as ImageGenRequest & { fabricImageUrl?: unknown }).fabricImageUrl;
+  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && fabricImageUrl !== undefined) {
+    const fabricReferenceError = directImageReferenceError(fabricImageUrl);
+    if (fabricReferenceError) {
+      res.status(400).json({ error: `request.fabricImageUrl ${fabricReferenceError}` });
+      return;
+    }
+  }
   if (!isModelAllowedForNode(modelId, resolvedKind)) {
     res.status(400).json({ error: `${modelId} is not allowed for ${resolvedKind}` });
     return;
   }
-  const maskSourceRef = request.referenceImages?.[0];
+  const structuredReferences = request.references ?? [];
+  const requestReferenceImages = structuredReferences.length > 0
+    ? structuredReferences.map((reference) => reference.dataUrl)
+    : submittedReferenceImages;
+  const maskSourceRef = requestReferenceImages[0];
   if (
     resolvedKind === "mask-redraw" &&
     (typeof maskSourceRef !== "string" || !maskSourceRef.trim() || typeof request.mask !== "string" || !request.mask.trim())
@@ -138,15 +262,19 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   const maxUserReferences = resolvedKind === "mask-redraw"
     ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
     : maxReferences;
-  if (request.referenceImages && request.referenceImages.length > maxUserReferences) {
+  if (requestReferenceImages.length > maxUserReferences) {
     const qualifier = resolvedKind === "mask-redraw" ? " user" : "";
     res.status(400).json({
       error: `referenceImages must contain at most ${maxUserReferences}${qualifier} images for ${modelId}`,
     });
     return;
   }
-  const modelOptions = request.modelOptions ?? defaultImageModelOptions(modelId, request.aspectRatio);
-  const optionsError = imageModelOptionsError(modelId, modelOptions);
+  if (!Object.prototype.hasOwnProperty.call(request, "modelOptions")) {
+    res.status(400).json({ error: "request.modelOptions is required; parameters are never filled silently" });
+    return;
+  }
+  const modelOptions = request.modelOptions;
+  const optionsError = imageModelOptionsErrorForOperation(modelId, modelOptions, request.operationMode);
   if (optionsError) {
     res.status(400).json({ error: `request.modelOptions ${optionsError}` });
     return;
@@ -167,13 +295,56 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   };
   const resolvedRequest: ImageGenRequest = {
     ...requestWithoutLegacyMaskMode,
+    referenceImages: requestReferenceImages.length ? requestReferenceImages : undefined,
     modelOptions,
   };
-  const plan = {
+  const admissionReferences: PromptRunReferenceSnapshot[] = structuredReferences.length > 0
+    ? structuredReferences.map((reference) => ({
+      role: reference.role,
+      order: reference.order,
+      ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
+      roleNeedsConfirmation: reference.roleNeedsConfirmation,
+    }))
+    : requestReferenceImages.map((_imageRef, order) => ({
+      role: "generic",
+      order,
+      roleNeedsConfirmation: true,
+    }));
+  const inputReferences: ReferenceImageSource[] = requestReferenceImages.map((imageRef, order) => ({
+    imageRef,
+    role: structuredReferences[order]?.role ?? "generic" as const,
+    order,
+    ...(structuredReferences[order]?.sourceNodeId
+      ? { sourceNodeId: structuredReferences[order].sourceNodeId }
+      : {}),
+    // This canonical plan is reachable only after admission validates the raw
+    // submitted order/role state below. Legacy-only inputs remain pending.
+    roleNeedsConfirmation: structuredReferences[order]?.roleNeedsConfirmation ?? true,
+  }));
+  // Preserve the exact request order for failure evidence. Auxiliary inputs
+  // append one-by-one so their indexes stay unambiguous even if node policies
+  // later allow more than one auxiliary image at a time.
+  const accessReferences: ImageReferenceAccessEvidence[] = [...inputReferences];
+  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && typeof fabricImageUrl === "string") {
+    accessReferences.push({
+      imageRef: fabricImageUrl,
+      order: accessReferences.length,
+      sourceNodeId: "direct-fabric",
+    });
+  }
+  if (resolvedKind === "mask-redraw" && typeof request.mask === "string") {
+    accessReferences.push({
+      imageRef: request.mask,
+      order: accessReferences.length,
+      sourceNodeId: "direct-mask",
+    });
+  }
+  const basePlan = {
     steps: [{
       nodeId: resolvedNodeId,
       kind: resolvedKind,
-      inputImages: request.referenceImages ?? [],
+      inputImages: requestReferenceImages,
+      inputReferences,
       params: {
         ...resolvedRequest,
         modelId,
@@ -182,6 +353,39 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }],
   };
   try {
+    const admission = evaluatePromptRunAdmission(
+      promptRunAdmissionInputFromParams(resolvedKind, basePlan.steps[0].params, admissionReferences),
+      { evaluationRun: false },
+    );
+    if (!admission.allowed) {
+      res.status(400).json(promptRunAdmissionFailurePayload(admission));
+      return;
+    }
+    assertNoRemoteImageReferencesAtAdmission(accessReferences);
+    // All cheap syntax/model/parameter/admission checks are complete. Decode
+    // inline inputs exactly once, outside the database transaction but inside
+    // the shared bounded image-processing slot.
+    const inlineAccessReferences = accessReferences.filter((reference) => (
+      reference.imageRef.startsWith("data:")
+    ));
+    try {
+      await assertImageReferencesAccessible(
+        inlineAccessReferences.map((reference) => reference.imageRef),
+        user.id,
+        undefined,
+        {
+          verifyInlineImages: true,
+          referenceInputs: inlineAccessReferences,
+        },
+      );
+    } catch (error) {
+      if (error instanceof ImageReferenceAccessError) {
+        res.status(400).json({ error: "request contains an unavailable inline image reference" });
+        return;
+      }
+      throw error;
+    }
+    const plan = basePlan;
     const outcome = await transaction(async (client) => {
       // 与账号转移/删除统一 user → project → assets → files → run 的锁顺序。
       await assertGenerationOwnerActive(client, user.id);
@@ -196,7 +400,18 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
         if (project.owner_id !== user.id) return { status: "forbidden" as const };
         serverProjectName = project.name;
       }
-      await assertImageReferencesAccessible(plan, user.id, client);
+      const storedAccessReferences = accessReferences.filter((reference) => (
+        isLocalImageReference(reference.imageRef)
+      ));
+      await assertImageReferencesAccessible(
+        storedAccessReferences.map((reference) => reference.imageRef),
+        user.id,
+        client,
+        {
+          verifyStoredFiles: true,
+          referenceInputs: storedAccessReferences,
+        },
+      );
       const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
         userId: user.id,
         clientRequestId,
@@ -207,7 +422,8 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
         kind: resolvedKind,
         prompt: request.prompt,
         parameters: plan.steps[0].params,
-        referenceImages: request.referenceImages,
+        referenceImages: requestReferenceImages,
+        referenceInputs: inputReferences,
         requestedCount,
       }, "direct");
       return { status: "queued" as const, runId: run.id };
@@ -221,7 +437,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }
   } catch (error) {
     if (error instanceof ImageReferenceAccessError) {
-      res.status(403).json({ error: error.message });
+      res.status(403).json(imageReferenceAccessFailurePayload(error));
       return;
     }
     if (error instanceof GenerationRequestConflictError) {

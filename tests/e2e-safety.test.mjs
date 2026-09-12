@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { playwrightArgsFromCli } from "../scripts/e2e-with-postgres.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const playwrightCli = resolve(root, "node_modules/playwright/cli.js");
+const productionSmokeScript = readFileSync(resolve(root, "scripts/e2e-production-smoke.mjs"), "utf8");
 const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-e2e-safety-"));
 const safeEnv = {
   ...process.env,
@@ -33,18 +36,35 @@ function listTests(overrides = {}, omitted = []) {
 }
 
 try {
+  assert.deepEqual(
+    playwrightArgsFromCli(["--skip-build", "--project=performance-baseline", "--grep", "render latency"]),
+    ["--project=performance-baseline", "--grep", "render latency"],
+    "the E2E wrapper must consume --skip-build without dropping valid Playwright arguments",
+  );
+
+  assert.doesNotMatch(
+    productionSmokeScript.match(/function runPlaywrightCommand\(env\) \{[\s\S]*?\n\}/)?.[0] ?? "",
+    /npm_execpath|\bnpx(?:\.cmd)?\b|\bnpm\s+exec\b/,
+    "production smoke must invoke the repository-local Playwright CLI directly",
+  );
+
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 5 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 7 files/);
   assert.match(
     baseline.stdout,
-    /\[golden-path\].*upload and text starters complete the isolated first-generation golden path/,
+    /\[golden-path\].*unverified upload stays blocked while a test-reviewed text starter completes the isolated golden path/,
     "isolated golden-path project must remain in the browser regression matrix",
   );
   assert.match(
     baseline.stdout,
     /\[initial-draft\].*hard refresh, a second tab, and relogin restore the same initial draft/,
     "initial-draft recovery must remain in the isolated browser regression matrix",
+  );
+  assert.match(
+    baseline.stdout,
+    /\[performance-baseline\].*capture 100-node desktop render latency and browser memory/,
+    "performance baseline must remain isolated from ordinary browser regressions",
   );
   for (const width of [1024, 1280, 1440]) {
     assert.match(

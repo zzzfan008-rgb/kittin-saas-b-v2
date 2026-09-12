@@ -20,6 +20,7 @@ import {
 import type { AiModifyNodeData } from "../src/types/workflow";
 import { ImageGrid } from "../src/components/nodes/ImageGrid";
 import { RunButton } from "../src/components/nodes/NodeFrame";
+import { normalizeReferenceImageEvidence } from "../src/lib/referenceEvidence";
 
 let passed = 0;
 
@@ -313,6 +314,25 @@ test("图片网格收到损坏的 undefined 数据时显示空状态而不抛错
 test("图片网格使用服务端缩略图但查看器仍保留原图引用", () => {
   const html = renderToStaticMarkup(createElement(ImageGrid, { images: ["/api/files/result.png"] }));
   assert.match(html, /\/api\/files\/result\.png\/thumbnail/);
+});
+
+test("历史参考证据始终与图片索引对齐，损坏条目保持待复核", () => {
+  const evidence = normalizeReferenceImageEvidence([
+    {
+      role: "garment_top",
+      order: 7,
+      assetSha256: "坏哈希",
+      sourceNodeId: "legacy-source",
+      roleNeedsConfirmation: false,
+    },
+  ], 2);
+  assert.deepEqual(evidence.map(({ order, role, roleNeedsConfirmation, evidenceState }) => ({
+    order, role, roleNeedsConfirmation, evidenceState,
+  })), [
+    { order: 0, role: "garment_top", roleNeedsConfirmation: true, evidenceState: "legacy" },
+    { order: 1, role: "generic", roleNeedsConfirmation: true, evidenceState: "unavailable" },
+  ]);
+  assert.equal(evidence[0]?.sourceNodeId, "legacy-source");
 });
 
 test("排队中的运行按钮禁用并明确显示排队状态", () => {

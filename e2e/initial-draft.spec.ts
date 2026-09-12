@@ -5,6 +5,7 @@ interface InitialDraftBody {
     id: string;
     name: string;
     revision: number;
+    flow: unknown;
   };
 }
 
@@ -34,14 +35,27 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
   };
 
   // Earlier desktop/golden-path projects intentionally remain in the isolated
-  // database. Seed the draft boundary when the suite has no active draft so
-  // this test exercises draft recovery without depending on test ordering.
-  const existingBeforeStartup = await readDraft();
+  // database. Seed a non-pristine draft boundary so the startup contract
+  // selects the draft even when a recent formal project also exists.
+  let existingBeforeStartup = await readDraft();
   if (!existingBeforeStartup) {
     const bootstrap = await page.request.post("/api/projects/initial-draft/bootstrap", {
       data: { flow: { schemaVersion: 3, nodes: [], edges: [] } },
     });
     expect(bootstrap.ok(), await bootstrap.text()).toBeTruthy();
+    existingBeforeStartup = await readDraft();
+  }
+  expect(existingBeforeStartup).not.toBeNull();
+  if (!existingBeforeStartup) throw new Error("Initial draft was not bootstrapped");
+  if (/^未修改项目名称\d{8}000000$/.test(existingBeforeStartup.name)) {
+    const seed = await page.request.put(`/api/projects/initial-draft/${existingBeforeStartup.id}`, {
+      data: {
+        expectedRevision: existingBeforeStartup.revision,
+        name: `E2E 初始草稿 ${Date.now()}`,
+        flow: existingBeforeStartup.flow,
+      },
+    });
+    expect(seed.ok(), await seed.text()).toBeTruthy();
   }
 
   await page.goto("/");

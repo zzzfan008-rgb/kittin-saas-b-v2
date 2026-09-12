@@ -1,6 +1,19 @@
 {
-  "schemaVersion": 2,
-  "reviewedOn": "2026-08-26",
+  "schemaVersion": 3,
+  "contractLayer": "productPolicy",
+  "contractId": "apiyi-image-contracts-v4",
+  "reviewedOn": "2026-09-03",
+  "generatedFrom": {
+    "knowledgeFile": "model-knowledge.json",
+    "sourceManifest": "sources.json",
+    "productMustRemainGatewaySubset": true
+  },
+  "releasePolicy": {
+    "defaultEvidenceStatus": "unverified",
+    "productionSelectableStatuses": ["verified", "recommended"],
+    "contractOrSourceDriftDowngradesTo": "unverified",
+    "automaticPaidProbes": false
+  },
   "baseUrl": "https://api.apiyi.com",
   "runtime": {
     "upstreamMode": "synchronous",
@@ -26,7 +39,13 @@
   "models": [
     {
       "id": "gpt-image-2",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:ba3586e5f7b4db85fbfe839f5c5da4a07181c2b2c8a0253a99576563ce2c8b57",
+      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "gatewayModelId": "gpt-image-2",
       "upstreamModelId": "gpt-image-2",
+      "vendorModelId": "gpt-image-2",
+      "evidenceStatus": "unverified",
       "label": "GPT Image 2 局部修改",
       "channel": "official",
       "allowedNodeKinds": ["mask-redraw"],
@@ -37,6 +56,8 @@
         "contentType": "multipart/form-data",
         "minReferences": 1,
         "maxReferences": 8,
+        "maxUserReferences": 7,
+        "systemGuideImages": 1,
         "singleImageField": "image[]",
         "multipleImageField": "image[]",
         "mask": {
@@ -68,7 +89,13 @@
     },
     {
       "id": "gpt-image-2-vip",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
+      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "gatewayModelId": "gpt-image-2-vip",
       "upstreamModelId": "gpt-image-2-vip",
+      "vendorModelId": null,
+      "evidenceStatus": "unverified",
       "label": "GPT Image 2 VIP",
       "channel": "reverse-codex",
       "allowedNodeKinds": ["image-generation"],
@@ -81,7 +108,13 @@
     },
     {
       "id": "gemini-3.1-flash-image",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
+      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "gatewayModelId": "gemini-3.1-flash-image",
       "upstreamModelId": "gemini-3.1-flash-image",
+      "vendorModelId": "gemini-3.1-flash-image",
+      "evidenceStatus": "unverified",
       "label": "Gemini 3.1 Flash Image",
       "channel": "official",
       "allowedNodeKinds": ["image-generation"],
@@ -94,7 +127,13 @@
     },
     {
       "id": "flux-2-pro",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
+      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "gatewayModelId": "flux-2-pro",
       "upstreamModelId": "flux-2-pro",
+      "vendorModelId": "flux-2-pro",
+      "evidenceStatus": "unverified",
       "label": "FLUX.2 Pro",
       "channel": "official",
       "allowedNodeKinds": ["image-generation"],
@@ -108,7 +147,13 @@
     },
     {
       "id": "seedream-5-0-260128",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
+      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "gatewayModelId": "seedream-5-0-260128",
       "upstreamModelId": "seedream-5-0-260128",
+      "vendorModelId": "seedream-5-0-260128",
+      "evidenceStatus": "unverified",
       "label": "Seedream 5.0",
       "channel": "official",
       "allowedNodeKinds": ["image-generation"],
@@ -119,20 +164,6 @@
       "requiredParameters": {"watermark": false, "sequential_image_generation": "disabled"},
       "forbiddenParameters": ["n"],
       "output": {"kind": "openai-image", "fields": ["url", "b64_json"], "recordActualSize": true}
-    },
-    {
-      "id": "grok-imagine-image",
-      "upstreamModelId": "grok-imagine-image",
-      "label": "Grok Imagine 2",
-      "channel": "official",
-      "allowedNodeKinds": ["image-generation"],
-      "timeoutMs": 360000,
-      "generation": {"path": "/v1/images/generations", "contentType": "application/json"},
-      "edit": {"path": "/v1/images/edits", "contentType": "multipart/form-data", "minReferences": 1, "maxReferences": 4, "singleImageField": "image", "multipleImageField": "image[]", "firstReferenceControlsDimensions": true},
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
-      "resolutions": ["1k", "2k"],
-      "outputCounts": {"min": 1, "max": 10},
-      "output": {"kind": "openai-image", "fields": ["url", "b64_json"], "usageIsAccountingSource": false}
     }
   ]
 }

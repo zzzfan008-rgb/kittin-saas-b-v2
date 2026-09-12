@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "apiyi-manual-model-catalog-review-20260903T132248000Z",
+  "kind": "gateway-model-catalog",
+  "capturedAt": "2026-09-03T13:22:48.000Z",
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "baseHost": "api.apiyi.com",
+    "authentication": "configured-project-token",
+    "requestCount": 1,
+    "retryCount": 0,
+    "paidProviderCalls": 0,
+    "imageGenerationOrEditCalls": 0
+  },
+  "response": {
+    "httpStatus": 200,
+    "rawExportByteLength": 61774,
+    "rawExportFileSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+    "rawExportRetainedInRepository": false,
+    "rawExportExternalFile": "../_external/apiyi-model-catalog/2026-09-03Tmanual-review-v1-models.json",
+    "rawExportPolicy": "The exact raw /v1/models response is retained outside Git and must be supplied from the controlled external file when a contract check is produced.",
+    "modelCount": 271,
+    "countScope": "canonical-unique-model-ids",
+    "hashScope": "sha256-canonical-model-id-set-v1",
+    "canonicalModelIdSetSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d"
+  },
+  "expectedGatewayModelIds": [
+    { "id": "gpt-image-2", "present": true },
+    { "id": "gpt-image-2-vip", "present": true },
+    { "id": "gemini-3.1-flash-image", "present": true },
+    { "id": "flux-2-pro", "present": true },
+    { "id": "seedream-5-0-260128", "present": true }
+  ],
+  "missingExpectedIds": [],
+  "humanReview": {
+    "scope": "current-five-model-product-catalog-baseline",
+    "independentReviewCompleted": true,
+    "reviewBasis": "exact model IDs from the retained raw export; no alias, fuzzy match, or fallback",
+    "authorizedByUserRequest": true,
+    "decision": "approved-for-reviewedExportSha256-materialization"
+  },
+  "qualityAssessment": {
+    "observationGrain": "One authenticated, account-scoped APIYI model-catalog response.",
+    "requiredModelCoverage": { "present": 5, "required": 5, "ratio": 1 },
+    "validity": "HTTP 200 returned a model data collection whose raw bytes, canonical unique ID count, canonical ID-set fingerprint, and exact five-model presence were reviewed.",
+    "catalogDriftFromPreviousReview": {
+      "previousEvidenceId": "apiyi-five-model-catalog-review-20260903T081222094Z",
+      "previousModelCount": 269,
+      "modelCountDelta": 2,
+      "canonicalModelIdSetSha256Changed": true
+    },
+    "confidence": "High for this configured token's captured catalog view; insufficient for generation, editing, output quality, billing, or APIYI-wide availability."
+  },
+  "interpretation": {
+    "scope": "configured-token-observed-view",
+    "catalogPresenceDoesNotProveEndpointSuccess": true,
+    "catalogPresenceDoesNotProveGenerationOrEditQuality": true,
+    "catalogPresenceDoesNotProveBillingSemantics": true,
+    "automaticAliasSubstitutionAllowed": false,
+    "automaticContractUpdateAllowed": false,
+    "allFiveModelsRemainUnverified": true
+  },
+  "limitations": [
+    "The raw account-scoped export remains outside Git; this repository record preserves only reviewed metadata and fingerprints.",
+    "Catalog presence does not verify image generation, image editing, output quality, billing, or retry semantics.",
+    "All five model observedEvidence statuses remain unverified until separate evaluation evidence and promotion gates pass."
+  ],
+  "releaseDecision": "catalog-baseline-materialized-release-not-ready",
+  "requiredNextStep": "Supply the exact external raw export to contract-check, then complete model evaluation evidence, promotion, and clean exact-SHA release gates before any release-readiness claim."
+}

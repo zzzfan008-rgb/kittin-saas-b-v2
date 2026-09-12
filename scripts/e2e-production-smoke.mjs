@@ -54,12 +54,8 @@ function runNpmScript(script, env) {
 }
 
 function runPlaywrightCommand(env) {
-  if (process.env.npm_execpath) {
-    runCommand(process.execPath, [process.env.npm_execpath, "exec", "--", "playwright", "test", "--config", "playwright.production.config.ts"], { env });
-    return;
-  }
-  const playwright = process.platform === "win32" ? "npx.cmd" : "npx";
-  runCommand(playwright, ["playwright", "test", "--config", "playwright.production.config.ts"], { env });
+  const playwrightCli = join(process.cwd(), "node_modules", "playwright", "cli.js");
+  runCommand(process.execPath, [playwrightCli, "test", "--config", "playwright.production.config.ts"], { env });
 }
 
 async function main() {

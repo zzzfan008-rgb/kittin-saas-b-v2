@@ -33,11 +33,53 @@
 | `COOKIE_SECURE` | 否 | `false` | HTTPS 反向代理部署必须设为 `true` |
 | `API_ONLY` | 否 | `false` | `true` 时不要求或托管前端构建 |
 | `AI_TIMEOUT_MS` | 否 | 按模型契约，通常 300000 | AI 请求超时毫秒数 |
+| `UPLOAD_NORMALIZATION_MOZJPEG` | 否 | `false` | 上传 JPEG 标准化默认使用 libjpeg；仅在质量/兼容回滚时设为 `true` 启用旧 mozjpeg 路径并重启服务 |
+| `ENABLE_PAID_EVALUATION_RUNS` | 否 | `false` | 只有完成单次预算审批与持久化授权后才可设为 `true`；普通生产发布保持关闭 |
+| `GARMENT_CANVAS_BUILD_CODE_SHA` | 付费评估或非空受审发布构建必需 | 无 | 构建阶段写入固定镜像身份文件的已审核提交 SHA；不是运行时信任输入 |
+| `GARMENT_CANVAS_CODE_SHA` | 付费评估或非空受审发布运行必需 | 无 | 已审核发布提交的恰好 40 或 64 位小写十六进制 SHA；必须匹配真实 Git HEAD 或镜像内构建身份 |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_HOST_DIR` | Compose 非空受审发布必需 | 无 | 宿主机 Git 工作树外的完整发布闭包绝对目录；必须通过宿主预检后只读挂载 |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SOURCE` | Compose 非空受审发布必需 | 无 | 必须精确指向 `HOST_DIR/prompt-release-registry.json`；仅作为构建输入，不是运行时完整证据包 |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_DIR` | 非 Docker 非空受审发布必需 | 无 | 运行时可读的完整外置发布闭包目录；Compose override 固定为 `/run/garment-canvas/evaluation-release` |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_PATH` | 非 Docker 非空受审发布必需 | 无 | 运行时 registry 绝对路径；必须精确位于 `RELEASE_DIR/prompt-release-registry.json` |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256` | 非空受审发布必需 | 无 | registry 原始文件字节的 SHA-256；前后端构建与运行时必须相同 |
+| `GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256` | 非空受审发布必需 | 无 | registry 递归可达发布闭包的受审根哈希，不能用 registry 文件哈希代替 |
+| `APIYI_TAIL_STALL_SALVAGE` | 否 | `true` | 完整对象 JSON 已到齐但连接不结束时启用安全收尾；设为 `false`、`0` 或 `off` 只关闭宽限期提前收尾，流式响应大小上限始终生效 |
+| `APIYI_TAIL_STALL_GRACE_MS` | 否 | `5000` | 最后一块数据后的完整 JSON 探测宽限期，限制为 1000–30000ms；不替代模型总超时或 Undici body timeout |
 | `GENERATION_WORKER_POLL_MS` | 否 | `2000` | Worker 轮询间隔，限制为 100–60000 ms |
 
 初始化成功并完成管理员改密后，可以从 `.env` 移除 `INITIAL_ADMIN_ACCOUNT_ID` 和 `INITIAL_ADMIN_PASSWORD`，避免长期保留临时凭据。
 
 Compose 会读取私有 `.env` 做端口插值：复制当前 `.env.example` 后宿主机网页端口是 3001；删除或不设置 `PORT` 时回退到 3002。Compose 部署通常不要再设置 `DATABASE_URL`，否则它会优先于容器内的 `PG*` 连接配置。
+
+真实付费评估必须先通过独立发布门禁：`git rev-parse HEAD` 必须逐字符等于获准 SHA，且 `git status --porcelain=v1 --untracked-files=normal` 必须为空。Docker 部署把同一个值分别写入私有 `.env` 的 `GARMENT_CANVAS_BUILD_CODE_SHA`（只在构建阶段生成固定身份文件）和 `GARMENT_CANVAS_CODE_SHA`（运行时声明），然后才设置 `ENABLE_PAID_EVALUATION_RUNS=true`。两者缺失、格式错误或不一致时服务会在数据库初始化和 Worker 启动前退出，不会调用 Provider。
+
+构建身份文件只证明镜像构建时声明了哪个 SHA，**不能证明 Docker build context 本身干净**。因此不能用该文件代替上面的干净 exact-SHA 发布门禁。运行镜像不安装 Git，也不复制 `.git`；在保留 Git 元数据的本地部署中，服务直接读取真实 HEAD 和 dirty 状态，环境变量不能覆盖它们。
+
+普通、不开启付费评估的 Docker 构建允许 `GARMENT_CANVAS_BUILD_CODE_SHA` 为空，服务不会读取空身份；这样的镜像只能运行普通任务。之后若要开启付费评估，必须带获准 SHA 重新构建镜像，不能只在旧容器上补运行时变量。
+
+### 2.1 外置受审评估发布物
+
+`docs/ai/evaluation/prompt-release-registry.json` 只是跟踪的空 schema 示例，不是生产发布源。真实的 contract check、各阶段 receipt、promotion 和 registry 必须由评估工具写入 Git 工作树外的受控目录，并在被评估的干净 exact-SHA 上生成。这样发布物不会改变 Git HEAD，也不会形成“提交 registry 后 SHA 又变化”的自指循环。工具只会初始化空的专用目录，并写入 `.garment-canvas-evaluation-release-root` 标记；文件系统根、HOME、共享临时根、Git 项目及其祖先、非空且无标记的目录都会被拒绝。
+
+部署时必须同时锁定 registry 原始字节哈希、registry 可达发布闭包根哈希和代码 SHA。可达闭包固定为 `registry → promotion → 当前及全部前序 gate receipts → contract check → retained /v1/models 原始文件`；未被 registry 触达的 `exports/` 或孤儿文件不计入根哈希。运行时会逐个读取原始字节、验证固定路径与递归关系，并重算根哈希后同时对照环境变量和构建 manifest，不能只信任一串外部声明。
+
+BuildKit secret 只避免把外部源文件保存在构建层历史中，不是浏览器保密边界。Vite 与 Node 会把**最小运行准入投影**编入产物；其中不含审批人、审批理由和审批时间。完整 promotion、receipt、contract check 及人工审计信息只留在外置包。前后端各自写出只含代码/闭包/registry 哈希和数量的 manifest；服务启动前还会校验服务端内嵌投影、运行时 registry、前后端 manifest 与 `GARMENT_CANVAS_CODE_SHA` 全部一致。任一可达文件缺失、被替换、路径穿越 symlink、哈希不符、模型目录漂移或版本漂移，都会在数据库初始化和 Worker 启动前失败关闭。运行时还会确认 registry 可达的每个文件及其包内父目录对服务进程都不可写，不再只检查 registry 一个文件。这个门禁与 `ENABLE_PAID_EVALUATION_RUNS` 无关，因为普通用户也会使用 `verified` / `recommended` 发布。
+
+当前五模型范围的 API易 `/v1/models` 目录基线已按本轮人工复核物化：捕获时间 `2026-09-03T13:22:48.000Z`，HTTP 200，271 个规范化唯一 ID，五个现役 ID 精确覆盖 5/5；原始文件 SHA-256 为 `7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408`，`sha256-canonical-model-id-set-v1` 指纹为 `43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d`。本次目录相对先前 269-ID 记录发生漂移，旧历史记录不改写。原始文件仍在 Git 工作树外；contract check 必须读取其精确字节并把它保留到外置发布闭包，仓库内摘要和历史脱敏探针都不能代替原始文件。
+
+该批准只关闭模型目录人工基线这一项前置阻断。五个模型仍为 `unverified`；在真实评估证据、阶段 gate、promotion、registry 和干净 exact-SHA 门禁完成前，仍不得生成或部署非空受审发布，也不得把目录存在解释为生成、编辑、质量或计费通过。
+
+只有通过上述门禁的非空发布才使用专用 Compose override：
+
+```bash
+npm run evaluation:release:preflight
+docker compose -f compose.yaml -f compose.evaluation-release.yaml config --quiet
+docker compose -f compose.yaml -f compose.evaluation-release.yaml up -d --build --wait
+```
+
+普通空发布不加该 override。宿主预检会拒绝相对路径、广域根/HOME/项目祖先目录、Git 工作树内路径、任一路径段 symlink、缺少专用目录标记、存在 `.prompt-release-registry.lock`、registry 位置/原始 SHA 不匹配以及 41–63 位伪代码 SHA。其 JSON 中 `ok: true` 只表示 `hostMountOnly: true` 的宿主路径、权限与哈希检查通过；`campaignReady: false` 是有意的宿主侧语义，表示预检没有加载或验证任何具体 Campaign/evidence 闭包，而不是账本或闭包能力尚未实现，也不能把该结果解释为总体发布就绪。评估工具把包目录精确写为 `0755`、文件精确写为 `0644`，使宿主操作者与容器 `USER node` UID 不同时仍可读；`0604`、`0744` 等近似权限也会被拒绝。`promote` 通过跨进程锁和 registry CAS 串行更新；遗留锁不会被自动破坏，必须人工确认无存活 writer 后处理。
+
+`GARMENT_CANVAS_EVALUATION_RELEASE_HOST_DIR` 必须是完整外置包目录，`GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SOURCE` 必须指向该目录下的 `prompt-release-registry.json`；容器内挂载点固定为 `/run/garment-canvas/evaluation-release` 且为只读。服务启动时会读取 Linux `/proc/self/mountinfo`，按最长路径匹配检查发布根、专用 marker、整棵发布树和所有递归可达文件/目录的 per-mount 选项；根为 `ro` 但存在嵌套 `rw` 挂载也会失败关闭。运行时还会拒绝活动 registry 锁、目录循环/绑定别名以及超过 20,000 项的异常发布树，再在只读证明后重读 registry。非空发布在非 Linux 环境或无法读取 mountinfo 时同样拒绝启动。`0755/0644` 只解决跨 UID 可读性，不是不可变证明；普通文件权限位不能替代 OS 级只读挂载。
 
 ## 3. Docker 安装与升级
 
@@ -50,6 +92,8 @@ docker compose config
 docker compose up -d --build --wait
 curl --fail http://localhost:3001/api/ready
 ```
+
+若本次部署获准执行真实评估，应在 `docker compose up` 前确认私有 `.env` 中的 `GARMENT_CANVAS_BUILD_CODE_SHA`、`GARMENT_CANVAS_CODE_SHA` 和获准提交三者完全一致，并强制重新构建镜像；不要把私有 `.env` 或完整 Compose 配置输出到公开日志。
 
 首次登录使用私有 `.env` 中的管理员临时凭据。界面会要求管理员本人完成最终密码修改；随后再通过账户菜单创建、停用、重置或删除普通用户。
 
@@ -66,7 +110,7 @@ curl --fail http://localhost:3001/api/ready
 
 ## 4. macOS 非 Docker 部署
 
-适用于已经独立管理 PostgreSQL 18 的单机环境。要求 Node.js 22.20.0 或更高版本。
+适用于已经独立管理 PostgreSQL 18 的单机环境。要求 macOS 13.5、Node.js 24.20.0 或更高版本。
 
 ```bash
 npm ci

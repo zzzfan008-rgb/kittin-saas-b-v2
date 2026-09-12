@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "apiyi-model-catalog-20260902T150417Z",
+  "kind": "gateway-model-catalog",
+  "capturedAt": "2026-09-02T15:04:17Z",
+  "request": {
+    "method": "GET",
+    "path": "/v1/models",
+    "baseHost": "api.apiyi.com",
+    "authentication": "configured-project-token",
+    "paidProviderCalls": 0
+  },
+  "response": {
+    "httpStatus": 200,
+    "modelCount": 272,
+    "hashScope": "sha256-canonical-model-id-set-v1",
+    "canonicalModelIdSetSha256": "bfe44201e1b2c6f2ea07ee75fa086857a3204dcf0d6ffb95f8dbf9bfaf1b7656",
+    "rawExportRetainedInRepository": false,
+    "rawExportPolicy": "The account-scoped full model list remains outside the repository; this record retains only its canonical hash and the six product-ID checks."
+  },
+  "expectedGatewayModelIds": [
+    { "id": "gpt-image-2", "present": true },
+    { "id": "gpt-image-2-vip", "present": true },
+    { "id": "gemini-3.1-flash-image", "present": true },
+    { "id": "flux-2-pro", "present": true },
+    { "id": "seedream-5-0-260128", "present": true },
+    { "id": "grok-imagine-image", "present": false }
+  ],
+  "missingExpectedIds": ["grok-imagine-image"],
+  "imageModelAliasCandidatesForMissingIds": [],
+  "interpretation": {
+    "scope": "configured-token-observed-view",
+    "catalogPresenceDoesNotProveEndpointSuccess": true,
+    "tokenWhitelistOrAccountGroupMayAffectResults": true,
+    "documentConflict": "The current local APIYI Grok documentation advertises grok-imagine-image, but this authenticated catalog view does not list that ID.",
+    "automaticAliasSubstitutionAllowed": false,
+    "automaticContractUpdateAllowed": false
+  },
+  "releaseDecision": "blocked",
+  "requiredNextStep": "Confirm the configured token whitelist/account group and APIYI availability of the exact grok-imagine-image gateway ID, then obtain a new catalog export. Do not probe the paid generation endpoint until separately authorized."
+}

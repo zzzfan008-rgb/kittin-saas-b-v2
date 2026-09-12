@@ -4,7 +4,7 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { config, ROOT_DIR } from "./config";
+import { assertPaidEvaluationStartupConfig, config, ROOT_DIR } from "./config";
 import { generateRouter } from "./routes/generate";
 import { runPlanRouter } from "./routes/runPlan";
 import { filesRouter } from "./routes/files";
@@ -17,6 +17,7 @@ import { historyRouter } from "./routes/history";
 import { usageRouter } from "./routes/usage";
 import { tutorialsRouter } from "./routes/tutorials";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
+import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
 import { migrateLegacyData } from "./lib/legacyMigration";
@@ -28,6 +29,8 @@ import {
   migrateLegacyUserTemplateOwners,
   reconcileUserTemplateAccountMutations,
 } from "./lib/userTemplateLifecycle";
+import { reconcileOpenAiMaskTestAccountMutations } from "./lib/openaiMaskTestLifecycle";
+import { assertEvaluationReleaseRuntimeConfig } from "./lib/evaluationReleaseRuntime";
 
 const app = express();
 
@@ -91,6 +94,8 @@ app.get("/api/ready", asyncHandler(async (_req, res) => {
 app.use("/api/auth/login", loginRateLimit);
 app.use("/api/auth", authRouter);
 app.use("/api", requireAuth, requirePasswordChanged);
+app.post("/api/openai-mask-test/runs", aiRateLimit);
+app.use("/api/openai-mask-test", createOpenAiMaskTestRouter());
 app.use("/api/generate", aiRateLimit, generateRouter);
 // 仅入队请求消耗 AI 限流额度；状态与 SSE 重连必须始终可达。
 app.post("/api/run-plan", aiRateLimit);
@@ -124,11 +129,18 @@ app.use(apiErrorHandler);
 
 const port = config.port();
 async function start(): Promise<void> {
+  assertEvaluationReleaseRuntimeConfig({
+    projectRoot: ROOT_DIR,
+    isProduction,
+    apiOnly,
+  });
+  assertPaidEvaluationStartupConfig();
   await initializeDatabase();
   await pruneExpiredSessions();
   await migrateLegacyData();
   await migrateLegacyUserTemplateOwners();
   await reconcileUserTemplateAccountMutations();
+  await reconcileOpenAiMaskTestAccountMutations();
   const initialReadiness = await readiness();
   if (!initialReadiness.ok) throw new Error(`Server is not ready: ${JSON.stringify(initialReadiness.checks)}`);
   const sessionPruneTimer = setInterval(() => {

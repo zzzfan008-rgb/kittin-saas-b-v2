@@ -14,15 +14,23 @@ import {
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
+  allowedOperationModesForNode,
+  referenceRoleForTargetHandle,
+  resolveReferenceEdgeData,
+  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
-  DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
-  defaultImageModelOptions,
+  imageModelOptionsErrorForOperation,
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
 } from "../../src/types/imageModels";
+import {
+  evaluatePromptRunAdmission,
+  promptRunAdmissionInputFromParams,
+  type PromptRunAdmissionDecision,
+} from "../../src/lib/promptRunAdmission";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -37,6 +45,28 @@ export interface FlowEdge {
   target: string;
   sourceHandle?: string | null;
   targetHandle?: string | null;
+  data?: unknown;
+}
+
+/**
+ * A visibly labelled target handle is an explicit role selection made by the
+ * user while connecting the edge. Keep this map narrow: ordinary handles and
+ * all unknown nodes remain pending unless the edge already carries a role.
+ */
+function resolveExecutionReferenceRole(
+  edge: FlowEdge,
+  targetKind: NodeKind,
+  sourceData: WorkflowNodeData,
+): { role: ReferenceRole; roleNeedsConfirmation: boolean } {
+  const explicit = resolveReferenceEdgeData(edge.data, sourceData);
+  if (edge.data && typeof edge.data === "object" && !Array.isArray(edge.data)) {
+    const raw = edge.data as Record<string, unknown>;
+    if (Object.hasOwn(raw, "role")) return explicit;
+  }
+  const fixedRole = referenceRoleForTargetHandle(targetKind, edge.targetHandle);
+  return fixedRole
+    ? { role: fixedRole, roleNeedsConfirmation: false }
+    : explicit;
 }
 
 export class DagError extends Error {
@@ -46,17 +76,91 @@ export class DagError extends Error {
   }
 }
 
+export class PromptRunAdmissionError extends DagError {
+  readonly nodeId: string;
+  readonly decision: PromptRunAdmissionDecision;
+
+  constructor(nodeId: string, decision: PromptRunAdmissionDecision) {
+    super(`Node ${nodeId} prompt admission blocked: ${decision.reason}`);
+    this.name = "PromptRunAdmissionError";
+    this.nodeId = nodeId;
+    this.decision = decision;
+  }
+}
+
+/**
+ * Release/evaluation admission is separate from graph-shape validation so
+ * legacy migration tests can inspect a plan without authorising a paid run.
+ * Both paid enqueue routes must call this immediately before enqueueing.
+ */
+export function assertPromptRunAdmissions(
+  plan: ExecutionPlan,
+  options: { evaluationRun?: boolean } = {},
+): void {
+  for (const step of plan.steps) {
+    if (!NODE_SPECS[step.kind].providerId) continue;
+    const references = (step.inputReferences ?? []).map((reference, order) => ({
+      role: reference.role,
+      order,
+      roleNeedsConfirmation: reference.roleNeedsConfirmation,
+      sourceNodeId: reference.sourceNodeId,
+    }));
+    const decision = evaluatePromptRunAdmission(
+      promptRunAdmissionInputFromParams(step.kind, step.params, references),
+      options,
+    );
+    if (!decision.allowed) {
+      throw new PromptRunAdmissionError(step.nodeId, decision);
+    }
+  }
+}
+
 /** 运行前验证会产生费用的节点具备真实图片输入。 */
 export function assertPlanInputs(plan: ExecutionPlan, edges: FlowEdge[]): void {
   const executingNodeIds = new Set(plan.steps.map((step) => step.nodeId));
   for (const step of plan.steps) {
     const spec = NODE_SPECS[step.kind];
     if (!spec.providerId) continue;
-    const modelId = isImageModelId(step.params.modelId)
-      ? step.params.modelId
-      : step.kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+    if (
+      step.params.modelSelectionNeedsConfirmation === true
+      || (typeof step.params.retiredModelId === "string" && step.params.retiredModelId.trim())
+    ) {
+      throw new DagError(
+        `Node ${step.nodeId} uses a retired model and must be manually reconfigured before running`,
+      );
+    }
+    if (!isImageModelId(step.params.modelId)) {
+      throw new DagError(`Node ${step.nodeId} must select an explicit supported image model`);
+    }
+    const modelId = step.params.modelId;
     if (!isModelAllowedForNode(modelId, step.kind)) {
       throw new DagError(`Model ${modelId} is not allowed for node ${step.nodeId}`);
+    }
+    const operationMode = step.params.operationMode;
+    const allowedModes = allowedOperationModesForNode(step.kind);
+    if (!allowedModes.includes(operationMode as never)) {
+      throw new DagError(
+        `Node ${step.nodeId} operationMode must be one of: ${allowedModes.join(", ")}`,
+      );
+    }
+    if (step.params.operationModeNeedsConfirmation === true) {
+      throw new DagError(`Node ${step.nodeId} operationMode must be confirmed before running`);
+    }
+    const optionsError = imageModelOptionsErrorForOperation(
+      modelId,
+      step.params.modelOptions,
+      operationMode as "generate" | "edit" | "mask-edit",
+    );
+    if (optionsError) {
+      throw new DagError(`Node ${step.nodeId} modelOptions ${optionsError}`);
+    }
+    if (
+      step.kind === "mask-redraw"
+      && Object.keys(step.params.modelOptions as Record<string, unknown>).length > 0
+    ) {
+      throw new DagError(
+        `Node ${step.nodeId} modelOptions must be empty; mask size is derived at runtime`,
+      );
     }
     const usableImages = (step.upstream ?? []).flatMap((upstream) =>
       executingNodeIds.has(upstream.nodeId) ? ["__runtime_output__"] : upstream.images,
@@ -71,10 +175,12 @@ export function assertPlanInputs(plan: ExecutionPlan, edges: FlowEdge[]): void {
         `Node ${step.nodeId} accepts at most ${maxUserReferences}${qualifier} reference images for ${modelId}`,
       );
     }
-    if (step.kind === "sketch-to-render" && usableImages.length === 0) {
-      // sketch-to-render 同时承担文生款式，只有 prompt 时允许无图片执行。
+    if (operationMode === "generate") {
+      if (usableImages.length > 0) {
+        throw new DagError(`Node ${step.nodeId} is generate mode and cannot accept reference images`);
+      }
       const prompt = typeof step.params.prompt === "string" ? step.params.prompt.trim() : "";
-      if (!prompt) throw new DagError(`Node ${step.nodeId} requires an image or a prompt`);
+      if (!prompt) throw new DagError(`Node ${step.nodeId} requires a prompt in generate mode`);
       continue;
     }
     if (step.kind === "fabric-recolor") {
@@ -182,17 +288,35 @@ export function buildExecutionPlan(
     const data = node.data;
 
     // 上游按 edges 数组顺序（result 节点多输入时保持连接顺序）
-    const upstream: { nodeId: string; images: string[] }[] = [];
+    const upstream: NodeExecution["upstream"] = [];
     for (const e of edges) {
       if (e.target !== id) continue;
       const srcData = nodeMap.get(e.source)!.data;
-      upstream.push({ nodeId: e.source, images: extractOutputImages(srcData) });
+      const reference = resolveExecutionReferenceRole(e, data.kind, srcData);
+      upstream.push({
+        nodeId: e.source,
+        images: extractOutputImages(srcData),
+        referenceRole: reference.role,
+        roleNeedsConfirmation: reference.roleNeedsConfirmation,
+      });
+    }
+
+    const inputImages = upstream.flatMap((source) => source.images);
+    const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({
+      imageRef,
+      role: source.referenceRole ?? "generic",
+      roleNeedsConfirmation: source.roleNeedsConfirmation,
+      sourceNodeId: source.nodeId,
+    }))).map((reference, order) => ({ ...reference, order }));
+    if (inputReferences.length !== inputImages.length) {
+      throw new DagError(`Node ${id} reference role expansion does not match its input images`);
     }
 
     return {
       nodeId: id,
       kind: data.kind,
-      inputImages: upstream.flatMap((u) => u.images),
+      inputImages,
+      inputReferences,
       upstream,
       params: extractParams(data),
     };
@@ -221,16 +345,49 @@ function extractOutputImages(data: WorkflowNodeData): string[] {
 
 /** 提取节点执行参数（prompt / aspectRatio / batchSize / fabricImageUrl 等） */
 function extractParams(data: WorkflowNodeData): Record<string, unknown> {
-  const modelFields = (preferredAspectRatio = "1:1") => {
+  const modelFields = (_preferredAspectRatio = "1:1") => {
     if (!NODE_SPECS[data.kind].providerId) return {};
-    const modelId = "modelId" in data && isImageModelId(data.modelId)
-      ? data.modelId
-      : data.kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+    if (
+      !("modelId" in data)
+      || !isImageModelId(data.modelId)
+      || !isModelAllowedForNode(data.modelId, data.kind)
+    ) {
+      throw new DagError(`Node data for ${data.kind} must select an explicit supported image model`);
+    }
+    const modelId = data.modelId;
+    const operationMode = "operationMode" in data ? data.operationMode : undefined;
+    const allowedModes = allowedOperationModesForNode(data.kind);
+    if (!allowedModes.includes(operationMode as never)) {
+      throw new DagError(`Node data for ${data.kind} has an invalid operationMode`);
+    }
+    const modelOptions = "modelOptions" in data ? data.modelOptions : undefined;
+    const optionsError = imageModelOptionsErrorForOperation(
+      modelId,
+      modelOptions,
+      operationMode as "generate" | "edit" | "mask-edit",
+    );
+    if (optionsError) {
+      throw new DagError(`Node data for ${data.kind} modelOptions ${optionsError}`);
+    }
     return {
       modelId,
-      modelOptions: "modelOptions" in data && data.modelOptions
-        ? data.modelOptions
-        : defaultImageModelOptions(modelId, preferredAspectRatio),
+      operationMode,
+      operationModeNeedsConfirmation: "operationModeNeedsConfirmation" in data
+        ? data.operationModeNeedsConfirmation === true
+        : false,
+      modelSelectionNeedsConfirmation: "modelSelectionNeedsConfirmation" in data
+        ? data.modelSelectionNeedsConfirmation === true
+        : false,
+      ...(typeof data.retiredModelId === "string" && data.retiredModelId.trim()
+        ? { retiredModelId: data.retiredModelId }
+        : {}),
+      modelOptions: { ...(modelOptions as Record<string, unknown>) },
+      ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
+      ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
+      ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),
+      ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
+      ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+      ...(typeof data.postprocessVersion === "string" ? { postprocessVersion: data.postprocessVersion } : {}),
     };
   };
   switch (data.kind) {
@@ -260,10 +417,31 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
     case "print-mutate":
       return { prompt: data.prompt, count: data.count, ...modelFields() };
     case "mask-redraw":
+      if (
+        data.modelId !== MASK_REDRAW_MODEL_ID
+        || data.operationMode !== "mask-edit"
+        || imageModelOptionsErrorForOperation(
+          MASK_REDRAW_MODEL_ID,
+          data.modelOptions,
+          "mask-edit",
+        )
+        || Object.keys(data.modelOptions).length > 0
+      ) {
+        throw new DagError(
+          "Node data for mask-redraw requires gpt-image-2, mask-edit, and empty modelOptions",
+        );
+      }
       return {
         prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef,
         maskPipelineVersion: MASK_PIPELINE_VERSION,
+        operationMode: "mask-edit", operationModeNeedsConfirmation: false,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
+        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
+        ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
+        ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),
+        ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
+        ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+        ...(typeof data.postprocessVersion === "string" ? { postprocessVersion: data.postprocessVersion } : {}),
       };
     case "result":
       return { note: data.note };

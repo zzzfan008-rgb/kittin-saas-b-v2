@@ -14,7 +14,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { migrateLegacyData } = await import("../server/lib/legacyMigration");
 
-console.log("PostgreSQL 18 编号迁移回归测试");
+console.log("PostgreSQL 20 编号迁移回归测试");
 await initializeDatabase();
 
 const versions = await query<{ version: number; name: string }>(
@@ -33,6 +33,14 @@ assert.deepEqual(versions, [
   { version: 10, name: "generation_run_request_idempotency" },
   { version: 11, name: "versioned_tutorial_receipts" },
   { version: 12, name: "initial_draft_project_lifecycle" },
+  { version: 13, name: "reference_role_and_provider_original_evidence" },
+  { version: 14, name: "evaluation_run_no_retry_policy" },
+  { version: 15, name: "evaluation_run_authorization_ledger" },
+  { version: 16, name: "evaluation_case_evidence_ledger" },
+  { version: 17, name: "evaluation_budget_and_evidence_integrity" },
+  { version: 18, name: "evaluation_code_identity_binding" },
+  { version: 19, name: "immutable_evaluation_campaign_ledger" },
+  { version: 20, name: "provider_request_id_evidence" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -151,6 +159,35 @@ assert.match(retryConstraint?.definition ?? "", /retry_count.*(?:0|3)/);
 assert.match(retryConstraint?.definition ?? "", />= 0/);
 assert.match(retryConstraint?.definition ?? "", /<= 3/);
 console.log("  ✓ 持久队列表、状态约束与最多三次重试约束已建立");
+const evaluationRunColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'generation_runs'
+    AND column_name IN (
+      'retry_policy','evaluation_case_id','evaluation_authorization_id',
+      'evaluation_campaign_id','evaluation_slot_id','billing_reconciliation_status'
+    )
+  ORDER BY column_name
+`);
+assert.deepEqual(evaluationRunColumns, [
+  { column_name: "billing_reconciliation_status" },
+  { column_name: "evaluation_authorization_id" },
+  { column_name: "evaluation_campaign_id" },
+  { column_name: "evaluation_case_id" },
+  { column_name: "evaluation_slot_id" },
+  { column_name: "retry_policy" },
+]);
+const evaluationRunTypeConstraint = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+  WHERE conname = 'generation_runs_run_type_check'
+`);
+assert.match(evaluationRunTypeConstraint?.definition ?? "", /evaluation/);
+const evaluationCaseIndex = await queryOne<{ indexdef: string }>(`
+  SELECT indexdef FROM pg_indexes
+  WHERE schemaname = 'public' AND indexname = 'generation_runs_owner_evaluation_case_unique'
+`);
+assert.match(evaluationCaseIndex?.indexdef ?? "", /UNIQUE INDEX/);
+assert.match(evaluationCaseIndex?.indexdef ?? "", /owner_id, evaluation_case_id/);
+console.log("  ✓ 真实评估 run_type、no-retry、case 去重与账单核对字段已建立");
 const queueHardeningColumns = await query<{ table_name: string; column_name: string }>(`
   SELECT table_name, column_name FROM information_schema.columns
   WHERE table_schema = 'public' AND (
@@ -219,6 +256,203 @@ assert.deepEqual(sizeColumns, [
   { table_name: "generation_run_steps", column_name: "provider_output_sizes_json" },
 ]);
 console.log("  ✓ 上游实际输出尺寸元数据列已建立");
+const evidenceColumns = await query<{ table_name: string; column_name: string }>(`
+  SELECT table_name, column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND (
+    (table_name = 'generation_runs' AND column_name = 'reference_inputs_json') OR
+    (table_name = 'generation_run_steps' AND column_name IN ('reference_inputs_json','provider_images_json')) OR
+    (table_name = 'generation_outputs' AND column_name = 'provider_image')
+  )
+  ORDER BY table_name, column_name
+`);
+assert.deepEqual(evidenceColumns, [
+  { table_name: "generation_outputs", column_name: "provider_image" },
+  { table_name: "generation_run_steps", column_name: "provider_images_json" },
+  { table_name: "generation_run_steps", column_name: "reference_inputs_json" },
+  { table_name: "generation_runs", column_name: "reference_inputs_json" },
+]);
+console.log("  ✓ 参考角色与 Provider 原图证据列已建立");
+const evaluationAuthorizationColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'evaluation_run_authorizations'
+    AND column_name IN (
+      'budget_limit_minor','campaign_id','price_minor_per_provider_request',
+      'reserved_budget_minor','slot_id','used_budget_minor'
+    )
+  ORDER BY column_name
+`);
+assert.deepEqual(evaluationAuthorizationColumns, [
+  { column_name: "budget_limit_minor" },
+  { column_name: "campaign_id" },
+  { column_name: "price_minor_per_provider_request" },
+  { column_name: "reserved_budget_minor" },
+  { column_name: "slot_id" },
+  { column_name: "used_budget_minor" },
+]);
+const evaluationCaseIntegrityColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'evaluation_case_evidence'
+    AND column_name IN (
+      'campaign_id','slot_id','preset_id','evaluation_unit_key','resolved_prompt','snapshot_json',
+      'error_events_json','billing_reference','hard_blockers_json',
+      'evidence_record_sha256','finalized_at'
+    )
+  ORDER BY column_name
+`);
+assert.deepEqual(evaluationCaseIntegrityColumns, [
+  { column_name: "billing_reference" },
+  { column_name: "campaign_id" },
+  { column_name: "error_events_json" },
+  { column_name: "evaluation_unit_key" },
+  { column_name: "evidence_record_sha256" },
+  { column_name: "finalized_at" },
+  { column_name: "hard_blockers_json" },
+  { column_name: "preset_id" },
+  { column_name: "resolved_prompt" },
+  { column_name: "slot_id" },
+  { column_name: "snapshot_json" },
+]);
+const providerEvidenceBillingColumns = await query<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'evaluation_provider_request_evidence'
+    AND column_name IN (
+      'reserved_cost_minor','budget_currency','actual_cost_minor',
+      'billing_reconciliation_status','billing_reference','provider_request_id'
+    )
+  ORDER BY column_name
+`);
+assert.deepEqual(providerEvidenceBillingColumns, [
+  { column_name: "actual_cost_minor" },
+  { column_name: "billing_reconciliation_status" },
+  { column_name: "billing_reference" },
+  { column_name: "budget_currency" },
+  { column_name: "provider_request_id" },
+  { column_name: "reserved_cost_minor" },
+]);
+const providerEvidenceImageLink = await queryOne<{ column_name: string }>(`
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'evaluation_image_evidence'
+    AND column_name = 'provider_request_evidence_id'
+`);
+assert.deepEqual(providerEvidenceImageLink, { column_name: "provider_request_evidence_id" });
+const evaluationEventTables = await query<{ table_name: string }>(`
+  SELECT table_name FROM information_schema.tables
+  WHERE table_schema = 'public' AND table_name IN (
+    'evaluation_billing_reconciliation_events',
+    'evaluation_manual_assessment_events'
+  )
+  ORDER BY table_name
+`);
+assert.deepEqual(evaluationEventTables, [
+  { table_name: "evaluation_billing_reconciliation_events" },
+  { table_name: "evaluation_manual_assessment_events" },
+]);
+const immutableEvaluationEventTriggers = await query<{ trigger_name: string }>(`
+  SELECT trigger_name FROM information_schema.triggers
+  WHERE event_object_schema = 'public' AND trigger_name IN (
+    'evaluation_billing_events_immutable_trigger',
+    'evaluation_manual_events_immutable_trigger'
+  )
+  GROUP BY trigger_name
+  ORDER BY trigger_name
+`);
+assert.deepEqual(immutableEvaluationEventTriggers, [
+  { trigger_name: "evaluation_billing_events_immutable_trigger" },
+  { trigger_name: "evaluation_manual_events_immutable_trigger" },
+]);
+console.log("  ✓ 真实评估单价/预算、快照完整性、双层图像链接与追加式审计表已建立");
+const evaluationCodeShaSourceConstraint = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+  WHERE conname = 'evaluation_case_evidence_code_sha_source_check'
+`);
+assert.match(evaluationCodeShaSourceConstraint?.definition ?? "", /git-head/);
+assert.match(evaluationCodeShaSourceConstraint?.definition ?? "", /build-identity/);
+assert.doesNotMatch(evaluationCodeShaSourceConstraint?.definition ?? "", /deployment-env/);
+console.log("  ✓ 评估证据仅接受 Git HEAD 或不可变构建身份来源");
+const campaignTables = await query<{ table_name: string }>(`
+  SELECT table_name FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_name IN ('evaluation_campaigns','evaluation_campaign_slots')
+  ORDER BY table_name
+`);
+assert.deepEqual(campaignTables, [
+  { table_name: "evaluation_campaign_slots" },
+  { table_name: "evaluation_campaigns" },
+]);
+const campaignForeignKeys = await query<{ conname: string; definition: string }>(`
+  SELECT conname, pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conname IN (
+    'evaluation_authorization_campaign_fk',
+    'evaluation_authorization_campaign_slot_fk',
+    'generation_runs_evaluation_campaign_fk',
+    'generation_runs_evaluation_campaign_slot_fk',
+    'evaluation_case_campaign_fk',
+    'evaluation_case_campaign_slot_fk'
+  )
+  ORDER BY conname
+`);
+assert.deepEqual(campaignForeignKeys.map((row) => row.conname), [
+  "evaluation_authorization_campaign_fk",
+  "evaluation_authorization_campaign_slot_fk",
+  "evaluation_case_campaign_fk",
+  "evaluation_case_campaign_slot_fk",
+  "generation_runs_evaluation_campaign_fk",
+  "generation_runs_evaluation_campaign_slot_fk",
+]);
+for (const foreignKey of campaignForeignKeys) {
+  assert.match(foreignKey.definition, /ON DELETE RESTRICT/);
+}
+assert.match(
+  campaignForeignKeys.find((row) => row.conname === "evaluation_authorization_campaign_slot_fk")?.definition ?? "",
+  /FOREIGN KEY \(campaign_id, slot_id\) REFERENCES evaluation_campaign_slots\(campaign_id, slot_id\)/,
+);
+assert.match(
+  campaignForeignKeys.find((row) => row.conname === "generation_runs_evaluation_campaign_slot_fk")?.definition ?? "",
+  /FOREIGN KEY \(evaluation_campaign_id, evaluation_slot_id\) REFERENCES evaluation_campaign_slots\(campaign_id, slot_id\)/,
+);
+assert.match(
+  campaignForeignKeys.find((row) => row.conname === "evaluation_case_campaign_slot_fk")?.definition ?? "",
+  /FOREIGN KEY \(campaign_id, slot_id\) REFERENCES evaluation_campaign_slots\(campaign_id, slot_id\)/,
+);
+const campaignIndexes = await query<{ indexname: string; indexdef: string }>(`
+  SELECT indexname, indexdef FROM pg_indexes
+  WHERE schemaname = 'public' AND indexname IN (
+    'evaluation_campaign_slots_campaign_status_idx',
+    'generation_runs_evaluation_campaign_slot_unique'
+  )
+  ORDER BY indexname
+`);
+assert.deepEqual(campaignIndexes.map((row) => row.indexname), [
+  "evaluation_campaign_slots_campaign_status_idx",
+  "generation_runs_evaluation_campaign_slot_unique",
+]);
+assert.match(
+  campaignIndexes.find((row) => row.indexname === "evaluation_campaign_slots_campaign_status_idx")?.indexdef ?? "",
+  /campaign_id, status, slot_id/,
+);
+assert.match(
+  campaignIndexes.find((row) => row.indexname === "generation_runs_evaluation_campaign_slot_unique")?.indexdef ?? "",
+  /UNIQUE INDEX/,
+);
+const campaignTriggers = await query<{ trigger_name: string }>(`
+  SELECT trigger_name FROM information_schema.triggers
+  WHERE event_object_schema = 'public' AND trigger_name IN (
+    'evaluation_campaign_immutable_trigger',
+    'evaluation_campaign_slot_immutable_trigger',
+    'evaluation_campaign_delete_trigger',
+    'evaluation_campaign_slot_delete_trigger'
+  )
+  GROUP BY trigger_name
+  ORDER BY trigger_name
+`);
+assert.deepEqual(campaignTriggers, [
+  { trigger_name: "evaluation_campaign_delete_trigger" },
+  { trigger_name: "evaluation_campaign_immutable_trigger" },
+  { trigger_name: "evaluation_campaign_slot_delete_trigger" },
+  { trigger_name: "evaluation_campaign_slot_immutable_trigger" },
+]);
+console.log("  ✓ Campaign/Slot 不可变账本、关联外键、索引与触发器已建立");
 const uploadColumns = await query<{ column_name: string }>(`
   SELECT column_name FROM information_schema.columns
   WHERE table_schema = 'public' AND table_name = 'files'
@@ -386,6 +620,171 @@ assert.equal((await queryOne<{ count: number }>(`
   SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version = 12
 `))?.count, 1);
 console.log("  ✓ 旧数据库无损补齐生命周期字段且迁移重复启动保持幂等");
+
+// Reconstruct a real version-17 ledger that predates the immutable identity
+// contract. Migration 18 must stop rather than silently relabel its
+// deployment-env evidence as Git/build evidence.
+const legacyEvaluationRunId = "legacy-deployment-env-run";
+const legacyEvaluationCaseId = "legacy-deployment-env-case";
+const legacyAuthorizationId = "legacy-deployment-env-authorization";
+const legacyEvidenceId = "legacy-deployment-env-evidence";
+const legacyCampaignId = "legacy-deployment-env-campaign";
+const legacySlotId = "legacy-deployment-env-slot";
+const legacyStartedAt = Date.now();
+const legacyHash = (character: string) => character.repeat(64);
+await query("DELETE FROM schema_migrations WHERE version = 18");
+await query(`
+  ALTER TABLE evaluation_case_evidence
+    DROP CONSTRAINT evaluation_case_evidence_code_sha_source_check;
+  ALTER TABLE evaluation_case_evidence
+    ADD CONSTRAINT evaluation_case_evidence_code_sha_source_check
+    CHECK (code_sha_source IN ('git-head','build-identity','deployment-env'))
+`);
+await query(`
+  INSERT INTO evaluation_campaigns (
+    campaign_id, owner_id, created_by_admin_id, stage, model_id,
+    evaluation_unit_key, code_sha, max_provider_requests, budget_limit_minor,
+    budget_currency, status, manifest_sha256, created_at
+  ) VALUES (
+    $1, $2, $2, 'internal-experiment', 'gpt-image-2-vip',
+    $3, $4, 1, 1, 'CNY', 'ready', $5, $6
+  )
+`, [
+  legacyCampaignId,
+  admin.id,
+  `sha256:${legacyHash("a")}`,
+  "b".repeat(40),
+  legacyHash("f"),
+  legacyStartedAt - 3_000,
+]);
+await query(`
+  INSERT INTO evaluation_campaign_slots (
+    slot_id, campaign_id, case_id, sample_id, resolved_prompt_sha256,
+    native_parameters_sha256, reference_inputs_sha256, requested_image_count,
+    max_provider_requests, price_minor_per_provider_request, budget_limit_minor,
+    status, created_at
+  ) VALUES ($1, $2, $3, 'legacy-sample', $4, $5, $6, 1, 1, 1, 1, 'ready', $7)
+`, [
+  legacySlotId,
+  legacyCampaignId,
+  legacyEvaluationCaseId,
+  legacyHash("c"),
+  legacyHash("d"),
+  legacyHash("e"),
+  legacyStartedAt - 2_500,
+]);
+await query(`
+  INSERT INTO generation_runs (
+    id, owner_id, node_id, node_label, kind, prompt, requested_count,
+    successful_count, provider_requests, status, started_at, updated_at,
+    run_type, retry_policy, evaluation_case_id, evaluation_authorization_id,
+    evaluation_campaign_id, evaluation_slot_id, billing_reconciliation_status
+  ) VALUES (
+    $1, $2, 'legacy-node', 'Legacy identity node', 'sketch-to-render',
+    'legacy identity evidence', 1, 0, 0, 'queued', $3, $3,
+    'evaluation', 'no-retry', $4, $5, $6, $7, 'not-required'
+  )
+`, [
+  legacyEvaluationRunId,
+  admin.id,
+  legacyStartedAt,
+  legacyEvaluationCaseId,
+  legacyAuthorizationId,
+  legacyCampaignId,
+  legacySlotId,
+]);
+await query(`
+  INSERT INTO evaluation_run_authorizations (
+    authorization_id, owner_id, created_by_admin_id, campaign_id, slot_id, scope_type, model_id,
+    prompt_variant_id, evaluation_unit_key, max_provider_requests,
+    price_minor_per_provider_request, budget_limit_minor, budget_currency,
+    reason, expires_at, status, bound_case_id, bound_run_id,
+    reserved_provider_requests, used_provider_requests, reserved_budget_minor,
+    used_budget_minor, created_at, consumed_at
+  ) VALUES (
+    $1, $2, $2, $3, $4, 'evaluation-unit', 'gpt-image-2-vip', NULL, $5, 1,
+    1, 1, 'CNY', 'migration 18 fail-closed regression', $6, 'consumed', $7, $8,
+    1, 0, 1, 0, $9, $10
+  )
+`, [
+  legacyAuthorizationId,
+  admin.id,
+  legacyCampaignId,
+  legacySlotId,
+  `sha256:${legacyHash("a")}`,
+  legacyStartedAt + 60_000,
+  legacyEvaluationCaseId,
+  legacyEvaluationRunId,
+  legacyStartedAt - 2_000,
+  legacyStartedAt - 1_000,
+]);
+await query(`
+  UPDATE evaluation_campaign_slots
+  SET authorization_id = $1, run_id = $2
+  WHERE campaign_id = $3 AND slot_id = $4
+`, [legacyAuthorizationId, legacyEvaluationRunId, legacyCampaignId, legacySlotId]);
+await query(`
+  INSERT INTO evaluation_case_evidence (
+    id, run_id, owner_id, case_id, sample_id, authorization_id, campaign_id, slot_id,
+    code_sha, code_sha_source, code_dirty, model_id, resolved_model_id,
+    node_kind, operation_mode, task_family_id, preset_id, prompt_variant_id,
+    prompt_version, prompt_sha256, evaluation_version, contract_hash,
+    evaluation_unit_key, parameter_profile_id, parameter_profile_version,
+    postprocess_version, input_normalization_version, golden_set_version,
+    scoring_rubric_version, resolved_prompt, native_parameters_json,
+    reference_inputs_json, requested_image_count, request_snapshot_sha256,
+    snapshot_json, outcome, provider_request_count,
+    billing_reconciliation_status, error_events_json, hard_blockers_json,
+    started_at, created_at, updated_at
+  ) VALUES (
+    $1, $2, $3, $4, 'legacy-sample', $5, $6, $7,
+    $8, 'deployment-env', FALSE, 'gpt-image-2-vip', 'gpt-image-2-vip',
+    'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
+    'legacy-variant', 'legacy-prompt-v1', $9, 'legacy-evaluation-v1', $10,
+    $11, 'legacy-profile', '1.0.0', 'fit-pad-v1',
+    'reference-input-sha256-v1', 'legacy-golden-v1', 'legacy-rubric-v1',
+    'legacy prompt', '{}', '[]', 1, $12, '{}', 'queued', 0,
+    'not-required', '[]', '[]', $13, $14, $14
+  )
+`, [
+  legacyEvidenceId,
+  legacyEvaluationRunId,
+  admin.id,
+  legacyEvaluationCaseId,
+  legacyAuthorizationId,
+  legacyCampaignId,
+  legacySlotId,
+  "b".repeat(40),
+  legacyHash("c"),
+  `sha256:${legacyHash("d")}`,
+  `sha256:${legacyHash("a")}`,
+  legacyHash("e"),
+  legacyStartedAt,
+  new Date(legacyStartedAt).toISOString(),
+]);
+await closeDatabaseForTests();
+await assert.rejects(
+  initializeDatabase(),
+  /migration 18 requires review of legacy deployment-env evaluation evidence/,
+  "version 18 must fail closed when a real version-17 ledger contains deployment-env evidence",
+);
+await closeDatabaseForTests();
+assert.equal((await queryOne<{ count: number }>(`
+  SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version = 18
+`))?.count, 0, "failed identity migration must not be recorded as applied");
+assert.equal((await queryOne<{ count: number }>(`
+  SELECT COUNT(*)::int AS count FROM evaluation_case_evidence
+  WHERE code_sha_source = 'deployment-env'
+`))?.count, 1, "failed identity migration must not rewrite legacy evidence");
+await query("DELETE FROM evaluation_case_evidence WHERE id = $1", [legacyEvidenceId]);
+// Campaign/Slot bindings are intentionally append-only, so the historical
+// authorization/run fixture remains after removing the evidence that blocks v18.
+await closeDatabaseForTests();
+await initializeDatabase();
+assert.equal((await queryOne<{ count: number }>(`
+  SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version = 18
+`))?.count, 1);
+console.log("  ✓ v17 deployment-env 真实证据阻断 v18，且失败事务不改写、不冒充来源");
 
 await closeDatabaseForTests();
 fs.rmSync(temp, { recursive: true, force: true });

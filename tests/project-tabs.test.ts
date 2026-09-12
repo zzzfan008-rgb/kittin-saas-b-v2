@@ -21,6 +21,40 @@ import {
   type RecentResult,
 } from "../src/store/flowStore";
 import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
+import {
+  buildGarmentPrompt,
+  requireGarmentPromptVariant,
+  type PromptVariant,
+} from "../src/lib/garmentPromptPresets";
+import {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} from "../src/types/modelParameterProfiles";
+import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
+
+const aiTestVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "ai-modify",
+  mode: "edit",
+});
+// These tests exercise store concurrency and persistence after admission. Keep
+// the production catalog closed while modelling reviewed evidence in-process.
+(aiTestVariant as { requiredRoles: PromptVariant["requiredRoles"] }).requiredRoles = [];
+promotePromptVariantForTest(aiTestVariant);
+promotePromptVariantForTest(aiTestVariant, "verified", [{ order: 0, role: "garment_full" }]);
+const aiTestProfile = getModelParameterProfile(aiTestVariant.parameterProfileId)!;
+const aiTestParameters = materializeModelParameterProfile(aiTestProfile);
+const AI_TEST_PROMPT = buildGarmentPrompt(aiTestVariant.variantId, "修改衣领");
+const geminiTestVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gemini-3.1-flash-image",
+  nodeKind: "ai-modify",
+  mode: "edit",
+});
+promotePromptVariantForTest(geminiTestVariant);
+const geminiTestProfile = getModelParameterProfile(geminiTestVariant.parameterProfileId)!;
+const geminiTestParameters = materializeModelParameterProfile(geminiTestProfile);
 
 let passed = 0;
 
@@ -63,12 +97,45 @@ function aiNode(id: string, label: string): FlowNode {
       kind: "ai-modify",
       label,
       status: "success",
-      prompt: "修改衣领",
-      aspectRatio: "1:1",
-      batchSize: 1,
+      prompt: AI_TEST_PROMPT,
+      aspectRatio: aiTestParameters.aspectRatio,
+      batchSize: aiTestParameters.batchSize,
       outputImages: ["/api/files/previous.png"],
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
+      modelId: aiTestVariant.modelId,
+      modelOptions: aiTestParameters.modelOptions,
+      promptVariantId: aiTestVariant.variantId,
+      promptFamilyId: aiTestVariant.familyId,
+      parameterProfileId: aiTestVariant.parameterProfileId,
+      contractHash: aiTestVariant.contractHash,
+      evaluationVersion: aiTestVariant.evaluationVersion,
+      postprocessVersion: aiTestProfile.postprocess.version,
     },
   };
+}
+
+function runnableAiGraph(node: FlowNode): { nodes: FlowNode[]; edges: Edge[] } {
+  const reference = imageNode(`${node.id}-reference`, `${node.data.label}参考图`);
+  if (reference.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
+  reference.data.imageUrl = `/api/files/${node.id}-reference.png`;
+  reference.data.imageRole = "garment_full";
+  reference.data.roleNeedsConfirmation = false;
+  return {
+    nodes: [reference, node],
+    edges: [{ id: `${node.id}-reference-edge`, source: reference.id, target: node.id }],
+  };
+}
+
+function addRunnableAiNode(node: FlowNode): void {
+  const graph = runnableAiGraph(node);
+  addExistingNodes(graph.nodes);
+  useFlowStore.getState().onConnect({
+    source: graph.edges[0].source,
+    target: graph.edges[0].target,
+    sourceHandle: null,
+    targetHandle: null,
+  });
 }
 
 function moveNode(nodeId: string, x: number, dragging = true): void {
@@ -122,6 +189,124 @@ await test("切换页签保留各自画布与项目名称", () => {
   assert.equal(activeDocument().nodes[0].data.label, "A 上传节点");
   useFlowStore.getState().switchTab(tabB);
   assert.equal(activeDocument().nodes[0].data.label, "B 上传节点");
+});
+
+await test("参考边编辑按目标文档作用域执行并保留边角色身份", () => {
+  const sharedSource = imageNode("scoped-shared-source", "共享参考图");
+  const secondSource = imageNode("scoped-second-source", "第二参考图");
+  const targetA = aiNode("scoped-target-a", "目标 A");
+  const targetB = aiNode("scoped-target-b", "目标 B");
+  const edgeA = {
+    id: "scoped-edge-a",
+    source: sharedSource.id,
+    target: targetA.id,
+    data: { role: "generic", roleNeedsConfirmation: true },
+  };
+  const edgeB = {
+    id: "scoped-edge-b",
+    source: secondSource.id,
+    target: targetA.id,
+    data: { role: "garment_top", roleNeedsConfirmation: false },
+  };
+  const otherTargetEdge = {
+    id: "scoped-other-target-edge",
+    source: sharedSource.id,
+    target: targetB.id,
+    data: { role: "identity", roleNeedsConfirmation: false },
+  };
+  useFlowStore.getState().openFlowTab({
+    projectId: "scoped-edge-edit-project",
+    projectName: "目标作用域边编辑",
+    nodes: [sharedSource, secondSource, targetA, targetB],
+    edges: [edgeA, edgeB, otherTargetEdge],
+  });
+  const testTabId = useFlowStore.getState().activeTabId;
+  const target = selectActiveDocumentTarget(useFlowStore.getState());
+
+  assert.equal(
+    useFlowStore.getState().updateEdgeReferenceRoleInTab(target, edgeA.id, "identity"),
+    true,
+  );
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
+    { role: "identity", roleNeedsConfirmation: false },
+    { role: "garment_top", roleNeedsConfirmation: false },
+    { role: "identity", roleNeedsConfirmation: false },
+  ]);
+
+  assert.equal(useFlowStore.getState().moveReferenceEdgeInTab(target, edgeB.id, "up"), true);
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
+    edgeB.id,
+    edgeA.id,
+    otherTargetEdge.id,
+  ]);
+  assert.equal(useFlowStore.getState().moveReferenceEdgeInTab(target, edgeB.id, "down"), true);
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
+    edgeA.id,
+    edgeB.id,
+    otherTargetEdge.id,
+  ]);
+
+  assert.equal(useFlowStore.getState().removeReferenceEdgeInTab(target, edgeA.id), true);
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
+    edgeB.id,
+    otherTargetEdge.id,
+  ]);
+  assert.equal(
+    activeDocument().nodes.find((node) => node.id === sharedSource.id)?.data.kind === "image-input"
+      ? activeDocument().nodes.find((node) => node.id === sharedSource.id)?.data.imageRole
+      : undefined,
+    "default",
+  );
+  useFlowStore.getState().closeTab(testTabId);
+  useFlowStore.getState().switchTab(tabB);
+});
+
+await test("非活动页签可定向编辑，旧 documentEpoch 请求不会穿透新项目", () => {
+  const source = imageNode("scoped-inactive-source", "非活动参考图");
+  const targetNode = aiNode("scoped-inactive-target", "非活动目标");
+  useFlowStore.getState().openFlowTab({
+    projectId: "scoped-inactive-project",
+    projectName: "非活动作用域",
+    nodes: [source, targetNode],
+    edges: [{
+      id: "scoped-inactive-edge",
+      source: source.id,
+      target: targetNode.id,
+      data: { role: "generic", roleNeedsConfirmation: true },
+    }],
+  });
+  const inactiveTarget = selectActiveDocumentTarget(useFlowStore.getState());
+  const inactiveTabId = inactiveTarget.tabId;
+  useFlowStore.getState().switchTab(tabA);
+
+  assert.equal(
+    useFlowStore.getState().updateEdgeReferenceRoleInTab(
+      inactiveTarget,
+      "scoped-inactive-edge",
+      "garment_full",
+    ),
+    true,
+  );
+  useFlowStore.getState().switchTab(inactiveTabId);
+  assert.equal(activeDocument().edges[0].data.role, "garment_full");
+
+  const staleTarget = selectActiveDocumentTarget(useFlowStore.getState());
+  useFlowStore.getState().loadFlow({
+    projectId: "scoped-replacement-project",
+    projectName: "替换后的项目",
+    nodes: [imageNode("scoped-replacement-source", "替换参考图"), aiNode("scoped-replacement-target", "替换目标")],
+    edges: [],
+  });
+  const before = activeDocument();
+  assert.equal(
+    useFlowStore.getState().updateEdgeReferenceRoleInTab(staleTarget, "scoped-inactive-edge", "identity"),
+    false,
+  );
+  assert.equal(activeDocument().projectId, "scoped-replacement-project");
+  assert.equal(activeDocument().documentEpoch, staleTarget.documentEpoch + 1);
+  assert.deepEqual(activeDocument().edges, before.edges);
+  useFlowStore.getState().closeTab(inactiveTabId);
+  useFlowStore.getState().switchTab(tabB);
 });
 
 await test("重复打开同一项目复用已有页签且不覆盖未保存状态", () => {
@@ -368,12 +553,98 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   assert.equal(activeDocument().edges.length, 1);
   assert.equal(activeDocument().edges[0].source, anchor.id);
   assert.equal(activeDocument().edges[0].target, addedId);
+  assert.deepEqual(activeDocument().edges[0].data, {
+    role: "generic",
+    roleNeedsConfirmation: true,
+  }, "含糊图片输入创建的边必须保持待确认");
   assert.equal(activeDocument().selectedNodeId, addedId);
   assert.equal(activeDocument().revision, beforeRevision + 1);
 
   useFlowStore.getState().undo();
   assert.deepEqual(activeDocument().nodes.map((node) => node.id), [anchor.id]);
   assert.equal(activeDocument().edges.length, 0);
+});
+
+await test("新连线只采用已确认图片输入默认角色，显式 edge role 优先", () => {
+  const confirmedSource = imageNode("confirmed-edge-source", "已确认人物");
+  if (confirmedSource.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
+  confirmedSource.data.imageUrl = "/api/files/confirmed-person.png";
+  confirmedSource.data.imageRole = "identity";
+  confirmedSource.data.roleNeedsConfirmation = false;
+  const firstTarget = aiNode("confirmed-edge-target", "第一目标");
+  const secondTarget = aiNode("explicit-edge-target", "第二目标");
+  useFlowStore.getState().openFlowTab({
+    projectId: "edge-role-creation-project",
+    projectName: "连线角色创建",
+    nodes: [confirmedSource, firstTarget, secondTarget],
+    edges: [],
+  });
+
+  useFlowStore.getState().onConnect({
+    source: confirmedSource.id,
+    target: firstTarget.id,
+    sourceHandle: null,
+    targetHandle: null,
+  });
+  useFlowStore.getState().onConnect({
+    source: confirmedSource.id,
+    target: secondTarget.id,
+    sourceHandle: null,
+    targetHandle: null,
+    data: { role: "garment_top", roleNeedsConfirmation: false },
+  } as never);
+
+  assert.deepEqual(activeDocument().edges.map((candidate) => candidate.data), [
+    { role: "identity", roleNeedsConfirmation: false },
+    { role: "garment_top", roleNeedsConfirmation: false },
+  ]);
+});
+
+await test("专用面料节点句柄在新连线时持久化固定角色", () => {
+  const source = imageNode("dedicated-handle-source", "待确认来源");
+  const targetId = "dedicated-handle-target";
+  const target = {
+    id: targetId,
+    type: "fabric-recolor",
+    position: { x: 320, y: 0 },
+    data: {
+      kind: "fabric-recolor" as const,
+      label: "面料换色",
+      status: "idle" as const,
+      colors: [],
+      prompt: "",
+      outputImages: [],
+      operationMode: "edit" as const,
+      operationModeNeedsConfirmation: false,
+      modelId: "gpt-image-2" as const,
+      modelOptions: {},
+    },
+  } satisfies FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "dedicated-handle-role-project",
+    projectName: "专用句柄角色",
+    nodes: [source, target],
+    edges: [],
+  });
+
+  useFlowStore.getState().onConnect({
+    source: source.id,
+    target: targetId,
+    sourceHandle: null,
+    targetHandle: "fabric",
+  });
+  useFlowStore.getState().onConnect({
+    source: source.id,
+    target: targetId,
+    sourceHandle: null,
+    targetHandle: "garment",
+    data: { role: "identity", roleNeedsConfirmation: false },
+  } as never);
+
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
+    { role: "fabric", roleNeedsConfirmation: false },
+    { role: "identity", roleNeedsConfirmation: false },
+  ], "显式边角色必须优先于专用句柄固定角色");
 });
 
 await test("快捷建图复用输入上限与只读门禁", () => {
@@ -388,6 +659,10 @@ await test("快捷建图复用输入上限与只读门禁", () => {
       status: "idle",
       imageSize: "2K",
       outputImages: [],
+      modelId: "gpt-image-2-vip",
+      modelOptions: { size: "auto" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
     },
   };
   useFlowStore.getState().openFlowTab({
@@ -502,13 +777,18 @@ await test("旧保存响应不得将同页签新项目标记为已保存", async
 
 await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", async () => {
   const sharedNodeId = "same-tab-async-identity";
+  const referenceNode = imageNode("same-tab-async-reference", "旧项目参考图");
+  if (referenceNode.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
+  referenceNode.data.imageUrl = "/api/files/garment-reference.png";
+  referenceNode.data.imageRole = "garment_full";
+  referenceNode.data.roleNeedsConfirmation = false;
   const sourceNode = aiNode(sharedNodeId, "旧项目节点");
   sourceNode.data.status = "idle";
   useFlowStore.getState().loadFlow({
     projectId: "same-tab-async-project-a",
     projectName: "异步项目 A",
-    nodes: [sourceNode],
-    edges: [],
+    nodes: [referenceNode, sourceNode],
+    edges: [{ id: "same-tab-async-edge", source: referenceNode.id, target: sourceNode.id }],
     markDirty: true,
   });
   const staleTarget = selectActiveDocumentTarget(useFlowStore.getState());
@@ -874,7 +1154,7 @@ await test("Save→Undo 先发送拖拽终点，再排队补写撤销快照", as
 
 await test("新建项目首次生成会先保存同一份项目，再提交运行", async () => {
   useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("first-run-ai", "首次生成"));
+  addRunnableAiNode(aiNode("first-run-ai", "首次生成"));
   const projectId = activeDocument().projectId;
   const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
   const originalFetch = globalThis.fetch;
@@ -913,11 +1193,12 @@ await test("新建项目首次生成会先保存同一份项目，再提交运�
 
 await test("runNode 等待拖拽结束后向保存与运行提交同一最终快照", async () => {
   const node = aiNode("drag-run-node", "拖拽后运行");
+  const graph = runnableAiGraph(node);
   useFlowStore.getState().openFlowTab({
     projectId: "drag-run-project",
     projectName: "拖拽后运行",
-    nodes: [node],
-    edges: [],
+    nodes: graph.nodes,
+    edges: graph.edges,
   });
   const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
   const originalFetch = globalThis.fetch;
@@ -945,8 +1226,10 @@ await test("runNode 等待拖拽结束后向保存与运行提交同一最终快
     assert.deepEqual(requests.map((request) => request.url), ["/api/projects", "/api/run-plan"]);
     const savedNodes = (requests[0].body as { flow: { nodes: FlowNode[] } }).flow.nodes;
     const runNodes = (requests[1].body as { nodes: FlowNode[] }).nodes;
-    assert.deepEqual(savedNodes[0].position, { x: 544, y: 24 });
-    assert.notEqual(savedNodes[0].dragging, true);
+    const savedTarget = savedNodes.find((candidate) => candidate.id === node.id);
+    assert.ok(savedTarget);
+    assert.deepEqual(savedTarget.position, { x: 544, y: 24 });
+    assert.notEqual(savedTarget.dragging, true);
     assert.deepEqual(runNodes, savedNodes);
   } finally {
     globalThis.fetch = originalFetch;
@@ -954,11 +1237,12 @@ await test("runNode 等待拖拽结束后向保存与运行提交同一最终快
 });
 
 await test("runNode 创建 queued 记录时保留当前结果选择", async () => {
+  const graph = runnableAiGraph(aiNode("queued-selection-node", "不抢占选择"));
   useFlowStore.getState().openFlowTab({
     projectId: "queued-selection-project",
     projectName: "运行选择测试",
-    nodes: [aiNode("queued-selection-node", "不抢占选择")],
-    edges: [],
+    nodes: graph.nodes,
+    edges: graph.edges,
   });
   const keptResult = {
     id: "kept-result-selection",
@@ -1031,19 +1315,34 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   generationNode.data.status = "idle";
   if (generationNode.data.kind !== "ai-modify") throw new Error("测试生成节点类型错误");
   generationNode.data.outputImages = [];
+  const invariantUpload = imageNode("model-invariant-upload", "异步上传");
+  if (invariantUpload.data.kind !== "image-input") throw new Error("测试上传节点类型错误");
+  invariantUpload.data.imageRole = "garment_full";
+  invariantUpload.data.roleNeedsConfirmation = false;
   useFlowStore.getState().openFlowTab({
     projectId: "model-invariant-project",
     projectName: "模型保真项目",
-    nodes: [imageNode("model-invariant-upload", "异步上传"), generationNode],
+    nodes: [invariantUpload, generationNode],
     edges: [{ id: "model-invariant-edge", source: "model-invariant-upload", target: generationNode.id }],
   });
   const invariantTabId = useFlowStore.getState().activeTabId;
   const expected = {
-    modelId: "gemini-3.1-flash-image",
-    modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
+    modelId: geminiTestVariant.modelId,
+    modelOptions: geminiTestParameters.modelOptions,
   };
 
-  useFlowStore.getState().updateNodeData(generationNode.id, expected);
+  useFlowStore.getState().updateNodeData(generationNode.id, {
+    ...expected,
+    prompt: buildGarmentPrompt(geminiTestVariant.variantId, "保持 Gemini 精确参数"),
+    aspectRatio: geminiTestParameters.aspectRatio,
+    batchSize: geminiTestParameters.batchSize,
+    promptVariantId: geminiTestVariant.variantId,
+    promptFamilyId: geminiTestVariant.familyId,
+    parameterProfileId: geminiTestVariant.parameterProfileId,
+    contractHash: geminiTestVariant.contractHash,
+    evaluationVersion: geminiTestVariant.evaluationVersion,
+    postprocessVersion: geminiTestProfile.postprocess.version,
+  });
   assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   await Promise.resolve().then(() => {
@@ -1065,6 +1364,8 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
       prompt: "仅替换被选中区域",
       modelId: "gpt-image-2",
       modelOptions: {},
+      operationMode: "mask-edit",
+      operationModeNeedsConfirmation: false,
       outputImages: [],
     },
   });
@@ -1150,6 +1451,8 @@ await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", ()
     /imageModelAspectRatioPatch\(selectedModelId, selectedModelOptions, e\.target\.value\)/,
     "Inspector 修改画幅时必须同步业务比例与 provider modelOptions",
   );
+  assert.match(inspectorSource, /每条入边的参考角色/);
+  assert.match(inspectorSource, /updateEdgeReferenceRole\(edge\.id/);
   for (const source of [aiModifySource, sketchSource]) {
     assert.match(
       source,
@@ -1161,7 +1464,7 @@ await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", ()
 
 await test("项目保存失败时显示错误且绝不提交生成", async () => {
   useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("blocked-first-run", "保存失败生成"));
+  addRunnableAiNode(aiNode("blocked-first-run", "保存失败生成"));
   const requests: string[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => {
@@ -1187,7 +1490,7 @@ await test("项目保存失败时显示错误且绝不提交生成", async () =>
 
 await test("保存等待期间的编辑不会悄悄改变已点击的付费请求", async () => {
   useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("snapshot-run", "快照生成"));
+  addRunnableAiNode(aiNode("snapshot-run", "快照生成"));
   const projectResolvers: Array<(response: Response) => void> = [];
   const runBodies: Array<{ nodes: FlowNode[] }> = [];
   const originalFetch = globalThis.fetch;
@@ -1220,7 +1523,7 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
     assert.equal(runBodies.length, 1);
     const submitted = runBodies[0].nodes.find((node) => node.id === "snapshot-run");
     assert.equal(submitted?.data.kind, "ai-modify");
-    assert.equal(submitted?.data.kind === "ai-modify" ? submitted.data.prompt : undefined, "修改衣领");
+    assert.equal(submitted?.data.kind === "ai-modify" ? submitted.data.prompt : undefined, AI_TEST_PROMPT);
     assert.match(
       activeDocument().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
       /画布尚未保存或已在其他位置更新/,
@@ -1232,7 +1535,7 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
 
 await test("网络或网关响应不确定时复用同一请求号，已知 runId 后禁止重复付费", async () => {
   useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("idempotent-run", "幂等生成"));
+  addRunnableAiNode(aiNode("idempotent-run", "幂等生成"));
   const clientRequestIds: string[] = [];
   let submissions = 0;
   const originalFetch = globalThis.fetch;
@@ -1283,7 +1586,7 @@ await test("网络或网关响应不确定时复用同一请求号，已知 runI
 
 await test("丢失响应后即使参数变化收到 409，也持续复用原付费请求号", async () => {
   useFlowStore.getState().createBlankTab();
-  useFlowStore.getState().addExistingNode(aiNode("ambiguous-conflict", "歧义冲突"));
+  addRunnableAiNode(aiNode("ambiguous-conflict", "歧义冲突"));
   const clientRequestIds: string[] = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -1304,7 +1607,9 @@ await test("丢失响应后即使参数变化收到 409，也持续复用原付�
 
   try {
     await useFlowStore.getState().runNode("ambiguous-conflict");
-    useFlowStore.getState().updateNodeData("ambiguous-conflict", { prompt: "响应丢失后的新提示词" });
+    useFlowStore.getState().updateNodeData("ambiguous-conflict", {
+      prompt: buildGarmentPrompt(aiTestVariant.variantId, "响应丢失后的新提示词"),
+    });
     await useFlowStore.getState().runNode("ambiguous-conflict");
     await useFlowStore.getState().runNode("ambiguous-conflict");
     assert.equal(clientRequestIds.length, 3);
@@ -1377,6 +1682,8 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           status: "idle",
           modelId: "gpt-image-2",
           modelOptions: {},
+          operationMode: "mask-edit",
+          operationModeNeedsConfirmation: false,
           prompt: "",
           outputImages: [],
         },

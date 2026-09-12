@@ -18,14 +18,22 @@ import {
 export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 import {
   NODE_SPECS,
+  LEGACY_IMAGE_ROLE_VALUES,
+  REFERENCE_ROLE_VALUES,
+  allowedOperationModesForNode,
+  defaultOperationModeForNode,
   isNodeRunActive,
   isNodeRunTerminal,
+  isReferenceRole,
+  resolveReferenceEdgeData,
   type Asset,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
   type ImageInputNodeData,
   type PersistedWorkflow,
+  type ReferenceRole,
+  type ReferenceImageEvidence,
 } from "@/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -35,6 +43,7 @@ import {
   isModelAllowedForNode,
   normalizeImageModelOptions,
 } from "@/types/imageModels";
+import { isRetiredImageModelId } from "@/types/retiredImageModels";
 import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   createDocumentSnapshot,
@@ -50,6 +59,23 @@ import {
   type ProjectTabsStorageManifest,
 } from "@/lib/tabSessionStorage";
 import { waitForInitialDraftSyncBeforeFormalSave } from "@/initialDraft/initialDraftRuntime";
+import {
+  evaluatePromptRunAdmission,
+  promptRunAdmissionInputFromNode,
+  promptRunReferenceSnapshotsFromGraph,
+} from "@/lib/promptRunAdmission";
+import type { HistoricalReferenceEvidence } from "@/lib/referenceEvidence";
+import { apiErrorMessage } from "@/lib/apiErrors";
+import {
+  applyRunEventToNode,
+  normalizeRunEvent,
+  requestedResultCount,
+  type NodeStatusRunEvent,
+  type RunEvent,
+} from "@/store/flowRunEvents";
+
+export { applyRunEventToNode, normalizeRunEvent, requestedResultCount } from "@/store/flowRunEvents";
+export type { NodeStatusRunEvent, RunEvent } from "@/store/flowRunEvents";
 
 export type FlowNode = Node<WorkflowNodeData>;
 export type ConnectedNodeDirection = "upstream" | "downstream";
@@ -84,8 +110,13 @@ export interface RecentResult {
   successfulCount?: number;
   providerRequests?: number;
   providerOutputSize?: string;
+  /** Provider 原图；可能与业务后处理成品相同。 */
+  providerImage?: string;
+  /** 失败发生在后处理时也保留全部 Provider 原始产物。 */
+  providerImages?: string[];
   parameters?: Record<string, unknown>;
   referenceImages?: string[];
+  referenceInputs?: Array<ReferenceImageEvidence | HistoricalReferenceEvidence>;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -142,7 +173,7 @@ export interface FlowState {
   /** 最近生成（底部结果面板，含运行记录），新条目在前 */
   recentResults: RecentResult[];
   /** 全局图片查看器（单击任意图片弹出，滚轮缩放 1x~2x） */
-  viewer: { url: string; title?: string; prompt?: string; meta?: string } | null;
+  viewer: { url: string; title?: string; prompt?: string; meta?: string; resultId?: string } | null;
   /** 浏览器会话草稿未能持久化；非空时刷新可能丢失尚未保存的修改。 */
   tabSessionPersistenceError: string | null;
   /** 仅内存：打开的蒙版编辑器与尚未结束的蒙版上传总数。 */
@@ -166,7 +197,7 @@ export interface FlowState {
   toggleCompareId: (id: string) => void;
   clearCompare: () => void;
   removeRecentResult: (id: string) => void;
-  openViewer: (v: { url: string; title?: string; prompt?: string; meta?: string }) => void;
+  openViewer: (v: { url: string; title?: string; prompt?: string; meta?: string; resultId?: string }) => void;
   closeViewer: () => void;
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
@@ -187,6 +218,22 @@ export interface FlowState {
   /** 复制/粘贴等调用方已有完整节点时，仍通过此入口维护 revision/dirty。 */
   addExistingNode: (node: FlowNode) => void;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  /** 显式确认一条入边在当前目标中的参考角色；作为一次可撤销文档修改。 */
+  updateEdgeReferenceRole: (edgeId: string, role: ReferenceRole) => void;
+  /** 在指定文档作用域内确认一条参考边，拒绝过期页签/项目/epoch。 */
+  updateEdgeReferenceRoleInTab: (
+    target: DocumentTarget,
+    edgeId: string,
+    role: ReferenceRole,
+  ) => boolean;
+  /** 在指定目标节点的入边集合中移动参考边，保持边与角色绑定。 */
+  moveReferenceEdgeInTab: (
+    target: DocumentTarget,
+    edgeId: string,
+    direction: "up" | "down",
+  ) => boolean;
+  /** 从指定文档中移除一条参考边。 */
+  removeReferenceEdgeInTab: (target: DocumentTarget, edgeId: string) => boolean;
   updateNodeDataInTab: (target: DocumentTarget, id: string, patch: Record<string, unknown>) => void;
   setNodeStatus: (id: string, status: NodeRunStatus, error?: string) => void;
   runNode: (id: string) => Promise<void>;
@@ -666,6 +713,108 @@ function commitDocumentMutationWithSet(
   return changed;
 }
 
+/**
+ * 将文档修改绑定到不可变的页签/项目/epoch 身份。
+ * 活动文档继续走 zundo；非活动文档写入其页签独立历史，切页后可撤销。
+ */
+function commitDocumentMutationForTarget(
+  target: DocumentTarget,
+  mutation: DocumentMutation,
+): boolean {
+  flushActiveTextEditForTarget(target);
+  const initialState = useFlowStore.getState();
+  const initial = documentForTarget(initialState, target);
+  if (!initial || initial.readOnly) return false;
+
+  if (initialState.activeTabId === target.tabId) {
+    return commitDocumentMutationWithSet(useFlowStore.setState, (tab) => {
+      if (!matchesDocumentTarget(tab, target) || tab.readOnly) return {};
+      return typeof mutation === "function" ? mutation(tab) : mutation;
+    });
+  }
+
+  const before = temporalDocument(initial);
+  let changed = false;
+  useFlowStore.setState((state) => {
+    const tab = documentForTarget(state, target);
+    if (!tab || tab.readOnly) return {};
+    const patch = typeof mutation === "function" ? mutation(tab) : mutation;
+    if (!documentMutationChanged(tab, patch)) return {};
+    changed = true;
+    const nextTab: ProjectTab = {
+      ...tab,
+      ...patch,
+      revision: tab.revision + 1,
+      dirty: true,
+      saveState: tab.saveState === "saving" ? "saving" : "idle",
+    };
+    return { tabs: replaceTab(state.tabs, nextTab) };
+  });
+  if (!changed) return false;
+
+  const current = documentForTarget(useFlowStore.getState(), target);
+  if (current) recordInactiveTabHistory(target.tabId, before, temporalDocument(current));
+  return true;
+}
+
+function edgeDataWithReferenceRole(edge: Edge, role: ReferenceRole): Record<string, unknown> {
+  const data = typeof edge.data === "object" && edge.data !== null && !Array.isArray(edge.data)
+    ? edge.data as Record<string, unknown>
+    : {};
+  return { ...data, role, roleNeedsConfirmation: false };
+}
+
+function referenceEdgeMutation(
+  edgeId: string,
+  role: ReferenceRole,
+): DocumentMutation {
+  return (tab) => {
+    const edge = tab.edges.find((candidate) => candidate.id === edgeId);
+    if (!edge) return {};
+    const nextData = edgeDataWithReferenceRole(edge, role);
+    if (
+      edge.data &&
+      typeof edge.data === "object" &&
+      !Array.isArray(edge.data) &&
+      JSON.stringify(edge.data) === JSON.stringify(nextData)
+    ) return {};
+    return {
+      edges: tab.edges.map((candidate) => candidate.id === edgeId
+        ? { ...candidate, data: nextData }
+        : candidate),
+    };
+  };
+}
+
+function moveReferenceEdgeMutation(
+  edgeId: string,
+  direction: "up" | "down",
+): DocumentMutation {
+  return (tab) => {
+    const edgeIndex = tab.edges.findIndex((edge) => edge.id === edgeId);
+    if (edgeIndex < 0) return {};
+    const targetNodeId = tab.edges[edgeIndex].target;
+    const incomingIndexes = tab.edges.reduce<number[]>((indexes, edge, index) => {
+      if (edge.target === targetNodeId) indexes.push(index);
+      return indexes;
+    }, []);
+    const position = incomingIndexes.indexOf(edgeIndex);
+    if (position < 0) return {};
+    const nextPosition = direction === "up" ? position - 1 : position + 1;
+    if (nextPosition < 0 || nextPosition >= incomingIndexes.length) return {};
+    const swapIndex = incomingIndexes[nextPosition];
+    const edges = [...tab.edges];
+    [edges[edgeIndex], edges[swapIndex]] = [edges[swapIndex], edges[edgeIndex]];
+    return { edges };
+  };
+}
+
+function removeReferenceEdgeMutation(edgeId: string): DocumentMutation {
+  return (tab) => tab.edges.some((edge) => edge.id === edgeId)
+    ? { edges: tab.edges.filter((edge) => edge.id !== edgeId) }
+    : {};
+}
+
 /** 对当前项目文档执行一次原子、可撤销且具备 no-op 判定的修改。 */
 export function commitDocumentMutation(mutation: DocumentMutation): boolean {
   return commitDocumentMutationWithSet(useFlowStore.setState, mutation);
@@ -939,46 +1088,53 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
   const base = { label: spec.title, status: "idle" as NodeRunStatus };
   switch (kind) {
     case "image-input":
-      return { ...base, kind, imageRole: "default" };
+      return { ...base, kind, imageRole: "generic", roleNeedsConfirmation: true };
     case "sketch-to-render":
       return {
         ...base, kind, prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
+        operationMode: "generate", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
       };
     case "ai-modify":
       return {
         ...base, kind, prompt: "", aspectRatio: "1:1", batchSize: 1, outputImages: [],
+        operationMode: "edit", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
       };
     case "fabric-recolor":
       return {
         ...base, kind, colors: [], prompt: "", outputImages: [],
+        operationMode: "edit", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
       };
     case "upscale":
       return {
         ...base, kind, imageSize: "2K", outputImages: [],
+        operationMode: "edit", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
       };
     case "print-extract":
       return {
         ...base, kind, prompt: "", outputImages: [], savedAsAssets: [],
+        operationMode: "edit", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
       };
     case "print-mutate":
       return {
         ...base, kind, prompt: "", count: 4, outputImages: [],
+        operationMode: "edit", operationModeNeedsConfirmation: false,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
       };
     case "mask-redraw":
       return {
         ...base, kind, prompt: "", outputImages: [],
+        operationMode: "mask-edit", operationModeNeedsConfirmation: false,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
       };
     case "result":
@@ -1221,6 +1377,26 @@ export function isDocumentConnectionValid(
     (edge) => edge.source === connection.source &&
       (edge.targetHandle ?? null) === (connection.targetHandle ?? null),
   );
+}
+
+function connectionWithReferenceData(
+  nodes: readonly FlowNode[],
+  connection: Connection,
+): Connection & { data: ReturnType<typeof resolveReferenceEdgeData> } {
+  const source = nodes.find((node) => node.id === connection.source);
+  const target = nodes.find((node) => node.id === connection.target);
+  const explicitData = "data" in connection
+    ? (connection as Connection & { data?: unknown }).data
+    : undefined;
+  return {
+    ...connection,
+    data: resolveReferenceEdgeData(
+      explicitData,
+      source?.data,
+      target?.data.kind,
+      connection.targetHandle,
+    ),
+  };
 }
 
 function replaceTab(tabs: ProjectTab[], tab: ProjectTab): ProjectTab[] {
@@ -1620,19 +1796,52 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
   };
   if (typeof input.error !== "string") delete data.error;
   if (NODE_SPECS[kind].providerId) {
-    const modelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
+    const selectedModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
       ? input.modelId
-      : kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+      : undefined;
+    const retiredModelId = kind === "mask-redraw"
+      ? undefined
+      : typeof input.retiredModelId === "string" && input.retiredModelId.trim()
+        ? input.retiredModelId
+        : isRetiredImageModelId(input.modelId)
+          ? input.modelId
+          : typeof input.modelId === "string" && input.modelId.trim() && !selectedModelId
+            ? input.modelId
+            : undefined;
+    const modelId = selectedModelId
+      ?? (kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID);
     const preferredAspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "1:1";
     data.modelId = modelId;
+    if (retiredModelId) {
+      data.retiredModelId = retiredModelId;
+      data.modelSelectionNeedsConfirmation = true;
+      delete data.promptVariantId;
+      delete data.promptFamilyId;
+      delete data.parameterProfileId;
+      delete data.contractHash;
+      delete data.evaluationVersion;
+      delete data.postprocessVersion;
+    } else {
+      delete data.retiredModelId;
+      data.modelSelectionNeedsConfirmation = input.modelSelectionNeedsConfirmation === true;
+    }
     data.modelOptions = normalizeImageModelOptions(modelId, input.modelOptions, preferredAspectRatio);
+    const allowedModes = allowedOperationModesForNode(kind);
+    data.operationMode = allowedModes.includes(input.operationMode as never)
+      ? input.operationMode
+      : defaultOperationModeForNode(kind);
+    data.operationModeNeedsConfirmation = input.operationModeNeedsConfirmation === true;
   }
 
   switch (kind) {
     case "image-input":
-      data.imageRole = typeof input.imageRole === "string" && ["default", "sketch", "garment", "fabric", "reference"].includes(input.imageRole)
+      data.imageRole = typeof input.imageRole === "string" && [
+        ...REFERENCE_ROLE_VALUES,
+        ...LEGACY_IMAGE_ROLE_VALUES,
+      ].includes(input.imageRole as never)
         ? input.imageRole
-        : "default";
+        : "generic";
+      data.roleNeedsConfirmation = input.roleNeedsConfirmation === false ? false : true;
       if (typeof input.imageUrl !== "string") delete data.imageUrl;
       break;
     case "sketch-to-render":
@@ -1668,6 +1877,8 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       break;
     case "mask-redraw":
       data.modelId = MASK_REDRAW_MODEL_ID;
+      delete data.retiredModelId;
+      data.modelSelectionNeedsConfirmation = false;
       data.modelOptions = {};
       data.prompt = typeof input.prompt === "string" ? input.prompt : "";
       data.outputImages = stringList(input.outputImages);
@@ -1690,15 +1901,29 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
   } as FlowNode;
 }
 
-function normalizeSessionEdge(value: unknown, nodeIds: Set<string>): Edge | undefined {
+function normalizeSessionEdge(
+  value: unknown,
+  nodesById: ReadonlyMap<string, FlowNode>,
+): Edge | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
   if (
     typeof raw.id !== "string" || !raw.id ||
-    typeof raw.source !== "string" || !nodeIds.has(raw.source) ||
-    typeof raw.target !== "string" || !nodeIds.has(raw.target)
+    typeof raw.source !== "string" || !nodesById.has(raw.source) ||
+    typeof raw.target !== "string" || !nodesById.has(raw.target)
   ) return undefined;
-  return { ...raw, id: raw.id, source: raw.source, target: raw.target } as Edge;
+  return {
+    ...raw,
+    id: raw.id,
+    source: raw.source,
+    target: raw.target,
+    data: resolveReferenceEdgeData(
+      raw.data,
+      nodesById.get(raw.source)?.data,
+      nodesById.get(raw.target)?.data.kind,
+      typeof raw.targetHandle === "string" ? raw.targetHandle : null,
+    ),
+  } as Edge;
 }
 
 function normalizeSessionTab(value: unknown): ProjectTab | undefined {
@@ -1720,9 +1945,10 @@ function normalizeSessionTab(value: unknown): ProjectTab | undefined {
   });
   // 一个原本非空的页签若没有任何节点能迁移，说明其结构整体不可恢复。
   if (raw.nodes.length > 0 && nodes.length === 0) return undefined;
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const seenEdgeIds = new Set<string>();
   const edges = raw.edges.flatMap((edge): Edge[] => {
-    const normalized = normalizeSessionEdge(edge, seenNodeIds);
+    const normalized = normalizeSessionEdge(edge, nodesById);
     if (!normalized || seenEdgeIds.has(normalized.id)) return [];
     seenEdgeIds.add(normalized.id);
     return [normalized];
@@ -2122,164 +2348,11 @@ function persistRecentResults(list: RecentResult[]): void {
   }
 }
 
-interface RunFailure {
-  prompt?: string;
-  error: string;
-}
-
-interface RunEventMeta {
-  seq?: number;
-  error?: string;
-  model?: string;
-  prompts?: string[];
-  providerOutputSizes?: Array<string | null>;
-  failures?: RunFailure[];
-  startedAt?: number;
-  finishedAt?: number;
-}
-
-export type NodeStatusRunEvent =
-  | (RunEventMeta & {
-      type: "node-status";
-      nodeId: string;
-      status: "queued" | "running" | "retry_wait" | "cancel_requested";
-      images?: never;
-    })
-  | (RunEventMeta & {
-      type: "node-status";
-      nodeId: string;
-      status: "success";
-      /** 成功事件在客户端归一化后始终包含数组。 */
-      images: string[];
-    })
-  | (Omit<RunEventMeta, "error"> & {
-      type: "node-status";
-      nodeId: string;
-      status: "error" | "outcome_unknown" | "cancelled";
-      error: string;
-      images?: never;
-    });
-
-export type RunEvent =
-  | NodeStatusRunEvent
-  | { seq?: number; type: "done" }
-  | { seq?: number; type: "run-error"; nodeId?: string; error: string; finishedAt?: number };
-
-function optionalFiniteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
-
-function stringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-}
-
-function nullableStringArray(value: unknown): Array<string | null> | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.map((item) => optionalString(item) ?? null);
-}
-
-function runFailures(value: unknown): RunFailure[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const failures = value.flatMap((item): RunFailure[] => {
-    if (!item || typeof item !== "object") return [];
-    const candidate = item as { prompt?: unknown; error?: unknown };
-    const error = optionalString(candidate.error);
-    if (!error) return [];
-    return [{ error, ...(optionalString(candidate.prompt) ? { prompt: optionalString(candidate.prompt) } : {}) }];
-  });
-  return failures.length ? failures : undefined;
-}
-
-/** SSE 数据不可信：在进入状态层前归一为判别联合，缺失图片永远不会写成 undefined。 */
-export function normalizeRunEvent(value: unknown): RunEvent {
-  if (!value || typeof value !== "object") throw new Error("运行事件格式无效");
-  const raw = value as Record<string, unknown>;
-  const seq = optionalFiniteNumber(raw.seq);
-  if (raw.type === "done") return { type: "done", ...(seq !== undefined ? { seq } : {}) };
-  if (raw.type === "run-error") {
-    return {
-      type: "run-error",
-      error: optionalString(raw.error) ?? "运行失败",
-      ...(optionalString(raw.nodeId) ? { nodeId: optionalString(raw.nodeId) } : {}),
-      ...(optionalFiniteNumber(raw.finishedAt) !== undefined ? { finishedAt: optionalFiniteNumber(raw.finishedAt) } : {}),
-      ...(seq !== undefined ? { seq } : {}),
-    };
-  }
-  if (raw.type !== "node-status") throw new Error("运行事件类型无效");
-  const nodeId = optionalString(raw.nodeId);
-  if (!nodeId) throw new Error("运行事件缺少节点标识");
-  const common: RunEventMeta = {
-    ...(seq !== undefined ? { seq } : {}),
-    ...(optionalString(raw.error) ? { error: optionalString(raw.error) } : {}),
-    ...(optionalString(raw.model) ? { model: optionalString(raw.model) } : {}),
-    ...(stringArray(raw.prompts) ? { prompts: stringArray(raw.prompts) } : {}),
-    ...(nullableStringArray(raw.providerOutputSizes)
-      ? { providerOutputSizes: nullableStringArray(raw.providerOutputSizes) }
-      : {}),
-    ...(runFailures(raw.failures) ? { failures: runFailures(raw.failures) } : {}),
-    ...(optionalFiniteNumber(raw.startedAt) !== undefined ? { startedAt: optionalFiniteNumber(raw.startedAt) } : {}),
-    ...(optionalFiniteNumber(raw.finishedAt) !== undefined ? { finishedAt: optionalFiniteNumber(raw.finishedAt) } : {}),
-  };
-  if (raw.status === "success") {
-    return { ...common, type: "node-status", nodeId, status: "success", images: stringArray(raw.images) ?? [] };
-  }
-  if (raw.status === "error" || raw.status === "outcome_unknown" || raw.status === "cancelled") {
-    const { error: commonError, ...meta } = common;
-    const fallback = raw.status === "cancelled" ? "任务已取消" : raw.status === "outcome_unknown" ? "生成结果未知" : "生成失败";
-    return { ...meta, type: "node-status", nodeId, status: raw.status, error: commonError ?? fallback };
-  }
-  if (raw.status === "queued" || raw.status === "running" || raw.status === "retry_wait" || raw.status === "cancel_requested") {
-    return { ...common, type: "node-status", nodeId, status: raw.status };
-  }
-  throw new Error("运行事件状态无效");
-}
-
-/** 单一节点回写规则：失败保留旧图片，只有成功事件可以替换 outputImages。 */
-export function applyRunEventToNode(
-  data: WorkflowNodeData,
-  event: NodeStatusRunEvent,
-): WorkflowNodeData {
-  if (event.status === "success") {
-    return {
-      ...data,
-      ...(data.kind !== "image-input" && data.kind !== "result" ? { outputImages: event.images } : {}),
-      status: "success",
-      error: event.error,
-    } as WorkflowNodeData;
-  }
-  return {
-    ...data,
-    status: event.status,
-    error: event.error,
-  } as WorkflowNodeData;
-}
-
 function recordPrompt(data: WorkflowNodeData): string | undefined {
   if ("prompt" in data && typeof data.prompt === "string" && data.prompt.trim()) {
     return data.prompt.trim();
   }
   return undefined;
-}
-
-export function requestedResultCount(data: WorkflowNodeData): number {
-  switch (data.kind) {
-    case "sketch-to-render":
-    case "ai-modify":
-      return Math.max(1, Math.min(8, Number(data.batchSize) || 1));
-    case "print-mutate":
-      return Math.max(1, Math.min(8, Number(data.count) || 1));
-    case "fabric-recolor":
-      return Math.max(1, Math.min(8, data.colors.length || 1));
-    case "mask-redraw":
-      return 1;
-    default:
-      return 1;
-  }
 }
 
 function pendingResultCardId(recordId: string, index: number): string {
@@ -2527,14 +2600,6 @@ export function appendSavedAsset(current: string[] | undefined, url: string): st
   return existing.includes(url) ? existing : [...existing, url];
 }
 
-function responseErrorMessage(status: number, body: unknown): string {
-  if (typeof body === "object" && body !== null && "error" in body) {
-    const error = (body as { error?: unknown }).error;
-    if (typeof error === "string" && error.trim()) return error;
-  }
-  return `HTTP ${status}`;
-}
-
 /** 等待后端 DAG Run 的 SSE 终态；事件自身可重放，因此晚连接不会丢状态。 */
 function consumeRunEvents(
   runId: string,
@@ -2740,7 +2805,7 @@ export const useFlowStore = create<FlowState>()(
               });
               if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(responseErrorMessage(res.status, body));
+                throw new Error(apiErrorMessage(res.status, body));
               }
               const responseSettlement = waitForHistoryTransactionSettlement(tabId);
               if (responseSettlement) await responseSettlement;
@@ -3026,7 +3091,9 @@ export const useFlowStore = create<FlowState>()(
         const tab = selectActiveDocument(get());
         if (tab.readOnly) return;
         if (!get().isValidConnection(conn)) return;
-        commitDocumentMutationWithSet(set, { edges: addEdge(conn, tab.edges) });
+        commitDocumentMutationWithSet(set, {
+          edges: addEdge(connectionWithReferenceData(tab.nodes, conn), tab.edges),
+        });
       },
 
       addNode: (kind, position) => {
@@ -3068,7 +3135,7 @@ export const useFlowStore = create<FlowState>()(
         const selection = normalizeNodeSelection(nodes, [id]);
         commitDocumentMutationWithSet(set, {
           ...selection,
-          edges: addEdge(connection, tab.edges),
+          edges: addEdge(connectionWithReferenceData(nodes, connection), tab.edges),
           selectedResultId: null,
         });
         return id;
@@ -3112,6 +3179,21 @@ export const useFlowStore = create<FlowState>()(
           ),
         });
       },
+      updateEdgeReferenceRole: (edgeId, role) => {
+        const target = selectActiveDocumentTarget(get());
+        commitDocumentMutationForTarget(target, referenceEdgeMutation(edgeId, role));
+      },
+      updateEdgeReferenceRoleInTab: (target, edgeId, role) => {
+        if (!isReferenceRole(role)) return false;
+        return commitDocumentMutationForTarget(target, referenceEdgeMutation(edgeId, role));
+      },
+      moveReferenceEdgeInTab: (target, edgeId, direction) => {
+        if (direction !== "up" && direction !== "down") return false;
+        return commitDocumentMutationForTarget(target, moveReferenceEdgeMutation(edgeId, direction));
+      },
+      removeReferenceEdgeInTab: (target, edgeId) => (
+        commitDocumentMutationForTarget(target, removeReferenceEdgeMutation(edgeId))
+      ),
       updateNodeDataInTab: (target, id, patch) => {
         if (documentForTarget(get(), target)?.readOnly !== false) return;
         updateTabNodes(
@@ -3168,6 +3250,22 @@ export const useFlowStore = create<FlowState>()(
         const kind = node.data.kind;
         const spec = NODE_SPECS[kind];
         if (!spec.providerId) return;
+        const promptReferences = promptRunReferenceSnapshotsFromGraph(
+          initialDocument.nodes,
+          initialDocument.edges,
+          id,
+        );
+        const promptAdmission = evaluatePromptRunAdmission(
+          promptRunAdmissionInputFromNode(node.data, promptReferences),
+        );
+        if (!promptAdmission.allowed) {
+          runWithoutHistory(() => updateTabNodes(set, target, (nodes) => nodes.map((candidate) => (
+            candidate.id === id
+              ? { ...candidate, data: { ...candidate.data, error: promptAdmission.reason } as WorkflowNodeData }
+              : candidate
+          ))));
+          return;
+        }
 
         const preparationKey = runPreparationKey(target, id);
         const submissionKey = runSubmissionKey(initialDocument.projectId, id);
@@ -3275,7 +3373,7 @@ export const useFlowStore = create<FlowState>()(
             throw new AmbiguousRunSubmissionError("生成服务已接收请求，但未返回可确认的运行编号");
           }
           if (!response.ok || !payload.runId) {
-            throw new Error(responseErrorMessage(response.status, payload));
+            throw new Error(apiErrorMessage(response.status, payload));
           }
           clearAmbiguousRunRequest(submissionKey);
           knownRunId = payload.runId;

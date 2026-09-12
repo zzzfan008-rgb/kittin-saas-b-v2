@@ -91,10 +91,27 @@ function pipeline(buffer: Buffer, width: number, height: number) {
     .toColourspace("srgb");
 }
 
-async function encodeJpeg(buffer: Buffer, width: number, height: number, quality: number): Promise<EncodedImage> {
+export function uploadNormalizationUsesMozjpeg(
+  value = process.env.UPLOAD_NORMALIZATION_MOZJPEG,
+): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "false" || normalized === "0" || normalized === "off") return false;
+  if (normalized === "true" || normalized === "1" || normalized === "on") return true;
+  throw new ImageValidationError(
+    "UPLOAD_NORMALIZATION_MOZJPEG 必须为 true/false、1/0 或 on/off",
+  );
+}
+
+async function encodeJpeg(
+  buffer: Buffer,
+  width: number,
+  height: number,
+  quality: number,
+  mozjpeg: boolean,
+): Promise<EncodedImage> {
   const result = await pipeline(buffer, width, height)
     .flatten({ background: "#ffffff" })
-    .jpeg({ quality, chromaSubsampling: "4:4:4", mozjpeg: true })
+    .jpeg({ quality, chromaSubsampling: "4:4:4", mozjpeg })
     .toBuffer({ resolveWithObject: true });
   return { buffer: result.data, info: result.info };
 }
@@ -103,21 +120,22 @@ async function encodeOpaqueWithinLimit(
   buffer: Buffer,
   initialWidth: number,
   initialHeight: number,
+  mozjpeg: boolean,
 ): Promise<EncodedImage> {
   let width = initialWidth;
   let height = initialHeight;
   for (;;) {
-    const high = await encodeJpeg(buffer, width, height, UPLOAD_JPEG_QUALITY);
+    const high = await encodeJpeg(buffer, width, height, UPLOAD_JPEG_QUALITY, mozjpeg);
     if (high.buffer.byteLength <= UPLOAD_TARGET_BYTES) return high;
 
-    const low = await encodeJpeg(buffer, width, height, UPLOAD_MIN_JPEG_QUALITY);
+    const low = await encodeJpeg(buffer, width, height, UPLOAD_MIN_JPEG_QUALITY, mozjpeg);
     if (low.buffer.byteLength <= UPLOAD_TARGET_BYTES) {
       let best = low;
       let left = UPLOAD_MIN_JPEG_QUALITY + 1;
       let right = UPLOAD_JPEG_QUALITY - 1;
       while (left <= right) {
         const quality = Math.floor((left + right) / 2);
-        const candidate = await encodeJpeg(buffer, width, height, quality);
+        const candidate = await encodeJpeg(buffer, width, height, quality, mozjpeg);
         if (candidate.buffer.byteLength <= UPLOAD_TARGET_BYTES) {
           best = candidate;
           left = quality + 1;
@@ -170,9 +188,10 @@ export async function normalizeUploadImageDataUrl(dataUrl: unknown): Promise<Nor
       const oriented = orientedDimensions(metadata);
       const target = dimensionsWithinLongEdge(oriented.width, oriented.height);
       const transparent = await hasMeaningfulAlpha(validated.buffer, metadata);
+      const mozjpeg = uploadNormalizationUsesMozjpeg();
       const encoded = transparent
         ? await encodeTransparentWithinLimit(validated.buffer, target.width, target.height)
-        : await encodeOpaqueWithinLimit(validated.buffer, target.width, target.height);
+        : await encodeOpaqueWithinLimit(validated.buffer, target.width, target.height, mozjpeg);
       if (!encoded.info.width || !encoded.info.height) {
         throw new ImageValidationError("标准化后无法读取图片尺寸");
       }

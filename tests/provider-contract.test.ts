@@ -10,11 +10,14 @@ import { config } from "../server/config";
 import { compositeMaskedEdit, validateMaskForSource } from "../server/lib/maskProcessing";
 import { createRateLimitMiddleware } from "../server/lib/rateLimit";
 import { apiyiProviders } from "../server/providers/apiyi";
+import { closeApiyiDispatcher } from "../server/providers/apiyiTransport";
 import { fetchWithRetry, ProviderError } from "../server/providers/base";
 import { createAiDiagnosticsRouter } from "../server/routes/aiDiagnostics";
 import {
   IMAGE_MODEL_IDS,
+  REVIEWED_MODEL_CATALOG_BASELINE,
   getImageModelContract,
+  hasReviewedModelCatalogBaseline,
   imageModelOptionsError,
 } from "../src/types/imageModels";
 
@@ -116,8 +119,9 @@ async function main(): Promise<void> {
   const mask = await halfEditableMask(4, 2);
 
   try {
-    await test("本地知识库与 Provider 注册表严格覆盖首轮六个模型", () => {
+    await test("本地知识库与 Provider 注册表严格覆盖当前五个模型", () => {
       assert.deepEqual(Object.keys(apiyiProviders).sort(), [...IMAGE_MODEL_IDS].sort());
+      assert.equal(Object.hasOwn(apiyiProviders, "grok-imagine-image"), false, "退役模型不得保留 Provider 入口");
       for (const modelId of IMAGE_MODEL_IDS) {
         assert.equal(apiyiProviders[modelId].id, modelId);
         assert.equal(getImageModelContract(modelId).id, modelId);
@@ -126,9 +130,39 @@ async function main(): Promise<void> {
       assert.equal(getImageModelContract("gpt-image-2").generation, null);
     });
 
+    await test("五模型契约哈希绑定同一份 reviewed model catalog baseline", () => {
+      const expectedBaseline = {
+        reviewedExportHashScope: sources.modelCatalog.reviewedExportHashScope,
+        reviewedExportSha256: sources.modelCatalog.reviewedExportSha256,
+        reviewedRawExportSha256: sources.modelCatalog.reviewedRawExportSha256,
+        expectedGatewayModelIds: sources.modelCatalog.expectedGatewayModelIds,
+      };
+      assert.deepEqual(REVIEWED_MODEL_CATALOG_BASELINE, expectedBaseline);
+      assert.deepEqual(expectedBaseline.expectedGatewayModelIds, IMAGE_MODEL_IDS);
+      assert.equal(expectedBaseline.reviewedExportHashScope, "sha256-canonical-model-id-set-v1");
+      assert.equal(
+        expectedBaseline.reviewedExportSha256,
+        "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
+      );
+      assert.equal(
+        expectedBaseline.reviewedRawExportSha256,
+        "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+      );
+      assert.equal(sources.modelCatalog.reviewedExportCapturedAt, "2026-09-03T13:22:48.000Z");
+      assert.equal(hasReviewedModelCatalogBaseline(), true, "经人工批准的完整 /v1/models 指纹必须进入运行时基线");
+      for (const modelId of IMAGE_MODEL_IDS) {
+        assert.deepEqual(getImageModelContract(modelId).reviewedModelCatalogBaseline, expectedBaseline);
+        assert.match(getImageModelContract(modelId).contractHash, /^sha256:[a-f0-9]{64}$/);
+      }
+    });
+
     await test("API易来源清单指向存在的本地整理契约", () => {
       assert.equal(sources.sourceFormat, "official-markdown");
-      assert.equal(sources.localKnowledgeBase.rawSourcePagesStored, false);
+      assert.equal(sources.localKnowledgeBase.rawSourcePagesStored, true);
+      assert.equal(sources.localKnowledgeBase.rawContentTrust, "untrusted_document_content");
+      assert.ok(
+        fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", sources.localKnowledgeBase.rawSnapshotPointer)).isFile(),
+      );
       for (const document of sources.localKnowledgeBase.documents) {
         assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", document)).isFile(), document);
       }
@@ -175,6 +209,38 @@ async function main(): Promise<void> {
       }
     });
 
+    await test("Provider 最终防线拒绝结构化参考图的缺失或 true 角色确认", async () => {
+      let calls = 0;
+      const restoreFetch = installFetchMock(() => {
+        calls += 1;
+        return Response.json(pngPayload(white));
+      });
+      try {
+        for (const pending of [undefined, true] as const) {
+          await assert.rejects(
+            () => apiyiProviders["gpt-image-2-vip"].edit({
+              prompt: "不得发出",
+              operationMode: "edit",
+              references: [{
+                dataUrl: white,
+                role: "garment_full",
+                order: 0,
+                assetSha256: "a".repeat(64),
+                ...(pending === undefined ? {} : { roleNeedsConfirmation: pending }),
+              }],
+              modelOptions: { size: "1280x1280" },
+            }),
+            (error: unknown) => error instanceof ProviderError
+              && error.category === "invalid_request"
+              && /roleNeedsConfirmation is not false/.test(error.message),
+          );
+        }
+        assert.equal(calls, 0, "角色证据未确认时不得接触网络出口");
+      } finally {
+        restoreFetch();
+      }
+    });
+
     await test("gpt-image-2-vip 文生图与多参考图编辑使用文档字段", async () => {
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
@@ -184,6 +250,7 @@ async function main(): Promise<void> {
       try {
         const generated = await apiyiProviders["gpt-image-2-vip"].generate({
           prompt: "礼服",
+          operationMode: "generate",
           modelOptions: { size: "1280x1280" },
         });
         assert.deepEqual(generated.images, [white]);
@@ -194,9 +261,12 @@ async function main(): Promise<void> {
           prompt: "礼服",
           size: "1280x1280",
         });
+        const generateDispatcher = (captures[0].init as RequestInit & { dispatcher?: unknown })?.dispatcher;
+        assert.ok(generateDispatcher, "API易请求必须显式携带专属 Undici dispatcher");
 
         await apiyiProviders["gpt-image-2-vip"].edit({
           prompt: "融合参考图",
+          operationMode: "edit",
           referenceImages: [white, blue],
           modelOptions: { size: "2048x2048" },
         });
@@ -210,6 +280,11 @@ async function main(): Promise<void> {
         assert.equal(form.get("quality"), null);
         assert.equal(form.get("n"), null);
         assert.equal(form.get("aspect_ratio"), null);
+        assert.equal(
+          (captures[1].init as RequestInit & { dispatcher?: unknown })?.dispatcher,
+          generateDispatcher,
+          "同一进程内 API易请求必须复用连接池",
+        );
       } finally {
         restoreFetch();
       }
@@ -225,15 +300,21 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].generate({ prompt: "禁止文生图" }),
-          /只能由局部修改节点调用|仅用于带 PNG 蒙版的局部修改|不支持文生图/,
+          () => apiyiProviders["gpt-image-2"].generate({
+            prompt: "禁止文生图",
+            operationMode: "generate",
+          }),
+          (error: unknown) => error instanceof ProviderError &&
+            error.category === "invalid_request" &&
+            error.message === "gpt-image-2 首版仅支持 mask-edit 模式",
         );
         assert.equal(calls, 0);
 
         const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].edit({
-            prompt: "局部改红", referenceImages: [blue], mask: jpegMask, modelOptions: {},
+            prompt: "局部改红", operationMode: "mask-edit",
+            referenceImages: [blue], mask: jpegMask, modelOptions: {},
           }),
           /蒙版必须是 PNG/,
         );
@@ -242,7 +323,8 @@ async function main(): Promise<void> {
         const opaqueMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 });
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].edit({
-            prompt: "局部改红", referenceImages: [blue], mask: opaqueMask, modelOptions: {},
+            prompt: "局部改红", operationMode: "mask-edit",
+            referenceImages: [blue], mask: opaqueMask, modelOptions: {},
           }),
           /Alpha 通道/,
         );
@@ -251,7 +333,8 @@ async function main(): Promise<void> {
         const wrongSizeMask = await halfEditableMask(2, 2);
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].edit({
-            prompt: "局部改红", referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
+            prompt: "局部改红", operationMode: "mask-edit",
+            referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
           }),
           /蒙版尺寸必须与原图完全一致/,
         );
@@ -266,14 +349,15 @@ async function main(): Promise<void> {
         );
         await assert.rejects(
           () => apiyiProviders["gpt-image-2"].edit({
-            prompt: "局部改红", referenceImages: [blue], mask: oversizedMask, modelOptions: {},
+            prompt: "局部改红", operationMode: "mask-edit",
+            referenceImages: [blue], mask: oversizedMask, modelOptions: {},
           }),
           /image too large/,
         );
         assert.equal(calls, 0);
 
         await apiyiProviders["gpt-image-2"].edit({
-          prompt: "局部改红", referenceImages: [blue], mask,
+          prompt: "局部改红", operationMode: "mask-edit", referenceImages: [blue], mask,
           modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
@@ -320,7 +404,7 @@ async function main(): Promise<void> {
       try {
         const options = { aspectRatio: "3:4", imageSize: "1K" };
         const generated = await apiyiProviders["gemini-3.1-flash-image"].generate({
-          prompt: "时装大片", modelOptions: options,
+          prompt: "时装大片", operationMode: "generate", modelOptions: options,
         });
         assert.deepEqual(generated.images, [white]);
         assert.equal(
@@ -335,7 +419,7 @@ async function main(): Promise<void> {
 
         const webp = await imageDataUrl(4, 2, { r: 90, g: 120, b: 150 }, "webp");
         await apiyiProviders["gemini-3.1-flash-image"].edit({
-          prompt: "改图", referenceImages: [webp], modelOptions: options,
+          prompt: "改图", operationMode: "edit", referenceImages: [webp], modelOptions: options,
         });
         assert.equal(captures[1].url, captures[0].url);
         const editBody = jsonBody(captures[1].init) as { contents: Array<{ parts: Array<Record<string, unknown>> }> };
@@ -356,13 +440,15 @@ async function main(): Promise<void> {
       });
       try {
         const modelOptions = { width: 1024, height: 768, outputFormat: "png" as const };
-        const generated = await apiyiProviders["flux-2-pro"].generate({ prompt: "生成", modelOptions });
+        const generated = await apiyiProviders["flux-2-pro"].generate({
+          prompt: "生成", operationMode: "generate", modelOptions,
+        });
         assert.deepEqual(generated.images, [resultUrl]);
         assert.deepEqual(jsonBody(captures[0].init), {
           model: "flux-2-pro", prompt: "生成", width: 1024, height: 768, output_format: "png",
         });
         await apiyiProviders["flux-2-pro"].edit({
-          prompt: "融合", referenceImages: [white, blue], modelOptions,
+          prompt: "融合", operationMode: "edit", referenceImages: [white, blue], modelOptions,
         });
         const editedBody = jsonBody(captures[1].init);
         const firstInput = String(editedBody.input_image);
@@ -384,7 +470,7 @@ async function main(): Promise<void> {
 
         const largeReference = await imageDataUrl(3000, 2000, { r: 120, g: 80, b: 40 }, "jpeg");
         await apiyiProviders["flux-2-pro"].edit({
-          prompt: "缩放输入", referenceImages: [largeReference], modelOptions,
+          prompt: "缩放输入", operationMode: "edit", referenceImages: [largeReference], modelOptions,
         });
         const adapted = String(jsonBody(captures[2].init).input_image);
         const adaptedMetadata = await sharp(Buffer.from(adapted.split(",")[1], "base64")).metadata();
@@ -411,10 +497,11 @@ async function main(): Promise<void> {
       });
       try {
         const generated = await apiyiProviders["seedream-5-0-260128"].generate({
-          prompt: "生成", batchSize: 8, modelOptions: { size: "2K" },
+          prompt: "生成", operationMode: "generate", batchSize: 8, modelOptions: { size: "2K" },
         });
         const edited = await apiyiProviders["seedream-5-0-260128"].edit({
-          prompt: "融合", referenceImages: [white, blue], modelOptions: { size: "3K" },
+          prompt: "融合", operationMode: "edit",
+          referenceImages: [white, blue], modelOptions: { size: "3K" },
         });
         assert.deepEqual(generated.providerOutputSizes, ["2048x2048"]);
         assert.deepEqual(edited.providerOutputSizes, ["3072x3072"]);
@@ -432,60 +519,9 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("Grok 文生图保留 n，编辑端点不发送无效尺寸参数并限制 4 张参考图", async () => {
-      const captures: Array<{ url: string; init?: RequestInit }> = [];
-      const restoreFetch = installFetchMock((input, init) => {
-        captures.push({ url: String(input), init });
-        const count = captures.length === 1 ? 6 : 1;
-        return Response.json({ data: Array.from({ length: count }, () => ({ b64_json: white.split(",")[1] })) });
-      });
-      try {
-        const generated = await apiyiProviders["grok-imagine-image"].generate({
-          prompt: "生成", batchSize: 6, modelOptions: { aspectRatio: "16:9", resolution: "2k" },
-        });
-        assert.equal(generated.images.length, 6);
-        assert.deepEqual(jsonBody(captures[0].init), {
-          model: "grok-imagine-image", prompt: "生成", aspect_ratio: "16:9",
-          resolution: "2k", n: 6, response_format: "b64_json",
-        });
-
-        await apiyiProviders["grok-imagine-image"].edit({
-          prompt: "单图编辑", referenceImages: [white],
-          modelOptions: { aspectRatio: "1:1", resolution: "1k" },
-        });
-        const singleForm = captures[1].init?.body as FormData;
-        assert.equal(singleForm.getAll("image").length, 1);
-        assert.equal(singleForm.getAll("image[]").length, 0);
-
-        await apiyiProviders["grok-imagine-image"].edit({
-          prompt: "编辑", referenceImages: [white, blue],
-          modelOptions: { aspectRatio: "1:1", resolution: "1k" },
-        });
-        const form = captures[2].init?.body as FormData;
-        assert.equal(captures[2].url, "https://gateway.example/v1/images/edits");
-        assert.equal(form.getAll("image[]").length, 2);
-        assert.equal(form.getAll("image").length, 0);
-        assert.equal(form.get("resolution"), null);
-        assert.equal(form.get("aspect_ratio"), null);
-        assert.equal(form.get("n"), null);
-
-        const callsBeforeReject = captures.length;
-        await assert.rejects(
-          () => apiyiProviders["grok-imagine-image"].edit({
-            prompt: "超量", referenceImages: [white, white, white, white, white],
-            modelOptions: { aspectRatio: "1:1", resolution: "1k" },
-          }),
-          /最多支持 4 张参考图/,
-        );
-        assert.equal(captures.length, callsBeforeReject);
-      } finally {
-        restoreFetch();
-      }
-    });
-
     await test("非法模型原生参数在付费调用前拒绝", async () => {
       assert.match(imageModelOptionsError("flux-2-pro", { width: 513, height: 512, outputFormat: "png" }) ?? "", /unsupported/);
-      assert.match(imageModelOptionsError("grok-imagine-image", { aspectRatio: "1:1", resolution: "4k" }) ?? "", /unsupported/);
+      assert.match(imageModelOptionsError("seedream-5-0-260128", { size: "4K" }) ?? "", /unsupported/);
       let calls = 0;
       const restoreFetch = installFetchMock(() => {
         calls += 1;
@@ -495,6 +531,7 @@ async function main(): Promise<void> {
         await assert.rejects(
           () => apiyiProviders["flux-2-pro"].generate({
             prompt: "非法尺寸",
+            operationMode: "generate",
             modelOptions: { width: 513, height: 512, outputFormat: "png" },
           }),
           /模型参数无效/,
@@ -514,13 +551,57 @@ async function main(): Promise<void> {
       try {
         await assert.rejects(
           () => apiyiProviders["gpt-image-2-vip"].generate({
-            prompt: "截断", modelOptions: { size: "1280x1280" },
+            prompt: "截断", operationMode: "generate", modelOptions: { size: "1280x1280" },
           }),
           (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
         );
         assert.equal(calls, 1);
       } finally {
         restoreFetch();
+      }
+    });
+
+    await test("HTTP 200 完整对象已到齐但无 EOF 时安全收尾，仍只发送一次", async () => {
+      const restoreGrace = setEnv("APIYI_TAIL_STALL_GRACE_MS", "1000");
+      let calls = 0;
+      let cancelCount = 0;
+      let payload: Record<string, unknown> = {
+        ...pngPayload(white),
+        padding: "x".repeat(1_100),
+      };
+      const originalWarn = console.warn;
+      const recoveryEvents: unknown[] = [];
+      console.warn = (...args: unknown[]) => { recoveryEvents.push(args); };
+      const restoreFetch = installFetchMock(() => {
+        calls += 1;
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(payload)));
+          },
+          cancel() { cancelCount += 1; },
+        });
+        return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
+      });
+      const request = () => apiyiProviders["gpt-image-2-vip"].generate({
+        prompt: "尾部恢复", operationMode: "generate", modelOptions: { size: "1280x1280" },
+      });
+      try {
+        assert.deepEqual((await request()).images, [white]);
+        assert.equal(calls, 1);
+        assert.equal(cancelCount, 1);
+        assert.equal(recoveryEvents.length, 1);
+
+        payload = { data: [{ b64_json: "not-canonical-base64-response" }], padding: "x".repeat(1_100) };
+        await assert.rejects(
+          request,
+          (error: unknown) => error instanceof ProviderError && error.category === "invalid_response",
+        );
+        assert.equal(calls, 2, "尾部恢复后的坏图片也不得触发第二次请求");
+        assert.equal(cancelCount, 2);
+      } finally {
+        restoreFetch();
+        console.warn = originalWarn;
+        restoreGrace();
       }
     });
 
@@ -534,7 +615,7 @@ async function main(): Promise<void> {
         return Response.json(payload);
       });
       const vipRequest = () => apiyiProviders["gpt-image-2-vip"].generate({
-        prompt: "响应校验", modelOptions: { size: "1280x1280" },
+        prompt: "响应校验", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
         const scenarios: Array<{ payload: unknown; invoke: () => Promise<unknown> }> = [
@@ -547,14 +628,15 @@ async function main(): Promise<void> {
               }] } }],
             },
             invoke: () => apiyiProviders["gemini-3.1-flash-image"].generate({
-              prompt: "响应校验", modelOptions: { aspectRatio: "1:1", imageSize: "1K" },
+              prompt: "响应校验", operationMode: "generate",
+              modelOptions: { aspectRatio: "1:1", imageSize: "1K" },
             }),
           },
           { payload: { data: [{ url: "/relative-result.png?token=secret" }] }, invoke: vipRequest },
           {
             payload: pngPayload(white),
             invoke: () => apiyiProviders["seedream-5-0-260128"].generate({
-              prompt: "响应校验", modelOptions: { size: "2K" },
+              prompt: "响应校验", operationMode: "generate", modelOptions: { size: "2K" },
             }),
           },
         ];
@@ -631,7 +713,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("AI 诊断列出六个 API易模型且 gpt-image-2 只开放改图探针", async () => {
+    await test("AI 诊断列出五个 API易模型且 gpt-image-2 只开放改图探针", async () => {
       const app = express();
       app.use(express.json());
       app.use((req, _res, next) => {
@@ -674,6 +756,7 @@ async function main(): Promise<void> {
       }
     });
   } finally {
+    await closeApiyiDispatcher();
     restoreKey();
     restoreBase();
   }

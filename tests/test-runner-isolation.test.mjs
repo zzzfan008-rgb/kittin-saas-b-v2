@@ -15,7 +15,11 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { acquireTestLock, createComposeProjectName } from "../scripts/test-with-postgres.mjs";
+import {
+  acquireTestLock,
+  createComposeProjectName,
+  resolveRequestedTestFiles,
+} from "../scripts/test-with-postgres.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const runnerPath = join(repoRoot, "scripts/test-with-postgres.mjs");
@@ -52,6 +56,22 @@ const repeat = createComposeProjectName({ cwd: "/tmp/worktree-a" });
 assert.match(first, /^garment-canvas-test-[a-f0-9]{10}$/);
 assert.equal(first, repeat, "the same worktree must reuse its Compose project after a crash");
 assert.notEqual(first, second, "different worktrees must use different Compose projects");
+
+assert.deepEqual(
+  resolveRequestedTestFiles(["tests/authorization.test.ts"], { repoRoot }),
+  [realpathSync(join(repoRoot, "tests/authorization.test.ts"))],
+  "the runner must resolve an explicit focused test inside the repository test directory",
+);
+assert.throws(
+  () => resolveRequestedTestFiles(["package.json"], { repoRoot }),
+  /must be \.test\.ts or \.test\.mjs files/,
+  "the runner must reject non-test inputs",
+);
+assert.throws(
+  () => resolveRequestedTestFiles(["../outside.test.ts"], { repoRoot }),
+  /ENOENT|must stay inside/,
+  "the runner must reject paths outside the repository test directory",
+);
 
 const defaultComposeConfig = readComposeConfig();
 assert.equal(

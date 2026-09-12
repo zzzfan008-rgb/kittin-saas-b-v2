@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -6,10 +7,12 @@ import os from "node:os";
 import path from "node:path";
 import express, { type Request, type Response } from "express";
 import { ProviderError } from "../server/providers/base";
-import type { AuthenticatedRequest } from "../server/lib/auth";
+import type { AuthenticatedRequest, AuthUser } from "../server/lib/auth";
 import type { GenerationRecordContext } from "../server/lib/generationRecords";
+import type { EvaluationRunPolicy } from "../server/lib/evaluationRunPolicy";
 import type { ProviderResolver } from "../server/engine/runner";
 import type { AIProvider, ExecutionPlan, ImageGenRequest, ImageGenResult, NodeExecution } from "../src/types/workflow";
+import type { EvaluationShutdownRule } from "../src/types/promptEvaluation";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-run-queue-"));
@@ -17,20 +20,89 @@ process.env.DATA_DIR = temp;
 process.env.SQLITE_IMPORT_FILE = "missing.db";
 process.env.INITIAL_ADMIN_ACCOUNT_ID = "queue-admin";
 process.env.INITIAL_ADMIN_PASSWORD = "Initial1234";
+process.env.GARMENT_CANVAS_CODE_SHA = "a".repeat(40);
 
 await resetPostgresTestDatabase();
 const database = await import("../server/lib/database");
 const queue = await import("../server/engine/runQueue");
+const authorizationLedger = await import("../server/lib/evaluationAuthorizationLedger");
+const evaluationCampaign = await import("../server/lib/evaluationCampaign");
+const evaluationEvidenceStore = await import("../server/lib/evaluationEvidenceStore");
+const evaluationEvidence = await import("../server/lib/evaluationEvidence");
+const evaluationRunPolicy = await import("../server/lib/evaluationRunPolicy");
 const fileStore = await import("../server/lib/fileStore");
+const { executeStep } = await import("../server/engine/runner");
 const { generateRouter } = await import("../server/routes/generate");
+const { historyRouter } = await import("../server/routes/history");
 const { streamDurableRunEvents } = await import("../server/routes/runPlan");
+const {
+  buildGarmentPrompt,
+  requireGarmentPromptVariant,
+} = await import("../src/lib/garmentPromptPresets");
+const {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} = await import("../src/types/modelParameterProfiles");
+const { PROMPT_RUNTIME_SHUTDOWN_RULES } = await import("../src/lib/promptRuntimeShutdown");
+const {
+  promotePromptVariantForTest,
+  withdrawPromptVariantReleasesForTest,
+} = await import("./promptReleaseTestSupport");
 await database.initializeDatabase();
+
+const queueVariant = requireGarmentPromptVariant({
+  familyId: "fashion-lookbook",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "sketch-to-render",
+  mode: "generate",
+});
+// Queue tests exercise already-reviewed production jobs unless a test explicitly
+// changes this status to prove execution-time fail-closed behaviour.
+promotePromptVariantForTest(queueVariant);
+const queueProfile = getModelParameterProfile(queueVariant.parameterProfileId)!;
+const queueParameters = materializeModelParameterProfile(queueProfile);
+
+const runtimeEditVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "ai-modify",
+  mode: "edit",
+});
+promotePromptVariantForTest(runtimeEditVariant);
+const runtimeEditProfile = getModelParameterProfile(runtimeEditVariant.parameterProfileId)!;
+const runtimeEditParameters = materializeModelParameterProfile(runtimeEditProfile);
+
+const maskVariant = requireGarmentPromptVariant({
+  familyId: "mask-local-edit",
+  modelId: "gpt-image-2",
+  nodeKind: "mask-redraw",
+  mode: "mask-edit",
+});
+// This isolated queue/route fixture needs an accepted run to inspect persistence.
+// Model reviewed evidence only inside this process; production catalog remains fail-closed.
+promotePromptVariantForTest(maskVariant);
+const maskProfile = getModelParameterProfile(maskVariant.parameterProfileId)!;
+const maskParameters = materializeModelParameterProfile(maskProfile);
 
 const owner = await database.queryOne<{ id: string }>("SELECT id FROM users WHERE account_id = 'queue-admin'");
 assert.ok(owner);
+const adminActor: AuthUser = {
+  id: owner.id,
+  accountId: "queue-admin",
+  displayName: "管理员",
+  role: "admin",
+  mustChangePassword: true,
+};
 
 const PNG_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const OPAQUE_PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
+const TEST_EVALUATION_CODE_IDENTITY = {
+  codeSha: "a".repeat(40),
+  source: "git-head" as const,
+  dirty: false,
+};
 let sequence = 0;
 let clock = Date.now() + 10_000;
 let passed = 0;
@@ -46,17 +118,74 @@ function tick(amount = 1_000): number {
   return clock;
 }
 
+function boundQueueParams(
+  intent: string,
+  overrides: Readonly<Record<string, unknown>> = {},
+): NodeExecution["params"] {
+  return {
+    prompt: buildGarmentPrompt(queueVariant.variantId, intent),
+    promptVariantId: queueVariant.variantId,
+    promptFamilyId: queueVariant.familyId,
+    parameterProfileId: queueVariant.parameterProfileId,
+    contractHash: queueVariant.contractHash,
+    evaluationVersion: queueVariant.evaluationVersion,
+    postprocessVersion: queueProfile.postprocess.version,
+    operationMode: queueVariant.mode,
+    modelId: queueVariant.modelId,
+    modelOptions: queueParameters.modelOptions,
+    aspectRatio: queueParameters.aspectRatio,
+    batchSize: queueParameters.batchSize,
+    ...overrides,
+  };
+}
+
 function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecution {
   return {
     nodeId,
-    kind: "print-extract",
-    inputImages: upstream ? [] : [PNG_DATA_URL],
+    kind: "sketch-to-render",
+    inputImages: [],
     upstream,
+    params: boundQueueParams("生成服装效果图"),
+  };
+}
+
+function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
+  return {
+    nodeId,
+    kind: "ai-modify",
+    inputImages: [PNG_DATA_URL],
+    inputReferences: [{
+      imageRef: PNG_DATA_URL,
+      role: "garment_full",
+      order: 0,
+      sourceNodeId: `${nodeId}-source`,
+      roleNeedsConfirmation: false,
+    }],
     params: {
-      prompt: "提取印花",
-      modelId: "gpt-image-2-vip",
-      modelOptions: { size: "1280x1280" },
+      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
+      promptVariantId: runtimeEditVariant.variantId,
+      promptFamilyId: runtimeEditVariant.familyId,
+      parameterProfileId: runtimeEditVariant.parameterProfileId,
+      contractHash: runtimeEditVariant.contractHash,
+      evaluationVersion: runtimeEditVariant.evaluationVersion,
+      postprocessVersion: runtimeEditProfile.postprocess.version,
+      operationMode: runtimeEditVariant.mode,
+      modelId: runtimeEditVariant.modelId,
+      modelOptions: runtimeEditParameters.modelOptions,
+      aspectRatio: runtimeEditParameters.aspectRatio,
+      batchSize: runtimeEditParameters.batchSize,
     },
+  };
+}
+
+function runtimeEditContext(nodeId: string): GenerationRecordContext {
+  return {
+    userId: owner.id,
+    nodeId,
+    nodeLabel: nodeId,
+    kind: "ai-modify",
+    prompt: "保持服装结构并优化商业棚拍光线",
+    requestedCount: 1,
   };
 }
 
@@ -65,10 +194,116 @@ function context(nodeId: string): GenerationRecordContext {
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "print-extract",
-    prompt: "提取印花",
+    kind: "sketch-to-render",
+    prompt: "生成服装效果图",
     requestedCount: 1,
   };
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === undefined || value === null || typeof value !== "object") {
+    return JSON.stringify(value ?? null);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, nested]) => nested !== undefined)
+    .sort(([left], [right]) => left.localeCompare(right));
+  return `{${entries.map(([key, nested]) => `${JSON.stringify(key)}:${canonicalJson(nested)}`).join(",")}}`;
+}
+
+function canonicalSha256(value: unknown): string {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+async function authorizeEvaluationPlan(
+  plan: ExecutionPlan,
+  ids: { caseId: string; sampleId: string; authorizationId: string },
+  options: { expiresAt?: number; priceMinorPerProviderRequest?: number; budgetLimitMinor?: number } = {},
+): Promise<EvaluationRunPolicy> {
+  const policy: EvaluationRunPolicy = {
+    ...ids,
+    campaignId: `campaign-${ids.authorizationId}`,
+    slotId: `slot-${ids.authorizationId}`,
+    retryPolicy: "no-retry",
+  };
+  const persistedPlan = evaluationRunPolicy.attachEvaluationRunPolicy(plan, policy);
+  const providerStep = persistedPlan.steps.find((candidate) => candidate.params.evaluationPolicy !== undefined);
+  assert.ok(providerStep, "evaluation plan must contain one Provider step");
+  const capture = new Error("capture sealed evaluation request");
+  let capturedRequest: ImageGenRequest | undefined;
+  const captureProvider: AIProvider = {
+    id: providerStep.params.modelId as string,
+    async generate() { throw new Error("Provider must not be called while capturing the sealed request"); },
+    async edit() { throw new Error("Provider must not be called while capturing the sealed request"); },
+  };
+  try {
+    await executeStep(providerStep, providerStep.inputImages, () => captureProvider, {
+      referenceSources: providerStep.inputReferences ?? [],
+      beforeProviderCall: async (_providerRequest, request) => {
+        capturedRequest = request;
+        throw capture;
+      },
+    });
+  } catch (error) {
+    if (error !== capture) throw error;
+  }
+  assert.ok(capturedRequest, "evaluation plan did not materialize a Provider request");
+  const runtime = evaluationEvidence.buildEvaluationCaseSnapshotFromRuntime({
+    plan: persistedPlan,
+    step: providerStep,
+    request: capturedRequest,
+    policy,
+    codeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    capturedAt: "2026-09-08T00:00:00.000Z",
+  });
+  const target = authorizationLedger.evaluationAuthorizationTargetFromPlan(persistedPlan);
+  assert.equal(runtime.authorizationUnitKey, target.evaluationUnitKey);
+  const priceMinorPerProviderRequest = options.priceMinorPerProviderRequest ?? 1;
+  const budgetLimitMinor = options.budgetLimitMinor
+    ?? target.maximumProviderRequests * priceMinorPerProviderRequest;
+  await database.transaction(async (client) => {
+    await evaluationCampaign.createSealedEvaluationCampaign(client, adminActor, {
+      campaignId: policy.campaignId,
+      ownerId: owner.id,
+      stage: "internal-experiment",
+      modelId: target.modelId,
+      authorizationUnitKey: target.evaluationUnitKey,
+      codeSha: TEST_EVALUATION_CODE_IDENTITY.codeSha,
+      maxProviderRequests: target.maximumProviderRequests,
+      budgetLimitMinor,
+      budgetCurrency: "CNY",
+      slots: [{
+        slotId: policy.slotId,
+        caseId: policy.caseId,
+        sampleId: policy.sampleId,
+        resolvedPromptSha256: runtime.snapshot.resolvedPromptSha256,
+        nativeParametersSha256: canonicalSha256(runtime.snapshot.nativeParameters),
+        referenceInputsSha256: canonicalSha256(runtime.snapshot.references),
+        requestedImageCount: runtime.snapshot.requestedImageCount,
+        maxProviderRequests: target.maximumProviderRequests,
+        priceMinorPerProviderRequest,
+        budgetLimitMinor,
+      }],
+    });
+    await authorizationLedger.registerEvaluationRunAuthorization(client, adminActor, {
+      authorizationId: policy.authorizationId,
+      ownerId: owner.id,
+      campaignId: policy.campaignId,
+      slotId: policy.slotId,
+      scope: {
+        type: "evaluation-unit",
+        modelId: target.modelId,
+        evaluationUnitKey: target.evaluationUnitKey,
+      },
+      maxProviderRequests: target.maximumProviderRequests,
+      priceMinorPerProviderRequest,
+      budgetLimitMinor,
+      budgetCurrency: "CNY",
+      expiresAt: options.expiresAt ?? Date.now() + 60 * 60 * 1_000,
+      reason: "run-queue 零费用授权账本回归测试",
+    });
+  });
+  return policy;
 }
 
 async function enqueueSingle(prefix: string): Promise<string> {
@@ -133,11 +368,27 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
   assert.deepEqual(await runRow(runId), {
     status: "succeeded", error: null, provider_requests: 1, successful_count: 1,
   });
-  const output = await database.queryOne<{ image: string; provider_output_size: string | null }>(
-    "SELECT image, provider_output_size FROM generation_outputs WHERE run_id = $1 AND status = 'success'", [runId],
+  const output = await database.queryOne<{
+    image: string; provider_image: string | null; provider_output_size: string | null;
+  }>(
+    `SELECT image, provider_image, provider_output_size
+     FROM generation_outputs WHERE run_id = $1 AND status = 'success'`, [runId],
   );
   assert.match(output?.image ?? "", /^\/api\/files\//);
+  assert.match(output?.provider_image ?? "", /^\/api\/files\//);
+  assert.notEqual(output?.provider_image, output?.image, "Provider 原图与业务成品必须使用独立证据地址");
   assert.equal(output?.provider_output_size, "2048x2048");
+  const evidenceFiles = await database.query<{ id: string; source_type: string }>(`
+    SELECT id, source_type FROM files WHERE run_id = $1 ORDER BY source_type
+  `, [runId]);
+  assert.deepEqual(evidenceFiles, [
+    { id: path.basename(output!.image), source_type: "generated" },
+    { id: path.basename(output!.provider_image!), source_type: "provider-original" },
+  ]);
+  const stepEvidence = await database.queryOne<{ provider_images_json: string }>(`
+    SELECT provider_images_json FROM generation_run_steps WHERE run_id = $1
+  `, [runId]);
+  assert.deepEqual(JSON.parse(stepEvidence?.provider_images_json ?? "[]"), [output?.provider_image]);
 
   const allEvents = await queue.readDurableRunEvents(runId, owner.id, 0);
   assert.ok(allEvents && allEvents.length >= 4);
@@ -145,6 +396,996 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
   const cursor = allEvents[1].seq ?? 0;
   const replay = await queue.readDurableRunEvents(runId, owner.id, cursor);
   assert.deepEqual(replay?.map((event) => event.seq), allEvents.slice(2).map((event) => event.seq));
+});
+
+await test("入队后发布状态降级时 Worker 二次准入且 Provider 零调用", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const runId = await enqueueSingle("worker-release-drift");
+  const restoreRelease = withdrawPromptVariantReleasesForTest(queueVariant.variantId);
+  try {
+    assert.equal(await queue.processNextGenerationJob("worker-release-drift", {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+  } finally {
+    restoreRelease();
+  }
+  assert.equal(fake.calls(), 0, "执行时发布已降级时不得触发 Provider");
+  const blocked = await runRow(runId);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.equal(blocked?.successful_count, 0);
+  assert.match(blocked?.error ?? "", /执行前提示词准入阻断/);
+});
+
+await test("Worker 对持久化快照的角色确认三态失败关闭", async () => {
+  for (const confirmation of [undefined, true, false] as const) {
+    const suffix = confirmation === undefined ? "missing" : String(confirmation);
+    const nodeId = `worker-reference-confirmation-${suffix}-${++sequence}`;
+    const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+    const providerStep: NodeExecution = {
+      nodeId,
+      kind: "ai-modify",
+      inputImages: [PNG_DATA_URL],
+      inputReferences: [{
+        imageRef: PNG_DATA_URL,
+        role: "garment_full",
+        order: 0,
+        sourceNodeId: `source-${sequence}`,
+        ...(confirmation === undefined ? {} : { roleNeedsConfirmation: confirmation }),
+      }],
+      params: {
+        prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
+        promptVariantId: runtimeEditVariant.variantId,
+        promptFamilyId: runtimeEditVariant.familyId,
+        parameterProfileId: runtimeEditVariant.parameterProfileId,
+        contractHash: runtimeEditVariant.contractHash,
+        evaluationVersion: runtimeEditVariant.evaluationVersion,
+        postprocessVersion: runtimeEditProfile.postprocess.version,
+        operationMode: runtimeEditVariant.mode,
+        modelId: runtimeEditVariant.modelId,
+        modelOptions: runtimeEditParameters.modelOptions,
+        aspectRatio: runtimeEditParameters.aspectRatio,
+        batchSize: runtimeEditParameters.batchSize,
+      },
+    };
+    const run = await queue.enqueueGenerationRun(
+      { steps: [providerStep] },
+      owner.id,
+      {
+        userId: owner.id,
+        nodeId,
+        nodeLabel: nodeId,
+        kind: "ai-modify",
+        prompt: "保持服装结构并优化商业棚拍光线",
+        requestedCount: 1,
+      },
+    );
+
+    assert.equal(await queue.processNextGenerationJob(`worker-reference-confirmation-${suffix}`, {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    const result = await runRow(run.id);
+    if (confirmation === false) {
+      assert.equal(fake.calls(), 1, "显式 false 的普通 ai-modify 快照应恰好调用一次 Provider");
+      assert.equal(result?.status, "succeeded");
+      assert.equal(result?.provider_requests, 1);
+      assert.equal(result?.successful_count, 1);
+      const persisted = await database.queryOne<{ reference_inputs_json: string }>(
+        "SELECT reference_inputs_json FROM generation_run_steps WHERE run_id = $1",
+        [run.id],
+      );
+      assert.deepEqual(JSON.parse(persisted?.reference_inputs_json ?? "[]"), [{
+        role: "garment_full",
+        order: 0,
+        assetSha256: createHash("sha256")
+          .update(Buffer.from(PNG_DATA_URL.split(",")[1], "base64"))
+          .digest("hex"),
+        sourceNodeId: `source-${sequence}`,
+        roleNeedsConfirmation: false,
+      }], "成功路径必须持久化实际图片字节哈希与原始 role/order/source");
+    } else {
+      assert.equal(fake.calls(), 0, `${suffix} 确认位的持久化快照不得到达 Provider`);
+      assert.equal(result?.status, "failed");
+      assert.equal(result?.provider_requests, 0);
+      assert.equal(result?.successful_count, 0);
+      assert.match(result?.error ?? "", /参考图角色尚未全部确认/);
+    }
+  }
+});
+
+await test("Worker 不修复损坏的静态 reference order/imageRef/数量快照且 Provider 零调用", async () => {
+  const corruptions: Array<{
+    name: string;
+    mutate: (queuedStep: NodeExecution) => void;
+    expected: RegExp;
+  }> = [
+    {
+      name: "order",
+      mutate: (queuedStep) => { queuedStep.inputReferences![0].order = 1; },
+      expected: /参考图角色或顺序无效/,
+    },
+    {
+      name: "image-ref",
+      mutate: (queuedStep) => {
+        queuedStep.inputReferences![0].imageRef = "/api/files/must-not-be-resolved.png";
+      },
+      expected: /imageRef.*inputImages\[0\].*不一致/,
+    },
+    {
+      name: "length",
+      mutate: (queuedStep) => {
+        queuedStep.inputImages.push(OPAQUE_PNG_DATA_URL);
+      },
+      expected: /持久化参考图快照与 inputImages 数量不一致/,
+    },
+  ];
+
+  for (const corruption of corruptions) {
+    const nodeId = `worker-static-snapshot-${corruption.name}-${++sequence}`;
+    const originalStep = confirmedRuntimeEditStep(nodeId);
+    const run = await queue.enqueueGenerationRun(
+      { steps: [originalStep] },
+      owner.id,
+      runtimeEditContext(nodeId),
+    );
+    const stored = await database.queryOne<{ step_json: string }>(
+      "SELECT step_json FROM generation_run_steps WHERE run_id = $1",
+      [run.id],
+    );
+    assert.ok(stored);
+    const damagedStep = JSON.parse(stored.step_json) as NodeExecution;
+    corruption.mutate(damagedStep);
+    await database.query(
+      "UPDATE generation_run_steps SET step_json = $1 WHERE run_id = $2",
+      [JSON.stringify(damagedStep), run.id],
+    );
+
+    const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+    assert.equal(await queue.processNextGenerationJob(`worker-static-snapshot-${corruption.name}`, {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    assert.equal(fake.calls(), 0, `${corruption.name} 损坏快照不得进入 Provider`);
+    const blocked = await runRow(run.id);
+    assert.equal(blocked?.status, "failed", corruption.name);
+    assert.equal(blocked?.provider_requests, 0, corruption.name);
+    assert.match(blocked?.error ?? "", corruption.expected, corruption.name);
+  }
+});
+
+await test("Worker 拒绝绕过入队门禁的远程参考图且 Provider 零调用", async () => {
+  const nodeId = `worker-remote-reference-${++sequence}`;
+  const remoteReference = "https://references.example.invalid/garment.png";
+  const providerStep = confirmedRuntimeEditStep(nodeId);
+  providerStep.inputImages[0] = remoteReference;
+  providerStep.inputReferences![0].imageRef = remoteReference;
+  const run = await queue.enqueueGenerationRun(
+    { steps: [providerStep] },
+    owner.id,
+    runtimeEditContext(nodeId),
+  );
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+
+  assert.equal(await queue.processNextGenerationJob("worker-remote-reference", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(fake.calls(), 0, "远程输入不得进入 Provider");
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.equal(blocked?.successful_count, 0);
+  assert.match(blocked?.error ?? "", /远程参考图不能直接用于生成，请先上传或导入后再试/);
+});
+
+await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用", async () => {
+  const nodeId = `worker-remote-mask-${++sequence}`;
+  const maskStep: NodeExecution = {
+    nodeId,
+    kind: "mask-redraw",
+    inputImages: [PNG_DATA_URL],
+    inputReferences: [{
+      imageRef: PNG_DATA_URL,
+      role: "garment_full",
+      order: 0,
+      sourceNodeId: `${nodeId}:user-garment`,
+      roleNeedsConfirmation: false,
+    }],
+    params: {
+      prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
+      promptVariantId: maskVariant.variantId,
+      promptFamilyId: maskVariant.familyId,
+      parameterProfileId: maskVariant.parameterProfileId,
+      contractHash: maskVariant.contractHash,
+      evaluationVersion: maskVariant.evaluationVersion,
+      postprocessVersion: maskProfile.postprocess.version,
+      operationMode: maskVariant.mode,
+      modelId: maskVariant.modelId,
+      modelOptions: maskParameters.modelOptions,
+      mask: "https://references.example.invalid/mask.png",
+      maskSourceRef: PNG_DATA_URL,
+      maskPipelineVersion: 3,
+    },
+  };
+  const run = await queue.enqueueGenerationRun(
+    { steps: [maskStep] },
+    owner.id,
+    {
+      userId: owner.id,
+      nodeId,
+      nodeLabel: nodeId,
+      kind: "mask-redraw",
+      prompt: "仅修改蒙版区域的拉链颜色",
+      requestedCount: 1,
+    },
+  );
+  const fake = resolver(() => ({ images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId }));
+
+  assert.equal(await queue.processNextGenerationJob("worker-remote-mask", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(fake.calls(), 0, "远程蒙版不得进入 Provider");
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.equal(blocked?.successful_count, 0);
+  assert.match(blocked?.error ?? "", /远程参考图不能直接用于生成，请先上传或导入后再试/);
+});
+
+await test("Worker 在普通与评估 Provider 边界拒绝与实际内容不符的 reference hash", async () => {
+  for (const runType of ["workflow", "evaluation"] as const) {
+    const nodeId = `worker-reference-hash-${runType}-${++sequence}`;
+    const plan: ExecutionPlan = { steps: [confirmedRuntimeEditStep(nodeId)] };
+    const evaluationPolicy = runType === "evaluation"
+      ? await authorizeEvaluationPlan(plan, {
+          caseId: `reference-hash-case-${sequence}`,
+          sampleId: `reference-hash-sample-${sequence}`,
+          authorizationId: `reference-hash-authorization-${sequence}`,
+        })
+      : undefined;
+    const run = await queue.enqueueGenerationRun(
+      plan,
+      owner.id,
+      runtimeEditContext(nodeId),
+      runType,
+      evaluationPolicy,
+    );
+    let validations = 0;
+    let providerCalls = 0;
+    const provider: AIProvider = {
+      id: runtimeEditVariant.modelId,
+      validate(request) {
+        validations += 1;
+        assert.ok(request.references?.[0]);
+        request.references[0].assetSha256 = "0".repeat(64);
+      },
+      async generate() {
+        providerCalls += 1;
+        return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      },
+      async edit() {
+        providerCalls += 1;
+        return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      },
+    };
+    assert.equal(await queue.processNextGenerationJob(`worker-reference-hash-${runType}`, {
+      resolveProvider: () => provider,
+      evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    assert.equal(validations, 1, `${runType} 应在网络调用前进入本地契约验证`);
+    assert.equal(providerCalls, 0, `${runType} hash 损坏不得进入 Provider`);
+    const blocked = await runRow(run.id);
+    assert.equal(blocked?.status, "failed", runType);
+    assert.equal(blocked?.provider_requests, 0, runType);
+    assert.match(blocked?.error ?? "", /assetSha256 证据不一致/, runType);
+  }
+});
+
+await test("Worker 拒绝 references 与 Provider 兼容数组内容分叉且 Provider 零调用", async () => {
+  const nodeId = `worker-reference-content-mismatch-${++sequence}`;
+  const run = await queue.enqueueGenerationRun(
+    { steps: [confirmedRuntimeEditStep(nodeId)] },
+    owner.id,
+    runtimeEditContext(nodeId),
+  );
+  let validations = 0;
+  let providerCalls = 0;
+  const provider: AIProvider = {
+    id: runtimeEditVariant.modelId,
+    validate(request) {
+      validations += 1;
+      assert.ok(request.referenceImages?.[0]);
+      request.referenceImages[0] = OPAQUE_PNG_DATA_URL;
+    },
+    async generate() {
+      providerCalls += 1;
+      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+    },
+    async edit() {
+      providerCalls += 1;
+      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+    },
+  };
+  assert.equal(await queue.processNextGenerationJob("worker-reference-content-mismatch", {
+    resolveProvider: () => provider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(validations, 1);
+  assert.equal(providerCalls, 0);
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /结构化参考图与兼容数组内容或顺序不一致/);
+});
+
+await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order 且 Provider 零调用", async () => {
+  const nodeId = `worker-mask-guide-order-${++sequence}`;
+  const maskStep: NodeExecution = {
+    nodeId,
+    kind: "mask-redraw",
+    inputImages: [PNG_DATA_URL],
+    inputReferences: [{
+      imageRef: PNG_DATA_URL,
+      role: "garment_full",
+      order: 0,
+      sourceNodeId: `${nodeId}:user-garment`,
+      roleNeedsConfirmation: false,
+    }],
+    params: {
+      prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
+      promptVariantId: maskVariant.variantId,
+      promptFamilyId: maskVariant.familyId,
+      parameterProfileId: maskVariant.parameterProfileId,
+      contractHash: maskVariant.contractHash,
+      evaluationVersion: maskVariant.evaluationVersion,
+      postprocessVersion: maskProfile.postprocess.version,
+      operationMode: maskVariant.mode,
+      modelId: maskVariant.modelId,
+      modelOptions: maskParameters.modelOptions,
+      mask: PNG_DATA_URL,
+      maskSourceRef: PNG_DATA_URL,
+      maskPipelineVersion: 3,
+    },
+  };
+  const run = await queue.enqueueGenerationRun(
+    { steps: [maskStep] },
+    owner.id,
+    {
+      userId: owner.id,
+      nodeId,
+      nodeLabel: nodeId,
+      kind: "mask-redraw",
+      prompt: "仅修改蒙版区域的拉链颜色",
+      requestedCount: 1,
+    },
+  );
+  let validations = 0;
+  let generateCalls = 0;
+  let editCalls = 0;
+  const provider: AIProvider = {
+    id: maskVariant.modelId,
+    validate(request) {
+      validations += 1;
+      assert.ok(request.references && request.references.length >= 2);
+      request.references[request.references.length - 1].order = 0;
+    },
+    async generate() {
+      generateCalls += 1;
+      return { images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId };
+    },
+    async edit() {
+      editCalls += 1;
+      return { images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId };
+    },
+  };
+
+  assert.equal(await queue.processNextGenerationJob("worker-mask-guide-order", {
+    resolveProvider: () => provider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(validations, 1);
+  assert.equal(generateCalls, 0);
+  assert.equal(editCalls, 0);
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /references\[1\]\.order.*等于 1/);
+});
+
+await test("入队后命中运行时四级关闭规则时 Provider 零调用", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const runId = await enqueueSingle("worker-shutdown-drift");
+  const rules = PROMPT_RUNTIME_SHUTDOWN_RULES as EvaluationShutdownRule[];
+  const rule: EvaluationShutdownRule = {
+    id: `queue-test-shutdown-${++sequence}`,
+    active: true,
+    scope: { level: "model-variant", promptVariantId: queueVariant.variantId },
+    reason: "执行前回归审计",
+  };
+  rules.push(rule);
+  try {
+    assert.equal(await queue.processNextGenerationJob("worker-shutdown-drift", {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+  } finally {
+    const index = rules.indexOf(rule);
+    if (index >= 0) rules.splice(index, 1);
+  }
+  assert.equal(fake.calls(), 0, "入队后新生效的关闭规则必须阻止 Provider");
+  const blocked = await runRow(runId);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /运行时关闭/);
+});
+
+await test("Worker 在 Provider 边界按本次运行时用户参考角色二次准入", async () => {
+  const sourceNodeId = `runtime-role-source-${++sequence}`;
+  const targetNodeId = `runtime-role-target-${sequence}`;
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+  const plan: ExecutionPlan = {
+    steps: [
+      {
+        nodeId: sourceNodeId,
+        kind: "image-input",
+        inputImages: [],
+        params: { imageUrl: PNG_DATA_URL },
+      },
+      {
+        nodeId: targetNodeId,
+        kind: "ai-modify",
+        inputImages: [PNG_DATA_URL],
+        // The durable plan snapshot was admitted for garment_full. The actual
+        // upstream role below is fabric and must win at the Provider boundary.
+        inputReferences: [{
+          imageRef: PNG_DATA_URL,
+          role: "garment_full",
+          order: 0,
+          sourceNodeId,
+          roleNeedsConfirmation: false,
+        }],
+        upstream: [{
+          nodeId: sourceNodeId,
+          images: [PNG_DATA_URL],
+          referenceRole: "fabric",
+          roleNeedsConfirmation: false,
+        }],
+        params: {
+          prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持商品轮廓并改善棚拍光线"),
+          promptVariantId: runtimeEditVariant.variantId,
+          promptFamilyId: runtimeEditVariant.familyId,
+          parameterProfileId: runtimeEditVariant.parameterProfileId,
+          contractHash: runtimeEditVariant.contractHash,
+          evaluationVersion: runtimeEditVariant.evaluationVersion,
+          postprocessVersion: runtimeEditProfile.postprocess.version,
+          operationMode: runtimeEditVariant.mode,
+          modelId: runtimeEditVariant.modelId,
+          modelOptions: runtimeEditParameters.modelOptions,
+          aspectRatio: runtimeEditParameters.aspectRatio,
+          batchSize: runtimeEditParameters.batchSize,
+        },
+      },
+    ],
+  };
+  const run = await queue.enqueueGenerationRun(plan, owner.id, {
+    userId: owner.id,
+    nodeId: targetNodeId,
+    nodeLabel: targetNodeId,
+    kind: "ai-modify",
+    prompt: "保持商品轮廓并改善棚拍光线",
+    requestedCount: 1,
+  });
+
+  assert.equal(await queue.processNextGenerationJob("worker-runtime-role-source", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(await queue.processNextGenerationJob("worker-runtime-role-target", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+
+  assert.equal(fake.calls(), 0, "静态 garment_full 快照不得覆盖本次运行时 fabric 角色");
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /缺少该变体要求的参考角色.*garment_full/);
+});
+
+await test("Worker 在 Provider 边界拒绝运行时上游的缺失或 true 确认位", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+  for (const pendingValue of [undefined, true] as const) {
+    const suffix = pendingValue === true ? "true" : "missing";
+    const sourceNodeId = `runtime-confirmation-source-${suffix}-${++sequence}`;
+    const targetNodeId = `runtime-confirmation-target-${suffix}-${sequence}`;
+    const upstream = {
+      nodeId: sourceNodeId,
+      images: [PNG_DATA_URL],
+      referenceRole: "garment_full" as const,
+      ...(pendingValue === true ? { roleNeedsConfirmation: true } : {}),
+    };
+    const plan: ExecutionPlan = {
+      steps: [
+        {
+          nodeId: sourceNodeId,
+          kind: "image-input",
+          inputImages: [],
+          params: { imageUrl: PNG_DATA_URL },
+        },
+        {
+          nodeId: targetNodeId,
+          kind: "ai-modify",
+          inputImages: [PNG_DATA_URL],
+          inputReferences: [{
+            imageRef: PNG_DATA_URL,
+            role: "garment_full",
+            order: 0,
+            sourceNodeId,
+            roleNeedsConfirmation: false,
+          }],
+          upstream: [upstream],
+          params: {
+            prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
+            promptVariantId: runtimeEditVariant.variantId,
+            promptFamilyId: runtimeEditVariant.familyId,
+            parameterProfileId: runtimeEditVariant.parameterProfileId,
+            contractHash: runtimeEditVariant.contractHash,
+            evaluationVersion: runtimeEditVariant.evaluationVersion,
+            postprocessVersion: runtimeEditProfile.postprocess.version,
+            operationMode: runtimeEditVariant.mode,
+            modelId: runtimeEditVariant.modelId,
+            modelOptions: runtimeEditParameters.modelOptions,
+            aspectRatio: runtimeEditParameters.aspectRatio,
+            batchSize: runtimeEditParameters.batchSize,
+          },
+        },
+      ],
+    };
+    const run = await queue.enqueueGenerationRun(plan, owner.id, {
+      userId: owner.id,
+      nodeId: targetNodeId,
+      nodeLabel: targetNodeId,
+      kind: "ai-modify",
+      prompt: "保持服装结构并优化商业棚拍光线",
+      requestedCount: 1,
+    });
+
+    assert.equal(await queue.processNextGenerationJob(`runtime-confirmation-source-${suffix}`, {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    assert.equal(await queue.processNextGenerationJob(`runtime-confirmation-target-${suffix}`, {
+      resolveProvider: fake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    const blocked = await runRow(run.id);
+    assert.equal(blocked?.status, "failed", suffix);
+    assert.equal(blocked?.provider_requests, 0, suffix);
+    assert.match(blocked?.error ?? "", /参考图角色尚未全部确认/, suffix);
+  }
+  assert.equal(fake.calls(), 0, "运行时上游没有显式 false 时不得到达 Provider");
+});
+
+await test("Worker 不得用遗留 false 确认位把缺失的动态上游角色修复为 generic", async () => {
+  const sourceNodeId = `runtime-missing-role-source-${++sequence}`;
+  const targetNodeId = `runtime-missing-role-target-${sequence}`;
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+  const targetStep = confirmedRuntimeEditStep(targetNodeId);
+  targetStep.inputReferences![0].sourceNodeId = sourceNodeId;
+  targetStep.upstream = [{
+    nodeId: sourceNodeId,
+    images: [PNG_DATA_URL],
+    // Simulate a damaged/legacy snapshot whose old confirmation bit survived
+    // but whose role did not. It must become pending, never confirmed generic.
+    roleNeedsConfirmation: false,
+  }];
+  const run = await queue.enqueueGenerationRun({
+    steps: [
+      {
+        nodeId: sourceNodeId,
+        kind: "image-input",
+        inputImages: [],
+        params: { imageUrl: PNG_DATA_URL },
+      },
+      targetStep,
+    ],
+  }, owner.id, runtimeEditContext(targetNodeId));
+
+  assert.equal(await queue.processNextGenerationJob("worker-runtime-missing-role-source", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(await queue.processNextGenerationJob("worker-runtime-missing-role-target", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(fake.calls(), 0);
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /参考图角色尚未全部确认/);
+});
+
+await test("评估运行时重复角色不得借用静态 exact-unit 授权", async () => {
+  const firstSourceNodeId = `evaluation-runtime-role-source-a-${++sequence}`;
+  const secondSourceNodeId = `evaluation-runtime-role-source-b-${sequence}`;
+  const targetNodeId = `evaluation-runtime-role-target-${sequence}`;
+  const providerStep: NodeExecution = {
+    nodeId: targetNodeId,
+    kind: "ai-modify",
+    inputImages: [PNG_DATA_URL],
+    inputReferences: [{
+      imageRef: PNG_DATA_URL,
+      role: "garment_full",
+      order: 0,
+      sourceNodeId: firstSourceNodeId,
+      roleNeedsConfirmation: false,
+    }],
+    upstream: [
+      {
+        nodeId: firstSourceNodeId,
+        images: [PNG_DATA_URL],
+        referenceRole: "garment_full",
+        roleNeedsConfirmation: false,
+      },
+      {
+        nodeId: secondSourceNodeId,
+        images: [PNG_DATA_URL],
+        referenceRole: "garment_full",
+        roleNeedsConfirmation: false,
+      },
+    ],
+    params: {
+      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持商品轮廓并改善棚拍光线"),
+      promptVariantId: runtimeEditVariant.variantId,
+      promptFamilyId: runtimeEditVariant.familyId,
+      parameterProfileId: runtimeEditVariant.parameterProfileId,
+      contractHash: runtimeEditVariant.contractHash,
+      evaluationVersion: runtimeEditVariant.evaluationVersion,
+      postprocessVersion: runtimeEditProfile.postprocess.version,
+      operationMode: runtimeEditVariant.mode,
+      modelId: runtimeEditVariant.modelId,
+      modelOptions: runtimeEditParameters.modelOptions,
+      aspectRatio: runtimeEditParameters.aspectRatio,
+      batchSize: runtimeEditParameters.batchSize,
+    },
+  };
+  // onlyNodeId 评估计划只持久 Provider step；upstream.images 是其运行时
+  // 回退输入。这里刻意比静态 inputReferences 多一张同角色图。
+  const plan: ExecutionPlan = { steps: [providerStep] };
+  const policy = await authorizeEvaluationPlan(plan, {
+    caseId: `evaluation-runtime-role-case-${sequence}`,
+    sampleId: `evaluation-runtime-role-sample-${sequence}`,
+    authorizationId: `evaluation-runtime-role-authorization-${sequence}`,
+  });
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+  const run = await queue.enqueueGenerationRun(
+    plan,
+    owner.id,
+    {
+      userId: owner.id,
+      nodeId: targetNodeId,
+      nodeLabel: targetNodeId,
+      kind: "ai-modify",
+      prompt: "保持商品轮廓并改善棚拍光线",
+      requestedCount: 1,
+    },
+    "evaluation",
+    policy,
+  );
+
+  assert.equal(await queue.processNextGenerationJob("evaluation-runtime-role-target", {
+    resolveProvider: fake.resolveProvider,
+    evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+
+  assert.equal(fake.calls(), 0, "参考角色数量漂移必须在 Provider 前阻断");
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.match(blocked?.error ?? "", /exact-unit 授权/);
+  assert.equal((await database.queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]))?.count, 0);
+  assert.equal((await database.queryOne<{ used_provider_requests: number }>(`
+    SELECT used_provider_requests FROM evaluation_run_authorizations
+    WHERE authorization_id = $1
+  `, [policy.authorizationId]))?.used_provider_requests, 0);
+});
+
+await test("未登记 authorizationId 的真实评估在入队事务中阻断", async () => {
+  const nodeId = `unregistered-evaluation-${++sequence}`;
+  await assert.rejects(
+    queue.enqueueGenerationRun(
+      { steps: [step(nodeId)] },
+      owner.id,
+      context(nodeId),
+      "evaluation",
+      {
+        caseId: `unregistered-evaluation-case-${sequence}`,
+        sampleId: `unregistered-evaluation-sample-${sequence}`,
+        authorizationId: `unregistered-evaluation-authorization-${sequence}`,
+        retryPolicy: "no-retry",
+      },
+    ),
+    /未登记/,
+  );
+  assert.equal((await database.queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM generation_runs
+    WHERE owner_id = $1 AND evaluation_case_id = $2
+  `, [owner.id, `unregistered-evaluation-case-${sequence}`]))?.count, 0);
+});
+
+await test("未验证变体仅在持久化 evaluation + no-retry 策略下可执行", async () => {
+  const ordinaryFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const evaluationProviderRequestId = `req-evaluation-success-${sequence + 1}`;
+  const evaluationFake = resolver(() => ({
+    images: [PNG_DATA_URL],
+    model: "gpt-image-2-vip",
+    providerRequestId: evaluationProviderRequestId,
+  }));
+  const ordinaryNodeId = `worker-forged-evaluation-${++sequence}`;
+  const ordinaryStep = step(ordinaryNodeId);
+  ordinaryStep.params = {
+    ...ordinaryStep.params,
+    evaluationPolicy: {
+      caseId: `forged-case-${sequence}`,
+      sampleId: `forged-sample-${sequence}`,
+      authorizationId: `forged-authorization-${sequence}`,
+      retryPolicy: "no-retry",
+    },
+  };
+  const ordinaryRun = await queue.enqueueGenerationRun(
+    { steps: [ordinaryStep] },
+    owner.id,
+    context(ordinaryNodeId),
+  );
+  const evaluationNodeId = `worker-persisted-evaluation-${++sequence}`;
+  const evaluationPlan = { steps: [step(evaluationNodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `worker-evaluation-case-${sequence}`,
+    sampleId: `worker-evaluation-sample-${sequence}`,
+    authorizationId: `worker-evaluation-authorization-${sequence}`,
+  });
+  const evaluationRun = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(evaluationNodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+  const restoreRelease = withdrawPromptVariantReleasesForTest(queueVariant.variantId);
+  try {
+    assert.equal(await queue.processNextGenerationJob("worker-forged-evaluation", {
+      resolveProvider: ordinaryFake.resolveProvider,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+    assert.equal(await queue.processNextGenerationJob("worker-persisted-evaluation", {
+      resolveProvider: evaluationFake.resolveProvider,
+      evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+      now: () => tick(),
+      random: () => 0,
+    }), true);
+  } finally {
+    restoreRelease();
+  }
+  assert.equal(ordinaryFake.calls(), 0, "step.params 伪造的 evaluationPolicy 不得放行");
+  assert.equal((await runRow(ordinaryRun.id))?.status, "failed");
+  assert.equal((await runRow(ordinaryRun.id))?.provider_requests, 0);
+  assert.equal(evaluationFake.calls(), 1, "只有数据库持久化的 evaluation 策略可放行");
+  assert.equal((await runRow(evaluationRun.id))?.status, "succeeded");
+  assert.equal((await runRow(evaluationRun.id))?.provider_requests, 1);
+  const successfulEvidence = await database.queryOne<{
+    sample_id: string;
+    outcome: string;
+    provider_request_count: number;
+    billing_reconciliation_status: string;
+    evidence_record_sha256: string | null;
+    snapshot_json: string;
+  }>(`
+    SELECT sample_id, outcome, provider_request_count, billing_reconciliation_status,
+      evidence_record_sha256, snapshot_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [evaluationRun.id]);
+  assert.equal(successfulEvidence?.sample_id, evaluationPolicy.sampleId);
+  assert.equal(successfulEvidence?.outcome, "succeeded");
+  assert.equal(successfulEvidence?.provider_request_count, 1);
+  assert.equal(successfulEvidence?.billing_reconciliation_status, "pending");
+  assert.match(successfulEvidence?.evidence_record_sha256 ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(JSON.parse(successfulEvidence?.snapshot_json ?? "{}").sampleId, evaluationPolicy.sampleId);
+  assert.deepEqual(await database.query<{
+    request_index: number; outcome: string; output_count: number; billing_reconciliation_status: string;
+    provider_request_id: string | null;
+  }>(`
+    SELECT request_index, outcome, output_count, billing_reconciliation_status, provider_request_id
+    FROM evaluation_provider_request_evidence WHERE run_id = $1 ORDER BY request_index
+  `, [evaluationRun.id]), [{
+    request_index: 1,
+    outcome: "succeeded",
+    output_count: 1,
+    billing_reconciliation_status: "pending",
+    provider_request_id: evaluationProviderRequestId,
+  }]);
+  const successfulImages = await database.query<{
+    id: string; layer: string; source_evidence_id: string | null; provider_request_evidence_id: string | null;
+    artifact_sha256: string;
+  }>(`
+    SELECT id, layer, source_evidence_id, provider_request_evidence_id, artifact_sha256
+    FROM evaluation_image_evidence WHERE run_id = $1 ORDER BY layer DESC
+  `, [evaluationRun.id]);
+  assert.equal(successfulImages.length, 2);
+  const original = successfulImages.find((image) => image.layer === "provider-original");
+  const postprocessed = successfulImages.find((image) => image.layer === "postprocessed");
+  assert.ok(original?.provider_request_evidence_id);
+  assert.equal(original?.source_evidence_id, null);
+  assert.equal(postprocessed?.source_evidence_id, original?.id);
+  assert.equal(postprocessed?.provider_request_evidence_id, null);
+  assert.match(original?.artifact_sha256 ?? "", /^[a-f0-9]{64}$/);
+  assert.match(postprocessed?.artifact_sha256 ?? "", /^[a-f0-9]{64}$/);
+});
+
+await test("蒙版评估最终准入不重复计入系统 guide，证据固定为用户参考 + guide + mask", async () => {
+  const nodeId = `evaluation-mask-runtime-profile-${++sequence}`;
+  const maskStep: NodeExecution = {
+    nodeId,
+    kind: "mask-redraw",
+    inputImages: [PNG_DATA_URL],
+    inputReferences: [{
+      imageRef: PNG_DATA_URL,
+      role: "garment_full",
+      order: 0,
+      sourceNodeId: `${nodeId}:user-garment`,
+      roleNeedsConfirmation: false,
+    }],
+    params: {
+      prompt: buildGarmentPrompt(maskVariant.variantId, "仅将蒙版区域改为银色拉链"),
+      promptVariantId: maskVariant.variantId,
+      promptFamilyId: maskVariant.familyId,
+      parameterProfileId: maskVariant.parameterProfileId,
+      contractHash: maskVariant.contractHash,
+      evaluationVersion: maskVariant.evaluationVersion,
+      postprocessVersion: maskProfile.postprocess.version,
+      operationMode: maskVariant.mode,
+      modelId: maskVariant.modelId,
+      modelOptions: maskParameters.modelOptions,
+      mask: PNG_DATA_URL,
+      maskSourceRef: PNG_DATA_URL,
+      maskPipelineVersion: 3,
+    },
+  };
+  const plan: ExecutionPlan = { steps: [maskStep] };
+  const policy = await authorizeEvaluationPlan(plan, {
+    caseId: `evaluation-mask-case-${sequence}`,
+    sampleId: `evaluation-mask-sample-${sequence}`,
+    authorizationId: `evaluation-mask-authorization-${sequence}`,
+  });
+  let providerRequest: ImageGenRequest | undefined;
+  const fake = resolver((request) => {
+    providerRequest = request;
+    return { images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId };
+  });
+  const run = await queue.enqueueGenerationRun(
+    plan,
+    owner.id,
+    {
+      userId: owner.id,
+      nodeId,
+      nodeLabel: nodeId,
+      kind: "mask-redraw",
+      prompt: "仅将蒙版区域改为银色拉链",
+      requestedCount: 1,
+    },
+    "evaluation",
+    policy,
+  );
+
+  assert.equal(await queue.processNextGenerationJob("worker-evaluation-mask-runtime-profile", {
+    resolveProvider: fake.resolveProvider,
+    evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  assert.equal(fake.calls(), 1, "运行时动态 mask size 不应被误判为参数漂移");
+  assert.equal((await runRow(run.id))?.status, "succeeded");
+  assert.deepEqual(providerRequest?.references?.map((reference) => reference.role), [
+    "garment_full",
+    "generic",
+  ]);
+  assert.match(String(providerRequest?.modelOptions?.size ?? ""), /^\d+x\d+$/);
+
+  const evidence = await database.queryOne<{
+    snapshot_json: string;
+    reference_inputs_json: string;
+    native_parameters_json: string;
+  }>(`
+    SELECT snapshot_json, reference_inputs_json, native_parameters_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]);
+  assert.ok(evidence);
+  const runtimeSnapshot = JSON.parse(evidence.snapshot_json) as {
+    snapshot?: {
+      unit?: { referenceRoleProfile?: Array<{ order: number; role: string }> };
+      references?: Array<{ order: number; role: string }>;
+    };
+  };
+  const expectedProfile = [
+    { order: 0, role: "garment_full" },
+    { order: 1, role: "generic" },
+    { order: 2, role: "mask" },
+  ];
+  assert.deepEqual(runtimeSnapshot.snapshot?.unit?.referenceRoleProfile, expectedProfile);
+  assert.deepEqual(
+    runtimeSnapshot.snapshot?.references?.map(({ order, role }) => ({ order, role })),
+    expectedProfile,
+  );
+  assert.deepEqual(
+    (JSON.parse(evidence.reference_inputs_json) as Array<{ order: number; role: string }>)
+      .map(({ order, role }) => ({ order, role })),
+    expectedProfile,
+  );
+  assert.match(
+    String((JSON.parse(evidence.native_parameters_json) as { modelOptions?: { size?: string } }).modelOptions?.size ?? ""),
+    /^\d+x\d+$/,
+  );
+});
+
+await test("评估策略快照损坏时 Provider 零调用并确定性终止", async () => {
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const nodeId = `evaluation-policy-corrupt-${++sequence}`;
+  const plan = { steps: [step(nodeId)] };
+  const policy = await authorizeEvaluationPlan(plan, {
+    caseId: `evaluation-policy-corrupt-case-${sequence}`,
+    sampleId: `evaluation-policy-corrupt-sample-${sequence}`,
+    authorizationId: `evaluation-policy-corrupt-authorization-${sequence}`,
+  });
+  const run = await queue.enqueueGenerationRun(
+    plan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    policy,
+  );
+  await database.query(`
+    UPDATE generation_run_steps
+    SET step_json = (step_json::jsonb #- '{params,evaluationPolicy}')::text
+    WHERE run_id = $1
+  `, [run.id]);
+
+  assert.equal(await queue.processNextGenerationJob("worker-policy-corrupt", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+  }), true);
+  const row = await runRow(run.id);
+  assert.equal(row?.status, "failed");
+  assert.equal(row?.provider_requests, 0);
+  assert.match(row?.error ?? "", /策略快照损坏|lost its persisted policy snapshot/);
+  assert.equal(fake.calls(), 0);
+  assert.equal((await database.queryOne<{ count: number }>(`
+    SELECT COUNT(*)::int AS count FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]))?.count, 0);
 });
 
 await test("同一付费请求号并发重试只创建一个 run，语义漂移返回冲突", async () => {
@@ -334,9 +1575,23 @@ await test("队列结果文件按稳定键幂等落盘", async () => {
   }
 });
 
-await test("成功事务回滚会补偿删除本次新建的结果文件", async () => {
+await test("成功事务回滚只补偿业务成品，Provider 原图证据保留", async () => {
   const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
-  const runId = await enqueueSingle("rollback-file");
+  const nodeId = `rollback-file-${++sequence}`;
+  const evaluationPlan = { steps: [step(nodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `rollback-file-case-${sequence}`,
+    sampleId: `rollback-file-sample-${sequence}`,
+    authorizationId: `rollback-file-authorization-${sequence}`,
+  });
+  const run = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+  const runId = run.id;
   const before = new Set(fs.readdirSync(fileStore.uploadsDir()));
   await database.query(`
     CREATE OR REPLACE FUNCTION reject_test_generation_success() RETURNS trigger AS $$
@@ -354,7 +1609,10 @@ await test("成功事务回滚会补偿删除本次新建的结果文件", async
   try {
     const now = tick();
     assert.equal(await queue.processNextGenerationJob("worker-rollback-file", {
-      resolveProvider: fake.resolveProvider, now: () => now, random: () => 0,
+      resolveProvider: fake.resolveProvider,
+      evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+      now: () => now,
+      random: () => 0,
     }), true);
   } finally {
     await database.query("DROP TRIGGER IF EXISTS reject_test_generation_success_trigger ON generation_run_steps");
@@ -362,10 +1620,50 @@ await test("成功事务回滚会补偿删除本次新建的结果文件", async
   }
   assert.equal(fake.calls(), 1);
   assert.equal((await runRow(runId))?.status, "failed");
-  assert.equal((await database.queryOne<{ count: number }>(
-    "SELECT COUNT(*)::int AS count FROM files WHERE run_id = $1", [runId],
-  ))?.count, 0);
-  assert.deepEqual(fs.readdirSync(fileStore.uploadsDir()).filter((id) => !before.has(id)), []);
+  const evidenceFiles = await database.query<{ id: string; source_type: string }>(
+    "SELECT id, source_type FROM files WHERE run_id = $1", [runId],
+  );
+  assert.equal(evidenceFiles.length, 1);
+  assert.equal(evidenceFiles[0]?.source_type, "provider-original");
+  const stepEvidence = await database.queryOne<{ provider_images_json: string }>(
+    "SELECT provider_images_json FROM generation_run_steps WHERE run_id = $1", [runId],
+  );
+  assert.deepEqual(
+    JSON.parse(stepEvidence?.provider_images_json ?? "[]"),
+    [`/api/files/${evidenceFiles[0]?.id}`],
+  );
+  const failureOutput = await database.queryOne<{
+    image: string; provider_image: string | null; status: string; error: string | null;
+  }>(`
+    SELECT image, provider_image, status, error FROM generation_outputs WHERE run_id = $1
+  `, [runId]);
+  assert.equal(failureOutput?.image, "");
+  assert.equal(failureOutput?.provider_image, null);
+  assert.equal(failureOutput?.status, "error");
+  assert.match(failureOutput?.error ?? "", /forced completion rollback/);
+  const failedEvidence = await database.queryOne<{
+    outcome: string; provider_request_count: number; billing_reconciliation_status: string;
+    error_events_json: string; hard_blockers_json: string;
+  }>(`
+    SELECT outcome, provider_request_count, billing_reconciliation_status,
+      error_events_json, hard_blockers_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [runId]);
+  assert.equal(failedEvidence?.outcome, "failed");
+  assert.equal(failedEvidence?.provider_request_count, 1);
+  assert.equal(failedEvidence?.billing_reconciliation_status, "pending");
+  assert.equal(JSON.parse(failedEvidence?.error_events_json ?? "[]")[0]?.phase, "completion-persist");
+  assert.ok(
+    JSON.parse(failedEvidence?.hard_blockers_json ?? "[]")
+      .some((blocker: { code?: string }) => blocker.code === "evidence-integrity-failure"),
+  );
+  assert.deepEqual(await database.query<{ layer: string }>(`
+    SELECT layer FROM evaluation_image_evidence WHERE run_id = $1 ORDER BY layer
+  `, [runId]), [{ layer: "provider-original" }]);
+  assert.deepEqual(
+    fs.readdirSync(fileStore.uploadsDir()).filter((id) => !before.has(id)),
+    [evidenceFiles[0]?.id],
+  );
 });
 
 await test("明确 429 最多自动重放三次并保留四次真实请求计数", async () => {
@@ -445,6 +1743,186 @@ await test("连续三次 503 按 5/30/120 秒退避，第 4 次失败后终止",
   ), { retry_count: 3, status: "failed" });
 });
 
+await test("真实评估的 no-retry 策略跨数据库重连持久生效，503 不进入重试队列", async () => {
+  const nodeId = `evaluation-no-retry-${++sequence}`;
+  const evaluationPlan = { steps: [step(nodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `evaluation-known-failure-${sequence}`,
+    sampleId: `evaluation-known-failure-sample-${sequence}`,
+    authorizationId: `evaluation-authorization-${sequence}`,
+  });
+  const evaluationFailureRequestId = `req-evaluation-failure-${sequence}`;
+  const fake = resolver(() => {
+    throw new ProviderError(
+      "AI 服务暂时不可用，请稍后重试",
+      503,
+      "stub",
+      "gateway_unavailable",
+      undefined,
+      evaluationFailureRequestId,
+    );
+  });
+  const run = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+  assert.deepEqual(await database.queryOne<{
+    run_type: string;
+    retry_policy: string;
+    evaluation_case_id: string | null;
+    evaluation_authorization_id: string | null;
+    billing_reconciliation_status: string;
+  }>(`
+    SELECT run_type, retry_policy, evaluation_case_id, evaluation_authorization_id,
+      billing_reconciliation_status
+    FROM generation_runs WHERE id = $1
+  `, [run.id]), {
+    run_type: "evaluation",
+    retry_policy: "no-retry",
+    evaluation_case_id: evaluationPolicy.caseId,
+    evaluation_authorization_id: evaluationPolicy.authorizationId,
+    billing_reconciliation_status: "not-required",
+  });
+
+  await database.closeDatabaseForTests();
+  await database.initializeDatabase();
+  const now = tick();
+  assert.equal(await queue.processNextGenerationJob("worker-evaluation-no-retry", {
+    resolveProvider: fake.resolveProvider,
+    evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    now: () => now,
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), true);
+  assert.equal(fake.calls(), 1);
+  const failed = await database.queryOne<{
+    status: string;
+    error: string | null;
+    provider_requests: number;
+    retry_policy: string;
+    billing_reconciliation_status: string;
+  }>(`
+    SELECT status, error, provider_requests, retry_policy, billing_reconciliation_status
+    FROM generation_runs WHERE id = $1
+  `, [run.id]);
+  assert.equal(failed?.status, "failed");
+  assert.equal(failed?.provider_requests, 1);
+  assert.equal(failed?.retry_policy, "no-retry");
+  assert.equal(failed?.billing_reconciliation_status, "pending");
+  assert.match(failed?.error ?? "", /no-retry.*未自动重放/);
+  assert.doesNotMatch(failed?.error ?? "", new RegExp(evaluationFailureRequestId));
+  const failedCaseEvidence = await database.queryOne<{
+    outcome: string; billing_reconciliation_status: string; error_events_json: string;
+  }>(`
+    SELECT outcome, billing_reconciliation_status, error_events_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]);
+  assert.equal(failedCaseEvidence?.outcome, "failed");
+  assert.equal(failedCaseEvidence?.billing_reconciliation_status, "pending");
+  assert.equal(JSON.parse(failedCaseEvidence?.error_events_json ?? "[]")[0]?.phase, "provider");
+  assert.deepEqual(await database.queryOne<{ outcome: string; provider_request_id: string | null }>(`
+    SELECT outcome, provider_request_id FROM evaluation_provider_request_evidence WHERE run_id = $1
+  `, [run.id]), {
+    outcome: "failed",
+    provider_request_id: evaluationFailureRequestId,
+  });
+  assert.deepEqual(await database.queryOne<{ retry_count: number; status: string }>(
+    "SELECT retry_count, status FROM generation_jobs WHERE run_id = $1",
+    [run.id],
+  ), { retry_count: 0, status: "failed" });
+
+  assert.equal(await queue.processNextGenerationJob("worker-evaluation-no-retry-no-replay", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), false);
+  assert.equal(fake.calls(), 1, "no-retry 评估失败后不得发生第二次 Provider 提交");
+});
+
+await test("真实评估超时结果持久化为 outcome_unknown 与 pending，且绝不自动重放", async () => {
+  const nodeId = `evaluation-outcome-unknown-${++sequence}`;
+  const evaluationPlan = { steps: [step(nodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `evaluation-outcome-unknown-${sequence}`,
+    sampleId: `evaluation-outcome-unknown-sample-${sequence}`,
+    authorizationId: `evaluation-authorization-${sequence}`,
+  });
+  const fake = resolver(() => {
+    throw new ProviderError(
+      "AI 请求已超时，结果可能已经生成；为避免重复计费，系统不会自动重试",
+      504,
+      "stub",
+      "outcome_unknown",
+    );
+  });
+  const run = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+
+  const now = tick();
+  assert.equal(await queue.processNextGenerationJob("worker-evaluation-outcome-unknown", {
+    resolveProvider: fake.resolveProvider,
+    evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    now: () => now,
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), true);
+  assert.equal(fake.calls(), 1);
+  const unknown = await database.queryOne<{
+    status: string;
+    error: string | null;
+    provider_requests: number;
+    retry_policy: string;
+    evaluation_case_id: string | null;
+    billing_reconciliation_status: string;
+  }>(`
+    SELECT status, error, provider_requests, retry_policy, evaluation_case_id,
+      billing_reconciliation_status
+    FROM generation_runs WHERE id = $1
+  `, [run.id]);
+  assert.equal(unknown?.status, "outcome_unknown");
+  assert.equal(unknown?.provider_requests, 1);
+  assert.equal(unknown?.retry_policy, "no-retry");
+  assert.equal(unknown?.evaluation_case_id, evaluationPolicy.caseId);
+  assert.equal(unknown?.billing_reconciliation_status, "pending");
+  assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
+  const unknownEvidence = await database.queryOne<{
+    outcome: string; billing_reconciliation_status: string; hard_blockers_json: string;
+  }>(`
+    SELECT outcome, billing_reconciliation_status, hard_blockers_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]);
+  assert.equal(unknownEvidence?.outcome, "outcome_unknown");
+  assert.equal(unknownEvidence?.billing_reconciliation_status, "pending");
+  assert.ok(
+    JSON.parse(unknownEvidence?.hard_blockers_json ?? "[]")
+      .some((blocker: { code?: string }) => blocker.code === "outcome-unknown"),
+  );
+  assert.equal((await database.queryOne<{ outcome: string }>(`
+    SELECT outcome FROM evaluation_provider_request_evidence WHERE run_id = $1
+  `, [run.id]))?.outcome, "outcome_unknown");
+  assert.deepEqual(await database.queryOne<{ retry_count: number; status: string }>(
+    "SELECT retry_count, status FROM generation_jobs WHERE run_id = $1",
+    [run.id],
+  ), { retry_count: 0, status: "outcome_unknown" });
+
+  assert.equal(await queue.processNextGenerationJob("worker-evaluation-outcome-unknown-no-replay", {
+    resolveProvider: fake.resolveProvider,
+    now: () => tick(),
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), false);
+  assert.equal(fake.calls(), 1, "outcome_unknown 待账单核对时不得发生第二次 Provider 提交");
+});
+
 await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放", async () => {
   const fake = resolver(() => {
     throw new ProviderError(
@@ -470,6 +1948,166 @@ await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放
     resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
   }), false);
   assert.equal(fake.calls(), 1);
+});
+
+await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前阻断", async () => {
+  const nodeId = `partial-unknown-${++sequence}`;
+  const fake = resolver(() => ({
+    images: [PNG_DATA_URL], model: "gpt-image-2-vip", providerOutputSizes: ["2048x2048"],
+  }));
+  const plan: ExecutionPlan = {
+    steps: [{
+      nodeId,
+      kind: "sketch-to-render",
+      inputImages: [],
+      params: boundQueueParams("生成两张服装效果图", { batchSize: 2 }),
+    }],
+  };
+  const run = await queue.enqueueGenerationRun(plan, owner.id, {
+    userId: owner.id,
+    nodeId,
+    nodeLabel: nodeId,
+    kind: "sketch-to-render",
+    prompt: "生成两张服装效果图",
+    requestedCount: 2,
+  });
+  const firstAttemptAt = tick();
+  assert.equal(await queue.processNextGenerationJob("worker-partial-unknown", {
+    resolveProvider: fake.resolveProvider,
+    now: () => firstAttemptAt,
+    random: () => 0,
+    retryDelaysMs: [0, 0],
+  }), true);
+  assert.equal(fake.calls(), 0);
+  const blocked = await runRow(run.id);
+  assert.equal(blocked?.status, "failed");
+  assert.equal(blocked?.provider_requests, 0);
+  assert.equal(blocked?.successful_count, 0);
+  assert.match(blocked?.error ?? "", /原生参数.*偏离已评估参数档案/);
+  assert.deepEqual(await database.query<{ id: string }>(
+    "SELECT id FROM files WHERE run_id = $1",
+    [run.id],
+  ), []);
+});
+
+await test("结果节点汇总多上游多图时逐张保留 Provider 与业务成品映射", async () => {
+  const testId = ++sequence;
+  const firstNodeId = `mapping-first-${testId}`;
+  const secondNodeId = `mapping-second-${testId}`;
+  const targetNodeId = `mapping-result-${testId}`;
+  const generationStep = (nodeId: string, prompt: string): NodeExecution => ({
+    nodeId,
+    kind: "sketch-to-render",
+    inputImages: [],
+    params: boundQueueParams(prompt),
+  });
+  const plan: ExecutionPlan = {
+    steps: [
+      generationStep(firstNodeId, "第一组效果图"),
+      generationStep(secondNodeId, "第二组效果图"),
+      {
+        nodeId: targetNodeId,
+        kind: "result",
+        inputImages: [],
+        upstream: [
+          { nodeId: firstNodeId, images: [] },
+          { nodeId: secondNodeId, images: [] },
+        ],
+        params: {},
+      },
+    ],
+  };
+  const fake = resolver((request) => ({
+    images: Array.from({ length: Number(request.batchSize) || 1 }, () => PNG_DATA_URL),
+    model: "gpt-image-2-vip",
+  }));
+  const run = await queue.enqueueGenerationRun(plan, owner.id, {
+    userId: owner.id,
+    nodeId: targetNodeId,
+    nodeLabel: targetNodeId,
+    kind: "result",
+    requestedCount: 2,
+  });
+  for (let jobIndex = 0; jobIndex < 3; jobIndex += 1) {
+    const now = tick();
+    assert.equal(await queue.processNextGenerationJob(`worker-mapping-${jobIndex}`, {
+      resolveProvider: fake.resolveProvider,
+      now: () => now,
+      random: () => 0,
+    }), true);
+  }
+  assert.equal(fake.calls(), 2);
+  assert.deepEqual(await runRow(run.id), {
+    status: "succeeded", error: null, provider_requests: 2, successful_count: 2,
+  });
+
+  const upstreamSteps = await database.query<{
+    node_id: string; output_images_json: string; provider_images_json: string;
+  }>(`
+    SELECT node_id, output_images_json, provider_images_json
+    FROM generation_run_steps
+    WHERE run_id = $1 AND node_id = ANY($2::text[])
+    ORDER BY step_index
+  `, [run.id, [firstNodeId, secondNodeId]]);
+  assert.deepEqual(upstreamSteps.map((row) => row.node_id), [firstNodeId, secondNodeId]);
+  const expectedImages = upstreamSteps.flatMap(
+    (row) => JSON.parse(row.output_images_json) as string[],
+  );
+  const expectedProviderImages = upstreamSteps.flatMap(
+    (row) => JSON.parse(row.provider_images_json) as string[],
+  );
+  assert.equal(expectedImages.length, 2);
+  assert.equal(expectedProviderImages.length, 2);
+  assert.equal(new Set(expectedProviderImages).size, 2);
+
+  const outputRows = await database.query<{ image: string; provider_image: string | null }>(`
+    SELECT image, provider_image FROM generation_outputs
+    WHERE run_id = $1 AND status = 'success'
+    ORDER BY created_at, id
+  `, [run.id]);
+  const app = express();
+  app.use((req, _res, next) => {
+    (req as AuthenticatedRequest).authUser = {
+      id: owner.id, accountId: "queue-admin", displayName: "Queue Admin",
+      role: "admin", mustChangePassword: false,
+    };
+    next();
+  });
+  app.use("/api/history", historyRouter);
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await fetch(
+      `http://127.0.0.1:${address.port}/api/history?limit=100&before=${Date.now() + 60_000}`,
+    );
+    const responseText = await response.text();
+    assert.equal(response.status, 200, responseText);
+    const payload = JSON.parse(responseText) as {
+      records: Array<{ runId: string; image: string; providerImage: string }>;
+    };
+    const historyRows = payload.records
+      .filter((record) => record.runId === run.id)
+      .map((record) => ({ image: record.image, providerImage: record.providerImage }));
+    const expectedPairs = expectedImages.map((image, index) => ({
+      image,
+      providerImage: expectedProviderImages[index],
+    }));
+    assert.deepEqual({
+      outputs: outputRows.map((row) => ({ image: row.image, providerImage: row.provider_image })),
+      history: historyRows,
+      distinctHistoryProviderImages: new Set(historyRows.map((row) => row.providerImage)).size,
+    }, {
+      outputs: expectedPairs,
+      history: expectedPairs,
+      distinctHistoryProviderImages: expectedPairs.length,
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
 
 await test("invalid_response 是确定失败且不会进入自动重试", async () => {
@@ -527,6 +2165,165 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   assert.equal(unknown?.status, "outcome_unknown");
   assert.equal(unknown?.provider_requests, 1);
   assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
+});
+
+await test("评估恢复仍存在 started 请求时保持 outcome_unknown 并等待账单核对", async () => {
+  const nodeId = `lease-started-evaluation-${++sequence}`;
+  const evaluationPlan: ExecutionPlan = { steps: [step(nodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `lease-started-case-${sequence}`,
+    sampleId: `lease-started-sample-${sequence}`,
+    authorizationId: `lease-started-authorization-${sequence}`,
+  });
+  const run = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+  const startedAt = tick();
+  const claimed = await queue.claimNextJob("dead-started-evaluation-worker", startedAt, 1_000);
+  assert.ok(claimed);
+  assert.equal(claimed.runId, run.id);
+  const request: ImageGenRequest = {
+    prompt: String(claimed.step.params.prompt),
+    operationMode: "generate",
+    aspectRatio: claimed.step.params.aspectRatio as string,
+    batchSize: 1,
+    modelOptions: claimed.step.params.modelOptions as ImageGenRequest["modelOptions"],
+  };
+  await database.transaction(async (client) => {
+    await evaluationEvidenceStore.startEvaluationProviderRequestEvidence(client, {
+      runId: run.id,
+      ownerId: owner.id,
+      plan: { steps: [claimed.step] },
+      step: claimed.step,
+      policy: evaluationPolicy,
+      requestIndex: 1,
+      request,
+      startedAt,
+      codeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    });
+    await client.query(`
+      UPDATE generation_jobs SET attempt_started_at = $1, lease_expires_at = $2
+      WHERE id = $3
+    `, [startedAt, startedAt - 1, claimed.id]);
+    await client.query(
+      "UPDATE generation_run_steps SET provider_requests = 1 WHERE id = $1",
+      [claimed.stepId],
+    );
+  });
+
+  assert.equal(await queue.recoverExpiredGenerationJobs(tick()), 1);
+  const recovered = await runRow(run.id);
+  assert.equal(recovered?.status, "outcome_unknown");
+  assert.match(recovered?.error ?? "", /核对 API易消耗记录/);
+  assert.equal((await database.queryOne<{ outcome: string }>(`
+    SELECT outcome FROM evaluation_provider_request_evidence WHERE run_id = $1
+  `, [run.id]))?.outcome, "outcome_unknown");
+  const blockers = await database.queryOne<{ hard_blockers_json: string }>(`
+    SELECT hard_blockers_json FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]);
+  assert.equal(
+    JSON.parse(blockers?.hard_blockers_json ?? "[]")
+      .some((blocker: { code?: string }) => blocker.code === "outcome-unknown"),
+    true,
+  );
+});
+
+await test("评估请求已成功且原图落库后租约过期按后处理失败关闭，而非 outcome_unknown", async () => {
+  const nodeId = `lease-known-evaluation-${++sequence}`;
+  const evaluationPlan: ExecutionPlan = { steps: [step(nodeId)] };
+  const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
+    caseId: `lease-known-case-${sequence}`,
+    sampleId: `lease-known-sample-${sequence}`,
+    authorizationId: `lease-known-authorization-${sequence}`,
+  });
+  const run = await queue.enqueueGenerationRun(
+    evaluationPlan,
+    owner.id,
+    context(nodeId),
+    "evaluation",
+    evaluationPolicy,
+  );
+  const startedAt = tick();
+  const claimed = await queue.claimNextJob("dead-evaluation-worker", startedAt, 1_000);
+  assert.ok(claimed);
+  assert.equal(claimed.runId, run.id);
+  const request: ImageGenRequest = {
+    prompt: String(claimed.step.params.prompt),
+    operationMode: "generate",
+    aspectRatio: claimed.step.params.aspectRatio as string,
+    batchSize: 1,
+    modelOptions: claimed.step.params.modelOptions as ImageGenRequest["modelOptions"],
+  };
+  await database.transaction(async (client) => {
+    await evaluationEvidenceStore.startEvaluationProviderRequestEvidence(client, {
+      runId: run.id,
+      ownerId: owner.id,
+      plan: { steps: [claimed.step] },
+      step: claimed.step,
+      policy: evaluationPolicy,
+      requestIndex: 1,
+      request,
+      startedAt,
+      codeIdentity: TEST_EVALUATION_CODE_IDENTITY,
+    });
+    await client.query(`
+      UPDATE generation_jobs SET attempt_started_at = $1, lease_expires_at = $2
+      WHERE id = $3
+    `, [startedAt, startedAt - 1, claimed.id]);
+    await client.query(
+      "UPDATE generation_run_steps SET provider_requests = 1 WHERE id = $1",
+      [claimed.stepId],
+    );
+  });
+  const original = await fileStore.persistImageRefWithReceipt(
+    PNG_DATA_URL,
+    `${run.id}:${claimed.stepId}:provider:0`,
+  );
+  const providerFinishedAt = tick();
+  await database.transaction(async (client) => {
+    await client.query(`
+      UPDATE generation_run_steps SET provider_images_json = $1 WHERE id = $2
+    `, [JSON.stringify([original.url]), claimed.stepId]);
+    await client.query(`
+      INSERT INTO files (id, owner_id, source_type, node_id, run_id, created_at)
+      VALUES ($1, $2, 'provider-original', $3, $4, $5)
+    `, [original.id, owner.id, nodeId, run.id, new Date(providerFinishedAt).toISOString()]);
+    await evaluationEvidenceStore.recordEvaluationProviderRequestSuccess(client, {
+      runId: run.id,
+      policy: evaluationPolicy,
+      requestIndex: 1,
+      providerModel: queueVariant.modelId,
+      providerOutputSizes: ["1024x1024"],
+      providerOriginalStorageRefs: [original.url],
+      finishedAt: providerFinishedAt,
+    });
+  });
+
+  const recoveredAt = tick();
+  assert.equal(await queue.recoverExpiredGenerationJobs(recoveredAt), 1);
+  const recovered = await runRow(run.id);
+  assert.equal(recovered?.status, "failed");
+  assert.doesNotMatch(recovered?.error ?? "", /结果未知|核对 API易消耗记录/);
+  assert.match(recovered?.error ?? "", /原图已持久化.*后处理失败/);
+  assert.equal((await database.queryOne<{ outcome: string }>(`
+    SELECT outcome FROM evaluation_provider_request_evidence WHERE run_id = $1
+  `, [run.id]))?.outcome, "succeeded");
+  const caseEvidence = await database.queryOne<{
+    outcome: string; error_events_json: string; hard_blockers_json: string;
+  }>(`
+    SELECT outcome, error_events_json, hard_blockers_json
+    FROM evaluation_case_evidence WHERE run_id = $1
+  `, [run.id]);
+  assert.equal(caseEvidence?.outcome, "failed");
+  assert.equal(JSON.parse(caseEvidence?.error_events_json ?? "[]")[0]?.phase, "postprocess");
+  const blockerCodes = JSON.parse(caseEvidence?.hard_blockers_json ?? "[]")
+    .map((blocker: { code?: string }) => blocker.code);
+  assert.equal(blockerCodes.includes("evidence-integrity-failure"), true);
+  assert.equal(blockerCodes.includes("outcome-unknown"), false);
 });
 
 await test("同一 run 的并发事件通过原子序号严格递增且无缺口", async () => {
@@ -627,11 +2424,24 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         kind: "mask-redraw",
         nodeId: "direct-mask-test",
         request: {
-          prompt: "只修改左侧衣袖",
-          referenceImages: [PNG_DATA_URL],
+          prompt: buildGarmentPrompt(maskVariant.variantId, "只修改左侧衣袖"),
+          promptVariantId: maskVariant.variantId,
+          promptFamilyId: maskVariant.familyId,
+          parameterProfileId: maskVariant.parameterProfileId,
+          contractHash: maskVariant.contractHash,
+          evaluationVersion: maskVariant.evaluationVersion,
+          postprocessVersion: maskProfile.postprocess.version,
+          operationMode: "mask-edit",
+          references: [{
+            dataUrl: PNG_DATA_URL,
+            role: "garment_full",
+            order: 0,
+            assetSha256: "a".repeat(64),
+            roleNeedsConfirmation: false,
+          }],
           mask: PNG_DATA_URL,
           maskMode: "replace",
-          modelOptions: {},
+          modelOptions: maskParameters.modelOptions,
         },
       }),
     });
@@ -664,10 +2474,23 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         kind: "mask-redraw",
         nodeId: "direct-mask-over-limit",
         request: {
-          prompt: "局部修改",
-          referenceImages: Array.from({ length: 8 }, () => PNG_DATA_URL),
+          prompt: buildGarmentPrompt(maskVariant.variantId, "局部修改"),
+          promptVariantId: maskVariant.variantId,
+          promptFamilyId: maskVariant.familyId,
+          parameterProfileId: maskVariant.parameterProfileId,
+          contractHash: maskVariant.contractHash,
+          evaluationVersion: maskVariant.evaluationVersion,
+          postprocessVersion: maskProfile.postprocess.version,
+          operationMode: "mask-edit",
+          references: Array.from({ length: 8 }, (_value, order) => ({
+            dataUrl: PNG_DATA_URL,
+            role: "garment_full" as const,
+            order,
+            assetSha256: "b".repeat(64),
+            roleNeedsConfirmation: false,
+          })),
           mask: PNG_DATA_URL,
-          modelOptions: {},
+          modelOptions: maskParameters.modelOptions,
         },
       }),
     });

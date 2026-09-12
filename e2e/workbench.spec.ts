@@ -193,6 +193,30 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
 });
 
+test("unverified prompt variants stay disabled with an explicit runtime reason", async ({ page }) => {
+  await page.getByRole("button", { name: "节点库" }).click();
+  await page.getByTitle("点击添加草图→效果图，或拖拽到画布指定位置").click();
+  await page.getByRole("button", { name: "属性 / 结果" }).click();
+
+  const properties = page.getByRole("tabpanel", { name: "属性" });
+  await expect(properties).toBeVisible();
+
+  const presetDisclosure = properties.getByRole("button", { name: "服装提示词预设" });
+  await expect(presetDisclosure).toHaveAttribute("data-slot", "collapsible-trigger");
+  await presetDisclosure.click();
+  const presets = properties.getByRole("button", { name: /写实穿搭|电商主图|服装设定表/ });
+  await expect(presets).toHaveCount(3);
+  for (const preset of await presets.all()) {
+    await preset.scrollIntoViewIfNeeded();
+    expectInside(await rect(preset), await rect(properties));
+    await expect(preset).toBeDisabled();
+  }
+  await expect(properties.getByText(/尚未完成当前契约版本的真实评估/)).toHaveCount(3);
+  const runButton = properties.getByRole("button", { name: "未验证不可运行" });
+  await expect(runButton).toBeDisabled();
+  await expect(properties.getByText(/没有绑定当前版本的独立提示词变体/)).toBeVisible();
+});
+
 test("project center separates built-in and user templates and keeps template actions reachable", async ({ page }, testInfo) => {
   const templateName = `E2E 我的模板 ${testInfo.project.name}`;
   const createResponse = await page.request.post("/api/templates", {
@@ -423,8 +447,10 @@ test("adding a local edit node keeps the canvas mounted and exposes one clear wo
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
-  await expect(page.getByText(/涂抹区不是裁切框/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "生成局部修改" })).toBeVisible();
+  const addedNode = nodes.last();
+  await expect(addedNode.getByText(/涂抹区不是裁切框/)).toBeVisible();
+  await expect(addedNode.getByRole("button", { name: "未验证不可运行" })).toBeDisabled();
+  await expect(addedNode.getByText(/mask-edit 模式至少需要一张已确认角色的参考图/)).toBeVisible();
   await expect(page.getByRole("group", { name: "蒙版处理方式" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "取消" })).toHaveCount(0);
   await expect(page.getByText("页面出现异常")).toHaveCount(0);

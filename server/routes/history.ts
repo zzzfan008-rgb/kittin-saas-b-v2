@@ -5,6 +5,7 @@ import { query, queryOne, transaction } from "../lib/database";
 import { thumbnailUrlForImage } from "../lib/fileStore";
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 import { lockActiveOwner } from "../lib/ownerMutation";
+import { normalizeReferenceImageEvidence } from "../../src/lib/referenceEvidence";
 
 export const historyRouter = Router();
 
@@ -84,22 +85,45 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     return;
   }
   const rows = await query<Record<string, unknown>>(`
-    SELECT r.*, o.id AS output_id, o.image, o.prompt AS output_prompt,
+    SELECT r.*, o.id AS output_id, o.image, o.provider_image, o.prompt AS output_prompt,
       o.provider_output_size, o.status AS output_status, o.error AS output_error,
+      provider_evidence.provider_images_json AS step_provider_images_json,
+      provider_file_evidence.provider_images_json AS file_provider_images_json,
       u.display_name AS owner_name
     FROM generation_runs r
     JOIN users u ON u.id = r.owner_id
     LEFT JOIN generation_outputs o ON o.run_id = r.id
+    LEFT JOIN LATERAL (
+      SELECT step.provider_images_json
+      FROM generation_run_steps step
+      WHERE step.run_id = r.id AND step.provider_images_json <> '[]'
+      ORDER BY (step.id = r.target_step_id) DESC, step.step_index DESC
+      LIMIT 1
+    ) provider_evidence ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(
+        json_agg('/api/files/' || file.id ORDER BY file.created_at, file.id),
+        '[]'::json
+      )::text AS provider_images_json
+      FROM files file
+      WHERE file.run_id = r.id AND file.source_type = 'provider-original'
+    ) provider_file_evidence ON TRUE
     WHERE r.id = ANY($1::text[])
     ORDER BY r.started_at DESC, r.id DESC, o.created_at ASC, o.id ASC
   `, [pageRuns.map((run) => run.id)]);
   const records = rows.map((row) => {
     const runStatus = row.status === "succeeded" ? "success" : row.status === "failed" ? "error" : row.status;
+    const stepProviderImages = parseJson<string[]>(row.step_provider_images_json, []);
+    const providerImages = stepProviderImages.length > 0
+      ? stepProviderImages
+      : parseJson<string[]>(row.file_provider_images_json, []);
     return ({
     id: (row.output_id as string | null) ?? (row.id as string),
     runId: row.id,
     clientRequestId: row.client_request_id,
     image: (row.image as string | null) ?? "",
+    providerImage: (row.provider_image as string | null) ?? "",
+    providerImages,
     thumbnail: row.image ? thumbnailUrlForImage(row.image as string) : "",
     nodeId: row.node_id,
     nodeLabel: row.node_label,
@@ -111,6 +135,10 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     prompt: (row.output_prompt as string | null) ?? row.prompt,
     parameters: parseJson<Record<string, unknown>>(row.parameters_json, {}),
     referenceImages: parseJson<string[]>(row.reference_images_json, []),
+    referenceInputs: normalizeReferenceImageEvidence(
+      parseJson<unknown[]>(row.reference_inputs_json, []),
+      parseJson<string[]>(row.reference_images_json, []).length,
+    ),
     model: row.model,
     requestedCount: row.requested_count,
     successfulCount: row.successful_count,
@@ -195,6 +223,14 @@ historyRouter.delete("/:id", asyncHandler(async (req, res) => {
     `, [req.params.id, user.id], client);
     if (!row) return "missing" as const;
     await client.query("DELETE FROM generation_outputs WHERE id = $1", [req.params.id]);
+    const deletedAt = new Date().toISOString();
+    const updatedAt = Date.now();
+    await client.query(`
+      UPDATE generation_runs SET deleted_at = COALESCE(deleted_at, $1), updated_at = $2
+      WHERE id = $3 AND NOT EXISTS (
+        SELECT 1 FROM generation_outputs WHERE run_id = $3
+      )
+    `, [deletedAt, updatedAt, row.run_id]);
     return "deleted" as const;
   });
   if (result === "owner_unavailable") {

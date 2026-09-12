@@ -3,39 +3,47 @@
  * 运行记录保存在内存（P0 单进程足够）。
  */
 import { EventEmitter } from "node:events";
+import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import {
   NODE_SPECS,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
+  allowedOperationModesForNode,
   type ExecutionPlan,
   type AIProvider,
+  type ImageGenRequest,
+  type ImageOperationMode,
   type NodeExecution,
   type NodeRunStatus,
+  type ReferenceImageInput,
+  type ReferenceImageSource,
 } from "../../src/types/workflow";
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
 import { generateExactImages } from "../providers/exact";
 import { normalizeImageRef, persistImageRef } from "../lib/fileStore";
-import { isLocalImageReference } from "../lib/imageValidation";
+import {
+  isLocalImageReference,
+  isRemoteImageReference,
+  validateImageDataUrl,
+} from "../lib/imageValidation";
+import { REMOTE_IMAGE_REFERENCE_MESSAGE } from "../lib/imageReferenceAccess";
 import { normalizeUploadImageDataUrl } from "../lib/uploadImageNormalization";
 import { query } from "../lib/database";
 import {
-  fitGeneratedImageToAspect,
   normalizeExactAspectRatio,
   normalizeUpscaleSize,
-  upscaleImageToLongEdge,
 } from "../lib/imagePostProcessing";
 import { buildRecolorPrompt } from "../../src/lib/colors";
 import {
-  DEFAULT_GENERATION_MODEL_ID,
-  MASK_REDRAW_MODEL_ID,
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { compositeMaskedEdit, prepareMaskForGeneration } from "../lib/maskProcessing";
+import { renderProviderPrompt } from "../../src/lib/providerPromptRenderer";
 import {
   completeGenerationRecord,
   createGenerationRecord,
@@ -44,6 +52,9 @@ import {
   registerGeneratedFiles,
   type GenerationRecordContext,
 } from "../lib/generationRecords";
+import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
+
+export { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
 export interface RunFailure {
   prompt?: string;
@@ -89,28 +100,15 @@ export type RunEvent =
 
 export interface StepResult {
   images: string[];
+  /** 业务补边/缩放/WebP 转换前的 Provider 原图。 */
+  providerImages?: string[];
+  /** 实际发给 Provider 的角色化参考图证据。 */
+  references?: ReferenceImageInput[];
   model?: string;
   prompts?: string[];
   providerOutputSizes?: Array<string | null>;
   failures?: RunFailure[];
   providerRequests: number;
-}
-
-const DEFAULT_PROMPTS: Partial<Record<NodeExecution["kind"], string>> = {
-  "sketch-to-render": "将线稿渲染为写实服装效果图，保持结构与轮廓，高端时装摄影质感",
-  "ai-modify": "在保持整体版型不变的前提下，优化服装细节设计",
-  "fabric-recolor": "保持服装款式、细节、光影与背景不变，仅替换面料质感",
-};
-
-function maskReferenceRolePrompt(userReferenceCount: number): string {
-  const guideIndex = userReferenceCount + 1;
-  if (userReferenceCount <= 1) {
-    return "参考图1是完整原图；最后一张参考图（参考图2）是区域引导图";
-  }
-  const userReferences = userReferenceCount === 2
-    ? "参考图2是用户提供的目标内容参考图"
-    : `参考图2至参考图${userReferenceCount}是用户提供的目标内容参考图`;
-  return `参考图1是完整原图；${userReferences}，用户提示词中的图号始终对应这些用户参考图；最后一张参考图（参考图${guideIndex}）才是区域引导图`;
 }
 
 interface Run {
@@ -206,9 +204,14 @@ function emit(run: Run, event: RunEvent): void {
 async function executeRun(run: Run): Promise<void> {
   /** 每个节点的产出图片（统一为 /api/files/:id 引用），供下游节点使用 */
   const outputs = new Map<string, string[]>();
+  /** 与 outputs 同序的 Provider 原图引用，供 result 聚合节点保留逐图 provenance。 */
+  const providerOutputs = new Map<string, string[]>();
   let providerRequests = 0;
   let model: string | undefined;
-  let recordResult: Pick<StepResult, "images" | "prompts" | "providerOutputSizes" | "failures"> | undefined;
+  let recordResult: Pick<
+    StepResult,
+    "images" | "providerImages" | "references" | "prompts" | "providerOutputSizes" | "failures"
+  > | undefined;
 
   if (run.recordContext) await markGenerationRunning(run.id, Date.now());
 
@@ -230,9 +233,20 @@ async function executeRun(run: Run): Promise<void> {
 
   for (const step of run.plan.steps) {
     // 运行时解析真实输入：优先本次 Run 上游产出，范围外上游回退到计划期快照
-    const inputImages = (step.upstream ?? []).flatMap(
-      (u) => outputs.get(u.nodeId) ?? u.images,
-    );
+    const runtimeInputs = (step.upstream ?? []).flatMap((upstream) => {
+      const images = outputs.get(upstream.nodeId) ?? upstream.images;
+      const providerImages = providerOutputs.get(upstream.nodeId) ?? [];
+      return images.map((imageRef, index) => ({
+        imageRef,
+        providerImage: providerImages.length === images.length ? providerImages[index] : undefined,
+        role: upstream.referenceRole ?? "generic",
+        roleNeedsConfirmation: upstream.roleNeedsConfirmation !== false,
+        sourceNodeId: upstream.nodeId,
+        order: 0,
+      }));
+    }).map((reference, order) => ({ ...reference, order }));
+    const referenceSources = runtimeInputs.map(({ providerImage: _providerImage, ...reference }) => reference);
+    const inputImages = referenceSources.map((reference) => reference.imageRef);
 
     const runtimeInputLimit = step.kind === "mask-redraw"
       ? MAX_MASK_USER_REFERENCE_IMAGES
@@ -253,19 +267,48 @@ async function executeRun(run: Run): Promise<void> {
     const startedAt = Date.now();
     emit(run, { type: "node-status", nodeId: step.nodeId, status: "running", startedAt });
     try {
-      const result = await executeStep(step, inputImages, getProvider, run.id);
-      // 产出统一落盘为 /api/files/:id，避免 base64 大图驻留事件与内存
+      const result = await executeStep(step, inputImages, getProvider, {
+        runId: run.id,
+        referenceSources,
+        inputProviderImages: runtimeInputs.map((reference) => reference.providerImage),
+        ...(run.recordContext && NODE_SPECS[step.kind].providerId ? {
+          captureProviderImages: async ({ images }: { images: string[] }) => {
+            const captured: string[] = [];
+            for (const image of images) {
+              const evidenceSource = image.startsWith("/api/files/")
+                ? await normalizeImageRef(image)
+                : image;
+              captured.push(await persistImageRef(evidenceSource));
+            }
+            await registerGeneratedFiles(
+              run.recordContext!, run.id, step.nodeId, captured, Date.now(), "provider-original",
+            );
+            return captured;
+          },
+        } : {}),
+      });
+      const providerImages = result.providerImages ?? [];
+      if (providerImages.length > 0 && providerImages.length !== result.images.length) {
+        throw new Error("Provider originals and business outputs must have identical cardinality");
+      }
+      // 先确保原始证据存在，再落业务图；即使后者失败也不删除前者。
+      const persistedProviderImages = providerImages.length > 0
+        ? await persistOutputImages(providerImages)
+        : [];
       const persisted = await persistOutputImages(result.images);
       if (run.recordContext) {
         await registerGeneratedFiles(run.recordContext, run.id, step.nodeId, persisted, Date.now());
       }
       outputs.set(step.nodeId, persisted);
+      providerOutputs.set(step.nodeId, persistedProviderImages);
       const finishedAt = Date.now();
       providerRequests += result.providerRequests;
       if (result.model) model = result.model;
       if (run.recordContext?.nodeId === step.nodeId) {
         recordResult = {
           images: persisted,
+          providerImages: persistedProviderImages,
+          references: result.references,
           prompts: result.prompts,
           providerOutputSizes: result.providerOutputSizes,
           failures: result.failures,
@@ -300,6 +343,8 @@ async function executeRun(run: Run): Promise<void> {
     await completeGenerationRecord({
       runId: run.id,
       images: recordResult?.images ?? [],
+      providerImages: recordResult?.providerImages,
+      references: recordResult?.references,
       prompts: recordResult?.prompts,
       providerOutputSizes: recordResult?.providerOutputSizes,
       failures: recordResult?.failures,
@@ -317,31 +362,119 @@ async function persistOutputImages(images: string[]): Promise<string[]> {
   return Promise.all(images.map((img) => persistImageRef(img)));
 }
 
-/** Apply business-side output guarantees only to nodes that expose size controls to users. */
-export async function postProcessGeneratedOutputImages(
-  kind: NodeExecution["kind"],
-  params: Record<string, unknown>,
-  images: string[],
-): Promise<string[]> {
-  if (kind !== "sketch-to-render" && kind !== "ai-modify" && kind !== "upscale") return images;
-  const aspectRatio = normalizeExactAspectRatio(params.aspectRatio);
-  const imageSize = normalizeUpscaleSize(params.imageSize);
-  const processed: string[] = [];
-  for (const image of images) {
-    processed.push(
-      kind === "upscale"
-        ? await upscaleImageToLongEdge(image, imageSize)
-        : await fitGeneratedImageToAspect(image, aspectRatio),
-    );
-  }
-  return processed;
-}
-
 export type ProviderResolver = (id: string) => AIProvider;
 
 export interface ExecuteStepOptions {
   runId?: string;
-  beforeProviderCall?: (providerRequest: number) => void | Promise<void>;
+  beforeProviderCall?: (
+    providerRequest: number,
+    request: ImageGenRequest,
+  ) => void | Promise<void>;
+  onProviderCallError?: (artifact: {
+    providerRequest: number;
+    request: ImageGenRequest;
+    error: unknown;
+  }) => void | Promise<void>;
+  /** 运行时与 inputImages 对齐的角色快照。 */
+  referenceSources?: ReferenceImageSource[];
+  /** 与 inputImages 同序的上游 Provider 原图；非 Provider 输入可为空。 */
+  inputProviderImages?: Array<string | undefined>;
+  /** Provider 返回后、任何合成或业务后处理前立即保存原始产物。 */
+  captureProviderImages?: (artifact: {
+    providerRequest: number;
+    request: ImageGenRequest;
+    images: string[];
+    model: string;
+    prompt: string;
+    providerOutputSizes?: Array<string | null>;
+    providerRequestId?: string;
+  }) => Promise<string[]>;
+}
+
+function fallbackReferenceSources(step: NodeExecution, inputImages: string[]): ReferenceImageSource[] {
+  if (step.inputReferences !== undefined) {
+    if (step.inputReferences.length !== inputImages.length) {
+      throw new Error(`Node ${step.nodeId} reference snapshot length does not match inputImages`);
+    }
+    step.inputReferences.forEach((reference, index) => {
+      if (reference.imageRef !== inputImages[index]) {
+        throw new Error(`Node ${step.nodeId} reference snapshot imageRef does not match inputImages[${index}]`);
+      }
+    });
+    return step.inputReferences.map((reference) => ({ ...reference }));
+  }
+  return inputImages.map((imageRef, order) => ({
+    imageRef,
+    role: "generic",
+    order,
+    roleNeedsConfirmation: true,
+  }));
+}
+
+function assetSha256(dataUrl: string): string {
+  const image = validateImageDataUrl(dataUrl);
+  return createHash("sha256").update(image.buffer).digest("hex");
+}
+
+function assertContiguousReferenceSourceOrder(sources: readonly ReferenceImageSource[]): void {
+  sources.forEach((source, index) => {
+    if (!Number.isSafeInteger(source?.order) || source.order !== index) {
+      throw new Error(`referenceSources[${index}].order must be a safe integer equal to ${index}`);
+    }
+  });
+}
+
+function assertReferenceSourcesMatchImages(
+  sources: readonly ReferenceImageSource[],
+  inputImages: readonly string[],
+  nodeId: string,
+): void {
+  if (sources.length !== inputImages.length) {
+    throw new Error(`Node ${nodeId} runtime reference source length does not match inputImages`);
+  }
+  assertContiguousReferenceSourceOrder(sources);
+  sources.forEach((source, index) => {
+    if (source.imageRef !== inputImages[index]) {
+      throw new Error(`Node ${nodeId} runtime reference imageRef does not match inputImages[${index}]`);
+    }
+  });
+}
+
+function assertNoRemoteWorkerReferenceValues(values: readonly unknown[]): void {
+  if (values.some(isRemoteImageReference)) {
+    throw new Error(REMOTE_IMAGE_REFERENCE_MESSAGE);
+  }
+}
+
+function assertNoRemoteWorkerReferences(step: NodeExecution, inputImages: readonly string[]): void {
+  assertNoRemoteWorkerReferenceValues([
+    ...inputImages,
+    step.kind === "image-input" ? step.params.imageUrl : undefined,
+    step.kind === "fabric-recolor" ? step.params.fabricImageUrl : undefined,
+    step.kind === "mask-redraw" ? step.params.mask : undefined,
+  ]);
+}
+
+export async function resolveReferenceInputs(
+  sources: ReferenceImageSource[],
+): Promise<ReferenceImageInput[]> {
+  // Validate the durable ordering before resolving a local reference or
+  // decoding image bytes. Never repair a damaged snapshot by array position.
+  assertContiguousReferenceSourceOrder(sources);
+  assertNoRemoteWorkerReferenceValues(sources.map((source) => source.imageRef));
+  const dataUrls = await resolveImageRefs(sources.map((source) => source.imageRef));
+  return sources.map((source) => {
+    const dataUrl = dataUrls[source.order];
+    if (!dataUrl) throw new Error(`referenceSources[${source.order}] did not resolve to an image`);
+    return {
+      dataUrl,
+      role: source.role,
+      order: source.order,
+      assetSha256: assetSha256(dataUrl),
+      ...(source.sourceNodeId ? { sourceNodeId: source.sourceNodeId } : {}),
+      roleNeedsConfirmation: source.roleNeedsConfirmation !== false,
+    };
+  });
 }
 
 export async function executeStep(
@@ -353,6 +486,10 @@ export async function executeStep(
   const options: ExecuteStepOptions = typeof runIdOrOptions === "string"
     ? { runId: runIdOrOptions }
     : runIdOrOptions ?? {};
+  // Defense in depth for legacy or manually queued plans. Provider result URLs
+  // are persisted before becoming downstream inputs, so this gate is scoped to
+  // unresolved user input references and never changes output URL handling.
+  assertNoRemoteWorkerReferences(step, inputImages);
   switch (step.kind) {
     case "image-input": {
       const imageUrl = step.params.imageUrl as string | undefined;
@@ -360,7 +497,11 @@ export async function executeStep(
     }
     case "result": {
       // 结果节点：汇总上游本次运行的真实产出
-      return { images: inputImages, providerRequests: 0 };
+      const providerImages = options.inputProviderImages?.length === inputImages.length
+        && options.inputProviderImages.every((image): image is string => typeof image === "string" && image.length > 0)
+        ? options.inputProviderImages
+        : undefined;
+      return { images: inputImages, providerImages, providerRequests: 0 };
     }
     case "sketch-to-render":
     case "ai-modify":
@@ -369,27 +510,54 @@ export async function executeStep(
     case "print-extract":
     case "print-mutate":
     case "mask-redraw": {
-      const modelId = isImageModelId(step.params.modelId)
-        ? step.params.modelId
-        : step.kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+      if (
+        step.params.modelSelectionNeedsConfirmation === true
+        || (typeof step.params.retiredModelId === "string" && step.params.retiredModelId.trim())
+      ) {
+        throw new Error(`Node ${step.nodeId} uses a retired model and must be manually reconfigured before running`);
+      }
+      if (!isImageModelId(step.params.modelId)) {
+        throw new Error(`Node ${step.nodeId} must select an explicit supported image model`);
+      }
+      const modelId = step.params.modelId;
       if (!isModelAllowedForNode(modelId, step.kind)) {
         throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
       }
       const provider = resolveProvider(modelId);
       const modelOptions = step.params.modelOptions as ImageModelOptions | undefined;
+      const allowedModes = allowedOperationModesForNode(step.kind);
+      const operationMode = step.params.operationMode as ImageOperationMode;
+      if (!allowedModes.includes(operationMode as never)) {
+        throw new Error(`Node ${step.nodeId} has an invalid fixed operationMode`);
+      }
+      if (step.params.operationModeNeedsConfirmation === true) {
+        throw new Error(`Node ${step.nodeId} operationMode must be confirmed before running`);
+      }
       if (
         step.kind === "mask-redraw" &&
         (typeof step.params.maskSourceRef !== "string" || step.params.maskSourceRef !== inputImages[0])
       ) {
         throw new Error("蒙版对应的原图已变化，请重新绘制蒙版");
       }
-      const referenceImages = await resolveImageRefs(inputImages);
+      const inputReferenceSources = options.referenceSources !== undefined
+        ? options.referenceSources.map((reference) => ({ ...reference }))
+        : fallbackReferenceSources(step, inputImages);
+      assertReferenceSourcesMatchImages(inputReferenceSources, inputImages, step.nodeId);
 
-      // fabric-recolor 的面料参考图（可能不是边连入，而是节点参数）
+      // fabric-recolor 的面料参考图（可能不是边连入，而是节点参数）先并入
+      // canonical sources，再只从最终 references 派生兼容图片数组。
       const fabricImageUrl = step.params.fabricImageUrl as string | undefined;
-      if (step.kind === "fabric-recolor" && fabricImageUrl) {
-        referenceImages.push(...(await resolveImageRefs([fabricImageUrl])));
-      }
+      const referenceSources = step.kind === "fabric-recolor" && fabricImageUrl
+        ? [...inputReferenceSources, {
+          imageRef: fabricImageUrl,
+          role: "fabric" as const,
+          order: inputReferenceSources.length,
+          sourceNodeId: step.nodeId,
+          roleNeedsConfirmation: false,
+        }]
+        : inputReferenceSources;
+      const references = await resolveReferenceInputs(referenceSources);
+      const referenceImages = references.map((reference) => reference.dataUrl);
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
       const maxUserReferences = step.kind === "mask-redraw"
         ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
@@ -407,6 +575,7 @@ export async function executeStep(
           : [];
         if (colors.length > 0) {
           const images: string[] = [];
+          const providerImages: string[] = [];
           const prompts: string[] = [];
           const providerOutputSizes: Array<string | null> = [];
           const failures: RunFailure[] = [];
@@ -414,11 +583,17 @@ export async function executeStep(
           let providerRequests = 0;
           let firstError: unknown;
           for (const color of colors) {
-            const prompt = buildRecolorPrompt([color]);
+            const prompt = renderProviderPrompt({
+              nodeKind: step.kind,
+              modelId,
+              operationMode,
+              taskPrompt: buildRecolorPrompt([color]),
+              references,
+            });
             try {
               const result = await generateExactImages(
                 provider,
-                { prompt, referenceImages, modelOptions },
+                { prompt, operationMode: "edit", references, referenceImages, modelOptions },
                 1,
                 { ...options, nodeId: step.nodeId },
               );
@@ -426,6 +601,7 @@ export async function executeStep(
               model = result.model;
               for (const [index, image] of result.images.entries()) {
                 images.push(image);
+                providerImages.push(result.providerImages[index]!);
                 prompts.push(prompt);
                 providerOutputSizes.push(result.providerOutputSizes?.[index] ?? null);
               }
@@ -450,6 +626,8 @@ export async function executeStep(
           }
           return {
             images,
+            providerImages,
+            references,
             prompts,
             model,
             providerRequests,
@@ -464,18 +642,27 @@ export async function executeStep(
       // 印花裂变：分批出图（单次最多 4 张）
       if (step.kind === "print-mutate") {
         const count = Math.max(1, Math.min(8, Number(step.params.count) || 4));
-        const prompt =
+        const taskPrompt =
           "基于这张印花图案生成风格一致的新变体：保持原有配色体系、艺术风格与笔触质感，重新编排元素的构图与组合方式，纯白背景，适合作为印花素材复用" +
           (extra ? `。补充要求：${extra}` : "");
+        const prompt = renderProviderPrompt({
+          nodeKind: step.kind,
+          modelId,
+          operationMode,
+          taskPrompt,
+          references,
+        });
         const result = await generateExactImages(
           provider,
-          { prompt, referenceImages, modelOptions },
+          { prompt, operationMode: "edit", references, referenceImages, modelOptions },
           count,
           { ...options, nodeId: step.nodeId },
         );
         const failures = result.failures.map((error) => ({ prompt, error }));
         return {
           images: result.images,
+          providerImages: result.providerImages,
+          references,
           prompts: result.images.map(() => prompt),
           model: result.model,
           providerRequests: result.providerRequests,
@@ -484,21 +671,20 @@ export async function executeStep(
         };
       }
 
-      const maskReferenceRoles = step.kind === "mask-redraw"
-        ? maskReferenceRolePrompt(referenceImages.length)
-        : undefined;
-      const prompt =
+      const taskPrompt =
         step.kind === "upscale"
           ? "将这张服装效果图放大为超高清版本，增强面料纹理、走线与边缘细节，保持原有构图、色彩和光影完全不变"
           : step.kind === "print-extract"
             ? "提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用" +
               (extra ? `。补充要求：${extra}` : "")
-            : step.kind === "mask-redraw"
-              ? `目标修改：${extra}。${maskReferenceRoles}，其中红色表示用户涂抹的修改核心，红色已完全遮住旧内容，只用于表达位置；金色表示仅供完整轮廓延展和边缘融合的缓冲区；两者都是修改范围，不是裁切框。请根据用户说明在红色核心内添加、替换、删除或调整内容。凡用户要求替换、删除或改变既有对象时，必须先彻底清除与目标冲突的旧对象、旧包带、旧颜色、旧阴影、旧反光、旧纹理和残留边线，再依据周围连续的面料纹理、颜色、褶皱、缝线和光照完整重建被遮挡的底层服装或背景，然后放入新内容；禁止用模糊、暗斑、色块、漂浮投影或半透明残影遮盖清理区域。只有与新内容真实接触并符合整幅画面光源方向的阴影才可保留。不需要修改的服装结构、面料纹理和光影必须保持。结合整幅画面的构图、服装比例和视觉重量，新内容默认继承目标区域的中心位置与近似占位，除非用户明确要求，不得明显放大、缩小或偏移。只有完整轮廓、褶皱、缝线、阴影、反光和自然遮挡所必需的部分可以进入金色缓冲区，不得沿红色边缘截断，也不得覆盖缓冲区内的文字、独立图案、配饰或其他服装结构。交接处必须匹配原图的面料材质、纹理方向、褶皱、光影、透视、遮挡和清晰度，不得出现重影、透色、硬边或颜色污染。返回与整幅画面同尺寸、同坐标的 PNG 完整最终图片；修改范围以外的画面保持原状。`
-              : extra || DEFAULT_PROMPTS[step.kind] || NODE_SPECS[step.kind].description;
-      if (step.kind === "mask-redraw" && !extra) {
-        throw new Error("局部修改必须填写修改说明");
-      }
+            : extra;
+      const prompt = renderProviderPrompt({
+        nodeKind: step.kind,
+        modelId,
+        operationMode,
+        taskPrompt,
+        references,
+      });
       const maskReference = step.kind === "mask-redraw" ? step.params.mask : undefined;
       if (step.kind === "mask-redraw" && (typeof maskReference !== "string" || !maskReference)) {
         throw new Error("局部修改必须先保存 PNG 蒙版");
@@ -508,11 +694,25 @@ export async function executeStep(
         ? await prepareMaskForGeneration(referenceImages[0], mask!)
         : undefined;
       const providerMask = preparedMask?.mask ?? mask;
-      const providerReferenceImages = preparedMask
-        ? [referenceImages[0], ...referenceImages.slice(1), preparedMask.guide]
-        : referenceImages;
+      const providerReferences = preparedMask
+        ? [
+            references[0],
+            ...references.slice(1),
+            {
+              dataUrl: preparedMask.guide,
+              role: "generic" as const,
+              order: references.length,
+              assetSha256: assetSha256(preparedMask.guide),
+              sourceNodeId: `${step.nodeId}:mask-guide`,
+              roleNeedsConfirmation: false,
+            },
+          ]
+        : references;
+      const providerReferenceImages = providerReferences.map((reference) => reference.dataUrl);
       const request = {
         prompt,
+        operationMode: operationMode as "generate" | "edit" | "mask-edit",
+        references: providerReferences.length ? providerReferences : undefined,
         referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
         aspectRatio: step.kind === "sketch-to-render" || step.kind === "ai-modify"
           ? normalizeExactAspectRatio(step.params.aspectRatio)
@@ -539,6 +739,8 @@ export async function executeStep(
       const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);
       return {
         images,
+        providerImages: result.providerImages,
+        references: providerReferences,
         model: result.model,
         prompts: images.map(() => prompt),
         providerRequests: result.providerRequests,

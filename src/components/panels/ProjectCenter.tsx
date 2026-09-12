@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { thumbnailImageUrl } from "@/lib/images";
 import { inferTemplateLaunchMode, launchTemplateInNewTab } from "@/lib/templateLaunch";
+import { templateProductPolicy } from "@/lib/nodeProductPolicy";
 import { BUILTIN_TEMPLATE_COVERS } from "@/lib/templatePresentation";
 import {
   projectTabLifecycle,
@@ -464,24 +465,39 @@ export function ProjectCenter({
                 <div className={PROJECT_CENTER_CARD_GRID_CLASS}>
                   {filteredTemplates.map((template) => {
                     const image = BUILTIN_TEMPLATE_COVERS[template.id] ?? template.thumbnail ?? flowPreviewImage(template.flow);
+                    const productPolicy = templateProductPolicy(template);
+                    const unavailable = !productPolicy.launchAllowed;
+                    const reasonId = `project-center-template-policy-${template.id}`;
                     return (
                       <CardFrame key={template.id}>
                         <button
                           type="button"
+                          disabled={unavailable}
+                          title={productPolicy.reason}
+                          aria-describedby={unavailable ? reasonId : undefined}
                           onClick={() => openTemplate(template)}
-                          className="block w-full text-left"
+                          className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-75"
                         >
                           <ProjectCover src={image} alt={template.name} />
                           <span className="block p-3">
                             <span className="flex items-center gap-2">
                               <span className={PROJECT_CENTER_TITLE_CLASS}>{template.name}</span>
-                              <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">
-                                内置
+                              <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[8px] ${
+                                unavailable
+                                  ? "border-amber-600/50 text-amber-500"
+                                  : "border-[var(--gc-accent)]/40 text-[var(--gc-accent)]"
+                              }`}>
+                                {unavailable ? "unsupported" : "内置"}
                               </span>
                             </span>
                             <span className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
                               {template.description || "从此工作流模板创建一个新项目"}
                             </span>
+                            {unavailable && (
+                              <span id={reasonId} className="mt-1 block text-[9px] leading-relaxed text-amber-500">
+                                {productPolicy.reason}
+                              </span>
+                            )}
                           </span>
                         </button>
                       </CardFrame>

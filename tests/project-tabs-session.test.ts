@@ -8,6 +8,27 @@ import {
   PROJECT_TAB_STORAGE_KEY_PREFIX,
   projectTabStorageKey,
 } from "../src/lib/tabSessionStorage";
+import {
+  buildGarmentPrompt,
+  requireGarmentPromptVariant,
+} from "../src/lib/garmentPromptPresets";
+import {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} from "../src/types/modelParameterProfiles";
+import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
+
+const boundaryVariant = requireGarmentPromptVariant({
+  familyId: "commerce-hero",
+  modelId: "gpt-image-2-vip",
+  nodeKind: "sketch-to-render",
+  mode: "generate",
+});
+// This isolated serializer fixture needs to cross the client admission gate so
+// it can compare the save/run payloads; production catalog state stays closed.
+promotePromptVariantForTest(boundaryVariant);
+const boundaryProfile = getModelParameterProfile(boundaryVariant.parameterProfileId)!;
+const boundaryParameters = materializeModelParameterProfile(boundaryProfile);
 
 interface MemoryStorage {
   readonly length: number;
@@ -85,6 +106,10 @@ function storedSelectionTab(
 const sessionKey = "garment-canvas-project-tabs";
 const recentKey = "garment-canvas-recent-results";
 const restoredEdge = { id: "edge-a-b", source: "node-a", target: "node-b" };
+const normalizedRestoredEdge = {
+  ...restoredEdge,
+  data: { role: "generic", roleNeedsConfirmation: true },
+};
 const storedSession = {
   activeTabId: "tab-a",
   tabs: [
@@ -259,9 +284,9 @@ const document = activeDocument(state);
 
 console.log("项目页签会话恢复测试");
 
-assert.deepEqual(document.edges, [restoredEdge]);
-assert.deepEqual(state.tabs[0].edges, [restoredEdge]);
-console.log("  ✓ 刷新恢复活动页签的完整连线");
+assert.deepEqual(document.edges, [normalizedRestoredEdge]);
+assert.deepEqual(state.tabs[0].edges, [normalizedRestoredEdge]);
+console.log("  ✓ 刷新恢复活动页签的完整连线，旧边角色保持待确认");
 
 assert.equal(document.saveState, "idle");
 assert.equal(state.tabs[0].saveState, "idle");
@@ -269,7 +294,7 @@ assert.equal(document.dirty, true);
 console.log("  ✓ 刷新将中断的 saving 状态归一为 idle 并保留未保存标记");
 
 const persisted = persistedSession();
-assert.deepEqual(persisted.tabs[0].edges, [restoredEdge]);
+assert.deepEqual(persisted.tabs[0].edges, [normalizedRestoredEdge]);
 assert.equal(persisted.tabs[0].saveState, "idle");
 assert.equal((persisted as typeof storedSession & { schemaVersion: number }).schemaVersion, TAB_SESSION_SCHEMA_VERSION);
 console.log("  ✓ 初始化持久化不会再次覆盖恢复后的连线或保存状态");
@@ -454,11 +479,6 @@ const generalModelPairs = [
     aspectRatio: "16:9",
   },
   { modelId: "seedream-5-0-260128", modelOptions: { size: "3K" }, aspectRatio: "1:1" },
-  {
-    modelId: "grok-imagine-image",
-    modelOptions: { aspectRatio: "4:3", resolution: "1k" },
-    aspectRatio: "4:3",
-  },
 ] as const;
 const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
   activeTabId: "model-pairs-tab",
@@ -492,7 +512,47 @@ for (const [index, pair] of generalModelPairs.entries()) {
   assert.equal(restoredNode.data.modelId, pair.modelId);
   assert.deepEqual(restoredNode.data.modelOptions, pair.modelOptions);
 }
-console.log("  ✓ 五个通用模型的合法 modelId/modelOptions 会话恢复保真");
+console.log("  ✓ 四个现役通用模型的合法 modelId/modelOptions 会话恢复保真");
+
+const retiredModelSession = normalizeTabSessionValue({
+  activeTabId: "retired-model-tab",
+  tabs: [{
+    id: "retired-model-tab",
+    projectId: "retired-model-project",
+    projectName: "退役模型会话",
+    nodes: [{
+      id: "retired-model-node",
+      type: "ai-modify",
+      position: { x: 0, y: 0 },
+      data: {
+        kind: "ai-modify",
+        label: "历史 Grok 节点",
+        status: "idle",
+        prompt: "旧提示词",
+        aspectRatio: "4:3",
+        batchSize: 1,
+        outputImages: [],
+        modelId: "grok-imagine-image",
+        modelOptions: { aspectRatio: "4:3", resolution: "1k" },
+        operationMode: "edit",
+        promptVariantId: "fashion-lookbook.grok-imagine-image.ai-modify.edit.v1",
+        parameterProfileId: "grok-imagine-image:fashion-lookbook:edit:v1",
+      },
+    }],
+    edges: [],
+  }],
+});
+assert.ok(retiredModelSession);
+const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
+assert.equal(retiredModelData.kind, "ai-modify");
+if (retiredModelData.kind !== "ai-modify") throw new Error("unexpected retired node kind");
+assert.equal(retiredModelData.modelId, "gpt-image-2-vip");
+assert.equal(retiredModelData.retiredModelId, "grok-imagine-image");
+assert.equal(retiredModelData.modelSelectionNeedsConfirmation, true);
+assert.deepEqual(retiredModelData.modelOptions, { size: "2048x1536" });
+assert.equal(retiredModelData.promptVariantId, undefined);
+assert.equal(retiredModelData.parameterProfileId, undefined);
+console.log("  ✓ 退役 Grok 会话恢复保留原 ID、清除旧绑定并要求用户手选新模型");
 
 assert.deepEqual(state.recentResults, [], "登录后的历史必须以服务器为准，不能泄露上一账号的 localStorage");
 const writesBeforeHistory = sessionWrites;
@@ -517,6 +577,8 @@ useFlowStore.getState().openFlowTab({
       batchSize: 1,
       modelId: "gpt-image-2-vip",
       modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: [],
     },
   }],
@@ -582,6 +644,8 @@ useFlowStore.getState().openFlowTab({
       batchSize: 1,
       modelId: "gpt-image-2-vip",
       modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: [],
     },
   }],
@@ -631,6 +695,8 @@ useFlowStore.getState().openFlowTab({
       batchSize: 1,
       modelId: "gpt-image-2-vip",
       modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: [],
     },
   }],
@@ -690,7 +756,9 @@ useFlowStore.getState().openFlowTab({
     position: { x: 300, y: 0 },
     data: {
       kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改色",
-      modelId: "gpt-image-2", modelOptions: {}, outputImages: [],
+      modelId: "gpt-image-2", modelOptions: {},
+      operationMode: "mask-edit", operationModeNeedsConfirmation: false,
+      outputImages: [],
       mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
   }],
@@ -868,6 +936,10 @@ useFlowStore.getState().loadFlow({
       prompt: "生成成功",
       aspectRatio: "1:1",
       batchSize: 1,
+      modelId: "gpt-image-2-vip",
+      modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: ["/api/files/before-no-move.png"],
     },
   }],
@@ -911,6 +983,10 @@ useFlowStore.getState().loadFlow({
       prompt: "生成成功",
       aspectRatio: "1:1",
       batchSize: 1,
+      modelId: "gpt-image-2-vip",
+      modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: ["/api/files/before-net-zero.png"],
     },
   }],
@@ -1000,7 +1076,7 @@ console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切�
 
 const unsafeDocumentNode = {
   id: "pure-boundary-node",
-  type: "ai-modify",
+  type: "sketch-to-render",
   position: { x: 120, y: 48 },
   selected: true,
   dragging: true,
@@ -1009,32 +1085,51 @@ const unsafeDocumentNode = {
   height: 180,
   unknownNodeShell: "不得持久化",
   data: {
-    kind: "ai-modify",
+    kind: "sketch-to-render",
     label: "纯文档边界",
     status: "error",
     error: "旧运行错误不得持久化",
-    prompt: "保留衣身，只修改领型",
-    aspectRatio: "1:1",
-    batchSize: 1,
+    prompt: buildGarmentPrompt(boundaryVariant.variantId, "保留衣身，只修改领型"),
+    aspectRatio: boundaryParameters.aspectRatio,
+    batchSize: boundaryParameters.batchSize,
     outputImages: ["/api/files/pure-boundary-before.png"],
     modelId: "gpt-image-2-vip",
-    modelOptions: { size: "2048x2048" },
+    modelOptions: boundaryParameters.modelOptions,
+    operationMode: "generate",
+    promptVariantId: boundaryVariant.variantId,
+    promptFamilyId: boundaryVariant.familyId,
+    parameterProfileId: boundaryVariant.parameterProfileId,
+    contractHash: boundaryVariant.contractHash,
+    evaluationVersion: boundaryVariant.evaluationVersion,
+    postprocessVersion: boundaryProfile.postprocess.version,
     unknownData: "不得持久化",
   },
 } as import("../src/store/flowStore").FlowNode;
 const unsafeDocumentEdge = {
   id: "pure-boundary-edge",
   source: "pure-boundary-node",
-  target: "pure-boundary-node",
+  target: "pure-boundary-result",
   sourceHandle: "output",
   targetHandle: "input",
+  data: { role: "garment_full", roleNeedsConfirmation: false },
   selected: true,
   unknownEdgeShell: "不得持久化",
 };
+const boundaryResultNode = {
+  id: "pure-boundary-result",
+  type: "result",
+  position: { x: 520, y: 48 },
+  data: {
+    kind: "result",
+    label: "纯文档边界结果",
+    status: "idle",
+    images: [],
+  },
+} as import("../src/store/flowStore").FlowNode;
 useFlowStore.getState().openFlowTab({
   projectId: "pure-boundary-project",
   projectName: "纯文档边界项目",
-  nodes: [unsafeDocumentNode],
+  nodes: [unsafeDocumentNode, boundaryResultNode],
   edges: [unsafeDocumentEdge],
 });
 useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
@@ -1101,7 +1196,11 @@ assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
 assert.deepEqual(
   Object.keys(projectPayload.flow.edges[0] as Record<string, unknown>).sort(),
-  ["id", "source", "sourceHandle", "target", "targetHandle"],
+  ["data", "id", "source", "sourceHandle", "target", "targetHandle"],
+);
+assert.deepEqual(
+  (projectPayload.flow.edges[0] as { data: unknown }).data,
+  { role: "garment_full", roleNeedsConfirmation: false },
 );
 assert.deepEqual(sessionTab.selectedNodeIds, []);
 assert.equal(sessionTab.selectedNodeId, null);
@@ -1252,6 +1351,10 @@ useFlowStore.getState().openFlowTab({
       prompt: "后台成功",
       aspectRatio: "1:1",
       batchSize: 1,
+      modelId: "gpt-image-2-vip",
+      modelOptions: { size: "2048x2048" },
+      operationMode: "edit",
+      operationModeNeedsConfirmation: false,
       outputImages: ["/api/files/background-before.png"],
     },
   }],

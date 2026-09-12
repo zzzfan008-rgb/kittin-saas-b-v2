@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 export function createComposeProjectName({ cwd = process.cwd() } = {}) {
   const worktreeId = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 10);
@@ -111,7 +113,31 @@ function runNpmScript(script, env) {
   run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script], { env });
 }
 
+export function resolveRequestedTestFiles(args, { repoRoot = repositoryRoot } = {}) {
+  const testsRoot = realpathSync(join(repoRoot, "tests"));
+  return args.map((requestedPath) => {
+    if (!/\.test\.(?:mjs|ts)$/.test(requestedPath)) {
+      throw new Error(`Focused PostgreSQL tests must be .test.ts or .test.mjs files: ${requestedPath}`);
+    }
+    const resolvedPath = realpathSync(resolve(repoRoot, requestedPath));
+    const relativePath = relative(testsRoot, resolvedPath);
+    if (relativePath.startsWith("..") || resolve(testsRoot, relativePath) !== resolvedPath) {
+      throw new Error(`Focused PostgreSQL tests must stay inside ${testsRoot}: ${requestedPath}`);
+    }
+    return resolvedPath;
+  });
+}
+
+function runFocusedTests(testFiles, env) {
+  const tsxCli = join(repositoryRoot, "node_modules/tsx/dist/cli.mjs");
+  for (const testFile of testFiles) {
+    const args = testFile.endsWith(".ts") ? [tsxCli, testFile] : [testFile];
+    run(process.execPath, args, { env });
+  }
+}
+
 async function main() {
+  const focusedTestFiles = resolveRequestedTestFiles(process.argv.slice(2));
   const composeProjectName = createComposeProjectName();
   const releaseLock = acquireTestLock({ projectName: composeProjectName });
   const compose = [
@@ -157,7 +183,9 @@ async function main() {
     composeEnv = { ...composeEnv, POSTGRES_TEST_PORT: String(postgresPort) };
     const databaseUrl = `postgresql://garment_test:garment_test@127.0.0.1:${postgresPort}/garment_canvas_test`;
     run("docker", [...compose, "up", "-d", "--wait"], { env: composeEnv });
-    runNpmScript("test:suite", { ...composeEnv, DATABASE_URL: databaseUrl });
+    const testEnv = { ...composeEnv, DATABASE_URL: databaseUrl };
+    if (focusedTestFiles.length > 0) runFocusedTests(focusedTestFiles, testEnv);
+    else runNpmScript("test:suite", testEnv);
   } catch (error) {
     spawnSync("docker", [...compose, "logs", "--no-color"], {
       stdio: "inherit",

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   fetchWithRetry,
   ProviderError,
+  publicProviderErrorMessage,
   providerErrorFromResponse,
   sanitizedProviderDiagnostic,
 } from "../server/providers/base";
@@ -24,10 +25,56 @@ const retryableProvider: AIProvider = {
 };
 
 await assert.rejects(
-  () => generateExactImages(retryableProvider, { prompt: "重试归队列" }, 1),
+  () => generateExactImages(
+    retryableProvider,
+    { prompt: "重试归队列", operationMode: "generate" },
+    1,
+  ),
   (error: unknown) => error instanceof ProviderError && error.status === 429,
 );
 assert.equal(providerCalls, 1, "Provider/精确批量层不得自行重放付费请求");
+
+const providerRequestId = "req-provider-log-1";
+const logCalls: unknown[][] = [];
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => { logCalls.push(args); };
+try {
+  const requestIdProvider: AIProvider = {
+    id: "request-id-stub",
+    async generate() {
+      throw new ProviderError(
+        "AI 服务暂不支持当前参数或参考图组合，请调整后重试",
+        400,
+        "request-id-stub",
+        "invalid_request",
+        "HTTP 400: request validation failed",
+        providerRequestId,
+      );
+    },
+    async edit() { throw new Error("unexpected edit"); },
+  };
+  let captured: unknown;
+  try {
+    await generateExactImages(
+      requestIdProvider,
+      { prompt: "request id log", operationMode: "generate" },
+      1,
+    );
+  } catch (error) {
+    captured = error;
+  }
+  assert.ok(captured instanceof ProviderError);
+  assert.equal(captured.requestId, providerRequestId);
+  assert.doesNotMatch(publicProviderErrorMessage(captured), new RegExp(providerRequestId));
+  assert.doesNotMatch(sanitizedProviderDiagnostic(captured) ?? "", new RegExp(providerRequestId));
+  const log = logCalls.find((args) => args[0] === "[ai-provider-failure]");
+  assert.ok(log);
+  const payload = JSON.parse(String(log[1])) as { requestId?: string; diagnostic?: string };
+  assert.equal(payload.requestId, providerRequestId);
+  assert.doesNotMatch(payload.diagnostic ?? "", new RegExp(providerRequestId));
+} finally {
+  console.error = originalConsoleError;
+}
 
 let fetchCalls = 0;
 globalThis.fetch = (async () => {
@@ -65,8 +112,8 @@ try {
 
 const deterministic503 = providerErrorFromResponse(
   503,
-  JSON.stringify({ error: { message: "resolution=4k is unsupported; resolution must be 1k or 2k" } }),
-  "grok-imagine-image",
+  JSON.stringify({ error: { message: "width=513 is unsupported; width must be a multiple of 16" } }),
+  "flux-2-pro",
 );
 assert.equal(deterministic503.category, "invalid_request");
 
@@ -83,4 +130,4 @@ assert.ok(diagnostic?.includes("[redacted-image]"));
 assert.ok(!diagnostic?.includes("sk-secret"));
 assert.ok(!diagnostic?.includes("signed.example"));
 
-console.log("  ✓ Provider 单次发送、未知结果保护与诊断脱敏");
+console.log("  ✓ Provider 单次发送、请求 ID 证据、未知结果保护与诊断脱敏");

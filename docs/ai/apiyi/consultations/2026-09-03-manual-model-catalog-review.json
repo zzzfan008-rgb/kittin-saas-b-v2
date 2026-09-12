@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-03T13:40:44.928Z",
+  "baseCommit": "b9b051f72fb9e0ce5514f8b646e9e3068ff9359c",
+  "changeFingerprintSha256": "77bef752618b0f1cbdfd0110ca7dc2a23ccc40f8cf02641abd9ec9df35e4a7da",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "/v1/models 当前五个现役模型精确 ID 原始导出 raw SHA reviewedExportSha256 人工复核",
+  "affectedPaths": [
+    "docs/DEPLOYMENT_AND_OPERATIONS.md",
+    "docs/ai/apiyi/README.md",
+    "docs/ai/apiyi/evidence/2026-09-03-manual-model-catalog-review.json",
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/model-knowledge.json",
+    "docs/ai/apiyi/reviews/2026-09-03-manual-model-catalog-review.md",
+    "docs/ai/apiyi/sources.json",
+    "docs/ai/evaluation/README.md",
+    "tests/apiyi-docs.test.ts",
+    "tests/provider-contract.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/image-video-models",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/image-video-models.md",
+      "pageLocalPath": "pages/en/api-capabilities/image-video-models.md",
+      "title": "Image & Video Generation Models",
+      "sha256": "c81a2b722a2dfc83d39e5df6e3e0dd540e0b7dbde1183037ff3e6a9b41f7af15"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/google-ai-studio-usage-guide",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/news/google-ai-studio-usage-guide.md",
+      "pageLocalPath": "pages/en/news/google-ai-studio-usage-guide.md",
+      "title": "Google AI Studio Usage Guide: 3 Ways to Access Gemini Models Easily",
+      "sha256": "2582ae63efc51e33c16e6ece43b2c45885bd2b42a20ee471dbcc7da4ed73884e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/base-url-config",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/faq/base-url-config.md",
+      "pageLocalPath": "pages/en/faq/base-url-config.md",
+      "title": "How to Configure Base URL? Differences Between /v1, Root Domain, and /v1beta",
+      "sha256": "962af2f1474a6bbae879b03361ac4db2abc36c8123f2cbb2d9b9f2b018deb331"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "Mask Inpainting Guide",
+      "sha256": "3665213689430bcb9aa56fc97a4a6066a300c66bcf5b0652cec71f4ef4086155"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/happyhorse/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/happyhorse/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/happyhorse/overview.md",
+      "title": "HappyHorse Video Generation (Alibaba Cloud)",
+      "sha256": "54188d23f0c2b372a79d270d081ea2ff87d13680b22b46d4035a1ebd1dd7161e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/veo-3-1-official/text-to-video",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/veo-3-1-official/text-to-video.md",
+      "pageLocalPath": "pages/en/api-capabilities/veo-3-1-official/text-to-video.md",
+      "title": "VEO 3.1 Official Text-to-Video API",
+      "sha256": "f390249f604fe846ca6fcfdfb377b3daad34f2619d58cc860d0f7594ea6c0e6d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/native",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/openai/native.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/native.md",
+      "title": "OpenAI Responses API Native Guide",
+      "sha256": "9e1c246ab545254c10a5490afe2b12980e921b6b543d6e381cb421bceb7ff441"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/wan/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/en/api-capabilities/wan/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/wan/overview.md",
+      "title": "Wan Video Generation (Alibaba Cloud Tongyi Wanxiang)",
+      "sha256": "b33f85ec6481908d6b845609d1e3a44cf1d8ef5f2479a781204081bf4f309820"
+    }
+  ],
+  "decisionSummary": "使用已配置凭据只读获取的完整 /v1/models 原始导出完成五个现役 ID 的精确核对；物化 canonical reviewedExportSha256 与 raw SHA 基线，保留原始文件在 Git 外，五个模型继续 unverified，不调用图片生成或编辑端点。",
+  "unresolvedChoices": []
+}

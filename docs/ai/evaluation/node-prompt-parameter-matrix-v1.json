@@ -1,0 +1,2455 @@
+{
+  "schemaVersion": 1,
+  "version": "node-prompt-parameter-matrix-v1",
+  "generatedAt": "2026-09-04",
+  "evidenceStatus": "offline-contract-review-only",
+  "sourceSkills": [
+    "awesome-gpt-image-2",
+    "apiyi"
+  ],
+  "sourceContracts": {
+    "modelCatalogReviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
+    "modelCatalogReviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+    "modelContractIds": [
+      "gpt-image-2",
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ]
+  },
+  "scope": {
+    "nodeKinds": [
+      "sketch-to-render",
+      "ai-modify",
+      "mask-redraw",
+      "fabric-recolor",
+      "upscale",
+      "print-extract",
+      "print-mutate"
+    ],
+    "modelIds": [
+      "gpt-image-2",
+      "gpt-image-2-vip",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "entryCount": 35,
+    "supportedEntryCount": 9,
+    "unsupportedEntryCount": 26,
+    "unsupportedNodesRemainFailClosed": true,
+    "noProviderCallsPerformed": true,
+    "imageGenerationOrEditCalls": 0
+  },
+  "entries": [
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.gpt-image-2-vip.generate.v1",
+        "commerce-hero.gpt-image-2-vip.generate.v1",
+        "design-sheet.gpt-image-2-vip.generate.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:68e4712be141f9ffc8fc8a8fcaa8f0a57323830688d3f2fbb32533b81662332c",
+          "requiredRoles": [],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.gpt-image-2-vip.generate.v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:fec9a6aa5ccee11261344cc8be38f31f31a6414a3d3cb4fcd98419af48a64bb3",
+          "requiredRoles": [],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.gpt-image-2-vip.generate.v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:6a92a96d553981af2e98744d18fcb7f748217b0b76ebf90a773171d4038b9d95",
+          "requiredRoles": [],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "gpt-image-2-vip:fashion-lookbook:generate:v1",
+        "gpt-image-2-vip:commerce-hero:generate:v1",
+        "gpt-image-2-vip:design-sheet:generate:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:generate:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "1536x2048",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "gpt-image-2-vip:commerce-hero:generate:v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "2048x2048",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "gpt-image-2-vip:design-sheet:generate:v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "2048x1536",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "generate",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 300000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "size"
+          ],
+          "omittedFields": [
+            "response_format"
+          ],
+          "forbiddenFields": [
+            "quality",
+            "n",
+            "aspect_ratio"
+          ],
+          "referenceInputs": {
+            "userMax": 0,
+            "totalMax": 0,
+            "encoding": "none",
+            "orderSemantics": "no reference images"
+          },
+          "output": {
+            "fields": [
+              "b64_json",
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "persist provider original; b64_json becomes project data URL and url is downloaded immediately"
+          }
+        },
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/edits",
+            "contentType": "multipart/form-data"
+          },
+          "timeoutMs": 300000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "size",
+            "image (repeated)"
+          ],
+          "omittedFields": [
+            "response_format"
+          ],
+          "forbiddenFields": [
+            "quality",
+            "n",
+            "aspect_ratio"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "multipart image field repeated as image",
+            "orderSemantics": "image occurrence order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "b64_json",
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "persist provider original; b64_json becomes project data URL and url is downloaded immediately"
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+        "commerce-hero.gemini-3.1-flash-image.generate.v1",
+        "design-sheet.gemini-3.1-flash-image.generate.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:6902339a4657d428862b773a1ed322f77d432853bfc87d5f0db0179dc124823c",
+          "requiredRoles": [],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:e2aca2be1e45ac77bfabf5c222e359fdc0003d11e0b0d95e2218fb15e0fa01d7",
+          "requiredRoles": [],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.gemini-3.1-flash-image.generate.v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:5393de42bbb5eb4bf305e7925488ffd5c110b25fc16a3d88b613e5fda12549ce",
+          "requiredRoles": [],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "gemini-3.1-flash-image:fashion-lookbook:generate:v1",
+        "gemini-3.1-flash-image:commerce-hero:generate:v1",
+        "gemini-3.1-flash-image:design-sheet:generate:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:generate:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "3:4",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:generate:v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "1:1",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:design-sheet:generate:v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "4:3",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "generate",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1beta/models/{model}:generateContent",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 360000,
+          "requiredFields": [
+            "contents[0].parts[0].text",
+            "generationConfig.responseModalities=[IMAGE]",
+            "generationConfig.imageConfig.aspectRatio",
+            "generationConfig.imageConfig.imageSize"
+          ],
+          "omittedFields": [],
+          "forbiddenFields": [],
+          "referenceInputs": {
+            "userMax": 0,
+            "totalMax": 0,
+            "encoding": "none",
+            "orderSemantics": "no reference images"
+          },
+          "output": {
+            "fields": [
+              "inlineData"
+            ],
+            "maxImages": 1,
+            "handling": "scan every candidates[].content.parts[].inlineData and persist validated provider originals"
+          }
+        },
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1beta/models/{model}:generateContent",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 360000,
+          "requiredFields": [
+            "contents[0].parts[0].text",
+            "contents[0].parts[].inlineData.mimeType",
+            "contents[0].parts[].inlineData.data",
+            "generationConfig.responseModalities=[IMAGE]",
+            "generationConfig.imageConfig.aspectRatio",
+            "generationConfig.imageConfig.imageSize"
+          ],
+          "omittedFields": [],
+          "forbiddenFields": [],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "ordered inlineData parts after the text part; WebP converted to PNG",
+            "orderSemantics": "parts order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "inlineData"
+            ],
+            "maxImages": 1,
+            "handling": "scan every candidates[].content.parts[].inlineData and persist validated provider originals"
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.flux-2-pro.generate.v1",
+        "commerce-hero.flux-2-pro.generate.v1",
+        "design-sheet.flux-2-pro.generate.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.flux-2-pro.generate.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:0f7a4afd6977a0b7149b8868a35f3b7fbf9fdc03fe8337f9ec5a83d302a29688",
+          "requiredRoles": [],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.flux-2-pro.generate.v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:0b5db6fd1bee9dcd1422b41e5adf1f67973536c7e6202ce3098719e86a01bc74",
+          "requiredRoles": [],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.flux-2-pro.generate.v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:638740751e2794da9d1f22fe904b2b4c2de061b394f7d94b46d20b6433cadc6b",
+          "requiredRoles": [],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "flux-2-pro:fashion-lookbook:generate:v1",
+        "flux-2-pro:commerce-hero:generate:v1",
+        "flux-2-pro:design-sheet:generate:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "flux-2-pro:fashion-lookbook:generate:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 1536,
+            "height": 2048,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "flux-2-pro:commerce-hero:generate:v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 2048,
+            "height": 2048,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "flux-2-pro:design-sheet:generate:v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 2048,
+            "height": 1536,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "generate",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "width",
+            "height",
+            "output_format"
+          ],
+          "omittedFields": [
+            "size",
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 0,
+            "totalMax": 0,
+            "encoding": "none",
+            "orderSemantics": "no reference images"
+          },
+          "output": {
+            "fields": [
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "download temporary URL immediately and persist provider original",
+            "urlTtlSeconds": 600
+          }
+        },
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "width",
+            "height",
+            "output_format",
+            "input_image",
+            "input_image_2..input_image_8 (ordered, as present)"
+          ],
+          "omittedFields": [
+            "size",
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "input_image, input_image_2 ... input_image_8 JSON fields",
+            "orderSemantics": "field suffix order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "download temporary URL immediately and persist provider original",
+            "urlTtlSeconds": 600
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.seedream-5-0-260128.generate.v1",
+        "commerce-hero.seedream-5-0-260128.generate.v1",
+        "design-sheet.seedream-5-0-260128.generate.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:984b08e0963b993c765afbb7ab9ea276eaf35f6996804e3c1d6db03875e0e381",
+          "requiredRoles": [],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.seedream-5-0-260128.generate.v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:8cd2d1e53b26fcdb2478427359891145ec343ee6dcffd1f0ec438e55fca69295",
+          "requiredRoles": [],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.seedream-5-0-260128.generate.v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "nodeKind": "sketch-to-render",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:ee2022aedd5c5f96c87d877189f4cc9d6210e032cbc14cbd1bbdb3e666319bc2",
+          "requiredRoles": [],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "seedream-5-0-260128:fashion-lookbook:generate:v1",
+        "seedream-5-0-260128:commerce-hero:generate:v1",
+        "seedream-5-0-260128:design-sheet:generate:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:generate:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "seedream-5-0-260128:commerce-hero:generate:v1",
+          "familyId": "commerce-hero",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "seedream-5-0-260128:design-sheet:generate:v1",
+          "familyId": "design-sheet",
+          "mode": "generate",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "generate",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "size",
+            "response_format=b64_json",
+            "watermark=false",
+            "sequential_image_generation=disabled"
+          ],
+          "omittedFields": [
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 0,
+            "totalMax": 0,
+            "encoding": "none",
+            "orderSemantics": "no reference images"
+          },
+          "output": {
+            "fields": [
+              "url",
+              "b64_json"
+            ],
+            "maxImages": 1,
+            "handling": "accept b64_json or url, persist provider original, and record data[].size as actual provider size",
+            "recordsActualProviderSize": true
+          }
+        },
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "image (ordered array)",
+            "size",
+            "response_format=b64_json",
+            "watermark=false",
+            "sequential_image_generation=disabled"
+          ],
+          "omittedFields": [
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "image JSON array of URL/data URI values",
+            "orderSemantics": "array order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "url",
+              "b64_json"
+            ],
+            "maxImages": 1,
+            "handling": "accept b64_json or url, persist provider original, and record data[].size as actual provider size",
+            "recordsActualProviderSize": true
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.gpt-image-2-vip.edit.v1",
+        "commerce-hero.gpt-image-2-vip.edit.v1",
+        "design-sheet.gpt-image-2-vip.edit.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:ef50e39cc527fc07fc58419b54f9ee72a0345a09cdf7bede7033b0db0a399d36",
+          "requiredRoles": [
+            "identity",
+            "pose_composition",
+            "garment_top",
+            "garment_bottom"
+          ],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.gpt-image-2-vip.edit.v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:0d62719fd4050393afe861fa9c5365acfdfc0ee472ee81d209e571493b1f8050",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.gpt-image-2-vip.edit.v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:b9e29671caa7ee7111e03a5e250d17b81c72d53d8faa146b6551f914fa1d722e",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "gpt-image-2-vip:fashion-lookbook:edit:v1",
+        "gpt-image-2-vip:commerce-hero:edit:v1",
+        "gpt-image-2-vip:design-sheet:edit:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:edit:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "1536x2048",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "gpt-image-2-vip:commerce-hero:edit:v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "2048x2048",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "gpt-image-2-vip:design-sheet:edit:v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-vip",
+            "size": "2048x1536",
+            "referenceLimit": 8,
+            "omittedFields": [
+              "quality",
+              "n",
+              "aspect_ratio"
+            ]
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/edits",
+            "contentType": "multipart/form-data"
+          },
+          "timeoutMs": 300000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "size",
+            "image (repeated)"
+          ],
+          "omittedFields": [
+            "response_format"
+          ],
+          "forbiddenFields": [
+            "quality",
+            "n",
+            "aspect_ratio"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "multipart image field repeated as image",
+            "orderSemantics": "image occurrence order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "b64_json",
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "persist provider original; b64_json becomes project data URL and url is downloaded immediately"
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+        "commerce-hero.gemini-3.1-flash-image.edit.v1",
+        "design-sheet.gemini-3.1-flash-image.edit.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:bebace6086dad1ee74749bd7551404aee857f2725e00d4147e75a4f5a24521f3",
+          "requiredRoles": [
+            "identity",
+            "pose_composition",
+            "garment_top",
+            "garment_bottom"
+          ],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:cd95572c2d6f931a413c44203d30fb3409eda353651373c35500d8dcdd67f73d",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.gemini-3.1-flash-image.edit.v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:ea73283967ad476b372f642e2cf7ac8a4b0070d4f6dcb77ecf2175243b3dfda9",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
+        "gemini-3.1-flash-image:commerce-hero:edit:v1",
+        "gemini-3.1-flash-image:design-sheet:edit:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "3:4",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:edit:v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "1:1",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "gemini-3.1-flash-image:design-sheet:edit:v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gemini-image",
+            "aspectRatio": "4:3",
+            "imageSize": "2K",
+            "referenceLimit": 8,
+            "emptyImageOnHttp200IsError": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1beta/models/{model}:generateContent",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 360000,
+          "requiredFields": [
+            "contents[0].parts[0].text",
+            "contents[0].parts[].inlineData.mimeType",
+            "contents[0].parts[].inlineData.data",
+            "generationConfig.responseModalities=[IMAGE]",
+            "generationConfig.imageConfig.aspectRatio",
+            "generationConfig.imageConfig.imageSize"
+          ],
+          "omittedFields": [],
+          "forbiddenFields": [],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "ordered inlineData parts after the text part; WebP converted to PNG",
+            "orderSemantics": "parts order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "inlineData"
+            ],
+            "maxImages": 1,
+            "handling": "scan every candidates[].content.parts[].inlineData and persist validated provider originals"
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.flux-2-pro.edit.v1",
+        "commerce-hero.flux-2-pro.edit.v1",
+        "design-sheet.flux-2-pro.edit.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.flux-2-pro.edit.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:e7b40769427aa902e569bb18c339b8c1d04446365df92ceef17d8e80855fa2f9",
+          "requiredRoles": [
+            "identity",
+            "pose_composition",
+            "garment_top",
+            "garment_bottom"
+          ],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.flux-2-pro.edit.v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:74aaed9a488f67e4a02e34cd1adb66eb25b35931f212a2453a698dd1885b2082",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.flux-2-pro.edit.v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:afbd81ec18601e11c7c20b026c754939e354c22d2aada7bdd01b7dc5992d023a",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "flux-2-pro:fashion-lookbook:edit:v1",
+        "flux-2-pro:commerce-hero:edit:v1",
+        "flux-2-pro:design-sheet:edit:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "flux-2-pro:fashion-lookbook:edit:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 1536,
+            "height": 2048,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "flux-2-pro:commerce-hero:edit:v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 2048,
+            "height": 2048,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "flux-2-pro:design-sheet:edit:v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "flux-image",
+            "width": 2048,
+            "height": 1536,
+            "multipleOf": 16,
+            "maxPixels": 4194304,
+            "outputFormat": "png",
+            "referenceLimit": 8
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "width",
+            "height",
+            "output_format",
+            "input_image",
+            "input_image_2..input_image_8 (ordered, as present)"
+          ],
+          "omittedFields": [
+            "size",
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "input_image, input_image_2 ... input_image_8 JSON fields",
+            "orderSemantics": "field suffix order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "url"
+            ],
+            "maxImages": 1,
+            "handling": "download temporary URL immediately and persist provider original",
+            "urlTtlSeconds": 600
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [
+        "fashion-lookbook.seedream-5-0-260128.edit.v1",
+        "commerce-hero.seedream-5-0-260128.edit.v1",
+        "design-sheet.seedream-5-0-260128.edit.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:3f933e01fc15997518cb93a3bde61f2dbe085f3fc1a52f9a5780ab184a56618e",
+          "requiredRoles": [
+            "identity",
+            "pose_composition",
+            "garment_top",
+            "garment_bottom"
+          ],
+          "templateName": "Realistic Photography / 写实摄影",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "commerce-hero.seedream-5-0-260128.edit.v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:bc5995714eeeb13870bbe5c1c2f973aeed55c80bdb8f0e7ed1c36beedd965646",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Product Commerce Visual / 商品商业视觉",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        },
+        {
+          "promptVariantId": "design-sheet.seedream-5-0-260128.edit.v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "nodeKind": "ai-modify",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:6ab01c01a93d9bb028ecf230f3b9440aa1d221d81ebea8f2c756a0d900328e44",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "Character Design Sheet / 角色设定表",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": null,
+      "parameterProfileIds": [
+        "seedream-5-0-260128:fashion-lookbook:edit:v1",
+        "seedream-5-0-260128:commerce-hero:edit:v1",
+        "seedream-5-0-260128:design-sheet:edit:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:edit:v1",
+          "familyId": "fashion-lookbook",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "3:4",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "3:4"
+          }
+        },
+        {
+          "parameterProfileId": "seedream-5-0-260128:commerce-hero:edit:v1",
+          "familyId": "commerce-hero",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "1:1",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "1:1"
+          }
+        },
+        {
+          "parameterProfileId": "seedream-5-0-260128:design-sheet:edit:v1",
+          "familyId": "design-sheet",
+          "mode": "edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "4:3",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "seedream-image",
+            "size": "2K",
+            "referenceLimit": 8,
+            "responseFormat": "b64_json",
+            "watermark": false,
+            "sequentialImageGeneration": "disabled",
+            "aspectRatioField": "unsupported",
+            "forbiddenFields": [
+              "n",
+              "aspect_ratio"
+            ],
+            "recordActualOutputSize": true
+          },
+          "postprocess": {
+            "version": "fit-contain-dominant-webp-v1",
+            "strategy": "contain-with-dominant-padding",
+            "finalAspectRatio": "4:3"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "contentType": "application/json"
+          },
+          "timeoutMs": 120000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "image (ordered array)",
+            "size",
+            "response_format=b64_json",
+            "watermark=false",
+            "sequential_image_generation=disabled"
+          ],
+          "omittedFields": [
+            "aspect_ratio"
+          ],
+          "forbiddenFields": [
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 8,
+            "totalMax": 8,
+            "encoding": "image JSON array of URL/data URI values",
+            "orderSemantics": "array order equals prompt 图号"
+          },
+          "output": {
+            "fields": [
+              "url",
+              "b64_json"
+            ],
+            "maxImages": 1,
+            "handling": "accept b64_json or url, persist provider original, and record data[].size as actual provider size",
+            "recordsActualProviderSize": true
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unverified",
+      "productPolicy": {
+        "status": "supported"
+      },
+      "promptVariantId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+      "promptVariantIds": [
+        "mask-local-edit.gpt-image-2.mask-edit.v1"
+      ],
+      "promptReview": [
+        {
+          "promptVariantId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+          "familyId": "mask-local-edit",
+          "mode": "mask-edit",
+          "nodeKind": "mask-redraw",
+          "locale": "zh-CN",
+          "promptSha256": "sha256:920ce8fa929811ec24d889d94b5cbbf2c9cbf520676a2a3249c29d7e69359584",
+          "requiredRoles": [
+            "garment_full"
+          ],
+          "templateName": "GPT Image 2 mask-local-edit contract",
+          "checklist": [
+            "subject-task",
+            "composition",
+            "style-material",
+            "text-label",
+            "aspect-output",
+            "negative-constraints"
+          ]
+        }
+      ],
+      "parameterProfileId": "gpt-image-2:mask-local-edit:mask-edit:v1",
+      "parameterProfileIds": [
+        "gpt-image-2:mask-local-edit:mask-edit:v1"
+      ],
+      "parameterProfiles": [
+        {
+          "parameterProfileId": "gpt-image-2:mask-local-edit:mask-edit:v1",
+          "familyId": "mask-local-edit",
+          "mode": "mask-edit",
+          "version": "1.0.0",
+          "businessFrame": {
+            "aspectRatio": "source",
+            "requestedOutputs": 1
+          },
+          "native": {
+            "kind": "gpt-image-2-mask",
+            "size": "source-pixel-dimensions",
+            "mask": "alpha-png",
+            "userReferenceLimit": 7,
+            "systemGuideImages": 1
+          },
+          "postprocess": {
+            "version": "mask-composite-png-v3",
+            "strategy": "exact-outside-mask-protection",
+            "finalAspectRatio": "source"
+          }
+        }
+      ],
+      "providerRequests": [
+        {
+          "mode": "mask-edit",
+          "endpoint": {
+            "method": "POST",
+            "path": "/v1/images/edits",
+            "contentType": "multipart/form-data"
+          },
+          "timeoutMs": 360000,
+          "requiredFields": [
+            "model",
+            "prompt",
+            "size (runtime-derived)",
+            "image[] (ordered)",
+            "mask",
+            "background=opaque",
+            "output_format=png"
+          ],
+          "omittedFields": [],
+          "forbiddenFields": [
+            "input_fidelity",
+            "response_format",
+            "n"
+          ],
+          "referenceInputs": {
+            "userMax": 7,
+            "totalMax": 8,
+            "encoding": "ordered multipart image[] plus one internal system guide image",
+            "orderSemantics": "user image order equals prompt 图号; mask guide is appended internally and is not a user role"
+          },
+          "output": {
+            "fields": [
+              "b64_json"
+            ],
+            "maxImages": 1,
+            "handling": "persist full-canvas provider original, then locally composite exact outside-mask protection"
+          }
+        }
+      ],
+      "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gpt-image-2",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gpt-image-2-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gemini-3.1-flash-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "flux-2-pro",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "seedream-5-0-260128",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    }
+  ]
+}

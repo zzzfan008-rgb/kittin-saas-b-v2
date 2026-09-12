@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth, type CurrentUser } from "./AuthContext";
 import { broadcastAuthChange, prepareWorkspaceForLogin } from "./session";
 import { suppressWorkspaceUnloadWarning } from "@/lib/workspaceUnload";
+import { apiErrorMessage } from "@/lib/apiErrors";
 
 export function LoginPage() {
   const [accountId, setAccountId] = useState("");
@@ -23,7 +24,9 @@ export function LoginPage() {
         body: JSON.stringify({ accountId, password }),
       });
       const body = (await response.json().catch(() => ({}))) as { error?: string; user?: CurrentUser };
-      if (!response.ok) throw new Error(body.error ?? `登录失败（HTTP ${response.status}）`);
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(response.status, body, `登录失败（HTTP ${response.status}）`));
+      }
       if (!body.user?.id) throw new Error("登录响应缺少用户信息");
       // 同账号恢复本机草稿；只有切换到不同账号时才清除旧画布。
       prepareWorkspaceForLogin(window.sessionStorage, window.localStorage, body.user.id);
@@ -183,7 +186,7 @@ export function ChangePasswordPage() {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "修改密码失败");
+      if (!response.ok) throw new Error(apiErrorMessage(response.status, body, "修改密码失败"));
       if (!user) throw new Error("登录状态已失效");
       broadcastAuthChange(window.localStorage, "auth-changed", user.id);
       suppressWorkspaceUnloadWarning();

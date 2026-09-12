@@ -3,6 +3,10 @@
  * 类型契约从 src/types/workflow.ts 导入，不在此处重复定义。
  */
 import { config } from "../config";
+import { fetch as undiciFetch } from "undici";
+
+const nativeFetch = globalThis.fetch;
+const PROVIDER_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
 export class ProviderError extends Error {
   constructor(
@@ -12,6 +16,8 @@ export class ProviderError extends Error {
     public readonly category: ProviderErrorCategory = "unknown",
     /** 仅供服务端日志诊断，绝不返回浏览器或写入用户运行记录。 */
     public readonly diagnostic?: string,
+    /** 上游网关的关联标识；仅保留在服务端日志和评估证据中。 */
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = "ProviderError";
@@ -86,7 +92,17 @@ function classifyProviderMessage(status: number | undefined, rawMessage: string)
   return { category: "unknown", publicMessage: "AI 服务返回异常，请稍后重试" };
 }
 
-export function providerErrorFromResponse(status: number, responseBody: string, providerId?: string): ProviderError {
+export function providerRequestIdFromResponse(response: Pick<Response, "headers">): string | undefined {
+  const requestId = response.headers.get("x-request-id")?.trim();
+  return requestId && PROVIDER_REQUEST_ID_PATTERN.test(requestId) ? requestId : undefined;
+}
+
+export function providerErrorFromResponse(
+  status: number,
+  responseBody: string,
+  providerId?: string,
+  requestId?: string,
+): ProviderError {
   const classified = classifyProviderMessage(status, responseBody);
   return new ProviderError(
     classified.publicMessage,
@@ -94,12 +110,32 @@ export function providerErrorFromResponse(status: number, responseBody: string, 
     providerId,
     classified.category,
     `HTTP ${status}: ${responseBody.slice(0, 2_000)}`,
+    requestId,
   );
 }
 
 export function providerErrorFromMessage(message: string, providerId?: string, status?: number): ProviderError {
   const classified = classifyProviderMessage(status, message);
   return new ProviderError(classified.publicMessage, status, providerId, classified.category, message.slice(0, 2_000));
+}
+
+function dispatchFetch(
+  url: string,
+  init: RequestInit & { dispatcher?: unknown },
+): Promise<Response> {
+  // Node's native fetch does not reliably apply a request-level Undici
+  // dispatcher on the supported runtime. Keep replaced fetch implementations
+  // injectable for tests and embedders, while real requests use Undici.
+  if (init.dispatcher !== undefined && globalThis.fetch === nativeFetch) {
+    // The provider boundary accepts the platform RequestInit type, while
+    // Undici exposes a narrower Node-specific body type. Runtime fields are
+    // compatible here; keep the conversion local to this adapter.
+    return undiciFetch(
+      url,
+      init as unknown as Parameters<typeof undiciFetch>[1],
+    ) as unknown as Promise<Response>;
+  }
+  return globalThis.fetch(url, init);
 }
 
 export function publicProviderErrorMessage(error: unknown): string {
@@ -143,6 +179,41 @@ export class NotImplementedError extends ProviderError {
   }
 }
 
+export interface ProviderTransportFailure {
+  code?: string;
+  timedOut: boolean;
+  message: string;
+  diagnostic: string;
+}
+
+/**
+ * Node fetch/Undici 常把真实阶段码放在 cause 链中。这个提取器同时用于
+ * 响应头之前的 fetch 错误和响应头之后的 body 读取错误，避免阶段诊断丢失。
+ */
+export function inspectProviderTransportFailure(error: unknown): ProviderTransportFailure {
+  const errorChain: unknown[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === "object"; depth += 1) {
+    errorChain.push(current);
+    current = "cause" in current ? (current as { cause?: unknown }).cause : undefined;
+  }
+  const code = errorChain
+    .map((item) => "code" in (item as object) ? (item as { code?: unknown }).code : undefined)
+    .find((value): value is string => typeof value === "string");
+  const timedOut = errorChain.some((item) => item instanceof Error &&
+    (item.name === "TimeoutError" || item.name === "AbortError")) ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "UND_ERR_HEADERS_TIMEOUT" ||
+    code === "UND_ERR_BODY_TIMEOUT";
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    code,
+    timedOut,
+    message,
+    diagnostic: code ? `${code}: ${message}` : message,
+  };
+}
+
 /**
  * 单次 Provider 请求出口。重试必须由 PostgreSQL Worker 在拿到明确 429/503 后调度；
  * 网络错误、超时或连接中断可能已经产生计费，因此一律标记为 outcome_unknown。
@@ -150,7 +221,12 @@ export class NotImplementedError extends ProviderError {
 export async function fetchWithRetry(
   url: string,
   initFactory: () => RequestInit,
-  opts?: { timeoutMs?: number; maxRetries?: number; providerId?: string },
+  opts?: {
+    timeoutMs?: number;
+    maxRetries?: number;
+    providerId?: string;
+    dispatcherFactory?: () => unknown;
+  },
 ): Promise<Response> {
   let parsedUrl: URL;
   try {
@@ -170,26 +246,46 @@ export async function fetchWithRetry(
   const timeoutMs = opts?.timeoutMs ?? config.aiTimeoutMs();
   void opts?.maxRetries;
   try {
-    const res = await fetch(url, {
+    const requestInit: RequestInit & { dispatcher?: unknown } = {
       ...initFactory(),
       signal: AbortSignal.timeout(timeoutMs),
-    });
+    };
+    const dispatcher = opts?.dispatcherFactory?.();
+    if (dispatcher !== undefined) requestInit.dispatcher = dispatcher;
+    const res = await dispatchFetch(url, requestInit);
+    const requestId = providerRequestIdFromResponse(res);
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw providerErrorFromResponse(res.status, body, opts?.providerId);
+      // 非 2xx body 若本身超时/中断，结果和计费状态同样不可知；不得吞掉后误判为可重试 503。
+      try {
+        const body = await res.text();
+        throw providerErrorFromResponse(res.status, body, opts?.providerId, requestId);
+      } catch (error) {
+        if (error instanceof ProviderError) throw error;
+        const failure = inspectProviderTransportFailure(error);
+        throw new ProviderError(
+          failure.timedOut
+            ? "AI 响应体读取超时，结果可能已经生成；系统不会自动重试"
+            : "AI 响应中断或不完整，结果可能已经生成；系统不会自动重试",
+          failure.timedOut ? 504 : 502,
+          opts?.providerId,
+          "outcome_unknown",
+          failure.diagnostic,
+          requestId,
+        );
+      }
     }
     return res;
   } catch (error) {
     if (error instanceof ProviderError) throw error;
-    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    const failure = inspectProviderTransportFailure(error);
     throw new ProviderError(
-      timedOut
+      failure.timedOut
         ? "AI 请求已超时，结果可能已经生成；为避免重复计费，系统不会自动重试"
         : "AI 连接中断，结果可能已经生成；为避免重复计费，系统不会自动重试",
-      timedOut ? 504 : 502,
+      failure.timedOut ? 504 : 502,
       opts?.providerId,
       "outcome_unknown",
-      error instanceof Error ? error.message : String(error),
+      failure.diagnostic,
     );
   }
 }

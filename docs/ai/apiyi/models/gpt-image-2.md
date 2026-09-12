@@ -2,6 +2,8 @@
 
 产品范围：仅“局部修改”节点，不得出现在普通图片生成节点的模型列表中。
 
+当前证据状态：`unverified`。OpenAI 上游的普通生成或更多引用图能力不会自动扩大首版产品策略。
+
 ## 请求
 
 - Base URL：https://api.apiyi.com
@@ -10,6 +12,7 @@
 - 必填：model、prompt、第一张 image[]、mask
 - model 固定为 gpt-image-2
 - image[] 可为 PNG、JPEG 或 WebP；即使只有一张也使用 image[] 字段。单张小于 50MB，项目仍执行自身更严格的上传和引用图限制。
+- 产品最多接收 7 张用户引用图，Provider 适配层另附加 1 张系统引导图，总计不超过 8 张。不得静默丢弃第 8 张用户图。
 - mask 必须为带 Alpha 通道的 PNG、小于 4MB，并与第一张 image 的像素尺寸完全一致。
 - Alpha 0 表示允许编辑；Alpha 255 表示尽量保留；半透明仅是软过渡。
 - mask 只作用于第一张 image。

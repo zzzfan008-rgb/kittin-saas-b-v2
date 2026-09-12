@@ -1,4 +1,6 @@
 .git
+.garment-canvas-build-identity.json
+data/evaluation-release/
 .env*
 .codebase-memory
 .cbmignore

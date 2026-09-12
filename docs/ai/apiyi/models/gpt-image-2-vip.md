@@ -2,6 +2,8 @@
 
 产品范围：普通图片生成节点，支持文生图和参考图编辑。API易文档将该模型标为 Codex 官逆线路；产品文案不得把它误标为 OpenAI 官转。
 
+当前证据状态：`unverified`。该线路没有可以代替的 OpenAI 厂商契约，仅能依据 API易文档与本轮真实观测。
+
 ## 端点
 
 - 文生图：POST /v1/images/generations，application/json。
@@ -16,6 +18,7 @@
 - 单次固定返回 1 张。
 - 默认响应为 b64_json；本项目不发送 response_format，并兼容历史 data URI、纯 Base64 和意外返回的 url。
 - 编辑模式始终重复发送 image 字段，不使用 image[]；顺序对应提示词中的图 1、图 2。
+- 编辑模式最多 8 张图；每张图的角色与顺序必须显式进入请求快照。
 - 不支持 mask。
 
 30 档 size：

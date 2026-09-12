@@ -18,6 +18,7 @@ import {
   documentSnapshotToPersistedWorkflow,
 } from "@/lib/documentSnapshot";
 import { launchTemplateInNewTab } from "@/lib/templateLaunch";
+import { templateProductPolicy } from "@/lib/nodeProductPolicy";
 
 const TEMPLATES_PANEL_ID = "templates-dock-panel";
 
@@ -183,16 +184,22 @@ export function TemplatesDock() {
                 data-slot="templates-grid"
                 className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3"
               >
-                {templates.map((tpl) => (
-                  <div
+                {templates.map((tpl) => {
+                  const productPolicy = templateProductPolicy(tpl);
+                  const unavailable = !productPolicy.launchAllowed;
+                  const reasonId = `template-policy-${tpl.id}`;
+                  return (
+                    <div
                     key={tpl.id}
                     className="group flex flex-col overflow-hidden rounded-lg border border-[#262626] bg-[#1a1a1a] transition-colors hover:border-gold/50"
                   >
                     <button
                       type="button"
-                      title="从模板新建"
+                      title={productPolicy.reason ?? "从模板新建"}
+                      disabled={unavailable}
+                      aria-describedby={unavailable ? reasonId : undefined}
                       onClick={() => applyTemplate(tpl)}
-                      className="block w-full"
+                      className="block w-full disabled:cursor-not-allowed disabled:opacity-75"
                     >
                       {tpl.thumbnail ? (
                         <img
@@ -212,8 +219,12 @@ export function TemplatesDock() {
                           {tpl.name}
                         </span>
                         {tpl.builtIn && (
-                          <span className="shrink-0 rounded-sm border border-gold/40 px-1 py-px text-[8px] text-gold">
-                            内置
+                          <span className={`shrink-0 rounded-sm border px-1 py-px text-[8px] ${
+                            unavailable
+                              ? "border-amber-600/50 text-amber-400"
+                              : "border-gold/40 text-gold"
+                          }`}>
+                            {unavailable ? "unsupported" : "内置"}
                           </span>
                         )}
                       </div>
@@ -222,13 +233,20 @@ export function TemplatesDock() {
                           {tpl.description}
                         </p>
                       )}
+                      {unavailable && (
+                        <p id={reasonId} className="text-[9px] leading-relaxed text-amber-500">
+                          {productPolicy.reason}
+                        </p>
+                      )}
                       <div className="mt-auto flex gap-1.5 pt-1.5">
                         <button
                           type="button"
+                          disabled={unavailable}
+                          title={productPolicy.reason}
                           onClick={() => applyTemplate(tpl)}
-                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold"
+                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          从模板新建
+                          {unavailable ? "首版暂不支持" : "从模板新建"}
                         </button>
                         {!tpl.builtIn && (
                           <button
@@ -241,8 +259,9 @@ export function TemplatesDock() {
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,0 +1,141 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.apiyi.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# 企業客戶如何充值？
+
+> API易企業客戶推薦對公轉賬充值，單次 1000 元以上建議走對公，可後補合同。支援開具增值稅發票（稅率 1%）與 Invoice。
+
+## 簡短回答
+
+**企業客戶推薦使用對公轉賬（銀行電匯）充值，建議單次充值金額在 1000 元以上的客戶採用。**
+
+流程很簡單：通過官方企業微信客服獲取我方收款公司與銀行資訊 → 完成轉賬 → API易 收到費用後人工充值入賬到你指定的賬號。支援開具\*\*增值稅發票（稅率 1%）\*\*及 **Invoice**。
+
+<Info>
+  對公充值是 API易 多種充值方式之一。完整的充值方式總覽（微信、支付寶、USDT、Stripe 等）見 [APIYI 支援哪些充值方式？](/zh-Hant/faq/payment-methods)。
+</Info>
+
+## 什麼時候建議走對公充值
+
+<CardGroup cols={2}>
+  <Card title="適用金額" icon="coins">
+    建議**單次充值 1000 元以上**的客戶採用對公充值，便於財務報銷與開票。
+  </Card>
+
+  <Card title="合同可後補" icon="file-pen">
+    一開始**可以不用合同**，需要時再補籤。簽約基於雙方認可的合同模板內容，屬於**稅務合規**操作，對雙方都是保障。
+  </Card>
+</CardGroup>
+
+<Tip>
+  **關於合同**：合同是基於雙方認可的標準合同模板內容才簽署的，目的是滿足稅務合規要求——這對客戶和 API易 雙方都是一種保障，而非額外門檻。小額或無需合同的客戶可直接走對公流程。
+</Tip>
+
+## 對公充值流程
+
+<Steps>
+  <Step title="聯絡官方企業微信客服">
+    通過官方指定的企業微信聯絡方式（與本站客服為**同一入口**）聯絡我們，說明需要對公充值。
+  </Step>
+
+  <Step title="獲取收款公司與銀行資訊">
+    客服會提供我方的**轉賬公司名稱**和**銀行賬戶資訊**。
+  </Step>
+
+  <Step title="完成銀行轉賬">
+    向指定賬戶完成轉賬。轉賬時**可以備註你的使用者名稱**作為轉賬備註；**不備註也沒有關係**，我們會與聯絡的客戶**核對轉賬公司資訊和金額**，確認後入賬。
+  </Step>
+
+  <Step title="平臺人工充值入賬">
+    API易 收到費用後，進行**人工充值**，將金額入賬到你**指定的賬號**，餘額即可用於 API 呼叫。
+  </Step>
+</Steps>
+
+<Warning>
+  **資金安全提醒**：我方對公賬戶資訊**僅通過官方企業微信客服渠道獲取**，請勿相信任何第三方提供的"客服"或收款賬戶，避免資金損失。
+</Warning>
+
+## 發票與 Invoice 開具
+
+API易 同時支援開具**中國增值稅發票**和 **Invoice**，適配國內外財務流程。
+
+| 開票項         | 說明                         |
+| ----------- | -------------------------- |
+| **發票型別**    | 增值稅普通發票 或 增值稅專用發票          |
+| **稅率**      | 1%（小微企業國家專屬稅率）             |
+| **開票類目**    | 資訊科技服務費（預設，有特殊需求可溝通）       |
+| **Invoice** | 支援開具 Invoice，適配海外企業 / 跨境財務 |
+
+### 網站線上充值的開票規則
+
+在網站裡自助充值的金額也均可以開票，但**按支付通道區分**：
+
+| 支付通道       | 開票方式                        |
+| ---------- | --------------------------- |
+| **支付寶、微信** | 可開具**增值稅發票**（僅限支付寶和微信充值的商品） |
+| **Stripe** | 開具 **Invoice**              |
+| **USDT**   | **不開票**                     |
+
+<Tip>
+  **開票提醒**：發票 / Invoice 需求請在**付款時或付款前**告知客服，並提供**抬頭、稅號、郵箱**等資訊，方便一次開具完整；後補開票可能涉及跨賬期處理。
+</Tip>
+
+## 充值優惠
+
+對公充值同樣可以參與**充值加贈活動**，長期使用更划算，我們推薦企業客戶參與。
+
+📖 詳見：[充值優惠活動](/zh-Hant/faq/recharge-promotions)
+
+## 常見問題
+
+<AccordionGroup>
+  <Accordion title="一定要籤合同才能對公充值嗎？">
+    不需要。一開始可以**不用合同**直接走對公流程；需要時再後補簽訂。合同基於雙方認可的標準模板內容簽署，屬於稅務合規操作，對雙方都是保障。
+  </Accordion>
+
+  <Accordion title="轉賬時忘了備註使用者名稱怎麼辦？">
+    沒有關係。備註使用者名稱只是方便快速對應賬號；即使不備註，我們也會與聯絡的客戶**核對轉賬公司資訊和金額**，確認後人工入賬。
+  </Accordion>
+
+  <Accordion title="對公轉賬多久到賬？">
+    工作日通常**當日內**人工充值到賬（依銀行清算時間，部分跨境電匯可能 T+1 \~ T+3）。轉賬後**主動把憑證發給客服**可加快入賬。
+  </Accordion>
+
+  <Accordion title="發票稅率為什麼是 1%？">
+    1% 是**小微企業國家專屬稅率**。開票類目預設為**資訊科技服務費**，如有特殊需求可與客服溝通調整。
+  </Accordion>
+
+  <Accordion title="網站充值的錢可以開票嗎？">
+    可以，但按通道區分：**支付寶、微信**充值的商品可開**增值稅發票**；**Stripe** 付款開具 **Invoice**；**USDT** 付款**不開票**。
+  </Accordion>
+</AccordionGroup>
+
+## 相關文件
+
+<CardGroup cols={2}>
+  <Card title="支援哪些充值方式？" icon="credit-card" href="/zh-Hant/faq/payment-methods">
+    7 種充值方式總覽與發票說明
+  </Card>
+
+  <Card title="充值優惠活動" icon="gift" href="/zh-Hant/faq/recharge-promotions">
+    充值加贈活動詳情
+  </Card>
+
+  <Card title="企業客戶和個人使用者有什麼區別？" icon="building-2" href="/zh-Hant/faq/enterprise-vs-individual">
+    企業賬號、多令牌與內部共享
+  </Card>
+
+  <Card title="如何檢視呼叫日誌？" icon="file-text" href="/zh-Hant/faq/call-logs">
+    用量與消耗的查詢方式
+  </Card>
+</CardGroup>
+
+## 聯絡我們
+
+<Card title="企業微信客服" icon="headphones" href="https://work.weixin.qq.com/kfid/kfc9adfd5810ece25ec">
+  對公充值、合同簽訂、發票 / Invoice 開具等需求，歡迎聯絡：
+
+  * [聯絡企業微信客服](https://work.weixin.qq.com/kfid/kfc9adfd5810ece25ec)
+  * 郵箱：[hi@apiyi.com](mailto:hi@apiyi.com)
+</Card>

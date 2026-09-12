@@ -43,6 +43,7 @@ export function ResultsPanel({
     setSelectedResultId(r.id);
     openViewer({
       url: r.image,
+      resultId: r.id,
       title: r.nodeLabel,
       prompt: r.prompt,
       meta: `${r.model ?? ""} · ${(((r.finishedAt ?? r.startedAt) - r.startedAt) / 1000).toFixed(1)}s · ${new Date(r.finishedAt ?? r.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,

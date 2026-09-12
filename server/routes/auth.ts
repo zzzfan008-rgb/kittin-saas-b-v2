@@ -20,6 +20,10 @@ import {
   prepareUserTemplateAccountMutation,
   reconcileUserTemplateAccountMutations,
 } from "../lib/userTemplateLifecycle";
+import {
+  prepareOpenAiMaskTestAccountMutation,
+  reconcileOpenAiMaskTestAccountMutations,
+} from "../lib/openaiMaskTestLifecycle";
 
 export const authRouter = Router();
 
@@ -240,6 +244,21 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     if (!lockedSource || lockedSource.deleted_at !== null) {
       return { status: "source_changed" as const };
     }
+    const openAiMaskTestMutation = prepareOpenAiMaskTestAccountMutation({
+      sourceOwnerId: req.params.id,
+      sourceDeletedAt: nowIso,
+      ...(transferToUserId
+        ? { transferToOwnerId: transferToUserId }
+        : { deletedAt: nowIso, purgeAfter }),
+    });
+    if (openAiMaskTestMutation.activeCount > 0) {
+      return { status: "active_mask_tests" as const };
+    }
+    if (openAiMaskTestMutation.conflictCount > 0) {
+      return { status: "mask_test_conflict" as const };
+    }
+    openAiMaskTestMutation.apply();
+
     if (transferToUserId) {
       const lockedTarget = lockedUsers.find((row) => row.id === transferToUserId);
       if (!lockedTarget || lockedTarget.active !== 1 || lockedTarget.deleted_at !== null) {
@@ -339,10 +358,16 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
       console.error("[garment-canvas] failed to reconcile user template ownership mutation", reconcileError);
     });
+    await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
+      console.error("[garment-canvas] failed to reconcile OpenAI mask test ownership mutation", reconcileError);
+    });
     throw error;
   });
   await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
     console.error("[garment-canvas] failed to finalize user template ownership mutation", reconcileError);
+  });
+  await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
+    console.error("[garment-canvas] failed to finalize OpenAI mask test ownership mutation", reconcileError);
   });
   if (outcome.status === "source_changed") {
     res.status(404).json({ error: "用户不存在或状态已变化，请刷新后重试" });
@@ -358,6 +383,14 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
   }
   if (outcome.status === "active_runs") {
     res.status(409).json({ error: "账号仍有生成任务，请等待任务结束后再删除" });
+    return;
+  }
+  if (outcome.status === "active_mask_tests") {
+    res.status(409).json({ error: "账号仍有原生蒙版测试，请等待测试结束后再操作账号" });
+    return;
+  }
+  if (outcome.status === "mask_test_conflict") {
+    res.status(409).json({ error: "数据接收用户已有同名原生蒙版测试记录，请先处理重复记录后再转移" });
     return;
   }
   if (outcome.status === "draft_conflict") {

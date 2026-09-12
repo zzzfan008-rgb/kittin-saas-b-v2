@@ -55,7 +55,10 @@ await test("上游忽略 n 每次只回一张时，AI 改款仍补足用户选�
     },
   };
   const result = await generateExactImages(provider, {
-    prompt: "改款", referenceImages: ["data:image/png;base64,AA=="], batchSize: 4,
+    prompt: "改款",
+    operationMode: "edit",
+    referenceImages: ["data:image/png;base64,AA=="],
+    batchSize: 4,
   }, 4);
   assert.deepEqual(result.images, ["image-1", "image-2", "image-3", "image-4"]);
   assert.equal(result.providerRequests, 4);
@@ -72,7 +75,11 @@ await test("文生图同样补足数量，不只修复图生图节点", async ()
     },
     async edit() { throw new Error("unexpected edit"); },
   };
-  const result = await generateExactImages(provider, { prompt: "服装效果图" }, 2);
+  const result = await generateExactImages(
+    provider,
+    { prompt: "服装效果图", operationMode: "generate" },
+    2,
+  );
   assert.equal(result.images.length, 2);
   assert.equal(calls, 2);
 });
@@ -88,7 +95,12 @@ await test("明确 429 交由持久队列重试，精确批量层只调用一次
     async edit() { throw new Error("unexpected edit"); },
   };
   await assert.rejects(
-    () => generateExactImages(provider, { prompt: "重试" }, 1, { runId: "run-test" }),
+    () => generateExactImages(
+      provider,
+      { prompt: "重试", operationMode: "generate" },
+      1,
+      { runId: "run-test" },
+    ),
     (error: unknown) => error instanceof ProviderError && error.status === 429,
   );
   assert.equal(calls, 1);
@@ -105,7 +117,7 @@ await test("永久参数错误仍立即停止，不额外产生消耗", async ()
     async edit() { throw new Error("unexpected edit"); },
   };
   await assert.rejects(
-    generateExactImages(provider, { prompt: "错误参数" }, 1),
+    generateExactImages(provider, { prompt: "错误参数", operationMode: "generate" }, 1),
     /参数错误/,
   );
   assert.equal(calls, 1);
@@ -136,7 +148,10 @@ await test("内容安全拒绝是确定失败，不会为同一输入重复付�
     },
     async edit() { throw new Error("unexpected edit"); },
   };
-  await assert.rejects(() => generateExactImages(provider, { prompt: "被拒绝" }, 4), ProviderError);
+  await assert.rejects(
+    () => generateExactImages(provider, { prompt: "被拒绝", operationMode: "generate" }, 4),
+    ProviderError,
+  );
   assert.equal(calls, 1);
 });
 
@@ -161,7 +176,11 @@ await test("部分成功保留图片并明确记录 N/M", async () => {
     },
     async edit() { throw new Error("unexpected edit"); },
   };
-  const result = await generateExactImages(provider, { prompt: "四张" }, 4);
+  const result = await generateExactImages(
+    provider,
+    { prompt: "四张", operationMode: "generate" },
+    4,
+  );
   assert.deepEqual(result.images, ["ok-1", "ok-2"]);
   assert.ok(result.failures.some((message) => message.includes("2/4")));
 });
@@ -183,7 +202,7 @@ await test("部分成功后若后续请求结果未知，整步进入未知状�
     async edit() { throw new Error("unexpected edit"); },
   };
   await assert.rejects(
-    () => generateExactImages(provider, { prompt: "两张" }, 2),
+    () => generateExactImages(provider, { prompt: "两张", operationMode: "generate" }, 2),
     (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
   );
   assert.equal(calls, 2);
@@ -261,37 +280,70 @@ await test("runner 仅对生成/改款画幅和高清放大应用尺寸后处理
 
 await test("直接生成接口对显式节点种类严格校验尺寸参数", async () => {
   assert.deepEqual(
-    validateDirectGenerateRequest("sketch-to-render", { prompt: "效果图", aspectRatio: "3:4" }),
+    validateDirectGenerateRequest("sketch-to-render", {
+      prompt: "效果图",
+      operationMode: "generate",
+      aspectRatio: "3:4",
+    }),
     { ok: true, kind: "sketch-to-render" },
   );
   assert.deepEqual(
-    validateDirectGenerateRequest("upscale", { prompt: "放大", imageSize: "4K" }),
+    validateDirectGenerateRequest("upscale", {
+      prompt: "放大",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+      imageSize: "4K",
+    }),
     { ok: true, kind: "upscale" },
   );
   assert.deepEqual(
-    validateDirectGenerateRequest(undefined, { prompt: "旧请求没有 kind" }),
-    { ok: true },
+    validateDirectGenerateRequest(undefined, {
+      prompt: "不允许推断 kind",
+      operationMode: "generate",
+    }),
+    { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" },
   );
-  assert.equal(validateDirectGenerateRequest("result", { prompt: "非 AI 节点" }).ok, false);
+  assert.equal(validateDirectGenerateRequest("result", {
+    prompt: "非 AI 节点",
+    operationMode: "generate",
+  }).ok, false);
   assert.equal(
-    validateDirectGenerateRequest("sketch-to-render", { prompt: "缺少比例" }).ok,
+    validateDirectGenerateRequest("sketch-to-render", {
+      prompt: "缺少比例",
+      operationMode: "generate",
+    }).ok,
     false,
   );
   assert.equal(
-    validateDirectGenerateRequest("ai-modify", { prompt: "错误比例", aspectRatio: "2:3" }).ok,
+    validateDirectGenerateRequest("ai-modify", {
+      prompt: "错误比例",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+      aspectRatio: "2:3",
+    }).ok,
     false,
   );
   assert.equal(
-    validateDirectGenerateRequest("upscale", { prompt: "错误尺寸", imageSize: "8K" }).ok,
+    validateDirectGenerateRequest("upscale", {
+      prompt: "错误尺寸",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+      imageSize: "8K",
+    }).ok,
     false,
   );
   assert.deepEqual(
-    validateDirectGenerateRequest("print-mutate", { prompt: "其他 AI 节点不要尺寸参数" }),
+    validateDirectGenerateRequest("print-mutate", {
+      prompt: "其他 AI 节点不要尺寸参数",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+    }),
     { ok: true, kind: "print-mutate" },
   );
   const tooManyMaskReferences = Array.from({ length: 8 }, (_, index) => `/api/files/mask-ref-${index}.png`);
   const invalidMaskReferences = validateDirectGenerateRequest("mask-redraw", {
     prompt: "局部修改",
+    operationMode: "mask-edit",
     referenceImages: tooManyMaskReferences,
     mask: "/api/files/mask.png",
   });
@@ -305,7 +357,7 @@ await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理",
   const portrait = await fixtureDataUrl(100, 200);
   const sketch = await postProcessDirectGenerateImages(
     "sketch-to-render",
-    { prompt: "效果图", aspectRatio: "9:16" },
+    { prompt: "效果图", operationMode: "generate", aspectRatio: "9:16" },
     [portrait],
   );
   assert.equal((await imageInfo(sketch[0])).metadata.width, 864);
@@ -314,7 +366,12 @@ await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理",
   const landscape = await fixtureDataUrl(200, 100);
   const modify = await postProcessDirectGenerateImages(
     "ai-modify",
-    { prompt: "改款", aspectRatio: "16:9" },
+    {
+      prompt: "改款",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+      aspectRatio: "16:9",
+    },
     [landscape],
   );
   assert.equal((await imageInfo(modify[0])).metadata.width, 1536);
@@ -322,7 +379,12 @@ await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理",
 
   const upscale = await postProcessDirectGenerateImages(
     "upscale",
-    { prompt: "高清放大", imageSize: "4K" },
+    {
+      prompt: "高清放大",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+      imageSize: "4K",
+    },
     [landscape],
   );
   assert.equal((await imageInfo(upscale[0])).metadata.width, 4096);
@@ -330,11 +392,18 @@ await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理",
 
   const untouched = [portrait];
   assert.strictEqual(
-    await postProcessDirectGenerateImages("fabric-recolor", { prompt: "换色" }, untouched),
+    await postProcessDirectGenerateImages("fabric-recolor", {
+      prompt: "换色",
+      operationMode: "edit",
+      referenceImages: ["data:image/png;base64,AA=="],
+    }, untouched),
     untouched,
   );
   assert.strictEqual(
-    await postProcessDirectGenerateImages(undefined, { prompt: "旧请求保持原始输出" }, untouched),
+    await postProcessDirectGenerateImages(undefined, {
+      prompt: "旧请求保持原始输出",
+      operationMode: "generate",
+    }, untouched),
     untouched,
   );
 });

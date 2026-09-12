@@ -1,4 +1,5 @@
 import contracts from "../../docs/ai/apiyi/model-contracts.json";
+import type { ImageOperationMode } from "./imageOperations";
 
 export const IMAGE_MODEL_IDS = [
   "gpt-image-2",
@@ -6,7 +7,6 @@ export const IMAGE_MODEL_IDS = [
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
-  "grok-imagine-image",
 ] as const;
 
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number];
@@ -19,11 +19,20 @@ export interface ImageModelOptions {
   width?: number;
   height?: number;
   outputFormat?: "jpeg" | "png" | "webp";
-  resolution?: string;
+}
+
+export interface ReviewedModelCatalogBaseline {
+  reviewedExportHashScope: "sha256-canonical-model-id-set-v1";
+  reviewedExportSha256: string | null;
+  reviewedRawExportSha256: string | null;
+  expectedGatewayModelIds: readonly ImageModelId[];
 }
 
 export interface ImageModelContract {
   id: ImageModelId;
+  contractHashScope: "sha256-canonical-semantic-envelope-v1";
+  contractHash: `sha256:${string}`;
+  reviewedModelCatalogBaseline: ReviewedModelCatalogBaseline;
   upstreamModelId: string;
   label: string;
   channel: string;
@@ -34,6 +43,7 @@ export interface ImageModelContract {
     contentType: string;
     minReferences: number;
     maxReferences: number;
+    maxUserReferences?: number;
     singleImageField?: string;
     multipleImageField?: string;
     firstReferenceControlsDimensions?: boolean;
@@ -67,11 +77,57 @@ export interface ImageModelContract {
 const rawModels = contracts.models as unknown as ImageModelContract[];
 const contractMap = new Map(rawModels.map((model) => [model.id, model]));
 
+function hasExactImageModelIds(ids: readonly ImageModelId[]): boolean {
+  return ids.length === IMAGE_MODEL_IDS.length
+    && ids.every((id, index) => id === IMAGE_MODEL_IDS[index]);
+}
+
 for (const id of IMAGE_MODEL_IDS) {
   if (!contractMap.has(id)) throw new Error(`API易模型知识库缺少契约: ${id}`);
 }
 if (contractMap.size !== IMAGE_MODEL_IDS.length) {
   throw new Error("API易模型知识库与应用模型清单不一致");
+}
+
+const reviewedModelCatalogBaseline = rawModels[0]?.reviewedModelCatalogBaseline;
+if (
+  !reviewedModelCatalogBaseline
+  || reviewedModelCatalogBaseline.reviewedExportHashScope !== "sha256-canonical-model-id-set-v1"
+  || !hasExactImageModelIds(reviewedModelCatalogBaseline.expectedGatewayModelIds)
+  || (
+    reviewedModelCatalogBaseline.reviewedExportSha256 !== null
+    && !/^[a-f0-9]{64}$/.test(reviewedModelCatalogBaseline.reviewedExportSha256)
+  )
+  || (
+    reviewedModelCatalogBaseline.reviewedRawExportSha256 !== null
+    && !/^[a-f0-9]{64}$/.test(reviewedModelCatalogBaseline.reviewedRawExportSha256)
+  )
+  || (
+    (reviewedModelCatalogBaseline.reviewedExportSha256 === null)
+    !== (reviewedModelCatalogBaseline.reviewedRawExportSha256 === null)
+  )
+) {
+  throw new Error("API易模型契约缺少有效的 reviewed model catalog baseline");
+}
+for (const model of rawModels) {
+  const baseline = model.reviewedModelCatalogBaseline;
+  if (
+    !baseline
+    || baseline.reviewedExportHashScope !== reviewedModelCatalogBaseline.reviewedExportHashScope
+    || baseline.reviewedExportSha256 !== reviewedModelCatalogBaseline.reviewedExportSha256
+    || baseline.reviewedRawExportSha256 !== reviewedModelCatalogBaseline.reviewedRawExportSha256
+    || !hasExactImageModelIds(baseline.expectedGatewayModelIds)
+  ) {
+    throw new Error(`API易模型契约的 reviewed model catalog baseline 不一致: ${model.id}`);
+  }
+}
+
+export const REVIEWED_MODEL_CATALOG_BASELINE: Readonly<ReviewedModelCatalogBaseline> =
+  reviewedModelCatalogBaseline;
+
+export function hasReviewedModelCatalogBaseline(): boolean {
+  return REVIEWED_MODEL_CATALOG_BASELINE.reviewedExportSha256 !== null
+    && REVIEWED_MODEL_CATALOG_BASELINE.reviewedRawExportSha256 !== null;
 }
 
 export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2-vip";
@@ -87,6 +143,10 @@ export function isImageModelId(value: unknown): value is ImageModelId {
 
 export function getImageModelContract(id: ImageModelId): ImageModelContract {
   return contractMap.get(id)!;
+}
+
+export function imageModelContractHash(id: ImageModelId): `sha256:${string}` {
+  return getImageModelContract(id).contractHash;
 }
 
 export function imageModelLabel(id: ImageModelId): string {
@@ -147,13 +207,6 @@ export function defaultImageModelOptions(
     }
     case "seedream-5-0-260128":
       return { size: "2K" };
-    case "grok-imagine-image": {
-      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
-      return {
-        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
-        resolution: "2k",
-      };
-    }
   }
 }
 
@@ -219,17 +272,6 @@ export function normalizeImageModelOptions(
       const sizes = getImageModelContract(modelId).sizes ?? [];
       return { size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size };
     }
-    case "grok-imagine-image": {
-      const contract = getImageModelContract(modelId);
-      return {
-        aspectRatio: typeof raw.aspectRatio === "string" && contract.aspectRatios?.includes(raw.aspectRatio)
-          ? raw.aspectRatio
-          : defaults.aspectRatio,
-        resolution: typeof raw.resolution === "string" && contract.resolutions?.includes(raw.resolution)
-          ? raw.resolution
-          : defaults.resolution,
-      };
-    }
   }
 }
 
@@ -252,10 +294,6 @@ export function imageModelOptionsForAspectRatio(
     case "flux-2-pro": {
       const dimensions = FLUX_DIMENSIONS_BY_RATIO[aspectRatio];
       return dimensions ? { ...normalized, ...dimensions } : normalized;
-    }
-    case "grok-imagine-image": {
-      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
-      return allowed.includes(aspectRatio) ? { ...normalized, aspectRatio } : normalized;
     }
   }
 }
@@ -282,7 +320,6 @@ export function imageModelOptionsError(modelId: ImageModelId, value: unknown): s
     "gemini-3.1-flash-image": ["aspectRatio", "imageSize"],
     "flux-2-pro": ["width", "height", "outputFormat"],
     "seedream-5-0-260128": ["size"],
-    "grok-imagine-image": ["aspectRatio", "resolution"],
   };
   const unknown = Object.keys(raw).find((key) => !allowedKeys[modelId].includes(key));
   if (unknown) return `contains unsupported parameter ${unknown}`;
@@ -296,11 +333,28 @@ export function imageModelOptionsError(modelId: ImageModelId, value: unknown): s
   return undefined;
 }
 
+/** Mode-aware validation for parameters whose gateway meaning changes between generate and edit. */
+export function imageModelOptionsErrorForOperation(
+  modelId: ImageModelId,
+  value: unknown,
+  _operationMode: ImageOperationMode,
+): string | undefined {
+  return imageModelOptionsError(modelId, value);
+}
+
+export function normalizeImageModelOptionsForOperation(
+  modelId: ImageModelId,
+  value: unknown,
+  preferredAspectRatio: string,
+  _operationMode: ImageOperationMode,
+): ImageModelOptions {
+  return normalizeImageModelOptions(modelId, value, preferredAspectRatio);
+}
+
 export function modelMaxReferenceImages(modelId: ImageModelId): number {
   return Math.min(8, getImageModelContract(modelId).edit.maxReferences);
 }
 
 export function modelMaximumImagesPerRequest(modelId: ImageModelId): number {
-  if (modelId === "grok-imagine-image") return getImageModelContract(modelId).outputCounts?.max ?? 1;
   return getImageModelContract(modelId).output.maxImages ?? 1;
 }

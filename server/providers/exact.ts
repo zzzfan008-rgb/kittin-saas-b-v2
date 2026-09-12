@@ -2,6 +2,8 @@ import type { AIProvider, ImageGenRequest, ImageGenResult } from "../../src/type
 import { ProviderError, publicProviderErrorMessage, sanitizedProviderDiagnostic } from "./base";
 
 export interface ExactImageResult extends ImageGenResult {
+  /** 与 images 等长、同序的 Provider 原始产物引用。 */
+  providerImages: string[];
   providerRequests: number;
   failures: string[];
 }
@@ -10,7 +12,26 @@ export interface ExactImageOptions {
   runId?: string;
   nodeId?: string;
   /** Worker 在实际发出每一次可能计费的上游请求前持久化 attempt_started_at。 */
-  beforeProviderCall?: (providerRequest: number) => void | Promise<void>;
+  beforeProviderCall?: (
+    providerRequest: number,
+    request: ImageGenRequest,
+  ) => void | Promise<void>;
+  /** 记录已经发出的单次请求错误；评估账本用它闭合逐请求延迟与错误语义。 */
+  onProviderCallError?: (artifact: {
+    providerRequest: number;
+    request: ImageGenRequest;
+    error: unknown;
+  }) => void | Promise<void>;
+  /** 每次 Provider 成功返回后、下一次可能计费请求前，立即持久化本轮原图。 */
+  captureProviderImages?: (artifact: {
+    providerRequest: number;
+    request: ImageGenRequest;
+    images: string[];
+    model: string;
+    prompt: string;
+    providerOutputSizes?: Array<string | null>;
+    providerRequestId?: string;
+  }) => Promise<string[]>;
 }
 
 function logProviderFailure(provider: AIProvider, error: ProviderError, options: ExactImageOptions, attempt: number): void {
@@ -21,6 +42,7 @@ function logProviderFailure(provider: AIProvider, error: ProviderError, options:
     status: error.status ?? null,
     category: error.category,
     attempt,
+    requestId: error.requestId ?? null,
     diagnostic: sanitizedProviderDiagnostic(error) ?? error.message,
   }));
 }
@@ -38,6 +60,7 @@ export async function generateExactImages(
 ): Promise<ExactImageResult> {
   const target = Math.max(1, Math.min(8, Math.floor(requestedCount) || 1));
   const images: string[] = [];
+  const providerImages: string[] = [];
   const providerOutputSizes: Array<string | null> = [];
   const failures: string[] = [];
   let model = provider.id;
@@ -48,26 +71,21 @@ export async function generateExactImages(
   while (images.length < target && providerRequests < maxRequests) {
     const remaining = target - images.length;
     const current: ImageGenRequest = { ...request, batchSize: Math.min(4, remaining) };
-    const mode = current.referenceImages?.length ? "edit" : "generate";
-    await provider.validate?.(current, mode);
-    await options.beforeProviderCall?.(providerRequests + 1);
+    const mode = current.operationMode === "generate" ? "generate" : "edit";
+    await provider.validate?.(current, current.operationMode);
+    await options.beforeProviderCall?.(providerRequests + 1, current);
     providerRequests += 1;
+    let result: ImageGenResult;
     try {
-      const result = mode === "edit"
+      result = mode === "edit"
         ? await provider.edit(current)
         : await provider.generate(current);
-      model = result.model;
-      const accepted = result.images
-        .map((image, index) => ({ image, providerOutputSize: result.providerOutputSizes?.[index] ?? null }))
-        .filter((item) => Boolean(item.image))
-        .slice(0, remaining);
-      images.push(...accepted.map((item) => item.image));
-      providerOutputSizes.push(...accepted.map((item) => item.providerOutputSize));
-      if (accepted.length === 0) {
-        failures.push("模型未返回图片");
-        break;
-      }
     } catch (error) {
+      await options.onProviderCallError?.({
+        providerRequest: providerRequests,
+        request: current,
+        error,
+      });
       firstError ??= error;
       if (error instanceof ProviderError) logProviderFailure(provider, error, options, providerRequests);
       if (error instanceof ProviderError && error.category === "outcome_unknown") throw error;
@@ -78,12 +96,41 @@ export async function generateExactImages(
       failures.push(publicProviderErrorMessage(error));
       break;
     }
+    model = result.model;
+    const accepted = result.images
+      .map((image, index) => ({ image, providerOutputSize: result.providerOutputSizes?.[index] ?? null }))
+      .filter((item) => Boolean(item.image))
+      .slice(0, remaining);
+    if (accepted.length === 0) {
+      failures.push("模型未返回图片");
+      break;
+    }
+    const acceptedImages = accepted.map((item) => item.image);
+    const acceptedSizes = accepted.map((item) => item.providerOutputSize);
+    const captured = options.captureProviderImages
+      ? await options.captureProviderImages({
+          providerRequest: providerRequests,
+          request: current,
+          images: acceptedImages,
+          model: result.model,
+          prompt: current.prompt,
+          providerOutputSizes: acceptedSizes.some((size) => size !== null) ? acceptedSizes : undefined,
+          providerRequestId: result.providerRequestId,
+        })
+      : acceptedImages;
+    if (captured.length !== acceptedImages.length) {
+      throw new Error("Provider original capture must preserve output cardinality and order");
+    }
+    images.push(...acceptedImages);
+    providerImages.push(...captured);
+    providerOutputSizes.push(...acceptedSizes);
   }
 
   if (images.length === 0) throw firstError instanceof Error ? firstError : new Error(failures[0] ?? "模型未返回图片");
   if (images.length < target) failures.push(`只生成了 ${images.length}/${target} 张图片`);
   return {
     images,
+    providerImages,
     model,
     providerRequests,
     failures,

@@ -6,6 +6,7 @@ import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
 export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNodeData>>) {
@@ -16,6 +17,7 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
     { multiline: true },
   );
   const running = isNodeRunActive(data.status);
+  const admission = usePromptRunAdmission(id, data);
 
   return (
     <>
@@ -67,8 +69,13 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
             </select>
           </label>
         </div>
-        <ModelControls nodeId={id} modelId={data.modelId} modelOptions={data.modelOptions} preferredAspectRatio={data.aspectRatio} disabled={running} />
-        <RunButton status={data.status} onClick={() => void runNode(id)} label={data.label} />
+        <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} preferredAspectRatio={data.aspectRatio} disabled={running} referenceRows={admission.referenceRows} />
+        <RunButton
+          status={data.status}
+          onClick={() => void runNode(id)}
+          label={data.label}
+          disabledReason={admission.allowed ? undefined : admission.reason}
+        />
         {running && <Developing />}
         <ImageGrid images={data.outputImages} />
       </NodeFrame>

@@ -87,8 +87,6 @@ function diagnosticModelOptions(modelId: ImageModelId): ImageModelOptions {
       return { width: 512, height: 512, outputFormat: "png" };
     case "seedream-5-0-260128":
       return { size: "2K" };
-    case "grok-imagine-image":
-      return { aspectRatio: "1:1", resolution: "1k" };
   }
 }
 
@@ -137,11 +135,14 @@ const probeDiagnostics = asyncHandler(async (req, res) => {
     const prompt = "服装设计系统连通性测试：生成一块纯白色方形面料色卡，不包含文字";
     const modelOptions = diagnosticModelOptions(providerId);
     const result = mode === "generate"
-      ? await provider.generate({ prompt, batchSize: 1, aspectRatio: "1:1", modelOptions })
+      ? await provider.generate({
+          prompt, operationMode: "generate", batchSize: 1, aspectRatio: "1:1", modelOptions,
+        })
       : await (async () => {
           const images = await diagnosticImages();
           return provider.edit({
             prompt: "保持画面为纯白色方形色卡，不添加文字",
+            operationMode: providerId === "gpt-image-2" ? "mask-edit" : "edit",
             referenceImages: [images.source],
             mask: providerId === "gpt-image-2" ? images.mask : undefined,
             batchSize: 1,

@@ -13,6 +13,7 @@ import {
 import { lockActiveOwner } from "../lib/ownerMutation";
 import { isLocalImageReference } from "../lib/imageValidation";
 import type { PersistedWorkflow } from "../../src/types/workflow";
+import { purgeExpiredOpenAiMaskTests } from "../lib/openaiMaskTestLifecycle";
 
 export const projectsRouter = Router();
 
@@ -243,6 +244,7 @@ export async function purgeExpiredProjects(): Promise<void> {
     return files.rows.map((row) => row.id);
   });
   expiredFileIds.forEach(deleteStoredImage);
+  purgeExpiredOpenAiMaskTests(now);
 }
 
 projectsRouter.post("/", asyncHandler(async (req, res) => {
