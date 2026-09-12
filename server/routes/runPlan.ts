@@ -234,7 +234,7 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
     references.push(...actualStaticInputs);
 
     const plannedInputCount = plannedStepReferences(step).length;
-    if (step.kind === "fabric-recolor" && typeof step.params.fabricImageUrl === "string") {
+    if ((step.kind === "fabric-recolor" || step.kind === "fabric-replace") && typeof step.params.fabricImageUrl === "string") {
       references.push({
         imageRef: step.params.fabricImageUrl,
         order: plannedInputCount,

@@ -235,7 +235,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }
   }
   const fabricImageUrl = (request as ImageGenRequest & { fabricImageUrl?: unknown }).fabricImageUrl;
-  if (resolvedKind === "fabric-recolor" && fabricImageUrl !== undefined) {
+  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && fabricImageUrl !== undefined) {
     const fabricReferenceError = directImageReferenceError(fabricImageUrl);
     if (fabricReferenceError) {
       res.status(400).json({ error: `request.fabricImageUrl ${fabricReferenceError}` });
@@ -325,7 +325,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   // append one-by-one so their indexes stay unambiguous even if node policies
   // later allow more than one auxiliary image at a time.
   const accessReferences: ImageReferenceAccessEvidence[] = [...inputReferences];
-  if (resolvedKind === "fabric-recolor" && typeof fabricImageUrl === "string") {
+  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && typeof fabricImageUrl === "string") {
     accessReferences.push({
       imageRef: fabricImageUrl,
       order: accessReferences.length,

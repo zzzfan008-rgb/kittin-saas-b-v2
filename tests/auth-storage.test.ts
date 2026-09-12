@@ -19,6 +19,7 @@ const { closeDatabaseForTests, db, initializeDatabase, query, queryOne } = await
 const { authenticateRequest, authenticatedUser, createSession, SESSION_COOKIE } = await import("../server/lib/auth");
 const { authRouter } = await import("../server/routes/auth");
 const { purgeExpiredProjects } = await import("../server/routes/projects");
+const { openAiMaskTestRecordPath } = await import("../server/lib/openaiMaskTestLifecycle");
 const { verifyPassword } = await import("../server/lib/password");
 const {
   completeGenerationRecord, createGenerationRecord, failGenerationRecord, registerGeneratedFiles,
@@ -215,6 +216,15 @@ await test("账号数据转移会化解重复付费请求号而不触发唯一�
       ('transfer-target-run', $2, 'target-node', '目标任务', 'ai-modify', 1, 'failed', 2,
        'shared-transfer-request', 'target-fingerprint')
   `, [sourceId, targetId]);
+  const transferRecord = {
+    id: "transfer-mask-record",
+    status: "succeeded",
+    image: "/api/files/transfer-mask-output.png",
+  };
+  const sourceRecordPath = openAiMaskTestRecordPath(sourceId, transferRecord.id);
+  const targetRecordPath = openAiMaskTestRecordPath(targetId, transferRecord.id);
+  fs.writeFileSync(sourceRecordPath, JSON.stringify(transferRecord), { mode: 0o600 });
+  fs.rmSync(targetRecordPath, { force: true });
 
   const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
   const app = express();
@@ -264,6 +274,9 @@ await test("账号数据转移会化解重复付费请求号而不触发唯一�
       request_fingerprint: "target-fingerprint",
     },
   ]);
+  assert.equal(fs.existsSync(sourceRecordPath), false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(targetRecordPath, "utf8")), transferRecord);
+  fs.rmSync(targetRecordPath, { force: true });
 });
 
 await test("账号转移不会合并出超过安全恢复上限的活动任务", async () => {
@@ -532,6 +545,12 @@ await test("删除账号时全部业务数据进入 15 天回收期并在到期�
       provider_requests, duration_ms, created_at
     ) VALUES ('retention-usage', $1, 'retention-run', 'retention-project', 'node', 1, 1, 1, $2)
   `, [userId, createdAt]);
+  const maskRecordPath = openAiMaskTestRecordPath(userId, "retention-test");
+  fs.writeFileSync(maskRecordPath, JSON.stringify({
+    id: "retention-test",
+    status: "succeeded",
+    image: "/api/files/retention-mask-output.png",
+  }), { mode: 0o600 });
   const uploads = path.join(temp, "uploads");
   fs.mkdirSync(uploads, { recursive: true });
   fs.writeFileSync(path.join(uploads, "retention.png"), "test");
@@ -568,11 +587,21 @@ await test("删除账号时全部业务数据进入 15 天回收期并在到期�
     assert.ok(row?.deleted_at, `${table} should be tombstoned`);
     assert.ok(row?.purge_after, `${table} should have a purge deadline`);
   }
+  const retainedMaskRecord = JSON.parse(fs.readFileSync(maskRecordPath, "utf8")) as {
+    deletedAt?: string;
+    purgeAfter?: string;
+  };
+  assert.ok(retainedMaskRecord.deletedAt);
+  assert.ok(retainedMaskRecord.purgeAfter);
 
   const expired = new Date(Date.now() - 1_000).toISOString();
   for (const table of ["projects", "assets", "files", "generation_runs", "usage_events"] as const) {
     await query(`UPDATE ${table} SET purge_after = $1 WHERE owner_id = $2`, [expired, userId]);
   }
+  fs.writeFileSync(maskRecordPath, JSON.stringify({
+    ...retainedMaskRecord,
+    purgeAfter: expired,
+  }), { mode: 0o600 });
   await purgeExpiredProjects();
   for (const table of ["projects", "assets", "files", "generation_runs", "usage_events"] as const) {
     assert.equal((await queryOne<{ count: number }>(
@@ -581,6 +610,7 @@ await test("删除账号时全部业务数据进入 15 天回收期并在到期�
     ))?.count, 0, `${table} should be purged`);
   }
   assert.equal(fs.existsSync(path.join(uploads, "retention.png")), false);
+  assert.equal(fs.existsSync(maskRecordPath), false);
 });
 
 await test("到期清理保留仍被其他项目引用的素材文件", async () => {
