@@ -4,7 +4,20 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { createComposeProjectName, acquireTestLock } from "./test-with-postgres.mjs";
+import {
+  acquireTestLock,
+  assertTestDatabaseReachable,
+  createComposeProjectName,
+  resetTestDatabase,
+  resolveTestDatabaseUrl,
+} from "./test-with-postgres.mjs";
+
+/**
+ * 生产产物冒烟运行器（原生本机 PostgreSQL，不再使用 Docker）。
+ *
+ * 复用与单元/E2E 测试相同的隔离测试库和工作区锁；只额外构建生产产物、占用一个应用端口，
+ * 并把 AI 凭据固定为不可用的 dummy 值。
+ */
 
 async function reserveFreePort() {
   return new Promise((resolve, reject) => {
@@ -36,14 +49,6 @@ function runCommand(command, args, options = {}) {
   }
 }
 
-function runCommandSoft(command, args, options = {}) {
-  try {
-    runCommand(command, args, options);
-  } catch (error) {
-    console.warn(error instanceof Error ? error.message : String(error));
-  }
-}
-
 function runNpmScript(script, env) {
   if (process.env.npm_execpath) {
     runCommand(process.execPath, [process.env.npm_execpath, "run", script], { env });
@@ -60,28 +65,14 @@ function runPlaywrightCommand(env) {
 
 async function main() {
   const shouldBuild = !process.argv.includes("--skip-build");
-  const baseProjectName = createComposeProjectName();
-  const composeProjectName = `${baseProjectName}-e2e-prod-smoke`;
-  const releaseLock = acquireTestLock({ projectName: baseProjectName });
-  const composeCommand = [
-    "compose",
-    "--project-name",
-    composeProjectName,
-    "-f",
-    "compose.test.yaml",
-  ];
-
+  const runId = createComposeProjectName();
+  const releaseLock = acquireTestLock({ projectName: runId });
   const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-prod-smoke-"));
   let cleanupDone = false;
-  let composeEnv = {
-    ...process.env,
-    COMPOSE_PROJECT_NAME: composeProjectName,
-  };
 
   const cleanup = () => {
     if (cleanupDone) return;
     cleanupDone = true;
-    runCommandSoft("docker", [...composeCommand, "down", "--volumes", "--remove-orphans"], { env: composeEnv });
     releaseLock();
     try {
       rmSync(dataDir, { recursive: true, force: true });
@@ -98,17 +89,18 @@ async function main() {
   process.once("SIGTERM", handleTerminate);
 
   try {
-    const [postgresPort, appPort] = await Promise.all([reserveFreePort(), reserveFreePort()]);
-    composeEnv = {
-      ...composeEnv,
-      POSTGRES_TEST_PORT: String(postgresPort),
-    };
+    const databaseUrl = resolveTestDatabaseUrl();
+    await assertTestDatabaseReachable(databaseUrl);
+    // 生产冒烟同样依赖 INITIAL_ADMIN_* 在无用户时引导管理员，需要 pristine 数据库。
+    await resetTestDatabase(databaseUrl);
+    console.log("生产冒烟: 隔离测试库已重置为干净状态");
+    const appPort = await reserveFreePort();
 
     const runnerEnv = {
-      ...composeEnv,
+      ...process.env,
       E2E_ISOLATED_RUN: "1",
       NODE_ENV: "production",
-      DATABASE_URL: `postgresql://garment_test:garment_test@127.0.0.1:${postgresPort}/garment_canvas_test`,
+      DATABASE_URL: databaseUrl,
       DATA_DIR: dataDir,
       SQLITE_IMPORT_FILE: join(dataDir, "missing.db"),
       INITIAL_ADMIN_ACCOUNT_ID: "e2e-admin",
@@ -133,11 +125,8 @@ async function main() {
     if (shouldBuild) {
       runNpmScript("build", runnerEnv);
     }
-    runCommand("docker", [...composeCommand, "down", "--volumes", "--remove-orphans"], { env: composeEnv });
-    runCommand("docker", [...composeCommand, "up", "-d", "--wait"], { env: composeEnv });
     runPlaywrightCommand(runnerEnv);
   } catch (error) {
-    runCommandSoft("docker", [...composeCommand, "logs", "--no-color"], { env: composeEnv });
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   } finally {

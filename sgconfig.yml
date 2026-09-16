@@ -1,0 +1,6 @@
+# ast-grep 配置 — Garment Canvas 交付门禁的语法级结构证据。
+# 规则目录:tools/ast-grep-rules/（随仓库版本管理,每条规则在注释里写明理由与允许的替代做法）
+# 门禁调用:`ast-grep scan --config sgconfig.yml --json=pretty src server scripts e2e`
+# 手工调用:`npx ast-grep scan src server scripts e2e`
+ruleDirs:
+  - tools/ast-grep-rules

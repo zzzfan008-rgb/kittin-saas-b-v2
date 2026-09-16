@@ -4,7 +4,20 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { acquireTestLock, createComposeProjectName } from "./test-with-postgres.mjs";
+import {
+  acquireTestLock,
+  assertTestDatabaseReachable,
+  createComposeProjectName,
+  resetTestDatabase,
+  resolveTestDatabaseUrl,
+} from "./test-with-postgres.mjs";
+
+/**
+ * 隔离的 Playwright E2E 运行器（原生本机 PostgreSQL，不再使用 Docker）。
+ *
+ * 与单元测试 runner 共用同一个隔离测试库与工作区锁；E2E 只额外占用临时端口与临时 DATA_DIR，
+ * 并把 AI 凭据显式置为不可用的 dummy 值，确保 E2E 永远不会触发真实付费调用。
+ */
 
 async function reserveFreePorts(count) {
   const servers = [];
@@ -50,36 +63,20 @@ export function playwrightArgsFromCli(args) {
 }
 
 async function main() {
-  const baseProjectName = createComposeProjectName();
-  const composeProjectName = `${baseProjectName}-e2e`;
-  const releaseLock = acquireTestLock({ projectName: baseProjectName });
-  const compose = [
-    "compose",
-    "--project-name",
-    composeProjectName,
-    "-f",
-    "compose.test.yaml",
-  ];
+  const baseRunId = createComposeProjectName();
+  const releaseLock = acquireTestLock({ projectName: baseRunId });
   const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-e2e-"));
-  let composeEnv = {
-    ...process.env,
-    COMPOSE_PROJECT_NAME: composeProjectName,
-  };
   let cleanupDone = false;
 
   const cleanup = () => {
     if (cleanupDone) return;
     cleanupDone = true;
     try {
-      spawnSync("docker", [...compose, "down", "--volumes", "--remove-orphans"], {
-        stdio: "inherit",
-        env: composeEnv,
-      });
+      rmSync(dataDir, { recursive: true, force: true });
     } catch (cleanupError) {
       console.warn(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
     }
     try {
-      rmSync(dataDir, { recursive: true, force: true });
       releaseLock();
     } catch (cleanupError) {
       console.warn(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
@@ -94,18 +91,16 @@ async function main() {
   process.once("SIGTERM", () => terminate("SIGTERM"));
 
   try {
-    run("docker", [...compose, "down", "--volumes", "--remove-orphans"], { env: composeEnv });
-    const [postgresPort] = await reserveFreePorts(1);
-    composeEnv = {
-      ...composeEnv,
-      POSTGRES_TEST_PORT: String(postgresPort),
-    };
-    run("docker", [...compose, "up", "-d", "--wait"], { env: composeEnv });
+    const databaseUrl = resolveTestDatabaseUrl();
+    await assertTestDatabaseReachable(databaseUrl);
+    // E2E 通过 INITIAL_ADMIN_* 在无用户时引导管理员；原生测试库会跨运行保留状态，
+    // 因此这里显式清空 schema，恢复「每次运行一个全新数据库」的语义。
+    await resetTestDatabase(databaseUrl);
+    console.log("E2E: 隔离测试库已重置为干净状态");
     const [apiPort, webPort] = await reserveFreePorts(2);
 
-    const databaseUrl = `postgresql://garment_test:garment_test@127.0.0.1:${postgresPort}/garment_canvas_test`;
     const e2eEnv = {
-      ...composeEnv,
+      ...process.env,
       E2E_ISOLATED_RUN: "1",
       NODE_ENV: "test",
       DATABASE_URL: databaseUrl,
@@ -135,10 +130,6 @@ async function main() {
 
     runNpmScript("test:e2e:run", e2eEnv, playwrightArgsFromCli(process.argv.slice(2)));
   } catch (error) {
-    spawnSync("docker", [...compose, "logs", "--no-color"], {
-      stdio: "inherit",
-      env: composeEnv,
-    });
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   } finally {

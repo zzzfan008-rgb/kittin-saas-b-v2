@@ -47,36 +47,69 @@ assert.equal(read(".nvmrc").trim(), "24.20.0", ".nvmrc 必须固定最低受支�
 assert.equal(
   fs.existsSync(new URL("../.github/workflows/ci.yml", import.meta.url)),
   false,
-  "GitHub Actions CI 已由本地 Codex 门禁替代",
+  "GitHub Actions CI 已由本地交付门禁替代",
 );
 const codexGate = read("scripts/codex-gate.mjs");
 assert.match(
   codexGate,
   /const REQUIRED_NODE_VERSION = "24\.20\.0";/,
-  "Codex 门禁必须声明 Node.js 24.20.0 最低运行基线",
+  "交付门禁必须声明 Node.js 24.20.0 最低运行基线",
 );
 assert.match(
   codexGate,
   /function nodeVersionAtLeast\(version, minimumVersion = REQUIRED_NODE_VERSION\)/,
-  "Codex 门禁必须支持高于 Node.js 24.20.0 的运行时",
+  "交付门禁必须支持高于 Node.js 24.20.0 的运行时",
 );
 assert.match(
   codexGate,
   /!nodeVersionAtLeast\(process\.versions\.node\)/,
-  "Codex 门禁必须按最低版本比较而不是精确匹配",
+  "交付门禁必须按最低版本比较而不是精确匹配",
 );
 assert.match(codexGate, /run\("npm", \["run", "check"\]\)/);
 assert.match(codexGate, /run\("npm", \["run", "test:e2e"\]\)/);
+const reviewerStart = codexGate.indexOf("function reviewerArgs(");
+const reviewerEnd = codexGate.indexOf("function validateReviewResult(");
+assert.ok(
+  reviewerStart >= 0 && reviewerEnd > reviewerStart,
+  "本地门禁必须用 reviewerArgs 构造评审子进程参数",
+);
+const reviewerArgsBody = codexGate.slice(reviewerStart, reviewerEnd);
 assert.match(
   codexGate,
-  /run\("codex", \[[\s\S]*?"exec",[\s\S]*?"--ephemeral"/,
-  "本地门禁必须调用结构化 Codex exec 审查",
+  /const HERMES_BINARY = "hermes";/,
+  "本地门禁必须由 Hermes 子代理做结构化评审",
 );
-assert.doesNotMatch(
+assert.match(
   codexGate,
-  /run\("codex", \[[\s\S]*?"--model"/,
-  "Codex 门禁必须使用用户配置的默认模型",
+  /const REVIEWER_TOOLSET = "file";/,
+  "评审子进程必须使用最小只读 toolset",
 );
+for (const flag of [
+  '"chat"',
+  '"--query-file"',
+  '"--oneshot"',
+  '"-Q"',
+  '"--ignore-rules"',
+  '"-t"',
+  '"--in"',
+  '"--max-turns"',
+  '"--run-budget"',
+  '"--source"',
+  '"tool"',
+  "budgetSeconds",
+]) {
+  assert.ok(reviewerArgsBody.includes(flag), `评审子进程参数必须包含 ${flag}`);
+}
+for (const forbidden of [
+  '"-m"',
+  '"--model"',
+  '"--provider"',
+  '"--yolo"',
+  '"--ignore-user-config"',
+  '"--safe-mode"',
+]) {
+  assert.ok(!reviewerArgsBody.includes(forbidden), `评审子进程参数不得包含 ${forbidden}`);
+}
 const dockerfile = read("Dockerfile");
 const nodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
 assert.ok(nodeImages.length > 0, "Dockerfile 必须声明 Node.js 基础镜像");

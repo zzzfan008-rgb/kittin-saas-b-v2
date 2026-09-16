@@ -234,7 +234,11 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
     references.push(...actualStaticInputs);
 
     const plannedInputCount = plannedStepReferences(step).length;
-    if ((step.kind === "fabric-recolor" || step.kind === "fabric-replace") && typeof step.params.fabricImageUrl === "string") {
+    // 仅 fabric-recolor 会携带 fabricImageUrl：删除原先 `|| step.kind === "fabric-replace"`
+    // 是行为等价的死代码清理。fabric-replace 不是受支持的节点 kind（不在运行时 NODE_SPECS
+    // 中，TypeScript 亦以 TS2367 证明该比较恒为 false），上游校验会拒绝未知 kind；
+    // 回归不变量见 tests/generation-kind-contract.test.ts。
+    if (step.kind === "fabric-recolor" && typeof step.params.fabricImageUrl === "string") {
       references.push({
         imageRef: step.params.fabricImageUrl,
         order: plannedInputCount,

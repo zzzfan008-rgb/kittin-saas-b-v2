@@ -1,0 +1,10 @@
+id: no-error-suppression-tsx
+language: Tsx
+severity: error
+message: 禁止用 @ts-ignore / @ts-expect-error / eslint-disable 压制静态检查：这会静默吞掉真实的类型与规则错误，让 npm run lint 与门禁失去意义。
+note: |
+  允许的替代：修好类型；确属上游类型缺陷时用带说明的最小封装，并在评审中记录。
+  当前代码库零匹配 —— 该规则用于阻止新引入。
+rule:
+  kind: comment
+  regex: "@ts-(ignore|expect-error)|eslint-disable"

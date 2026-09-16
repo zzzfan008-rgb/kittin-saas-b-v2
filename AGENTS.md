@@ -163,16 +163,23 @@ instruction, then verify drift-prone repository and release state live.
 - Add or update regression coverage for each behavior change. For desktop UI, assert
   rendered geometry and interactions at 1024, 1280, and 1440 rather than class names.
 - Use the existing scripts: `npm run lint`, `npm run test`, `npm run check`, and
-  `npm run build`. The isolated PostgreSQL runner owns test Compose lifecycle; do
-  not replace it with ad-hoc direct Compose commands.
+  `npm run build`. The isolated PostgreSQL runner owns the test database lifecycle: it
+  resolves a local `*_test` database, refuses any connection that is not on `127.0.0.1`
+  or whose database name does not end in `_test`, and holds a per-worktree lock. Do not
+  bypass it with ad-hoc database resets, and never point test runs at the development
+  database.
 - Before delivery or commit, run the relevant focused tests, `npm run check`,
   `npm run build`, `git diff --check`, and GitNexus `detect_changes`. Report any
   unavailable or degraded gate instead of treating it as passed.
 - GitHub Actions is not a project gate. Run `npm run gate:codex -- --base origin/main`
   for a feature branch, or select an exact commit with `--commit SHA`. This runs the
   deterministic local suites on the exact minimum Node.js version pinned by `.nvmrc`,
-  then a structured `codex exec` review without a model override, so the user's
-  configured Codex default model is used. Any actionable P0-P3 finding blocks
+  then a structured review by an isolated Hermes Agent subagent (`hermes chat`, no
+  `-m/--provider` override, so the user's configured default model is used). Code
+  intelligence evidence comes from `ast-grep` structural rules plus
+  `dependency-cruiser` architecture rules (`.dependency-cruiser.cjs`,
+  `sgconfig.yml`, `tools/ast-grep-rules/`); GitNexus CLI and Codex CLI are no longer
+  part of the gate. Any actionable P0-P3 finding blocks
   delivery. Record the exact base/head and the local result in the PR.
 
 ## 7. Git, Review, and Release Gates
@@ -183,7 +190,8 @@ instruction, then verify drift-prone repository and release state live.
   a local exact-SHA review using the configured local review model. It does not
   authorize merging to `main`, tagging, releasing, or deploying.
 - Do not trigger or wait for Codex Cloud review. The current review path is the
-  local Codex gate, GitNexus, exact head/base verification, and the user's explicit
+  local delivery gate (`gate:codex`: Hermes reviewer + ast-grep/dependency-cruiser
+  code intelligence evidence), exact head/base verification, and the user's explicit
   approval. GitHub Actions and CodeRabbit are not required evidence.
 - Merging a PR, tagging, publishing a release, and deploying each require explicit
   user authorization. Never merge automatically.

@@ -1,13 +1,28 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { closeSync, existsSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import pg from "pg";
+
+/**
+ * 隔离的 PostgreSQL 测试运行器（原生本机 PostgreSQL，不再使用 Docker）。
+ *
+ * 数据隔离由专门的测试库承担：runner 只解析出本地 `*_test` 库的连接串并传给测试进程，
+ * 库内状态由测试自身通过 `resetPostgresTestDatabase()` 重置（与既有行为一致：
+ * 容器模式也只保证一次运行开始时是干净的）。
+ *
+ * 安全约束：连接串必须指向本机且数据库名以 `_test` 结尾，否则 runner 直接拒绝启动，
+ * 避免误连、误删开发库。runner 也绝不会把 .env 里的 AI 凭据扩散到测试进程。
+ */
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
+const LOCAL_DATABASE_HOSTS = new Set(["127.0.0.1", "localhost"]);
+const { Client } = pg;
+
+/** 稳定的工作区运行标识：同一工作区在崩溃后必须复用同一个锁名。 */
 export function createComposeProjectName({ cwd = process.cwd() } = {}) {
   const worktreeId = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 10);
   return `garment-canvas-test-${worktreeId}`;
@@ -80,37 +95,127 @@ export function acquireTestLock({
   throw new Error(`Unable to acquire PostgreSQL test lock: ${lockPath}`);
 }
 
-function findFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("Unable to reserve a PostgreSQL test port"));
-        return;
-      }
-
-      const { port } = address;
-      server.close((error) => (error ? reject(error) : resolve(port)));
-    });
-  });
-}
-
-function run(command, args, options = {}) {
-  const result = spawnSync(command, args, { stdio: "inherit", ...options });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
-}
-
-function runNpmScript(script, env) {
-  if (process.env.npm_execpath) {
-    run(process.execPath, [process.env.npm_execpath, "run", script], { env });
-    return;
+/**
+ * 只读取 .env 中的 PostgreSQL 连接键。绝不注入 AI 凭据，也不改动 process.env，
+ * 因此测试进程不会因为加载 .env 而获得可用的付费 provider 密钥。
+ */
+function readPostgresKeysFromDotEnv(dotEnvPath) {
+  if (!existsSync(dotEnvPath)) return {};
+  const allowed = new Set([
+    "PGHOST",
+    "PGPORT",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGDATABASE",
+    "POSTGRES_HOST_PORT",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_DB",
+  ]);
+  const values = {};
+  for (const rawLine of readFileSync(dotEnvPath, "utf8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    if (separator <= 0) continue;
+    const key = line.slice(0, separator).trim();
+    if (!allowed.has(key)) continue;
+    values[key] = line.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
   }
-  run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script], { env });
+  return values;
+}
+
+/** 校验并返回测试库连接串；错误信息只回显主机与库名，绝不回显凭据。 */
+export function validateTestDatabaseUrl(value, source) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${source} 不是合法的 PostgreSQL 连接串`);
+  }
+  if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
+    throw new Error(`${source} 必须是 postgresql:// 连接串`);
+  }
+  if (!LOCAL_DATABASE_HOSTS.has(parsed.hostname)) {
+    throw new Error(
+      `${source} 只允许连接本机 PostgreSQL（127.0.0.1 或 localhost），当前主机为 ${parsed.hostname}`,
+    );
+  }
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  if (!databaseName.endsWith("_test")) {
+    throw new Error(`${source} 的数据库名必须以 _test 结尾，避免误用开发库，当前为 ${databaseName || "(空)"}`);
+  }
+  if (!parsed.username || !parsed.password) {
+    throw new Error(`${source} 必须同时包含用户名和密码`);
+  }
+  return value;
+}
+
+/**
+ * 解析本次运行要使用的隔离测试库连接串。
+ * 优先级：显式 DATABASE_URL / GARMENT_CANVAS_TEST_DATABASE_URL > .env 推导（库名追加 _test）。
+ */
+export function resolveTestDatabaseUrl(env = process.env, { dotEnvPath = join(repositoryRoot, ".env") } = {}) {
+  const explicit = (env.DATABASE_URL ?? "").trim() || (env.GARMENT_CANVAS_TEST_DATABASE_URL ?? "").trim();
+  if (explicit) return validateTestDatabaseUrl(explicit, "DATABASE_URL");
+
+  const file = readPostgresKeysFromDotEnv(dotEnvPath);
+  const host = (env.PGHOST ?? "").trim() || file.PGHOST || "127.0.0.1";
+  const port = (env.PGPORT ?? "").trim() || file.PGPORT || file.POSTGRES_HOST_PORT || "5432";
+  const user = (env.PGUSER ?? "").trim() || file.PGUSER || file.POSTGRES_USER || "";
+  const password = env.PGPASSWORD || file.PGPASSWORD || file.POSTGRES_PASSWORD || "";
+  const database = (env.PGDATABASE ?? "").trim() || file.PGDATABASE || file.POSTGRES_DB || "";
+
+  if (!user || !password || !database) {
+    throw new Error(
+      "无法确定测试库连接串：请在私有 .env 中配置 POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB，" +
+        "或显式设置 DATABASE_URL / GARMENT_CANVAS_TEST_DATABASE_URL",
+    );
+  }
+  const url = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(
+    database,
+  )}_test`;
+  return validateTestDatabaseUrl(url, "由 .env 推导的测试库");
+}
+
+/** 只读探活：数据库不可达时给出可执行的提示，而不是让测试零零散散地失败。 */
+export async function assertTestDatabaseReachable(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5_000 });
+  try {
+    await client.connect();
+    await client.query("SELECT 1");
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `测试库 ${parsed.hostname}:${parsed.port}/${databaseName} 不可达或凭据无效（${reason}）。\n` +
+        "本机原生 PostgreSQL 可用以下方式确认：\n" +
+        "  brew services start postgresql@18\n" +
+        "  /opt/homebrew/opt/postgresql@18/bin/pg_isready -h 127.0.0.1 -p 5432",
+    );
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+/**
+ * 清空隔离测试库的 public schema。
+ *
+ * 与「每次运行一个全新容器」等价，供需要 pristine 数据库的流程使用（E2E 依赖
+ * INITIAL_ADMIN_* 在无用户时引导管理员账号）。调用方必须已持有工作区锁。
+ * 破坏性操作前重新校验连接串，确保只会作用于本机 `*_test` 库。
+ */
+export async function resetTestDatabase(databaseUrl) {
+  validateTestDatabaseUrl(databaseUrl, "重置目标");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await client.query("CREATE SCHEMA public");
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 export function resolveRequestedTestFiles(args, { repoRoot = repositoryRoot } = {}) {
@@ -128,6 +233,20 @@ export function resolveRequestedTestFiles(args, { repoRoot = repositoryRoot } = 
   });
 }
 
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, { stdio: "inherit", ...options });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
+}
+
+function runNpmScript(script, env) {
+  if (process.env.npm_execpath) {
+    run(process.execPath, [process.env.npm_execpath, "run", script], { env });
+    return;
+  }
+  run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", script], { env });
+}
+
 function runFocusedTests(testFiles, env) {
   const tsxCli = join(repositoryRoot, "node_modules/tsx/dist/cli.mjs");
   for (const testFile of testFiles) {
@@ -138,31 +257,13 @@ function runFocusedTests(testFiles, env) {
 
 async function main() {
   const focusedTestFiles = resolveRequestedTestFiles(process.argv.slice(2));
-  const composeProjectName = createComposeProjectName();
-  const releaseLock = acquireTestLock({ projectName: composeProjectName });
-  const compose = [
-    "compose",
-    "--project-name",
-    composeProjectName,
-    "-f",
-    "compose.test.yaml",
-  ];
-  let composeEnv = {
-    ...process.env,
-    COMPOSE_PROJECT_NAME: composeProjectName,
-  };
+  const runId = createComposeProjectName();
+  const releaseLock = acquireTestLock({ projectName: runId });
   let cleanupDone = false;
 
   const cleanup = () => {
     if (cleanupDone) return;
     cleanupDone = true;
-    try {
-      run("docker", [...compose, "down", "--volumes", "--remove-orphans"], {
-        env: composeEnv,
-      });
-    } catch (cleanupError) {
-      console.warn(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
-    }
     try {
       releaseLock();
     } catch (cleanupError) {
@@ -178,19 +279,12 @@ async function main() {
   process.once("SIGTERM", () => terminate("SIGTERM"));
 
   try {
-    run("docker", [...compose, "down", "--volumes", "--remove-orphans"], { env: composeEnv });
-    const postgresPort = await findFreePort();
-    composeEnv = { ...composeEnv, POSTGRES_TEST_PORT: String(postgresPort) };
-    const databaseUrl = `postgresql://garment_test:garment_test@127.0.0.1:${postgresPort}/garment_canvas_test`;
-    run("docker", [...compose, "up", "-d", "--wait"], { env: composeEnv });
-    const testEnv = { ...composeEnv, DATABASE_URL: databaseUrl };
+    const databaseUrl = resolveTestDatabaseUrl();
+    await assertTestDatabaseReachable(databaseUrl);
+    const testEnv = { ...process.env, DATABASE_URL: databaseUrl };
     if (focusedTestFiles.length > 0) runFocusedTests(focusedTestFiles, testEnv);
     else runNpmScript("test:suite", testEnv);
   } catch (error) {
-    spawnSync("docker", [...compose, "logs", "--no-color"], {
-      stdio: "inherit",
-      env: composeEnv,
-    });
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   } finally {

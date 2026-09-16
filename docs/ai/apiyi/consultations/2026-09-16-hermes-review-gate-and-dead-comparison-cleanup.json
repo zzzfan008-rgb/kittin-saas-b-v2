@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-16T08:49:25.860Z",
+  "baseCommit": "de670dba0fca1dda70388202edad2b5a068c744e",
+  "changeFingerprintSha256": "3d7c41b44e29afd68ba93f04fe22c93e8559cec50633fabe3051e0efe7d7fcae",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "交付门禁 评审 代码智能 生成 kind 死比较 清理",
+  "affectedPaths": [
+    "scripts/codex-gate.mjs",
+    "server/routes/generate.ts",
+    "server/routes/runPlan.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/log-retention-policy",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/log-retention-policy.md",
+      "pageLocalPath": "pages/faq/log-retention-policy.md",
+      "title": "调用日志保存多久？多久清理一次？",
+      "sha256": "08124783708b891993a61cec51b02ed798caa68e62c6a0de3741de055ac7b6c6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/log-retention-policy",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/log-retention-policy.md",
+      "pageLocalPath": "pages/zh-Hant/faq/log-retention-policy.md",
+      "title": "呼叫日誌儲存多久？多久清理一次？",
+      "sha256": "b1a4a754dc04e718e7438b669b47e84103835c8251e61c7b934555a5cd78a2fc"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 图像生成 API - OpenAI 当下最新图片 API",
+      "sha256": "7f61739c18a3b163a725d69d5268521531af7df6234bc5b27c548a59d970a694"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-image/overview.md",
+      "title": "Nano Banana Pro 图片生成",
+      "sha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 视频生成",
+      "sha256": "6cfb74f5750a6aa90881bd2963c7cf823a9b7f5c95db29979394d465cb1da49f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All 画像生成/編集",
+      "sha256": "c04a46c5b91a168028f1a799a558285d4e100795b1ff43e4382e8245c660c13e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 画像生成/編集",
+      "sha256": "d0c32d560d2a83e2b57abb0c1350109f15ab9d63a085d0fd78f4e5df6e3f9924"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2 画像生成/編集",
+      "sha256": "1dae5d488968f7077821942bf8a12f0c4ace37ecbf7eee27217d18bc8ffdf746"
+    }
+  ],
+  "decisionSummary": "范围确认凭证（第 2 版，覆盖本轮新增注释与回归测试）。本批 diff 命中 3 个 API易 变更范围路径：\n（1）scripts/codex-gate.mjs —— 交付门禁脚本重构：模型评审段由 codex exec 换成本机 Hermes Agent 子进程（隔离上下文；-t file 限权、不覆盖模型、--max-turns/--run-budget 有上限；评审前后比对隔离目录指纹，评审者创建或修改任何文件即 fail-closed；哨兵标记解析，缺失或不可解析即 fail-closed）；代码智能证据段由 GitNexus 换成 ast-grep 结构规则 + dependency-cruiser 依赖与分层规则（新增 .dependency-cruiser.cjs、sgconfig.yml、tools/ast-grep-rules/；巡航不到任何 TypeScript 模块即失败，以避免依赖巡航静默漏掉全部 TS 造成假绿）；REVIEW_SCHEMA 的 gitnexus 字段更名为 code_analysis；外层硬杀改为在内层预算之上增加可配置宽限（默认 120000ms），避免评审子进程输出最终 JSON 时被 SIGTERM 判成 degraded。不涉及 provider、模型 ID/契约/参数、提示词变体、参考图角色与顺序、图像归一化、生成重试与超时、计费与未知结果处理、或评估与准入逻辑。\n（2）server/routes/generate.ts 与（3）server/routes/runPlan.ts —— 删除与类型联合无交集的死比较（原守卫中的 fabric-replace 分支），并在同处补充注释记录证明：fabric-replace 既不在 NodeKind 联合与运行时 NODE_SPECS 中，且 validateDirectGenerateRequest 已用 isDirectGenerateKind（要求 kind 是 NODE_SPECS 的键）在更早处拒绝未知 kind，故该比较不可达、删除行为等价；同时修复 main 上 8 个 TS2367 类型错误导致的无法编译。新增 tests/generation-kind-contract.test.ts 固化“路由比较的 kind 必须来自 NODE_SPECS”这一回归不变量。不涉及任何 API易 语义面。\nsources 为就近检索的本地镜像页；本批没有适用的 API易 条款变更，本凭证不构成对外契约结论。",
+  "unresolvedChoices": []
+}

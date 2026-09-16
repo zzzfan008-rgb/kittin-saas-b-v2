@@ -235,7 +235,16 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }
   }
   const fabricImageUrl = (request as ImageGenRequest & { fabricImageUrl?: unknown }).fabricImageUrl;
-  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && fabricImageUrl !== undefined) {
+  // 仅 fabric-recolor 会携带 fabricImageUrl。删除原先 `|| resolvedKind === "fabric-replace"`
+  // 是行为等价的死代码清理，不是收窄校验，理由有三层：
+  //   1. validateDirectGenerateRequest 已用 isDirectGenerateKind 在此前拒绝未知 kind，
+  //      而它要求 kind 必须是运行时 NODE_SPECS 的键，所以 resolvedKind 到这里只可能是
+  //      受支持的节点 kind；
+  //   2. NODE_SPECS 中并不存在 fabric-replace（TypeScript 也以 TS2367 证明该比较与类型
+  //      联合无交集、恒为 false）；
+  //   3. 该比较因此不可达，fabric-replace 请求在更早的守卫处即被 400 拒绝。
+  // 回归不变量见 tests/generation-kind-contract.test.ts。
+  if (resolvedKind === "fabric-recolor" && fabricImageUrl !== undefined) {
     const fabricReferenceError = directImageReferenceError(fabricImageUrl);
     if (fabricReferenceError) {
       res.status(400).json({ error: `request.fabricImageUrl ${fabricReferenceError}` });
@@ -325,7 +334,9 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   // append one-by-one so their indexes stay unambiguous even if node policies
   // later allow more than one auxiliary image at a time.
   const accessReferences: ImageReferenceAccessEvidence[] = [...inputReferences];
-  if ((resolvedKind === "fabric-recolor" || resolvedKind === "fabric-replace") && typeof fabricImageUrl === "string") {
+  // 同上：fabric-replace 不是受支持的节点 kind（不在 NODE_SPECS 中，且 TS2367 证明比较
+  // 恒为 false），未知 kind 已在 validateDirectGenerateRequest 处被拒绝。
+  if (resolvedKind === "fabric-recolor" && typeof fabricImageUrl === "string") {
     accessReferences.push({
       imageRef: fabricImageUrl,
       order: accessReferences.length,

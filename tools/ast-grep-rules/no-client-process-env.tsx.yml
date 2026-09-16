@@ -1,0 +1,14 @@
+id: no-client-process-env-tsx
+language: Tsx
+severity: error
+message: 前端代码（src/）不得读取 process.env：客户端 bundle 只能通过 import.meta.env 使用显式暴露的变量；直接读 process.env 既取不到值，也会把服务端配置名暴露到客户端代码面（AGENTS.md §4 安全不变量）。
+note: |
+  允许的替代：Vite 的 import.meta.env.VITE_*，或从服务端接口取得配置。
+  当前代码库零匹配 —— 该规则用于阻止新引入。
+files:
+  - src/**/*.ts
+  - src/**/*.tsx
+rule:
+  any:
+    - pattern: process.env.$KEY
+    - pattern: process.env[$KEY]

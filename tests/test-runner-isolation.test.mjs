@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -19,19 +19,12 @@ import {
   acquireTestLock,
   createComposeProjectName,
   resolveRequestedTestFiles,
+  resolveTestDatabaseUrl,
+  validateTestDatabaseUrl,
 } from "../scripts/test-with-postgres.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const runnerPath = join(repoRoot, "scripts/test-with-postgres.mjs");
-
-function readComposeConfig(projectName) {
-  const args = ["compose"];
-  if (projectName) args.push("--project-name", projectName);
-  args.push("-f", join(repoRoot, "compose.test.yaml"), "config", "--format", "json");
-  const env = { ...process.env };
-  delete env.COMPOSE_PROJECT_NAME;
-  return JSON.parse(execFileSync("docker", args, { cwd: repoRoot, encoding: "utf8", env }));
-}
 
 function writeCommandShim(path) {
   writeFileSync(
@@ -54,8 +47,8 @@ const second = createComposeProjectName({ cwd: "/tmp/worktree-b" });
 const repeat = createComposeProjectName({ cwd: "/tmp/worktree-a" });
 
 assert.match(first, /^garment-canvas-test-[a-f0-9]{10}$/);
-assert.equal(first, repeat, "the same worktree must reuse its Compose project after a crash");
-assert.notEqual(first, second, "different worktrees must use different Compose projects");
+assert.equal(first, repeat, "the same worktree must reuse its isolation lock name after a crash");
+assert.notEqual(first, second, "different worktrees must use different isolation lock names");
 
 assert.deepEqual(
   resolveRequestedTestFiles(["tests/authorization.test.ts"], { repoRoot }),
@@ -73,18 +66,83 @@ assert.throws(
   "the runner must reject paths outside the repository test directory",
 );
 
-const defaultComposeConfig = readComposeConfig();
+// 测试库连接串必须指向本机且以 _test 结尾，否则 runner 拒绝启动。
+const localTestUrl = "postgresql://runner_user:runner_secret@127.0.0.1:5432/garment_canvas_test";
 assert.equal(
-  defaultComposeConfig.name,
-  "garment-canvas-test",
-  "a bare compose.test.yaml command must never target the development Compose project",
+  validateTestDatabaseUrl(localTestUrl, "DATABASE_URL"),
+  localTestUrl,
+  "a local *_test database must be accepted",
 );
-const overriddenComposeConfig = readComposeConfig(first);
+assert.throws(
+  () => validateTestDatabaseUrl("postgresql://runner_user:runner_secret@db.internal:5432/garment_canvas_test", "DATABASE_URL"),
+  /只允许连接本机 PostgreSQL/,
+  "a remote database must be refused",
+);
+assert.throws(
+  () => validateTestDatabaseUrl("postgresql://runner_user:runner_secret@127.0.0.1:5432/garment_canvas", "DATABASE_URL"),
+  /必须以 _test 结尾/,
+  "a database without the _test suffix must be refused so the development database cannot be reset",
+);
+assert.throws(
+  () => validateTestDatabaseUrl("mysql://runner_user:runner_secret@127.0.0.1:5432/garment_canvas_test", "DATABASE_URL"),
+  /必须是 postgresql:\/\//,
+  "a non-PostgreSQL URL must be refused",
+);
+assert.throws(
+  () => validateTestDatabaseUrl("postgresql://127.0.0.1:5432/garment_canvas_test", "DATABASE_URL"),
+  /必须同时包含用户名和密码/,
+  "credentials must be present",
+);
+
+const refusal = (() => {
+  try {
+    validateTestDatabaseUrl("postgresql://runner_user:runner_secret@db.internal:5432/garment_canvas_test", "DATABASE_URL");
+  } catch (error) {
+    return error.message;
+  }
+  return "";
+})();
 assert.equal(
-  overriddenComposeConfig.name,
-  first,
-  "the runner's explicit project name must override compose.test.yaml's safe default",
+  refusal.includes("runner_secret"),
+  false,
+  "a refused connection string must never echo the password",
 );
+
+const derivedRoot = mkdtempSync(join(tmpdir(), "garment-canvas-dotenv-"));
+try {
+  const derivedEnvPath = join(derivedRoot, ".env");
+  writeFileSync(
+    derivedEnvPath,
+    [
+      "APIYI_API_KEY=must-not-leak",
+      "POSTGRES_DB=garment_canvas",
+      "POSTGRES_USER=garment_canvas",
+      "POSTGRES_PASSWORD=p@ss word",
+      "POSTGRES_HOST_PORT=5432",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  const derived = resolveTestDatabaseUrl({}, { dotEnvPath: derivedEnvPath });
+  assert.equal(
+    derived,
+    "postgresql://garment_canvas:p%40ss%20word@127.0.0.1:5432/garment_canvas_test",
+    "the runner must derive the isolated *_test database from .env and percent-encode credentials",
+  );
+  const emptyEnv = {};
+  assert.throws(
+    () => resolveTestDatabaseUrl(emptyEnv, { dotEnvPath: join(derivedRoot, "missing.env") }),
+    /无法确定测试库连接串/,
+    "the runner must fail closed when no PostgreSQL configuration exists",
+  );
+  assert.equal(
+    Object.keys(emptyEnv).length,
+    0,
+    "resolving the test database must not mutate the caller environment",
+  );
+} finally {
+  rmSync(derivedRoot, { recursive: true, force: true });
+}
 
 const lockRoot = join(tmpdir(), `garment-canvas-lock-test-${process.pid}`);
 mkdirSync(lockRoot, { recursive: true });
@@ -97,7 +155,7 @@ try {
   assert.throws(
     () => acquireTestLock({ projectName: first, lockRoot, isProcessActive: () => true }),
     /Another PostgreSQL test run is active/,
-    "a second run in the same worktree must fail before touching the active Compose project",
+    "a second run in the same worktree must fail before touching the shared isolated database",
   );
   release();
 
@@ -140,18 +198,15 @@ try {
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 
-  const calls = readFileSync(callLog, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  const calls = readFileSync(callLog, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const dockerCalls = calls.filter(({ command }) => command === "docker");
   const npmCalls = calls.filter(({ command }) => basename(command).startsWith("npm"));
-  assert.equal(dockerCalls.length, 3, "a symlinked runner must perform initial cleanup, startup, and final cleanup");
+  assert.equal(
+    dockerCalls.length,
+    0,
+    "the native runner must not shell out to Docker: the isolated test database is a local PostgreSQL database",
+  );
   assert.deepEqual(npmCalls.map(({ args }) => args), [["run", "test:suite"]]);
-  assert.equal(dockerCalls.some(({ args }) => args.includes("up")), true, "the symlinked runner must start PostgreSQL");
-
-  const expectedProject = createComposeProjectName({ cwd: realpathSync(runnerCwd) });
-  for (const { args } of dockerCalls) {
-    const projectNameIndex = args.indexOf("--project-name") + 1;
-    assert.equal(args[projectNameIndex], expectedProject, "every lifecycle call must use the stable worktree project");
-  }
 } finally {
   rmSync(symlinkTestRoot, { recursive: true, force: true });
 }

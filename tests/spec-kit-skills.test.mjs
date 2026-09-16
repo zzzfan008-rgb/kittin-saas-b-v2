@@ -55,6 +55,7 @@ assert.match(tasksToIssuesSkill, /is:issue in:title T001/);
 assert.doesNotMatch(tasksToIssuesSkill, /server's `list_issues` tool/);
 assert.doesNotMatch(tasksToIssuesSkill, /Request `perPage: 100`/);
 
+const currentFeatureDirectory = "specs/002-whole-project-audit";
 const prerequisites = JSON.parse(execFileSync(
   "bash",
   [
@@ -64,7 +65,13 @@ const prerequisites = JSON.parse(execFileSync(
     "--require-tasks",
     "--include-tasks",
   ],
-  { cwd: repoRoot, encoding: "utf8" },
+  {
+    cwd: repoRoot,
+    encoding: "utf8",
+    // Pin the feature explicitly: .specify/feature.json is local, gitignored state,
+    // so relying on it would make this contract test fail on any fresh checkout.
+    env: { ...process.env, SPECIFY_FEATURE_DIRECTORY: currentFeatureDirectory },
+  },
 ));
 assert.equal(prerequisites.TASKS, resolve(repoRoot, "specs/002-whole-project-audit/tasks.md"));
 assert.ok(prerequisites.AVAILABLE_DOCS.includes("tasks.md"));

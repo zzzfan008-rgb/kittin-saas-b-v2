@@ -1,0 +1,15 @@
+id: no-unsafe-html-injection-tsx
+language: Tsx
+severity: error
+message: 禁止把字符串直接注入 HTML（dangerouslySetInnerHTML / innerHTML / outerHTML / insertAdjacentHTML）：会把用户或模型产出的文本变成可执行标记（XSS / 脚本注入，AGENTS.md §4 安全不变量）。
+note: |
+  允许的替代：用 React 子节点渲染文本；确需富文本时先做白名单净化。
+  当前代码库零匹配 —— 该规则用于阻止新引入。
+rule:
+  any:
+    # JSX 属性节点：bare identifier 模式在 Tsx 里无法匹配 jsx_attribute，必须按 kind 匹配。
+    - kind: jsx_attribute
+      regex: "^dangerouslySetInnerHTML"
+    - pattern: $TARGET.innerHTML = $VALUE
+    - pattern: $TARGET.outerHTML = $VALUE
+    - pattern: $TARGET.insertAdjacentHTML($$$ARGS)

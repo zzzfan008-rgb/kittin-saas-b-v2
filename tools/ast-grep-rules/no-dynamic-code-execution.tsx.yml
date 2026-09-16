@@ -1,0 +1,12 @@
+id: no-dynamic-code-execution-tsx
+language: Tsx
+severity: error
+message: 禁止动态代码求值（eval / new Function / document.write）：这是脚本注入面，并会绕过类型检查与打包器的静态分析（AGENTS.md §4 安全不变量）。
+note: |
+  允许的替代：用显式分支/查表代替按字符串求值；用 DOM API 而非 document.write。
+  当前代码库零匹配 —— 该规则用于阻止新引入，而不是清理存量。
+rule:
+  any:
+    - pattern: eval($$$ARGS)
+    - pattern: new Function($$$ARGS)
+    - pattern: document.write($$$ARGS)

@@ -18,6 +18,137 @@ const source = new URL("../scripts/codex-gate.mjs", import.meta.url);
 const apiyiChangeScopeSource = new URL("../docs/ai/apiyi/change-scope.json", import.meta.url);
 const fixtureRoots = new Set();
 
+const DEFAULT_DEPCRUISE_GRAPH = JSON.stringify({
+  modules: [{ source: "src/main.tsx" }, { source: "server/index.ts" }],
+  summary: {
+    violations: [],
+    error: 0,
+    warn: 0,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const BASELINE_CIRCULAR_VIOLATION = JSON.stringify({
+  modules: [{ source: "src/main.tsx" }, { source: "server/index.ts" }],
+  summary: {
+    violations: [
+      {
+        type: "cycle",
+        from: "server/config.ts",
+        to: "server/lib/evaluationCampaign.ts",
+        rule: { name: "no-circular-baseline", severity: "warn" },
+      },
+    ],
+    error: 0,
+    warn: 1,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const NEW_CIRCULAR_VIOLATION = JSON.stringify({
+  modules: [{ source: "src/main.tsx" }, { source: "server/index.ts" }],
+  summary: {
+    violations: [
+      {
+        type: "cycle",
+        from: "src/lib/loopA.ts",
+        to: "src/lib/loopB.ts",
+        rule: { name: "no-circular", severity: "error" },
+      },
+    ],
+    error: 1,
+    warn: 0,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const ORPHAN_VIOLATION = JSON.stringify({
+  modules: [{ source: "src/main.tsx" }, { source: "server/index.ts" }],
+  summary: {
+    violations: [
+      {
+        type: "module",
+        from: "src/lib/dead.ts",
+        to: "",
+        rule: { name: "no-orphans", severity: "error" },
+      },
+    ],
+    error: 1,
+    warn: 0,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const UNREGISTERED_RULE_VIOLATION = JSON.stringify({
+  modules: [{ source: "src/main.tsx" }, { source: "server/index.ts" }],
+  summary: {
+    violations: [
+      {
+        type: "dependency",
+        from: "src/main.tsx",
+        to: "server/index.ts",
+        rule: { name: "src-must-not-import-server", severity: "warn" },
+      },
+    ],
+    error: 0,
+    warn: 1,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const NO_TYPESCRIPT_GRAPH = JSON.stringify({
+  modules: [{ source: "src/main.js" }, { source: "server/index.js" }],
+  summary: {
+    violations: [],
+    error: 0,
+    warn: 0,
+    info: 0,
+    ignore: 0,
+    totalCruised: 2,
+    totalDependenciesCruised: 1,
+    optionsUsed: {},
+    ruleSetUsed: {},
+    environment: {},
+  },
+});
+
+const DEFAULT_REVIEW = {
+  verdict: "pass",
+  summary: "ok",
+  findings: [],
+  code_analysis: { status: "pass", evidence: "test" },
+};
+
 function cleanupFixtures() {
   for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
   fixtureRoots.clear();
@@ -35,6 +166,11 @@ function git(cwd, ...args) {
   return result.stdout.trim();
 }
 
+/**
+ * 门禁现在只有两个外部工具家族：Hermes 评审子进程，以及 ast-grep + dependency-cruiser
+ * 代码智能证据。fixture 刻意不提供 codex / gitnexus 桩：一旦门禁回退到旧工具链，
+ * 解析不到可执行文件就会 fail-closed，测试随即失败。
+ */
 function fixture({ requiredNodeVersion = process.versions.node } = {}) {
   const root = mkdtempSync(join(tmpdir(), "codex-gate-test-"));
   fixtureRoots.add(root);
@@ -60,7 +196,7 @@ if (process.env.GATE_APIYI_EXIT) process.exit(Number(process.env.GATE_APIYI_EXIT
   );
   writeFileSync(
     join(root, ".gitignore"),
-    ".gate-npm-log\n.gate-gitnexus-log\n.gate-codex-log\n.gate-apiyi-log\n",
+    ".gate-npm-log\n.gate-depcruise-log\n.gate-depcruise-env-log\n.gate-astgreep-log\n.gate-hermes-log\n.gate-apiyi-log\n",
   );
   writeFileSync(join(root, "tracked.txt"), "initial\n");
   writeFileSync(
@@ -68,55 +204,57 @@ if (process.env.GATE_APIYI_EXIT) process.exit(Number(process.env.GATE_APIYI_EXIT
     '#!/bin/sh\nif [ -n "$GATE_NPM_LOG" ]; then printf \'%s\\n\' "$*" >> "$GATE_NPM_LOG"; fi\nexit 0\n',
   );
   writeFileSync(
-    join(bin, "codex"),
+    join(bin, "depcruise"),
     `#!/bin/sh
-out=""
-if [ -n "$GATE_CODEX_LOG" ]; then
-  for arg in "$@"; do printf '%s\\n' "$arg" >> "$GATE_CODEX_LOG"; done
-fi
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then out="$2"; shift 2; else shift; fi
-done
-if [ -n "$GATE_MUTATE_FILE" ]; then printf '%s\\n' mutation >> "$GATE_MUTATE_FILE"; fi
-if [ -n "$GATE_CODEX_SLEEP_SECONDS" ]; then sleep "$GATE_CODEX_SLEEP_SECONDS"; fi
-if [ -n "$GATE_SCOPE_COPY" ]; then cp "\${out%/*}/review-scope.json" "$GATE_SCOPE_COPY"; fi
-if [ -n "$GATE_PACKET_COPY" ]; then cp "\${out%/*}/review-packet-1.json" "$GATE_PACKET_COPY"; fi
-if [ -n "$GATE_CODEX_EXIT" ]; then exit "$GATE_CODEX_EXIT"; fi
-review_json="$GATE_REVIEW_JSON"
-if [ -z "$review_json" ]; then
-  review_json='{"verdict":"pass","summary":"ok","findings":[],"gitnexus":{"status":"pass","evidence":"test"}}'
-fi
-printf '%s\\n' "$review_json" > "$out"
-if [ -n "$GATE_BREAK_REPO" ]; then mv "$GATE_BREAK_REPO/.git" "$GATE_BREAK_REPO/.git-broken"; fi
+if [ -n "$GATE_DEPCRUISE_LOG" ]; then printf '%s\\n' "$*" >> "$GATE_DEPCRUISE_LOG"; fi
+if [ -n "$GATE_DEPCRUISE_ENV_LOG" ]; then printf '%s\\n' "$NODE_PATH" >> "$GATE_DEPCRUISE_ENV_LOG"; fi
+if [ -n "$GATE_DEPCRUISE_PLAIN" ]; then printf '%s\\n' "ERROR: Can't open 'e2e' for reading"; exit 1; fi
+if [ -n "$GATE_DEPCRUISE_EXIT" ]; then exit "$GATE_DEPCRUISE_EXIT"; fi
+if [ -n "$GATE_DEPCRUISE_JSON" ]; then printf '%s' "$GATE_DEPCRUISE_JSON"; else printf '%s' '${DEFAULT_DEPCRUISE_GRAPH}'; fi
 `,
   );
   writeFileSync(
-    join(bin, "gitnexus"),
+    join(bin, "ast-grep"),
     `#!/bin/sh
-if [ -n "$GATE_GITNEXUS_LOG" ]; then printf '%s\\n' "$*" >> "$GATE_GITNEXUS_LOG"; fi
-if [ -n "$GATE_GITNEXUS_EXIT" ]; then exit "$GATE_GITNEXUS_EXIT"; fi
-if [ "$GITNEXUS_LANG" = "en" ]; then
-  if [ "$1" = "status" ]; then
-    printf '%s\\n' 'Indexed commit: test' 'Current commit: test' 'Status: ✅ up-to-date'
-  elif [ -n "$GATE_GITNEXUS_LARGE" ]; then
-    printf '%s\\n' 'Changes: 1 files, 1 symbols' 'Affected processes: 0' 'Risk level: low'
-    printf '%s\\n' 'Changed symbols: DETAIL-marker-that-must-not-enter-review-prompt'
-    printf '%*s\\n' 12000 '' | tr ' ' 'D'
-  elif [ -n "$GATE_GITNEXUS_NO_CHANGES" ]; then
-    printf '%s\\n' 'No changes detected.'
-  else
-    printf '%s\\n' 'Changes: 1 files, 1 symbols' 'Affected processes: 0' 'Risk level: low'
-  fi
-elif [ "$1" = "status" ]; then
-  printf '%s\\n' '索引提交: test' '当前提交: test' '状态: ✅ 已是最新'
-else
-  printf '%s\\n' '变更：1 个文件，1 个符号' '受影响流程：0' '风险等级：low'
+if [ -n "$GATE_AST_GREP_LOG" ]; then printf '%s\\n' "$*" >> "$GATE_AST_GREP_LOG"; fi
+if [ -n "$GATE_AST_GREP_EXIT" ]; then exit "$GATE_AST_GREP_EXIT"; fi
+if [ -n "$GATE_AST_GREP_JSON" ]; then printf '%s' "$GATE_AST_GREP_JSON"; fi
+`,
+  );
+  writeFileSync(
+    join(bin, "hermes"),
+    `#!/bin/sh
+prompt=""
+if [ -n "$GATE_HERMES_LOG" ]; then
+  for arg in "$@"; do printf '%s\\n' "$arg" >> "$GATE_HERMES_LOG"; done
 fi
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--query-file" ]; then prompt="$2"; shift 2; else shift; fi
+done
+dir=\${prompt%/*}
+if [ -n "$GATE_PROMPT_COPY" ]; then cp "$prompt" "$GATE_PROMPT_COPY"; fi
+if [ -n "$GATE_SCOPE_COPY" ]; then cp "$dir/review-scope.json" "$GATE_SCOPE_COPY"; fi
+if [ -n "$GATE_PACKET_COPY" ]; then cp "$dir/review-packet-1.json" "$GATE_PACKET_COPY"; fi
+if [ -n "$GATE_MUTATE_FILE" ]; then printf '%s\\n' mutation >> "$GATE_MUTATE_FILE"; fi
+if [ -n "$GATE_HERMES_SLEEP_SECONDS" ]; then sleep "$GATE_HERMES_SLEEP_SECONDS"; fi
+if [ -n "$GATE_HERMES_WRITE_IN_DIR" ]; then printf '%s\\n' stray > "$dir/reviewer-stray.txt"; fi
+if [ -n "$GATE_HERMES_EXIT" ]; then exit "$GATE_HERMES_EXIT"; fi
+if [ -n "$GATE_HERMES_RAW_STDOUT" ]; then printf '%s\n' "$GATE_HERMES_RAW_STDOUT"; exit 0; fi
+review_json="$GATE_REVIEW_JSON"
+if [ -z "$review_json" ]; then
+  review_json='${JSON.stringify(DEFAULT_REVIEW)}'
+fi
+printf '%s\n' "<GATE_JSON>"
+printf '%s\n' "$review_json"
+printf '%s\n' "</GATE_JSON>"
+printf '%s\n' "session_id: test-session"
+if [ -n "$GATE_BREAK_REPO" ]; then mv "$GATE_BREAK_REPO/.git" "$GATE_BREAK_REPO/.git-broken"; fi
 `,
   );
   chmodSync(join(bin, "npm"), 0o755);
-  chmodSync(join(bin, "codex"), 0o755);
-  chmodSync(join(bin, "gitnexus"), 0o755);
+  chmodSync(join(bin, "depcruise"), 0o755);
+  chmodSync(join(bin, "ast-grep"), 0o755);
+  chmodSync(join(bin, "hermes"), 0o755);
   git(root, "init", "-q");
   git(root, "config", "user.email", "gate@example.test");
   git(root, "config", "user.name", "Gate Test");
@@ -131,6 +269,16 @@ function gateTempDirs() {
   return readdirSync(tmpdir())
     .filter((name) => name.startsWith("garment-canvas-codex-gate-"))
     .sort();
+}
+
+function runGate(f, ...args) {
+  return command(f.root, process.execPath, ["scripts/codex-gate.mjs", ...args], f.env);
+}
+
+function tempCopy(name) {
+  const path = join(tmpdir(), `codex-gate-${name}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  fixtureRoots.add(path);
+  return path;
 }
 
 {
@@ -148,10 +296,6 @@ function gateTempDirs() {
   assert.notEqual(result.status, 0, "--base 必须拒绝不是 HEAD 祖先的分叉基线");
 }
 
-function runGate(f, ...args) {
-  return command(f.root, process.execPath, ["scripts/codex-gate.mjs", ...args], f.env);
-}
-
 {
   const f = fixture({ requiredNodeVersion: "0.0.0-test" });
   const result = runGate(f, "--uncommitted");
@@ -164,17 +308,36 @@ function runGate(f, ...args) {
   assert.match(
     gateSource,
     /function nodeVersionAtLeast\(version, minimumVersion = REQUIRED_NODE_VERSION\)/,
-    "Codex 门禁必须通过最低版本比较函数支持向上兼容",
+    "交付门禁必须通过最低版本比较函数支持向上兼容",
   );
   assert.match(
     gateSource,
     /!nodeVersionAtLeast\(process\.versions\.node\)/,
-    "Codex 门禁不得把最低版本当成精确版本匹配",
+    "交付门禁不得把最低版本当成精确版本匹配",
   );
   assert.match(
     gateSource,
     /\$\{REQUIRED_NODE_VERSION\} 或更高版本上运行/,
     "版本阻断信息必须明确说明允许更高版本",
+  );
+}
+
+{
+  const gateSource = readFileSync(source, "utf8");
+  assert.doesNotMatch(
+    gateSource,
+    /run\("codex"|resolveExecutable\("codex"\)|"gitnexus"|gitNexusOutput/,
+    "门禁不得再调用 Codex CLI 或 GitNexus CLI",
+  );
+  assert.match(
+    gateSource,
+    /const HERMES_BINARY = "hermes";/,
+    "评审段必须由 Hermes 子进程执行",
+  );
+  assert.match(
+    gateSource,
+    /const DEP_CRUISER_BINARY = "depcruise";[\s\S]*const AST_GREP_BINARY = "ast-grep";/,
+    "代码智能证据段必须由 dependency-cruiser 与 ast-grep 提供",
   );
 }
 
@@ -212,7 +375,7 @@ function runGate(f, ...args) {
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /Codex verdict: pass/);
+  assert.match(result.stdout, /Reviewer verdict: pass/);
   assert.match(result.stdout, /API易知识门禁：跳过/);
   assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "不可变历史快照不得重复触发 API易知识门禁");
 }
@@ -223,7 +386,7 @@ function runGate(f, ...args) {
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /Codex verdict: pass/);
+  assert.match(result.stdout, /Reviewer verdict: pass/);
   assert.match(result.stdout, /API易知识门禁：跳过/);
   assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通差异不得启动 API易知识库门禁");
 }
@@ -261,24 +424,136 @@ function runGate(f, ...args) {
   assert.equal(readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(), "guard --uncommitted");
 }
 
+// ---------------------------------------------------------------- 代码智能证据段
+
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "code intelligence evidence change\n");
+  const depCruiseLog = join(f.root, ".gate-depcruise-log");
+  const depCruiseEnvLog = join(f.root, ".gate-depcruise-env-log");
+  const astGrepLog = join(f.root, ".gate-astgreep-log");
+  f.env.GATE_DEPCRUISE_LOG = depCruiseLog;
+  f.env.GATE_DEPCRUISE_ENV_LOG = depCruiseEnvLog;
+  f.env.GATE_AST_GREP_LOG = astGrepLog;
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(
+    readFileSync(depCruiseLog, "utf8").trim(),
+    "--config .dependency-cruiser.cjs --output-type json src server scripts e2e",
+    "dependency-cruiser 必须绑定仓库配置、JSON reporter 与完整第一方范围",
+  );
+  assert.match(readFileSync(depCruiseEnvLog, "utf8").trim(), /node_modules$/, "dependency-cruiser 必须能解析本仓库的 typescript");
+  assert.equal(
+    readFileSync(astGrepLog, "utf8").trim(),
+    "scan --config sgconfig.yml --json=pretty src server scripts e2e",
+    "ast-grep 必须绑定 sgconfig 与 JSON 输出",
+  );
+  for (const line of [
+    "Changed files: 1",
+    "Dependency violations: 0",
+    "Circular dependencies: 0",
+    "Orphan modules: 0",
+    "Structural findings (ast-grep): 0",
+    "Risk level: low",
+  ]) {
+    assert.ok(result.stdout.includes(line), `证据行缺失：${line}\n${result.stdout}`);
+  }
+}
+
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "baseline circular change\n");
+  f.env.GATE_DEPCRUISE_JSON = BASELINE_CIRCULAR_VIOLATION;
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.equal(result.status, 0, `基线豁免的既存环不得阻断门禁：${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /Circular dependencies: 1/);
+  assert.match(result.stdout, /Risk level: medium/);
+  assert.match(result.stdout, /Baseline-exempted warnings: 1 \(no-circular-baseline\)/);
+}
+
+for (const [label, graph, expected] of [
+  ["新增循环依赖", NEW_CIRCULAR_VIOLATION, /dependency-cruiser 发现阻断级依赖违规/],
+  ["孤儿模块", ORPHAN_VIOLATION, /dependency-cruiser 发现阻断级依赖违规/],
+  ["未登记的规则级别", UNREGISTERED_RULE_VIOLATION, /dependency-cruiser 命中未登记的违规级别\/规则/],
+]) {
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), `code intelligence ${label}\n`);
+  f.env.GATE_DEPCRUISE_JSON = graph;
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, `${label} 必须 fail-closed`);
+  assert.match(result.stderr, expected, `${label} 的失败原因必须可核对`);
+}
+
+{
+  const f = fixture();
+  f.env.GATE_DEPCRUISE_PLAIN = "1";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "dependency-cruiser 没有返回 JSON 证据时必须 fail-closed");
+  assert.match(result.stderr, /未返回可解析的 JSON 证据/);
+}
+
+{
+  const f = fixture();
+  f.env.GATE_DEPCRUISE_JSON = NO_TYPESCRIPT_GRAPH;
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "缺失 TypeScript 视图的退化证据必须 fail-closed");
+  assert.match(result.stderr, /没有巡航到任何 TypeScript 模块/);
+}
+
+{
+  const f = fixture();
+  f.env.GATE_AST_GREP_JSON = JSON.stringify([
+    {
+      ruleId: "no-client-process-env",
+      file: "src/lib/leak.ts",
+      range: { start: { line: 6, column: 2 } },
+      text: "process.env.SECRET",
+    },
+  ]);
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "ast-grep 命中结构规则必须 fail-closed");
+  assert.match(result.stderr, /ast-grep 命中结构规则（1 条）/);
+  assert.match(result.stderr, /no-client-process-env src\/lib\/leak\.ts:7/);
+}
+
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "empty final diff candidate\n");
+  git(f.root, "add", "tracked.txt");
+  git(f.root, "commit", "-qm", "candidate");
+  const result = runGate(f, "--base", git(f.root, "rev-parse", "HEAD"));
+  assert.notEqual(result.status, 0, "精确差异为空时必须失败");
+  assert.match(result.stderr, /选定的 Git 差异为空/);
+}
+
+// ---------------------------------------------------------------- 评审段（Hermes 子进程）
+
 {
   const f = fixture();
   writeFileSync(join(f.root, "tracked.txt"), "large graph evidence change\n");
-  f.env.GATE_GITNEXUS_LARGE = "1";
-  f.env.GATE_CODEX_LOG = join(f.root, ".gate-codex-log");
+  const hermesLog = join(f.root, ".gate-hermes-log");
+  const promptCopy = tempCopy("prompt");
+  f.env.GATE_HERMES_LOG = hermesLog;
+  f.env.GATE_PROMPT_COPY = promptCopy;
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const codexPrompt = readFileSync(f.env.GATE_CODEX_LOG, "utf8");
-  assert.match(codexPrompt, /Changes: 1 files, 1 symbols/);
-  assert.match(codexPrompt, /Affected processes: 0/);
-  assert.match(codexPrompt, /Risk level: low/);
-  assert.match(codexPrompt, /Do not rerun GitNexus inside the reviewer subprocess/);
-  assert.match(codexPrompt, /Dated audit records, handoffs, completion ledgers, review notes, and screenshots are historical evidence/);
-  assert.match(codexPrompt, /Do not report a P0-P3 finding solely because a historical record documents an earlier failure/);
-  assert.match(codexPrompt, /current implementation, current verification evidence, or the current release closure improperly contradicts/);
-  assert.doesNotMatch(codexPrompt, /You MUST also call GitNexus detect_changes/);
-  assert.doesNotMatch(codexPrompt, /DETAIL-marker-that-must-not-enter-review-prompt/);
-  assert.ok(codexPrompt.length < 5_000, "review prompt must not duplicate unbounded GitNexus detail");
+  const prompt = readFileSync(promptCopy, "utf8");
+  assert.match(prompt, /Changed files: 1/);
+  assert.match(prompt, /Dependency violations: 0/);
+  assert.match(prompt, /Circular dependencies: 0/);
+  assert.match(prompt, /Orphan modules: 0/);
+  assert.match(prompt, /Structural findings \(ast-grep\): 0/);
+  assert.match(prompt, /Risk level: low/);
+  assert.match(prompt, /Do not rerun ast-grep or dependency-cruiser inside the reviewer subprocess/);
+  assert.match(prompt, /Report code_analysis.status as pass only when the deterministic evidence above is complete/);
+  assert.match(prompt, /Code intelligence scope: src server scripts e2e \(2 modules/);
+  assert.match(prompt, /<GATE_JSON>[\s\S]*<\/GATE_JSON>/);
+  assert.match(prompt, /Dated audit records, handoffs, completion ledgers, review notes, and screenshots are historical evidence/);
+  assert.match(prompt, /Do not report a P0-P3 finding solely because a historical record documents an earlier failure/);
+  assert.match(prompt, /current implementation, current verification evidence, or the current release closure improperly contradicts/);
+  assert.doesNotMatch(prompt, /GitNexus/);
+  assert.doesNotMatch(prompt, /gitnexus\.status/);
+  assert.ok(prompt.length < 5_000, "review prompt must not duplicate unbounded code intelligence detail");
 }
 
 {
@@ -291,13 +566,15 @@ function runGate(f, ...args) {
       evidence: "The old Node 22 gate timed out and did not produce a durable pass receipt.",
     }) + "\n",
   );
-  f.env.GATE_CODEX_LOG = join(f.root, ".gate-codex-log");
+  const promptCopy = tempCopy("audit-prompt");
+  f.env.GATE_PROMPT_COPY = promptCopy;
+  f.env.GATE_REVIEW_JSON = JSON.stringify(DEFAULT_REVIEW);
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  const codexPrompt = readFileSync(f.env.GATE_CODEX_LOG, "utf8");
-  assert.match(codexPrompt, /historical evidence, not the current implementation or current release decision/);
-  assert.match(codexPrompt, /older Node\.js baseline/);
-  assert.match(codexPrompt, /still-applicable requirement/);
+  const prompt = readFileSync(promptCopy, "utf8");
+  assert.match(prompt, /historical evidence, not the current implementation or current release decision/);
+  assert.match(prompt, /older Node\.js baseline/);
+  assert.match(prompt, /still-applicable requirement/);
 }
 
 {
@@ -311,13 +588,12 @@ function runGate(f, ...args) {
   writeFileSync(join(f.root, "docs", "ai", "apiyi", "site", "snapshots", "snapshot-1", "page.md"), "historical evidence\n");
   writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "old.json"), '{"historical":true}\n');
   writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "older.json"), '{"historical":"older"}\n');
-  const scopeCopy = join(tmpdir(), `codex-gate-scope-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  const packetCopy = join(tmpdir(), `codex-gate-packet-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  fixtureRoots.add(scopeCopy);
-  fixtureRoots.add(packetCopy);
+  const scopeCopy = tempCopy("scope");
+  const packetCopy = tempCopy("packet");
+  const promptCopy = tempCopy("scope-prompt");
   f.env.GATE_SCOPE_COPY = scopeCopy;
   f.env.GATE_PACKET_COPY = packetCopy;
-  f.env.GATE_CODEX_LOG = join(f.root, ".gate-codex-log");
+  f.env.GATE_PROMPT_COPY = promptCopy;
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const scope = JSON.parse(readFileSync(scopeCopy, "utf8"));
@@ -371,17 +647,16 @@ function runGate(f, ...args) {
   ]);
   assert.match(packet.materials[0].content, /Provider contract/);
   assert.match(packet.materials[1].content, /changed = true/);
-  const codexArgs = readFileSync(f.env.GATE_CODEX_LOG, "utf8");
-  assert.match(codexArgs, /review-packet-1\.json/);
-  assert.match(codexArgs, /Do not run git, repository-wide search/i);
-  assert.match(codexArgs, /do not open it or recursively inspect omitted/i);
+  const prompt = readFileSync(promptCopy, "utf8");
+  assert.match(prompt, /review-packet-1\.json/);
+  assert.match(prompt, /Do not run git, repository-wide search/i);
+  assert.match(prompt, /do not open it or recursively inspect omitted/i);
 }
 
 {
   const f = fixture();
   writeFileSync(join(f.root, "tracked.txt"), "review packet tracked change\n");
-  const packetCopy = join(tmpdir(), `codex-gate-tracked-packet-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
-  fixtureRoots.add(packetCopy);
+  const packetCopy = tempCopy("tracked-packet");
   f.env.GATE_PACKET_COPY = packetCopy;
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -401,14 +676,17 @@ function runGate(f, ...args) {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const receiptFiles = readdirSync(receiptDir).filter((name) => name.endsWith(".json"));
   assert.equal(receiptFiles.length, 1, "外置回执目录应生成一个结构化 JSON 回执");
+  assert.match(receiptFiles[0], /^codex-gate-[a-f0-9]{64}\.json$/, "回执文件命名保持原样");
   const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]), "utf8"));
   assert.equal(receipt.schemaVersion, 1);
   assert.equal(receipt.gateDecision, "pass");
   assert.equal(receipt.exitCode, 0);
   assert.equal(receipt.review.verdict, "pass");
-  assert.equal(receipt.review.gitnexus.status, "pass");
+  assert.equal(receipt.review.code_analysis.status, "pass");
+  assert.equal(receipt.review.gitnexus, undefined, "评审结果不得再带 gitnexus 字段");
   assert.match(receipt.reviewBatches[0].packetSha256, /^[a-f0-9]{64}$/);
-  assert.match(result.stdout, /Codex review receipt:/);
+  assert.match(receipt.gitNexusEvidence, /^Changed files: 1$/m);
+  assert.match(result.stdout, /Gate review receipt:/);
 }
 
 {
@@ -417,14 +695,15 @@ function runGate(f, ...args) {
   git(f.root, "add", "tracked.txt");
   git(f.root, "commit", "-qm", "candidate");
   const npmLog = join(f.root, ".gate-npm-log");
-  const gitNexusLog = join(f.root, ".gate-gitnexus-log");
-  const codexLog = join(f.root, ".gate-codex-log");
+  const depCruiseLog = join(f.root, ".gate-depcruise-log");
+  const astGrepLog = join(f.root, ".gate-astgreep-log");
+  const hermesLog = join(f.root, ".gate-hermes-log");
   const apiyiLog = join(f.root, ".gate-apiyi-log");
   f.env.GATE_NPM_LOG = npmLog;
-  f.env.GATE_GITNEXUS_LOG = gitNexusLog;
-  f.env.GATE_CODEX_LOG = codexLog;
+  f.env.GATE_DEPCRUISE_LOG = depCruiseLog;
+  f.env.GATE_AST_GREP_LOG = astGrepLog;
+  f.env.GATE_HERMES_LOG = hermesLog;
   f.env.GATE_APIYI_LOG = apiyiLog;
-  f.env.GITNEXUS_LANG = "zh-CN";
   const result = runGate(f, "--base", f.base);
   assert.equal(result.status, 0, `最终 clean-HEAD 门禁应通过：${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
@@ -433,20 +712,26 @@ function runGate(f, ...args) {
     "完整门禁必须先执行 npm ci，再按固定顺序执行验证套件",
   );
   assert.equal(existsSync(apiyiLog), false, "普通最终差异不得启动 API易知识库门禁");
-  assert.deepEqual(
-    readFileSync(gitNexusLog, "utf8").trim().split("\n"),
-    ["status", `detect-changes --scope compare --repo ${realpathSync(f.root)} --base-ref ${f.base}`],
-    "完整门禁必须独立验证 GitNexus 索引并绑定所选 base..HEAD 范围",
-  );
-  const codexArgs = readFileSync(codexLog, "utf8").trim().split("\n");
-  const approvalIndex = codexArgs.indexOf("--ask-for-approval");
-  const sandboxIndex = codexArgs.indexOf("--sandbox");
-  const schemaIndex = codexArgs.indexOf("--output-schema");
-  assert.equal(codexArgs[approvalIndex + 1], "never", "Codex 审查必须禁用交互式授权");
-  assert.ok(codexArgs.includes("--skip-git-repo-check"), "隔离审查目录必须显式跳过 Git 仓库前置检查");
-  assert.equal(codexArgs[sandboxIndex + 1], "read-only", "Codex 审查必须使用只读沙箱");
-  assert.ok(schemaIndex >= 0 && codexArgs[schemaIndex + 1], "Codex 审查必须提供输出 schema");
-  assert.ok(!codexArgs.includes("--model"), "Codex 审查不得覆盖用户配置的默认模型");
+  assert.match(readFileSync(depCruiseLog, "utf8"), /--config \.dependency-cruiser\.cjs --output-type json src server scripts e2e/);
+  assert.match(readFileSync(astGrepLog, "utf8"), /^scan --config sgconfig\.yml --json=pretty src server scripts e2e$/m);
+  const hermesArgs = readFileSync(hermesLog, "utf8").trim().split("\n");
+  assert.equal(hermesArgs[0], "chat", "评审段必须走 hermes chat 子进程");
+  assert.ok(hermesArgs.includes("--oneshot"), "评审子进程必须显式单轮结束（非交互）");
+  assert.ok(hermesArgs.includes("-Q"), "评审子进程必须只输出最终响应以便机读解析");
+  assert.ok(hermesArgs.includes("--ignore-rules"), "评审子进程不得注入 AGENTS.md/记忆等会话上下文");
+  const toolsetIndex = hermesArgs.indexOf("-t");
+  assert.equal(hermesArgs[toolsetIndex + 1], "file", "评审子进程必须使用最小只读 toolset");
+  assert.ok(!hermesArgs.includes("terminal"), "评审子进程不得获得终端工具");
+  const inIndex = hermesArgs.indexOf("--in");
+  assert.ok(inIndex >= 0 && hermesArgs[inIndex + 1].includes("garment-canvas-codex-gate-"), "评审子进程必须在隔离临时目录内工作");
+  assert.ok(hermesArgs.includes("--max-turns") && Number(hermesArgs[hermesArgs.indexOf("--max-turns") + 1]) > 0, "评审子进程必须限制工具轮次");
+  assert.equal(hermesArgs[hermesArgs.indexOf("--run-budget") + 1], "900", "评审预算必须来自 15 分钟默认超时");
+  assert.equal(hermesArgs[hermesArgs.indexOf("--source") + 1], "tool", "门禁会话必须标记为工具来源");
+  assert.ok(!hermesArgs.includes("-m") && !hermesArgs.includes("--model") && !hermesArgs.includes("--provider"), "评审不得覆盖用户配置的默认模型");
+  assert.ok(!hermesArgs.includes("--yolo"), "评审不得绕过审批");
+  assert.ok(!hermesArgs.includes("--ignore-user-config") && !hermesArgs.includes("--safe-mode"), "评审必须保留用户配置的默认模型与凭据");
+  assert.match(result.stdout, /Reviewer verdict: pass/);
+  assert.match(result.stdout, /Code analysis \(ast-grep \+ dependency-cruiser\): pass/);
 }
 
 {
@@ -465,73 +750,73 @@ function runGate(f, ...args) {
   );
 }
 
-{
-  const f = fixture();
-  writeFileSync(join(f.root, "tracked.txt"), "graph-neutral candidate\n");
-  git(f.root, "add", "tracked.txt");
-  git(f.root, "commit", "-qm", "graph-neutral candidate");
-  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
-  const result = runGate(f, "--base", f.base, "--review-only");
-  assert.equal(result.status, 0, `非空精确差异可以规范化无图增量证据：${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /Changes: 1 files, GitNexus reported no graph deltas/);
-  assert.match(result.stdout, /Affected processes: 0/);
-  assert.match(result.stdout, /Risk level: low/);
-}
+// ---------------------------------------------------------------- 评审结果解析
 
 {
   const f = fixture();
-  writeFileSync(join(f.root, "tracked.txt"), "uncommitted graph-neutral candidate\n");
-  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
+  writeFileSync(join(f.root, "tracked.txt"), "legacy review shape\n");
+  f.env.GATE_REVIEW_JSON = JSON.stringify({
+    verdict: "pass",
+    summary: "legacy",
+    findings: [],
+    gitnexus: { status: "pass", evidence: "legacy" },
+  });
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "--uncommitted 不得借用精确差异的无图增量分支放行");
+  assert.notEqual(result.status, 0, "缺少 code_analysis 的旧字段结构必须 fail-closed");
+  assert.match(`${result.stdout}${result.stderr}`, /评审结果不符合 REVIEW_SCHEMA/);
 }
 
 {
   const f = fixture();
-  git(f.root, "commit", "--allow-empty", "-qm", "empty candidate");
-  f.env.GATE_GITNEXUS_NO_CHANGES = "1";
-  const result = runGate(f, "--base", f.base, "--review-only");
-  assert.notEqual(result.status, 0, "GitNexus 无图增量时，空精确差异仍必须失败");
-  assert.match(result.stderr, /选定的 Git 差异为空/);
+  writeFileSync(join(f.root, "tracked.txt"), "extra key review shape\n");
+  f.env.GATE_REVIEW_JSON = JSON.stringify({ ...DEFAULT_REVIEW, extra: "field" });
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "schema 之外的字段必须 fail-closed");
+  assert.match(`${result.stdout}${result.stderr}`, /出现 schema 之外的字段 extra/);
 }
 
 {
   const f = fixture();
-  writeFileSync(join(f.root, "inherited.txt"), "pre-existing whitespace   \n");
-  git(f.root, "add", "inherited.txt");
-  git(f.root, "commit", "-qm", "pre-existing parent");
-  const parent = git(f.root, "rev-parse", "HEAD");
-  writeFileSync(join(f.root, "tracked.txt"), "single commit candidate\n");
-  git(f.root, "add", "tracked.txt");
-  git(f.root, "commit", "-qm", "single commit candidate");
-  const candidate = git(f.root, "rev-parse", "HEAD");
+  writeFileSync(join(f.root, "tracked.txt"), "malformed sentinel payload\n");
+  f.env.GATE_HERMES_RAW_STDOUT = "<GATE_JSON>\n{not json}\n</GATE_JSON>\nsession_id: x";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "哨兵块内不是合法 JSON 时必须 fail-closed");
+  assert.match(`${result.stdout}${result.stderr}`, /哨兵块不是合法 JSON/);
+}
 
-  const exactResult = runGate(f, "--commit", candidate);
-  assert.equal(
-    exactResult.status,
-    0,
-    `--commit 必须只审查所选 HEAD 的父提交差异：${exactResult.stdout}\n${exactResult.stderr}`,
-  );
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "missing sentinel payload\n");
+  f.env.GATE_HERMES_RAW_STDOUT = "I reviewed the packet and everything looks fine.";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "缺少哨兵块时必须 fail-closed");
+  assert.match(`${result.stdout}${result.stderr}`, /没有在 <GATE_JSON>\.\.\.<\/GATE_JSON> 哨兵之间返回 JSON/);
+}
 
-  const staleResult = runGate(f, "--commit", parent);
-  assert.notEqual(staleResult.status, 0, "--commit 必须拒绝不等于当前 HEAD 的旧提交");
+{
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "reviewer wrote into isolated dir\n");
+  f.env.GATE_HERMES_WRITE_IN_DIR = "1";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.notEqual(result.status, 0, "评审子进程写文件即破坏只读姿态，必须 fail-closed");
+  assert.match(`${result.stdout}${result.stderr}`, /只读姿态被破坏/);
 }
 
 for (const review of [
-  { verdict: "fail", summary: "failed", findings: [], gitnexus: { status: "pass", evidence: "test" } },
+  { verdict: "fail", summary: "failed", findings: [], code_analysis: { status: "pass", evidence: "test" } },
   {
     verdict: "pass",
     summary: "finding",
     findings: [
       { severity: "P2", title: "blocking", file: "x.js", line: 1, reason: "test" },
     ],
-    gitnexus: { status: "pass", evidence: "test" },
+    code_analysis: { status: "pass", evidence: "test" },
   },
   {
     verdict: "pass",
     summary: "degraded",
     findings: [],
-    gitnexus: { status: "degraded", evidence: "test" },
+    code_analysis: { status: "degraded", evidence: "test" },
   },
 ]) {
   const f = fixture();
@@ -545,14 +830,7 @@ for (const review of [
   writeFileSync(join(f.root, "tracked.txt"), "valid change\n");
   f.env.GATE_MUTATE_FILE = join(f.root, "tracked.txt");
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "Codex 审查期间发生工作树变化时必须作废结果");
-}
-
-{
-  const f = fixture();
-  f.env.GATE_GITNEXUS_EXIT = "9";
-  const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "GitNexus CLI 检查失败时不得仅信任模型自报结果");
+  assert.notEqual(result.status, 0, "模型评审期间发生工作树变化时必须作废结果");
 }
 
 {
@@ -561,7 +839,7 @@ for (const review of [
   writeFileSync(join(f.root, "server", "providers", "apiyi.ts"), "export const providerChanged = true;\n");
   f.env.GATE_APIYI_EXIT = "8";
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "API易相关差异的本地知识库或咨询门禁失败时必须阻断 Codex 门禁");
+  assert.notEqual(result.status, 0, "API易相关差异的本地知识库或咨询门禁失败时必须阻断交付门禁");
 }
 
 {
@@ -577,10 +855,10 @@ for (const review of [
 {
   const f = fixture();
   const before = gateTempDirs();
-  f.env.GATE_CODEX_EXIT = "7";
+  f.env.GATE_HERMES_EXIT = "7";
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "Codex 进程失败必须阻断门禁");
-  assert.deepEqual(gateTempDirs(), before, "Codex 进程失败后必须清理门禁临时目录");
+  assert.notEqual(result.status, 0, "Hermes 评审进程失败必须阻断门禁");
+  assert.deepEqual(gateTempDirs(), before, "评审进程失败后必须清理门禁临时目录");
 }
 
 {
@@ -588,19 +866,40 @@ for (const review of [
   const receiptDir = mkdtempSync(join(tmpdir(), "codex-gate-timeout-receipts-"));
   fixtureRoots.add(receiptDir);
   const before = gateTempDirs();
-  f.env.GATE_CODEX_SLEEP_SECONDS = "2";
+  f.env.GATE_HERMES_SLEEP_SECONDS = "2";
   f.env.GARMENT_CANVAS_CODEX_REVIEW_TIMEOUT_MS = "1000";
+  // 置 0 宽限以复现严格的阶段超时：外层硬杀与阶段预算同一时刻生效
+  f.env.GARMENT_CANVAS_CODEX_REVIEW_TERMINATION_GRACE_MS = "0";
   const result = runGate(f, "--uncommitted", "--review-only", "--receipt-dir", receiptDir);
-  assert.notEqual(result.status, 0, "Codex 复核超时必须 fail-closed");
+  assert.notEqual(result.status, 0, "评审超时必须 fail-closed");
   const receiptFiles = readdirSync(receiptDir).filter((name) => name.endsWith(".json"));
-  assert.equal(receiptFiles.length, 1, "复核超时必须保留外置 fail-closed 回执");
+  assert.equal(receiptFiles.length, 1, "评审超时必须保留外置 fail-closed 回执");
   const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]), "utf8"));
   assert.equal(receipt.gateDecision, "fail-closed");
   assert.equal(receipt.exitCode, 1);
   assert.equal(receipt.review.verdict, "fail");
-  assert.equal(receipt.review.gitnexus.status, "degraded");
+  assert.equal(receipt.review.code_analysis.status, "degraded");
   assert.match(receipt.review.summary, /did not produce a structured result/);
-  assert.deepEqual(gateTempDirs(), before, "复核超时后的门禁临时目录应已清理");
+  assert.deepEqual(gateTempDirs(), before, "评审超时后的门禁临时目录应已清理");
+}
+
+{
+  // 回归不变量：外层硬杀必须晚于内层 `--run-budget`。两者相等时，评审子进程会在正要
+  // 输出最终 JSON 的同一刻被 SIGTERM 掉，把一次本可给出结论的评审判成 degraded。
+  const f = fixture();
+  f.env.GATE_HERMES_SLEEP_SECONDS = "2";
+  f.env.GARMENT_CANVAS_CODEX_REVIEW_TIMEOUT_MS = "1000";
+  const result = runGate(f, "--uncommitted", "--review-only");
+  assert.equal(
+    result.status,
+    0,
+    `超出阶段预算但仍在宽限内的评审必须允许收尾（外层硬杀不得与内层预算同时触发）：\n${result.stdout}\n${result.stderr}`,
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /did not produce a structured result/,
+    "宽限期内的评审不得被判成超时或未产出结构化结果",
+  );
 }
 
 {
@@ -611,6 +910,8 @@ for (const review of [
   for (let index = 0; index < 81; index += 1) {
     writeFileSync(join(f.root, "many", `changed-${index}.txt`), `change ${index}\n`);
   }
+  const hermesLog = join(f.root, ".gate-hermes-log");
+  f.env.GATE_HERMES_LOG = hermesLog;
   const result = runGate(f, "--uncommitted", "--review-only", "--receipt-dir", receiptDir);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const receiptFiles = readdirSync(receiptDir).filter((name) => name.endsWith(".json"));
@@ -618,7 +919,12 @@ for (const review of [
   const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]), "utf8"));
   assert.equal(receipt.reviewBatches.length, 4, "大范围审查必须按小文件批次拆分 reviewer 工作量");
   assert.equal(receipt.review.verdict, "pass");
-  assert.equal(receipt.review.gitnexus.status, "pass");
+  assert.equal(receipt.review.code_analysis.status, "pass");
+  assert.equal(
+    readFileSync(hermesLog, "utf8").split("\n").filter((line) => line === "chat").length,
+    4,
+    "每个评审批次必须各起一个隔离的 hermes 子进程",
+  );
 }
 
 {
@@ -626,14 +932,15 @@ for (const review of [
   const before = gateTempDirs();
   f.env.GATE_BREAK_REPO = f.root;
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "Codex 审查后的 Git 读取失败必须阻断门禁");
-  assert.deepEqual(gateTempDirs(), before, "审查后的 Git 读取失败仍必须清理门禁临时目录");
+  assert.notEqual(result.status, 0, "模型评审后的 Git 读取失败必须阻断门禁");
+  assert.deepEqual(gateTempDirs(), before, "评审后的 Git 读取失败仍必须清理门禁临时目录");
 }
 
 const roots = [...fixtureRoots];
 cleanupFixtures();
-assert.ok(roots.every((root) => !existsSync(root)), "Codex 门禁测试必须清理所有临时 Git fixture");
+assert.ok(roots.every((root) => !existsSync(root)), "交付门禁测试必须清理所有临时 Git fixture");
 
 console.log(
-  "  ✓ Codex 门禁覆盖 Node 下限、条件 API易门禁、npm ci 锁定安装、GitNexus 独立证据、clean-HEAD、--commit 精确范围、差异范围、阻断矩阵、状态漂移与临时目录清理",
+  "  ✓ 门禁覆盖 Node 下限、条件 API易门禁、npm ci 锁定安装、ast-grep+dependency-cruiser 代码智能证据、"
+  + "clean-HEAD、--commit 精确范围、差异范围、审查阻断矩阵、哨兵解析 fail-closed、评审只读姿态、状态漂移与临时目录清理",
 );
