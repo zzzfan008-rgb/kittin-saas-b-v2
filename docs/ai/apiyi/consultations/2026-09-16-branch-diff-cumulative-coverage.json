@@ -1,13 +1,15 @@
 {
   "schemaVersion": 1,
-  "createdAt": "2026-09-16T10:59:12.405Z",
-  "baseCommit": "596c06309a4a81de24566dd735be919c2318e540",
-  "changeFingerprintSha256": "cb9eb4dc48502863d67cb4171f9549d4f10b877d41456de4c9a3ca4c1b9a9b5c",
+  "createdAt": "2026-09-16T11:12:20.698Z",
+  "baseCommit": "de670dba0fca1dda70388202edad2b5a068c744e",
+  "changeFingerprintSha256": "4e9f5264940e270272d2196d8059804b917692f4b6d715af711900c8bb6dcad6",
   "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
   "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
   "query": "交付门禁 评审 证据 内联 只读 不变量 失败关闭",
   "affectedPaths": [
-    "scripts/codex-gate.mjs"
+    "scripts/codex-gate.mjs",
+    "server/routes/generate.ts",
+    "server/routes/runPlan.ts"
   ],
   "sources": [
     {
@@ -67,6 +69,6 @@
       "sha256": "9338cb9b577219cc6eea59211e88732d9311f56799e770cd1f6584b119ac0655"
     }
   ],
-  "decisionSummary": "本批只改 scripts/codex-gate.mjs（tests/codex-gate.test.mjs 同批更新，不在 API易 变更范围内）：评审段不再让 Hermes 评审子进程读取隔离目录里的证据文件，改为把 REVIEW_SCHEMA、批次 scope 清单、批次 packet 与确定性代码智能证据内联进评审 prompt；整目录漂移护栏替换为“门禁自己写出的证据制品（评审 prompt）在评审前后 sha256 逐字节不变”的精确不变量，评审者在会被删除的临时目录里新建无关文件不再判失败。改动不涉及 API易 provider、模型 ID/契约、请求参数、提示词或参考图语义、计费与未知结果处理、评估/发布逻辑。",
+  "decisionSummary": "本分支相对 origin/main 的累计差异范围凭证（评审段证据内联 + 证据制品不变量 + 上一批 generate/runPlan 改动）。",
   "unresolvedChoices": []
 }
