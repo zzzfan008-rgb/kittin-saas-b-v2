@@ -47,7 +47,6 @@ body {
   background-color: #0a0a0a;
   color: #e5e5e5;
   font-family:
-    "Inter",
     -apple-system,
     "Segoe UI",
     "PingFang SC",
@@ -58,17 +57,43 @@ body {
 
 .login-brand-title {
   font-family:
-    "Helvetica Neue",
-    "Avenir Next",
-    "Inter",
     -apple-system,
     "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
     sans-serif;
   font-feature-settings: "kern" 1, "liga" 1;
 }
 
 :root {
   --gc-media-overlay-text: #f4f4f4;
+  /* ---- 字阶（tokens.css §0 唯一事实源；此处仅接入变量名） ---- */
+  --gc-font-ui: 12px;
+  --gc-font-body: 13px;
+  --gc-font-label: 11px;
+  --gc-font-meta-en: 10px;
+  --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  /* ---- 状态色 8 槽位（tokens.css §3 唯一事实源；全主题共享，一色一义） ---- */
+  --gc-dot-status: 10px;
+  --gc-status-queued: #eab308;
+  --gc-status-running: #60a5fa;
+  --gc-status-retry: #fb923c;
+  --gc-status-success: #34d399;
+  --gc-status-error: #f87171;
+  --gc-status-unknown: #a78bfa;
+  --gc-status-idle: #8b9198;
+  --gc-warn-text: #fbbf24;
+}
+
+/* ---- 全局 reduced-motion 兜底（audit M5；覆盖 keyframes 与 Tailwind 动画） ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---- 深色滚动条 ---- */
@@ -219,6 +244,80 @@ body {
   animation: develop-breathe 1.6s ease-in-out infinite;
 }
 
+/* ---- 主题：墨白（白色为主） ---- */
+[data-theme="white"] body {
+  background-color: #ffffff !important;
+  color: #1d1d1f;
+}
+[data-theme="white"] .bg-ink,
+[data-theme="white"] .react-flow { background-color: #ffffff !important; }
+[data-theme="white"] .bg-\[\#141414\] { background-color: #ffffff !important; }
+[data-theme="white"] .bg-\[\#1a1a1a\] { background-color: #f5f5f7 !important; }
+[data-theme="white"] .bg-\[\#1d1d1f\] { background-color: #f5f5f7 !important; }
+[data-theme="white"] .bg-\[\#0f0f0f\] { background-color: #fbfbfd !important; }
+[data-theme="white"] .bg-\[\#3a3226\] { background-color: #e8e8ed !important; }
+[data-theme="white"] .border-\[\#262626\] { border-color: #d2d2d7 !important; }
+[data-theme="white"] .border-\[\#333\] { border-color: #c7c7cc !important; }
+[data-theme="white"] .text-neutral-200 { color: #1d1d1f !important; }
+[data-theme="white"] .text-neutral-300 { color: #3a3a3c !important; }
+[data-theme="white"] .text-neutral-400 { color: #48484a !important; }
+[data-theme="white"] .text-neutral-500 { color: #6e6e73 !important; }
+[data-theme="white"] .text-neutral-600 { color: #86868b !important; }
+[data-theme="white"] .text-neutral-700 { color: #98989d !important; }
+[data-theme="white"] .text-gold { color: #1d1d1f !important; }
+[data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #98989d !important; }
+[data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
+[data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
+[data-theme="white"] .react-flow__handle {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(29, 29, 31, 0.62),
+    0 3px 7px rgba(29, 29, 31, 0.2),
+    inset -2px -3px 4px rgba(29, 29, 31, 0.28),
+    inset 2px 2px 3px rgba(255, 255, 255, 0.75);
+}
+[data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
+[data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
+[data-theme="white"] .bg-\[\#141414\]\/90 { background-color: rgba(255,255,255,0.92) !important; }
+[data-theme="white"] .bg-\[\#161616\] { background-color: #ffffff !important; }
+[data-theme="white"] .hover\:bg-\[\#222\]:hover { background-color: #f5f5f7 !important; }
+
+/* ---- 主题：护眼绿（绿色为主） ---- */
+[data-theme="eye"] body {
+  background-color: #cfe3c2 !important;
+  color: #1e301c;
+}
+[data-theme="eye"] .bg-ink,
+[data-theme="eye"] .react-flow { background-color: #cfe3c2 !important; }
+[data-theme="eye"] .bg-\[\#141414\] { background-color: #ddeccf !important; }
+[data-theme="eye"] .bg-\[\#1a1a1a\] { background-color: #d2e4c3 !important; }
+[data-theme="eye"] .bg-\[\#0f0f0f\] { background-color: #eaf4de !important; }
+[data-theme="eye"] .bg-\[\#3a3226\] { background-color: #bcd6a8 !important; }
+[data-theme="eye"] .border-\[\#262626\] { border-color: #aec99a !important; }
+[data-theme="eye"] .border-\[\#333\] { border-color: #98b884 !important; }
+[data-theme="eye"] .text-neutral-200 { color: #1e301c !important; }
+[data-theme="eye"] .text-neutral-300 { color: #30452b !important; }
+[data-theme="eye"] .text-neutral-400 { color: #47623f !important; }
+[data-theme="eye"] .text-neutral-500 { color: #5c7a52 !important; }
+[data-theme="eye"] .text-neutral-600 { color: #729066 !important; }
+[data-theme="eye"] .text-neutral-700 { color: #86a279 !important; }
+[data-theme="eye"] .text-gold { color: #2c5a31 !important; }
+[data-theme="eye"] .placeholder\:text-neutral-600::placeholder { color: #86a279 !important; }
+[data-theme="eye"] .react-flow__minimap { border-color: #aec99a !important; }
+[data-theme="eye"] .react-flow__handle {
+  border-color: #ddeccf;
+  box-shadow:
+    0 0 0 1px rgba(44, 90, 49, 0.58),
+    0 3px 7px rgba(30, 48, 28, 0.25),
+    inset -2px -3px 4px rgba(28, 61, 32, 0.3),
+    inset 2px 2px 3px rgba(255, 248, 226, 0.65);
+}
+[data-theme="eye"] ::-webkit-scrollbar-thumb { background: #98b884; }
+[data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #7ea368; }
+[data-theme="eye"] .bg-\[\#141414\]\/90 { background-color: rgba(221,236,207,0.92) !important; }
+[data-theme="eye"] .bg-\[\#161616\] { background-color: #ddeccf !important; }
+[data-theme="eye"] .hover\:bg-\[\#222\]:hover { background-color: #d2e4c3 !important; }
+
 /* ---- 节点语义主题：画布节点与节点库共用，和周边面板颜色解耦 ---- */
 :root,
 [data-theme="current"] {
@@ -232,6 +331,8 @@ body {
   --gc-border: #2b2e32;
   --gc-border-strong: #3d4147;
   --gc-accent: #9a7333;
+  --gc-accent-cta-ink: #0a0a0a;
+  --gc-accent-deep: #6f521f;
   --gc-primary-foreground: #0a0a0a;
   --gc-node-main: #f1f2f4;
   --gc-node-header: #ffffff;
@@ -269,22 +370,24 @@ body {
   --gc-text-muted: #696d73;
   --gc-border: #d5d2cc;
   --gc-border-strong: #b8b4ac;
-  --gc-accent: #dc7397;
-  --gc-primary-foreground: #1d1d1f;
-  --gc-node-main: #34373b;
-  --gc-node-header: #3f4247;
-  --gc-node-inner: #4b4f55;
-  --gc-node-inner-hover: #575c63;
-  --gc-node-border: #656a72;
-  --gc-node-text: #f4f4f5;
-  --gc-node-muted: #c0c2c6;
-  --gc-node-accent: #dc7397;
+  --gc-accent: #1d1d1f;
+  --gc-accent-cta-ink: #ffffff;
+  --gc-accent-deep: #1d1d1f;
+  --gc-primary-foreground: #ffffff;
+  --gc-node-main: #2e3136;
+  --gc-node-header: #383c42;
+  --gc-node-inner: #3a3e44;
+  --gc-node-inner-hover: #474c53;
+  --gc-node-border: #565b63;
+  --gc-node-text: #f5f6f7;
+  --gc-node-muted: #c3c7cc;
+  --gc-node-accent: #d9a441;
   --gc-edge: #8a8e95;
-  --gc-handle-highlight: #ffd7e3;
-  --gc-handle-mid: #e98faa;
-  --gc-handle-dark: #9e365d;
-  --gc-handle-ring: rgba(220, 115, 151, 0.78);
-  --gc-handle-glow: rgba(233, 125, 163, 0.8);
+  --gc-handle-highlight: #ffe9b8;
+  --gc-handle-mid: #c89a4b;
+  --gc-handle-dark: #7a5a1e;
+  --gc-handle-ring: rgba(217, 164, 65, 0.78);
+  --gc-handle-glow: rgba(217, 164, 65, 0.8);
 }
 
 [data-theme="eye"] {
@@ -293,26 +396,28 @@ body {
   --gc-panel: #e5eedf;
   --gc-panel-hover: #d1e0ca;
   --gc-control: #edf3e9;
-  --gc-text: #183247;
-  --gc-text-muted: #48677e;
+  --gc-text: #1e301c;
+  --gc-text-muted: #4c6347;
   --gc-border: #a9bfa2;
   --gc-border-strong: #7e9a76;
-  --gc-accent: #173b63;
+  --gc-accent: #2c5a31;
+  --gc-accent-cta-ink: #f8fafc;
+  --gc-accent-deep: #234827;
   --gc-primary-foreground: #f8fafc;
-  --gc-node-main: #adc8dc;
-  --gc-node-header: #bed3e3;
-  --gc-node-inner: #d0e0eb;
-  --gc-node-inner-hover: #dce9f1;
-  --gc-node-border: #819fb8;
-  --gc-node-text: #183247;
-  --gc-node-muted: #48677e;
-  --gc-node-accent: #173b63;
+  --gc-node-main: #dce8d2;
+  --gc-node-header: #d3e2c7;
+  --gc-node-inner: #e6f0dd;
+  --gc-node-inner-hover: #eef5e7;
+  --gc-node-border: #9db88e;
+  --gc-node-text: #1e301c;
+  --gc-node-muted: #4c6347;
+  --gc-node-accent: #2e5d33;
   --gc-edge: #6d8566;
-  --gc-handle-highlight: #9db8d3;
-  --gc-handle-mid: #315b87;
-  --gc-handle-dark: #102c4c;
-  --gc-handle-ring: rgba(23, 59, 99, 0.78);
-  --gc-handle-glow: rgba(31, 72, 115, 0.75);
+  --gc-handle-highlight: #cfe3c2;
+  --gc-handle-mid: #3f7a46;
+  --gc-handle-dark: #1c3d20;
+  --gc-handle-ring: rgba(46, 93, 51, 0.78);
+  --gc-handle-glow: rgba(58, 108, 64, 0.75);
 }
 
 [data-theme] .gc-node-card,
@@ -436,6 +541,7 @@ body {
 /* shadcn/Base UI 直接桥接到现有 data-theme 语义，不引入第二套主题状态。 */
 @theme inline {
   --font-heading: inherit;
+  --font-mono: var(--gc-font-mono);
   --color-background: var(--gc-shell);
   --color-foreground: var(--gc-text);
   --color-card: var(--gc-panel);

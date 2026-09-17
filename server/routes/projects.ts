@@ -45,13 +45,15 @@ const MAX_DRAFT_REVISION = 2_147_483_646;
 export function initialDraftProjectName(now = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai",
-    year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   }).formatToParts(now);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((candidate) => candidate.type === type)?.value ?? "";
-  return `未修改项目名称${part("year")}${part("month")}${part("day")}000000`;
+  return `未命名项目 · ${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
 }
 
 function initialDraftPayload(row: InitialDraftRow) {

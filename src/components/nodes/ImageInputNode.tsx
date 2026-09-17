@@ -149,7 +149,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
     <>
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <label className="nodrag block space-y-1">
-          <span className="flex items-center justify-between text-[9px] text-neutral-500">
+          <span className="flex items-center justify-between text-[11px] text-neutral-500">
             <span>新连线默认角色</span>
             {normalizedRole.roleNeedsConfirmation && (
               <span className="text-amber-400">待确认</span>
@@ -187,7 +187,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               </SelectPositioner>
             </SelectPortal>
           </Select>
-          <span className="block text-[8px] leading-relaxed text-neutral-600">
+          <span className="block text-[11px] leading-relaxed text-neutral-600">
             已存在的连线请在目标节点 Inspector 中逐条确认，不会随这里静默改变。
           </span>
         </label>

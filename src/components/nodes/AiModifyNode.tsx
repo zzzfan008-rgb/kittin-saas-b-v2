@@ -24,7 +24,7 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
       <Handle type="target" position={Position.Left} />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">编辑指令</span>
+          <span className="text-[11px] text-neutral-500">编辑指令</span>
           <textarea
             value={data.prompt}
             {...promptEdit.bind}
@@ -32,11 +32,11 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
             placeholder="描述需要如何组合、迁移或修改参考图"
             className={`${inputClass} resize-none`}
           />
-          <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
+          <span className="text-[11px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1">
-            <span className="text-[10px] text-neutral-500">画幅比例</span>
+            <span className="text-[11px] text-neutral-500">画幅比例</span>
             <select
               value={data.aspectRatio}
               onChange={(e) => updateNodeData(
@@ -53,7 +53,7 @@ export function AiModifyNode({ id, data, selected }: NodeProps<Node<AiModifyNode
             </select>
           </label>
           <label className="block space-y-1">
-            <span className="text-[10px] text-neutral-500">生成数量</span>
+            <span className="text-[11px] text-neutral-500">生成数量</span>
             <select
               value={data.batchSize}
               onChange={(e) =>

@@ -97,7 +97,8 @@ export function CanvasZoomControls() {
           <output
             aria-live="polite"
             aria-label={`当前缩放 ${zoomPercent}%`}
-            className="min-w-11 text-center text-[10px] tabular-nums text-[var(--gc-text-muted)]"
+            className="min-w-11 text-center text-[11px] tabular-nums text-[var(--gc-text-muted)]"
+            style={{ fontFamily: "var(--gc-font-mono)" }}
           >
             {zoomPercent}%
           </output>

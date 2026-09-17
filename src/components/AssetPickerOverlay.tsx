@@ -113,7 +113,7 @@ export function AssetPickerOverlay({
                 key={key}
                 type="button"
                 onClick={() => setCategory(key)}
-                className={`rounded-sm border px-2 py-1 text-[10px] transition-colors ${
+                className={`rounded-sm border px-2 py-1 text-[11px] transition-colors ${
                   category === key
                     ? "border-gold/60 text-gold"
                     : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
@@ -146,10 +146,10 @@ export function AssetPickerOverlay({
             </div>
           )}
           {!error && loading && assets.length === 0 && (
-            <p className="py-6 text-center text-[10px] text-neutral-600">加载中…</p>
+            <p className="py-6 text-center text-[11px] text-neutral-600">加载中…</p>
           )}
           {!error && !loading && assets.length === 0 && (
-            <p className="py-6 text-center text-[10px] text-neutral-600">
+            <p className="py-6 text-center text-[11px] text-neutral-600">
               {debouncedSearch ? "没有匹配的素材" : "暂无素材，可在印花提取节点中「存为素材」"}
             </p>
           )}

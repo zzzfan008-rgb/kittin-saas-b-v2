@@ -43,12 +43,12 @@ export function NodeLibraryPanel({ className }: { className?: string }) {
       )}
     >
       <div className="flex h-10 shrink-0 items-center border-b border-[var(--gc-border)] px-4">
-        <h2 className="text-[10px] font-medium tracking-widest text-[var(--gc-text-muted)]">
+        <h2 className="text-[11px] font-medium tracking-widest text-[var(--gc-text-muted)]">
           节点库
         </h2>
       </div>
       <NodeList />
-      <div className="border-t border-[var(--gc-border)] px-3 py-2 text-[10px] leading-relaxed text-[var(--gc-text-muted)]">
+      <div className="border-t border-[var(--gc-border)] px-3 py-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
         点击添加 · 也可拖拽到画布
         <br />
         左键框选 · 中/右键平移 · Delete 删除
@@ -112,17 +112,17 @@ function NodeList() {
               <span className="flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]">
                 <span>{spec.title}</span>
                 {unavailable && (
-                  <span className="shrink-0 rounded border border-amber-600/50 px-1 py-0.5 text-[8px] font-medium text-amber-400">
-                    unsupported
+                  <span className="shrink-0 rounded border border-[var(--gc-border)] px-1 py-0.5 text-[11px] font-medium text-[var(--gc-text-muted)]">
+                    暂不支持
                   </span>
                 )}
               </span>
-              <span className="text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
+              <span className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
                 {spec.description}
               </span>
               {unavailable && (
-                <span id={`node-policy-${kind}`} className="text-[9px] leading-relaxed text-amber-500">
-                  首版尚无独立提示词、参数档案和真实评估，暂不可新建或付费运行。
+                <span id={`node-policy-${kind}`} className="sr-only">
+                  {productPolicy.reason}
                 </span>
               )}
             </Button>

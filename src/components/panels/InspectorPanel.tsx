@@ -152,12 +152,12 @@ function PromptPresetPicker({
 
   return (
     <Collapsible className="rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2.5 py-2">
-      <CollapsibleTrigger className="cursor-pointer select-none rounded-sm text-[10px] font-medium text-[var(--gc-text-muted)] data-open:[&_svg]:rotate-180">
+      <CollapsibleTrigger className="cursor-pointer select-none rounded-sm text-[11px] font-medium text-[var(--gc-text-muted)] data-open:[&_svg]:rotate-180">
         <span>服装提示词预设</span>
         <ChevronDownIcon aria-hidden="true" className="size-3 transition-transform" />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-2">
-        <p className="text-[10px] leading-relaxed text-[var(--gc-text-muted)]">
+        <p className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
           保留当前内容作为设计意图，再补齐构图、材质、画幅和约束。
         </p>
         {GARMENT_PROMPT_PRESETS.map((preset) => {
@@ -214,21 +214,21 @@ function PromptPresetPicker({
                 }}
                 className="h-auto w-full flex-col items-stretch gap-0 rounded-md border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-left whitespace-normal hover:border-[var(--gc-accent)]"
               >
-                <span className="flex items-center justify-between gap-2 text-[10px] text-[var(--gc-text)]">
+                <span className="flex items-center justify-between gap-2 text-[11px] text-[var(--gc-text)]">
                   <span>{preset.name}</span>
-                  <span className="shrink-0 text-[9px] text-[var(--gc-accent)]">{preset.aspectRatio}</span>
+                  <span className="shrink-0 text-[11px] text-[var(--gc-accent)]">{preset.aspectRatio}</span>
                 </span>
-                <span className="mt-0.5 block text-[10px] leading-relaxed text-[var(--gc-text-muted)]">{preset.description}</span>
-                <span className="mt-1 block text-[10px] text-[var(--gc-text-muted)]">
+                <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--gc-text-muted)]">{preset.description}</span>
+                <span className="mt-1 block text-[11px] text-[var(--gc-text-muted)]">
                   {preset.templateName} · case {preset.exampleCaseIds.join(", ")}
                 </span>
               </Button>
-              {reason && <p id={reasonId} className="px-1 text-[9px] leading-relaxed text-amber-500/90">{reason}</p>}
+              {reason && <p id={reasonId} className="px-1 text-[11px] leading-relaxed text-[var(--gc-warn-text)]">{reason}</p>}
             </div>
           );
         })}
         {activePending && (
-          <div aria-live="polite" className="space-y-2 rounded-md border border-[var(--gc-accent)]/40 bg-black/20 p-2 text-[9px] text-[var(--gc-text-muted)]">
+          <div aria-live="polite" className="space-y-2 rounded-md border border-[var(--gc-accent)]/40 bg-black/20 p-2 text-[11px] text-[var(--gc-text-muted)]">
             <p className="font-medium text-[var(--gc-text)]">确认应用：{activePending.preset.name}</p>
             <dl className="space-y-1">
               <div className="space-y-0.5"><dt>提示词变体</dt><dd className="break-all font-mono text-[var(--gc-text)]">{activePending.variant.variantId}</dd></div>
@@ -238,7 +238,7 @@ function PromptPresetPicker({
               <div className="space-y-0.5"><dt>模型原生参数</dt><dd className="break-all text-[var(--gc-text)]">{JSON.stringify(currentModelOptions ?? {})} → {JSON.stringify(activePending.parameters.modelOptions)}</dd></div>
               <div className="space-y-0.5"><dt>后处理</dt><dd className="text-[var(--gc-text)]">{activePending.profile.postprocess.version} · {activePending.profile.postprocess.finalAspectRatio}</dd></div>
               {activePending.parameters.ignoredNativeFields.length > 0 && (
-                <div className="space-y-0.5"><dt>将清除/忽略</dt><dd className="text-amber-400">{activePending.parameters.ignoredNativeFields.join("、")}</dd></div>
+                <div className="space-y-0.5"><dt>将清除/忽略</dt><dd className="text-[var(--gc-warn-text)]">{activePending.parameters.ignoredNativeFields.join("、")}</dd></div>
               )}
             </dl>
             <div className="space-y-0.5">
@@ -282,10 +282,10 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
 
   return (
     <section aria-label="快捷建图" className="space-y-2 border-t border-[var(--gc-border)] pt-3">
-      <p className="text-[10px] font-medium text-[var(--gc-text-muted)]">快捷建图</p>
+      <p className="text-[11px] font-medium text-[var(--gc-text-muted)]">快捷建图</p>
       {groups.map((group) => (
         <div key={group.direction} className="space-y-1">
-          <div className="flex items-center justify-between text-[9px] text-neutral-600">
+          <div className="flex items-center justify-between text-[11px] text-neutral-600">
             <span>{group.label}</span>
             {group.disabled && <span>输入已满</span>}
           </div>
@@ -300,17 +300,17 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
                   disabled={disabled}
                   title={!productPolicy.canCreate ? productPolicy.reason : undefined}
                   onClick={() => add(nextKind, group.direction)}
-                  className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[9px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[11px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {group.direction === "upstream" ? "← " : "+ "}{NODE_SPECS[nextKind].title}
-                  {!productPolicy.canCreate && " · unsupported"}
+                  {!productPolicy.canCreate && " · 暂不支持"}
                 </button>
               );
             })}
           </div>
         </div>
       ))}
-      <p className="text-[9px] leading-relaxed text-neutral-600">新增节点与连线属于同一次撤销操作。</p>
+      <p className="text-[11px] leading-relaxed text-neutral-600">新增节点与连线属于同一次撤销操作。</p>
     </section>
   );
 }
@@ -371,11 +371,11 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-neutral-200">{spec.title}</span>
-        <span className="text-[10px] text-neutral-500">{STATUS_TEXT[d.status]}</span>
+        <span className="text-[11px] text-neutral-500">{STATUS_TEXT[d.status]}</span>
       </div>
 
       <label className="block space-y-1">
-        <span className="text-[10px] text-neutral-500">节点名称</span>
+        <span className="text-[11px] text-neutral-500">节点名称</span>
         <input
           value={d.label}
           {...labelEdit.bind}
@@ -387,16 +387,16 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         <section
           aria-label="节点产品支持状态"
           data-product-support="unsupported"
-          className="rounded-md border border-amber-700/50 bg-amber-950/25 p-2 text-[9px] leading-relaxed text-amber-300"
+          className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] p-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
         >
-          <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
+          <p className="font-medium tracking-wide">暂不支持</p>
           <p className="mt-0.5">{productPolicy.reason}</p>
         </section>
       )}
 
       {d.kind === "sketch-to-render" && (
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">操作模式（固定写入任务）</span>
+          <span className="text-[11px] text-neutral-500">操作模式（固定写入任务）</span>
           <select
             value={d.operationMode}
             disabled={readOnly || isNodeRunActive(d.status)}
@@ -416,12 +416,12 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
             <option value="edit">参考图编辑（至少 1 张）</option>
           </select>
           {d.operationModeNeedsConfirmation && (
-            <span className="text-[9px] leading-relaxed text-amber-500">旧项目模式无法可靠推断，请确认后再运行。</span>
+            <span className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">旧项目模式无法可靠推断，请确认后再运行。</span>
           )}
         </label>
       )}
       {d.kind === "ai-modify" && (
-        <p className="text-[9px] text-neutral-500">操作模式：参考图编辑（节点固定）</p>
+        <p className="text-[11px] text-neutral-500">操作模式：参考图编辑（节点固定）</p>
       )}
 
       {spec.providerId && referenceRows.length > 0 && (
@@ -444,14 +444,14 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       {(d.kind === "sketch-to-render" || d.kind === "ai-modify" || d.kind === "fabric-recolor") && (
         <div className="space-y-2">
           <label className="block space-y-1">
-            <span className="text-[10px] text-neutral-500">提示词</span>
+            <span className="text-[11px] text-neutral-500">提示词</span>
             <textarea
               value={d.prompt}
               {...promptEdit.bind}
               rows={12}
               className={`${inputClass} resize-none`}
             />
-            <span className="text-[9px] text-neutral-600">每条入边的参考角色必须确认；可连接最多 8 张参考图，按连线顺序传入</span>
+            <span className="text-[11px] text-neutral-600">每条入边的参考角色必须确认；可连接最多 8 张参考图，按连线顺序传入</span>
           </label>
           {(d.kind === "sketch-to-render" || d.kind === "ai-modify") && (
             <PromptPresetPicker
@@ -489,7 +489,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       {(d.kind === "sketch-to-render" || d.kind === "ai-modify") && (
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1">
-            <span className="text-[10px] text-neutral-500">画幅比例</span>
+            <span className="text-[11px] text-neutral-500">画幅比例</span>
             <select
               value={d.aspectRatio}
               onChange={(e) => updateNodeData(
@@ -506,7 +506,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
             </select>
           </label>
           <label className="block space-y-1">
-            <span className="text-[10px] text-neutral-500">生成数量</span>
+            <span className="text-[11px] text-neutral-500">生成数量</span>
             <select
               value={d.batchSize}
               onChange={(e) =>
@@ -526,7 +526,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
 
       {d.kind === "result" && (
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">备注</span>
+          <span className="text-[11px] text-neutral-500">备注</span>
           <textarea
             value={d.note ?? ""}
             {...noteEdit.bind}
@@ -548,7 +548,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       )}
 
       {modelParameterError && (
-        <p className="rounded-md border border-amber-800/50 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-400">
+        <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] p-2 text-[11px] leading-relaxed text-[var(--gc-warn-text)]">
           当前模式的模型参数未确认：{modelParameterError}
         </p>
       )}
@@ -589,14 +589,14 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
     cancelled: "已取消",
   };
   const statusColor: Record<RecentResult["status"], string> = {
-    queued: "text-yellow-400",
-    running: "text-blue-400",
-    retry_wait: "text-amber-400",
-    cancel_requested: "text-orange-400",
-    success: "text-emerald-400",
-    error: "text-red-400",
-    outcome_unknown: "text-orange-500",
-    cancelled: "text-neutral-500",
+    queued: "text-[var(--gc-status-queued)]",
+    running: "text-[var(--gc-status-running)]",
+    retry_wait: "text-[var(--gc-status-retry)]",
+    cancel_requested: "text-[var(--gc-status-retry)]",
+    success: "text-[var(--gc-status-success)]",
+    error: "text-[var(--gc-status-error)]",
+    outcome_unknown: "text-[var(--gc-status-unknown)]",
+    cancelled: "text-[var(--gc-status-idle)]",
   };
 
   return (
@@ -604,7 +604,7 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-neutral-200">{record.nodeLabel}</span>
         <span
-          className={`text-[10px] ${statusColor[record.status]}`}
+          className={`text-[11px] ${statusColor[record.status]}`}
         >
           {statusText[record.status]}
         </span>
@@ -620,7 +620,7 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
         />
       )}
 
-      <dl className="space-y-1.5 text-[10px]">
+      <dl className="space-y-1.5 text-[11px]">
         <div className="flex justify-between">
           <dt className="text-neutral-500">节点类型</dt>
           <dd className="text-neutral-300">{NODE_SPECS[record.kind].title}</dd>
@@ -664,8 +664,8 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       {record.error && (
         <div className="space-y-1">
-          <span className="text-[10px] text-red-400/80">错误信息</span>
-          <p className="rounded-md border border-red-900/50 bg-red-950/20 px-2 py-1.5 text-[10px] leading-relaxed text-red-300/90">
+          <span className="text-[11px] text-red-400/80">错误信息</span>
+          <p className="rounded-md border border-red-900/50 bg-red-950/20 px-2 py-1.5 text-[11px] leading-relaxed text-red-300/90">
             {record.error}
           </p>
         </div>
@@ -699,14 +699,14 @@ export function InspectorPanel({ className, view = "auto" }: InspectorPanelProps
           selectedResultId ? (
             <ResultRecordDetail resultId={selectedResultId} />
           ) : (
-            <p className="py-4 text-center text-[10px] text-neutral-600">
+            <p className="py-4 text-center text-[11px] text-neutral-600">
               选择上方结果查看完整运行记录
             </p>
           )
         ) : selectedNodeId ? (
           <PropertyEditor nodeId={selectedNodeId} />
         ) : (
-          <p className="py-4 text-center text-[10px] text-neutral-600">
+          <p className="py-4 text-center text-[11px] text-neutral-600">
             点击画布节点查看属性
           </p>
         )}

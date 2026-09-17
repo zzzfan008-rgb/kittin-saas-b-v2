@@ -74,12 +74,12 @@ export function CompareOverlay({
                 <span className="truncate text-xs font-medium text-neutral-200">
                   {r.nodeLabel}
                 </span>
-                <span className="shrink-0 text-[10px] text-neutral-500">
+                <span className="shrink-0 text-[11px] text-neutral-500">
                   {formatTime(r.finishedAt ?? r.startedAt)}
                 </span>
               </div>
               {r.prompt && (
-                <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500">
+                <p className="line-clamp-2 text-[11px] leading-relaxed text-neutral-500">
                   {r.prompt}
                 </p>
               )}

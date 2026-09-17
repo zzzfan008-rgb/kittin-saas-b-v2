@@ -37,7 +37,7 @@ export function ResultsPanel({
   );
   const resultCardClass = "aspect-square min-w-0 w-full";
   const resultActionClass =
-    "rounded-sm px-1 py-1 text-[10px] font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
+    "rounded-sm px-1 py-1 text-[11px] font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
   const viewResult = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
@@ -74,7 +74,7 @@ export function ResultsPanel({
         <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-500">
           最近生成
         </span>
-        <span className="text-[10px] text-neutral-600">{recentResults.length} 条</span>
+        <span className="text-[11px] text-neutral-600">{recentResults.length} 条</span>
         <span className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
           {compareIds.length >= 2 && (
             <button
@@ -83,7 +83,7 @@ export function ResultsPanel({
                 e.stopPropagation();
                 window.dispatchEvent(new CustomEvent(OPEN_COMPARE_EVENT));
               }}
-              className="rounded-sm border border-gold/60 bg-gold/10 px-2 py-0.5 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
+              className="rounded-sm border border-gold/60 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold transition-colors hover:bg-gold/20"
             >
               对比 {compareIds.length} 张
             </button>
@@ -92,7 +92,7 @@ export function ResultsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {recentResults.length === 0 ? (
-            <p className="py-3 text-center text-[10px] text-neutral-600">
+            <p className="py-3 text-center text-[11px] text-neutral-600">
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
@@ -111,10 +111,10 @@ export function ResultsPanel({
                     title={STATUS_TEXT[r.status]}
                   >
                     <span className="h-5 w-5 animate-spin rounded-full border-2 border-gold/30 border-t-gold" />
-                    <span className="text-[10px] text-gold">
+                    <span className="text-[11px] text-gold">
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-[9px] text-neutral-500">
+                    <span className="w-full truncate text-center text-[11px] text-neutral-500">
                       {r.nodeLabel}
                     </span>
                   </button>
@@ -132,10 +132,10 @@ export function ResultsPanel({
                     }`}
                     title={r.error ?? STATUS_TEXT[r.status]}
                   >
-                    <span className={`text-[10px] ${r.status === "cancelled" ? "text-neutral-500" : "text-red-400"}`}>
+                    <span className={`text-[11px] ${r.status === "cancelled" ? "text-neutral-500" : "text-red-400"}`}>
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-[9px] text-neutral-500">
+                    <span className="w-full truncate text-center text-[11px] text-neutral-500">
                       {r.nodeLabel}
                     </span>
                   </button>
@@ -171,7 +171,7 @@ export function ResultsPanel({
                       />
                     </button>
                     {compareIds.includes(r.id) && (
-                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[9px] font-bold text-ink">
+                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[11px] font-bold text-ink">
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}
@@ -233,7 +233,7 @@ export function ResultsPanel({
                   type="button"
                   onClick={onLoadMore}
                   disabled={loadingMore}
-                  className={`${resultCardClass} rounded-md border border-dashed border-(--gc-border) text-[10px] text-(--gc-text-muted) hover:border-(--gc-accent) hover:text-(--gc-accent) disabled:opacity-50`}
+                  className={`${resultCardClass} rounded-md border border-dashed border-(--gc-border) text-[11px] text-(--gc-text-muted) hover:border-(--gc-accent) hover:text-(--gc-accent) disabled:opacity-50`}
                 >
                   {loadingMore ? "加载中…" : "加载更多"}
                 </button>

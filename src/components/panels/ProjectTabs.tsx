@@ -197,7 +197,7 @@ export function ProjectTabs() {
                   {renameError && (
                     <span
                       role="alert"
-                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-[9px] text-red-200 shadow-lg"
+                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-[11px] text-red-200 shadow-lg"
                     >
                       {renameError}
                     </span>

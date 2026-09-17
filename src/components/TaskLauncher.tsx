@@ -49,21 +49,21 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
       >
         <div className="relative overflow-hidden">
           <TemplateCover template={template} />
-          <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[8px] backdrop-blur-sm ${
+          <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[11px] backdrop-blur-sm ${
             unavailable
-              ? "border-amber-400/60 bg-amber-950/80 text-amber-200"
+              ? "border-[var(--gc-border)] bg-[var(--gc-control)]/80 text-[var(--gc-text-muted)]"
               : "border-white/30 bg-black/55 text-white"
           }`}>
-            {unavailable ? "unsupported" : "内置"}
+            {unavailable ? "暂不支持" : "内置"}
           </span>
         </div>
         <span className="block p-3">
           <span className="block truncate text-xs font-semibold text-[var(--gc-text)]">{template.name}</span>
-          <span className="mt-1 block min-h-8 line-clamp-2 text-[10px] leading-4 text-[var(--gc-text-muted)]">
+          <span className="mt-1 block min-h-8 line-clamp-2 text-[11px] leading-4 text-[var(--gc-text-muted)]">
             {template.description || "从此工作流模板创建一个新项目"}
           </span>
           {unavailable && (
-            <span id={reasonId} className="mt-1 block text-[9px] leading-relaxed text-amber-500">
+            <span id={reasonId} className="mt-1 block text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
               {productPolicy.reason}
             </span>
           )}
@@ -133,7 +133,7 @@ export function TaskLauncher() {
           <div className="mx-auto flex size-9 items-center justify-center rounded-xl border border-[var(--gc-accent)]/40 bg-[var(--gc-panel-soft)] text-[var(--gc-accent)]">
             <LayoutTemplateIcon aria-hidden="true" className="size-4" />
           </div>
-          <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.22em] text-[var(--gc-accent)]">
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--gc-accent)]">
             First creation
           </p>
           <h1 className="mt-2 text-lg font-semibold text-[var(--gc-text)]">从一个明确的任务开始</h1>
@@ -156,7 +156,7 @@ export function TaskLauncher() {
             </div>
           )}
           {!loading && !error && templates && builtinTemplates.length === 0 && (
-            <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-950/20 px-4 py-8 text-center text-xs text-amber-200">
+            <div role="alert" className="rounded-xl border border-[var(--gc-border)] bg-[var(--gc-control)] px-4 py-8 text-center text-xs text-[var(--gc-warn-text)]">
               内置模板暂不可用，请联系管理员重新初始化模板。
             </div>
           )}
@@ -172,7 +172,7 @@ export function TaskLauncher() {
         </div>
 
         {loading && (
-          <p role="status" className="mt-3 flex items-center justify-center gap-2 text-[10px] text-[var(--gc-text-muted)]">
+          <p role="status" className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[var(--gc-text-muted)]">
             <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" />
             正在准备内置模板…
           </p>

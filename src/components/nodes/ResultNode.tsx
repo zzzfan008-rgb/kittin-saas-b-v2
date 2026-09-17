@@ -68,7 +68,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
   }, [images, autoSave, supported, directoryName, permission, saveAll]);
 
   if (!supported) {
-    return <p className="text-[9px] text-neutral-600">当前浏览器不支持保存到文件夹，已回退为逐张下载。</p>;
+    return <p className="text-[11px] text-neutral-600">当前浏览器不支持保存到文件夹，已回退为逐张下载。</p>;
   }
 
   const onChoose = async () => {
@@ -124,11 +124,11 @@ function ResultSaveControls({ images }: { images: string[] }) {
         type="button"
         disabled={busy || !directoryName || images.length === 0}
         onClick={() => void onSaveAll()}
-        className="nodrag w-full rounded-md bg-gold py-1 text-[10px] font-medium text-ink disabled:opacity-40"
+        className="nodrag w-full rounded-md bg-gold py-1 text-[11px] font-medium text-ink disabled:opacity-40"
       >
         保存全部到文件夹
       </button>
-      {status && <p className="text-[9px] text-neutral-500">{status}</p>}
+      {status && <p className="text-[11px] text-neutral-500">{status}</p>}
     </div>
   );
 }
@@ -166,7 +166,7 @@ export function ResultNode({ id, data, selected }: NodeProps<Node<ResultNodeData
           </>
         )}
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">备注</span>
+          <span className="text-[11px] text-neutral-500">备注</span>
           <textarea
             value={data.note ?? ""}
             {...noteEdit.bind}

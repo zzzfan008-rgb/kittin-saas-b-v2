@@ -110,7 +110,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
     <>
       <Handle type="target" position={Position.Left} />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
-        <div className="flex items-center justify-between text-[10px]">
+        <div className="flex items-center justify-between text-[11px]">
           <span className="text-neutral-500">图片模型</span>
           <span className="font-mono text-neutral-300">gpt-image-2</span>
         </div>
@@ -143,10 +143,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             应用 GPT Image 2 局部修改专轨
           </button>
           {!presetAvailability.enabled && (
-            <p id={`${id}-mask-preset-reason`} className="text-[9px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
+            <p id={`${id}-mask-preset-reason`} className="text-[11px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
           )}
           {presetPending && presetVariant && presetProfile && (
-            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] text-amber-200">
+            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[11px] text-amber-200">
               <p>将写入独立提示词变体、契约哈希、参数档案与后处理版本；模型仍为 gpt-image-2，业务画幅跟随来源图片。</p>
               <dl className="space-y-0.5">
                 <div><dt>提示词变体</dt><dd className="break-all font-mono text-neutral-200">{presetVariant.variantId}</dd></div>
@@ -198,7 +198,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           </div>
         )}
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">修改说明</span>
+          <span className="text-[11px] text-neutral-500">修改说明</span>
           <textarea
             ref={promptRef}
             value={data.prompt}
@@ -215,7 +215,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             className={`${inputClass} resize-none ${promptRequired ? "border-red-500" : ""}`}
           />
           {promptRequired && (
-            <span id={`${id}-prompt-required`} className="block text-[10px] text-red-400">
+            <span id={`${id}-prompt-required`} className="block text-[11px] text-red-400">
               请先填写需要如何修改选中区域
             </span>
           )}
@@ -228,7 +228,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         >
           {data.mask && !staleMask ? "编辑蒙版" : "绘制蒙版"}
         </button>
-        {staleMask && <p className="text-[10px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
+        {staleMask && <p className="text-[11px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
         <RunButton
           status={data.status}
           onClick={run}

@@ -5,8 +5,8 @@ export type ThemeId = "current" | "white" | "eye";
 
 export const THEMES: { id: ThemeId; label: string; swatch: string; desc: string }[] = [
   { id: "current", label: "经典暗金", swatch: "#9A7333", desc: "简白节点 + 暗金圆珠" },
-  { id: "white", label: "简白", swatch: "#E98FA8", desc: "高级灰黑节点 + 粉红圆珠" },
-  { id: "eye", label: "护眼绿", swatch: "#173B63", desc: "浅蓝节点 + 藏蓝圆珠" },
+  { id: "white", label: "墨白", swatch: "#1D1D1F", desc: "深灰节点 + 墨色圆珠" },
+  { id: "eye", label: "护眼绿", swatch: "#2C5A31", desc: "绿灰节点 + 深绿圆珠" },
 ];
 
 const STORAGE_KEY = "garment-canvas-theme";

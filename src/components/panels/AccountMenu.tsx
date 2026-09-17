@@ -55,9 +55,9 @@ export function AccountMenu() {
           type="button"
           aria-label={`账户菜单：${user.displayName}`}
           title={`账户菜单：${user.displayName}`}
-          className="flex h-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-3 py-1.5 text-[10px] text-(--gc-text-muted) outline-hidden transition-colors hover:border-(--gc-accent) focus-visible:ring-2 focus-visible:ring-(--gc-accent)/50"
+          className="flex h-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-3 py-1.5 text-[11px] text-(--gc-text-muted) outline-hidden transition-colors hover:border-(--gc-accent) focus-visible:ring-2 focus-visible:ring-(--gc-accent)/50"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[9px] font-semibold text-white">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[11px] font-semibold text-white">
             {user.displayName.slice(0, 1)}
           </span>
           <span>{user.displayName}</span>

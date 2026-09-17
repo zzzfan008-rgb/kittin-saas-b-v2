@@ -18,7 +18,7 @@ export function ReferenceEvidenceList({
   const normalizedEvidence = normalizeReferenceImageEvidence(evidence, images.length);
   return (
     <div className="mt-4">
-      <p className="text-[10px] text-neutral-500">参考图 · {images.length} 张</p>
+      <p className="text-[11px] text-neutral-500">参考图 · {images.length} 张</p>
       <div className="mt-2 grid grid-cols-4 gap-2">
         {images.map((image, index) => {
           const item = normalizedEvidence[index]!;
@@ -35,11 +35,11 @@ export function ReferenceEvidenceList({
                 decoding="async"
                 className="aspect-square w-full rounded-sm border border-[var(--gc-border)] object-cover"
               />
-              <p className="mt-1 truncate text-[8px] text-neutral-500">
+              <p className="mt-1 truncate text-[11px] text-neutral-500">
                 {item.order + 1}. {roleLabel} · {stateLabel}
               </p>
               {item.sourceNodeId && (
-                <p className="truncate text-[8px] text-neutral-600">来源：{item.sourceNodeId}</p>
+                <p className="truncate text-[11px] text-neutral-600">来源：{item.sourceNodeId}</p>
               )}
             </div>
           );
@@ -148,7 +148,7 @@ export function ImageViewer() {
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-medium text-neutral-100">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
-            <p className="mt-1 text-[10px] text-neutral-500">{record?.projectName ?? "当前项目"}</p>
+            <p className="mt-1 text-[11px] text-neutral-500">{record?.projectName ?? "当前项目"}</p>
           </div>
           <button type="button" onClick={closeViewer} className="text-sm text-neutral-500 hover:text-white">✕</button>
         </div>
@@ -165,7 +165,7 @@ export function ImageViewer() {
         {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-[var(--gc-text-muted)]">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-[11px] leading-relaxed text-[var(--gc-text)]">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">复制提示词</button></div>}
         {providerOriginals.length > 0 && (
           <div className="mt-4">
-            <p className="text-[10px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
+            <p className="text-[11px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {providerOriginals.map((image, index) => (
                 <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">

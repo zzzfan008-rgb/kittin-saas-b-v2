@@ -228,7 +228,7 @@ export async function abandonInitialDraft(input: {
 }
 
 export function isServerInitialDraftPristine(draft: ServerInitialDraftSnapshot): boolean {
-  if (!/^未修改项目名称\d{8}000000$/.test(draft.name) || draft.flow.edges.length !== 0) return false;
+  if (!/^未命名项目 · \d{2}-\d{2} \d{2}:\d{2}$/.test(draft.name) || draft.flow.edges.length !== 0) return false;
   if (draft.flow.nodes.length !== 1) return false;
   const node = draft.flow.nodes[0];
   return node.data.kind === "image-input" && node.data.status === "idle" && !node.data.imageUrl;
