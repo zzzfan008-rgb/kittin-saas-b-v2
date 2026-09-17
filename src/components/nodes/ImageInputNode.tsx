@@ -171,7 +171,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           >
             <SelectTrigger
               aria-label="新连线默认角色"
-              className="nodrag nopan h-7 w-full rounded-md border border-[#2a2a2a] bg-[#111] px-2 text-[10px] text-neutral-300 focus:border-gold"
+              className="nodrag nopan h-7 w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 text-[10px] text-[var(--gc-text)] focus:border-gold"
             >
               <SelectValue placeholder="请确认这张图的用途" />
             </SelectTrigger>
@@ -192,7 +192,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           </span>
         </label>
         {data.imageUrl ? (
-          <div className="nodrag overflow-hidden rounded-md border border-[#262626]">
+          <div className="nodrag overflow-hidden rounded-md border border-[var(--gc-node-border)]">
             <button
               type="button"
               className="block w-full cursor-zoom-in"
@@ -204,7 +204,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
                 loading="lazy"
                 decoding="async"
                 alt="已上传图片"
-                className="max-h-40 w-full object-contain bg-[#0f0f0f]"
+                className="max-h-40 w-full object-contain bg-[var(--gc-control)]"
               />
             </button>
           </div>
@@ -220,10 +220,10 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[#0f0f0f] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
+            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[var(--gc-control)] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
               dragOver
                 ? "border-gold bg-gold/5 text-gold"
-                : "border-[#2a2a2a] text-neutral-500 hover:border-neutral-500"
+                : "border-[var(--gc-node-border)] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)]"
             }`}
           >
             {fileInput}
@@ -236,21 +236,21 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           <button
             type="button"
             onClick={openAssetPicker}
-            className="nodrag w-full rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-gold/60 hover:text-gold"
+            className="nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
           >
             从素材库选择
           </button>
         )}
         {data.imageUrl && (
           <div className="nodrag flex gap-1.5">
-            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[#262626] py-1 text-center text-[10px] text-neutral-400 hover:border-neutral-500 hover:text-neutral-200 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
+            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-text)] focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
               {fileInput}
               <span className="pointer-events-none">重新上传</span>
             </div>
             <button
               type="button"
               onClick={openAssetPicker}
-              className="flex-1 rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-gold/60 hover:text-gold"
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
             >
               素材库
             </button>

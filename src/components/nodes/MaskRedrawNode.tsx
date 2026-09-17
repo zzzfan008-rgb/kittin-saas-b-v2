@@ -129,16 +129,16 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             }}
           />
         )}
-        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[9px] leading-4 text-neutral-500">
+        <p className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2.5 py-2 text-[9px] leading-4 text-[var(--gc-node-muted)]">
           涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
         </p>
-        <div className="space-y-1 rounded-md border border-[#2b2b2b] bg-[#111] p-2">
+        <div className="space-y-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] p-2">
           <button
             type="button"
             disabled={!presetAvailability.enabled || !presetVariant || !presetProfile || running || readOnly}
             aria-describedby={!presetAvailability.enabled ? `${id}-mask-preset-reason` : undefined}
             onClick={() => setPresetPending(true)}
-            className="nodrag w-full rounded-md border border-[#333] px-2 py-1.5 text-[10px] text-neutral-300 hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
+            className="nodrag w-full rounded-md border border-[var(--gc-node-border)] px-2 py-1.5 text-[10px] text-[var(--gc-text)] hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
           >
             应用 GPT Image 2 局部修改专轨
           </button>
@@ -179,7 +179,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
                 >
                   确认应用
                 </button>
-                <button type="button" onClick={() => setPresetPending(false)} className="rounded border border-[#555] px-2 py-1">
+                <button type="button" onClick={() => setPresetPending(false)} className="rounded border border-[var(--gc-node-border)] px-2 py-1">
                   取消
                 </button>
               </div>
@@ -190,10 +190,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <img
             src={thumbnailImageUrl(source)}
             alt="蒙版原图"
-            className="aspect-4/3 w-full rounded-md border border-[#262626] object-contain"
+            className="aspect-4/3 w-full rounded-md border border-[var(--gc-node-border)] object-contain"
           />
         ) : (
-          <div className="flex aspect-4/3 items-center justify-center rounded-md border border-dashed border-[#333] text-[10px] text-neutral-600">
+          <div className="flex aspect-4/3 items-center justify-center rounded-md border border-dashed border-[var(--gc-node-border)] text-[10px] text-[var(--gc-node-muted)]">
             连接需要局部修改的图片
           </div>
         )}
@@ -224,7 +224,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           type="button"
           onClick={() => setEditing(true)}
           disabled={!source || running || readOnly}
-          className="nodrag w-full rounded-md border border-[#333] px-3 py-1.5 text-xs text-neutral-300 hover:border-gold/60 hover:text-gold disabled:opacity-40"
+          className="nodrag w-full rounded-md border border-[var(--gc-node-border)] px-3 py-1.5 text-xs text-[var(--gc-text)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
         >
           {data.mask && !staleMask ? "编辑蒙版" : "绘制蒙版"}
         </button>

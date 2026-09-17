@@ -45,7 +45,7 @@ export function ModelControls({
   };
 
   return (
-    <div className="space-y-2 border-t border-[#262626] pt-2">
+    <div className="space-y-2 border-t border-[var(--gc-node-border)] pt-2">
       <label className="block space-y-1">
         <span className="text-[10px] text-neutral-500">图片模型</span>
         {retiredModelId && (

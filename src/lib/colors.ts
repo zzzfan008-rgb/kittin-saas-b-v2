@@ -140,6 +140,9 @@ export function buildRecolorPrompt(colors: string[]): string {
   return `保持服装的版型、款式细节、构图和光线完全不变，仅将面料配色替换为：${list}。配色应用于面料主体，呈现真实面料质感与准确色彩，无文字无水印。`;
 }
 
+/** 取色器无有效输入时的回退默认色（对应 tokens.css --gc-accent 暗金主题值） */
+export const DEFAULT_COLOR_HEX = "#9a7333";
+
 /** 校验 #RGB / #RRGGBB */
 export function isValidHex(value: string): boolean {
   return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim());

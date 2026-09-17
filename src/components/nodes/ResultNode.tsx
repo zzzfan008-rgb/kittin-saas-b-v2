@@ -95,14 +95,14 @@ function ResultSaveControls({ images }: { images: string[] }) {
   };
 
   return (
-    <div className="space-y-1.5 rounded-md border border-[#262626] p-2">
-      <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
-        <span className="text-neutral-500">保存到:</span>
+    <div className="space-y-1.5 rounded-md border border-[var(--gc-node-border)] p-2">
+      <div className="flex items-center gap-1.5 text-[10px] text-[var(--gc-text-muted)]">
+        <span className="text-[var(--gc-node-muted)]">保存到:</span>
         <span className="truncate text-gold">{directoryName ?? "未设置"}</span>
         <button
           type="button"
           onClick={() => void onChoose()}
-          className="nodrag ml-auto shrink-0 rounded-sm border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
+          className="nodrag ml-auto shrink-0 rounded-sm border border-[var(--gc-node-border)] px-1.5 py-0.5 hover:border-gold hover:text-gold"
         >
           选择文件夹
         </button>
@@ -110,13 +110,13 @@ function ResultSaveControls({ images }: { images: string[] }) {
           <button
             type="button"
             onClick={() => void clearDirectory()}
-            className="nodrag shrink-0 rounded-sm border border-[#333] px-1.5 py-0.5 hover:border-gold hover:text-gold"
+            className="nodrag shrink-0 rounded-sm border border-[var(--gc-node-border)] px-1.5 py-0.5 hover:border-gold hover:text-gold"
           >
             清除
           </button>
         )}
       </div>
-      <label className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+      <label className="flex items-center gap-1.5 text-[10px] text-[var(--gc-text-muted)]">
         <input type="checkbox" className="nodrag" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} />
         自动保存新结果图
       </label>
@@ -156,7 +156,7 @@ export function ResultNode({ id, data, selected }: NodeProps<Node<ResultNodeData
                     key={`${url}-${i}`}
                     type="button"
                     onClick={() => downloadImage(url, i, extension)}
-                    className="nodrag rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-gold hover:text-gold"
+                    className="nodrag rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold hover:text-gold"
                   >
                     {extension ? `下载 ${extension.toUpperCase()} ${i + 1}` : `下载图片 ${i + 1}`}
                   </button>

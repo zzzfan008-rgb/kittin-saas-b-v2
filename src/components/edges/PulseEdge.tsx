@@ -33,10 +33,10 @@ export function PulseEdge({
   );
 
   const baseStroke = selected
-    ? "#C9A66B"
+    ? "var(--gc-accent)"
     : running
-      ? "rgba(201,166,107,0.45)"
-      : "#3a3a3a";
+      ? "color-mix(in srgb, var(--gc-accent) 45%, transparent)"
+      : "var(--gc-border-strong)";
   const dur = running ? "1.2s" : "2.8s";
 
   return (
@@ -49,20 +49,20 @@ export function PulseEdge({
       {/* 三颗追尾光珠（SMIL 沿路径运动，零 JS 开销） */}
       <circle
         r={4}
-        fill="#C9A66B"
+        fill="var(--gc-accent)"
         opacity={running ? 1 : 0.5}
         style={
           running
-            ? { filter: "drop-shadow(0 0 4px #C9A66B) drop-shadow(0 0 8px rgba(201,166,107,.6))" }
+            ? { filter: "drop-shadow(0 0 4px var(--gc-accent)) drop-shadow(0 0 8px color-mix(in srgb, var(--gc-accent) 60%, transparent))" }
             : undefined
         }
       >
         <animateMotion dur={dur} repeatCount="indefinite" path={path} />
       </circle>
-      <circle r={3} fill="#C9A66B" opacity={running ? 0.7 : 0.35}>
+      <circle r={3} fill="var(--gc-accent)" opacity={running ? 0.7 : 0.35}>
         <animateMotion dur={dur} begin="0.4s" repeatCount="indefinite" path={path} />
       </circle>
-      <circle r={2.4} fill="#C9A66B" opacity={running ? 0.5 : 0.25}>
+      <circle r={2.4} fill="var(--gc-accent)" opacity={running ? 0.5 : 0.25}>
         <animateMotion dur={dur} begin="0.8s" repeatCount="indefinite" path={path} />
       </circle>
     </>

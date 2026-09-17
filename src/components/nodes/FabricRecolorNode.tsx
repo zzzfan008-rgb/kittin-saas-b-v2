@@ -8,6 +8,7 @@ import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import {
   COLOR_CATEGORIES,
+  DEFAULT_COLOR_HEX,
   buildRecolorPrompt,
   isValidHex,
   nameOfColor,
@@ -95,12 +96,12 @@ export function FabricRecolorNode({
       />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
-        <div className="rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-[10px] leading-relaxed text-neutral-500">
+        <div className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
           左侧输入口：上 = 款式/补充参考，下 = 面料参考；总计最多 8 图
         </div>
 
         {/* 已选配色（最多 3 色，点击移除） */}
-        <div className="flex min-h-[22px] flex-wrap items-center gap-1 rounded-md border border-[#262626] bg-[#0f0f0f] px-1.5 py-1">
+        <div className="flex min-h-[22px] flex-wrap items-center gap-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-1.5 py-1">
           {colors.length === 0 ? (
             <span className="text-[10px] text-neutral-600">已选配色（最多 8 色，每色出 1 张图）</span>
           ) : (
@@ -110,7 +111,7 @@ export function FabricRecolorNode({
                 type="button"
                 onClick={() => toggleColor(hex)}
                 title={`${nameOfColor(hex)} ${hex} · 点击移除`}
-                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[9px] text-neutral-300 hover:border-red-400/60"
+                className="flex items-center gap-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-[9px] text-[var(--gc-node-text)] hover:border-red-400/60"
               >
                 <span
                   className="h-2.5 w-2.5 rounded-[2px]"
@@ -123,7 +124,7 @@ export function FabricRecolorNode({
         </div>
 
         {/* 色板常显：分类页签 + 色块网格 */}
-        <div className="nodrag rounded-md border border-[#262626] bg-[#161616] p-1.5">
+        <div className="nodrag rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-1.5">
           <div className="mb-1.5 grid grid-cols-4 gap-1">
             {tabs.map((cat) => (
               <button
@@ -133,7 +134,7 @@ export function FabricRecolorNode({
                 className={`rounded-xs border px-1 py-1 text-[10px] transition-colors ${
                   cat.id === categoryId
                     ? "border-gold bg-gold/15 text-gold"
-                    : "border-[#333] text-neutral-400 hover:border-gold/40"
+                    : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-gold/40"
                 }`}
               >
                 {cat.label}
@@ -167,7 +168,7 @@ export function FabricRecolorNode({
                     <span
                       className={`h-5 w-full rounded-xs border transition-transform hover:scale-105 ${
                         active
-                          ? "border-gold ring-1 ring-[#C9A66B]"
+                          ? "border-gold ring-1 ring-[var(--gc-accent)]"
                           : "border-white/15"
                       }`}
                       style={{ backgroundColor: c.hex }}
@@ -190,9 +191,9 @@ export function FabricRecolorNode({
             <div className="mt-1.5 flex items-center gap-1">
               <input
                 type="color"
-                value={isValidHex(hexInput) ? normalizeHex(hexInput) : "#C9A66B"}
+                value={isValidHex(hexInput) ? normalizeHex(hexInput) : DEFAULT_COLOR_HEX}
                 onChange={(e) => setHexInput(e.target.value)}
-                className="h-6 w-7 cursor-pointer rounded-xs border border-[#333] bg-transparent p-0"
+                className="h-6 w-7 cursor-pointer rounded-xs border border-[var(--gc-node-border)] bg-transparent p-0"
                 title="自定义取色"
               />
               <input
@@ -200,13 +201,13 @@ export function FabricRecolorNode({
                 onChange={(e) => setHexInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
                 placeholder="#RRGGBB"
-                className="h-6 flex-1 rounded-xs border border-[#333] bg-[#0f0f0f] px-1.5 font-mono text-[10px] text-neutral-200 outline-hidden focus:border-gold/60"
+                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-1.5 font-mono text-[10px] text-[var(--gc-text)] outline-hidden focus:border-gold/60"
               />
               <button
                 type="button"
                 onClick={addCustomHex}
                 disabled={!isValidHex(hexInput)}
-                className="h-6 rounded-xs border border-[#333] px-2 text-[10px] text-neutral-300 hover:border-gold/60 disabled:opacity-40"
+                className="h-6 rounded-xs border border-[var(--gc-node-border)] px-2 text-[10px] text-[var(--gc-text)] hover:border-gold/60 disabled:opacity-40"
               >
                 添加
               </button>

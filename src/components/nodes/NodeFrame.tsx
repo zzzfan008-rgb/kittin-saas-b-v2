@@ -68,11 +68,11 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
 
   return (
     <div
-      className={`gc-node-card w-[280px] rounded-xl border bg-[#141414] shadow-xl shadow-black/40 transition-colors ${
-        selected ? "border-gold" : "border-[#262626]"
+      className={`gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
+        selected ? "border-gold" : "border-[var(--gc-node-border)]"
       }`}
     >
-      <div className="gc-node-header flex items-center gap-2 rounded-t-xl border-b border-[#262626] bg-[#1a1a1a] px-3 py-2">
+      <div className="gc-node-header flex items-center gap-2 rounded-t-xl border-b border-[var(--gc-node-border)] bg-[var(--gc-node-header)] px-3 py-2">
         <StatusDot status={status} />
         {editing ? (
           <input
@@ -98,7 +98,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
                 setEditing(false);
               }
             }}
-            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[#0f0f0f] px-1.5 py-0.5 text-xs text-neutral-200 focus:outline-hidden"
+            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[var(--gc-control)] px-1.5 py-0.5 text-xs text-[var(--gc-text)] focus:outline-hidden"
           />
         ) : (
           <span
@@ -156,7 +156,7 @@ export function RunButton({
         disabled={active || disabled || Boolean(disabledReason) || newGenerationBlocked}
         title={newGenerationBlocked ? safetyBlockReason ?? undefined : disabledReason}
         className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
-          active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
+          active ? "btn-running-breathe bg-[var(--gc-panel-hover)] text-gold" : "bg-gold text-ink disabled:opacity-40"
         }`}
       >
         {active
@@ -202,4 +202,4 @@ export function Developing() {
 }
 
 export const inputClass =
-  "nodrag w-full rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-gold focus:outline-hidden";
+  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";

@@ -68,9 +68,9 @@ export function ResultsPanel({
   return (
     <section
       aria-label="最近生成"
-      className={cn("gc-panel flex min-h-0 flex-col bg-[#141414]", className)}
+      className={cn("gc-panel flex min-h-0 flex-col bg-[var(--gc-panel)]", className)}
     >
-      <div className="flex min-w-0 items-center gap-2 border-b border-[#262626] px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2 border-b border-[var(--gc-border)] px-3 py-2">
         <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-500">
           最近生成
         </span>
@@ -103,10 +103,10 @@ export function ResultsPanel({
                     key={r.id}
                     type="button"
                     onClick={() => setSelectedResultId(r.id)}
-                    className={`flex ${resultCardClass} flex-col items-center justify-center gap-2 rounded-md border bg-[#0f0f0f] px-1 ${
+                    className={`flex ${resultCardClass} flex-col items-center justify-center gap-2 rounded-md border bg-[var(--gc-control)] px-1 ${
                       selectedResultId === r.id
                         ? "border-gold"
-                        : "border-[#3a3226] hover:border-gold/60"
+                        : "border-[var(--gc-border)] hover:border-gold/60"
                     }`}
                     title={STATUS_TEXT[r.status]}
                   >
@@ -123,7 +123,7 @@ export function ResultsPanel({
                     key={r.id}
                     type="button"
                     onClick={() => setSelectedResultId(r.id)}
-                    className={`flex ${resultCardClass} flex-col items-center justify-center gap-1 rounded-md border bg-[#0f0f0f] px-1 ${
+                    className={`flex ${resultCardClass} flex-col items-center justify-center gap-1 rounded-md border bg-[var(--gc-control)] px-1 ${
                       selectedResultId === r.id
                         ? r.status === "cancelled" ? "border-neutral-500" : "border-red-400"
                         : r.status === "cancelled"
@@ -142,12 +142,12 @@ export function ResultsPanel({
                 ) : (
                   <article
                     key={r.id}
-                    className={`group relative ${resultCardClass} overflow-hidden rounded-md border bg-[#0f0f0f] ${
+                    className={`group relative ${resultCardClass} overflow-hidden rounded-md border bg-[var(--gc-control)] ${
                       compareIds.includes(r.id)
                         ? "border-gold ring-2 ring-gold/70"
                         : selectedResultId === r.id
                           ? "border-gold ring-1 ring-gold"
-                          : "border-[#262626] hover:border-gold/60"
+                          : "border-[var(--gc-border)] hover:border-gold/60"
                     }`}
                   >
                     <button

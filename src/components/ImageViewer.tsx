@@ -33,7 +33,7 @@ export function ReferenceEvidenceList({
                 alt={`参考图 ${item.order + 1}：${roleLabel}`}
                 loading="lazy"
                 decoding="async"
-                className="aspect-square w-full rounded-sm border border-[#333] object-cover"
+                className="aspect-square w-full rounded-sm border border-[var(--gc-border)] object-cover"
               />
               <p className="mt-1 truncate text-[8px] text-neutral-500">
                 {item.order + 1}. {roleLabel} · {stateLabel}
@@ -144,7 +144,7 @@ export function ImageViewer() {
       <span className="absolute left-4 top-4 text-[11px] text-neutral-400">
         滚轮缩放 {Math.round(scale * 100)}%（最大 200%）· 双击复位 · Esc 关闭
       </span>
-      <aside className="w-[400px] shrink-0 overflow-y-auto border-l border-[#333] bg-[#141414]/98 p-5" onClick={(e) => e.stopPropagation()}>
+      <aside className="w-[400px] shrink-0 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)]/98 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-medium text-neutral-100">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
@@ -152,7 +152,7 @@ export function ImageViewer() {
           </div>
           <button type="button" onClick={closeViewer} className="text-sm text-neutral-500 hover:text-white">✕</button>
         </div>
-        <dl className="mt-5 space-y-2 border-y border-[#2b2b2b] py-4 text-[11px]">
+        <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-[11px]">
           {[
             ["状态", record?.status === "success" ? "成功" : record?.status === "error" ? "失败" : "生成中"],
             ["模型", record?.model ?? "—"],
@@ -162,14 +162,14 @@ export function ImageViewer() {
             ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
           ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-neutral-500">{label}</dt><dd className="text-right text-neutral-300">{value}</dd></div>)}
         </dl>
-        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-white">复制提示词</button></div>}
+        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-[var(--gc-text-muted)]">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-[11px] leading-relaxed text-[var(--gc-text)]">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">复制提示词</button></div>}
         {providerOriginals.length > 0 && (
           <div className="mt-4">
             <p className="text-[10px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {providerOriginals.map((image, index) => (
                 <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
-                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[#333] object-contain" />
+                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[var(--gc-border)] object-contain" />
                 </a>
               ))}
             </div>
@@ -178,18 +178,18 @@ export function ImageViewer() {
         {record?.referenceImages && record.referenceImages.length > 0 && (
           <ReferenceEvidenceList images={record.referenceImages} evidence={record.referenceInputs} />
         )}
-        {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[#2b2b2b] p-3 text-[10px] text-neutral-400"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
+        {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[var(--gc-border)] p-3 text-[10px] text-[var(--gc-text-muted)]"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
         <div className="mt-5 flex flex-wrap gap-2">
           <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
-          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
+          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
           {record && (
             <button
               type="button"
               onClick={runAgain}
               disabled={Boolean(generationSafetyBlockReason)}
               title={generationSafetyBlockReason ?? undefined}
-              className="rounded-sm border border-[#444] px-3 py-1.5 text-[11px] text-neutral-300 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
             </button>
