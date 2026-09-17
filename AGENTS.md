@@ -134,7 +134,7 @@ instruction, then verify drift-prone repository and release state live.
   2–3 concrete options (including effects and a recommendation where appropriate)
   and wait for the user's selection. Do not implement through an unresolved choice.
 - Missing, stale, tampered, uncovered, or unresolved knowledge evidence fails closed.
-  `npm run docs:apiyi:guard` is part of the local Codex gate only when the exact
+  `npm run docs:apiyi:guard` is part of the local delivery gate only when the exact
   selected diff matches `docs/ai/apiyi/change-scope.json`. Ordinary dependency,
   deployment, UI-only, or unrelated audit changes skip this knowledge check. A site refresh may
   update only the immutable reference snapshot; reviewed contracts and release
@@ -142,9 +142,11 @@ instruction, then verify drift-prone repository and release state live.
 
 ## 6. Change and Verification Workflow
 
-- Inspect relevant flows and tests first. Run GitNexus `impact` before editing a
-  function, class, method, route contract, or shared type; warn before proceeding
-  when risk is HIGH or CRITICAL.
+- Inspect relevant flows and tests first. Before editing a function, class, method,
+  route contract, or shared type, establish its module-level blast radius as described
+  in the code intelligence section above — who imports it, and which dependency paths
+  reach it. Report the affected surface to the user when the change crosses a shared
+  contract or a layer boundary.
 - Prefer the smallest evidence-backed patch. Do not mix UI work with unrelated
   security fixes, architecture rewrites, dependency upgrades, or formatting churn.
 - Add or update regression coverage for each behavior change. For desktop UI, assert
@@ -156,7 +158,8 @@ instruction, then verify drift-prone repository and release state live.
   bypass it with ad-hoc database resets, and never point test runs at the development
   database.
 - Before delivery or commit, run the relevant focused tests, `npm run check`,
-  `npm run build`, `git diff --check`, and GitNexus `detect_changes`. Report any
+  `npm run build`, `git diff --check`, and the ast-grep plus dependency-cruiser scans
+  described above. Report any
   unavailable or degraded gate instead of treating it as passed.
 - GitHub Actions is not a project gate. Run `npm run gate:codex -- --base origin/main`
   for a feature branch, or select an exact commit with `--commit SHA`. This runs the
