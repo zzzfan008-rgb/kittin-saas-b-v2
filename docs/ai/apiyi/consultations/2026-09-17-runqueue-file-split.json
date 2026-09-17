@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-17T08:18:57.643Z",
+  "baseCommit": "4035456ce16c18caee332a0f06f522a8b53bef9a",
+  "changeFingerprintSha256": "e28b46dd6e13029ec69af2ccfd10203b233b21fc6b1015b1937efd2b5442d46a",
+  "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
+  "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
+  "query": "runQueue 持久化生成队列 模块边界 文件结构",
+  "affectedPaths": [
+    "server/engine/runQueue.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/CLAUDE",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/CLAUDE.source.md",
+      "pageLocalPath": "pages/CLAUDE.source.md",
+      "title": "CLAUDE",
+      "sha256": "3297567336157ccc15cee071a5c2d16e682906161a87ae6c5e400b5be648c983"
+    }
+  ],
+  "decisionSummary": "阶段 1.0 结构重组：把 runQueue.ts (1697 行) 拆分为 runQueue/ 子目录 9 个职责文件（types/events/evaluation/promptAdmission/persist/claim/lifecycle/worker/queries），runQueue.ts 保留为 facade re-export。所有评估证据绑定、Provider 请求构造、计费语义、提示词准入、参考图契约、取消语义、重试策略、exact-unit 授权核对代码均逐字搬迁，未修改任何运行时行为。公开 API 表面保持完全一致（facade 模式），81 个测试文件全绿。",
+  "unresolvedChoices": []
+}
