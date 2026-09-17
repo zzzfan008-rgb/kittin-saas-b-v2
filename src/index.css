@@ -47,7 +47,6 @@ body {
   background-color: #0a0a0a;
   color: #e5e5e5;
   font-family:
-    "Inter",
     -apple-system,
     "Segoe UI",
     "PingFang SC",
@@ -58,17 +57,33 @@ body {
 
 .login-brand-title {
   font-family:
-    "Helvetica Neue",
-    "Avenir Next",
-    "Inter",
     -apple-system,
     "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
     sans-serif;
   font-feature-settings: "kern" 1, "liga" 1;
 }
 
 :root {
   --gc-media-overlay-text: #f4f4f4;
+  /* ---- 字阶（tokens.css §0 唯一事实源；此处仅接入变量名） ---- */
+  --gc-font-ui: 12px;
+  --gc-font-body: 13px;
+  --gc-font-label: 11px;
+  --gc-font-meta-en: 10px;
+  --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+/* ---- 全局 reduced-motion 兜底（audit M5；覆盖 keyframes 与 Tailwind 动画） ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---- 深色滚动条 ---- */
@@ -512,6 +527,7 @@ body {
 /* shadcn/Base UI 直接桥接到现有 data-theme 语义，不引入第二套主题状态。 */
 @theme inline {
   --font-heading: inherit;
+  --font-mono: var(--gc-font-mono);
   --color-background: var(--gc-shell);
   --color-foreground: var(--gc-text);
   --color-card: var(--gc-panel);

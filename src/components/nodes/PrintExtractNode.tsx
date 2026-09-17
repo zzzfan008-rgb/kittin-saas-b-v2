@@ -39,7 +39,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">补充说明</span>
+          <span className="text-[11px] text-neutral-500">补充说明</span>
           <textarea
             value={data.prompt}
             {...promptEdit.bind}
@@ -47,7 +47,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
             placeholder='可选：如"只要胸前那朵花"'
             className={`${inputClass} resize-none`}
           />
-          <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
+          <span className="text-[11px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} disabled={running} referenceRows={admission.referenceRows} />
         <RunButton
@@ -67,7 +67,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
                 type="button"
                 disabled={isSaved || savingUrl === url}
                 onClick={() => void saveAsAsset(url)}
-                className={`w-full px-1.5 py-1 text-[10px] transition-colors ${
+                className={`w-full px-1.5 py-1 text-[11px] transition-colors ${
                   isSaved
                     ? "cursor-not-allowed text-gold/70"
                     : "text-neutral-400 hover:text-gold disabled:opacity-50"
@@ -79,7 +79,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
           }}
         />
         {saveError && (
-          <p className="text-[10px] text-red-400">存素材失败：{saveError}</p>
+          <p className="text-[11px] text-red-400">存素材失败：{saveError}</p>
         )}
       </NodeFrame>
       <Handle type="source" position={Position.Right} />

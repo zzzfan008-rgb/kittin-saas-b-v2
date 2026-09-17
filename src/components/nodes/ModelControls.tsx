@@ -47,9 +47,9 @@ export function ModelControls({
   return (
     <div className="space-y-2 border-t border-[#262626] pt-2">
       <label className="block space-y-1">
-        <span className="text-[10px] text-neutral-500">图片模型</span>
+        <span className="text-[11px] text-neutral-500">图片模型</span>
         {retiredModelId && (
-          <span role="alert" className="block rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-300">
+          <span role="alert" className="block rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[11px] leading-relaxed text-amber-300">
             原模型 {retiredModelId} 已退出产品范围，系统没有自动换模。请手动选择一个新模型后再配置提示词与参数。
           </span>
         )}
@@ -169,7 +169,7 @@ function SelectOption({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-[10px] text-neutral-500">{label}</span>
+      <span className="text-[11px] text-neutral-500">{label}</span>
       <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={inputClass}>
         {values.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -184,7 +184,7 @@ function NumberOption({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-[10px] text-neutral-500">{label}</span>
+      <span className="text-[11px] text-neutral-500">{label}</span>
       <input
         type="number" min={64} step={16} value={value} disabled={disabled}
         onChange={(event) => {

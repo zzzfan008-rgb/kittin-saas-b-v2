@@ -110,7 +110,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
     <>
       <Handle type="target" position={Position.Left} />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
-        <div className="flex items-center justify-between text-[10px]">
+        <div className="flex items-center justify-between text-[11px]">
           <span className="text-neutral-500">图片模型</span>
           <span className="font-mono text-neutral-300">gpt-image-2</span>
         </div>
@@ -129,7 +129,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             }}
           />
         )}
-        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[9px] leading-4 text-neutral-500">
+        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[11px] leading-4 text-neutral-500">
           涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
         </p>
         <div className="space-y-1 rounded-md border border-[#2b2b2b] bg-[#111] p-2">
@@ -138,15 +138,15 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             disabled={!presetAvailability.enabled || !presetVariant || !presetProfile || running || readOnly}
             aria-describedby={!presetAvailability.enabled ? `${id}-mask-preset-reason` : undefined}
             onClick={() => setPresetPending(true)}
-            className="nodrag w-full rounded-md border border-[#333] px-2 py-1.5 text-[10px] text-neutral-300 hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
+            className="nodrag w-full rounded-md border border-[#333] px-2 py-1.5 text-[11px] text-neutral-300 hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
           >
             应用 GPT Image 2 局部修改专轨
           </button>
           {!presetAvailability.enabled && (
-            <p id={`${id}-mask-preset-reason`} className="text-[9px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
+            <p id={`${id}-mask-preset-reason`} className="text-[11px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
           )}
           {presetPending && presetVariant && presetProfile && (
-            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] text-amber-200">
+            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[11px] text-amber-200">
               <p>将写入独立提示词变体、契约哈希、参数档案与后处理版本；模型仍为 gpt-image-2，业务画幅跟随来源图片。</p>
               <dl className="space-y-0.5">
                 <div><dt>提示词变体</dt><dd className="break-all font-mono text-neutral-200">{presetVariant.variantId}</dd></div>
@@ -193,12 +193,12 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             className="aspect-4/3 w-full rounded-md border border-[#262626] object-contain"
           />
         ) : (
-          <div className="flex aspect-4/3 items-center justify-center rounded-md border border-dashed border-[#333] text-[10px] text-neutral-600">
+          <div className="flex aspect-4/3 items-center justify-center rounded-md border border-dashed border-[#333] text-[11px] text-neutral-600">
             连接需要局部修改的图片
           </div>
         )}
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">修改说明</span>
+          <span className="text-[11px] text-neutral-500">修改说明</span>
           <textarea
             ref={promptRef}
             value={data.prompt}
@@ -215,7 +215,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             className={`${inputClass} resize-none ${promptRequired ? "border-red-500" : ""}`}
           />
           {promptRequired && (
-            <span id={`${id}-prompt-required`} className="block text-[10px] text-red-400">
+            <span id={`${id}-prompt-required`} className="block text-[11px] text-red-400">
               请先填写需要如何修改选中区域
             </span>
           )}
@@ -228,7 +228,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         >
           {data.mask && !staleMask ? "编辑蒙版" : "绘制蒙版"}
         </button>
-        {staleMask && <p className="text-[10px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
+        {staleMask && <p className="text-[11px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
         <RunButton
           status={data.status}
           onClick={run}

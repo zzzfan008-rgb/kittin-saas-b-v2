@@ -70,7 +70,7 @@ export function LoginPage() {
             className="relative mt-7 w-full overflow-hidden rounded-[28px] border border-white/60 bg-[#f8f6f1]/72 p-7 shadow-[0_28px_80px_rgba(22,24,26,0.16),inset_0_1px_0_rgba(255,255,255,0.38)] backdrop-blur-xl backdrop-saturate-125 before:pointer-events-none before:absolute before:inset-x-7 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.95),transparent)] before:content-[''] min-[1440px]:p-8 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500 motion-safe:[animation-delay:160ms] motion-safe:[animation-fill-mode:both] motion-reduce:animate-none"
           >
             <div className="mb-6 min-[1440px]:mb-7">
-              <p className="text-[10px] font-semibold tracking-[0.26em] text-[#62666a] uppercase min-[1440px]:text-[11px]">Designer workspace</p>
+              <p className="text-[11px] font-semibold tracking-[0.26em] text-[#62666a] uppercase min-[1440px]:text-[11px]">Designer workspace</p>
               <h2 className="mt-2 text-xl font-semibold tracking-[-0.025em] text-[#151719] min-[1440px]:text-[1.375rem]">登录服装设计工作台</h2>
               <p className="mt-1.5 text-xs leading-5 text-[#62666a] min-[1440px]:text-[13px]">账号由管理员创建，同一账号仅允许一个设备在线。</p>
             </div>
@@ -146,7 +146,7 @@ export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
   return (
     <main className="flex h-full items-center justify-center bg-[#101214] px-4 text-neutral-200">
       <section className="w-full max-w-sm rounded-2xl border border-[#2b2d30] bg-[#17191c] p-7 shadow-2xl">
-        <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-[#9A7333]">GARMENT CANVAS</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.35em] text-[#9A7333]">GARMENT CANVAS</p>
         <h1 className="mt-3 text-xl font-semibold">账号已在其他设备登录</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-400">
           为保护项目数据，本设备已退出工作区。已绑定当前账号的本机草稿会保留；使用其他账号登录时会安全清除，无法确认归属的旧缓存也不会继续加载。

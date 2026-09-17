@@ -560,7 +560,7 @@ export function InitialDraftSyncNotice() {
     >
       <CardContent className="flex min-h-9 items-center justify-center gap-3 px-3 py-1.5 text-center">
         <CloudIcon aria-hidden="true" className="size-3.5 text-amber-300" />
-        <p className="text-[10px] text-amber-300">
+        <p className="text-[11px] text-amber-300">
           云端草稿同步失败；本机内容已保留。{syncError ?? ""}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={retrySync}>重试同步</Button>

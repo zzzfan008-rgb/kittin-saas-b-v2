@@ -132,7 +132,7 @@ export function TemplatesDock() {
         >
           <span className="text-[13px] leading-none">▦</span>
           模板库
-          <span className="text-[9px] text-neutral-500">{open ? "▲" : "▼"}</span>
+          <span className="text-[11px] text-neutral-500">{open ? "▲" : "▼"}</span>
         </button>
       </div>
 
@@ -151,14 +151,14 @@ export function TemplatesDock() {
                 ref={saveButtonRef}
                 type="button"
                 onClick={() => setSaving(true)}
-                className="rounded-md border border-gold/50 bg-gold/10 px-2.5 py-1 text-[10px] font-medium text-gold transition-colors hover:bg-gold/20"
+                className="rounded-md border border-gold/50 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold transition-colors hover:bg-gold/20"
               >
                 当前画布存为模板
               </button>
               <button
                 type="button"
                 onClick={closeAndRestoreFocus}
-                className="rounded-md border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-neutral-200"
+                className="rounded-md border border-[#333] px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200"
               >
                 关闭 Esc
               </button>
@@ -172,7 +172,7 @@ export function TemplatesDock() {
                 <button
                   type="button"
                   onClick={() => void load()}
-                  className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+                  className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[11px] text-neutral-400 hover:border-gold/50 hover:text-gold"
                 >
                   重试
                 </button>
@@ -219,7 +219,7 @@ export function TemplatesDock() {
                           {tpl.name}
                         </span>
                         {tpl.builtIn && (
-                          <span className={`shrink-0 rounded-sm border px-1 py-px text-[8px] ${
+                          <span className={`shrink-0 rounded-sm border px-1 py-px text-[11px] ${
                             unavailable
                               ? "border-amber-600/50 text-amber-400"
                               : "border-gold/40 text-gold"
@@ -229,12 +229,12 @@ export function TemplatesDock() {
                         )}
                       </div>
                       {tpl.description && (
-                        <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500">
+                        <p className="line-clamp-2 text-[11px] leading-relaxed text-neutral-500">
                           {tpl.description}
                         </p>
                       )}
                       {unavailable && (
-                        <p id={reasonId} className="text-[9px] leading-relaxed text-amber-500">
+                        <p id={reasonId} className="text-[11px] leading-relaxed text-amber-500">
                           {productPolicy.reason}
                         </p>
                       )}
@@ -244,7 +244,7 @@ export function TemplatesDock() {
                           disabled={unavailable}
                           title={productPolicy.reason}
                           onClick={() => applyTemplate(tpl)}
-                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[11px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {unavailable ? "首版暂不支持" : "从模板新建"}
                         </button>
@@ -252,7 +252,7 @@ export function TemplatesDock() {
                           <button
                             type="button"
                             onClick={() => void removeTemplate(tpl)}
-                            className="rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400"
+                            className="rounded-sm border border-[#262626] px-1.5 py-1 text-[11px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400"
                           >
                             删除
                           </button>
@@ -354,12 +354,12 @@ export function SaveTemplateForm({
       >
         <div>
           <DialogTitle className="text-sm font-medium text-[var(--gc-text)]">存为模板</DialogTitle>
-          <DialogDescription className="mt-1 text-[10px] text-[var(--gc-text-muted)]">
+          <DialogDescription className="mt-1 text-[11px] text-[var(--gc-text-muted)]">
             保存当前节点、连线和参数配置，供之后快速复用。
           </DialogDescription>
         </div>
         <label className="block space-y-1">
-          <span className="text-[10px] text-[var(--gc-text-muted)]">名称</span>
+          <span className="text-[11px] text-[var(--gc-text-muted)]">名称</span>
           <input
             ref={initialFocusRef}
             value={name}
@@ -369,7 +369,7 @@ export function SaveTemplateForm({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-[10px] text-[var(--gc-text-muted)]">描述</span>
+          <span className="text-[11px] text-[var(--gc-text-muted)]">描述</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -378,7 +378,7 @@ export function SaveTemplateForm({
             className="w-full resize-none rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
           />
         </label>
-        {error && <p role="alert" className="text-[10px] text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-[11px] text-red-400">{error}</p>}
         <DialogFooter className="border-[var(--gc-border)] bg-[var(--gc-panel-soft)]">
           <DialogClose render={<Button type="button" variant="outline" />}>
             取消

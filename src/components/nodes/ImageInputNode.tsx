@@ -149,7 +149,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
     <>
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <label className="nodrag block space-y-1">
-          <span className="flex items-center justify-between text-[9px] text-neutral-500">
+          <span className="flex items-center justify-between text-[11px] text-neutral-500">
             <span>新连线默认角色</span>
             {normalizedRole.roleNeedsConfirmation && (
               <span className="text-amber-400">待确认</span>
@@ -171,7 +171,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           >
             <SelectTrigger
               aria-label="新连线默认角色"
-              className="nodrag nopan h-7 w-full rounded-md border border-[#2a2a2a] bg-[#111] px-2 text-[10px] text-neutral-300 focus:border-gold"
+              className="nodrag nopan h-7 w-full rounded-md border border-[#2a2a2a] bg-[#111] px-2 text-[11px] text-neutral-300 focus:border-gold"
             >
               <SelectValue placeholder="请确认这张图的用途" />
             </SelectTrigger>
@@ -187,7 +187,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               </SelectPositioner>
             </SelectPortal>
           </Select>
-          <span className="block text-[8px] leading-relaxed text-neutral-600">
+          <span className="block text-[11px] leading-relaxed text-neutral-600">
             已存在的连线请在目标节点 Inspector 中逐条确认，不会随这里静默改变。
           </span>
         </label>
@@ -220,7 +220,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[#0f0f0f] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
+            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[#0f0f0f] py-6 text-center text-[11px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
               dragOver
                 ? "border-gold bg-gold/5 text-gold"
                 : "border-[#2a2a2a] text-neutral-500 hover:border-neutral-500"
@@ -236,21 +236,21 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           <button
             type="button"
             onClick={openAssetPicker}
-            className="nodrag w-full rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-gold/60 hover:text-gold"
+            className="nodrag w-full rounded-md border border-[#262626] py-1 text-[11px] text-neutral-400 hover:border-gold/60 hover:text-gold"
           >
             从素材库选择
           </button>
         )}
         {data.imageUrl && (
           <div className="nodrag flex gap-1.5">
-            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[#262626] py-1 text-center text-[10px] text-neutral-400 hover:border-neutral-500 hover:text-neutral-200 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
+            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[#262626] py-1 text-center text-[11px] text-neutral-400 hover:border-neutral-500 hover:text-neutral-200 focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
               {fileInput}
               <span className="pointer-events-none">重新上传</span>
             </div>
             <button
               type="button"
               onClick={openAssetPicker}
-              className="flex-1 rounded-md border border-[#262626] py-1 text-[10px] text-neutral-400 hover:border-gold/60 hover:text-gold"
+              className="flex-1 rounded-md border border-[#262626] py-1 text-[11px] text-neutral-400 hover:border-gold/60 hover:text-gold"
             >
               素材库
             </button>

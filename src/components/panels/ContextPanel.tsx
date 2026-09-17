@@ -58,14 +58,14 @@ export function ContextPanel({
       >
         <TabsTrigger
           value="properties"
-          className="flex items-center justify-center gap-1.5 rounded-sm text-[10px] font-medium text-[var(--gc-text-muted)] transition-colors hover:text-[var(--gc-text)] data-active:bg-[var(--gc-panel-hover)] data-active:text-[var(--gc-accent)]"
+          className="flex items-center justify-center gap-1.5 rounded-sm text-[11px] font-medium text-[var(--gc-text-muted)] transition-colors hover:text-[var(--gc-text)] data-active:bg-[var(--gc-panel-hover)] data-active:text-[var(--gc-accent)]"
         >
           <SlidersHorizontalIcon aria-hidden="true" className="size-3.5" />
           属性
         </TabsTrigger>
         <TabsTrigger
           value="results"
-          className="flex items-center justify-center gap-1.5 rounded-sm text-[10px] font-medium text-[var(--gc-text-muted)] transition-colors hover:text-[var(--gc-text)] data-active:bg-[var(--gc-panel-hover)] data-active:text-[var(--gc-accent)]"
+          className="flex items-center justify-center gap-1.5 rounded-sm text-[11px] font-medium text-[var(--gc-text-muted)] transition-colors hover:text-[var(--gc-text)] data-active:bg-[var(--gc-panel-hover)] data-active:text-[var(--gc-accent)]"
         >
           <HistoryIcon aria-hidden="true" className="size-3.5" />
           结果 / 记录
