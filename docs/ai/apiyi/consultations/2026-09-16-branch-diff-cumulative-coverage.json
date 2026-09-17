@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "createdAt": "2026-09-16T11:12:20.698Z",
+  "createdAt": "2026-09-17T05:20:55.342Z",
   "baseCommit": "de670dba0fca1dda70388202edad2b5a068c744e",
   "changeFingerprintSha256": "4e9f5264940e270272d2196d8059804b917692f4b6d715af711900c8bb6dcad6",
   "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
   "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
-  "query": "交付门禁 评审 证据 内联 只读 不变量 失败关闭",
+  "query": "交付门禁 评审 代码智能 生成 kind 死比较 清理 原生本地搭建",
   "affectedPaths": [
     "scripts/codex-gate.mjs",
     "server/routes/generate.ts",
@@ -13,62 +13,62 @@
   ],
   "sources": [
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/asset-first-workflow",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedance2/asset-first-workflow.md",
-      "pageLocalPath": "pages/api-capabilities/seedance2/asset-first-workflow.md",
-      "title": "素材优先：更快更稳的带图带视频生成",
-      "sha256": "ce57b738ac637b644ea6f945834d8f48dcd6809975e79af029a06e789152fa08"
+      "canonicalUrl": "https://docs.apiyi.com/faq/log-retention-policy",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/faq/log-retention-policy.md",
+      "pageLocalPath": "pages/faq/log-retention-policy.md",
+      "title": "调用日志保存多久？多久清理一次？",
+      "sha256": "08124783708b891993a61cec51b02ed798caa68e62c6a0de3741de055ac7b6c6"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/video-understanding",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/video-understanding.md",
-      "pageLocalPath": "pages/api-capabilities/video-understanding.md",
-      "title": "视频理解 API",
-      "sha256": "04fa8ce6ef1910a2934f6576c6ca7f34590a54ed28e41f08cf19fab87bf854a9"
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/log-retention-policy",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/zh-Hant/faq/log-retention-policy.md",
+      "pageLocalPath": "pages/zh-Hant/faq/log-retention-policy.md",
+      "title": "呼叫日誌儲存多久？多久清理一次？",
+      "sha256": "b1a4a754dc04e718e7438b669b47e84103835c8251e61c7b934555a5cd78a2fc"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/CLAUDE",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/CLAUDE.source.md",
-      "pageLocalPath": "pages/CLAUDE.source.md",
-      "title": "CLAUDE",
-      "sha256": "3297567336157ccc15cee071a5c2d16e682906161a87ae6c5e400b5be648c983"
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 图像生成 API - OpenAI 当下最新图片 API",
+      "sha256": "7f61739c18a3b163a725d69d5268521531af7df6234bc5b27c548a59d970a694"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/deepseek-v4-flash-vision/overview",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/deepseek-v4-flash-vision/overview.md",
-      "pageLocalPath": "pages/api-capabilities/deepseek-v4-flash-vision/overview.md",
-      "title": "DeepSeek V4 Flash Vision 图像理解",
-      "sha256": "0013d223c851f8ca297dc4a35b2a2f21cd74bc45ac13ec273f8cf09cb096936a"
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/nano-banana-image/overview.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-image/overview.md",
+      "title": "Nano Banana Pro 图片生成",
+      "sha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gemini/multimodal",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gemini/multimodal.md",
-      "pageLocalPath": "pages/api-capabilities/gemini/multimodal.md",
-      "title": "Gemini 多模态输入与代码执行",
-      "sha256": "f061dc49acbfec49c966ba1f3fa606d563a171eaf7dd46afcef473300f940d34"
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 视频生成",
+      "sha256": "6cfb74f5750a6aa90881bd2963c7cf823a9b7f5c95db29979394d465cb1da49f"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gemini/native",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gemini/native.md",
-      "pageLocalPath": "pages/api-capabilities/gemini/native.md",
-      "title": "Gemini 原生格式调用指南",
-      "sha256": "e181e988193d1871ae901f2cecdb5d24ccfbab1acbb19c843a716077affe3b11"
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2-All 画像生成/編集",
+      "sha256": "c04a46c5b91a168028f1a799a558285d4e100795b1ff43e4382e8245c660c13e"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/news/qwen-3-6-opensource-launch",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/news/qwen-3-6-opensource-launch.md",
-      "pageLocalPath": "pages/news/qwen-3-6-opensource-launch.md",
-      "title": "Qwen3.6 开源双模上线：API易官转托管 · 免租卡",
-      "sha256": "c51467bd1b17d97269603d51eeb788fbdda57e2ff5b537112c9787c67114aed6"
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2-VIP 画像生成/編集",
+      "sha256": "d0c32d560d2a83e2b57abb0c1350109f15ab9d63a085d0fd78f4e5df6e3f9924"
     },
     {
-      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gemini/web-search",
-      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/api-capabilities/gemini/web-search.md",
-      "pageLocalPath": "pages/api-capabilities/gemini/web-search.md",
-      "title": "Gemini API 联网搜索使用指南",
-      "sha256": "9338cb9b577219cc6eea59211e88732d9311f56799e770cd1f6584b119ac0655"
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-02T12-55-56.022Z-a90bb31d7f8c13df/pages/ja/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2 画像生成/編集",
+      "sha256": "1dae5d488968f7077821942bf8a12f0c4ace37ecbf7eee27217d18bc8ffdf746"
     }
   ],
-  "decisionSummary": "本分支相对 origin/main 的累计差异范围凭证（评审段证据内联 + 证据制品不变量 + 上一批 generate/runPlan 改动）。",
+  "decisionSummary": "本分支相对 origin/main 的累计差异凭证（3 个提交：恢复可编译的 main + 交付门禁迁离 Codex/GitNexus + 评审段只读姿态修复 + 原生本地搭建成为文档主路径）。\n（1）scripts/codex-gate.mjs —— 交付门禁重构：评审段由 codex exec 换成本机 Hermes Agent 子进程（隔离上下文、有限轮次与预算、哨兵 JSON、解析失败即 fail-closed）；外层硬杀在内层预算之上留有可配置宽限；代码智能证据段由 GitNexus 换成 ast-grep 结构规则 + dependency-cruiser 依赖与分层规则（巡航不到任何 TypeScript 模块即失败，避免假绿）；REVIEW_SCHEMA 的 gitnexus 字段更名为 code_analysis；不再向评审者交付任何需要打开的证据文件（schema/scope/packet 内联进 prompt），改以「门禁写出的证据制品必须逐字节不变」作为只读不变量。\n（2）server/routes/generate.ts 与（3）server/routes/runPlan.ts —— 各删除与类型联合无交集的字符串比较（原守卫中的 fabric-replace 分支）。fabric-replace 不是合法节点 kind：不在 src/types/workflow.ts 的 NodeKind 联合与运行时目录 NODE_SPECS 中（TypeScript 以 TS2367 证明该比较恒为 false），且 validateDirectGenerateRequest 已用 isDirectGenerateKind 在更早处拒绝未知 kind，该比较不可达；删除属行为等价的死代码清理，用于修复 main 上 8 个类型错误导致的无法编译与服务端启动即崩。新增 tests/generation-kind-contract.test.ts 固化「路由比较的 kind 必须来自 NODE_SPECS」。\n三者均不涉及 API易 provider、模型 ID/契约/参数、提示词变体、参考图角色与顺序、图像归一化、生成重试与超时、计费与未知结果处理，或评估与准入逻辑。sources 为就近检索的本地镜像页；本批没有适用的 API易 条款变更，本凭证不构成对外契约结论。",
   "unresolvedChoices": []
 }
