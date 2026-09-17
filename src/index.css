@@ -85,17 +85,6 @@ body {
   --gc-warn-text: #fbbf24;
 }
 
-/* ---- 全局 reduced-motion 兜底（audit M5；覆盖 keyframes 与 Tailwind 动画） ---- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
 /* ---- 深色滚动条 ---- */
 ::-webkit-scrollbar {
   width: 8px;
@@ -242,6 +231,31 @@ body {
 
 .btn-running-breathe {
   animation: develop-breathe 1.6s ease-in-out infinite;
+}
+
+/* ---- 减弱动态效果全局兜底 ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .develop-overlay .develop-gridlines,
+  .develop-overlay .develop-scanline,
+  .btn-running-breathe {
+    animation: none !important;
+  }
+
+  .react-flow__handle,
+  .react-flow__node:not(.dragging):hover .gc-node-card,
+  .react-flow__node:not(.dragging):hover .react-flow__handle,
+  [data-theme] .gc-node-library-card:hover {
+    transition: none !important;
+  }
 }
 
 /* ---- 主题：墨白（白色为主） ---- */
