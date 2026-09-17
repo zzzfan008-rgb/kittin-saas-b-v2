@@ -47,7 +47,6 @@ interface PromptReviewEntry {
   nodeKind: NodeKind;
   locale: PromptVariant["promptLocale"];
   promptSha256: `sha256:${string}`;
-  requiredRoles: readonly string[];
   templateName: string;
   checklist: readonly [
     "subject-task",
@@ -157,7 +156,6 @@ function promptReview(variant: PromptVariant): PromptReviewEntry {
       nodeKind: variant.nodeKind,
       locale: variant.promptLocale,
       promptSha256: sha256(variant.fullPrompt),
-      requiredRoles: variant.requiredRoles,
       templateName: "GPT Image 2 mask-local-edit contract",
       checklist: ["subject-task", "composition", "style-material", "text-label", "aspect-output", "negative-constraints"],
     };
@@ -169,7 +167,6 @@ function promptReview(variant: PromptVariant): PromptReviewEntry {
     nodeKind: variant.nodeKind,
     locale: variant.promptLocale,
     promptSha256: sha256(variant.fullPrompt),
-    requiredRoles: variant.requiredRoles,
     templateName: preset.templateName,
     checklist: ["subject-task", "composition", "style-material", "text-label", "aspect-output", "negative-constraints"],
   };

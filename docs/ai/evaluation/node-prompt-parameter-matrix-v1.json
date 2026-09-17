@@ -91,7 +91,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:68e4712be141f9ffc8fc8a8fcaa8f0a57323830688d3f2fbb32533b81662332c",
-          "requiredRoles": [],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -109,7 +108,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:fec9a6aa5ccee11261344cc8be38f31f31a6414a3d3cb4fcd98419af48a64bb3",
-          "requiredRoles": [],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -127,7 +125,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:6a92a96d553981af2e98744d18fcb7f748217b0b76ebf90a773171d4038b9d95",
-          "requiredRoles": [],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -325,7 +322,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:6902339a4657d428862b773a1ed322f77d432853bfc87d5f0db0179dc124823c",
-          "requiredRoles": [],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -343,7 +339,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:e2aca2be1e45ac77bfabf5c222e359fdc0003d11e0b0d95e2218fb15e0fa01d7",
-          "requiredRoles": [],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -361,7 +356,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:5393de42bbb5eb4bf305e7925488ffd5c110b25fc16a3d88b613e5fda12549ce",
-          "requiredRoles": [],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -539,7 +533,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:0f7a4afd6977a0b7149b8868a35f3b7fbf9fdc03fe8337f9ec5a83d302a29688",
-          "requiredRoles": [],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -557,7 +550,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:0b5db6fd1bee9dcd1422b41e5adf1f67973536c7e6202ce3098719e86a01bc74",
-          "requiredRoles": [],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -575,7 +567,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:638740751e2794da9d1f22fe904b2b4c2de061b394f7d94b46d20b6433cadc6b",
-          "requiredRoles": [],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -773,7 +764,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:984b08e0963b993c765afbb7ab9ea276eaf35f6996804e3c1d6db03875e0e381",
-          "requiredRoles": [],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -791,7 +781,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:8cd2d1e53b26fcdb2478427359891145ec343ee6dcffd1f0ec438e55fca69295",
-          "requiredRoles": [],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -809,7 +798,6 @@
           "nodeKind": "sketch-to-render",
           "locale": "zh-CN",
           "promptSha256": "sha256:ee2022aedd5c5f96c87d877189f4cc9d6210e032cbc14cbd1bbdb3e666319bc2",
-          "requiredRoles": [],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -1043,12 +1031,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:ef50e39cc527fc07fc58419b54f9ee72a0345a09cdf7bede7033b0db0a399d36",
-          "requiredRoles": [
-            "identity",
-            "pose_composition",
-            "garment_top",
-            "garment_bottom"
-          ],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -1066,9 +1048,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:0d62719fd4050393afe861fa9c5365acfdfc0ee472ee81d209e571493b1f8050",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -1086,9 +1065,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:b9e29671caa7ee7111e03a5e250d17b81c72d53d8faa146b6551f914fa1d722e",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -1249,12 +1225,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:bebace6086dad1ee74749bd7551404aee857f2725e00d4147e75a4f5a24521f3",
-          "requiredRoles": [
-            "identity",
-            "pose_composition",
-            "garment_top",
-            "garment_bottom"
-          ],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -1272,9 +1242,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:cd95572c2d6f931a413c44203d30fb3409eda353651373c35500d8dcdd67f73d",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -1292,9 +1259,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:ea73283967ad476b372f642e2cf7ac8a4b0070d4f6dcb77ecf2175243b3dfda9",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -1441,12 +1405,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:e7b40769427aa902e569bb18c339b8c1d04446365df92ceef17d8e80855fa2f9",
-          "requiredRoles": [
-            "identity",
-            "pose_composition",
-            "garment_top",
-            "garment_bottom"
-          ],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -1464,9 +1422,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:74aaed9a488f67e4a02e34cd1adb66eb25b35931f212a2453a698dd1885b2082",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -1484,9 +1439,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:afbd81ec18601e11c7c20b026c754939e354c22d2aada7bdd01b7dc5992d023a",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -1646,12 +1598,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:3f933e01fc15997518cb93a3bde61f2dbe085f3fc1a52f9a5780ab184a56618e",
-          "requiredRoles": [
-            "identity",
-            "pose_composition",
-            "garment_top",
-            "garment_bottom"
-          ],
           "templateName": "Realistic Photography / 写实摄影",
           "checklist": [
             "subject-task",
@@ -1669,9 +1615,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:bc5995714eeeb13870bbe5c1c2f973aeed55c80bdb8f0e7ed1c36beedd965646",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Product Commerce Visual / 商品商业视觉",
           "checklist": [
             "subject-task",
@@ -1689,9 +1632,6 @@
           "nodeKind": "ai-modify",
           "locale": "zh-CN",
           "promptSha256": "sha256:6ab01c01a93d9bb028ecf230f3b9440aa1d221d81ebea8f2c756a0d900328e44",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "Character Design Sheet / 角色设定表",
           "checklist": [
             "subject-task",
@@ -1864,9 +1804,6 @@
           "nodeKind": "mask-redraw",
           "locale": "zh-CN",
           "promptSha256": "sha256:920ce8fa929811ec24d889d94b5cbbf2c9cbf520676a2a3249c29d7e69359584",
-          "requiredRoles": [
-            "garment_full"
-          ],
           "templateName": "GPT Image 2 mask-local-edit contract",
           "checklist": [
             "subject-task",

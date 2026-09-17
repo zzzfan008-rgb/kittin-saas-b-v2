@@ -40,7 +40,6 @@ const aiTestVariant = requireGarmentPromptVariant({
 });
 // These tests exercise store concurrency and persistence after admission. Keep
 // the production catalog closed while modelling reviewed evidence in-process.
-(aiTestVariant as { requiredRoles?: unknown }).requiredRoles = [];
 promotePromptVariantForTest(aiTestVariant);
 const aiTestProfile = getModelParameterProfile(aiTestVariant.parameterProfileId)!;
 const aiTestParameters = materializeModelParameterProfile(aiTestProfile);

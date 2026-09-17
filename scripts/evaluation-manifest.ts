@@ -13,7 +13,6 @@ import { promptEvaluationReleaseVector } from "../src/lib/promptEvaluationReleas
 import { RECOMMENDATION_BASELINE_IMPLEMENTATION_STATUS } from "../src/lib/promptEvaluationReleaseRegistry";
 import { getModelParameterProfile } from "../src/types/modelParameterProfiles";
 import type {
-  EvaluationReferenceRoleProfileEntry,
   PromptEvaluationUnit,
   PromptEvaluationVersionVector,
 } from "../src/types/promptEvaluation";
@@ -122,18 +121,6 @@ function sha256(value: string | Buffer): `sha256:${string}` {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
 }
 
-function baseReferenceRoleProfile(
-  variant: PromptVariant,
-): readonly EvaluationReferenceRoleProfileEntry[] {
-  const profile: EvaluationReferenceRoleProfileEntry[] = variant.requiredRoles
-    .map((role, order) => ({ order, role }));
-  if (variant.mode === "mask-edit") {
-    profile.push({ order: profile.length, role: "generic" });
-    profile.push({ order: profile.length, role: "mask" });
-  }
-  return profile;
-}
-
 function currentPlanIdentity(): { version: string; sha256: `sha256:${string}` } {
   const raw = readFileSync(PLAN_PATH);
   const value = JSON.parse(raw.toString("utf8")) as { version?: unknown };
@@ -186,8 +173,7 @@ function stageRequestCaps(): EvaluationManifestStageRequestCap[] {
 
 function currentBaseUnits(): EvaluationManifestUnit[] {
   return GARMENT_PROMPT_VARIANTS.map((variant) => {
-    const referenceRoleProfile = baseReferenceRoleProfile(variant);
-    const target = currentEvaluationPromotionTarget(variant.variantId, referenceRoleProfile);
+    const target = currentEvaluationPromotionTarget(variant.variantId);
     const profile = getModelParameterProfile(variant.parameterProfileId);
     if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
     return {
@@ -195,7 +181,7 @@ function currentBaseUnits(): EvaluationManifestUnit[] {
       unit: target.unit,
       versions: target.versions,
       businessFrame: { ...profile.businessFrame },
-      releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant, referenceRoleProfile)),
+      releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant)),
     };
   });
 }
