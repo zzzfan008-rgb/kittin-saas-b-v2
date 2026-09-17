@@ -43,7 +43,10 @@ async function canAccessFile(id: string, req: Parameters<typeof requestUser>[0])
   // SQLite/旧版本导入会补 files 元数据；没有记录的物理文件只能是未完成写入或
   // 回收失败留下的孤儿，不能绕过账号 ACL 继续读取。
   if (!access) return "denied";
-  if (access.owner_id === null || access.shared) return "public";
+  // 仅显式 shared/global 素材公开；owner_id 为 NULL 且无显式共享的无主文件
+  // 是未知归属，fail-closed 一律拒绝（含 admin），不得默认公开。
+  if (access.shared) return "public";
+  if (access.owner_id === null) return "denied";
   if (access.owner_id === user.id || user.role === "admin") return "private";
   return "denied";
 }

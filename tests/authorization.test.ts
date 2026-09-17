@@ -651,6 +651,31 @@ await test("没有 files 元数据的物理孤儿文件拒绝所有账号读取"
   deleteStoredImage(orphanId);
 });
 
+await test("owner_id 为 NULL 且无显式共享素材的文件拒绝所有账号读取", async () => {
+  const unownedId = "unowned-orphan.png";
+  await query(`
+    INSERT INTO files (id, owner_id, source_type, created_at)
+    VALUES ($1, NULL, 'legacy', $2)
+  `, [unownedId, now]);
+  assert.equal(
+    (await queryOne<{ owner_id: string | null }>(
+      "SELECT owner_id FROM files WHERE id = $1",
+      [unownedId],
+    ))?.owner_id,
+    null,
+  );
+  writeTestPng(unownedId);
+  try {
+    for (const actor of ["owner", "other", "admin"] as const) {
+      assert.equal((await request(`/files/${unownedId}`, actor)).status, 403);
+      assert.equal((await request(`/files/${unownedId}/thumbnail`, actor)).status, 403);
+    }
+  } finally {
+    await query("DELETE FROM files WHERE id = $1", [unownedId]);
+    deleteStoredImage(unownedId);
+  }
+});
+
 await test("管理员创建通用素材时解除底层文件的个人归属", async () => {
   const upload = await request("/files", "admin", {
     method: "POST",
