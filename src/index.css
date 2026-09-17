@@ -8,8 +8,10 @@
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafaf8;
-  --color-gold: #c9a66b;
-  --color-golddeep: #896932;
+  /* gold/golddeep 为 Tailwind 品牌工具类槽位，运行时跟随当前主题 accent；
+     此处默认值仅作未加载主题时的回退（与曜黑 #FFC940 一致） */
+  --color-gold: #FFC940;
+  --color-golddeep: #8a6d00;
 }
 
 /*
@@ -73,9 +75,9 @@ body {
   --gc-font-label: 11px;
   --gc-font-meta-en: 10px;
   --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
-  /* ---- 状态色 8 槽位（tokens.css §3 唯一事实源；全主题共享，一色一义） ---- */
+  /* ---- 状态色 8 槽位（默认=深底亮色版；浅底主题在各自 data-theme 段覆盖） ---- */
   --gc-dot-status: 10px;
-  --gc-status-queued: #eab308;
+  --gc-status-queued: #2dd4bf;
   --gc-status-running: #60a5fa;
   --gc-status-retry: #fb923c;
   --gc-status-success: #34d399;
@@ -258,63 +260,45 @@ body {
   }
 }
 
-/* ---- 主题：曜黑（活力黄）· 工具类反查段 ---- */
+/* ---- 主题：简白·Apple（工具类反查段，仅保留存活选择器） ---- */
 [data-theme="white"] body {
-  background-color: #16181d !important;
-  color: #e8eaee;
+  background-color: #f5f5f7 !important;
+  color: #1d1d1f;
 }
 [data-theme="white"] .bg-ink,
-[data-theme="white"] .react-flow { background-color: #16181d !important; }
-[data-theme="white"] .bg-\[\#141414\] { background-color: #21242a !important; }
-[data-theme="white"] .bg-\[\#1a1a1a\] { background-color: #2b2f36 !important; }
-[data-theme="white"] .bg-\[\#1d1d1f\] { background-color: #2b2f36 !important; }
-[data-theme="white"] .bg-\[\#0f0f0f\] { background-color: #1e2126 !important; }
-[data-theme="white"] .bg-\[\#3a3226\] { background-color: #2b2f36 !important; }
-[data-theme="white"] .border-\[\#262626\] { border-color: #33373f !important; }
-[data-theme="white"] .border-\[\#333\] { border-color: #454a53 !important; }
-[data-theme="white"] .text-neutral-200 { color: #e8eaee !important; }
-[data-theme="white"] .text-neutral-300 { color: #c6cbd2 !important; }
-[data-theme="white"] .text-neutral-400 { color: #b0b6bf !important; }
-[data-theme="white"] .text-neutral-500 { color: #9ba1a9 !important; }
-[data-theme="white"] .text-neutral-600 { color: #858b94 !important; }
-[data-theme="white"] .text-neutral-700 { color: #6f757e !important; }
-[data-theme="white"] .text-gold { color: #FFC940 !important; }
-[data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #6f757e !important; }
-[data-theme="white"] .shadow-xl { box-shadow: 0 0 0 0.5px rgba(0,0,0,.5), 0 12px 28px rgba(0, 0, 0, 0.5) !important; }
-[data-theme="white"] .react-flow__minimap { border-color: #33373f !important; }
+[data-theme="white"] .react-flow { background-color: #f5f5f7 !important; }
+[data-theme="white"] .text-neutral-200 { color: #1d1d1f !important; }
+[data-theme="white"] .text-neutral-300 { color: #3a3a3c !important; }
+[data-theme="white"] .text-neutral-400 { color: #48484a !important; }
+[data-theme="white"] .text-neutral-500 { color: #6e6e73 !important; }
+[data-theme="white"] .text-neutral-600 { color: #86868b !important; }
+[data-theme="white"] .text-gold { color: #0071e3 !important; }
+[data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #98989d !important; }
+[data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
+[data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
 [data-theme="white"] .react-flow__handle {
   border-color: #ffffff;
   box-shadow:
-    0 0 0 1px rgba(255, 201, 64, 0.75),
-    0 3px 7px rgba(0, 0, 0, 0.5),
-    inset -2px -3px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 113, 227, 0.62),
+    0 3px 7px rgba(29, 29, 31, 0.2),
+    inset -2px -3px 4px rgba(0, 74, 153, 0.28),
     inset 2px 2px 3px rgba(255, 255, 255, 0.75);
 }
-[data-theme="white"] ::-webkit-scrollbar-thumb { background: #454a53; }
-[data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #565c66; }
-[data-theme="white"] .bg-\[\#141414\]\/90 { background-color: rgba(33,36,42,0.92) !important; }
-[data-theme="white"] .bg-\[\#161616\] { background-color: #21242a !important; }
-[data-theme="white"] .hover\:bg-\[\#222\]:hover { background-color: #2b2f36 !important; }
+[data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
+[data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
 
-/* ---- 主题：护眼绿 v3（薄荷翡翠）· 工具类反查段 ---- */
+/* ---- 主题：护眼绿 v3（薄荷翡翠）· 工具类反查段（仅保留存活选择器） ---- */
 [data-theme="eye"] body {
   background-color: #E9F1EA !important;
   color: #123B2B;
 }
 [data-theme="eye"] .bg-ink,
 [data-theme="eye"] .react-flow { background-color: #E9F1EA !important; }
-[data-theme="eye"] .bg-\[\#141414\] { background-color: #ffffff !important; }
-[data-theme="eye"] .bg-\[\#1a1a1a\] { background-color: #DCE9DD !important; }
-[data-theme="eye"] .bg-\[\#0f0f0f\] { background-color: #f0f6f1 !important; }
-[data-theme="eye"] .bg-\[\#3a3226\] { background-color: #DCE9DD !important; }
-[data-theme="eye"] .border-\[\#262626\] { border-color: #c9dccc !important; }
-[data-theme="eye"] .border-\[\#333\] { border-color: #a8c2ac !important; }
 [data-theme="eye"] .text-neutral-200 { color: #123B2B !important; }
 [data-theme="eye"] .text-neutral-300 { color: #2c5443 !important; }
 [data-theme="eye"] .text-neutral-400 { color: #47685A !important; }
 [data-theme="eye"] .text-neutral-500 { color: #557a68 !important; }
 [data-theme="eye"] .text-neutral-600 { color: #6d8d7c !important; }
-[data-theme="eye"] .text-neutral-700 { color: #85a291 !important; }
 [data-theme="eye"] .text-gold { color: #0B7A43 !important; }
 [data-theme="eye"] .placeholder\:text-neutral-600::placeholder { color: #85a291 !important; }
 [data-theme="eye"] .react-flow__minimap { border-color: #c9dccc !important; }
@@ -328,9 +312,6 @@ body {
 }
 [data-theme="eye"] ::-webkit-scrollbar-thumb { background: #a8c2ac; }
 [data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #8fb096; }
-[data-theme="eye"] .bg-\[\#141414\]\/90 { background-color: rgba(255,255,255,0.92) !important; }
-[data-theme="eye"] .bg-\[\#161616\] { background-color: #ffffff !important; }
-[data-theme="eye"] .hover\:bg-\[\#222\]:hover { background-color: #DCE9DD !important; }
 
 /* ---- 节点语义主题：画布节点与节点库共用，和周边面板颜色解耦 ---- */
 :root,
@@ -374,6 +355,10 @@ body {
   --gc-kind-mask-redraw: #e05252;
   --gc-kind-result: #6e6e6e;
 }
+/* 曜黑章 gold 工具类跟随活力黄（与 white/eye 反查段同构，消除双金色并存） */
+[data-theme="current"] .text-gold { color: #FFC940 !important; }
+[data-theme="current"] .border-gold { border-color: #FFC940 !important; }
+[data-theme="current"] .bg-gold { background-color: #FFC940 !important; }
 
 [data-theme="white"] {
   /* 简白·Apple：DESIGN.md 2026-09-18 定稿 */
@@ -390,6 +375,15 @@ body {
   --gc-accent-cta-ink: #ffffff;
   --gc-accent-deep: #0066cc;
   --gc-primary-foreground: #ffffff;
+  /* 浅底状态色覆盖（DESIGN.md st-*-light） */
+  --gc-status-queued: #c79002;
+  --gc-status-running: #3b82f6;
+  --gc-status-retry: #ea8a00;
+  --gc-status-success: #1d7a3e;
+  --gc-status-error: #d30000;
+  --gc-status-unknown: #6e54b3;
+  --gc-status-idle: #8e8e93;
+  --gc-warn-text: #b45309;
   --gc-node-main: #ffffff;
   --gc-node-header: #ffffff;
   --gc-node-inner: #f5f5f7;
@@ -421,6 +415,15 @@ body {
   --gc-accent-cta-ink: #ffffff;
   --gc-accent-deep: #0B7A43;
   --gc-primary-foreground: #ffffff;
+  /* 浅底状态色覆盖（DESIGN.md st-*-light 系） */
+  --gc-status-queued: #a1801a;
+  --gc-status-running: #2f6db5;
+  --gc-status-retry: #c07a10;
+  --gc-status-success: #1d7a3e;
+  --gc-status-error: #c23a3a;
+  --gc-status-unknown: #5e50a8;
+  --gc-status-idle: #6d8d7c;
+  --gc-warn-text: #92600a;
   --gc-node-main: #ffffff;
   --gc-node-header: #ffffff;
   --gc-node-inner: #f0f6f1;

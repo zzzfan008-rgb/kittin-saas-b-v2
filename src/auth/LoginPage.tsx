@@ -144,9 +144,9 @@ export function LoginPage() {
 
 export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
   return (
-    <main className="flex h-full items-center justify-center bg-[#101214] px-4 text-neutral-200">
-      <section className="w-full max-w-sm rounded-2xl border border-[#2b2d30] bg-[#17191c] p-7 shadow-2xl">
-        <p className="text-[11px] font-medium uppercase tracking-[0.35em] text-[#9A7333]">GARMENT CANVAS</p>
+    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-neutral-200">
+      <section className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
+        <p className="text-[11px] font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">GARMENT CANVAS</p>
         <h1 className="mt-3 text-xl font-semibold">账号已在其他设备登录</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-400">
           为保护项目数据，本设备已退出工作区。已绑定当前账号的本机草稿会保留；使用其他账号登录时会安全清除，无法确认归属的旧缓存也不会继续加载。
@@ -154,7 +154,7 @@ export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
         <button
           type="button"
           onClick={onContinue}
-          className="mt-5 w-full rounded-lg bg-[#9A7333] py-2.5 text-sm font-medium text-white hover:bg-[#ae8440]"
+          className="mt-5 w-full rounded-lg bg-[var(--gc-accent)] py-2.5 text-sm font-medium text-white hover:opacity-90"
         >
           返回登录页
         </button>
@@ -199,8 +199,8 @@ export function ChangePasswordPage() {
   };
 
   return (
-    <main className="flex h-full items-center justify-center bg-[#101214] px-4 text-neutral-200">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-[#2b2d30] bg-[#17191c] p-7 shadow-2xl">
+    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-neutral-200">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
         <h1 className="text-xl font-semibold">首次登录，请修改密码</h1>
         <p className="mt-1 text-xs text-neutral-500">新密码至少 10 位，并同时包含字母和数字。</p>
         {[
@@ -211,12 +211,12 @@ export function ChangePasswordPage() {
           <label key={label as string} className="mt-4 block space-y-1.5">
             <span className="text-xs text-neutral-400">{label as string}</span>
             <input type="password" value={value as string} onChange={(e) => (setter as (v: string) => void)(e.target.value)}
-              autoComplete={auto as string} className="w-full rounded-lg border border-[#34363a] bg-[#0f1113] px-3 py-2.5 text-sm outline-hidden focus:border-[#9A7333]" />
+              autoComplete={auto as string} className="w-full rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] px-3 py-2.5 text-sm outline-hidden focus:border-[var(--gc-accent)]" />
           </label>
         ))}
         {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
         <button type="submit" disabled={submitting || !currentPassword || !newPassword || !confirm}
-          className="mt-5 w-full rounded-lg bg-[#9A7333] py-2.5 text-sm font-medium text-white disabled:opacity-50">
+          className="mt-5 w-full rounded-lg bg-[var(--gc-accent)] py-2.5 text-sm font-medium text-white disabled:opacity-50">
           {submitting ? "保存中…" : "修改密码并继续"}
         </button>
       </form>

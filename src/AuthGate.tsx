@@ -8,7 +8,7 @@ const AuthenticatedWorkspace = lazy(() => import("./App"));
 
 function FullScreenStatus({ children }: { children: string }) {
   return (
-    <div className="flex h-full items-center justify-center bg-[#101214] text-xs text-neutral-500">
+    <div className="flex h-full items-center justify-center bg-[var(--gc-shell)] text-xs text-neutral-500">
       {children}
     </div>
   );
