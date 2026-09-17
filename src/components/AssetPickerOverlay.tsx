@@ -92,21 +92,21 @@ export function AssetPickerOverlay({
       onClick={() => onRequestChange(null)}
     >
       <div
-        className="flex max-h-[80vh] w-[min(680px,90vw)] flex-col rounded-lg border border-[#262626] bg-[#141414]"
+        className="flex max-h-[80vh] w-[min(680px,90vw)] flex-col rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#262626] px-4 py-3">
-          <span className="text-xs font-medium tracking-widest text-neutral-400">从素材库选择</span>
+        <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
+          <span className="text-xs font-medium tracking-widest text-[var(--gc-text-muted)]">从素材库选择</span>
           <button
             type="button"
             onClick={() => onRequestChange(null)}
-            className="rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-500 hover:border-gold/50 hover:text-gold"
+            className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
           >
             关闭
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-[#262626] px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-[var(--gc-border)] px-4 py-2.5">
           <div className="flex gap-1">
             {CATEGORY_TABS.map(([key, label]) => (
               <button
@@ -116,7 +116,7 @@ export function AssetPickerOverlay({
                 className={`rounded-sm border px-2 py-1 text-[10px] transition-colors ${
                   category === key
                     ? "border-gold/60 text-gold"
-                    : "border-[#262626] text-neutral-500 hover:text-neutral-300"
+                    : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
                 }`}
               >
                 {label}
@@ -128,18 +128,18 @@ export function AssetPickerOverlay({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索素材名称"
-            className="ml-auto w-44 rounded-sm border border-[#262626] bg-[#0f0f0f] px-2 py-1 text-[10px] text-neutral-200 placeholder:text-neutral-600 focus:border-gold/60 focus:outline-hidden"
+            className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-[10px] text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
           />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
           {error && (
             <div className="py-6 text-center">
-              <p className="text-[10px] text-neutral-600">素材服务暂不可用（{error}）</p>
+              <p className="text-[10px] text-[var(--gc-text-muted)]">素材服务暂不可用（{error}）</p>
               <button
                 type="button"
                 onClick={() => void load(0)}
-                className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+                className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
               >
                 重试
               </button>
@@ -161,16 +161,16 @@ export function AssetPickerOverlay({
                   type="button"
                   onClick={() => pick(asset)}
                   title={asset.name}
-                  className="overflow-hidden rounded-md border border-[#262626] bg-[#1a1a1a] text-left transition-colors hover:border-gold/60"
+                  className="overflow-hidden rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-hover)] text-left transition-colors hover:border-gold/60"
                 >
                   <img
                     src={asset.thumbnail ?? thumbnailImageUrl(asset.image)}
                     alt={asset.name}
                     loading="lazy"
                     decoding="async"
-                    className="aspect-square w-full bg-[#0f0f0f] object-cover"
+                    className="aspect-square w-full bg-[var(--gc-control)] object-cover"
                   />
-                  <div className="truncate px-1.5 py-1 text-[10px] text-neutral-300">{asset.name}</div>
+                  <div className="truncate px-1.5 py-1 text-[10px] text-[var(--gc-text)]">{asset.name}</div>
                 </button>
               ))}
             </div>
@@ -180,7 +180,7 @@ export function AssetPickerOverlay({
               type="button"
               onClick={() => void load(assets.length)}
               disabled={loading}
-              className="mt-2.5 w-full rounded-md border border-dashed border-[#262626] px-3 py-2 text-[10px] text-neutral-500 hover:border-gold/60 hover:text-gold disabled:opacity-50"
+              className="mt-2.5 w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-50"
             >
               {loading ? "加载中…" : "加载更多素材"}
             </button>

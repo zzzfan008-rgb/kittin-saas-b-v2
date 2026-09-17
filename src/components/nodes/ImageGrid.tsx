@@ -18,7 +18,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
 
   if (safeImages.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-[#2a2a2a] py-4 text-center text-[10px] text-neutral-600">
+      <div className="rounded-md border border-dashed border-[var(--gc-node-border)] py-4 text-center text-[10px] text-[var(--gc-node-muted)]">
         {empty}
       </div>
     );
@@ -29,7 +29,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
       {safeImages.map((url, i) => (
         <div
           key={`${url}-${i}`}
-          className="nodrag group overflow-hidden rounded-md border border-[#262626] bg-[#0f0f0f]"
+          className="nodrag group overflow-hidden rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)]"
         >
           <button
             type="button"

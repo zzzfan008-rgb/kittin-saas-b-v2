@@ -616,7 +616,7 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
           loading="lazy"
           decoding="async"
           alt={record.nodeLabel}
-          className="w-full rounded-md border border-[#262626] object-cover"
+          className="w-full rounded-md border border-[var(--gc-border)] object-cover"
         />
       )}
 
@@ -656,7 +656,7 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
       {record.prompt && (
         <div className="space-y-1">
           <span className="text-[10px] text-neutral-500">提示词</span>
-          <p className="rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-[10px] leading-relaxed text-neutral-400">
+          <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--gc-text-muted)]">
             {record.prompt}
           </p>
         </div>
@@ -687,11 +687,11 @@ export function InspectorPanel({ className, view = "auto" }: InspectorPanelProps
   return (
     <aside
       className={cn(
-        "gc-panel flex w-64 shrink-0 flex-col border-l border-[#262626] bg-[#141414]",
+        "gc-panel flex w-64 shrink-0 flex-col border-l border-[var(--gc-border)] bg-[var(--gc-panel)]",
         className,
       )}
     >
-      <div className="border-b border-[#262626] px-3 py-2.5 text-[10px] font-medium uppercase tracking-widest text-neutral-500">
+      <div className="border-b border-[var(--gc-border)] px-3 py-2.5 text-[10px] font-medium uppercase tracking-widest text-[var(--gc-text-muted)]">
         {showResult ? "生成记录" : "属性"}
       </div>
       <div className="flex-1 overflow-y-auto p-3">

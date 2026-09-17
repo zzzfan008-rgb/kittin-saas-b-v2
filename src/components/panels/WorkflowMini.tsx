@@ -1,16 +1,16 @@
 import type { NodeKind } from "@/types/workflow";
 
-/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色） */
+/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色，值定义在 tokens.css §5 --gc-kind-*） */
 const KIND_COLOR: Record<NodeKind, string> = {
-  "image-input": "#4A90D9",
-  "sketch-to-render": "#C9A66B",
-  "ai-modify": "#9B72CF",
-  "fabric-recolor": "#D9707E",
-  upscale: "#4FA37C",
-  "print-extract": "#E8935A",
-  "print-mutate": "#5AA8E8",
-  "mask-redraw": "#E05252",
-  result: "#6E6E6E",
+  "image-input": "var(--gc-kind-image-input)",
+  "sketch-to-render": "var(--gc-kind-sketch-to-render)",
+  "ai-modify": "var(--gc-kind-ai-modify)",
+  "fabric-recolor": "var(--gc-kind-fabric-recolor)",
+  upscale: "var(--gc-kind-upscale)",
+  "print-extract": "var(--gc-kind-print-extract)",
+  "print-mutate": "var(--gc-kind-print-mutate)",
+  "mask-redraw": "var(--gc-kind-mask-redraw)",
+  result: "var(--gc-kind-result)",
 };
 
 interface MiniNode {
@@ -37,7 +37,7 @@ export function WorkflowMini({
   const nodes = flow.nodes as MiniNode[];
   const edges = flow.edges as MiniEdge[];
   if (nodes.length === 0) {
-    return <div className={className} style={{ background: "#0f0f0f" }} />;
+    return <div className={className} style={{ background: "var(--gc-control)" }} />;
   }
 
   // 节点在原画布上的包围盒
@@ -73,7 +73,7 @@ export function WorkflowMini({
   const blockH = Math.max(NODE_H * scale * 0.6, 5);
 
   return (
-    <svg viewBox={`0 0 ${VW} ${VH}`} className={className} style={{ background: "#0f0f0f" }}>
+    <svg viewBox={`0 0 ${VW} ${VH}`} className={className} style={{ background: "var(--gc-control)" }}>
       {edges.map((e, i) => {
         const s = center.get(e.source);
         const t = center.get(e.target);
@@ -84,7 +84,7 @@ export function WorkflowMini({
             key={i}
             d={`M ${s.x} ${s.y} C ${midX} ${s.y}, ${midX} ${t.y}, ${t.x} ${t.y}`}
             fill="none"
-            stroke="#4b4b4b"
+            stroke="var(--gc-border-strong)"
             strokeWidth={0.9}
           />
         );
@@ -100,7 +100,7 @@ export function WorkflowMini({
             width={blockW}
             height={blockH}
             rx={1.6}
-            fill={KIND_COLOR[kind] ?? "#6E6E6E"}
+            fill={KIND_COLOR[kind] ?? "var(--gc-kind-result)"}
             opacity={0.9}
           />
         );

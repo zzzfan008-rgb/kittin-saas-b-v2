@@ -126,8 +126,8 @@ export function TemplatesDock() {
           aria-expanded={open}
           className={`pointer-events-auto flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[11px] font-medium shadow-lg shadow-black/40 backdrop-blur-sm transition-colors ${
             open
-              ? "border-gold bg-[#1a1a1a] text-gold"
-              : "border-[#333] bg-[#141414]/90 text-neutral-300 hover:border-gold/60 hover:text-gold"
+              ? "border-gold bg-[var(--gc-panel-hover)] text-gold"
+              : "border-[var(--gc-border)] bg-[var(--gc-panel)]/90 text-[var(--gc-text)] hover:border-gold/60 hover:text-gold"
           }`}
         >
           <span className="text-[13px] leading-none">▦</span>
@@ -142,9 +142,9 @@ export function TemplatesDock() {
           id={TEMPLATES_PANEL_ID}
           role="region"
           aria-label="工作流模板"
-          className="gc-panel pointer-events-auto mx-auto mt-2 w-full max-w-[660px] rounded-xl border border-[#333] bg-[#141414] shadow-2xl shadow-black/60"
+          className="gc-panel pointer-events-auto mx-auto mt-2 w-full max-w-[660px] rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] shadow-2xl shadow-black/60"
         >
-          <div className="flex items-center justify-between border-b border-[#262626] px-4 py-2.5">
+          <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-2.5">
             <span className="text-xs font-medium text-neutral-200">工作流模板</span>
             <div className="flex items-center gap-2">
               <button
@@ -158,7 +158,7 @@ export function TemplatesDock() {
               <button
                 type="button"
                 onClick={closeAndRestoreFocus}
-                className="rounded-md border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-neutral-200"
+                className="rounded-md border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
               >
                 关闭 Esc
               </button>
@@ -172,7 +172,7 @@ export function TemplatesDock() {
                 <button
                   type="button"
                   onClick={() => void load()}
-                  className="mt-2 rounded-sm border border-[#262626] px-2 py-1 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold"
+                  className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
                 >
                   重试
                 </button>
@@ -191,7 +191,7 @@ export function TemplatesDock() {
                   return (
                     <div
                     key={tpl.id}
-                    className="group flex flex-col overflow-hidden rounded-lg border border-[#262626] bg-[#1a1a1a] transition-colors hover:border-gold/50"
+                    className="group flex flex-col overflow-hidden rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel-hover)] transition-colors hover:border-gold/50"
                   >
                     <button
                       type="button"
@@ -244,7 +244,7 @@ export function TemplatesDock() {
                           disabled={unavailable}
                           title={productPolicy.reason}
                           onClick={() => applyTemplate(tpl)}
-                          className="flex-1 rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-300 transition-colors hover:border-gold/60 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex-1 rounded-sm border border-[var(--gc-border)] px-1.5 py-1 text-[10px] text-[var(--gc-text)] transition-colors hover:border-gold/60 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {unavailable ? "首版暂不支持" : "从模板新建"}
                         </button>
@@ -252,7 +252,7 @@ export function TemplatesDock() {
                           <button
                             type="button"
                             onClick={() => void removeTemplate(tpl)}
-                            className="rounded-sm border border-[#262626] px-1.5 py-1 text-[10px] text-neutral-500 transition-colors hover:border-red-900 hover:text-red-400"
+                            className="rounded-sm border border-[var(--gc-border)] px-1.5 py-1 text-[10px] text-[var(--gc-text-muted)] transition-colors hover:border-red-900 hover:text-red-400"
                           >
                             删除
                           </button>

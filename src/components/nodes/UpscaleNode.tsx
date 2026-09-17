@@ -35,7 +35,7 @@ export function UpscaleNode({ id, data, selected }: NodeProps<Node<UpscaleNodeDa
                   className={`nodrag rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     active
                       ? "border-gold bg-gold/10 text-gold"
-                      : "border-[#262626] bg-[#0f0f0f] text-neutral-400 hover:border-gold/50"
+                      : "border-[var(--gc-node-border)] bg-[var(--gc-control)] text-[var(--gc-text-muted)] hover:border-gold/50"
                   }`}
                 >
                   {label}

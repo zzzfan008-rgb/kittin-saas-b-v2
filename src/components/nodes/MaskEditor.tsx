@@ -314,8 +314,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-100 flex flex-col bg-[#0b0b0b]">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[#262626] px-4">
+    <div className="fixed inset-0 z-100 flex flex-col bg-[var(--gc-shell)]">
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--gc-border)] px-4">
         <strong className="text-sm font-medium text-neutral-100">局部修改</strong>
         <span className="text-[10px] text-neutral-500">GPT Image 2</span>
         <div className="ml-auto flex items-center gap-1.5">
@@ -323,13 +323,13 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
           <ToolbarButton label="重做" disabled={saving || !redoStack.length} onClick={redo} />
           <ToolbarButton label="清空" disabled={saving} onClick={clearMask} />
           <ToolbarButton label="反选" disabled={saving} onClick={invertMask} />
-          <button type="button" onClick={onClose} disabled={saving} className="ml-2 rounded-md border border-[#333] px-3 py-1.5 text-xs text-neutral-300 hover:border-neutral-500 disabled:opacity-40">
+          <button type="button" onClick={onClose} disabled={saving} className="ml-2 rounded-md border border-[var(--gc-border)] px-3 py-1.5 text-xs text-[var(--gc-text)] hover:border-[var(--gc-text-muted)] disabled:opacity-40">
             关闭
           </button>
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#101010] p-4">
+      <main className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[var(--gc-canvas)] p-4">
         <div className="relative inline-flex max-h-full max-w-full shadow-2xl shadow-black">
           <img
             ref={imageRef}
@@ -353,8 +353,8 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
         </div>
       </main>
 
-      <footer className="flex min-h-16 shrink-0 items-center gap-4 border-t border-[#262626] px-4 py-2">
-        <div className="flex rounded-md border border-[#333] p-0.5">
+      <footer className="flex min-h-16 shrink-0 items-center gap-4 border-t border-[var(--gc-border)] px-4 py-2">
+        <div className="flex rounded-md border border-[var(--gc-border)] p-0.5">
           <ModeButton active={mode === "edit"} label="涂抹修改区" disabled={saving} onClick={() => setMode("edit")} />
           <ModeButton active={mode === "preserve"} label="恢复保留区" disabled={saving} onClick={() => setMode("preserve")} />
         </div>
@@ -385,7 +385,7 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
 
 function ToolbarButton({ label, onClick, disabled = false }: { label: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="rounded-md border border-[#333] px-2.5 py-1.5 text-[10px] text-neutral-400 hover:border-gold/50 hover:text-gold disabled:opacity-30">
+    <button type="button" onClick={onClick} disabled={disabled} className="rounded-md border border-[var(--gc-border)] px-2.5 py-1.5 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold disabled:opacity-30">
       {label}
     </button>
   );

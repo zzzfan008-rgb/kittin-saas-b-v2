@@ -50,7 +50,7 @@ export function CompareOverlay({
         <button
           type="button"
           onClick={close}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#3a3a3a] text-sm text-neutral-400 transition-colors hover:border-gold hover:text-gold"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--gc-border)] text-sm text-[var(--gc-text-muted)] transition-colors hover:border-gold hover:text-gold"
           title="关闭（Esc）"
         >
           ✕
@@ -60,16 +60,16 @@ export function CompareOverlay({
         {items.map((r) => (
           <div
             key={r.id}
-            className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#262626] bg-[#141414]"
+            className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)]"
           >
-            <div className="flex min-h-0 flex-1 items-center justify-center bg-[#0f0f0f] p-2">
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-[var(--gc-control)] p-2">
               <img
                 src={r.image}
                 alt={r.nodeLabel}
                 className="max-h-full max-w-full object-contain"
               />
             </div>
-            <div className="shrink-0 space-y-1 border-t border-[#262626] px-3 py-2.5">
+            <div className="shrink-0 space-y-1 border-t border-[var(--gc-border)] px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-xs font-medium text-neutral-200">
                   {r.nodeLabel}
