@@ -13,6 +13,7 @@ import {
   type PromptRunGraphNode,
 } from "@/lib/promptRunAdmission";
 import {
+  isReferenceRole,
   resolveReferenceEdgeData,
   type ReferenceRole,
 } from "@/types/workflow";
@@ -69,8 +70,9 @@ export function promptRunBrowserReferencesFromGraph(
         ...(edgeId ? { edgeId } : {}),
         sourceNodeId: edge.source,
         sourceLabel: source?.data.label ?? edge.source,
-        role: role.role,
-        roleNeedsConfirmation: role.roleNeedsConfirmation,
+        // TODO(R-02/R-03): 移除角色后删除此守卫
+        role: isReferenceRole(role.role) ? role.role : "generic",
+        roleNeedsConfirmation: role.roleNeedsConfirmation !== false,
         ...(imageUrl ? { imageUrl } : {}),
         available,
         ...(available ? {} : {

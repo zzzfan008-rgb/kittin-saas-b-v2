@@ -13,6 +13,7 @@ import {
   type ImageGenRequest,
   type NodeKind,
   type ReferenceImageSource,
+  type ReferenceRole,
 } from "../../src/types/workflow";
 import { postProcessGeneratedOutputImages } from "../engine/runner";
 import { EXACT_ASPECT_DIMENSIONS } from "../lib/imagePostProcessing";
@@ -309,7 +310,8 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   };
   const admissionReferences: PromptRunReferenceSnapshot[] = structuredReferences.length > 0
     ? structuredReferences.map((reference) => ({
-      role: reference.role,
+      // TODO(R-02/R-03): 移除角色后删除此守卫
+      role: reference.role as ReferenceRole,
       order: reference.order,
       ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
       roleNeedsConfirmation: reference.roleNeedsConfirmation,

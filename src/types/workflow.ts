@@ -73,6 +73,7 @@ export function defaultOperationModeForNode(kind: NodeKind): ImageOperationMode 
 }
 
 // ---------- 参考图角色与可追溯输入 ----------
+/** @deprecated 参考图角色体系将被移除（见 docs/design/2026-09-17-remove-reference-roles/plan.md）。 */
 export const REFERENCE_ROLE_VALUES = [
   "identity",
   "pose_composition",
@@ -85,6 +86,7 @@ export const REFERENCE_ROLE_VALUES = [
   "background",
   "generic",
 ] as const;
+/** @deprecated 参考图角色体系将被移除。 */
 export type ReferenceRole = (typeof REFERENCE_ROLE_VALUES)[number];
 
 /** Target handles whose semantics are fixed by the receiving node. */
@@ -106,10 +108,14 @@ export function referenceRoleForTargetHandle(
 }
 
 /** v0-v3 画布中的含糊角色只用于迁移，不可直接当作新角色使用。 */
+/** @deprecated 参考图角色体系将被移除。 */
 export const LEGACY_IMAGE_ROLE_VALUES = ["default", "sketch", "garment", "reference"] as const;
+/** @deprecated 参考图角色体系将被移除。 */
 export type LegacyImageRole = (typeof LEGACY_IMAGE_ROLE_VALUES)[number];
+/** @deprecated 参考图角色体系将被移除。 */
 export type ImageInputRole = ReferenceRole | LegacyImageRole;
 
+/** @deprecated 参考图角色体系将被移除。 */
 export function isReferenceRole(value: unknown): value is ReferenceRole {
   return typeof value === "string" && (REFERENCE_ROLE_VALUES as readonly string[]).includes(value);
 }
@@ -139,11 +145,9 @@ export function normalizeImageInputReferenceRole(
 /**
  * One graph edge is one explicit reference-role assignment. The same source
  * node may therefore serve different roles for different target nodes.
+ * @deprecated 参考图角色体系将被移除；边数据按任意键值容忍读取。
  */
-export interface ReferenceEdgeData extends Record<string, unknown> {
-  role: ReferenceRole;
-  roleNeedsConfirmation: boolean;
-}
+export type ReferenceEdgeData = Record<string, unknown>;
 
 /**
  * Resolve an edge conservatively. Explicit edge data always wins. A missing
@@ -178,7 +182,8 @@ export function resolveReferenceEdgeData(
 /** Provider 收到的已解析参考图；dataUrl 必须与 assetSha256 对应。 */
 export interface ReferenceImageInput {
   dataUrl: string;
-  role: ReferenceRole;
+  /** @deprecated 参考图角色体系将被移除。 */
+  role?: ReferenceRole;
   order: number;
   assetSha256: string;
   sourceNodeId?: string;
@@ -192,7 +197,8 @@ export type ReferenceImageEvidence = Omit<ReferenceImageInput, "dataUrl">;
 /** DAG 计划中的轻量引用；运行时解析为 ReferenceImageInput。 */
 export interface ReferenceImageSource {
   imageRef: string;
-  role: ReferenceRole;
+  /** @deprecated 参考图角色体系将被移除。 */
+  role?: ReferenceRole;
   order: number;
   sourceNodeId?: string;
   roleNeedsConfirmation?: boolean;
@@ -239,9 +245,10 @@ export interface ImageInputNodeData extends BaseNodeData {
   kind: "image-input";
   /** dataURL 或 /api/files/xxx 路径 */
   imageUrl?: string;
-  imageRole: ImageInputRole;
-  /** 旧项目不能可靠推断角色；用户在画布重新选择后才置 false。 */
-  roleNeedsConfirmation?: boolean;
+  /** @deprecated 参考图角色体系将被移除；读取旧数据时容忍并忽略。 */
+  imageRole?: unknown;
+  /** @deprecated 参考图角色体系将被移除；读取旧数据时容忍并忽略。 */
+  roleNeedsConfirmation?: unknown;
 }
 
 export interface SketchToRenderNodeData extends BaseNodeData, ModelSelectableNodeData {

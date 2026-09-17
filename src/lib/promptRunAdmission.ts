@@ -37,6 +37,7 @@ import {
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   allowedOperationModesForNode,
+  isReferenceRole,
   resolveReferenceEdgeData,
 } from "../types/workflow";
 
@@ -102,8 +103,9 @@ export function promptRunReferenceSnapshotsFromGraph(
     for (let index = 0; index < imageCount; index += 1) {
       references.push({
         order: references.length,
-        role: role.role,
-        roleNeedsConfirmation: role.roleNeedsConfirmation,
+        // TODO(R-02/R-03): 移除角色后删除此守卫
+        role: isReferenceRole(role.role) ? role.role : "generic",
+        roleNeedsConfirmation: role.roleNeedsConfirmation !== false,
         sourceNodeId: source.id,
       });
     }

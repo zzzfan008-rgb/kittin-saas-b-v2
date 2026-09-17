@@ -138,7 +138,8 @@ export function referenceRolePrompt(
   const template = providerPromptRoleWrapper(modelId, mode);
   if (references.length === 0) return "";
   const list = references.map((reference, index) => {
-    const definition = getReferenceRoleDefinition(reference.role);
+    // TODO(R-02/R-03): 移除角色后删除此守卫
+    const definition = getReferenceRoleDefinition(reference.role ?? "generic");
     const pending = reference.roleNeedsConfirmation
       ? PROVIDER_PROMPT_RENDERER_CONTRACT.pendingRoleSuffix
       : "";

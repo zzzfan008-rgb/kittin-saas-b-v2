@@ -22,7 +22,8 @@ export function ReferenceEvidenceList({
       <div className="mt-2 grid grid-cols-4 gap-2">
         {images.map((image, index) => {
           const item = normalizedEvidence[index]!;
-          const roleLabel = getReferenceRoleDefinition(item.role).label;
+          // TODO(R-02/R-03): 移除角色后删除此守卫
+          const roleLabel = getReferenceRoleDefinition(item.role ?? "generic").label;
           const stateLabel = item.evidenceState === "confirmed"
             ? "已确认"
             : item.evidenceState === "legacy" ? "历史证据，待复核" : "证据不可用，待复核";

@@ -216,7 +216,8 @@ function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
       return {
         kind: data.kind,
         label: data.label,
-        imageRole: data.imageRole,
+        // TODO(R-02/R-03): 移除角色后删除此守卫（ImageInputNodeData.imageRole 已放宽为 unknown，快照边界保留原值）
+        imageRole: data.imageRole as ImageInputRole,
         roleNeedsConfirmation: data.roleNeedsConfirmation !== false,
         ...optionalString("imageUrl", data.imageUrl),
       };

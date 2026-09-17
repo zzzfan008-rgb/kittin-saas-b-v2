@@ -15,6 +15,7 @@ import {
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
   allowedOperationModesForNode,
+  isReferenceRole,
   referenceRoleForTargetHandle,
   resolveReferenceEdgeData,
   type ReferenceRole,
@@ -58,15 +59,20 @@ function resolveExecutionReferenceRole(
   targetKind: NodeKind,
   sourceData: WorkflowNodeData,
 ): { role: ReferenceRole; roleNeedsConfirmation: boolean } {
+  // TODO(R-02/R-03): 移除角色后删除此守卫（resolveReferenceEdgeData 现返回 Record<string, unknown>）
   const explicit = resolveReferenceEdgeData(edge.data, sourceData);
+  const explicitRole: { role: ReferenceRole; roleNeedsConfirmation: boolean } = {
+    role: isReferenceRole(explicit.role) ? explicit.role : "generic",
+    roleNeedsConfirmation: explicit.roleNeedsConfirmation !== false,
+  };
   if (edge.data && typeof edge.data === "object" && !Array.isArray(edge.data)) {
     const raw = edge.data as Record<string, unknown>;
-    if (Object.hasOwn(raw, "role")) return explicit;
+    if (Object.hasOwn(raw, "role")) return explicitRole;
   }
   const fixedRole = referenceRoleForTargetHandle(targetKind, edge.targetHandle);
   return fixedRole
     ? { role: fixedRole, roleNeedsConfirmation: false }
-    : explicit;
+    : explicitRole;
 }
 
 export class DagError extends Error {
@@ -100,7 +106,8 @@ export function assertPromptRunAdmissions(
   for (const step of plan.steps) {
     if (!NODE_SPECS[step.kind].providerId) continue;
     const references = (step.inputReferences ?? []).map((reference, order) => ({
-      role: reference.role,
+      // TODO(R-02/R-03): 移除角色后删除此守卫
+      role: reference.role as ReferenceRole,
       order,
       roleNeedsConfirmation: reference.roleNeedsConfirmation,
       sourceNodeId: reference.sourceNodeId,

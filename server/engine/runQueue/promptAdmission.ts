@@ -7,8 +7,9 @@ import type {
   NodeExecution,
   ReferenceImageInput,
   ReferenceImageSource,
+  ReferenceRole,
 } from "../../../src/types/workflow";
-import { isReferenceRole, NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS } from "../../../src/types/workflow";
 import { validateImageDataUrl } from "../../lib/imageValidation";
 import {
   evaluatePromptRunAdmission,
@@ -67,7 +68,8 @@ export function evaluateClaimedJobPromptAdmission(
     };
   }
   const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
-    role: reference.role,
+    // TODO(R-02/R-03): 移除角色后删除此守卫
+    role: reference.role as ReferenceRole,
     order: reference.order,
     roleNeedsConfirmation: reference.roleNeedsConfirmation,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),

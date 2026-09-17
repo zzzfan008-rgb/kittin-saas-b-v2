@@ -15,6 +15,7 @@ import {
   allowedOperationModesForNode,
   defaultOperationModeForNode,
   resolveReferenceEdgeData,
+  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -509,7 +510,8 @@ function validateReferenceEdgeData(
     failReferenceRole("data", value === undefined ? "missing" : "invalid", path, "must be an object");
   }
   const raw = value as Record<string, unknown>;
-  if (!REFERENCE_ROLE_VALUES.includes(raw.role as ReferenceEdgeData["role"])) {
+  // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceEdgeData 现为 Record<string, unknown>，此处先校验再窄化）
+  if (!REFERENCE_ROLE_VALUES.includes(raw.role as ReferenceRole)) {
     failReferenceRole(
       "role",
       raw.role === undefined ? "missing" : "invalid",
@@ -517,7 +519,7 @@ function validateReferenceEdgeData(
       `must be one of: ${REFERENCE_ROLE_VALUES.join(", ")}`,
     );
   }
-  const role = raw.role as ReferenceEdgeData["role"];
+  const role = raw.role as ReferenceRole;
   if (typeof raw.roleNeedsConfirmation !== "boolean") {
     failReferenceRole(
       "roleNeedsConfirmation",

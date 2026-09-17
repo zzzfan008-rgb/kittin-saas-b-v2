@@ -11,6 +11,7 @@ import {
   PROVIDER_PROMPT_RENDERER_HASH,
   PROVIDER_PROMPT_RENDERER_VERSION,
   renderProviderPrompt,
+  type ProviderPromptReference,
 } from "../../src/lib/providerPromptRenderer";
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import type {
@@ -36,6 +37,7 @@ import {
   type ExecutionPlan,
   type ImageGenRequest,
   type NodeExecution,
+  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
   getModelParameterProfile,
@@ -334,7 +336,8 @@ function evaluationReferenceInputs(request: ImageGenRequest, step: NodeExecution
       }
     }
     return {
-      role: reference.role,
+      // TODO(R-02/R-03): 移除角色后删除此守卫
+      role: reference.role as ReferenceRole,
       order: reference.order,
       assetSha256: actualSha256,
       ...(reference.sourceNodeId === undefined ? {} : { sourceNodeId: reference.sourceNodeId }),
@@ -432,12 +435,17 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   const promptReferences = (input.request.references ?? []).filter((reference) => (
     reference.sourceNodeId !== `${step.nodeId}:mask-guide`
   ));
+  // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceImageInput.role 已放宽为可选）
+  const providerPromptReferences: ProviderPromptReference[] = promptReferences.map((reference) => ({
+    role: reference.role,
+    roleNeedsConfirmation: reference.roleNeedsConfirmation,
+  }));
   const expectedResolvedPrompt = renderProviderPrompt({
     nodeKind: step.kind,
     modelId,
     operationMode: variant.mode,
     taskPrompt: typeof step.params.prompt === "string" ? step.params.prompt : "",
-    references: promptReferences,
+    references: providerPromptReferences,
   });
   if (input.request.prompt !== expectedResolvedPrompt) {
     throw new Error("actual ImageGenRequest prompt differs from the shared reviewed Provider renderer output");

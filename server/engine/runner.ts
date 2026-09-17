@@ -41,7 +41,7 @@ import {
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { compositeMaskedEdit, prepareMaskForGeneration } from "../lib/maskProcessing";
-import { renderProviderPrompt } from "../../src/lib/providerPromptRenderer";
+import { renderProviderPrompt, type ProviderPromptReference } from "../../src/lib/providerPromptRenderer";
 import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
 export { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
@@ -296,6 +296,11 @@ export async function executeStep(
         }]
         : inputReferenceSources;
       const references = await resolveReferenceInputs(referenceSources);
+      // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceImageInput.role 已放宽为可选，Provider 边界仍要求 role 字段存在）
+      const promptReferences: ProviderPromptReference[] = references.map((reference) => ({
+        role: reference.role,
+        roleNeedsConfirmation: reference.roleNeedsConfirmation,
+      }));
       const referenceImages = references.map((reference) => reference.dataUrl);
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
       const maxUserReferences = step.kind === "mask-redraw"
@@ -327,7 +332,7 @@ export async function executeStep(
               modelId,
               operationMode,
               taskPrompt: buildRecolorPrompt([color]),
-              references,
+              references: promptReferences,
             });
             try {
               const result = await generateExactImages(
@@ -389,7 +394,7 @@ export async function executeStep(
           modelId,
           operationMode,
           taskPrompt,
-          references,
+          references: promptReferences,
         });
         const result = await generateExactImages(
           provider,
@@ -422,7 +427,7 @@ export async function executeStep(
         modelId,
         operationMode,
         taskPrompt,
-        references,
+        references: promptReferences,
       });
       const maskReference = step.kind === "mask-redraw" ? step.params.mask : undefined;
       if (step.kind === "mask-redraw" && (typeof maskReference !== "string" || !maskReference)) {

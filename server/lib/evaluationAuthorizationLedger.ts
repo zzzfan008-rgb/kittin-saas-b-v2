@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { isImageModelId, type ImageModelId } from "../../src/types/imageModels";
 import { promptRunReferenceRoleProfile } from "../../src/lib/promptRunAdmission";
-import { NODE_SPECS, type ExecutionPlan, type NodeExecution } from "../../src/types/workflow";
+import { NODE_SPECS, type ExecutionPlan, type NodeExecution, type ReferenceRole } from "../../src/types/workflow";
 import type { AuthUser } from "./auth";
 import {
   EVALUATION_AUTHORIZATION_ID_PATTERN,
@@ -137,7 +137,8 @@ export function evaluationAuthorizationTargetFromPlan(plan: ExecutionPlan): Eval
     operationMode: step.params.operationMode,
     references: (step.inputReferences ?? []).map((reference) => ({
       order: reference.order,
-      role: reference.role,
+      // TODO(R-02/R-03): 移除角色后删除此守卫
+      role: reference.role as ReferenceRole,
       roleNeedsConfirmation: reference.roleNeedsConfirmation,
     })),
   });
