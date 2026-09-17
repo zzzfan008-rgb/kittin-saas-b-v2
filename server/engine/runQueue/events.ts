@@ -1,6 +1,5 @@
 import type { PoolClient } from "pg";
-import { db, query, queryOne, transaction } from "../../lib/database";
-import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
+import type { RunEvent } from "../runner";
 export async function appendRunEvent(
   client: PoolClient,
   runId: string,

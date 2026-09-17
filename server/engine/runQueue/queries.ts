@@ -1,6 +1,6 @@
 import { DURABLE_RUN_EVENT_BATCH_SIZE, parseJson } from "./types";
-import { db, query, queryOne, transaction } from "../../lib/database";
-import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
+import { query, queryOne } from "../../lib/database";
+import type { RunEvent } from "../runner";
 import {
   ActiveRunLimitError,
   CancelledBeforeProviderCall,

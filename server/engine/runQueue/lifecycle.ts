@@ -11,7 +11,7 @@ import type {
   ReferenceImageSource,
 } from "../../../src/types/workflow";
 import { isReferenceRole, NODE_SPECS } from "../../../src/types/workflow";
-import { db, query, queryOne, transaction } from "../../lib/database";
+import { transaction } from "../../lib/database";
 import {
   deleteStoredImage,
   normalizeImageRef,
@@ -28,7 +28,7 @@ import {
   recordEvaluationProviderRequestSuccess,
   startEvaluationProviderRequestEvidence,
 } from "../../lib/evaluationEvidenceStore";
-import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
+import type { RunEvent, StepResult } from "../runner";
 import {
   ActiveRunLimitError,
   CancelledBeforeProviderCall,

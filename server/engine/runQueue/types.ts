@@ -7,7 +7,7 @@ import type {
 } from "../../../src/types/workflow";
 import type { PoolClient } from "pg";
 import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
+import type { ProviderResolver } from "../runner";
 import {
   ActiveRunLimitError,
   CancelledBeforeProviderCall,
