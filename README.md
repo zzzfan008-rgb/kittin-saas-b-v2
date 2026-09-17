@@ -6,10 +6,79 @@ Garment Canvas 是面向服装设计师的桌面工作流画布，覆盖图片�
 
 生产部署、macOS 常驻运行、完整环境变量、管理员初始化、备份恢复、PostgreSQL/SQLite 迁移、故障处理和安全基线见 [`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md)。发布前使用 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，最新三主题桌面视觉证据见 [`docs/PHASE_D_VISUAL_ACCEPTANCE.md`](docs/PHASE_D_VISUAL_ACCEPTANCE.md)。
 
-## Docker 启动（推荐）
+## 本地开发
 
-要求 Docker Desktop / Docker Engine + Compose。先复制 `.env.example` 为私有
-`.env`，至少替换 PostgreSQL 密码、AI 网关和首次管理员配置，然后执行：
+要求 Node.js 24.20.0 或更高版本，以及本机原生 PostgreSQL 18。
+
+```bash
+brew install postgresql@18
+brew services start postgresql@18
+npm ci
+npm run dev
+```
+
+首次准备数据库时创建应用角色与两个库（开发库与隔离测试库）：
+
+```bash
+psql -d postgres -c "CREATE ROLE garment_canvas LOGIN PASSWORD '<长随机密码>';"
+psql -d postgres -c "CREATE DATABASE garment_canvas OWNER garment_canvas;"
+psql -d postgres -c "CREATE DATABASE garment_canvas_test OWNER garment_canvas;"
+```
+
+把密码写进私有 `.env`（`POSTGRES_HOST_PORT` 指向本机实例，原生安装为 5432）。注意
+`.env` 的值不要追加行内 `#` 注释，解析器不会剥离它们。
+
+`npm run dev` 会先自动执行 `npm run dev:check`：核对 Node.js 版本、5173/后端端口
+占用、PostgreSQL 认证与只读 `SELECT 1`，以及 Vite API 代理目标。预检只读取连接状态，
+不会停止进程、启动服务、修改数据库或调用 AI。若提示旧 Vite/API 端口冲突，应先停止
+旧开发进程；若 PostgreSQL 不可达，按提示启动本机实例。Docker Engine 只作为可选部署
+路径被探测，使用本机 PostgreSQL 时它不可用属于预期状态。也可单独运行
+`npm run dev:check` 排查环境。
+
+前端开发服务器默认为 `http://localhost:5173`，API 默认为
+`http://localhost:3001`，本机 Node 通过 `POSTGRES_HOST_PORT` 连接 PostgreSQL。
+Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
+会同时将后端与前端代理切换到 3002。如需转发到独立地址，可在私有
+`.env` 中显式设置 `API_PROXY_TARGET=http://localhost:3002`，该值优先于 `PORT`。
+
+`npm run test` 使用隔离的本机测试库（数据库名必须以 `_test` 结尾，且必须在本机），
+运行全部回归；测试自身会重置该库的 schema，测试数据不会污染开发库。runner 会拒绝
+任何非本机或未以 `_test` 结尾的连接串，两者不能绕过。
+
+未提交改动先运行只读预审；固定候选提交并保持干净工作树后，再运行完整本地门禁替代
+GitHub Actions：
+
+```bash
+npm run gate:codex -- --uncommitted --review-only
+
+# 候选提交后
+npm run gate:codex -- --base origin/main
+```
+
+门禁先运行完整确定性检查、桌面 E2E、生产构建和 production smoke，再由
+`ast-grep` + `dependency-cruiser` 采集结构与依赖证据，最后交给一个隔离的 Hermes Agent
+子进程评审精确差异。评审子进程只读、有限轮次与时间预算，结果必须落在哨兵标记内的
+JSON 中，缺失、不可解析或写入隔离目录都会 fail-closed。任何 P0-P3 有效问题都会令门禁
+失败。Node.js 24.20.0 是 `.nvmrc` 固定的最低
+可复现基线；门禁接受 24.20.0 及更高兼容版本（有 nvm 时可先 `nvm use`）。审查单个提交可改用
+`--commit SHA`。
+
+桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
+请求。首次运行先安装 Chromium，然后执行：
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+该套件覆盖项目支持下限 1024×768，以及主要视觉宽度 1280×720 与 1440×900；
+不包含移动端适配测试。
+
+## Docker 部署（可选）
+
+Docker 是可选的生产部署路径，本地开发不需要它。要求 Docker Desktop / Docker Engine +
+Compose。先复制 `.env.example` 为私有 `.env`，至少替换 PostgreSQL 密码、AI 网关和首次
+管理员配置，然后执行：
 
 ```bash
 docker compose up -d --build --wait
@@ -26,58 +95,6 @@ PostgreSQL 18 官方镜像的卷挂载点是 `/var/lib/postgresql`。从 17 升�
 如果 `data/garment-canvas.db` 存在且 PostgreSQL 还没有用户，首次启动会自动导入
 旧 SQLite 中的用户、会话、项目、素材、生成记录和消耗流水。导入成功后原
 SQLite 文件会保留，便于回退核对。
-
-## 本地开发
-
-要求 Node.js 24.20.0 或更高版本。先只启动 PostgreSQL，再启动开发服务：
-
-```bash
-docker compose up -d postgres --wait
-npm ci
-npm run dev
-```
-
-`npm run dev` 会先自动执行 `npm run dev:check`：核对 Node.js 版本、5173/后端端口
-占用、PostgreSQL 认证与只读 `SELECT 1`、Docker Engine 和 Vite API 代理目标。预检只读取连接状态，
-不会停止进程、启动容器、修改数据库或调用 AI。若提示旧 Vite/API 端口冲突，应先停止
-旧开发进程；若 PostgreSQL 不可达，按提示重新执行
-`docker compose up -d postgres --wait`。也可单独运行 `npm run dev:check` 排查环境。
-
-前端开发服务器默认为 `http://localhost:5173`，API 默认为
-`http://localhost:3001`，本机 Node 通过 `POSTGRES_HOST_PORT`（默认 54329）连接容器。
-Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
-会同时将后端与前端代理切换到 3002。如需转发到独立地址，可在私有
-`.env` 中显式设置 `API_PROXY_TARGET=http://localhost:3002`，该值优先于 `PORT`。
-
-`npm run test` 会自动启动隔离的临时 PostgreSQL 容器，运行全部回归后删除测试容器和卷；
-测试数据不会污染正式数据。
-
-未提交改动先运行只读预审；固定候选提交并保持干净工作树后，再运行完整本地门禁替代
-GitHub Actions：
-
-```bash
-npm run gate:codex -- --uncommitted --review-only
-
-# 候选提交后
-nvm use
-npm run gate:codex -- --base origin/main
-```
-
-门禁先运行完整确定性检查、桌面 E2E、生产构建和 production smoke，再调用
-结构化 `codex exec` 审查精确差异。命令不指定模型，始终使用当前 Codex 配置的默认模型；
-任何 P0-P3 有效问题都会令门禁失败。Node.js 24.20.0 是 `.nvmrc` 固定的最低
-可复现基线；门禁接受 24.20.0 及更高兼容版本。审查单个提交可改用 `--commit SHA`。
-
-桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
-请求。首次运行先安装 Chromium，然后执行：
-
-```bash
-npx playwright install chromium
-npm run test:e2e
-```
-
-该套件覆盖项目支持下限 1024×768，以及主要视觉宽度 1280×720 与 1440×900；
-不包含移动端适配测试。
 
 ## 非 Docker 构建与启动
 
@@ -108,9 +125,9 @@ npm start
 - `GET /api/health`：进程存活检查；
 - `GET /api/ready`：检查 PostgreSQL、`DATA_DIR`、AI 配置和完整模式下的前端构建。
 
-用户、会话、项目、素材、生成记录和消耗流水保存在 Docker 内置 PostgreSQL 18；上传及
-生成图片保存在 `DATA_DIR`。当前部署使用本地磁盘，不自动备份，但 PostgreSQL 命名卷
-与文件目录已分离，可后续接入备份接口。
+用户、会话、项目、素材、生成记录和消耗流水保存在 PostgreSQL 18（原生实例或 Docker
+命名卷）；上传及生成图片保存在 `DATA_DIR`。当前部署使用本地磁盘，不自动备份，但
+PostgreSQL 数据与文件目录已分离，可后续接入备份接口。
 
 首次启动前必须在私有 `.env` 中配置管理员临时凭据（不要提交 `.env`）：
 

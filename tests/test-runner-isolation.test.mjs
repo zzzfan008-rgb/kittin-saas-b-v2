@@ -129,6 +129,11 @@ try {
     "postgresql://garment_canvas:p%40ss%20word@127.0.0.1:5432/garment_canvas_test",
     "the runner must derive the isolated *_test database from .env and percent-encode credentials",
   );
+  assert.equal(
+    derived.includes("must-not-leak"),
+    false,
+    "由 .env 推导的测试库连接串绝不能携带非 PostgreSQL 的凭据（付费 provider 密钥不得进入测试进程）",
+  );
   const emptyEnv = {};
   assert.throws(
     () => resolveTestDatabaseUrl(emptyEnv, { dotEnvPath: join(derivedRoot, "missing.env") }),

@@ -98,6 +98,9 @@ export function acquireTestLock({
 /**
  * 只读取 .env 中的 PostgreSQL 连接键。绝不注入 AI 凭据，也不改动 process.env，
  * 因此测试进程不会因为加载 .env 而获得可用的付费 provider 密钥。
+ *
+ * 这份凭据隔离由 tests/test-runner-isolation.test.mjs 用一份含 APIYI_API_KEY 的
+ * 临时 .env 断言覆盖：推导出的连接串不得包含该值，调用方环境不得被改动。
  */
 function readPostgresKeysFromDotEnv(dotEnvPath) {
   if (!existsSync(dotEnvPath)) return {};
@@ -125,7 +128,13 @@ function readPostgresKeysFromDotEnv(dotEnvPath) {
   return values;
 }
 
-/** 校验并返回测试库连接串；错误信息只回显主机与库名，绝不回显凭据。 */
+/**
+ * 校验并返回测试库连接串；错误信息只回显主机与库名，绝不回显凭据。
+ *
+ * 全部拒绝路径（非本机 host、库名不以 _test 结尾、协议不是 postgresql、
+ * 缺用户名或密码）以及「错误信息不得回显密码」，都由
+ * tests/test-runner-isolation.test.mjs 断言覆盖；该文件是 test:suite 的第一项。
+ */
 export function validateTestDatabaseUrl(value, source) {
   let parsed;
   try {
@@ -204,7 +213,8 @@ export async function assertTestDatabaseReachable(databaseUrl) {
  *
  * 与「每次运行一个全新容器」等价，供需要 pristine 数据库的流程使用（E2E 依赖
  * INITIAL_ADMIN_* 在无用户时引导管理员账号）。调用方必须已持有工作区锁。
- * 破坏性操作前重新校验连接串，确保只会作用于本机 `*_test` 库。
+ * 破坏性操作前重新校验连接串，确保只会作用于本机 `*_test` 库；
+ * 该校验与拒绝路径由 tests/test-runner-isolation.test.mjs 覆盖。
  */
 export async function resetTestDatabase(databaseUrl) {
   validateTestDatabaseUrl(databaseUrl, "重置目标");

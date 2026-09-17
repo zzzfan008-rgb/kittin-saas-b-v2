@@ -1,48 +1,35 @@
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+<!-- code-intelligence:start -->
+# Code Intelligence — ast-grep + dependency-cruiser
 
-This project is indexed by GitNexus as **kittin-saas-b-v2** (33451 symbols, 75442 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+本仓库的代码智能证据来自两个本地确定性工具，**不再使用 GitNexus**：
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+- `ast-grep`：配置 `sgconfig.yml`，规则位于 `tools/ast-grep-rules/`。覆盖动态代码求值、
+  不安全 HTML 注入、前端 `process.env` 泄漏、静态检查压制。
+- `dependency-cruiser`：配置 `.dependency-cruiser.cjs`。覆盖循环依赖、分层边界与孤儿模块。
+  既有基线环以 `no-circular-baseline`（warn，逐路径登记豁免理由）保留；任何新模块被卷入
+  这些环会落入 `no-circular`（error）。
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user. For unified PDG impact, add `mode: "pdg"` with optional `line: <N>` — it returns statement-level `affectedStatements` over CDG + REACHING_DEF and inter-procedural symbols in `interproceduralByDepth`/`byDepth`; no-layer/degraded PDG results are UNKNOWN-risk notes (`--pdg` layer).
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
-- For control/data dependence, `pdg_query({mode: "controls", target: "fileOrSymbol"})` answers "under what condition does X run?" (CDG, incl. guard clauses) and `pdg_query({mode: "flows", target, variable})` traces "where does variable Y flow?" (REACHING_DEF). `--pdg` layer.
+- 改动函数、类、方法、路由契约或共享类型前，先确认它在**模块级**的影响面：谁 import 了它、
+  它位于哪条依赖路径上。改动共享契约或跨层依赖时，把影响范围报告给用户。
+- 提交前运行 `npm run gate:codex`。至少也要单独运行：
+  `ast-grep scan --config sgconfig.yml src server scripts e2e` 与
+  `npx depcruise --config .dependency-cruiser.cjs src server scripts e2e`，
+  并确认没有新增依赖违规或结构命中。
+- 新增依赖，或引入会形成新环 / 越过分层规则的 import 时，先与用户确认。
 
-## Never Do
+## 能力边界（必须知情，不得假装拥有）
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+ast-grep 与 dependency-cruiser **提供不了** GitNexus 原有的符号级能力。以下做法已经不存在：
 
-## Resources
+- 符号级 callers/callees 爆炸半径、跨文件执行流追踪、PDG 控制与数据依赖：没有任何工具支持。
+  改动的真实影响面要在测试与类型检查（`tsc --noEmit`）里被证明，而不是被声明。
+- 符号重命名：没有 call-graph 感知的 `rename`。改名必须使用编辑器的 TypeScript 语言服务，
+  或人工核对全部引用；**禁止用全局 find-and-replace 代替**。
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/kittin-saas-b-v2/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/kittin-saas-b-v2/clusters` | All functional areas |
-| `gitnexus://repo/kittin-saas-b-v2/processes` | All execution flows |
-| `gitnexus://repo/kittin-saas-b-v2/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+因此当前可依赖的证据链是：模块级依赖与结构规则（确定性）+ 类型检查 + 测试 + 门禁评审段。
+<!-- code-intelligence:end -->
 
 # Garment Canvas — Current Project Rules
 
