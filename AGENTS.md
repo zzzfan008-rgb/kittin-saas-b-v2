@@ -179,14 +179,15 @@ instruction, then verify drift-prone repository and release state live.
 - The user message `通过` authorizes committing and pushing the approved batch plus
   a local exact-SHA review using the configured local review model. It does not
   authorize merging to `main`, tagging, releasing, or deploying.
-- Do not trigger or wait for Codex Cloud review. The current review path is the
-  local delivery gate (`gate:codex`: Hermes reviewer + ast-grep/dependency-cruiser
-  code intelligence evidence), exact head/base verification, and the user's explicit
-  approval. GitHub Actions and CodeRabbit are not required evidence.
+- The review path is the local delivery gate (Hermes reviewer +
+  ast-grep/dependency-cruiser code intelligence evidence), exact head/base
+  verification, and the user's explicit approval. GitHub Actions, CodeRabbit, and
+  any external cloud review service are not required evidence.
 - Merging a PR, tagging, publishing a release, and deploying each require explicit
   user authorization. Never merge automatically.
 - Keep `.env`, `.env.local`, PATs, provider keys, credentials, uploads, database
   dumps, `data/`, `dist/`, `dist-server/`, and other runtime/generated output out of
   commits and agent output. `.env.example` remains the public configuration contract.
-- Historical audit details belong in `CODEX_REVIEW_HANDOFF_APP.md` and dated docs,
+- Historical audit details belong in dated documents and handoff files under
+  `docs/` (plus the historical `CODEX_REVIEW_*.md` records at the repository root),
   not in this current-rule file.

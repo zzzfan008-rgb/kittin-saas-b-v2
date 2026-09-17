@@ -194,7 +194,7 @@ async function main() {
   if (toolName === "Bash") {
     if (linked) process.exit(0);
     if (!isReadOnlyBash(toolInput.command)) {
-      deny("Only a conservative read-only Bash allowlist is available in the primary worktree. Use Read/Grep/GitNexus, or restart with claude --worktree <task-name>.");
+      deny("Only a conservative read-only Bash allowlist is available in the primary worktree. Use Read/Grep, or restart with claude --worktree <task-name>.");
     }
   }
 
