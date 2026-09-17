@@ -354,7 +354,7 @@ await assert.rejects(
       taskPassed: true, validForScoring: true,
     },
   )),
-  /exactly the five rubric criteria/,
+  /exactly the four rubric criteria/,
 );
 await assert.rejects(
   database.transaction((client) => reviewLedger.appendEvaluationManualAssessment(

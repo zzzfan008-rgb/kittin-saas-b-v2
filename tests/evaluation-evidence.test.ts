@@ -196,7 +196,7 @@ const scores: PromptEvaluationScores = {
 assert.deepEqual(validateManualScores(scores), scores);
 assert.throws(
   () => validateManualScores({ ...scores, extraCriterion: 100 }),
-  /exactly the five rubric criteria/,
+  /exactly the four rubric criteria/,
 );
 assert.throws(
   () => validateManualScores({ ...scores, commercialUsability: 101 }),
