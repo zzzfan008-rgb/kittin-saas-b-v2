@@ -127,7 +127,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
                 setEditing(false);
               }
             }}
-            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[var(--gc-control)] px-1.5 py-0.5 text-xs text-[var(--gc-text)] focus:outline-hidden"
+            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-text)] focus:outline-hidden"
           />
         ) : (
           <span
@@ -212,7 +212,7 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     <div
       role="note"
       data-product-support="unsupported"
-      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
     >
       <p className="font-medium tracking-wide">暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>
@@ -232,4 +232,4 @@ export function Developing() {
 }
 
 export const inputClass =
-  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";
+  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";

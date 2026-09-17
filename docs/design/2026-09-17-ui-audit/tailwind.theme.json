@@ -1,0 +1,131 @@
+{
+  "theme": {
+    "extend": {
+      "colors": {
+        "primary": "#0071e3",
+        "secondary": "#6e6e73",
+        "aw-canvas": "#f5f5f7",
+        "aw-panel": "#ffffff",
+        "aw-panel-translucent": "#ffffffb8",
+        "aw-ink": "#1d1d1f",
+        "aw-ink-secondary": "#6e6e73",
+        "aw-ink-tertiary": "#0000007a",
+        "aw-accent": "#0071e3",
+        "aw-accent-hover": "#0068d4",
+        "aw-accent-ink": "#ffffff",
+        "aw-card-inner": "#f5f5f7",
+        "aw-link": "#0066cc",
+        "aw-disabled-bg": "#ececf0",
+        "aw-disabled-ink": "#75757b",
+        "aw-border": "#00000014",
+        "aw-border-strong": "#00000029",
+        "ob-canvas": "#16181d",
+        "ob-shell": "#1a1c22",
+        "ob-panel": "#21242a",
+        "ob-panel-hover": "#2b2f36",
+        "ob-ink": "#e8eaee",
+        "ob-ink-secondary": "#9ba1a9",
+        "ob-accent": "#ffc940",
+        "ob-accent-ink": "#131313",
+        "ob-card": "#ffffff",
+        "ob-card-inner": "#f2f3f5",
+        "ob-card-ink": "#1d1d1f",
+        "ob-card-ink-secondary": "#6b7075",
+        "ob-border": "#33373f",
+        "ob-border-strong": "#454a53",
+        "eg-canvas": "#e9f1ea",
+        "eg-shell": "#edf4ee",
+        "eg-panel": "#ffffff",
+        "eg-panel-hover": "#dce9dd",
+        "eg-ink": "#123b2b",
+        "eg-ink-secondary": "#47685a",
+        "eg-accent": "#0b7a43",
+        "eg-accent-ink": "#ffffff",
+        "eg-card": "#ffffff",
+        "eg-card-inner": "#f0f6f1",
+        "eg-border": "#c9dccc",
+        "eg-border-strong": "#a8c2ac",
+        "st-idle": "#8e8e93",
+        "st-queued-light": "#c79002",
+        "st-queued-dark": "#2dd4bf",
+        "st-running-light": "#3b82f6",
+        "st-running-dark": "#60a5fa",
+        "st-retry-light": "#ea8a00",
+        "st-success-light": "#1d7a3e",
+        "st-success-dark": "#34d399",
+        "st-error-light": "#d30000",
+        "st-error-dark": "#f87171",
+        "st-unknown-light": "#6e54b3",
+        "st-unknown-dark": "#a78bfa",
+        "st-warn-light": "#b45309"
+      },
+      "fontFamily": {
+        "body": [
+          "system-ui"
+        ],
+        "node-title": [
+          "system-ui"
+        ],
+        "section-heading": [
+          "system-ui"
+        ],
+        "field-label": [
+          "system-ui"
+        ],
+        "mono-value": [
+          "SF Mono"
+        ]
+      },
+      "fontSize": {
+        "body": [
+          "14px",
+          {
+            "letterSpacing": "-0.16px",
+            "fontWeight": "400"
+          }
+        ],
+        "node-title": [
+          "13.5px",
+          {
+            "letterSpacing": "-0.25px",
+            "fontWeight": "600"
+          }
+        ],
+        "section-heading": [
+          "40px",
+          {
+            "letterSpacing": "-0.55px",
+            "fontWeight": "650"
+          }
+        ],
+        "field-label": [
+          "11.5px",
+          {
+            "letterSpacing": "-0.1px",
+            "fontWeight": "500"
+          }
+        ],
+        "mono-value": [
+          "11.5px",
+          {
+            "letterSpacing": "0px",
+            "fontWeight": "400"
+          }
+        ]
+      },
+      "borderRadius": {
+        "node": "12px",
+        "input": "8px",
+        "pill": "980px",
+        "stage": "18px",
+        "card": "14px"
+      },
+      "spacing": {
+        "node-pad": "18px",
+        "node-gap": "14px",
+        "field-gap": "6px",
+        "section": "88px"
+      }
+    }
+  }
+}

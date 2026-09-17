@@ -111,10 +111,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             }}
           />
         )}
-        <p className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2.5 py-2 text-[9px] leading-4 text-[var(--gc-node-muted)]">
+        <p className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2.5 py-2 text-[9px] leading-4 text-[var(--gc-node-muted)]">
           涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
         </p>
-        <div className="space-y-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] p-2">
+        <div className="space-y-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-2">
           <button
             type="button"
             disabled={!presetAvailability.enabled || !presetVariant || !presetProfile || running || readOnly}

@@ -4,9 +4,9 @@ import { useSyncExternalStore } from "react";
 export type ThemeId = "current" | "white" | "eye";
 
 export const THEMES: { id: ThemeId; label: string; swatch: string; desc: string }[] = [
-  { id: "current", label: "经典暗金", swatch: "#9A7333", desc: "简白节点 + 暗金圆珠" },
-  { id: "white", label: "墨白", swatch: "#1D1D1F", desc: "深灰节点 + 墨色圆珠" },
-  { id: "eye", label: "护眼绿", swatch: "#2C5A31", desc: "绿灰节点 + 深绿圆珠" },
+  { id: "current", label: "曜黑·活力黄", swatch: "#FFC940", desc: "提亮黑画布 + 活力黄圆珠" },
+  { id: "white", label: "简白", swatch: "#0071E3", desc: "Apple 白画布 + 蓝色圆珠" },
+  { id: "eye", label: "护眼绿", swatch: "#0B7A43", desc: "薄荷绿画布 + 翡翠圆珠" },
 ];
 
 const STORAGE_KEY = "garment-canvas-theme";

@@ -65,7 +65,7 @@ export function ReferenceImageList({
             <div
               key={`${reference.sourceNodeId}:${reference.order}`}
               data-reference-order={reference.order}
-              className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-2 rounded border border-[var(--gc-border)] bg-[var(--gc-control)] p-1.5"
+              className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-2 rounded border border-[var(--gc-border)] bg-[var(--gc-node-inner)] p-1.5"
             >
               <div className="overflow-hidden rounded-sm border border-[var(--gc-border)] bg-black/20">
                 {reference.available && reference.imageUrl ? (

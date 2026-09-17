@@ -28,43 +28,57 @@
   --node-divider:rgba(0,0,0,.07); --node-text:#1d1d1f; --node-muted:#6e6e73;
   --node-shadow:0 0 0 0.5px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 8px rgba(0,0,0,.05), 0 20px 44px rgba(0,0,0,.11);
   --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.06), 0 8px 16px rgba(0,0,0,.08), 0 28px 60px rgba(0,0,0,.15);
-  --edge:#c7c7cc;
+  --edge:#0071e3;
   --st-idle:#8e8e93; --st-queued:#c79002; --st-running:#3b82f6; --st-retry:#ea8a00;
   --st-success:#1d7a3e; --st-error:#d30000; --st-unknown:#6e54b3;
   --board-bg:#f5f5f7; --board-ink:#1d1d1f; --board-muted:#6e6e73;
   --board-line:rgba(0,0,0,.08);
 }
 [data-theme="dark-gold"] {
-  --gc-canvas:#0d0f11; --gc-shell:#101214; --gc-panel:#17191c; --gc-panel-hover:#222529;
-  --gc-control:#0f1113; --gc-text:#e5e7eb; --gc-text-muted:#8b9198;
-  --gc-border:#2b2e32; --gc-border-strong:#3d4147;
-  --gc-accent:#c9a66b; --gc-accent-ink:#0a0a0a;
-  --node-card:#f4f2ed; --node-inner:#f9f7f3; --node-inner-hover:#ffffff;
-  --node-divider:#e3dfd5; --node-text:#25282c; --node-muted:#6a6f75;
-  --node-shadow:0 3px 5px rgba(0,0,0,.18), 0 10px 30px rgba(0,0,0,.26);
-  --node-shadow-lift:0 5px 8px rgba(0,0,0,.2), 0 18px 44px rgba(0,0,0,.34);
-  --edge:#6b7076;
-  --st-idle:#8e8e93; --st-queued:#eab308; --st-running:#60a5fa; --st-retry:#fb923c;
+  /* 曜黑·活力黄:提亮黑 + 时尚黄(黑底黄Cocktail,全对验证) */
+  --gc-canvas:#16181d; --gc-shell:#1a1c22; --gc-panel:#21242a; --gc-panel-hover:#2b2f36;
+  --gc-control:#1e2126; --gc-text:#e8eaee; --gc-text-muted:#9ba1a9;
+  --gc-border:#33373f; --gc-border-strong:#454a53;
+  --gc-accent:#FFC940; --gc-accent-ink:#131313;
+  --node-card:#ffffff; --node-inner:#f2f3f5; --node-inner-hover:#e9eaee;
+  --node-divider:#e4e6ea; --node-text:#1d1d1f; --node-muted:#6b7075;
+  --node-shadow:0 0 0 0.5px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
+  --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.42), 0 8px 18px rgba(0,0,0,.4), 0 28px 60px rgba(0,0,0,.56);
+  --edge:#FFC940;
+  --st-idle:#8e8e93; --st-queued:#2dd4bf; --st-running:#60a5fa; --st-retry:#fb923c;
   --st-success:#34d399; --st-error:#f87171; --st-unknown:#a78bfa;
-  --board-bg:#0c0d0e; --board-ink:#e8e6e1; --board-muted:#9a968e;
-  --board-line:#26282b;
+  --board-bg:#101116; --board-ink:#e8eaee; --board-muted:#9ba1a9;
+  --board-line:#2a2d34;
 }
 [data-theme="eye-green"] {
-  --gc-canvas:#c8d8c0; --gc-shell:#d9e4d2; --gc-panel:#e5eedf; --gc-panel-hover:#d1e0ca;
-  --gc-control:#edf3e9; --gc-text:#1e301c; --gc-text-muted:#4c6347;
-  --gc-border:#a9bfa2; --gc-border-strong:#7e9a76;
-  --gc-accent:#2c5a31; --gc-accent-ink:#f8fafc;
-  --node-card:#dce8d2; --node-inner:#e6f0dd; --node-inner-hover:#eef5e7;
-  --node-divider:#c2d4b6; --node-text:#1e301c; --node-muted:#4c6347;
-  --node-shadow:0 3px 5px rgba(30,48,28,.10), 0 10px 30px rgba(30,48,28,.14);
-  --node-shadow-lift:0 5px 8px rgba(30,48,28,.12), 0 18px 44px rgba(30,48,28,.2);
-  --edge:#6d8566;
+  /* 护眼绿 v3:薄荷画布 + 白卡 + 翡翠绿(清爽搭配,全对验证) */
+  --gc-canvas:#E9F1EA; --gc-shell:#EDF4EE; --gc-panel:#ffffff; --gc-panel-hover:#DCE9DD;
+  --gc-control:#f4f9f5; --gc-text:#123B2B; --gc-text-muted:#47685A;
+  --gc-border:#c9dccc; --gc-border-strong:#a8c2ac;
+  --gc-accent:#0B7A43; --gc-accent-ink:#ffffff;
+  --node-card:#ffffff; --node-inner:#f0f6f1; --node-inner-hover:#e5efe7;
+  --node-divider:#e2ece4; --node-text:#123B2B; --node-muted:#47685A;
+  --node-shadow:0 0 0 0.5px rgba(18,59,43,.06), 0 1px 2px rgba(18,59,43,.05), 0 4px 10px rgba(18,59,43,.06), 0 20px 44px rgba(18,59,43,.11);
+  --node-shadow-lift:0 0 0 0.5px rgba(18,59,43,.07), 0 2px 4px rgba(18,59,43,.06), 0 8px 18px rgba(18,59,43,.09), 0 28px 60px rgba(18,59,43,.16);
+  --edge:#0B7A43;
   --st-idle:#6d8566; --st-queued:#a1801a; --st-running:#2f6db5; --st-retry:#c07a10;
   --st-success:#1d7a3e; --st-error:#c23a3a; --st-unknown:#5e50a8;
-  --board-bg:#c2d2ba; --board-ink:#1e301c; --board-muted:#48604a;
-  --board-line:#a8bfa2;
+  --board-bg:#DDE9DF; --board-ink:#123B2B; --board-muted:#47685A;
+  --board-line:#c2d5c5;
 }
-:root{ --mono:"SF Mono",ui-monospace,Menlo,monospace; }
+:root{ --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  /* Hallmark 动效纪律:命名缓动三曲线 + 时长三档,禁止 transition-all 与裸 ease */
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+  --ease-in:cubic-bezier(0.7,0,0.84,0);
+  --ease-in-out:cubic-bezier(0.65,0,0.35,1);
+  --dur-1:120ms;  /* 即时反馈:按压/状态点 */
+  --dur-2:180ms;  /* hover/焦点色/单属性 */
+  --dur-3:250ms;  /* 浮层/内容过渡 */
+}
+/* 全局焦点环:即时出现,永不参与过渡(所有交互元素) */
+:where(a,button,input,select,[role="button"]):focus-visible{
+  outline:2px solid var(--gc-accent); outline-offset:2px; border-radius:inherit;
+}
 
 *{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:clip}
@@ -74,7 +88,13 @@ body{
   font-size:14px; line-height:1.47; letter-spacing:-0.16px;
   padding-bottom:120px; transition:background .3s;
 }
-@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    transition-duration:.01ms!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}
 
 /* ---------- Apple 玻璃导航 ---------- */
 .glassnav{
@@ -94,9 +114,12 @@ body{
 .tp{
   height:30px; padding:0 16px; border-radius:980px; font-size:12px; letter-spacing:-0.1px;
   border:1px solid var(--board-line); background:transparent; color:var(--board-muted);
-  font-family:inherit; cursor:pointer; transition:all .18s;
+  font-family:inherit; cursor:pointer;
+  transition:color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+    background-color var(--dur-2) var(--ease-out);
 }
 .tp:hover{ color:var(--board-ink); border-color:var(--gc-border-strong); }
+.tp:active{ transform:scale(.97); transition-duration:var(--dur-1); }
 .tp.on{ background:var(--gc-accent); border-color:transparent; color:var(--gc-accent-ink); font-weight:500; }
 
 /* ---------- Hero(Apple 式:大标题·紧行高·居中·一屏) ---------- */
@@ -116,12 +139,16 @@ body{
 .hero .ctas{ display:flex; gap:14px; justify-content:center; }
 .pill{
   height:40px; padding:0 24px; border-radius:980px; font-size:15px; font-family:inherit;
-  cursor:pointer; letter-spacing:-0.2px; transition:all .18s; display:inline-flex; align-items:center;
+  cursor:pointer; letter-spacing:-0.2px; display:inline-flex; align-items:center;
+  transition:background-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
 }
-.pill.filled{ background:var(--gc-accent); border:1px solid transparent; color:var(--gc-accent-ink); }
-.pill.filled:hover{ filter:brightness(1.08); }
+.pill.filled{ background:#0071e3; border:1px solid transparent; color:#fff; }
+.pill.filled:hover{ background:#0077ed; }
+.pill.filled:active{ transform:scale(.97); }
 .pill.ghost{ background:transparent; border:1px solid var(--gc-border-strong); color:var(--board-ink); }
 .pill.ghost:hover{ border-color:var(--gc-accent); color:var(--gc-accent); }
+.pill.ghost:active{ transform:scale(.97); }
 
 /* ---------- 分区标题 ---------- */
 .wrap{ max-width:1180px; margin:0 auto; padding:0 32px; }
@@ -191,32 +218,42 @@ section{ margin-top:88px; }
 .node:hover .handle, .handle:hover, .handle.connecting{
   background:var(--gc-accent); transform:scale(1.2);
 }
+/* 连线 = 强调色单色线(三主题统一) */
+.ct-svg path{ stroke:var(--gc-accent) !important; }
+.ct-svg marker path{ fill:var(--gc-accent) !important; }
 .handle.out{right:-7px;top:24px} .handle.in{left:-7px;top:24px}
 
 .field{display:flex;flex-direction:column;gap:6px}
-.field>label{font-size:11.5px;color:var(--node-muted);letter-spacing:-0.1px;font-weight:500}
+.field>label{font-size:11.5px;color:var(--node-muted);letter-spacing:-0.1px;font-weight:500;min-height:1lh}
+.field .helper{font-size:11.5px;line-height:1.45;min-height:1lh;margin-top:-2px}
+.field .helper.error{color:var(--st-error)}
 .field .val{font-family:var(--mono);font-size:11.5px;color:var(--node-text)}
 .input,.select{
   width:100%;height:32px;border-radius:8px;padding:0 11px;
   border:1px solid var(--gc-border);background:var(--node-inner);
   color:var(--node-text);font-size:12.5px;font-family:inherit;letter-spacing:-0.15px;
-  transition:border-color .14s, box-shadow .14s;
+  transition:border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
+  outline:2px solid transparent; outline-offset:1px;
 }
 .input:hover,.select:hover{border-color:var(--gc-border-strong)}
 .input.mono{font-family:var(--mono);font-size:11.5px}
 .input::placeholder{color:var(--node-muted);opacity:.8}
-.input:focus,.select:focus{outline:none;border-color:var(--gc-accent);
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--gc-accent) 18%,transparent)}
+/* 焦点环即时出现,不参与过渡(Hallmark 纪律:焦点永不动画) */
+.input:focus-visible,.select:focus-visible{
+  outline-color:var(--gc-accent);
+  border-color:var(--gc-accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--gc-accent) 18%,transparent);
+}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
 .run{
   width:100%;height:34px;border:0;border-radius:980px;cursor:pointer;
   background:var(--gc-accent);color:var(--gc-accent-ink);
   font-size:13px;font-weight:500;font-family:inherit;letter-spacing:-0.15px;
-  transition:filter .15s,transform .08s;
+  transition:background-color var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out);
 }
-.run:hover{filter:brightness(1.08)}
-.run:active{transform:scale(.985)}
+.run:hover{background:#0077ed}
+.run:active{transform:scale(.98)}
 .run.running{
   background:var(--node-inner);color:var(--node-muted);
   border:1px solid var(--gc-border);
@@ -224,6 +261,16 @@ section{ margin-top:88px; }
 .run:disabled{background:var(--gc-disabled-bg);color:var(--gc-disabled-ink);opacity:1;cursor:not-allowed;box-shadow:none}
 
 .warn-line{font-size:11.5px;color:var(--st-retry);line-height:1.5}
+
+/* 内联 spinner:替换标签前缀,不新增布局(Hallmark loading 态配方) */
+.spinner{
+  display:inline-block; width:12px; height:12px; border-radius:50%;
+  border:2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color:currentColor;
+  animation:spin 0.8s linear infinite;
+  margin-right:8px; vertical-align:-2px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 .drop{
   border:1.5px dashed var(--gc-border-strong);border-radius:10px;height:96px;
@@ -240,7 +287,7 @@ section{ margin-top:88px; }
 }
 .develop .scan{position:absolute;left:14%;right:14%;height:2px;top:8%;border-radius:2px;
   background:linear-gradient(90deg,transparent,var(--gc-accent),transparent);
-  animation:scan 1.7s ease-in-out infinite}
+  animation:scan 1.7s var(--ease-in-out) infinite}
 @keyframes scan{0%,100%{top:8%}50%{top:88%}}
 .develop .lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:11px;letter-spacing:.24em;color:var(--gc-accent)}
@@ -266,8 +313,11 @@ section{ margin-top:88px; }
 .shelf-card .demo{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 .btn2{height:32px;padding:0 18px;border-radius:980px;font-size:13px;font-family:inherit;cursor:pointer;
   letter-spacing:-0.15px;border:1px solid var(--gc-border);background:var(--gc-panel-solid);
-  color:var(--board-ink);transition:all .16s;box-shadow:var(--node-shadow)}
+  color:var(--board-ink);box-shadow:var(--node-shadow);
+  transition:color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out)}
 .btn2:hover{border-color:var(--gc-accent);color:var(--gc-accent)}
+.btn2:active{transform:scale(.97)}
 .btn2.primary{background:var(--gc-accent);color:var(--gc-accent-ink);border-color:transparent}
 .btn2.ghost{background:transparent;box-shadow:none;border-color:transparent;color:var(--board-muted)}
 input[type=range]{accent-color:var(--gc-accent);width:160px}
@@ -309,8 +359,8 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
   </nav>
   <div class="theme-pills">
     <button class="tp on" data-t="apple-white">简白 · Apple</button>
-    <button class="tp" data-t="dark-gold">暗金</button>
-    <button class="tp" data-t="eye-green">护眼绿</button>
+    <button class="tp" data-t="dark-gold">曜黑 · 活力黄</button>
+    <button class="tp" data-t="eye-green">护眼绿 v3</button>
   </div>
 </header>
 
@@ -400,7 +450,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
           <div class="field"><label>参考图</label><div class="val">2 / 8</div></div>
         </div>
         <div class="develop"><div class="scan"></div><span class="lbl">显影中</span></div>
-        <button class="run running">运行中 · 轻点取消</button>
+        <button class="run running"><span class="spinner" aria-hidden="true"></span>运行中 · 轻点取消</button>
       </div>
     </div>
 
@@ -460,8 +510,9 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
         <input class="input mono" style="width:132px" value="1536 × 2048">
         <input class="input" placeholder="节点名称…">
         <span class="field" style="width:150px">
-          <input class="input" style="border-color:var(--st-error)" value="1536 × 9999">
-          <label style="color:var(--st-error)">尺寸超上限，支持 ≤ 4096</label>
+          <label>输出尺寸</label>
+          <input class="input" style="border-color:var(--st-error)" value="1536 × 9999" aria-invalid="true">
+          <span class="helper error">尺寸超上限，支持 ≤ 4096</span>
         </span>
       </div>
     </div>
@@ -495,14 +546,14 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       <div class="sw"><i style="background:#f5f5f7;border:1px solid rgba(0,0,0,.1)"></i><i style="background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.15)"></i><i style="background:#0071e3"></i><i style="background:#1d1d1f"></i></div>
     </div>
     <div class="t3 b">
-      <h4>暗金 · Atelier</h4>
-      <p>近黑画布 + 暖象牙纸样卡 + 香槟金行动色。夜班模式。</p>
-      <div class="sw"><i style="background:#0d0f11"></i><i style="background:#f4f2ed"></i><i style="background:#c9a66b"></i><i style="background:#9a7333"></i></div>
+      <h4>曜黑 · 活力黄</h4>
+      <p>提亮黑画布 + 纯白节点卡 + 活力黄行动色。连线即黄。</p>
+      <div class="sw"><i style="background:#16181d"></i><i style="background:#ffffff"></i><i style="background:#FFC940"></i><i style="background:#2dd4bf"></i></div>
     </div>
     <div class="t3 c">
-      <h4>护眼绿 · v2</h4>
-      <p>绿灰同族画布与卡片 + 深绿行动色。长时间审图用。</p>
-      <div class="sw"><i style="background:#c8d8c0"></i><i style="background:#dce8d2"></i><i style="background:#2c5a31"></i><i style="background:#1e301c"></i></div>
+      <h4>护眼绿 · v3</h4>
+      <p>薄荷画布 + 白卡 + 翡翠绿行动色。清爽不浑浊。</p>
+      <div class="sw"><i style="background:#E9F1EA"></i><i style="background:#ffffff;box-shadow:0 0 0 1px rgba(18,59,43,.12)"></i><i style="background:#0B7A43"></i><i style="background:#123B2B"></i></div>
     </div>
   </div>
 </section>
@@ -518,8 +569,8 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
     </div>
     <div class="dec">
       <div class="no">DECISION 02</div>
-      <b>暗金/护眼绿保持 V2 方案</b>
-      <span>暖象牙纸样卡与绿灰同族已在前版确认方向；本版仅统一节点结构语言（300px、分栏、状态点、胶囊 CTA）。</span>
+      <b>曜黑·活力黄 / 护眼绿v3 重配色</b>
+      <span>暗金改曜黑+活力黄(#FFC940,黑底更提亮至#16181d,节点卡改纯白更干净);护眼绿改薄荷画布+白卡+翡翠绿。连线三主题统一为强调色单色线。</span>
     </div>
     <div class="dec">
       <div class="no">DECISION 03</div>

@@ -145,7 +145,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
                 loading="lazy"
                 decoding="async"
                 alt="已上传图片"
-                className="max-h-40 w-full object-contain bg-[var(--gc-control)]"
+                className="max-h-40 w-full object-contain bg-[var(--gc-node-inner)]"
               />
             </button>
           </div>
@@ -161,7 +161,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[var(--gc-control)] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
+            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[var(--gc-node-inner)] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
               dragOver
                 ? "border-gold bg-gold/5 text-gold"
                 : "border-[var(--gc-node-border)] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)]"

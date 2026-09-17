@@ -96,12 +96,12 @@ export function FabricRecolorNode({
       />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
-        <div className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
+        <div className="rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
           左侧输入口：上 = 款式/补充参考，下 = 面料参考；总计最多 8 图
         </div>
 
         {/* 已选配色（最多 3 色，点击移除） */}
-        <div className="flex min-h-[22px] flex-wrap items-center gap-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-1.5 py-1">
+        <div className="flex min-h-[22px] flex-wrap items-center gap-1 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 py-1">
           {colors.length === 0 ? (
             <span className="text-[11px] text-neutral-600">已选配色（最多 8 色，每色出 1 张图）</span>
           ) : (
@@ -201,7 +201,7 @@ export function FabricRecolorNode({
                 onChange={(e) => setHexInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
                 placeholder="#RRGGBB"
-                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-1.5 font-mono text-[10px] text-[var(--gc-text)] outline-hidden focus:border-gold/60"
+                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 font-mono text-[10px] text-[var(--gc-text)] outline-hidden focus:border-gold/60"
               />
               <button
                 type="button"

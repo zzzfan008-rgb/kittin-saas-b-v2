@@ -29,7 +29,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
       {safeImages.map((url, i) => (
         <div
           key={`${url}-${i}`}
-          className="nodrag group overflow-hidden rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)]"
+          className="nodrag group overflow-hidden rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)]"
         >
           <button
             type="button"
