@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garment Canvas · 节点卡与主题原型 · 决策板</title>
+<style>
+/* ============================================================
+   决策板:新节点卡 / 墨白主题 / 护眼绿v2 —— 值唯一来源:
+   docs/design/2026-09-17-ui-audit/tokens.css (已过对比度验证)
+   D1 决策按方案A:系统字体栈 + mono 数字
+   ============================================================ */
+
+/* ---- 三主题 token(与 tokens.css 逐值一致) ---- */
+:root, [data-theme="dark-gold"] {
+  --gc-shell:#101214; --gc-canvas:#0d0f11; --gc-panel:#17191c; --gc-panel-hover:#222529;
+  --gc-control:#0f1113; --gc-text:#e5e7eb; --gc-text-muted:#8b9198;
+  --gc-border:#2b2e32; --gc-border-strong:#3d4147;
+  --gc-accent:#9a7333; --gc-accent-cta-ink:#0a0a0a; --gc-accent-deep:#6f521f;
+  --gc-node-main:#f1f2f4; --gc-node-header:#ffffff; --gc-node-inner:#f8f9fa;
+  --gc-node-inner-hover:#ffffff; --gc-node-border:#ccd0d5; --gc-node-text:#25282c;
+  --gc-node-muted:#676c73; --gc-node-accent:#9a7333;
+  --gc-edge:#6b7076;
+  --gc-handle-hi:#f2ddb2; --gc-handle-mid:#b18745; --gc-handle-dark:#61451f;
+  --gc-handle-ring:rgba(154,115,51,.75); --gc-handle-glow:rgba(176,138,74,.78);
+  --gc-warn:#fbbf24;
+  --board-bg:#0b0d0e; --board-text:#d7dade; --board-muted:#7c828a; --board-line:#23262a;
+}
+[data-theme="ink-white"] {
+  --gc-shell:#f6f5f2; --gc-canvas:#eceae6; --gc-panel:#fffefb; --gc-panel-hover:#eceae6;
+  --gc-control:#f2f0ec; --gc-text:#26282c; --gc-text-muted:#696d73;
+  --gc-border:#d5d2cc; --gc-border-strong:#b8b4ac;
+  --gc-accent:#1d1d1f; --gc-accent-cta-ink:#ffffff; --gc-accent-deep:#1d1d1f;
+  --gc-node-main:#2e3136; --gc-node-header:#383c42; --gc-node-inner:#3a3e44;
+  --gc-node-inner-hover:#474c53; --gc-node-border:#565b63; --gc-node-text:#f5f6f7;
+  --gc-node-muted:#c3c7cc; --gc-node-accent:#d9a441;
+  --gc-edge:#8a8e95;
+  --gc-handle-hi:#ffe9b8; --gc-handle-mid:#c89a4b; --gc-handle-dark:#7a5a1e;
+  --gc-handle-ring:rgba(217,164,65,.78); --gc-handle-glow:rgba(217,164,65,.8);
+  --gc-warn:#b45309;
+  --board-bg:#e9e7e2; --board-text:#2a2c30; --board-muted:#6d7076; --board-line:#d3d0c9;
+}
+[data-theme="eye-green"] {
+  --gc-shell:#d9e4d2; --gc-canvas:#c8d8c0; --gc-panel:#e5eedf; --gc-panel-hover:#d1e0ca;
+  --gc-control:#edf3e9; --gc-text:#1e301c; --gc-text-muted:#4c6347;
+  --gc-border:#a9bfa2; --gc-border-strong:#7e9a76;
+  --gc-accent:#2c5a31; --gc-accent-cta-ink:#f8fafc; --gc-accent-deep:#234827;
+  --gc-node-main:#dce8d2; --gc-node-header:#d3e2c7; --gc-node-inner:#e6f0dd;
+  --gc-node-inner-hover:#eef5e7; --gc-node-border:#9db88e; --gc-node-text:#1e301c;
+  --gc-node-muted:#4c6347; --gc-node-accent:#2e5d33;
+  --gc-edge:#6d8566;
+  --gc-handle-hi:#cfe3c2; --gc-handle-mid:#3f7a46; --gc-handle-dark:#1c3d20;
+  --gc-handle-ring:rgba(46,93,51,.78); --gc-handle-glow:rgba(58,108,64,.75);
+  --gc-warn:#92600a;
+  --board-bg:#b9cdb0; --board-text:#1e301c; --board-muted:#48604a; --board-line:#a4bda0;
+}
+
+/* ---- 语义状态色(全主题共享,均过 4.5:1 / 3:1) ---- */
+:root {
+  --st-queued:#eab308; --st-running:#60a5fa; --st-retry:#fb923c; --st-success:#34d399;
+  --st-error:#f87171; --st-unknown:#a78bfa; --st-idle:#8b9198;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+html { overflow-x:clip; }
+body {
+  background:var(--board-bg); color:var(--board-text);
+  font-family:-apple-system,"PingFang SC","Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:13px; line-height:1.6; padding:0 0 80px;
+  transition:background .25s;
+}
+
+/* ---- 决策板 chrome ---- */
+.board-head {
+  position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:16px;
+  padding:14px 28px; border-bottom:1px solid var(--board-line);
+  background:color-mix(in srgb, var(--board-bg) 88%, transparent);
+  backdrop-filter:blur(8px);
+}
+.board-head h1 { font-size:14px; font-weight:600; letter-spacing:.02em; }
+.board-head .sub { font-size:11px; color:var(--board-muted); }
+.spacer { flex:1; }
+.theme-switch { display:flex; gap:0; border:1px solid var(--board-line); border-radius:8px; overflow:hidden; }
+.theme-switch button {
+  padding:6px 14px; font-size:12px; border:0; cursor:pointer;
+  background:transparent; color:var(--board-muted); font-family:inherit;
+  transition:background .15s,color .15s;
+}
+.theme-switch button + button { border-left:1px solid var(--board-line); }
+.theme-switch button.on { background:var(--gc-accent); color:var(--gc-accent-cta-ink); font-weight:600; }
+@media (prefers-reduced-motion:reduce){ *{transition-duration:.01ms!important;animation-duration:.01ms!important} }
+
+section { padding:36px 28px 8px; max-width:1240px; margin:0 auto; }
+.sec-tag { font-size:11px; color:var(--board-muted); letter-spacing:.14em; margin-bottom:4px; }
+h2 { font-size:17px; font-weight:650; margin-bottom:4px; letter-spacing:.01em; }
+.sec-note { font-size:12px; color:var(--board-muted); margin-bottom:20px; max-width:70ch; }
+.sec-note b { color:var(--board-text); font-weight:600; }
+
+/* ---- 画布舞台 ---- */
+.stage {
+  position:relative; border:1px solid var(--board-line); border-radius:12px; overflow:hidden;
+  background:
+    radial-gradient(circle, color-mix(in srgb,var(--gc-border-strong) 55%,transparent) 1px, transparent 1.4px) 0 0/22px 22px,
+    var(--gc-canvas);
+  min-height:560px; transition:background .25s;
+}
+.stage svg.edges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+/* ---- 节点卡(新版) ---- */
+.node {
+  position:absolute; width:280px; border-radius:12px;
+  background:var(--gc-node-main); border:1px solid var(--gc-node-border);
+  color:var(--gc-node-text);
+  box-shadow:0 10px 28px rgba(8,14,22,.2);
+}
+.node.selected { border-color:var(--gc-node-accent); box-shadow:0 0 0 1px color-mix(in srgb,var(--gc-node-accent) 58%,transparent),0 14px 34px rgba(8,14,22,.3); }
+.node-head {
+  display:flex; align-items:center; gap:8px; padding:8px 12px;
+  background:var(--gc-node-header); border-bottom:1px solid var(--gc-node-border);
+  border-radius:11px 11px 0 0;
+}
+.node-head .title { flex:1; min-width:0; font-size:12px; font-weight:600; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.node-head .kind { font-size:10px; color:var(--gc-node-muted); font-family:var(--mono); }
+.node-body { padding:12px; display:flex; flex-direction:column; gap:12px; }
+
+/* 状态点 v2:10px + 运行态描边环 */
+.dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; position:relative; }
+.dot.idle{background:var(--st-idle)} .dot.queued{background:var(--st-queued)}
+.dot.running{background:var(--st-running)} .dot.running::after{
+  content:""; position:absolute; inset:-3px; border-radius:50%;
+  border:1.5px solid var(--st-running); opacity:.55;
+}
+.dot.retry{background:var(--st-retry)} .dot.retry::after{
+  content:""; position:absolute; inset:-3px; border-radius:50%;
+  border:1.5px solid var(--st-retry); opacity:.55;
+}
+.dot.success{background:var(--st-success)} .dot.error{background:var(--st-error)}
+.dot.unknown{background:var(--st-unknown)}
+
+/* handle 圆环(品牌资产,保留) */
+.handle {
+  position:absolute; width:18px; height:18px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, var(--gc-handle-hi) 0 10%, var(--gc-handle-mid) 24%, var(--gc-node-accent) 56%, var(--gc-handle-dark) 100%);
+  border:3px solid var(--gc-node-main);
+  box-shadow:0 0 0 1px var(--gc-handle-ring), 0 3px 7px rgba(0,0,0,.42),
+    inset -2px -3px 4px color-mix(in srgb,var(--gc-handle-dark) 55%,transparent),
+    inset 2px 2px 3px color-mix(in srgb,var(--gc-handle-hi) 62%,transparent);
+  cursor:crosshair;
+}
+.handle.out{ right:-9px; top:24px; } .handle.in{ left:-9px; top:24px; }
+
+/* 节点内表单(新控件语言) */
+.field { display:flex; flex-direction:column; gap:5px; }
+.field > label { font-size:11px; color:var(--gc-node-muted); font-weight:500; }
+.field .val { font-family:var(--mono); font-size:11px; color:var(--gc-node-text); }
+.input, .select {
+  width:100%; height:28px; border-radius:8px; padding:0 9px;
+  border:1px solid var(--gc-node-border); background:var(--gc-node-inner);
+  color:var(--gc-node-text); font-size:12px; font-family:inherit;
+  transition:border-color .12s;
+}
+.input.mono { font-family:var(--mono); font-size:11.5px; }
+.input::placeholder { color:var(--gc-node-muted); opacity:.85; }
+section { scroll-margin-top:70px; }
+.input:focus,.select:focus { outline:none; border-color:var(--gc-node-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--gc-node-accent) 25%,transparent); }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+/* 主CTA:金/墨/绿 随主题,只此一处强色 */
+.run {
+  width:100%; height:30px; border:0; border-radius:8px; cursor:pointer;
+  background:var(--gc-accent); color:var(--gc-accent-cta-ink);
+  font-size:12px; font-weight:600; font-family:inherit; letter-spacing:.02em;
+  transition:filter .12s, transform .06s;
+}
+.run:hover { filter:brightness(1.06); }
+.run:active { transform:translateY(1px); }
+.run.running { background:var(--gc-panel-hover); color:var(--gc-warn); border:1px solid color-mix(in srgb,var(--gc-warn) 40%,transparent); }
+.run:disabled { opacity:.45; cursor:not-allowed; }
+
+.warn-line { font-size:11px; color:var(--gc-warn); line-height:1.5; }
+
+/* 图片占位(上传节点) */
+.drop {
+  border:1.5px dashed var(--gc-node-border); border-radius:8px; height:84px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--gc-node-muted); font-size:11px; transition:border-color .15s,background .15s;
+}
+.drop:hover { border-color:var(--gc-node-accent); background:var(--gc-node-inner-hover); }
+.drop .glyph { font-size:16px; opacity:.7; }
+.drop small { font-size:10px; font-family:var(--mono); opacity:.75; }
+
+/* 显影占位(品牌动效,保留) */
+.develop {
+  position:relative; height:84px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--gc-node-border);
+  background:linear-gradient(180deg, color-mix(in srgb,var(--gc-node-accent) 5%,transparent), color-mix(in srgb,var(--gc-node-accent) 14%,transparent));
+}
+.develop .scan { position:absolute; left:0; right:0; height:2px; top:8%;
+  background:linear-gradient(90deg,transparent,var(--gc-node-accent),transparent);
+  box-shadow:0 0 12px var(--gc-node-accent); animation:scan 1.6s ease-in-out infinite; }
+@keyframes scan { 0%,100%{top:8%} 50%{top:88%} }
+.develop .lbl { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:10px; letter-spacing:.2em; color:color-mix(in srgb,var(--gc-node-accent) 85%,var(--gc-node-text)); }
+
+/* ---- 新旧对比条 ---- */
+.compare { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.old-card {
+  width:280px; border-radius:12px; background:#141414; border:1px solid #262626;
+  color:#e5e5e5; box-shadow:0 10px 28px rgba(0,0,0,.4); font-family:inherit;
+}
+.old-card .oh { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#1a1a1a; border-bottom:1px solid #262626; border-radius:11px 11px 0 0; }
+.old-card .oh .t { font-size:12px; font-weight:500; }
+.old-card .ob { padding:12px; display:flex; flex-direction:column; gap:8px; }
+.old-card label { font-size:10px; color:#737373; }
+.old-card .oi { height:26px; border-radius:6px; border:1px solid #262626; background:#0f0f0f; color:#e5e5e5; font-size:12px; padding:0 8px; }
+.old-card .orun { height:28px; border:0; border-radius:6px; background:#c9a66b; color:#0a0a0a; font-size:12px; font-weight:500; cursor:pointer; }
+.old-card .owarn { font-size:9px; color:#fbbf24; }
+.pill-old,.pill-new { display:inline-flex; align-items:center; gap:6px; font-size:11px; margin-bottom:10px; color:var(--board-muted); }
+.pill-old::before,.pill-new::before{ content:""; width:8px; height:8px; border-radius:50%; }
+.pill-old::before{ background:#5c6167 } .pill-new::before{ background:var(--st-success) }
+
+/* ---- 状态系统图例 ---- */
+.legend { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.legend .item {
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border:1px solid var(--board-line); border-radius:10px;
+  background:color-mix(in srgb,var(--gc-panel) 60%,transparent);
+}
+.legend .item .name { font-size:12px; font-weight:500; }
+.legend .item .en { font-size:10px; color:var(--board-muted); font-family:var(--mono); }
+
+/* ---- 控件语言样张 ---- */
+.ctl-lab { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; }
+.ctl-card { border:1px solid var(--board-line); border-radius:12px; padding:16px;
+  background:color-mix(in srgb,var(--gc-panel) 70%,transparent); display:flex; flex-direction:column; gap:12px; }
+.ctl-card h3 { font-size:12px; font-weight:600; color:var(--board-muted); letter-spacing:.08em; }
+.ctl-card .demo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.btn2 { height:30px; padding:0 14px; border-radius:8px; font-size:12px; font-family:inherit; cursor:pointer;
+  border:1px solid var(--gc-border-strong); background:var(--gc-control); color:var(--gc-text); transition:border-color .12s; }
+.btn2:hover { border-color:var(--gc-accent); }
+.btn2.primary { border-color:transparent; background:var(--gc-accent); color:var(--gc-accent-cta-ink); font-weight:600; }
+.btn2.ghost { border-color:transparent; background:transparent; color:var(--gc-text-muted); }
+input[type=range] { accent-color:var(--gc-accent); width:150px; }
+
+/* 决策脚注 */
+.decisions { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-top:8px; }
+.decision { border:1px solid var(--board-line); border-left:3px solid var(--gc-accent); border-radius:8px; padding:12px 14px; }
+.decision b { font-size:12.5px; display:block; margin-bottom:4px; }
+.decision span { font-size:11.5px; color:var(--board-muted); }
+</style>
+</head>
+<body data-theme="dark-gold">
+
+<header class="board-head">
+  <div>
+    <h1>节点卡 × 三主题 · 决策板</h1>
+    <div class="sub">切换主题查看 · 数值已全部过 WCAG 验证 · 来源 docs/design/2026-09-17-ui-audit/tokens.css</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="theme-switch" role="tablist" aria-label="主题预览">
+    <button class="on" data-t="dark-gold">暗金(修订)</button>
+    <button data-t="ink-white">墨白(D2-A)</button>
+    <button data-t="eye-green">护眼绿 v2(D3-A)</button>
+  </div>
+</header>
+
+<!-- A. 画布舞台:节点三连 -->
+<section>
+  <div class="sec-tag">A · WORKBENCH CANVAS</div>
+  <h2>节点三连 · 真实比例</h2>
+  <p class="sec-note">上传 → AI 改款 → 结果。节点宽 <b>280px</b>、内边距 12px、标签 11px、数值走 mono。金色只在 <b>handle 圆环 + 主 CTA + 选中描边</b> 三处;警示走独立黄;状态点 10px 且运行态带描边环。连线提级 + 箭头。</p>
+  <div class="stage" id="stage">
+    <svg class="edges" viewBox="0 0 1180 560" preserveAspectRatio="none">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--gc-edge)"/>
+        </marker>
+      </defs>
+      <path d="M 330 150 C 400 150, 410 300, 480 300" fill="none" stroke="var(--gc-edge)" stroke-width="1.6" marker-end="url(#arrow)"/>
+      <path d="M 330 430 C 400 430, 410 310, 480 308" fill="none" stroke="var(--gc-edge)" stroke-width="1.6" marker-end="url(#arrow)"/>
+      <path d="M 770 300 C 840 300, 850 290, 900 288" fill="none" stroke="var(--gc-edge)" stroke-width="1.6" marker-end="url(#arrow)"/>
+    </svg>
+
+    <!-- 上传节点 1 -->
+    <div class="node" style="left:60px; top:92px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">图1 · 原始图案</span>
+        <span class="kind">INPUT</span>
+        <span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop">
+          <span class="glyph">⬒</span>
+          点击 / 拖拽 / Ctrl+V
+          <small>JPG · PNG · WEBP · BMP</small>
+        </div>
+        <div class="field">
+          <label>引用角色</label>
+          <div class="val">garment_full · 主体保真</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传节点 2 -->
+    <div class="node" style="left:60px; top:372px;">
+      <div class="node-head">
+        <span class="dot idle"></span>
+        <span class="title">图2 · 风格参考</span>
+        <span class="kind">INPUT</span>
+        <span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop">
+          <span class="glyph">⬒</span>
+          点击 / 拖拽 / Ctrl+V
+          <small>JPG · PNG · WEBP · BMP</small>
+        </div>
+        <div class="field">
+          <label>引用角色</label>
+          <div class="val">styling_only · 仅风格</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 改款节点(运行中,选中态) -->
+    <div class="node selected" style="left:480px; top:180px;">
+      <div class="node-head">
+        <span class="dot running"></span>
+        <span class="title">图案风格迁移</span>
+        <span class="kind">AI</span>
+        <span class="handle in"></span>
+        <span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="field">
+          <label>指令</label>
+          <input class="input" value="保留图1主题与构图,用图2的材质与色彩语言重绘">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>模型</label>
+            <select class="select"><option>GPT Image 2 · hi</option></select>
+          </div>
+          <div class="field">
+            <label>输出尺寸</label>
+            <input class="input mono" value="1536 × 2048">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>生成数量</label>
+            <select class="select"><option>1 张</option></select>
+          </div>
+          <div class="field">
+            <label>参考图</label>
+            <div class="val">2 / 8</div>
+          </div>
+        </div>
+        <div class="develop">
+          <div class="scan"></div>
+          <span class="lbl">显影中</span>
+        </div>
+        <button class="run running">运行中 · 点击取消</button>
+      </div>
+    </div>
+
+    <!-- 结果节点 -->
+    <div class="node" style="left:900px; top:212px;">
+      <div class="node-head">
+        <span class="dot idle"></span>
+        <span class="title">迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop" style="height:96px;">
+          <span class="glyph">◍</span>
+          等待上游输出
+        </div>
+        <button class="run" disabled>未验证不可运行</button>
+        <p class="warn-line">该节点所属流程尚未通过评估,暂不可付费运行。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- B. 新旧对比 -->
+<section>
+  <div class="sec-tag">B · BEFORE / AFTER</div>
+  <h2>节点卡 · 新旧对比</h2>
+  <div class="sec-note">左:现行实现(硬编码值复现,括号内为现行字号标注)。右:新 token 版。注意 <b>标签 10px→11px、警示 9px→11px 且独立色、状态点 8px→10px、标题栏分层、控件高度统一 28px</b>。墨白主题下 CTA 为墨色、深节点上金色 handle 保留为品牌呼应(见图例下方 handle 样张)。</p>
+  <div class="compare">
+    <div>
+      <div class="pill-old">现行 · 2026-09-17 快照</div>
+      <div class="old-card">
+        <div class="oh"><span style="width:8px;height:8px;border-radius:50%;background:#737373"></span><span class="t">AI 改款</span></div>
+        <div class="ob">
+          <label>提示词(10px 灰)</label>
+          <div class="oi">保留主题与构图…</div>
+          <label>尺寸(10px) / 数量</label>
+          <div class="oi" style="font-size:10px">1536x2048</div>
+          <p class="owarn">当前尚无独立提示词、参数档案和真实评估,暂不可新建或付费运行。(9px amber)</p>
+          <button class="orun">运行</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="pill-new">新版 · token 化</div>
+      <div class="node" style="position:relative;">
+        <div class="node-head">
+          <span class="dot idle"></span>
+          <span class="title">AI 改款</span>
+          <span class="kind">AI</span>
+        </div>
+        <div class="node-body">
+          <div class="field">
+            <label>指令</label>
+            <input class="input" value="保留主题与构图,替换材质语言">
+          </div>
+          <div class="row2">
+            <div class="field"><label>尺寸</label><input class="input mono" value="1536 × 2048"></div>
+            <div class="field"><label>数量</label><select class="select"><option>1 张</option></select></div>
+          </div>
+          <p class="warn-line">该流程尚未通过评估,暂不可付费运行。</p>
+          <button class="run">运行</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- C. 状态系统 -->
+<section>
+  <div class="sec-tag">C · STATUS SYSTEM</div>
+  <h2>8 态状态点 · 一色一义</h2>
+  <p class="sec-note">与品牌金彻底解耦。运行/等待重试带描边环以区分"活着"与"卡住";idle 与 cancelled 共用中性灰,靠文字区分。悬停可见完整图例(现行 title 属性不可发现)。</p>
+  <div class="legend">
+    <div class="item"><span class="dot idle"></span><div><div class="name">空闲</div><div class="en">idle</div></div></div>
+    <div class="item"><span class="dot queued"></span><div><div class="name">排队中</div><div class="en">queued</div></div></div>
+    <div class="item"><span class="dot running"></span><div><div class="name">运行中</div><div class="en">running</div></div></div>
+    <div class="item"><span class="dot retry"></span><div><div class="name">等待重试</div><div class="en">retry_wait</div></div></div>
+    <div class="item"><span class="dot success"></span><div><div class="name">成功</div><div class="en">success</div></div></div>
+    <div class="item"><span class="dot error"></span><div><div class="name">失败</div><div class="en">error</div></div></div>
+    <div class="item"><span class="dot unknown"></span><div><div class="name">结果未知</div><div class="en">outcome_unknown</div></div></div>
+    <div class="item"><span class="dot idle"></span><div><div class="name">已取消</div><div class="en">cancelled</div></div></div>
+  </div>
+</section>
+
+<!-- D. 控件语言 -->
+<section>
+  <div class="sec-tag">D · CONTROL LANGUAGE</div>
+  <h2>控件样张 · 节点 / 面板同一语言</h2>
+  <p class="sec-note">节点内 28px、面板内 32px 双档高度;同一套边框/圆角/焦点环。焦点环 2px accent,即时出现(不动画)。滑杆 accent 随主题。</p>
+  <div class="ctl-lab">
+    <div class="ctl-card">
+      <h3>按钮 · 三级</h3>
+      <div class="demo">
+        <button class="btn2 primary">运行</button>
+        <button class="btn2">从素材库选择</button>
+        <button class="btn2 ghost">取消</button>
+        <button class="btn2" disabled style="opacity:.45;cursor:not-allowed">未验证不可运行</button>
+      </div>
+    </div>
+    <div class="ctl-card">
+      <h3>输入 · mono 数值 / 校验态</h3>
+      <div class="demo">
+        <input class="input mono" style="width:130px" value="1536 × 2048">
+        <input class="input" placeholder="节点名称…">
+        <span class="field" style="width:130px">
+          <input class="input" style="border-color:var(--st-error)" value="1536 × 9999">
+          <label style="color:var(--st-error)">尺寸超上限,支持 ≤ 4096</label>
+        </span>
+      </div>
+    </div>
+    <div class="ctl-card">
+      <h3>滑杆 / 下拉</h3>
+      <div class="demo">
+        <span class="field" style="flex-direction:row;align-items:center;gap:8px">
+          <label style="margin:0">重绘强度</label>
+          <input type="range" min="0" max="100" value="60" aria-label="重绘强度">
+        </span>
+        <span class="val" style="font-family:var(--mono);font-size:11.5px">0.60</span>
+        <span class="field" style="width:150px">
+          <label>图片模型</label>
+          <select class="select"><option>GPT Image 2 · hi</option></select>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 决策点 -->
+<section>
+  <div class="sec-tag">E · DECISIONS</div>
+  <h2>本板承载的三个决策</h2>
+  <div class="decisions">
+    <div class="decision"><b>D1 · 字体 = 方案 A(已按此渲染)</b><span>系统栈 + mono 数字。板内无任何网络字体;尺寸/坐标/时间戳走 SF Mono / JetBrains Mono 栈。</span></div>
+    <div class="decision"><b>D2 · 「黑白」→「墨白」= 方案 A</b><span>切到墨白主题查看:accent 墨色 #1d1d1f,深节点上的金 handle 保留为品牌呼应,粉色已移除。</span></div>
+    <div class="decision"><b>D3 · 护眼绿 v2 = 方案 A</b><span>切到护眼绿主题查看:节点族绿灰同族,accent 深绿,原 3.43:1 不达标已修复。</span></div>
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.theme-switch button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.theme-switch button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.body.dataset.theme = btn.dataset.t;
+  });
+});
+</script>
+</body>
+</html>
