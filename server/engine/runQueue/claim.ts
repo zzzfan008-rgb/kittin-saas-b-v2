@@ -1,4 +1,4 @@
-import { ClaimedJob, DurableRunRow, JobLockRow, EvaluationRecoveryEvidenceSummary, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS } from "./types";
+import { ClaimedJob, DurableRunRow, JobLockRow, EvaluationRecoveryEvidenceSummary, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS, lockRun } from "./types";
 import { appendRunEvent } from "./events";
 import { persistedEvaluationPolicy } from "./evaluation";
 import { terminateRun } from "./lifecycle";
@@ -167,13 +167,7 @@ export async function markAttemptStarted(
 }
 
 
-export async function lockRun(client: PoolClient, runId: string): Promise<DurableRunRow | undefined> {
-  return (await client.query<DurableRunRow>(
-    `SELECT id, owner_id, project_id, node_id, status, target_step_id, run_type, started_at, finished_at
-     FROM generation_runs WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
-    [runId],
-  )).rows[0];
-}
+
 
 
 export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<number> {

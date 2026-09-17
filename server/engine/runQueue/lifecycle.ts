@@ -1,5 +1,4 @@
-import { lockRun } from "./claim";
-import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, CANCELLED_AFTER_START_WARNING } from "./types";
+import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, CANCELLED_AFTER_START_WARNING, lockRun } from "./types";
 import { appendRunEvent } from "./events";
 import { persistedEvaluationPolicy, persistedEvaluationPolicyFromRow } from "./evaluation";
 import type { PoolClient } from "pg";

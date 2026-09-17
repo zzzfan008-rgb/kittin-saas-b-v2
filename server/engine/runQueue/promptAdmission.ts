@@ -1,4 +1,4 @@
-import { ClaimedJob } from "./types";
+import { ClaimedJob, PromptAdmissionBlockedBeforeProviderCall } from "./types";
 import { persistedEvaluationPolicy } from "./evaluation";
 import { createHash } from "node:crypto";
 import type {
@@ -15,13 +15,6 @@ import {
   promptRunAdmissionInputFromParams,
   type PromptRunReferenceSnapshot,
 } from "../../../src/lib/promptRunAdmission";
-export class PromptAdmissionBlockedBeforeProviderCall extends Error {
-  constructor(reason: string) {
-    super(`执行前提示词准入阻断：${reason}`);
-    this.name = "PromptAdmissionBlockedBeforeProviderCall";
-  }
-}
-
 
 export function evaluateClaimedJobPromptAdmission(
   job: ClaimedJob,

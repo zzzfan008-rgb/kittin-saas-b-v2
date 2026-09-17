@@ -5,6 +5,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
+import type { PoolClient } from "pg";
 import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
 import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
 import {
@@ -110,4 +111,21 @@ export function parseJson<T>(value: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/** 通用提示词准入失败（Provider 调用前阻断）。 */
+export class PromptAdmissionBlockedBeforeProviderCall extends Error {
+  constructor(reason: string) {
+    super(`执行前提示词准入阻断：${reason}`);
+    this.name = "PromptAdmissionBlockedBeforeProviderCall";
+  }
+}
+
+/** 通用 run 行级锁；所有生命周期/恢复路径共用。 */
+export async function lockRun(client: PoolClient, runId: string): Promise<DurableRunRow | undefined> {
+  return (await client.query<DurableRunRow>(
+    `SELECT id, owner_id, project_id, node_id, status, target_step_id, run_type, started_at, finished_at
+     FROM generation_runs WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+    [runId],
+  )).rows[0];
 }
