@@ -43,7 +43,7 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
       id: "starter",
       type: "image-input",
       position: { x: 0, y: 0 },
-      data: { kind: "image-input", label: "上传服装图", status: "idle", imageRole: "default" },
+      data: { kind: "image-input", label: "上传服装图", status: "idle" },
     }],
     edges: [],
     selectedNodeIds: [],

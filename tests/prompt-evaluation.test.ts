@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   GOLDEN_GARMENT_SAMPLE_IDS,
   GOLDEN_GARMENT_SET_VERSION,
+  PROMPT_SCORE_WEIGHTS,
   PROMPT_SCORING_RUBRIC_VERSION,
   automaticRetryDecision,
   bootstrapQualityGainLowerBound,
@@ -33,11 +34,6 @@ const unit: PromptEvaluationUnit = {
   nodeKind: "ai-modify",
   modelId: "gemini-3.1-flash-image",
   operationMode: "edit",
-  referenceRoleProfile: [
-    { order: 0, role: "garment_full" },
-    { order: 1, role: "identity" },
-    { order: 2, role: "pose_composition" },
-  ],
   parameterProfileId: "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
   parameterProfileVersion: "1.0.0",
 };
@@ -58,14 +54,12 @@ const versions: PromptEvaluationVersionVector = {
 const passingScores: PromptEvaluationScores = {
   garmentMaterialFidelity: 90,
   instructionFollowing: 90,
-  referenceRoleFidelity: 90,
   artifactControl: 90,
   commercialUsability: 90,
 };
 const baselineScores: PromptEvaluationScores = {
   garmentMaterialFidelity: 78,
   instructionFollowing: 78,
-  referenceRoleFidelity: 78,
   artifactControl: 78,
   commercialUsability: 78,
 };
@@ -114,29 +108,22 @@ function makeAttempt(
   };
 }
 
-assert.notEqual(promptEvaluationUnitKey({
-  ...unit,
-  referenceRoleProfile: [
-    { order: 0, role: "pose_composition" },
-    { order: 1, role: "garment_full" },
-    { order: 2, role: "identity" },
-    { order: 3, role: "garment_full" },
-  ],
-}), unitKey, "参考角色顺序、重复和数量必须属于评估单位 key");
-assert.notEqual(promptEvaluationUnitKey({
-  ...unit,
-  referenceRoleProfile: [...unit.referenceRoleProfile, { order: 3, role: "identity" }],
-}), unitKey, "重复角色数量变化必须产生不同 key");
 assert.notEqual(promptEvaluationUnitKey({ ...unit, parameterProfileVersion: "1.0.1" }), unitKey);
 
 assert.equal(scorePromptEvaluation({
   garmentMaterialFidelity: 90,
   instructionFollowing: 80,
-  referenceRoleFidelity: 70,
   artifactControl: 60,
   commercialUsability: 50,
 }).weightedScore, 75);
 assert.throws(() => scorePromptEvaluation({ ...passingScores, artifactControl: 101 }), /0 to 100/);
+
+assert.deepEqual(PROMPT_SCORE_WEIGHTS, {
+  garmentMaterialFidelity: 0.35,
+  instructionFollowing: 0.30,
+  artifactControl: 0.20,
+  commercialUsability: 0.15,
+});
 
 assert.deepEqual(automaticRetryDecision("outcome_unknown"), {
   allowed: false,
@@ -227,7 +214,6 @@ assert.equal(formal.supportLevel, "verified");
 const lowScores: PromptEvaluationScores = {
   garmentMaterialFidelity: 40,
   instructionFollowing: 40,
-  referenceRoleFidelity: 40,
   artifactControl: 40,
   commercialUsability: 40,
 };

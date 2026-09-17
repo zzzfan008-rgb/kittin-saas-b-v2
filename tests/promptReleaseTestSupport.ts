@@ -5,27 +5,14 @@ import {
   type PromptEvaluationRelease,
   type ReleasedPromptSupportStatus,
 } from "../src/lib/promptEvaluationReleaseRegistry";
-import type { EvaluationReferenceRoleProfileEntry } from "../src/types/promptEvaluation";
 
 export const TEST_PROMPT_RELEASE_CODE_SHA = "0123456789abcdef0123456789abcdef01234567";
 const TEST_SHA256 = "0".repeat(64);
-
-function defaultReferenceRoleProfile(
-  variant: PromptVariant,
-): readonly EvaluationReferenceRoleProfileEntry[] {
-  const profile: EvaluationReferenceRoleProfileEntry[] = variant.requiredRoles.map((role, order) => ({ order, role }));
-  if (variant.mode === "mask-edit") {
-    profile.push({ order: profile.length, role: "generic" });
-    profile.push({ order: profile.length, role: "mask" });
-  }
-  return profile;
-}
 
 /** Isolated-process fixture only; production has no promotion entries. */
 export function promotePromptVariantForTest(
   variant: PromptVariant,
   supportStatus: ReleasedPromptSupportStatus = "verified",
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[] = defaultReferenceRoleProfile(variant),
 ): void {
   // Runtime callers read the code identity from their environment; tests must
   // provide the same explicit, syntactically valid identity as their release.
@@ -34,7 +21,6 @@ export function promotePromptVariantForTest(
   const existing = releases.findIndex((release) => release.variantId === variant.variantId);
   const release = createPromptEvaluationReleaseSnapshot(
     variant,
-    referenceRoleProfile,
     supportStatus,
     `test-only:${variant.variantId}`,
     {

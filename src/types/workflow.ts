@@ -72,7 +72,7 @@ export function defaultOperationModeForNode(kind: NodeKind): ImageOperationMode 
   return allowedOperationModesForNode(kind)[0];
 }
 
-// ---------- 参考图角色与可追溯输入 ----------
+// ---------- 参考图可追溯输入 ----------
 /** @deprecated 参考图角色体系将被移除（见 docs/design/2026-09-17-remove-reference-roles/plan.md）。 */
 export const REFERENCE_ROLE_VALUES = [
   "identity",
@@ -89,24 +89,6 @@ export const REFERENCE_ROLE_VALUES = [
 /** @deprecated 参考图角色体系将被移除。 */
 export type ReferenceRole = (typeof REFERENCE_ROLE_VALUES)[number];
 
-/** Target handles whose semantics are fixed by the receiving node. */
-const DEDICATED_REFERENCE_HANDLE_ROLES: Partial<
-  Record<NodeKind, Readonly<Record<string, ReferenceRole>>>
-> = {
-  "fabric-recolor": {
-    garment: "garment_full",
-    fabric: "fabric",
-  },
-};
-
-export function referenceRoleForTargetHandle(
-  targetKind: NodeKind | undefined,
-  targetHandle: string | null | undefined,
-): ReferenceRole | undefined {
-  if (!targetKind || !targetHandle) return undefined;
-  return DEDICATED_REFERENCE_HANDLE_ROLES[targetKind]?.[targetHandle];
-}
-
 /** v0-v3 画布中的含糊角色只用于迁移，不可直接当作新角色使用。 */
 /** @deprecated 参考图角色体系将被移除。 */
 export const LEGACY_IMAGE_ROLE_VALUES = ["default", "sketch", "garment", "reference"] as const;
@@ -121,63 +103,10 @@ export function isReferenceRole(value: unknown): value is ReferenceRole {
 }
 
 /**
- * 旧角色只做保守映射，一律保留“待确认”。新角色也必须有显式 false
- * 才表示用户已确认，避免旧项目在迁移时被误判。
- */
-export function normalizeImageInputReferenceRole(
-  value: unknown,
-  roleNeedsConfirmation: unknown,
-): { role: ReferenceRole; roleNeedsConfirmation: boolean } {
-  const confirmed = roleNeedsConfirmation === false;
-  if (isReferenceRole(value)) return { role: value, roleNeedsConfirmation: !confirmed };
-  switch (value) {
-    case "sketch":
-      return { role: "pose_composition", roleNeedsConfirmation: true };
-    case "garment":
-      return { role: "garment_full", roleNeedsConfirmation: true };
-    case "default":
-    case "reference":
-    default:
-      return { role: "generic", roleNeedsConfirmation: true };
-  }
-}
-
-/**
- * One graph edge is one explicit reference-role assignment. The same source
- * node may therefore serve different roles for different target nodes.
+ * 边数据按任意键值容忍读取；角色字段已被忽略。
  * @deprecated 参考图角色体系将被移除；边数据按任意键值容忍读取。
  */
 export type ReferenceEdgeData = Record<string, unknown>;
-
-/**
- * Resolve an edge conservatively. Explicit edge data always wins. A missing
- * edge role may use an already-confirmed image-input role as its creation or
- * migration default; every other legacy/malformed edge remains pending.
- */
-export function resolveReferenceEdgeData(
-  value: unknown,
-  sourceData?: WorkflowNodeData,
-  targetKind?: NodeKind,
-  targetHandle?: string | null,
-): ReferenceEdgeData {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const raw = value as Record<string, unknown>;
-    if (Object.hasOwn(raw, "role")) {
-      return isReferenceRole(raw.role)
-        ? { role: raw.role, roleNeedsConfirmation: raw.roleNeedsConfirmation !== false }
-      : { role: "generic", roleNeedsConfirmation: true };
-    }
-  }
-  const fixedRole = referenceRoleForTargetHandle(targetKind, targetHandle);
-  if (fixedRole) return { role: fixedRole, roleNeedsConfirmation: false };
-  if (sourceData?.kind === "image-input") {
-    return normalizeImageInputReferenceRole(
-      sourceData.imageRole,
-      sourceData.roleNeedsConfirmation,
-    );
-  }
-  return { role: "generic", roleNeedsConfirmation: true };
-}
 
 /** Provider 收到的已解析参考图；dataUrl 必须与 assetSha256 对应。 */
 export interface ReferenceImageInput {
@@ -426,15 +355,12 @@ export interface NodeExecution {
   inputImages: string[];
   /** 与 inputImages 对齐的角色快照；供单节点重跑和历史证据使用。 */
   inputReferences?: ReferenceImageSource[];
-  /**
-   * 上游依赖（按边顺序）：运行时优先取本次 Run 中该上游的产出，
+  /** 上游依赖（按边顺序）：运行时优先取本次 Run 中该上游的产出，
    * 上游不在执行范围（单节点重跑）时回退到 images 快照。
    */
   upstream?: {
     nodeId: string;
     images: string[];
-    referenceRole?: ReferenceRole;
-    roleNeedsConfirmation?: boolean;
   }[];
   params: Record<string, unknown>;
 }

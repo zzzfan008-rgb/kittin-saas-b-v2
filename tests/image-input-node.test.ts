@@ -50,7 +50,6 @@ const baseData: ImageInputNodeData = {
   kind: "image-input",
   label: "图片上传",
   status: "idle",
-  imageRole: "reference",
 };
 
 console.log("图片上传节点文件选择测试");

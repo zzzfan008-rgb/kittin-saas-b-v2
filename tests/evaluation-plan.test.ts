@@ -19,7 +19,7 @@ const plan = JSON.parse(readFileSync(
     persistProviderOriginalAndPostprocessed: boolean;
     separateGenerateAndEdit: boolean;
   };
-  scenarioAxes: Array<{ id: string; operationMode: string; referenceRoleProfile: string[] }>;
+  scenarioAxes: Array<{ id: string; operationMode: string }>;
   capabilityExtensions: Array<Record<string, unknown> & { id: string; modelIds: string[] }>;
   rules: Record<string, boolean>;
 };
@@ -45,7 +45,6 @@ assert.deepEqual(plan.scenarioAxes.map((axis) => axis.id), [
   "occlusion-and-nontarget-preservation",
 ]);
 assert.ok(plan.scenarioAxes.every((axis) => axis.operationMode === "generate" || axis.operationMode === "edit"));
-assert.equal(plan.scenarioAxes.find((axis) => axis.id === "multi-image-role-isolation")?.referenceRoleProfile.length, 4);
 
 const extensions = new Map(plan.capabilityExtensions.map((extension) => [extension.id, extension]));
 assert.deepEqual(extensions.get("five-to-eight-reference-images")?.modelIds, [

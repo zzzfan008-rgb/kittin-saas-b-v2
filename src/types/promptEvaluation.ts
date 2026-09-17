@@ -1,20 +1,9 @@
 import type { ImageModelId } from "./imageModels";
-import type { NodeKind, ReferenceRole } from "./workflow";
+import type { NodeKind } from "./workflow";
 
 export type EvaluationNodeKind = Exclude<NodeKind, "image-input" | "result">;
 
 export type EvaluationOperationMode = "generate" | "edit" | "mask-edit";
-
-export type EvaluationReferenceRole = ReferenceRole | "mask";
-
-/**
- * Exact ordered Provider-input role profile. `order` is zero-based and must
- * match the array position; duplicates are meaningful and are never collapsed.
- */
-export interface EvaluationReferenceRoleProfileEntry {
-  order: number;
-  role: EvaluationReferenceRole;
-}
 
 /**
  * The smallest independently evaluated and releasable prompt/model combination.
@@ -28,7 +17,6 @@ export interface PromptEvaluationUnit {
   nodeKind: EvaluationNodeKind;
   modelId: ImageModelId;
   operationMode: EvaluationOperationMode;
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[];
   parameterProfileId: string;
   parameterProfileVersion: string;
 }
@@ -63,7 +51,6 @@ export interface PromptEvaluationVersionVector {
 export type PromptScoreCriterion =
   | "garmentMaterialFidelity"
   | "instructionFollowing"
-  | "referenceRoleFidelity"
   | "artifactControl"
   | "commercialUsability";
 
@@ -80,7 +67,6 @@ export type EvaluationHardBlockerCode =
   | "contract-mismatch"
   | "missing-provider-original"
   | "missing-postprocessed-output"
-  | "reference-role-bleed"
   | "garment-identity-corruption"
   | "duplicate-billing"
   | "unsafe-output"

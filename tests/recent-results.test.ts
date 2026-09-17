@@ -112,6 +112,7 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
     aspectRatio: "1:1",
     batchSize: 4,
     outputImages: [],
+    operationMode: "edit",
   };
   assert.equal(requestedResultCount(modify), 4);
   assert.equal(requestedResultCount({
@@ -277,6 +278,7 @@ test("异常错误事件即使夹带 images 也不会清空节点原有图片", 
     aspectRatio: "1:1",
     batchSize: 1,
     outputImages: ["/api/files/previous.png"],
+    operationMode: "edit",
   };
   const event = normalizeRunEvent({
     type: "node-status",
@@ -319,20 +321,17 @@ test("图片网格使用服务端缩略图但查看器仍保留原图引用", ()
 test("历史参考证据始终与图片索引对齐，损坏条目保持待复核", () => {
   const evidence = normalizeReferenceImageEvidence([
     {
-      role: "garment_top",
       order: 7,
       assetSha256: "坏哈希",
       sourceNodeId: "legacy-source",
-      roleNeedsConfirmation: false,
     },
   ], 2);
-  assert.deepEqual(evidence.map(({ order, role, roleNeedsConfirmation, evidenceState }) => ({
-    order, role, roleNeedsConfirmation, evidenceState,
+  assert.deepEqual(evidence.map(({ evidenceState }) => ({
+    evidenceState,
   })), [
-    { order: 0, role: "garment_top", roleNeedsConfirmation: true, evidenceState: "legacy" },
-    { order: 1, role: "generic", roleNeedsConfirmation: true, evidenceState: "unavailable" },
+    { evidenceState: "legacy" },
+    { evidenceState: "unavailable" },
   ]);
-  assert.equal(evidence[0]?.sourceNodeId, "legacy-source");
 });
 
 test("排队中的运行按钮禁用并明确显示排队状态", () => {

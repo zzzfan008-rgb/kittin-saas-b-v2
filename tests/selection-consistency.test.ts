@@ -56,7 +56,7 @@ function node(id: string, selected = false): FlowNode {
     type: "image-input",
     position: { x: id === "a" ? 0 : 320, y: 0 },
     selected,
-    data: { kind: "image-input", label: id, status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label: id, status: "idle" },
   };
 }
 

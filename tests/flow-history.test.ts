@@ -131,59 +131,7 @@ await test("历史对账的运行态修复不进入撤销历史", () => {
   assert.equal(activeDocument().revision, beforeRevision);
 });
 
-await test("每条入边角色确认形成一次可撤销文档修改，重复确认不新增历史", () => {
-  const source: FlowNode = {
-    id: "edge-role-source",
-    type: "image-input",
-    position: { x: 0, y: 0 },
-    data: {
-      kind: "image-input",
-      label: "参考图",
-      status: "idle",
-      imageUrl: "/api/files/reference.png",
-      imageRole: "generic",
-      roleNeedsConfirmation: true,
-    },
-  };
-  const target = aiNode("edge-role-target");
-  useFlowStore.getState().loadFlow({
-    projectId: "edge-role-history-project",
-    projectName: "边角色撤销测试",
-    nodes: [source, target],
-    edges: [{
-      id: "edge-role",
-      source: source.id,
-      target: target.id,
-      data: { role: "generic", roleNeedsConfirmation: true },
-    }],
-  });
-  useFlowStore.temporal.getState().clear();
-  const beforeRevision = activeDocument().revision;
-
-  useFlowStore.getState().updateEdgeReferenceRole("edge-role", "garment_top");
-  assert.deepEqual(activeDocument().edges[0].data, {
-    role: "garment_top",
-    roleNeedsConfirmation: false,
-  });
-  assert.equal(activeDocument().revision, beforeRevision + 1);
-  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
-
-  useFlowStore.getState().updateEdgeReferenceRole("edge-role", "garment_top");
-  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
-
-  useFlowStore.getState().undo();
-  assert.deepEqual(activeDocument().edges[0].data, {
-    role: "generic",
-    roleNeedsConfirmation: true,
-  });
-  useFlowStore.getState().redo();
-  assert.deepEqual(activeDocument().edges[0].data, {
-    role: "garment_top",
-    roleNeedsConfirmation: false,
-  });
-});
-
-await test("参考边改角色、重排和移除可逐步撤销并重做", () => {
+await test("参考边重排和移除可逐步撤销并重做", () => {
   const sourceA = {
     ...aiNode("history-reference-a"),
     type: "image-input" as const,
@@ -192,8 +140,6 @@ await test("参考边改角色、重排和移除可逐步撤销并重做", () =>
       label: "参考 A",
       status: "idle" as const,
       imageUrl: "/api/files/history-a.png",
-      imageRole: "default" as const,
-      roleNeedsConfirmation: true,
     },
   };
   const sourceB = {
@@ -216,29 +162,22 @@ await test("参考边改角色、重排和移除可逐步撤销并重做", () =>
         id: "history-reference-edge-a",
         source: sourceA.id,
         target: targetNode.id,
-        data: { role: "identity", roleNeedsConfirmation: false },
       },
       {
         id: "history-reference-edge-b",
         source: sourceB.id,
         target: targetNode.id,
-        data: { role: "pose_composition", roleNeedsConfirmation: false },
       },
       {
         id: "history-reference-edge-c",
         source: sourceC.id,
         target: targetNode.id,
-        data: { role: "garment_full", roleNeedsConfirmation: false },
       },
     ],
   });
   useFlowStore.temporal.getState().clear();
   const target = documentTargetForTab(useFlowStore.getState().activeTabId);
 
-  assert.equal(
-    useFlowStore.getState().updateEdgeReferenceRoleInTab(target, "history-reference-edge-a", "background"),
-    true,
-  );
   assert.equal(
     useFlowStore.getState().moveReferenceEdgeInTab(target, "history-reference-edge-c", "up"),
     true,
@@ -255,8 +194,7 @@ await test("参考边改角色、重排和移除可逐步撤销并重做", () =>
     "history-reference-edge-c",
     "history-reference-edge-a",
   ]);
-  assert.deepEqual(activeDocument().edges.map((edge) => edge.data?.role), ["garment_full", "background"]);
-  assert.equal(useFlowStore.temporal.getState().pastStates.length, 4);
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 3);
 
   useFlowStore.getState().undo();
   assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
@@ -276,12 +214,7 @@ await test("参考边改角色、重排和移除可逐步撤销并重做", () =>
     "history-reference-edge-b",
     "history-reference-edge-c",
   ]);
-  assert.equal(activeDocument().edges[0].data?.role, "background");
-  useFlowStore.getState().undo();
-  assert.equal(activeDocument().edges[0].data?.role, "identity");
 
-  useFlowStore.getState().redo();
-  assert.equal(activeDocument().edges[0].data?.role, "background");
   useFlowStore.getState().redo();
   assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
     "history-reference-edge-a",

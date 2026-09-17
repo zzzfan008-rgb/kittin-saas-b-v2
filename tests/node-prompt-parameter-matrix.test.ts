@@ -83,7 +83,6 @@ for (const entry of supported) {
     assert.equal(review.familyId, variant.familyId);
     assert.equal(review.mode, variant.mode);
     assert.equal(review.promptSha256, `sha256:${createHash("sha256").update(variant.fullPrompt).digest("hex")}`);
-    assert.deepEqual(review.requiredRoles, variant.requiredRoles);
     assert.deepEqual(review.checklist, [
       "subject-task",
       "composition",

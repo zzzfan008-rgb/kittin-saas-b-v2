@@ -1,28 +1,19 @@
-import {
-  isReferenceRole,
-  type ImageGenRequest,
-  type ReferenceImageInput,
-} from "../types/workflow";
+import type { ImageGenRequest, ReferenceImageInput } from "../types/workflow";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
-export interface ReferenceInputRoleState {
-  role: unknown;
+export interface ReferenceInputEntryState {
   order: unknown;
-  roleNeedsConfirmation?: unknown;
   sourceNodeId?: unknown;
 }
 
 export type ReferenceInputIssueCode =
-  | "reference-role-invalid"
-  | "reference-role-unconfirmed";
+  | "reference-structure-invalid";
 
 export type ReferenceInputIssueField =
   | "references"
   | "reference"
-  | "order"
-  | "role"
-  | "roleNeedsConfirmation";
+  | "order";
 
 export interface ReferenceInputIssue {
   code: ReferenceInputIssueCode;
@@ -34,10 +25,8 @@ export interface ReferenceInputIssue {
 }
 
 /**
- * Canonical role/order/confirmation validation shared by browser, server and
- * Worker admission. Issues stay in input-array order; within one entry,
- * structural role issues precede confirmation so callers can fail closed on
- * the most fundamental error without recomputing a second validation model.
+ * Canonical order/structure validation shared by browser, server and
+ * Worker admission. Issues stay in input-array order.
  */
 export function referenceInputIssues(
   references: unknown,
@@ -45,7 +34,7 @@ export function referenceInputIssues(
   if (references === undefined) return [];
   if (!Array.isArray(references)) {
     return [{
-      code: "reference-role-invalid",
+      code: "reference-structure-invalid",
       field: "references",
       order: 0,
       reason: "references must be an array",
@@ -55,14 +44,14 @@ export function referenceInputIssues(
   references.forEach((value, index) => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       issues.push({
-        code: "reference-role-invalid",
+        code: "reference-structure-invalid",
         field: "reference",
         order: index,
         reason: `references[${index}] must be an object`,
       });
       return;
     }
-    const reference = value as ReferenceInputRoleState;
+    const reference = value as ReferenceInputEntryState;
     const sourceNodeId = typeof reference.sourceNodeId === "string" && reference.sourceNodeId.length > 0
       ? reference.sourceNodeId
       : undefined;
@@ -73,29 +62,9 @@ export function referenceInputIssues(
     });
     if (!Number.isSafeInteger(reference.order) || reference.order !== index) {
       issues.push(locate({
-        code: "reference-role-invalid",
+        code: "reference-structure-invalid",
         field: "order",
         reason: `references[${index}].order must be a safe integer equal to ${index}`,
-      }));
-    }
-    if (!isReferenceRole(reference.role)) {
-      issues.push(locate({
-        code: "reference-role-invalid",
-        field: "role",
-        reason: `references[${index}].role must be a supported reference role`,
-      }));
-    }
-    if (reference.roleNeedsConfirmation === undefined || reference.roleNeedsConfirmation === true) {
-      issues.push(locate({
-        code: "reference-role-unconfirmed",
-        field: "roleNeedsConfirmation",
-        reason: "roleNeedsConfirmation is not false",
-      }));
-    } else if (reference.roleNeedsConfirmation !== false) {
-      issues.push(locate({
-        code: "reference-role-invalid",
-        field: "roleNeedsConfirmation",
-        reason: `references[${index}].roleNeedsConfirmation must be a boolean`,
       }));
     }
   });
@@ -108,14 +77,14 @@ export function orderedReferenceInputs(request: ImageGenRequest): ReferenceImage
 
 /**
  * Provider 适配层的唯一参考图入口。迁移期允许只有旧数组，但当两者
- * 同时存在时必须完全一致，防止角色证据与真实请求分叉。
+ * 同时存在时必须完全一致，防止证据与真实请求分叉。
  */
 export function referenceDataUrls(request: ImageGenRequest): string[] {
   const structured = orderedReferenceInputs(request).map((reference) => reference.dataUrl);
   return structured.length > 0 ? structured : [...(request.referenceImages ?? [])];
 }
 
-/** Data/body validation that deliberately leaves role admission to the shared gate. */
+/** Data/body validation that deliberately leaves admission to the shared gate. */
 export function referenceInputsTransportError(request: ImageGenRequest): string | undefined {
   if (request.references !== undefined && !Array.isArray(request.references)) {
     return "references must be an array";
@@ -157,9 +126,9 @@ export function referenceInputsTransportError(request: ImageGenRequest): string 
   return undefined;
 }
 
-/** Compatibility wrapper used by the Provider boundary: transport plus invalid roles/orders. */
+/** Compatibility wrapper used by the Provider boundary: transport plus invalid orders. */
 export function referenceInputsError(request: ImageGenRequest): string | undefined {
-  const firstInvalidRoleIssue = referenceInputIssues(request.references)
-    .find((issue) => issue.code === "reference-role-invalid");
-  return firstInvalidRoleIssue?.reason ?? referenceInputsTransportError(request);
+  const firstInvalidIssue = referenceInputIssues(request.references)
+    .find((issue) => issue.code === "reference-structure-invalid");
+  return firstInvalidIssue?.reason ?? referenceInputsTransportError(request);
 }

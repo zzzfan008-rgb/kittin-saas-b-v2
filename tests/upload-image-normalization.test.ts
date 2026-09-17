@@ -358,7 +358,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         id: "source-node",
         type: "image-input",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "原图", status: "idle", imageRole: "default", imageUrl: body.url },
+        data: { kind: "image-input", label: "原图", status: "idle", imageUrl: body.url },
       }, {
         id: maskNodeId,
         type: "mask-redraw",
@@ -493,7 +493,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         id: "starter",
         type: "image-input",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "上传服装图", status: "idle", imageRole: "default" },
+        data: { kind: "image-input", label: "上传服装图", status: "idle" },
       }],
       edges: [],
     };

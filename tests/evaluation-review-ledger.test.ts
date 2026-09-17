@@ -314,14 +314,12 @@ console.log("  ✓ 账单更正追加 previous hash 链并只刷新摘要字段"
 const score80 = {
   garmentMaterialFidelity: 80,
   instructionFollowing: 80,
-  referenceRoleFidelity: 80,
   artifactControl: 80,
   commercialUsability: 80,
 };
 const score100 = {
   garmentMaterialFidelity: 100,
   instructionFollowing: 100,
-  referenceRoleFidelity: 100,
   artifactControl: 100,
   commercialUsability: 100,
 };
@@ -405,13 +403,12 @@ const completed = await database.queryOne<{
 assert.deepEqual(JSON.parse(completed!.manual_scores_json), {
   garmentMaterialFidelity: 90,
   instructionFollowing: 90,
-  referenceRoleFidelity: 90,
   artifactControl: 90,
   commercialUsability: 90,
 });
 assert.equal(completed!.baseline_scores_json, null);
 assert.equal(completed?.task_passed, true);
-console.log("  ✓ 人工分数复用五维校验且评完所有输出后才生成 case 摘要；detached 基线写入被拒绝");
+console.log("  ✓ 人工分数复用四维校验且评完所有输出后才生成 case 摘要；detached 基线写入被拒绝");
 
 await assert.rejects(
   database.transaction((client) => reviewLedger.appendEvaluationManualAssessment(
@@ -439,7 +436,6 @@ const blockingManual = await database.transaction((client) => reviewLedger.appen
     scores: {
       garmentMaterialFidelity: 0,
       instructionFollowing: 0,
-      referenceRoleFidelity: 0,
       artifactControl: 0,
       commercialUsability: 0,
     },

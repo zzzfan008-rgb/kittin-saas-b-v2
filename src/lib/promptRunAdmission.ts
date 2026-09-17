@@ -5,7 +5,6 @@ import {
 } from "./garmentPromptPresets";
 import { effectivePromptSupport } from "./promptEvaluationRelease";
 import type { PromptEvaluationRelease } from "./promptEvaluationReleaseRegistry";
-import { canonicalReferenceRoleProfile } from "./promptEvaluation";
 import {
   getModelParameterProfile,
   materializeModelParameterProfile,
@@ -18,7 +17,6 @@ import {
   type ImageModelId,
 } from "../types/imageModels";
 import type {
-  EvaluationReferenceRoleProfileEntry,
   EvaluationShutdownRule,
 } from "../types/promptEvaluation";
 import { PROMPT_RUNTIME_SHUTDOWN_RULES } from "./promptRuntimeShutdown";
@@ -30,21 +28,16 @@ import {
 import type {
   ImageOperationMode,
   NodeKind,
-  ReferenceRole,
   WorkflowNodeData,
 } from "../types/workflow";
 import {
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   allowedOperationModesForNode,
-  isReferenceRole,
-  resolveReferenceEdgeData,
 } from "../types/workflow";
 
 export interface PromptRunReferenceSnapshot {
-  role: ReferenceRole;
   order: number;
-  roleNeedsConfirmation?: boolean;
   sourceNodeId?: string;
 }
 
@@ -84,7 +77,7 @@ function promptRunNodeOutputCount(data: WorkflowNodeData): number {
 
 /**
  * Mirror DAG reference expansion exactly: edges stay in graph order and every
- * visible source image contributes one role entry. A single upstream Provider
+ * visible source image contributes one reference entry. A single upstream Provider
  * node may expose several images, so counting edges is not sufficient evidence.
  */
 export function promptRunReferenceSnapshotsFromGraph(
@@ -97,15 +90,10 @@ export function promptRunReferenceSnapshotsFromGraph(
     if (edge.target !== targetNodeId) continue;
     const source = nodes.find((node) => node.id === edge.source);
     if (!source) continue;
-    const target = nodes.find((node) => node.id === targetNodeId);
-    const role = resolveReferenceEdgeData(edge.data, source.data, target?.data.kind, edge.targetHandle);
     const imageCount = promptRunNodeOutputCount(source.data);
     for (let index = 0; index < imageCount; index += 1) {
       references.push({
         order: references.length,
-        // TODO(R-02/R-03): 移除角色后删除此守卫
-        role: isReferenceRole(role.role) ? role.role : "generic",
-        roleNeedsConfirmation: role.roleNeedsConfirmation !== false,
         sourceNodeId: source.id,
       });
     }
@@ -152,9 +140,7 @@ export interface PromptRunAdmissionDecision {
     | "generate-reference-conflict"
     | "edit-reference-missing"
     | "reference-limit-exceeded"
-    | "reference-role-invalid"
-    | "reference-role-unconfirmed"
-    | "reference-role-missing"
+    | "reference-structure-invalid"
     | "shutdown"
     | "support-status-blocked";
   reason: string;
@@ -247,28 +233,6 @@ function isImageOperationMode(value: unknown): value is ImageOperationMode {
   return value === "generate" || value === "edit" || value === "mask-edit";
 }
 
-/**
- * Project the exact Provider evidence profile. Mask runs append one generated
- * guide image and the PNG mask after the ordered user references.
- */
-export function promptRunReferenceRoleProfile(
-  input: Pick<PromptRunAdmissionInput, "nodeKind" | "operationMode" | "references">,
-): readonly EvaluationReferenceRoleProfileEntry[] {
-  const profile: EvaluationReferenceRoleProfileEntry[] = (input.references ?? []).map(
-    (reference, index) => {
-      if (reference.order !== index || !Number.isSafeInteger(reference.order)) {
-        throw new Error("参考角色顺序必须连续、从 0 开始并与输入数组一致。");
-      }
-      return { order: reference.order, role: reference.role };
-    },
-  );
-  if (input.nodeKind === "mask-redraw" && input.operationMode === "mask-edit") {
-    profile.push({ order: profile.length, role: "generic" });
-    profile.push({ order: profile.length, role: "mask" });
-  }
-  return canonicalReferenceRoleProfile(profile);
-}
-
 /** Shared early model/mode/reference compatibility gate for UI, Store and DAG. */
 export function evaluatePromptRunCompatibility(
   input: PromptRunAdmissionInput,
@@ -348,7 +312,7 @@ export function evaluatePromptRunCompatibility(
     return {
       allowed: false,
       code: "edit-reference-missing",
-      reason: `${input.operationMode} 模式至少需要一张已确认角色的参考图。`,
+      reason: `${input.operationMode} 模式至少需要一张参考图。`,
     };
   }
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(input.modelId));
@@ -363,32 +327,13 @@ export function evaluatePromptRunCompatibility(
     };
   }
   const referenceIssues = referenceInputIssues(references);
-  const invalidReferences = referenceIssues.filter((issue) => issue.code === "reference-role-invalid");
+  const invalidReferences = referenceIssues.filter((issue) => issue.code === "reference-structure-invalid");
   if (invalidReferences.length > 0) {
     return {
       allowed: false,
-      code: "reference-role-invalid",
-      reason: "参考图角色或顺序无效。",
+      code: "reference-structure-invalid",
+      reason: "参考图结构或顺序无效。",
       references: promptRunAdmissionReferenceIssues(invalidReferences),
-    };
-  }
-  try {
-    promptRunReferenceRoleProfile(input);
-  } catch (error) {
-    return {
-      allowed: false,
-      code: "reference-role-invalid",
-      reason: error instanceof Error ? error.message : "参考角色顺序无效。",
-    };
-  }
-  const unconfirmedReferences = referenceIssues
-    .filter((issue) => issue.code === "reference-role-unconfirmed");
-  if (unconfirmedReferences.length > 0) {
-    return {
-      allowed: false,
-      code: "reference-role-unconfirmed",
-      reason: "参考图角色尚未全部确认",
-      references: promptRunAdmissionReferenceIssues(unconfirmedReferences),
     };
   }
   return undefined;
@@ -465,18 +410,6 @@ export function evaluatePromptRunAdmission(
       variant,
     };
   }
-  if (input.references) {
-    const roles = new Set(input.references.map((reference) => reference.role));
-    const missingRoles = variant.requiredRoles.filter((role) => !roles.has(role));
-    if (missingRoles.length > 0) {
-      return {
-        allowed: false,
-        code: "reference-role-missing",
-        reason: `缺少该变体要求的参考角色：${missingRoles.join("、")}`,
-        variant,
-      };
-    }
-  }
   const shutdown = effectiveShutdownRule(
     variant,
     options.shutdownRules ?? PROMPT_RUNTIME_SHUTDOWN_RULES,
@@ -489,10 +422,8 @@ export function evaluatePromptRunAdmission(
       variant,
     };
   }
-  const referenceRoleProfile = promptRunReferenceRoleProfile(input);
   const support = effectivePromptSupport(
     variant,
-    referenceRoleProfile,
     options.releases,
     options.currentCodeSha,
   );

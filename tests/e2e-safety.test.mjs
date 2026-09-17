@@ -50,7 +50,7 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 7 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 6 files/);
   assert.match(
     baseline.stdout,
     /\[golden-path\].*unverified upload stays blocked while a test-reviewed text starter completes the isolated golden path/,

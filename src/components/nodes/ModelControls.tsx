@@ -2,9 +2,9 @@ import { selectActiveDocumentTarget, useFlowStore } from "@/store/flowStore";
 import { useShallow } from "zustand/react/shallow";
 import { inputClass } from "./NodeFrame";
 import {
-  ReferenceRoleSummary,
-  type ReferenceRoleSummaryReference,
-} from "./ReferenceRoleSummary";
+  ReferenceImageList,
+  type ReferenceImageListItem,
+} from "./ReferenceImageList";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   GENERATION_IMAGE_MODEL_IDS,
@@ -22,7 +22,7 @@ interface ModelControlsProps {
   modelOptions?: ImageModelOptions;
   preferredAspectRatio?: string;
   disabled?: boolean;
-  referenceRows?: readonly ReferenceRoleSummaryReference[];
+  referenceRows?: readonly ReferenceImageListItem[];
 }
 
 export function ModelControls({
@@ -36,7 +36,6 @@ export function ModelControls({
 }: ModelControlsProps) {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const documentTarget = useFlowStore(useShallow(selectActiveDocumentTarget));
-  const updateEdgeReferenceRoleInTab = useFlowStore((state) => state.updateEdgeReferenceRoleInTab);
   const moveReferenceEdgeInTab = useFlowStore((state) => state.moveReferenceEdgeInTab);
   const removeReferenceEdgeInTab = useFlowStore((state) => state.removeReferenceEdgeInTab);
   const options = normalizeImageModelOptions(modelId, modelOptions, preferredAspectRatio);
@@ -143,12 +142,9 @@ export function ModelControls({
       )}
 
       {referenceRows && referenceRows.length > 0 && (
-        <ReferenceRoleSummary
+        <ReferenceImageList
           references={referenceRows}
           disabled={disabled}
-          onRoleChange={(reference, role) => {
-            if (reference.edgeId) updateEdgeReferenceRoleInTab(documentTarget, reference.edgeId, role);
-          }}
           onMove={(reference, direction) => {
             if (reference.edgeId) moveReferenceEdgeInTab(documentTarget, reference.edgeId, direction);
           }}

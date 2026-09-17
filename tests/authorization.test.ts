@@ -115,7 +115,6 @@ function flow(images: string[] = []) {
         kind: "image-input",
         label: `图片 ${index + 1}`,
         status: "idle",
-        imageRole: "default",
         imageUrl,
       },
     })),
@@ -165,8 +164,6 @@ function editFlow(imageUrl: string) {
           kind: "image-input",
           label: "原图",
           status: "idle",
-          imageRole: "garment_full",
-          roleNeedsConfirmation: false,
           imageUrl,
         },
       },
@@ -198,10 +195,7 @@ function editFlow(imageUrl: string) {
       id: "source-edit",
       source: "source",
       target: "edit",
-      data: {
-        role: "garment_full",
-        roleNeedsConfirmation: false,
-      },
+      data: {},
     }],
   };
 }
@@ -376,10 +370,8 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
       batchSize: 1,
       references: [{
         dataUrl: referenceImage,
-        role: "garment_full",
         order: 0,
         assetSha256: "a".repeat(64),
-        roleNeedsConfirmation: false,
       }],
       modelOptions: editParameters.modelOptions,
     },
@@ -1035,199 +1027,13 @@ await test("直连生成在入队前拒绝未知 modelOptions", async () => {
   assert.equal(after, before);
 });
 
-await test("直连生成对缺失、true 和旧数组参考角色失败关闭且零入队", async () => {
-  const clientRequestIds = [
-    "direct-unconfirmed-role-missing",
-    "direct-unconfirmed-role-true",
-    "direct-unconfirmed-role-legacy",
-  ];
-  for (const [index, clientRequestId] of clientRequestIds.entries()) {
-    const body = directGenerateBody(PNG_DATA_URL, undefined, clientRequestId);
-    const requestBody = body.request as typeof body.request & {
-      referenceImages?: string[];
-      references?: typeof body.request.references;
-    };
-    if (index === 0) {
-      delete (requestBody.references![0] as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
-    } else if (index === 1) {
-      requestBody.references![0].roleNeedsConfirmation = true;
-    } else {
-      requestBody.referenceImages = [PNG_DATA_URL];
-      delete (requestBody as { references?: typeof body.request.references }).references;
-    }
-    const response = await request("/generate", "owner", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    const payload = await response.json() as {
-      error?: string;
-      code?: string;
-      references?: Array<{ order: number; sourceNodeId?: string; reason: string }>;
-    };
-    assert.equal(response.status, 400, clientRequestId);
-    assert.deepEqual(payload, {
-      error: "参考图角色尚未全部确认",
-      code: "reference-role-unconfirmed",
-      references: [{ order: 0, reason: "roleNeedsConfirmation is not false" }],
-    }, clientRequestId);
-  }
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_runs
-    WHERE client_request_id = ANY($1::text[])
-  `, [clientRequestIds]))?.count, 0);
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_jobs
-    WHERE run_id IN (
-      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
-    )
-  `, [clientRequestIds]))?.count, 0);
-});
-
-await test("直连生成保留非法角色与 order 的结构化明细，损坏 JSON 确定返回 400", async () => {
-  const invalidRoleId = "direct-invalid-reference-role";
-  const invalidRoleBody = directGenerateBody(PNG_DATA_URL, undefined, invalidRoleId);
-  invalidRoleBody.request.references[0].role = "unsupported-role" as never;
-  const invalidRoleResponse = await request("/generate", "owner", {
-    method: "POST",
-    body: JSON.stringify(invalidRoleBody),
-  });
-  assert.equal(invalidRoleResponse.status, 400);
-  assert.deepEqual(await invalidRoleResponse.json(), {
-    error: "参考图角色或顺序无效。",
-    code: "reference-role-invalid",
-    references: [{
-      order: 0,
-      reason: "references[0].role must be a supported reference role",
-    }],
-  });
-
-  const invalidOrderId = "direct-invalid-reference-order";
-  const invalidOrderBody = directGenerateBody(PNG_DATA_URL, undefined, invalidOrderId);
-  invalidOrderBody.request.references[0].order = 1;
-  const invalidOrderResponse = await request("/generate", "owner", {
-    method: "POST",
-    body: JSON.stringify(invalidOrderBody),
-  });
-  assert.equal(invalidOrderResponse.status, 400);
-  assert.deepEqual(await invalidOrderResponse.json(), {
-    error: "参考图角色或顺序无效。",
-    code: "reference-role-invalid",
-    references: [{
-      order: 0,
-      reason: "references[0].order must be a safe integer equal to 0",
-    }],
-  });
-
-  const malformedCases = [
-    {
-      clientRequestId: "direct-reference-array-object",
-      mutate: (requestBody: Record<string, unknown>) => { requestBody.references = {}; },
-      error: "request references must be an array",
-    },
-    {
-      clientRequestId: "direct-reference-null-entry",
-      mutate: (requestBody: Record<string, unknown>) => { requestBody.references = [null]; },
-      error: "request references[0] must be an object",
-    },
-    {
-      clientRequestId: "direct-legacy-reference-string",
-      mutate: (requestBody: Record<string, unknown>) => {
-        delete requestBody.references;
-        requestBody.referenceImages = "abc";
-      },
-      error: "request referenceImages must be an array",
-    },
-  ];
-  for (const testCase of malformedCases) {
-    const body = directGenerateBody(PNG_DATA_URL, undefined, testCase.clientRequestId);
-    testCase.mutate(body.request as unknown as Record<string, unknown>);
-    const response = await request("/generate", "owner", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    assert.equal(response.status, 400, testCase.clientRequestId);
-    assert.deepEqual(await response.json(), { error: testCase.error }, testCase.clientRequestId);
-  }
-
-  const clientRequestIds = [
-    invalidRoleId,
-    invalidOrderId,
-    ...malformedCases.map((testCase) => testCase.clientRequestId),
-  ];
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_runs
-    WHERE client_request_id = ANY($1::text[])
-  `, [clientRequestIds]))?.count, 0);
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_jobs
-    WHERE run_id IN (
-      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
-    )
-  `, [clientRequestIds]))?.count, 0);
-});
-
-await test("画布运行对迁移后待确认连线返回同一结构化 400 且零入队", async () => {
-  const pendingFlow = editFlow(PNG_DATA_URL);
-  pendingFlow.schemaVersion = 5;
-  delete (pendingFlow.edges[0].data as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
-  const save = await request("/projects", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      id: "pending-reference-role-project",
-      name: "待确认参考角色",
-      flow: pendingFlow,
-    }),
-  });
-  assert.equal(save.status, 200, await save.text());
-  const savedProject = await queryOne<{ flow_json: string }>(
-    "SELECT flow_json FROM projects WHERE id = 'pending-reference-role-project'",
-  );
-  assert.ok(savedProject);
-  const savedFlow = JSON.parse(savedProject.flow_json) as ReturnType<typeof editFlow>;
-  assert.equal(savedFlow.edges[0].data.roleNeedsConfirmation, true);
-
-  const response = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...savedFlow,
-      onlyNodeId: "edit",
-      projectId: "pending-reference-role-project",
-      clientRequestId: "workflow-unconfirmed-role",
-    }),
-  });
-  const payload = await response.json() as {
-    error?: string;
-    code?: string;
-    references?: Array<{ order: number; sourceNodeId?: string; reason: string }>;
-  };
-  assert.equal(response.status, 400);
-  assert.deepEqual(payload, {
-    error: "参考图角色尚未全部确认",
-    code: "reference-role-unconfirmed",
-    references: [{
-      order: 0,
-      sourceNodeId: "source",
-      reason: "roleNeedsConfirmation is not false",
-    }],
-  });
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_runs
-    WHERE client_request_id = 'workflow-unconfirmed-role'
-  `))?.count, 0);
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_jobs
-    WHERE run_id IN (
-      SELECT id FROM generation_runs WHERE client_request_id = 'workflow-unconfirmed-role'
-    )
-  `))?.count, 0);
-});
 
 await test("run-plan 保留显式确认参考角色的普通 edit 正向入队", async () => {
   const confirmedFlow = editFlow(PNG_DATA_URL);
   const save = await request("/projects", "owner", {
     method: "POST",
     body: JSON.stringify({
-      id: "confirmed-reference-role-project",
+      id: "confirmed-reference-project",
       name: "已确认参考角色项目",
       flow: confirmedFlow,
     }),
@@ -1239,8 +1045,8 @@ await test("run-plan 保留显式确认参考角色的普通 edit 正向入队",
     body: JSON.stringify({
       ...confirmedFlow,
       onlyNodeId: "edit",
-      projectId: "confirmed-reference-role-project",
-      clientRequestId: "workflow-confirmed-reference-role",
+      projectId: "confirmed-reference-project",
+      clientRequestId: "workflow-confirmed-reference",
     }),
   });
   const payload = await response.json() as { runId?: string; error?: string };
@@ -1248,265 +1054,12 @@ await test("run-plan 保留显式确认参考角色的普通 edit 正向入队",
   assert.ok(payload.runId);
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
-    WHERE client_request_id = 'workflow-confirmed-reference-role'
+    WHERE client_request_id = 'workflow-confirmed-reference'
   `))?.count, 1);
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_jobs
     WHERE run_id = $1
   `, [payload.runId]))?.count, 1);
-});
-
-await test("run-plan 仅对已授权且 topology 一致的 v6 提交映射参考角色错误", async () => {
-  const savedFlow = editFlow(PNG_DATA_URL);
-  const generatedSource = {
-    ...structuredClone(savedFlow.nodes[1]),
-    id: "generated-source",
-    position: { x: 160, y: 180 },
-    data: {
-      ...structuredClone(savedFlow.nodes[1].data),
-      label: "两张已生成参考图",
-      outputImages: [PNG_DATA_URL, PNG_DATA_URL],
-    },
-  };
-  savedFlow.nodes.splice(1, 0, generatedSource);
-  savedFlow.edges.push({
-    id: "generated-edit",
-    source: "generated-source",
-    target: "edit",
-    data: { role: "fabric", roleNeedsConfirmation: false },
-  });
-  const save = await request("/projects", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      id: "strict-reference-role-project",
-      name: "严格参考角色项目",
-      flow: savedFlow,
-    }),
-  });
-  assert.equal(save.status, 200, await save.text());
-  const persisted = await queryOne<{ flow_json: string }>(
-    "SELECT flow_json FROM projects WHERE id = 'strict-reference-role-project'",
-  );
-  assert.ok(persisted);
-  const canonicalFlow = JSON.parse(persisted.flow_json) as ReturnType<typeof editFlow>;
-
-  const cases: Array<{
-    clientRequestId: string;
-    mutate: (flow: ReturnType<typeof editFlow>) => void;
-    expected: {
-      error: string;
-      code: string;
-      references: Array<{ order: number; sourceNodeId: string; reason: string }>;
-    };
-  }> = [
-    {
-      clientRequestId: "workflow-invalid-reference-role",
-      mutate: (flow) => { flow.edges[1].data.role = "unsupported-role" as never; },
-      expected: {
-        error: "参考图角色或顺序无效。",
-        code: "reference-role-invalid",
-        references: [1, 2].map((order) => ({
-          order,
-          sourceNodeId: "generated-source",
-          reason: `references[${order}].role must be a supported reference role`,
-        })),
-      },
-    },
-    {
-      clientRequestId: "workflow-missing-reference-confirmation",
-      mutate: (flow) => {
-        delete (flow.edges[1].data as { roleNeedsConfirmation?: boolean }).roleNeedsConfirmation;
-      },
-      expected: {
-        error: "参考图角色尚未全部确认",
-        code: "reference-role-unconfirmed",
-        references: [1, 2].map((order) => ({
-          order,
-          sourceNodeId: "generated-source",
-          reason: "roleNeedsConfirmation is not false",
-        })),
-      },
-    },
-    {
-      clientRequestId: "workflow-invalid-reference-confirmation",
-      mutate: (flow) => {
-        flow.edges[1].data.roleNeedsConfirmation = "false" as never;
-      },
-      expected: {
-        error: "参考图角色或顺序无效。",
-        code: "reference-role-invalid",
-        references: [1, 2].map((order) => ({
-          order,
-          sourceNodeId: "generated-source",
-          reason: `references[${order}].roleNeedsConfirmation must be a boolean`,
-        })),
-      },
-    },
-  ];
-
-  for (const testCase of cases) {
-    const submitted = structuredClone(canonicalFlow);
-    testCase.mutate(submitted);
-    const response = await request("/run-plan", "owner", {
-      method: "POST",
-      body: JSON.stringify({
-        ...submitted,
-        onlyNodeId: "edit",
-        projectId: "strict-reference-role-project",
-        clientRequestId: testCase.clientRequestId,
-      }),
-    });
-    assert.equal(response.status, 400, testCase.clientRequestId);
-    assert.deepEqual(await response.json(), testCase.expected, testCase.clientRequestId);
-  }
-
-  const invalidRole = structuredClone(canonicalFlow);
-  invalidRole.edges[1].data.role = "unsupported-role" as never;
-  const wholePlan = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...invalidRole,
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-invalid-reference-role-whole-plan",
-    }),
-  });
-  assert.equal(wholePlan.status, 400);
-  assert.deepEqual(await wholePlan.json(), cases[0].expected);
-
-  const downstream = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...invalidRole,
-      onlyNodeId: "generated-source",
-      includeDownstream: true,
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-invalid-reference-role-downstream",
-    }),
-  });
-  assert.equal(downstream.status, 400);
-  assert.deepEqual(await downstream.json(), cases[0].expected);
-
-  const handleDriftRequestIds: string[] = [];
-  for (const handle of ["sourceHandle", "targetHandle"] as const) {
-    const handleDrift = structuredClone(canonicalFlow);
-    (handleDrift.edges[1] as unknown as Record<typeof handle, string>)[handle] = "fabric";
-    const clientRequestId = `workflow-reference-${handle}-drift`;
-    handleDriftRequestIds.push(clientRequestId);
-    const response = await request("/run-plan", "owner", {
-      method: "POST",
-      body: JSON.stringify({
-        ...handleDrift,
-        onlyNodeId: "edit",
-        projectId: "strict-reference-role-project",
-        clientRequestId,
-      }),
-    });
-    assert.equal(response.status, 409, handle);
-    assert.deepEqual(await response.json(), {
-      error: "画布尚未保存或已在其他位置更新，请保存后重试",
-    }, handle);
-  }
-
-  const denied = await request("/run-plan", "other", {
-    method: "POST",
-    body: JSON.stringify({
-      ...invalidRole,
-      onlyNodeId: "edit",
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-invalid-reference-non-owner",
-    }),
-  });
-  assert.equal(denied.status, 403);
-  assert.deepEqual(await denied.json(), {
-    error: "管理员只能查看其他用户项目，不能运行或修改",
-  });
-
-  const forgedTopology = structuredClone(invalidRole);
-  forgedTopology.edges[1].source = "source";
-  const forged = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...forgedTopology,
-      onlyNodeId: "edit",
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-invalid-reference-forged-topology",
-    }),
-  });
-  assert.equal(forged.status, 400);
-  assert.deepEqual(await forged.json(), {
-    error: "flow.edges[1].data.role: must be one of: identity, pose_composition, garment_top, garment_bottom, garment_full, fabric, accessory, styling_only, background, generic",
-  });
-
-  const invalidRoleWithHandleDrift = structuredClone(invalidRole);
-  (invalidRoleWithHandleDrift.edges[1] as unknown as { targetHandle?: string }).targetHandle = "fabric";
-  const invalidHandleTopology = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...invalidRoleWithHandleDrift,
-      onlyNodeId: "edit",
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-invalid-reference-role-handle-drift",
-    }),
-  });
-  assert.equal(invalidHandleTopology.status, 400);
-  assert.deepEqual(await invalidHandleTopology.json(), {
-    error: "flow.edges[1].data.role: must be one of: identity, pose_composition, garment_top, garment_bottom, garment_full, fabric, accessory, styling_only, background, generic",
-  });
-
-  const reordered = structuredClone(canonicalFlow);
-  reordered.edges.reverse();
-  const reorderConflict = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...reordered,
-      onlyNodeId: "edit",
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-reference-edge-reordered",
-    }),
-  });
-  assert.equal(reorderConflict.status, 409, await reorderConflict.text());
-
-  const damagedSavedFlow = structuredClone(canonicalFlow);
-  damagedSavedFlow.edges[1].data.roleNeedsConfirmation = "false" as never;
-  await query(
-    "UPDATE projects SET flow_json = $1 WHERE id = 'strict-reference-role-project'",
-    [JSON.stringify(damagedSavedFlow)],
-  );
-  const damaged = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({
-      ...invalidRole,
-      onlyNodeId: "edit",
-      projectId: "strict-reference-role-project",
-      clientRequestId: "workflow-damaged-saved-reference-role",
-    }),
-  });
-  assert.equal(damaged.status, 400);
-  assert.deepEqual(await damaged.json(), {
-    error: "flow.edges[1].data.roleNeedsConfirmation: must be a boolean",
-  });
-
-  const clientRequestIds = [
-    ...cases.map((testCase) => testCase.clientRequestId),
-    "workflow-invalid-reference-role-whole-plan",
-    "workflow-invalid-reference-role-downstream",
-    ...handleDriftRequestIds,
-    "workflow-invalid-reference-non-owner",
-    "workflow-invalid-reference-forged-topology",
-    "workflow-invalid-reference-role-handle-drift",
-    "workflow-reference-edge-reordered",
-    "workflow-damaged-saved-reference-role",
-  ];
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_runs
-    WHERE client_request_id = ANY($1::text[])
-  `, [clientRequestIds]))?.count, 0);
-  assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_jobs
-    WHERE run_id IN (
-      SELECT id FROM generation_runs WHERE client_request_id = ANY($1::text[])
-    )
-  `, [clientRequestIds]))?.count, 0);
 });
 
 await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且零入队", async () => {
@@ -1908,10 +1461,8 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
       inputImages: ["/api/files/input-only-static.png"],
       inputReferences: [{
         imageRef: "/api/files/input-only-static.png",
-        role: "garment_full",
         order: 0,
         sourceNodeId: "persisted-source",
-        roleNeedsConfirmation: false,
       }],
       params: {},
     }],
@@ -1931,10 +1482,8 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
         inputImages: ["/api/files/fabric-base.png"],
         inputReferences: [{
           imageRef: "/api/files/fabric-base.png",
-          role: "garment_full",
           order: 0,
           sourceNodeId: "fabric-base-source",
-          roleNeedsConfirmation: false,
         }],
         params: { fabricImageUrl: "https://references.example/fabric.png" },
       },
@@ -1944,10 +1493,8 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
         inputImages: ["/api/files/mask-base.png"],
         inputReferences: [{
           imageRef: "/api/files/mask-base.png",
-          role: "garment_full",
           order: 0,
           sourceNodeId: "mask-base-source",
-          roleNeedsConfirmation: false,
         }],
         params: { mask: "https://references.example/mask.png" },
       },
@@ -2332,10 +1879,7 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
     ...duplicateBody.request.references[0],
     order: 1,
   });
-  promotePromptVariantForTest(editVariant, "verified", [
-    { order: 0, role: "garment_full" },
-    { order: 1, role: "garment_full" },
-  ]);
+  promotePromptVariantForTest(editVariant, "verified");
   try {
     const duplicateDenied = await request("/generate", "owner", {
       method: "POST",

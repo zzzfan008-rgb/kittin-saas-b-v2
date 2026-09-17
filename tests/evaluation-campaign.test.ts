@@ -571,7 +571,6 @@ console.log("  ✓ failed and outcome-unknown slots stop campaigns, with idempot
     scores: {
       garmentMaterialFidelity: 95,
       instructionFollowing: 95,
-      referenceRoleFidelity: 95,
       artifactControl: 95,
       commercialUsability: 95,
     },

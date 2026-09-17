@@ -102,7 +102,6 @@ function writeArtifact(folder: string, artifact: { artifactSha256: string }): st
 const PASSING_SCORES: PromptEvaluationScores = {
   garmentMaterialFidelity: 90,
   instructionFollowing: 90,
-  referenceRoleFidelity: 90,
   artifactControl: 90,
   commercialUsability: 90,
 };
@@ -319,7 +318,6 @@ function buildExternalRelease(): {
     schemaVersion: 1 as const,
     artifactType: "prompt-evaluation-contract-check" as const,
     variantId: variant.variantId,
-    referenceRoleProfile: [],
     codeSha: CODE_SHA,
     commands: EVALUATION_CONTRACT_CHECK_COMMANDS.map((file) => ({
       file,

@@ -36,21 +36,9 @@ const units = manifest.baseUnits.map(({ unit }) => unit);
 assert.equal(units.filter(({ operationMode }) => operationMode === "generate").length, 12);
 assert.equal(units.filter(({ operationMode }) => operationMode === "edit").length, 12);
 assert.equal(units.filter(({ operationMode }) => operationMode === "mask-edit").length, 1);
-assert.ok(units.filter(({ operationMode }) => operationMode === "generate")
-  .every(({ referenceRoleProfile }) => referenceRoleProfile.length === 0));
-
-for (const unit of units.filter(({ operationMode }) => operationMode === "edit")) {
-  const expectedRoles = unit.taskFamilyId === "fashion-lookbook"
-    ? ["identity", "pose_composition", "garment_top", "garment_bottom"]
-    : ["garment_full"];
-  assert.deepEqual(unit.referenceRoleProfile.map(({ role }) => role), expectedRoles);
-}
+assert.ok((units as unknown as Array<Record<string, unknown>>)
+  .every((unit) => unit.referenceRoleProfile === undefined));
 const maskUnit = units.find(({ operationMode }) => operationMode === "mask-edit");
-assert.deepEqual(maskUnit?.referenceRoleProfile, [
-  { order: 0, role: "garment_full" },
-  { order: 1, role: "generic" },
-  { order: 2, role: "mask" },
-]);
 assert.equal(Object.hasOwn(maskUnit ?? {}, "versions"), false, "版本向量只存放在单元外层，不污染 PromptEvaluationUnit");
 
 assert.equal(new Set(units.map(promptEvaluationUnitKey)).size, 25);

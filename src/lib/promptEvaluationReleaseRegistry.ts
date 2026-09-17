@@ -1,6 +1,4 @@
 import type { PromptSupportStatus } from "./garmentPromptPresets";
-import type { EvaluationReferenceRoleProfileEntry } from "../types/promptEvaluation";
-import { canonicalReferenceRoleProfile } from "./promptEvaluation";
 
 declare const __GARMENT_CANVAS_PROMPT_EVALUATION_RELEASE_REGISTRY__: unknown;
 
@@ -26,8 +24,6 @@ export const RECOMMENDATION_BASELINE_BLOCKER_DETAIL =
 export interface PromptEvaluationRelease {
   schemaVersion: 1;
   variantId: string;
-  /** Exact ordered profile evaluated by this release; duplicates are retained. */
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[];
   supportStatus: ReleasedPromptSupportStatus;
   evaluationStage: "internal-experiment" | "formal-validation" | "recommendation";
   evaluationVersion: string;
@@ -60,7 +56,7 @@ const RELEASE_STAGES = new Set([
 ]);
 const REGISTRY_FIELDS = new Set(["schemaVersion", "generatedAt", "releases"]);
 const RELEASE_FIELDS = new Set([
-  "schemaVersion", "variantId", "referenceRoleProfile", "supportStatus",
+  "schemaVersion", "variantId", "supportStatus",
   "evaluationStage", "evaluationVersion", "releaseVector", "evidenceArtifactId",
   "evidenceArtifactSha256", "gateReceiptSha256", "evaluationUnitKey", "codeSha",
   "contractHash", "parameterProfileVersion", "postprocessVersion",
@@ -129,27 +125,6 @@ function validateRegistry(value: unknown): {
     if (expectedStatus !== release.supportStatus) {
       errors.push(`prompt release registry releases[${index}] stage/status pairing is invalid`);
     }
-    let canonicalProfile: readonly EvaluationReferenceRoleProfileEntry[] | undefined;
-    if (!Array.isArray(release.referenceRoleProfile)) {
-      errors.push(`prompt release registry releases[${index}].referenceRoleProfile must be an array`);
-    } else {
-      try {
-        for (const [profileIndex, entry] of release.referenceRoleProfile.entries()) {
-          if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-          const fields = Object.keys(entry as Record<string, unknown>);
-          if (fields.length !== 2 || !fields.includes("order") || !fields.includes("role")) {
-            throw new Error(`entry ${profileIndex} must contain only order and role`);
-          }
-        }
-        canonicalProfile = canonicalReferenceRoleProfile(
-          release.referenceRoleProfile as unknown as readonly EvaluationReferenceRoleProfileEntry[],
-        );
-      } catch (error) {
-        errors.push(
-          `prompt release registry releases[${index}].referenceRoleProfile is invalid: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
     if (typeof release.evidenceArtifactSha256 !== "string" || !SHA256_PATTERN.test(release.evidenceArtifactSha256)) {
       errors.push(`prompt release registry releases[${index}].evidenceArtifactSha256 is invalid`);
     }
@@ -168,12 +143,11 @@ function validateRegistry(value: unknown): {
     if (typeof release.evidenceArtifactId !== "string" || !SAFE_ID_PATTERN.test(release.evidenceArtifactId)) {
       errors.push(`prompt release registry releases[${index}].evidenceArtifactId is invalid`);
     }
-    const key = JSON.stringify([release.variantId, canonicalProfile ?? null]);
+    const key = JSON.stringify([release.variantId]);
     if (uniqueKeys.has(key)) errors.push(`prompt release registry contains duplicate release key at index ${index}`);
     uniqueKeys.add(key);
     releases.push({
       ...release,
-      referenceRoleProfile: canonicalProfile ?? [],
     } as unknown as PromptEvaluationRelease);
   }
   return {

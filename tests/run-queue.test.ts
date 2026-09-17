@@ -156,10 +156,8 @@ function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
-      role: "garment_full",
       order: 0,
       sourceNodeId: `${nodeId}-source`,
-      roleNeedsConfirmation: false,
     }],
     params: {
       prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
@@ -419,84 +417,6 @@ await test("入队后发布状态降级时 Worker 二次准入且 Provider 零�
   assert.match(blocked?.error ?? "", /执行前提示词准入阻断/);
 });
 
-await test("Worker 对持久化快照的角色确认三态失败关闭", async () => {
-  for (const confirmation of [undefined, true, false] as const) {
-    const suffix = confirmation === undefined ? "missing" : String(confirmation);
-    const nodeId = `worker-reference-confirmation-${suffix}-${++sequence}`;
-    const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
-    const providerStep: NodeExecution = {
-      nodeId,
-      kind: "ai-modify",
-      inputImages: [PNG_DATA_URL],
-      inputReferences: [{
-        imageRef: PNG_DATA_URL,
-        role: "garment_full",
-        order: 0,
-        sourceNodeId: `source-${sequence}`,
-        ...(confirmation === undefined ? {} : { roleNeedsConfirmation: confirmation }),
-      }],
-      params: {
-        prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
-        promptVariantId: runtimeEditVariant.variantId,
-        promptFamilyId: runtimeEditVariant.familyId,
-        parameterProfileId: runtimeEditVariant.parameterProfileId,
-        contractHash: runtimeEditVariant.contractHash,
-        evaluationVersion: runtimeEditVariant.evaluationVersion,
-        postprocessVersion: runtimeEditProfile.postprocess.version,
-        operationMode: runtimeEditVariant.mode,
-        modelId: runtimeEditVariant.modelId,
-        modelOptions: runtimeEditParameters.modelOptions,
-        aspectRatio: runtimeEditParameters.aspectRatio,
-        batchSize: runtimeEditParameters.batchSize,
-      },
-    };
-    const run = await queue.enqueueGenerationRun(
-      { steps: [providerStep] },
-      owner.id,
-      {
-        userId: owner.id,
-        nodeId,
-        nodeLabel: nodeId,
-        kind: "ai-modify",
-        prompt: "保持服装结构并优化商业棚拍光线",
-        requestedCount: 1,
-      },
-    );
-
-    assert.equal(await queue.processNextGenerationJob(`worker-reference-confirmation-${suffix}`, {
-      resolveProvider: fake.resolveProvider,
-      now: () => tick(),
-      random: () => 0,
-    }), true);
-    const result = await runRow(run.id);
-    if (confirmation === false) {
-      assert.equal(fake.calls(), 1, "显式 false 的普通 ai-modify 快照应恰好调用一次 Provider");
-      assert.equal(result?.status, "succeeded");
-      assert.equal(result?.provider_requests, 1);
-      assert.equal(result?.successful_count, 1);
-      const persisted = await database.queryOne<{ reference_inputs_json: string }>(
-        "SELECT reference_inputs_json FROM generation_run_steps WHERE run_id = $1",
-        [run.id],
-      );
-      assert.deepEqual(JSON.parse(persisted?.reference_inputs_json ?? "[]"), [{
-        role: "garment_full",
-        order: 0,
-        assetSha256: createHash("sha256")
-          .update(Buffer.from(PNG_DATA_URL.split(",")[1], "base64"))
-          .digest("hex"),
-        sourceNodeId: `source-${sequence}`,
-        roleNeedsConfirmation: false,
-      }], "成功路径必须持久化实际图片字节哈希与原始 role/order/source");
-    } else {
-      assert.equal(fake.calls(), 0, `${suffix} 确认位的持久化快照不得到达 Provider`);
-      assert.equal(result?.status, "failed");
-      assert.equal(result?.provider_requests, 0);
-      assert.equal(result?.successful_count, 0);
-      assert.match(result?.error ?? "", /参考图角色尚未全部确认/);
-    }
-  }
-});
-
 await test("Worker 不修复损坏的静态 reference order/imageRef/数量快照且 Provider 零调用", async () => {
   const corruptions: Array<{
     name: string;
@@ -506,7 +426,7 @@ await test("Worker 不修复损坏的静态 reference order/imageRef/数量快�
     {
       name: "order",
       mutate: (queuedStep) => { queuedStep.inputReferences![0].order = 1; },
-      expected: /参考图角色或顺序无效/,
+      expected: /参考图顺序无效|参考图角色或顺序无效|reference-structure-invalid/,
     },
     {
       name: "image-ref",
@@ -592,10 +512,8 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
-      role: "garment_full",
       order: 0,
       sourceNodeId: `${nodeId}:user-garment`,
-      roleNeedsConfirmation: false,
     }],
     params: {
       prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
@@ -737,10 +655,8 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
-      role: "garment_full",
       order: 0,
       sourceNodeId: `${nodeId}:user-garment`,
-      roleNeedsConfirmation: false,
     }],
     params: {
       prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
@@ -830,288 +746,6 @@ await test("入队后命中运行时四级关闭规则时 Provider 零调用", a
   assert.equal(blocked?.status, "failed");
   assert.equal(blocked?.provider_requests, 0);
   assert.match(blocked?.error ?? "", /运行时关闭/);
-});
-
-await test("Worker 在 Provider 边界按本次运行时用户参考角色二次准入", async () => {
-  const sourceNodeId = `runtime-role-source-${++sequence}`;
-  const targetNodeId = `runtime-role-target-${sequence}`;
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
-  const plan: ExecutionPlan = {
-    steps: [
-      {
-        nodeId: sourceNodeId,
-        kind: "image-input",
-        inputImages: [],
-        params: { imageUrl: PNG_DATA_URL },
-      },
-      {
-        nodeId: targetNodeId,
-        kind: "ai-modify",
-        inputImages: [PNG_DATA_URL],
-        // The durable plan snapshot was admitted for garment_full. The actual
-        // upstream role below is fabric and must win at the Provider boundary.
-        inputReferences: [{
-          imageRef: PNG_DATA_URL,
-          role: "garment_full",
-          order: 0,
-          sourceNodeId,
-          roleNeedsConfirmation: false,
-        }],
-        upstream: [{
-          nodeId: sourceNodeId,
-          images: [PNG_DATA_URL],
-          referenceRole: "fabric",
-          roleNeedsConfirmation: false,
-        }],
-        params: {
-          prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持商品轮廓并改善棚拍光线"),
-          promptVariantId: runtimeEditVariant.variantId,
-          promptFamilyId: runtimeEditVariant.familyId,
-          parameterProfileId: runtimeEditVariant.parameterProfileId,
-          contractHash: runtimeEditVariant.contractHash,
-          evaluationVersion: runtimeEditVariant.evaluationVersion,
-          postprocessVersion: runtimeEditProfile.postprocess.version,
-          operationMode: runtimeEditVariant.mode,
-          modelId: runtimeEditVariant.modelId,
-          modelOptions: runtimeEditParameters.modelOptions,
-          aspectRatio: runtimeEditParameters.aspectRatio,
-          batchSize: runtimeEditParameters.batchSize,
-        },
-      },
-    ],
-  };
-  const run = await queue.enqueueGenerationRun(plan, owner.id, {
-    userId: owner.id,
-    nodeId: targetNodeId,
-    nodeLabel: targetNodeId,
-    kind: "ai-modify",
-    prompt: "保持商品轮廓并改善棚拍光线",
-    requestedCount: 1,
-  });
-
-  assert.equal(await queue.processNextGenerationJob("worker-runtime-role-source", {
-    resolveProvider: fake.resolveProvider,
-    now: () => tick(),
-    random: () => 0,
-  }), true);
-  assert.equal(await queue.processNextGenerationJob("worker-runtime-role-target", {
-    resolveProvider: fake.resolveProvider,
-    now: () => tick(),
-    random: () => 0,
-  }), true);
-
-  assert.equal(fake.calls(), 0, "静态 garment_full 快照不得覆盖本次运行时 fabric 角色");
-  const blocked = await runRow(run.id);
-  assert.equal(blocked?.status, "failed");
-  assert.equal(blocked?.provider_requests, 0);
-  assert.match(blocked?.error ?? "", /缺少该变体要求的参考角色.*garment_full/);
-});
-
-await test("Worker 在 Provider 边界拒绝运行时上游的缺失或 true 确认位", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
-  for (const pendingValue of [undefined, true] as const) {
-    const suffix = pendingValue === true ? "true" : "missing";
-    const sourceNodeId = `runtime-confirmation-source-${suffix}-${++sequence}`;
-    const targetNodeId = `runtime-confirmation-target-${suffix}-${sequence}`;
-    const upstream = {
-      nodeId: sourceNodeId,
-      images: [PNG_DATA_URL],
-      referenceRole: "garment_full" as const,
-      ...(pendingValue === true ? { roleNeedsConfirmation: true } : {}),
-    };
-    const plan: ExecutionPlan = {
-      steps: [
-        {
-          nodeId: sourceNodeId,
-          kind: "image-input",
-          inputImages: [],
-          params: { imageUrl: PNG_DATA_URL },
-        },
-        {
-          nodeId: targetNodeId,
-          kind: "ai-modify",
-          inputImages: [PNG_DATA_URL],
-          inputReferences: [{
-            imageRef: PNG_DATA_URL,
-            role: "garment_full",
-            order: 0,
-            sourceNodeId,
-            roleNeedsConfirmation: false,
-          }],
-          upstream: [upstream],
-          params: {
-            prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
-            promptVariantId: runtimeEditVariant.variantId,
-            promptFamilyId: runtimeEditVariant.familyId,
-            parameterProfileId: runtimeEditVariant.parameterProfileId,
-            contractHash: runtimeEditVariant.contractHash,
-            evaluationVersion: runtimeEditVariant.evaluationVersion,
-            postprocessVersion: runtimeEditProfile.postprocess.version,
-            operationMode: runtimeEditVariant.mode,
-            modelId: runtimeEditVariant.modelId,
-            modelOptions: runtimeEditParameters.modelOptions,
-            aspectRatio: runtimeEditParameters.aspectRatio,
-            batchSize: runtimeEditParameters.batchSize,
-          },
-        },
-      ],
-    };
-    const run = await queue.enqueueGenerationRun(plan, owner.id, {
-      userId: owner.id,
-      nodeId: targetNodeId,
-      nodeLabel: targetNodeId,
-      kind: "ai-modify",
-      prompt: "保持服装结构并优化商业棚拍光线",
-      requestedCount: 1,
-    });
-
-    assert.equal(await queue.processNextGenerationJob(`runtime-confirmation-source-${suffix}`, {
-      resolveProvider: fake.resolveProvider,
-      now: () => tick(),
-      random: () => 0,
-    }), true);
-    assert.equal(await queue.processNextGenerationJob(`runtime-confirmation-target-${suffix}`, {
-      resolveProvider: fake.resolveProvider,
-      now: () => tick(),
-      random: () => 0,
-    }), true);
-    const blocked = await runRow(run.id);
-    assert.equal(blocked?.status, "failed", suffix);
-    assert.equal(blocked?.provider_requests, 0, suffix);
-    assert.match(blocked?.error ?? "", /参考图角色尚未全部确认/, suffix);
-  }
-  assert.equal(fake.calls(), 0, "运行时上游没有显式 false 时不得到达 Provider");
-});
-
-await test("Worker 不得用遗留 false 确认位把缺失的动态上游角色修复为 generic", async () => {
-  const sourceNodeId = `runtime-missing-role-source-${++sequence}`;
-  const targetNodeId = `runtime-missing-role-target-${sequence}`;
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
-  const targetStep = confirmedRuntimeEditStep(targetNodeId);
-  targetStep.inputReferences![0].sourceNodeId = sourceNodeId;
-  targetStep.upstream = [{
-    nodeId: sourceNodeId,
-    images: [PNG_DATA_URL],
-    // Simulate a damaged/legacy snapshot whose old confirmation bit survived
-    // but whose role did not. It must become pending, never confirmed generic.
-    roleNeedsConfirmation: false,
-  }];
-  const run = await queue.enqueueGenerationRun({
-    steps: [
-      {
-        nodeId: sourceNodeId,
-        kind: "image-input",
-        inputImages: [],
-        params: { imageUrl: PNG_DATA_URL },
-      },
-      targetStep,
-    ],
-  }, owner.id, runtimeEditContext(targetNodeId));
-
-  assert.equal(await queue.processNextGenerationJob("worker-runtime-missing-role-source", {
-    resolveProvider: fake.resolveProvider,
-    now: () => tick(),
-    random: () => 0,
-  }), true);
-  assert.equal(await queue.processNextGenerationJob("worker-runtime-missing-role-target", {
-    resolveProvider: fake.resolveProvider,
-    now: () => tick(),
-    random: () => 0,
-  }), true);
-  assert.equal(fake.calls(), 0);
-  const blocked = await runRow(run.id);
-  assert.equal(blocked?.status, "failed");
-  assert.equal(blocked?.provider_requests, 0);
-  assert.match(blocked?.error ?? "", /参考图角色尚未全部确认/);
-});
-
-await test("评估运行时重复角色不得借用静态 exact-unit 授权", async () => {
-  const firstSourceNodeId = `evaluation-runtime-role-source-a-${++sequence}`;
-  const secondSourceNodeId = `evaluation-runtime-role-source-b-${sequence}`;
-  const targetNodeId = `evaluation-runtime-role-target-${sequence}`;
-  const providerStep: NodeExecution = {
-    nodeId: targetNodeId,
-    kind: "ai-modify",
-    inputImages: [PNG_DATA_URL],
-    inputReferences: [{
-      imageRef: PNG_DATA_URL,
-      role: "garment_full",
-      order: 0,
-      sourceNodeId: firstSourceNodeId,
-      roleNeedsConfirmation: false,
-    }],
-    upstream: [
-      {
-        nodeId: firstSourceNodeId,
-        images: [PNG_DATA_URL],
-        referenceRole: "garment_full",
-        roleNeedsConfirmation: false,
-      },
-      {
-        nodeId: secondSourceNodeId,
-        images: [PNG_DATA_URL],
-        referenceRole: "garment_full",
-        roleNeedsConfirmation: false,
-      },
-    ],
-    params: {
-      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持商品轮廓并改善棚拍光线"),
-      promptVariantId: runtimeEditVariant.variantId,
-      promptFamilyId: runtimeEditVariant.familyId,
-      parameterProfileId: runtimeEditVariant.parameterProfileId,
-      contractHash: runtimeEditVariant.contractHash,
-      evaluationVersion: runtimeEditVariant.evaluationVersion,
-      postprocessVersion: runtimeEditProfile.postprocess.version,
-      operationMode: runtimeEditVariant.mode,
-      modelId: runtimeEditVariant.modelId,
-      modelOptions: runtimeEditParameters.modelOptions,
-      aspectRatio: runtimeEditParameters.aspectRatio,
-      batchSize: runtimeEditParameters.batchSize,
-    },
-  };
-  // onlyNodeId 评估计划只持久 Provider step；upstream.images 是其运行时
-  // 回退输入。这里刻意比静态 inputReferences 多一张同角色图。
-  const plan: ExecutionPlan = { steps: [providerStep] };
-  const policy = await authorizeEvaluationPlan(plan, {
-    caseId: `evaluation-runtime-role-case-${sequence}`,
-    sampleId: `evaluation-runtime-role-sample-${sequence}`,
-    authorizationId: `evaluation-runtime-role-authorization-${sequence}`,
-  });
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
-  const run = await queue.enqueueGenerationRun(
-    plan,
-    owner.id,
-    {
-      userId: owner.id,
-      nodeId: targetNodeId,
-      nodeLabel: targetNodeId,
-      kind: "ai-modify",
-      prompt: "保持商品轮廓并改善棚拍光线",
-      requestedCount: 1,
-    },
-    "evaluation",
-    policy,
-  );
-
-  assert.equal(await queue.processNextGenerationJob("evaluation-runtime-role-target", {
-    resolveProvider: fake.resolveProvider,
-    evaluationCodeIdentity: TEST_EVALUATION_CODE_IDENTITY,
-    now: () => tick(),
-    random: () => 0,
-  }), true);
-
-  assert.equal(fake.calls(), 0, "参考角色数量漂移必须在 Provider 前阻断");
-  const blocked = await runRow(run.id);
-  assert.equal(blocked?.status, "failed");
-  assert.equal(blocked?.provider_requests, 0);
-  assert.match(blocked?.error ?? "", /exact-unit 授权/);
-  assert.equal((await database.queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM evaluation_case_evidence WHERE run_id = $1
-  `, [run.id]))?.count, 0);
-  assert.equal((await database.queryOne<{ used_provider_requests: number }>(`
-    SELECT used_provider_requests FROM evaluation_run_authorizations
-    WHERE authorization_id = $1
-  `, [policy.authorizationId]))?.used_provider_requests, 0);
 });
 
 await test("未登记 authorizationId 的真实评估在入队事务中阻断", async () => {
@@ -1254,10 +888,8 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
-      role: "garment_full",
       order: 0,
       sourceNodeId: `${nodeId}:user-garment`,
-      roleNeedsConfirmation: false,
     }],
     params: {
       prompt: buildGarmentPrompt(maskVariant.variantId, "仅将蒙版区域改为银色拉链"),
@@ -1309,10 +941,6 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
   }), true);
   assert.equal(fake.calls(), 1, "运行时动态 mask size 不应被误判为参数漂移");
   assert.equal((await runRow(run.id))?.status, "succeeded");
-  assert.deepEqual(providerRequest?.references?.map((reference) => reference.role), [
-    "garment_full",
-    "generic",
-  ]);
   assert.match(String(providerRequest?.modelOptions?.size ?? ""), /^\d+x\d+$/);
 
   const evidence = await database.queryOne<{
@@ -1326,24 +954,17 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
   assert.ok(evidence);
   const runtimeSnapshot = JSON.parse(evidence.snapshot_json) as {
     snapshot?: {
-      unit?: { referenceRoleProfile?: Array<{ order: number; role: string }> };
-      references?: Array<{ order: number; role: string }>;
+      references?: Array<{ order: number }>;
     };
   };
-  const expectedProfile = [
-    { order: 0, role: "garment_full" },
-    { order: 1, role: "generic" },
-    { order: 2, role: "mask" },
-  ];
-  assert.deepEqual(runtimeSnapshot.snapshot?.unit?.referenceRoleProfile, expectedProfile);
   assert.deepEqual(
-    runtimeSnapshot.snapshot?.references?.map(({ order, role }) => ({ order, role })),
-    expectedProfile,
+    runtimeSnapshot.snapshot?.references?.map(({ order }) => ({ order })),
+    [{ order: 0 }, { order: 1 }, { order: 2 }],
   );
   assert.deepEqual(
-    (JSON.parse(evidence.reference_inputs_json) as Array<{ order: number; role: string }>)
-      .map(({ order, role }) => ({ order, role })),
-    expectedProfile,
+    (JSON.parse(evidence.reference_inputs_json) as Array<{ order: number }>)
+      .map(({ order }) => ({ order })),
+    [{ order: 0 }, { order: 1 }, { order: 2 }],
   );
   assert.match(
     String((JSON.parse(evidence.native_parameters_json) as { modelOptions?: { size?: string } }).modelOptions?.size ?? ""),
@@ -2434,10 +2055,8 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           operationMode: "mask-edit",
           references: [{
             dataUrl: PNG_DATA_URL,
-            role: "garment_full",
             order: 0,
             assetSha256: "a".repeat(64),
-            roleNeedsConfirmation: false,
           }],
           mask: PNG_DATA_URL,
           maskMode: "replace",
@@ -2484,10 +2103,8 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           operationMode: "mask-edit",
           references: Array.from({ length: 8 }, (_value, order) => ({
             dataUrl: PNG_DATA_URL,
-            role: "garment_full" as const,
             order,
             assetSha256: "b".repeat(64),
-            roleNeedsConfirmation: false,
           })),
           mask: PNG_DATA_URL,
           modelOptions: maskParameters.modelOptions,

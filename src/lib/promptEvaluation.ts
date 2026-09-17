@@ -1,8 +1,6 @@
 import type {
   AutomaticRetryDecision,
   EvaluationHardBlocker,
-  EvaluationReferenceRole,
-  EvaluationReferenceRoleProfileEntry,
   EvaluationShutdownDecision,
   EvaluationShutdownRule,
   EvaluationStageThreshold,
@@ -25,11 +23,10 @@ export const PROMPT_SCORING_RUBRIC_VERSION = "garment-rubric-v1";
 export const GOLDEN_GARMENT_SET_VERSION = "garment-gold-v1";
 
 export const PROMPT_SCORE_WEIGHTS: Readonly<Record<PromptScoreCriterion, number>> = {
-  garmentMaterialFidelity: 0.30,
-  instructionFollowing: 0.25,
-  referenceRoleFidelity: 0.20,
-  artifactControl: 0.15,
-  commercialUsability: 0.10,
+  garmentMaterialFidelity: 0.35,
+  instructionFollowing: 0.30,
+  artifactControl: 0.20,
+  commercialUsability: 0.15,
 };
 
 export const GOLDEN_GARMENT_SAMPLE_IDS = [
@@ -85,20 +82,6 @@ export const PROMPT_EVALUATION_THRESHOLDS: Readonly<Record<PromptEvaluationStage
   },
 };
 
-const REFERENCE_ROLE_ORDER: readonly EvaluationReferenceRole[] = [
-  "identity",
-  "pose_composition",
-  "garment_top",
-  "garment_bottom",
-  "garment_full",
-  "fabric",
-  "accessory",
-  "styling_only",
-  "background",
-  "generic",
-  "mask",
-];
-
 const VERSION_FIELDS = [
   "presetVersion",
   "parameterProfileVersion",
@@ -124,35 +107,6 @@ function assertScore(value: number, criterion: PromptScoreCriterion): void {
   }
 }
 
-export function canonicalReferenceRoleSet(
-  roles: readonly EvaluationReferenceRole[],
-): readonly EvaluationReferenceRole[] {
-  const unique = new Set(roles);
-  return REFERENCE_ROLE_ORDER.filter((role) => unique.has(role));
-}
-
-/**
- * Validate and copy the exact ordered profile. Unlike the legacy role-set
- * helper this intentionally preserves duplicates and count.
- */
-export function canonicalReferenceRoleProfile(
-  profile: readonly EvaluationReferenceRoleProfileEntry[],
-): readonly EvaluationReferenceRoleProfileEntry[] {
-  if (!Array.isArray(profile)) throw new TypeError("referenceRoleProfile must be an array");
-  return profile.map((entry, index) => {
-    if (!entry || typeof entry !== "object") {
-      throw new TypeError(`referenceRoleProfile[${index}] is invalid`);
-    }
-    if (entry.order !== index || !Number.isSafeInteger(entry.order)) {
-      throw new Error("referenceRoleProfile order must be contiguous, zero-based, and match array order");
-    }
-    if (!REFERENCE_ROLE_ORDER.includes(entry.role)) {
-      throw new TypeError(`referenceRoleProfile[${index}].role is invalid`);
-    }
-    return { order: entry.order, role: entry.role };
-  });
-}
-
 export function promptEvaluationUnitKey(unit: PromptEvaluationUnit): string {
   return JSON.stringify({
     taskFamilyId: unit.taskFamilyId,
@@ -162,7 +116,6 @@ export function promptEvaluationUnitKey(unit: PromptEvaluationUnit): string {
     nodeKind: unit.nodeKind,
     modelId: unit.modelId,
     operationMode: unit.operationMode,
-    referenceRoleProfile: canonicalReferenceRoleProfile(unit.referenceRoleProfile),
     parameterProfileId: unit.parameterProfileId,
     parameterProfileVersion: unit.parameterProfileVersion,
   });
@@ -362,7 +315,6 @@ function emptyMetrics(): PromptEvaluationMetrics {
     criterionAverages: {
       garmentMaterialFidelity: 0,
       instructionFollowing: 0,
-      referenceRoleFidelity: 0,
       artifactControl: 0,
       commercialUsability: 0,
     },

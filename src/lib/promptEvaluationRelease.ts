@@ -16,9 +16,7 @@ import {
   PROVIDER_PROMPT_RENDERER_HASH,
   PROVIDER_PROMPT_RENDERER_VERSION,
 } from "./providerPromptRenderer";
-import { canonicalReferenceRoleProfile } from "./promptEvaluation";
 import { getModelParameterProfile } from "../types/modelParameterProfiles";
-import type { EvaluationReferenceRoleProfileEntry } from "../types/promptEvaluation";
 
 function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -31,7 +29,6 @@ function canonicalJson(value: unknown): string {
 /** Exact material covered by one promotion decision. */
 export function promptEvaluationReleaseVector(
   variant: PromptVariant,
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[],
   codeSha?: string,
 ): string {
   return canonicalJson({
@@ -42,8 +39,6 @@ export function promptEvaluationReleaseVector(
     mode: variant.mode,
     promptLocale: variant.promptLocale,
     fullPrompt: variant.fullPrompt,
-    requiredRoles: [...variant.requiredRoles],
-    referenceRoleProfile: canonicalReferenceRoleProfile(referenceRoleProfile),
     parameterProfile: getModelParameterProfile(variant.parameterProfileId) ?? null,
     contractHash: variant.contractHash,
     evaluationVersion: variant.evaluationVersion,
@@ -66,7 +61,6 @@ export interface PromptEvaluationReleaseMetadata {
 
 export function createPromptEvaluationReleaseSnapshot(
   variant: PromptVariant,
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[],
   supportStatus: ReleasedPromptSupportStatus,
   evidenceArtifactId: string,
   metadata: PromptEvaluationReleaseMetadata,
@@ -76,11 +70,10 @@ export function createPromptEvaluationReleaseSnapshot(
   return {
     schemaVersion: 1,
     variantId: variant.variantId,
-    referenceRoleProfile: canonicalReferenceRoleProfile(referenceRoleProfile),
     supportStatus,
     evaluationStage: metadata.evaluationStage,
     evaluationVersion: variant.evaluationVersion,
-    releaseVector: promptEvaluationReleaseVector(variant, referenceRoleProfile, metadata.codeSha),
+    releaseVector: promptEvaluationReleaseVector(variant, metadata.codeSha),
     evidenceArtifactId,
     evidenceArtifactSha256: metadata.evidenceArtifactSha256,
     gateReceiptSha256: metadata.gateReceiptSha256,
@@ -116,18 +109,13 @@ function runtimeReleaseCodeSha(): string | undefined {
  */
 export function effectivePromptSupport(
   variant: PromptVariant,
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[],
   releases: readonly PromptEvaluationRelease[] = PROMPT_EVALUATION_RELEASES,
   currentCodeSha: string | undefined = runtimeReleaseCodeSha(),
 ): EffectivePromptSupport {
   if (variant.supportStatus === "unsupported") {
     return { status: "unsupported", reason: variant.statusReason };
   }
-  const canonicalProfile = canonicalReferenceRoleProfile(referenceRoleProfile);
-  const release = releases.find((candidate) => (
-    candidate.variantId === variant.variantId
-    && canonicalJson(canonicalReferenceRoleProfile(candidate.referenceRoleProfile)) === canonicalJson(canonicalProfile)
-  ));
+  const release = releases.find((candidate) => candidate.variantId === variant.variantId);
   if (!release) {
     return {
       status: "unverified",
@@ -156,7 +144,7 @@ export function effectivePromptSupport(
     && release.contractHash === variant.contractHash
     && release.parameterProfileVersion === profile?.version
     && release.postprocessVersion === profile?.postprocess.version
-    && release.releaseVector === promptEvaluationReleaseVector(variant, canonicalProfile, release.codeSha)
+    && release.releaseVector === promptEvaluationReleaseVector(variant, release.codeSha)
   );
   if (!matches) {
     return {
@@ -182,26 +170,14 @@ export function getRuntimePromptVariantAvailability(
   query: PromptVariantQuery,
   options: {
     allowExperimental?: boolean;
-    referenceRoleProfile?: readonly EvaluationReferenceRoleProfileEntry[];
     /** Explicit injection is used by isolated tests; production omits it and uses the build identity. */
     currentCodeSha?: string;
   } = {},
 ): PromptVariantAvailability {
   const variant = getGarmentPromptVariant(query);
   if (!variant) return { enabled: false, reason: unsupportedReason(query) };
-  const referenceRoleProfile = query.mode === "generate"
-    ? []
-    : options.referenceRoleProfile;
-  if (!referenceRoleProfile) {
-    return {
-      enabled: false,
-      reason: "该编辑变体必须匹配一个已评估的有序参考角色配置，不能按变体整体泛化发布。",
-      variant,
-    };
-  }
   const support = effectivePromptSupport(
     variant,
-    referenceRoleProfile,
     PROMPT_EVALUATION_RELEASES,
     options.currentCodeSha ?? runtimeReleaseCodeSha(),
   );
