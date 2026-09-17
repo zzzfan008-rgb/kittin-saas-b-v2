@@ -51,10 +51,10 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
           <TemplateCover template={template} />
           <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[11px] backdrop-blur-sm ${
             unavailable
-              ? "border-amber-400/60 bg-amber-950/80 text-amber-200"
+              ? "border-[var(--gc-border)] bg-[var(--gc-control)]/80 text-[var(--gc-text-muted)]"
               : "border-white/30 bg-black/55 text-white"
           }`}>
-            {unavailable ? "unsupported" : "内置"}
+            {unavailable ? "暂不支持" : "内置"}
           </span>
         </div>
         <span className="block p-3">
@@ -63,7 +63,7 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
             {template.description || "从此工作流模板创建一个新项目"}
           </span>
           {unavailable && (
-            <span id={reasonId} className="mt-1 block text-[11px] leading-relaxed text-amber-500">
+            <span id={reasonId} className="mt-1 block text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
               {productPolicy.reason}
             </span>
           )}
@@ -156,7 +156,7 @@ export function TaskLauncher() {
             </div>
           )}
           {!loading && !error && templates && builtinTemplates.length === 0 && (
-            <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-950/20 px-4 py-8 text-center text-xs text-amber-200">
+            <div role="alert" className="rounded-xl border border-[var(--gc-border)] bg-[var(--gc-control)] px-4 py-8 text-center text-xs text-[var(--gc-warn-text)]">
               内置模板暂不可用，请联系管理员重新初始化模板。
             </div>
           )}

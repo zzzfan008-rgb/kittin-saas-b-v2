@@ -3,17 +3,29 @@ import { isNodeRunActive, type NodeKind, type NodeRunStatus } from "@/types/work
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const STATUS_STYLE: Record<NodeRunStatus, string> = {
-  idle: "bg-neutral-500",
-  queued: "bg-yellow-400",
-  running: "bg-blue-400 animate-pulse",
-  retry_wait: "bg-amber-400 animate-pulse",
-  cancel_requested: "bg-orange-400 animate-pulse",
-  success: "bg-emerald-400",
-  error: "bg-red-500",
-  outcome_unknown: "bg-orange-500",
-  cancelled: "bg-neutral-600",
+  idle: "var(--gc-status-idle)",
+  queued: "var(--gc-status-queued)",
+  running: "var(--gc-status-running)",
+  retry_wait: "var(--gc-status-retry)",
+  cancel_requested: "var(--gc-status-retry)",
+  success: "var(--gc-status-success)",
+  error: "var(--gc-status-error)",
+  outcome_unknown: "var(--gc-status-unknown)",
+  cancelled: "var(--gc-status-idle)",
+};
+
+const STATUS_ANIMATE: Partial<Record<NodeRunStatus, string>> = {
+  running: "animate-pulse",
+  retry_wait: "animate-pulse",
+  cancel_requested: "animate-pulse",
 };
 
 export const STATUS_TEXT: Record<NodeRunStatus, string> = {
@@ -30,10 +42,27 @@ export const STATUS_TEXT: Record<NodeRunStatus, string> = {
 
 export function StatusDot({ status }: { status: NodeRunStatus }) {
   return (
-    <span
-      className={`inline-block h-2 w-2 shrink-0 rounded-full ${STATUS_STYLE[status]}`}
-      title={STATUS_TEXT[status]}
-    />
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span
+              aria-label={`状态：${STATUS_TEXT[status]}`}
+              className={`inline-block shrink-0 rounded-full ${STATUS_ANIMATE[status] ?? ""}`}
+              style={{
+                width: "var(--gc-dot-status)",
+                height: "var(--gc-dot-status)",
+                backgroundColor: STATUS_STYLE[status],
+                opacity: status === "cancelled" ? 0.6 : undefined,
+              }}
+            />
+          }
+        />
+        <TooltipContent side="top" sideOffset={6}>
+          {STATUS_TEXT[status]}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -156,8 +185,9 @@ export function RunButton({
         disabled={active || disabled || Boolean(disabledReason) || newGenerationBlocked}
         title={newGenerationBlocked ? safetyBlockReason ?? undefined : disabledReason}
         className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
-          active ? "btn-running-breathe bg-[#3a3226] text-gold" : "bg-gold text-ink disabled:opacity-40"
+          active ? "btn-running-breathe text-[var(--gc-warn-text)]" : "bg-gold text-ink disabled:opacity-40"
         }`}
+        style={active ? { backgroundColor: "var(--gc-panel-hover)" } : undefined}
       >
         {active
           ? STATUS_TEXT[status]
@@ -168,7 +198,7 @@ export function RunButton({
               : label}
       </button>
       {!active && !newGenerationBlocked && disabledReason && (
-        <p className="text-[11px] leading-relaxed text-amber-400">{disabledReason}</p>
+        <p className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">{disabledReason}</p>
       )}
     </div>
   );
@@ -182,9 +212,9 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     <div
       role="note"
       data-product-support="unsupported"
-      className="rounded-md border border-amber-700/50 bg-amber-950/25 px-2 py-1.5 text-[11px] leading-relaxed text-amber-300"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
     >
-      <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
+      <p className="font-medium tracking-wide">暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>
     </div>
   );

@@ -484,17 +484,17 @@ export function ProjectCenter({
                               <span className={PROJECT_CENTER_TITLE_CLASS}>{template.name}</span>
                               <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] ${
                                 unavailable
-                                  ? "border-amber-600/50 text-amber-500"
+                                  ? "border-[var(--gc-border)] text-[var(--gc-text-muted)]"
                                   : "border-[var(--gc-accent)]/40 text-[var(--gc-accent)]"
                               }`}>
-                                {unavailable ? "unsupported" : "内置"}
+                                {unavailable ? "暂不支持" : "内置"}
                               </span>
                             </span>
                             <span className="mt-1 line-clamp-2 min-h-8 text-[11px] leading-4 text-[var(--gc-text-muted)]">
                               {template.description || "从此工作流模板创建一个新项目"}
                             </span>
                             {unavailable && (
-                              <span id={reasonId} className="mt-1 block text-[11px] leading-relaxed text-amber-500">
+                              <span id={reasonId} className="mt-1 block text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
                                 {productPolicy.reason}
                               </span>
                             )}

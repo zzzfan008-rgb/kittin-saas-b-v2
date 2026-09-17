@@ -223,7 +223,7 @@ function PromptPresetPicker({
                   {preset.templateName} · case {preset.exampleCaseIds.join(", ")}
                 </span>
               </Button>
-              {reason && <p id={reasonId} className="px-1 text-[11px] leading-relaxed text-amber-500/90">{reason}</p>}
+              {reason && <p id={reasonId} className="px-1 text-[11px] leading-relaxed text-[var(--gc-warn-text)]">{reason}</p>}
             </div>
           );
         })}
@@ -238,7 +238,7 @@ function PromptPresetPicker({
               <div className="space-y-0.5"><dt>模型原生参数</dt><dd className="break-all text-[var(--gc-text)]">{JSON.stringify(currentModelOptions ?? {})} → {JSON.stringify(activePending.parameters.modelOptions)}</dd></div>
               <div className="space-y-0.5"><dt>后处理</dt><dd className="text-[var(--gc-text)]">{activePending.profile.postprocess.version} · {activePending.profile.postprocess.finalAspectRatio}</dd></div>
               {activePending.parameters.ignoredNativeFields.length > 0 && (
-                <div className="space-y-0.5"><dt>将清除/忽略</dt><dd className="text-amber-400">{activePending.parameters.ignoredNativeFields.join("、")}</dd></div>
+                <div className="space-y-0.5"><dt>将清除/忽略</dt><dd className="text-[var(--gc-warn-text)]">{activePending.parameters.ignoredNativeFields.join("、")}</dd></div>
               )}
             </dl>
             <div className="space-y-0.5">
@@ -303,7 +303,7 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
                   className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[11px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {group.direction === "upstream" ? "← " : "+ "}{NODE_SPECS[nextKind].title}
-                  {!productPolicy.canCreate && " · unsupported"}
+                  {!productPolicy.canCreate && " · 暂不支持"}
                 </button>
               );
             })}
@@ -387,9 +387,9 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         <section
           aria-label="节点产品支持状态"
           data-product-support="unsupported"
-          className="rounded-md border border-amber-700/50 bg-amber-950/25 p-2 text-[11px] leading-relaxed text-amber-300"
+          className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] p-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
         >
-          <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
+          <p className="font-medium tracking-wide">暂不支持</p>
           <p className="mt-0.5">{productPolicy.reason}</p>
         </section>
       )}
@@ -416,7 +416,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
             <option value="edit">参考图编辑（至少 1 张）</option>
           </select>
           {d.operationModeNeedsConfirmation && (
-            <span className="text-[11px] leading-relaxed text-amber-500">旧项目模式无法可靠推断，请确认后再运行。</span>
+            <span className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">旧项目模式无法可靠推断，请确认后再运行。</span>
           )}
         </label>
       )}
@@ -548,7 +548,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       )}
 
       {modelParameterError && (
-        <p className="rounded-md border border-amber-800/50 bg-amber-950/20 p-2 text-[11px] leading-relaxed text-amber-400">
+        <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] p-2 text-[11px] leading-relaxed text-[var(--gc-warn-text)]">
           当前模式的模型参数未确认：{modelParameterError}
         </p>
       )}
@@ -589,14 +589,14 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
     cancelled: "已取消",
   };
   const statusColor: Record<RecentResult["status"], string> = {
-    queued: "text-yellow-400",
-    running: "text-blue-400",
-    retry_wait: "text-amber-400",
-    cancel_requested: "text-orange-400",
-    success: "text-emerald-400",
-    error: "text-red-400",
-    outcome_unknown: "text-orange-500",
-    cancelled: "text-neutral-500",
+    queued: "text-[var(--gc-status-queued)]",
+    running: "text-[var(--gc-status-running)]",
+    retry_wait: "text-[var(--gc-status-retry)]",
+    cancel_requested: "text-[var(--gc-status-retry)]",
+    success: "text-[var(--gc-status-success)]",
+    error: "text-[var(--gc-status-error)]",
+    outcome_unknown: "text-[var(--gc-status-unknown)]",
+    cancelled: "text-[var(--gc-status-idle)]",
   };
 
   return (

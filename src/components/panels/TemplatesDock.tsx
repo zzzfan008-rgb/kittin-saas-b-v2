@@ -221,10 +221,10 @@ export function TemplatesDock() {
                         {tpl.builtIn && (
                           <span className={`shrink-0 rounded-sm border px-1 py-px text-[11px] ${
                             unavailable
-                              ? "border-amber-600/50 text-amber-400"
+                              ? "border-[var(--gc-border)] text-[var(--gc-text-muted)]"
                               : "border-gold/40 text-gold"
                           }`}>
-                            {unavailable ? "unsupported" : "内置"}
+                            {unavailable ? "暂不支持" : "内置"}
                           </span>
                         )}
                       </div>
@@ -234,7 +234,7 @@ export function TemplatesDock() {
                         </p>
                       )}
                       {unavailable && (
-                        <p id={reasonId} className="text-[11px] leading-relaxed text-amber-500">
+                        <p id={reasonId} className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
                           {productPolicy.reason}
                         </p>
                       )}

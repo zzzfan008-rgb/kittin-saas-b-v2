@@ -73,6 +73,16 @@ body {
   --gc-font-label: 11px;
   --gc-font-meta-en: 10px;
   --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  /* ---- 状态色 8 槽位（tokens.css §3 唯一事实源；全主题共享，一色一义） ---- */
+  --gc-dot-status: 10px;
+  --gc-status-queued: #eab308;
+  --gc-status-running: #60a5fa;
+  --gc-status-retry: #fb923c;
+  --gc-status-success: #34d399;
+  --gc-status-error: #f87171;
+  --gc-status-unknown: #a78bfa;
+  --gc-status-idle: #8b9198;
+  --gc-warn-text: #fbbf24;
 }
 
 /* ---- 全局 reduced-motion 兜底（audit M5；覆盖 keyframes 与 Tailwind 动画） ---- */
@@ -319,7 +329,10 @@ body {
   --gc-text: #e5e7eb;
   --gc-text-muted: #8b9198;
   --gc-border: #2b2e32;
+  --gc-border-strong: #3d4147;
   --gc-accent: #9a7333;
+  --gc-accent-cta-ink: #0a0a0a;
+  --gc-accent-deep: #6f521f;
   --gc-primary-foreground: #0a0a0a;
   --gc-node-main: #f1f2f4;
   --gc-node-header: #ffffff;
@@ -329,6 +342,7 @@ body {
   --gc-node-text: #25282c;
   --gc-node-muted: #676c73;
   --gc-node-accent: #9a7333;
+  --gc-edge: #6b7076;
   --gc-handle-highlight: #f2ddb2;
   --gc-handle-mid: #b18745;
   --gc-handle-dark: #61451f;
@@ -345,7 +359,10 @@ body {
   --gc-text: #26282c;
   --gc-text-muted: #696d73;
   --gc-border: #d5d2cc;
+  --gc-border-strong: #b8b4ac;
   --gc-accent: #1d1d1f;
+  --gc-accent-cta-ink: #ffffff;
+  --gc-accent-deep: #1d1d1f;
   --gc-primary-foreground: #ffffff;
   --gc-node-main: #2e3136;
   --gc-node-header: #383c42;
@@ -355,6 +372,7 @@ body {
   --gc-node-text: #f5f6f7;
   --gc-node-muted: #c3c7cc;
   --gc-node-accent: #d9a441;
+  --gc-edge: #8a8e95;
   --gc-handle-highlight: #ffe9b8;
   --gc-handle-mid: #c89a4b;
   --gc-handle-dark: #7a5a1e;
@@ -371,7 +389,10 @@ body {
   --gc-text: #1e301c;
   --gc-text-muted: #4c6347;
   --gc-border: #a9bfa2;
+  --gc-border-strong: #7e9a76;
   --gc-accent: #2c5a31;
+  --gc-accent-cta-ink: #f8fafc;
+  --gc-accent-deep: #234827;
   --gc-primary-foreground: #f8fafc;
   --gc-node-main: #dce8d2;
   --gc-node-header: #d3e2c7;
@@ -381,6 +402,7 @@ body {
   --gc-node-text: #1e301c;
   --gc-node-muted: #4c6347;
   --gc-node-accent: #2e5d33;
+  --gc-edge: #6d8566;
   --gc-handle-highlight: #cfe3c2;
   --gc-handle-mid: #3f7a46;
   --gc-handle-dark: #1c3d20;

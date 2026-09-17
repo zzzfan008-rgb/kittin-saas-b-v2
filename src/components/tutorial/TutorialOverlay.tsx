@@ -141,10 +141,7 @@ export function TutorialOverlay() {
         <header className="flex items-start justify-between gap-6 border-b border-[var(--gc-border)] px-7 py-5">
           <div>
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--gc-accent)]">
-              <span>Workspace guide</span>
-              <span aria-label={`教程版本 ${WORKBENCH_TUTORIAL_VERSION}`} className="rounded-full border border-[var(--gc-border)] px-2 py-0.5 tracking-normal text-[var(--gc-text-muted)]">
-                {WORKBENCH_TUTORIAL_VERSION}
-              </span>
+              <span>使用指南</span>
             </div>
             <Dialog.Title className="mt-2 text-xl font-semibold text-[var(--gc-text)]">
               欢迎使用服装设计工作台
@@ -211,7 +208,7 @@ export function TutorialOverlay() {
                   <StepIcon aria-hidden="true" className="size-6" />
                 </div>
                 <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
-                  Step {step + 1} / {STEPS.length}
+                  步骤 {step + 1} / {STEPS.length}
                 </p>
                 <h2 className="mt-2 text-lg font-semibold text-[var(--gc-text)]">{current.title}</h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--gc-text-muted)]">{current.description}</p>
