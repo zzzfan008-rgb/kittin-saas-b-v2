@@ -73,51 +73,15 @@ export function defaultOperationModeForNode(kind: NodeKind): ImageOperationMode 
 }
 
 // ---------- 参考图可追溯输入 ----------
-/** @deprecated 参考图角色体系将被移除（见 docs/design/2026-09-17-remove-reference-roles/plan.md）。 */
-export const REFERENCE_ROLE_VALUES = [
-  "identity",
-  "pose_composition",
-  "garment_top",
-  "garment_bottom",
-  "garment_full",
-  "fabric",
-  "accessory",
-  "styling_only",
-  "background",
-  "generic",
-] as const;
-/** @deprecated 参考图角色体系将被移除。 */
-export type ReferenceRole = (typeof REFERENCE_ROLE_VALUES)[number];
-
-/** v0-v3 画布中的含糊角色只用于迁移，不可直接当作新角色使用。 */
-/** @deprecated 参考图角色体系将被移除。 */
-export const LEGACY_IMAGE_ROLE_VALUES = ["default", "sketch", "garment", "reference"] as const;
-/** @deprecated 参考图角色体系将被移除。 */
-export type LegacyImageRole = (typeof LEGACY_IMAGE_ROLE_VALUES)[number];
-/** @deprecated 参考图角色体系将被移除。 */
-export type ImageInputRole = ReferenceRole | LegacyImageRole;
-
-/** @deprecated 参考图角色体系将被移除。 */
-export function isReferenceRole(value: unknown): value is ReferenceRole {
-  return typeof value === "string" && (REFERENCE_ROLE_VALUES as readonly string[]).includes(value);
-}
-
-/**
- * 边数据按任意键值容忍读取；角色字段已被忽略。
- * @deprecated 参考图角色体系将被移除；边数据按任意键值容忍读取。
- */
+/** 边数据按任意键值容忍读取；历史数据中的角色字段一律忽略。 */
 export type ReferenceEdgeData = Record<string, unknown>;
 
 /** Provider 收到的已解析参考图；dataUrl 必须与 assetSha256 对应。 */
 export interface ReferenceImageInput {
   dataUrl: string;
-  /** @deprecated 参考图角色体系将被移除。 */
-  role?: ReferenceRole;
   order: number;
   assetSha256: string;
   sourceNodeId?: string;
-  /** 只有显式 false 表示已确认；缺失、true 或含糊输入都必须失败关闭。 */
-  roleNeedsConfirmation?: boolean;
 }
 
 /** 持久化历史证据不包含 base64 正文，避免数据库与 API 载荷膨胀。 */
@@ -126,11 +90,8 @@ export type ReferenceImageEvidence = Omit<ReferenceImageInput, "dataUrl">;
 /** DAG 计划中的轻量引用；运行时解析为 ReferenceImageInput。 */
 export interface ReferenceImageSource {
   imageRef: string;
-  /** @deprecated 参考图角色体系将被移除。 */
-  role?: ReferenceRole;
   order: number;
   sourceNodeId?: string;
-  roleNeedsConfirmation?: boolean;
 }
 
 // ---------- 节点数据（存 React Flow node.data）----------
@@ -174,10 +135,6 @@ export interface ImageInputNodeData extends BaseNodeData {
   kind: "image-input";
   /** dataURL 或 /api/files/xxx 路径 */
   imageUrl?: string;
-  /** @deprecated 参考图角色体系将被移除；读取旧数据时容忍并忽略。 */
-  imageRole?: unknown;
-  /** @deprecated 参考图角色体系将被移除；读取旧数据时容忍并忽略。 */
-  roleNeedsConfirmation?: unknown;
 }
 
 export interface SketchToRenderNodeData extends BaseNodeData, ModelSelectableNodeData {
