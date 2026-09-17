@@ -6,7 +6,6 @@ import type { Request } from "express";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
-import type { ExecutionPlan } from "../src/types/workflow";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-auth-"));
 process.env.DATA_DIR = temp;
@@ -21,10 +20,7 @@ const { authRouter } = await import("../server/routes/auth");
 const { purgeExpiredProjects } = await import("../server/routes/projects");
 const { openAiMaskTestRecordPath } = await import("../server/lib/openaiMaskTestLifecycle");
 const { verifyPassword } = await import("../server/lib/password");
-const {
-  completeGenerationRecord, createGenerationRecord, failGenerationRecord, registerGeneratedFiles,
-} = await import("../server/lib/generationRecords");
-const { createRun } = await import("../server/engine/runner");
+const { enqueueGenerationRun, processNextGenerationJob } = await import("../server/engine/runQueue");
 const { buildGarmentPrompt, requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
 const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
 const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
@@ -700,147 +696,78 @@ await test("删除管理员后仍保留有效通用素材及其底层文件", as
 });
 
 await test("成功图片写消耗流水，失败任务不写消耗", async () => {
-  await createGenerationRecord("run-success", {
-    userId: String(admin.id), nodeId: "node", nodeLabel: "AI 改款", kind: "ai-modify", requestedCount: 2,
-  }, 1000);
-  await completeGenerationRecord({
-    runId: "run-success", images: ["/api/files/a.png"],
-    providerImages: ["/api/files/a-provider.png"], model: "stub", providerRequests: 3,
-    startedAt: 1000, finishedAt: 2000,
-  });
-  await createGenerationRecord("run-failure", {
-    userId: String(admin.id), nodeId: "node", nodeLabel: "AI 改款", kind: "ai-modify", requestedCount: 1,
-  }, 3000);
-  await failGenerationRecord("run-failure", "timeout", 4000);
+  const pngDataUrl =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const processNow = Date.now() + 10_000;
+  const successProvider = {
+    id: "gpt-image-2-vip",
+    async generate() { return { images: [pngDataUrl], model: "gpt-image-2-vip" }; },
+    async edit() { return { images: [pngDataUrl], model: "gpt-image-2-vip" }; },
+  };
+  const successNodeId = "usage-success-node";
+  const successRun = await enqueueGenerationRun(
+    {
+      steps: [{
+        nodeId: successNodeId,
+        kind: "sketch-to-render",
+        inputImages: [],
+        params: boundStorageGenerateParams("生成成功效果图"),
+      }],
+    },
+    String(admin.id),
+    {
+      userId: String(admin.id),
+      nodeId: successNodeId,
+      nodeLabel: "AI 改款",
+      kind: "sketch-to-render",
+      requestedCount: 1,
+    },
+  );
+  assert.equal(await processNextGenerationJob("usage-success-worker", {
+    resolveProvider: () => successProvider,
+    now: () => processNow,
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), true);
+
+  const failureProvider = {
+    id: "gpt-image-2-vip",
+    async generate() { throw new Error("timeout"); },
+    async edit() { throw new Error("timeout"); },
+  };
+  const failureNodeId = "usage-failure-node";
+  const failureRun = await enqueueGenerationRun(
+    {
+      steps: [{
+        nodeId: failureNodeId,
+        kind: "sketch-to-render",
+        inputImages: [],
+        params: boundStorageGenerateParams("生成失败效果图"),
+      }],
+    },
+    String(admin.id),
+    {
+      userId: String(admin.id),
+      nodeId: failureNodeId,
+      nodeLabel: "AI 改款",
+      kind: "sketch-to-render",
+      requestedCount: 1,
+    },
+  );
+  assert.equal(await processNextGenerationJob("usage-failure-worker", {
+    resolveProvider: () => failureProvider,
+    now: () => processNow,
+    random: () => 0,
+    retryDelaysMs: [0, 0, 0],
+  }), true);
+
   const rows = await query<Record<string, unknown>>(
     "SELECT run_id, successful_count, provider_requests FROM usage_events ORDER BY run_id",
   );
-  assert.deepEqual(rows, [{ run_id: "run-success", successful_count: 1, provider_requests: 3 }]);
-});
-
-await test("执行计划中的中间生成图片也登记用户和节点归属", async () => {
-  const context = {
-    userId: String(admin.id), projectId: "project-1", nodeId: "target", nodeLabel: "结果", kind: "result", requestedCount: 1,
-  };
-  await registerGeneratedFiles(context, "run-success", "upstream-ai", ["/api/files/intermediate.png"], 5000);
-  const file = await queryOne<Record<string, unknown>>(
-    "SELECT owner_id, project_id, node_id, run_id FROM files WHERE id = $1",
-    ["intermediate.png"],
-  );
-  assert.deepEqual(file, {
-    owner_id: admin.id,
-    project_id: "project-1",
-    node_id: "upstream-ai",
-    run_id: "run-success",
-  });
-});
-
-async function waitForRun(run: { finished: boolean; emitter: { once: (event: string, listener: () => void) => void } }): Promise<void> {
-  if (run.finished) return;
-  await new Promise<void>((resolve) => run.emitter.once("finish", resolve));
-}
-
-function plan(...steps: ExecutionPlan["steps"]): ExecutionPlan {
-  return { steps };
-}
-
-await test("运行在前置节点失败时会结束记录而不是永久 queued", async () => {
-  const run = await createRun(
-    plan(
-      { nodeId: "upstream", kind: "ai-modify", inputImages: [], params: { operationMode: "edit" } },
-      { nodeId: "target", kind: "result", inputImages: [], params: {} },
-    ),
-    String(admin.id),
-    { userId: String(admin.id), nodeId: "target", nodeLabel: "结果", kind: "result", requestedCount: 1 },
-  );
-  await waitForRun(run);
-  const row = await queryOne<{ status: string }>("SELECT status FROM generation_runs WHERE id = $1", [run.id]);
-  assert.equal(row?.status, "error");
-});
-
-await test("下游失败不会让已提前完成的目标记录假 success", async () => {
-  const run = await createRun(
-    plan(
-      { nodeId: "target", kind: "image-input", inputImages: [], params: {} },
-      {
-        nodeId: "downstream", kind: "ai-modify", inputImages: [],
-        upstream: [{ nodeId: "target", images: [] }], params: { operationMode: "edit" },
-      },
-    ),
-    String(admin.id),
-    { userId: String(admin.id), nodeId: "target", nodeLabel: "目标", kind: "image-input", requestedCount: 1 },
-  );
-  await waitForRun(run);
-  const row = await queryOne<{ status: string }>("SELECT status FROM generation_runs WHERE id = $1", [run.id]);
-  assert.equal(row?.status, "error");
-});
-
-await test("成功的多 AI 节点按整次运行汇总 provider_requests", async () => {
-  const originalFetch = globalThis.fetch;
-  process.env.APIYI_BASE_URL = "https://provider.test";
-  process.env.APIYI_API_KEY = "test-key";
-  globalThis.fetch = async () => Response.json({ data: [{ b64_json: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" }] });
-  try {
-    const run = await createRun(
-      plan(
-        {
-          nodeId: "first", kind: "sketch-to-render", inputImages: [],
-          params: boundStorageGenerateParams("生成第一张效果图"),
-        },
-        {
-          nodeId: "second", kind: "sketch-to-render", inputImages: [],
-          params: boundStorageGenerateParams("生成第二张效果图"),
-        },
-        { nodeId: "target", kind: "result", inputImages: [], upstream: [
-          { nodeId: "first", images: [] }, { nodeId: "second", images: [] },
-        ], params: {} },
-      ),
-      String(admin.id),
-      { userId: String(admin.id), nodeId: "target", nodeLabel: "结果", kind: "result", requestedCount: 1 },
-    );
-    await waitForRun(run);
-    const row = await queryOne<{ status: string; provider_requests: number }>(
-      "SELECT status, provider_requests FROM generation_runs WHERE id = $1", [run.id],
-    );
-    assert.equal(row?.status, "success");
-    assert.equal(row?.provider_requests, 2);
-
-    const uploads = path.join(temp, "uploads");
-    const filesBeforeFailedRun = new Set(fs.readdirSync(uploads));
-    const failed = await createRun(
-      plan(
-        {
-          nodeId: "paid-upstream", kind: "sketch-to-render", inputImages: [],
-          params: boundStorageGenerateParams("生成上游效果图"),
-        },
-        {
-          nodeId: "too-many-inputs", kind: "ai-modify", inputImages: [],
-          upstream: Array.from({ length: 9 }, () => ({ nodeId: "paid-upstream", images: [] })),
-          params: { operationMode: "edit" },
-        },
-      ),
-      String(admin.id),
-      {
-        userId: String(admin.id), nodeId: "too-many-inputs", nodeLabel: "下游",
-        kind: "ai-modify", requestedCount: 1,
-      },
-    );
-    await waitForRun(failed);
-    assert.equal((await queryOne<{ status: string }>(
-      "SELECT status FROM generation_runs WHERE id = $1", [failed.id],
-    ))?.status, "error");
-    const failedEvidence = await query<{ id: string; source_type: string }>(
-      "SELECT id, source_type FROM files WHERE run_id = $1 ORDER BY id", [failed.id],
-    );
-    assert.equal(failedEvidence.length, 1, "下游失败后必须保留已付费上游的 Provider 原图");
-    assert.equal(failedEvidence[0]?.source_type, "provider-original");
-    assert.deepEqual(
-      new Set(fs.readdirSync(uploads)),
-      new Set([...filesBeforeFailedRun, failedEvidence[0]!.id]),
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  assert.deepEqual(rows, [{ run_id: successRun.id, successful_count: 1, provider_requests: 1 }]);
+  assert.equal((await queryOne<{ status: string }>(
+    "SELECT status FROM generation_runs WHERE id = $1", [failureRun.id],
+  ))?.status, "failed");
 });
 
 console.log(`\n通过 ${passed} 项`);

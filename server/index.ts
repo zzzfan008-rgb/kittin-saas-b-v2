@@ -34,6 +34,11 @@ import { assertEvaluationReleaseRuntimeConfig } from "./lib/evaluationReleaseRun
 
 const app = express();
 
+// 部署在反向代理（nginx/traefik）之后；显式信任一跳代理，使限流器的 req.ip
+// 反映真实客户端 IP，而不是把不同客户端都归并到代理地址。默认（false）会让
+// 限流与按 IP 审计全部失效。
+app.set("trust proxy", 1);
+
 app.use(express.json({ limit: "50mb" }));
 
 const aiRateLimit = createRateLimitMiddleware();

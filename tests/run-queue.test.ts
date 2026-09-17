@@ -8,7 +8,7 @@ import path from "node:path";
 import express, { type Request, type Response } from "express";
 import { ProviderError } from "../server/providers/base";
 import type { AuthenticatedRequest, AuthUser } from "../server/lib/auth";
-import type { GenerationRecordContext } from "../server/lib/generationRecords";
+import type { GenerationRecordContext } from "../server/engine/runQueue";
 import type { EvaluationRunPolicy } from "../server/lib/evaluationRunPolicy";
 import type { ProviderResolver } from "../server/engine/runner";
 import type { AIProvider, ExecutionPlan, ImageGenRequest, ImageGenResult, NodeExecution } from "../src/types/workflow";

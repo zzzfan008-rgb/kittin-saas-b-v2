@@ -18,7 +18,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, db, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { deleteStoredImage, uploadsDir } = await import("../server/lib/fileStore");
 const { createSession, SESSION_COOKIE } = await import("../server/lib/auth");
-const { createRun } = await import("../server/engine/runner");
+const { enqueueGenerationRun } = await import("../server/engine/runQueue");
 const { buildExecutionPlan } = await import("../server/engine/dag");
 const { authRouter } = await import("../server/routes/auth");
 const { runPlanRouter, staticImageReferencesForPlan } = await import("../server/routes/runPlan");
@@ -569,7 +569,13 @@ await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式�
     type: "result",
     data: { kind: "result", label: "结果", status: "idle", images: [] },
   }], []);
-  const run = await createRun(plan, users.owner.id);
+  const run = await enqueueGenerationRun(plan, users.owner.id, {
+    userId: users.owner.id,
+    nodeId: "result",
+    nodeLabel: "结果",
+    kind: "result",
+    requestedCount: 1,
+  });
 
   assert.equal((await request(`/run-plan/${run.id}`, "owner")).status, 200);
   assert.equal((await request(`/run-plan/${run.id}`, "other")).status, 404);

@@ -1,16 +1,14 @@
 /**
- * 执行计划运行器：逐步执行 ExecutionPlan，通过事件总线推送每步状态（SSE 用）。
- * 运行记录保存在内存（P0 单进程足够）。
+ * 执行步骤执行器：把单个 NodeExecution 逐步执行并调用 Provider。
+ * 运行队列与事件持久化已迁移到 runQueue/（PostgreSQL 持久队列）；本文件只保留
+ * executeStep 及其纯执行辅助函数（参考图解析、Provider 请求、后处理）。
  */
-import { EventEmitter } from "node:events";
 import { createHash } from "node:crypto";
-import { nanoid } from "nanoid";
 import {
   NODE_SPECS,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   allowedOperationModesForNode,
-  type ExecutionPlan,
   type AIProvider,
   type ImageGenRequest,
   type ImageOperationMode,
@@ -22,7 +20,7 @@ import {
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
 import { generateExactImages } from "../providers/exact";
-import { normalizeImageRef, persistImageRef } from "../lib/fileStore";
+import { normalizeImageRef } from "../lib/fileStore";
 import {
   isLocalImageReference,
   isRemoteImageReference,
@@ -44,14 +42,6 @@ import {
 } from "../../src/types/imageModels";
 import { compositeMaskedEdit, prepareMaskForGeneration } from "../lib/maskProcessing";
 import { renderProviderPrompt } from "../../src/lib/providerPromptRenderer";
-import {
-  completeGenerationRecord,
-  createGenerationRecord,
-  failGenerationRecord,
-  markGenerationRunning,
-  registerGeneratedFiles,
-  type GenerationRecordContext,
-} from "../lib/generationRecords";
 import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
 export { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
@@ -109,257 +99,6 @@ export interface StepResult {
   providerOutputSizes?: Array<string | null>;
   failures?: RunFailure[];
   providerRequests: number;
-}
-
-interface Run {
-  id: string;
-  /** 实时运行数据始终绑定发起用户；不从可选的记录上下文间接推断。 */
-  ownerId: string;
-  plan: ExecutionPlan;
-  emitter: EventEmitter;
-  events: RunEvent[]; // 已完成事件（供 SSE 重放）
-  finished: boolean;
-  createdAt: number;
-  recordContext?: GenerationRecordContext;
-}
-
-const runs = new Map<string, Run>();
-
-/** 已完成 Run 的保留上限（超出后清理最老的无订阅 Run，防内存无限增长） */
-const MAX_FINISHED_RUNS = 50;
-/** 已完成 Run 的最大存活时间（30 分钟） */
-const FINISHED_RUN_TTL_MS = 30 * 60 * 1000;
-
-/** 清理终态 Run：不影响正在运行或仍有活跃 SSE 订阅的 Run */
-function pruneRuns(): void {
-  const now = Date.now();
-  const finished: Run[] = [];
-  for (const run of runs.values()) {
-    if (!run.finished) continue;
-    if (run.emitter.listenerCount("event") > 0) continue; // 有活跃订阅，不动
-    if (now - run.createdAt > FINISHED_RUN_TTL_MS) {
-      runs.delete(run.id);
-    } else {
-      finished.push(run);
-    }
-  }
-  // 超上限：从最老的开始删
-  if (finished.length > MAX_FINISHED_RUNS) {
-    finished.sort((a, b) => a.createdAt - b.createdAt);
-    for (const run of finished.slice(0, finished.length - MAX_FINISHED_RUNS)) {
-      runs.delete(run.id);
-    }
-  }
-}
-
-export function getRunForUser(id: string, ownerId: string): Run | undefined {
-  const run = runs.get(id);
-  return run?.ownerId === ownerId ? run : undefined;
-}
-
-export async function createRun(
-  plan: ExecutionPlan,
-  ownerId: string,
-  recordContext?: GenerationRecordContext,
-): Promise<Run> {
-  if (!ownerId.trim()) throw new Error("run ownerId is required");
-  if (recordContext && recordContext.userId !== ownerId) {
-    throw new Error("run ownerId must match recordContext.userId");
-  }
-  pruneRuns();
-  const run: Run = {
-    id: nanoid(10),
-    ownerId,
-    plan,
-    emitter: new EventEmitter(),
-    events: [],
-    finished: false,
-    createdAt: Date.now(),
-    recordContext,
-  };
-  run.emitter.setMaxListeners(50);
-  runs.set(run.id, run);
-  if (recordContext) await createGenerationRecord(run.id, recordContext, run.createdAt);
-  // 异步启动，调用方先拿到 runId 再订阅事件
-  setImmediate(() => {
-    executeRun(run).catch(async (err) => {
-      const message = err instanceof ProviderError ? publicProviderErrorMessage(err) : err instanceof Error ? err.message : String(err);
-      if (run.recordContext) await failGenerationRecord(run.id, message, Date.now());
-      emit(run, { type: "run-error", error: message });
-    });
-  });
-  return run;
-}
-
-function emit(run: Run, event: RunEvent): void {
-  const sequenced = { ...event, seq: run.events.length + 1 };
-  run.events.push(sequenced);
-  run.emitter.emit("event", sequenced);
-  if (sequenced.type === "done" || sequenced.type === "run-error") {
-    run.finished = true;
-    run.emitter.emit("finish");
-  }
-}
-
-async function executeRun(run: Run): Promise<void> {
-  /** 每个节点的产出图片（统一为 /api/files/:id 引用），供下游节点使用 */
-  const outputs = new Map<string, string[]>();
-  /** 与 outputs 同序的 Provider 原图引用，供 result 聚合节点保留逐图 provenance。 */
-  const providerOutputs = new Map<string, string[]>();
-  let providerRequests = 0;
-  let model: string | undefined;
-  let recordResult: Pick<
-    StepResult,
-    "images" | "providerImages" | "references" | "prompts" | "providerOutputSizes" | "failures"
-  > | undefined;
-
-  if (run.recordContext) await markGenerationRunning(run.id, Date.now());
-
-  const failRun = async (message: string, nodeId?: string, startedAt?: number): Promise<void> => {
-    const finishedAt = Date.now();
-    if (run.recordContext) await failGenerationRecord(run.id, message, finishedAt);
-    if (nodeId) {
-      emit(run, {
-        type: "node-status",
-        nodeId,
-        status: "error",
-        error: message,
-        ...(startedAt !== undefined ? { startedAt } : {}),
-        finishedAt,
-      });
-    }
-    emit(run, { type: "run-error", ...(nodeId ? { nodeId } : {}), error: message, finishedAt });
-  };
-
-  for (const step of run.plan.steps) {
-    // 运行时解析真实输入：优先本次 Run 上游产出，范围外上游回退到计划期快照
-    const runtimeInputs = (step.upstream ?? []).flatMap((upstream) => {
-      const images = outputs.get(upstream.nodeId) ?? upstream.images;
-      const providerImages = providerOutputs.get(upstream.nodeId) ?? [];
-      return images.map((imageRef, index) => ({
-        imageRef,
-        providerImage: providerImages.length === images.length ? providerImages[index] : undefined,
-        role: upstream.referenceRole ?? "generic",
-        roleNeedsConfirmation: upstream.roleNeedsConfirmation !== false,
-        sourceNodeId: upstream.nodeId,
-        order: 0,
-      }));
-    }).map((reference, order) => ({ ...reference, order }));
-    const referenceSources = runtimeInputs.map(({ providerImage: _providerImage, ...reference }) => reference);
-    const inputImages = referenceSources.map((reference) => reference.imageRef);
-
-    const runtimeInputLimit = step.kind === "mask-redraw"
-      ? MAX_MASK_USER_REFERENCE_IMAGES
-      : MAX_REFERENCE_IMAGES;
-    if (NODE_SPECS[step.kind].providerId && inputImages.length > runtimeInputLimit) {
-      const message = `Node ${step.nodeId} accepts at most ${runtimeInputLimit}${step.kind === "mask-redraw" ? " user" : ""} reference images`;
-      await failRun(message, step.nodeId);
-      return;
-    }
-
-    // 运行时最终门禁：即使静态计划中的上游节点实际未产图，也绝不退化成无参考图付费生成。
-    if (NODE_SPECS[step.kind].providerId && step.kind !== "sketch-to-render" && inputImages.length === 0) {
-      const message = `Node ${step.nodeId} requires an upstream image`;
-      await failRun(message, step.nodeId);
-      return;
-    }
-
-    const startedAt = Date.now();
-    emit(run, { type: "node-status", nodeId: step.nodeId, status: "running", startedAt });
-    try {
-      const result = await executeStep(step, inputImages, getProvider, {
-        runId: run.id,
-        referenceSources,
-        inputProviderImages: runtimeInputs.map((reference) => reference.providerImage),
-        ...(run.recordContext && NODE_SPECS[step.kind].providerId ? {
-          captureProviderImages: async ({ images }: { images: string[] }) => {
-            const captured: string[] = [];
-            for (const image of images) {
-              const evidenceSource = image.startsWith("/api/files/")
-                ? await normalizeImageRef(image)
-                : image;
-              captured.push(await persistImageRef(evidenceSource));
-            }
-            await registerGeneratedFiles(
-              run.recordContext!, run.id, step.nodeId, captured, Date.now(), "provider-original",
-            );
-            return captured;
-          },
-        } : {}),
-      });
-      const providerImages = result.providerImages ?? [];
-      if (providerImages.length > 0 && providerImages.length !== result.images.length) {
-        throw new Error("Provider originals and business outputs must have identical cardinality");
-      }
-      // 先确保原始证据存在，再落业务图；即使后者失败也不删除前者。
-      const persistedProviderImages = providerImages.length > 0
-        ? await persistOutputImages(providerImages)
-        : [];
-      const persisted = await persistOutputImages(result.images);
-      if (run.recordContext) {
-        await registerGeneratedFiles(run.recordContext, run.id, step.nodeId, persisted, Date.now());
-      }
-      outputs.set(step.nodeId, persisted);
-      providerOutputs.set(step.nodeId, persistedProviderImages);
-      const finishedAt = Date.now();
-      providerRequests += result.providerRequests;
-      if (result.model) model = result.model;
-      if (run.recordContext?.nodeId === step.nodeId) {
-        recordResult = {
-          images: persisted,
-          providerImages: persistedProviderImages,
-          references: result.references,
-          prompts: result.prompts,
-          providerOutputSizes: result.providerOutputSizes,
-          failures: result.failures,
-        };
-      }
-      const partialWarning = result.failures?.length
-        ? `${result.failures.length} 个生成任务失败`
-        : undefined;
-      emit(run, {
-        type: "node-status",
-        nodeId: step.nodeId,
-        status: "success",
-        images: persisted,
-        error: partialWarning,
-        model: result.model,
-        prompts: result.prompts,
-        providerOutputSizes: result.providerOutputSizes,
-        failures: result.failures,
-        startedAt,
-        finishedAt,
-      });
-    } catch (err) {
-      const message = err instanceof ProviderError
-        ? publicProviderErrorMessage(err)
-        : err instanceof Error ? err.message : String(err);
-      await failRun(message, step.nodeId, startedAt);
-      return; // P0：单步失败即终止整个 run
-    }
-  }
-  if (run.recordContext) {
-    const finishedAt = Date.now();
-    await completeGenerationRecord({
-      runId: run.id,
-      images: recordResult?.images ?? [],
-      providerImages: recordResult?.providerImages,
-      references: recordResult?.references,
-      prompts: recordResult?.prompts,
-      providerOutputSizes: recordResult?.providerOutputSizes,
-      failures: recordResult?.failures,
-      model,
-      providerRequests,
-      startedAt: run.createdAt,
-      finishedAt,
-    });
-  }
-  emit(run, { type: "done" });
-}
-
-/** 产出图片归一化：dataURL / 远程 URL → 落盘为 /api/files/:id；已是本地引用的原样保留 */
-async function persistOutputImages(images: string[]): Promise<string[]> {
-  return Promise.all(images.map((img) => persistImageRef(img)));
 }
 
 export type ProviderResolver = (id: string) => AIProvider;

@@ -27,7 +27,7 @@ import {
   promptRunReferenceSnapshotsFromGraph,
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
-import { getRunForUser, type RunEvent } from "../engine/runner";
+import type { RunEvent } from "../engine/runner";
 import {
   ActiveRunLimitError,
   assertGenerationOwnerActive,
@@ -406,48 +406,6 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
   }
 }));
 
-function streamInMemoryRun(
-  run: NonNullable<ReturnType<typeof getRunForUser>>,
-  req: Request,
-  res: Response,
-): void {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-  res.write("retry: 3000\n\n");
-
-  const send = (event: RunEvent) => {
-    if (event.seq !== undefined) res.write(`id: ${event.seq}\n`);
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
-  };
-  const lastEventId = Number(req.get("Last-Event-ID") ?? 0);
-  const cursor = Number.isSafeInteger(lastEventId) && lastEventId >= 0 ? lastEventId : 0;
-  // 晚连接拿全量；重连只补发游标后的事件，避免终态/最近生成重复记账。
-  for (const event of run.events) {
-    if ((event.seq ?? 0) > cursor) send(event);
-  }
-  if (run.finished) {
-    res.end();
-    return;
-  }
-  run.emitter.on("event", send);
-  const heartbeat = setInterval(() => res.write(": keepalive\n\n"), 15_000);
-  const close = () => {
-    clearInterval(heartbeat);
-    run.emitter.off("event", send);
-    res.end();
-  };
-  run.emitter.once("finish", close);
-  req.on("close", () => {
-    clearInterval(heartbeat);
-    run.emitter.off("event", send);
-    run.emitter.off("finish", close);
-  });
-}
-
 interface DurableRunEventStreamDependencies {
   readEvents: typeof readDurableRunEvents;
   getRun: typeof getDurableRunForUser;
@@ -523,29 +481,18 @@ runPlanRouter.get("/:id/events", asyncHandler(async (req, res) => {
   const ownerId = requestUser(req).id;
   const durable = await getDurableRunForUser(req.params.id, ownerId);
   if (!durable) {
-    const legacyRun = getRunForUser(req.params.id, ownerId);
-    if (!legacyRun) {
-      res.status(404).json({ error: "run not found" });
-      return;
-    }
-    streamInMemoryRun(legacyRun, req, res);
+    res.status(404).json({ error: "run not found" });
     return;
   }
   await streamDurableRunEvents(req.params.id, ownerId, req, res);
 }));
 
-/** 刷新后先确认内存中的 Run 仍可恢复，避免对已丢失的 id 无限 SSE 重连。 */
 runPlanRouter.get("/:id", asyncHandler(async (req, res) => {
   const ownerId = requestUser(req).id;
   const durable = await getDurableRunForUser(req.params.id, ownerId);
-  if (durable) {
-    res.json({ runId: durable.id, status: durable.status, finished: durable.finished });
-    return;
-  }
-  const run = getRunForUser(req.params.id, ownerId);
-  if (!run) {
+  if (!durable) {
     res.status(404).json({ error: "run not found" });
     return;
   }
-  res.json({ runId: run.id, finished: run.finished });
+  res.json({ runId: durable.id, status: durable.status, finished: durable.finished });
 }));

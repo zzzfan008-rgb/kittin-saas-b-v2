@@ -4,7 +4,6 @@
  * 2. 分支 DAG：每个下游只收到其直接上游
  * 3. 环检测仍有效
  * 4. 单节点重跑：范围外上游回退快照
- * 5. runs 清理有界（终态 Run 超上限被回收）
  * 运行：node node_modules/tsx/dist/cli.mjs tests/dag.test.ts
  */
 import assert from "node:assert";
@@ -30,9 +29,8 @@ import type {
 const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-test-"));
 process.env.DATA_DIR = TEST_DATA_DIR;
 
-const { createRun, executeStep, getRunForUser } = await import("../server/engine/runner");
+const { executeStep } = await import("../server/engine/runner");
 const { uploadsDir } = await import("../server/lib/fileStore");
-const TEST_OWNER_ID = "dag-test-owner";
 
 // 造一张真实存在的测试图片（落盘校验需要）。
 const SEED_PNG = Buffer.from(
@@ -1055,50 +1053,6 @@ async function main() {
     );
   });
 
-
-  await ok("端到端（无 AI）：result 节点收到上游本次产出", async () => {
-    // image-input → result：image-input 执行时产出图片，result 必须收到它
-    const plan = buildExecutionPlan(
-      [imgNode("input", "/api/files/seed.png"), resultNode("out")],
-      [edge("input", "out")],
-    );
-    const run = await createRun(plan, TEST_OWNER_ID);
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("run timeout")), 5000);
-      run.emitter.on(
-        "event",
-        (e: { type: string; nodeId?: string; status?: string; images?: string[] }) => {
-          if (e.type === "node-status" && e.nodeId === "out" && e.status === "success") {
-            assert.deepStrictEqual(e.images, ["/api/files/seed.png"]);
-          }
-          if (e.type === "done") {
-            clearTimeout(timer);
-            resolve();
-          }
-          if (e.type === "run-error") {
-            clearTimeout(timer);
-            reject(new Error(`run failed: ${(e as { error?: string }).error}`));
-          }
-        },
-      );
-    });
-  });
-
-  await ok("runs 有界：终态 Run 超上限被清理", async () => {
-    // 直接造 60 个终态 Run 再触发一次 createRun 的清理
-    const plan = buildExecutionPlan([resultNode("x")], []);
-    let oldestRunId = "";
-    for (let i = 0; i < 60; i++) {
-      const r = await createRun(plan, TEST_OWNER_ID);
-      if (i === 0) oldestRunId = r.id;
-      r.finished = true;
-    }
-    await createRun(plan, TEST_OWNER_ID);
-    const probe = await createRun(plan, TEST_OWNER_ID);
-    assert.ok(getRunForUser(probe.id, TEST_OWNER_ID), "新 Run 必须存在");
-    assert.strictEqual(getRunForUser(probe.id, "another-owner"), undefined, "其他用户不能读取 Run");
-    assert.strictEqual(getRunForUser(oldestRunId, TEST_OWNER_ID), undefined, "最老的终态 Run 必须已被回收");
-  });
 
   console.log(`\n通过 ${passed} 项`);
 }

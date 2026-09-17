@@ -21,7 +21,6 @@ import {
   persistImageRefWithReceipt,
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
-import type { GenerationRecordContext } from "../../lib/generationRecords";
 import type { EvaluationRunPolicy } from "../../lib/evaluationRunPolicy";
 import {
   consumeEvaluationRunAuthorization,
@@ -48,6 +47,28 @@ import {
   outcomeUnknownMessage,
   type DurableRunStatus,
 } from "../runQueueContracts";
+
+/**
+ * 持久队列创建 generation_runs 行所需的上下文。
+ * 从已删除的 server/lib/generationRecords.ts 迁移而来：旧内存 runner 用它写旧状态词表，
+ * 现在只由 runQueue/persist.ts 与入队方使用。
+ */
+export interface GenerationRecordContext {
+  userId: string;
+  /** 客户端对一次付费提交生成的稳定请求号；持久队列据此跨 HTTP 重试去重。 */
+  clientRequestId?: string;
+  projectId?: string;
+  projectName?: string;
+  nodeId: string;
+  nodeLabel: string;
+  kind: string;
+  prompt?: string;
+  parameters?: Record<string, unknown>;
+  referenceImages?: string[];
+  referenceInputs?: Array<ReferenceImageInput | ReferenceImageSource>;
+  requestedCount: number;
+}
+
 export async function assertGenerationOwnerActive(
   client: PoolClient,
   ownerId: string,

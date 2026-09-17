@@ -366,14 +366,16 @@ filesRouter.get("/:id", asyncHandler(async (req, res) => {
     res.status(400).json({ error: "invalid file id" });
     return;
   }
-  const filePath = path.join(uploadsDir(), id);
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "file not found" });
-    return;
-  }
+  // 与 thumbnail 路由语义统一：先 ACL 后磁盘。无权访问（含无 files 元数据）一律
+  // 403，只有已授权但物理文件缺失（回收失败等）才返回 404。
   const access = await canAccessFile(id, req);
   if (access === "denied") {
     res.status(403).json({ error: "无权访问此文件" });
+    return;
+  }
+  const filePath = path.join(uploadsDir(), id);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: "file not found" });
     return;
   }
   res.setHeader("Content-Type", mimeOfFile(id));

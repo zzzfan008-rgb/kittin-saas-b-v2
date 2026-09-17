@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import pg from "pg";
 import sharp from "sharp";
-import type { GenerationRecordContext } from "../server/lib/generationRecords";
+import type { GenerationRecordContext } from "../server/engine/runQueue";
 import type { ExecutionPlan, NodeExecution } from "../src/types/workflow";
 import { summarizeDurations } from "../scripts/performance-baseline";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
