@@ -30,10 +30,10 @@ const SHORTCUTS_PANEL_ID = "workbench-shortcuts";
 
 function themePreviewColors(theme: ThemeId) {
   if (theme === "white") {
-    return { shell: "#f5f5f7", panel: "#ffffff", line: "#d3d3d8", accent: "#e98fa8" };
+    return { shell: "#f5f5f7", panel: "#ffffff", line: "#d3d3d8", accent: "#1d1d1f" };
   }
   if (theme === "eye") {
-    return { shell: "#dcebd0", panel: "#eef5e8", line: "#a4bb94", accent: "#173b63" };
+    return { shell: "#dcebd0", panel: "#eef5e8", line: "#a4bb94", accent: "#2c5a31" };
   }
   return { shell: "#101010", panel: "#1b1b1b", line: "#3a3a3a", accent: "#c9a66b" };
 }
