@@ -164,7 +164,7 @@ test("unverified upload stays blocked while a test-reviewed text starter complet
 
   const uploadGenerateNode = page.getByTestId("rf__node-transfer");
   await expect(uploadGenerateNode.getByRole("button", { name: "未验证不可运行" })).toBeDisabled();
-  await expect(uploadGenerateNode.getByText(/参考图角色尚未全部确认|没有绑定当前版本的独立提示词变体/)).toBeVisible();
+  await expect(uploadGenerateNode.getByText(/没有绑定当前版本的独立提示词变体/)).toBeVisible();
   expect(runs).toHaveLength(0);
 
   await page.getByRole("button", { name: "打开项目中心" }).click();

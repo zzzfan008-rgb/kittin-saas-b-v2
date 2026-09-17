@@ -426,7 +426,7 @@ await test("Worker 不修复损坏的静态 reference order/imageRef/数量快�
     {
       name: "order",
       mutate: (queuedStep) => { queuedStep.inputReferences![0].order = 1; },
-      expected: /参考图顺序无效|参考图角色或顺序无效|reference-structure-invalid/,
+      expected: /参考图结构或顺序无效/,
     },
     {
       name: "image-ref",
