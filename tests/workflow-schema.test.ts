@@ -136,12 +136,49 @@ async function main() {
   });
 
   await test("v6 含旧角色字段（imageRole/边 data.role/roleNeedsConfirmation）读取容忍且不抛错", () => {
-    const legacyRoleFlow = strictReferenceFlow();
+    const legacyRoleFlow = {
+      schemaVersion: 6,
+      nodes: [
+        {
+          id: "source",
+          type: "image-input",
+          position: { x: 0, y: 0 },
+          data: {
+            kind: "image-input",
+            label: "参考图",
+            status: "idle",
+            imageUrl: PNG_DATA_URL,
+            imageRole: "garment_full",
+            roleNeedsConfirmation: false,
+          },
+        },
+        {
+          id: "result",
+          type: "result",
+          position: { x: 320, y: 0 },
+          data: { kind: "result", label: "结果", status: "idle", images: [] },
+        },
+      ],
+      edges: [
+        {
+          id: "source-result",
+          source: "source",
+          target: "result",
+          data: { role: "garment_full", roleNeedsConfirmation: false },
+        },
+      ],
+    };
     // 旧角色字段存在即忽略：不报错、不写回。
     const normalized = validateAndMigrateFlow(legacyRoleFlow);
     assert.equal(normalized.schemaVersion, 6);
     assert.equal(normalized.nodes[0].id, "source");
     assert.equal(normalized.edges[0].id, "source-result");
+    // 旧角色字段存在即忽略：节点级字段被剥离；边数据按任意键值容忍保留（不销毁未知键）。
+    assert.ok(!("imageRole" in normalized.nodes[0].data));
+    assert.ok(!("roleNeedsConfirmation" in normalized.nodes[0].data));
+    assert.ok(!("role" in normalized.nodes[0].data));
+    // 边数据按任意键值容忍：未知键原样保留，不销毁用户数据。
+    assert.equal((normalized.edges[0].data as Record<string, unknown>)["role"], "garment_full");
   });
 
   await test("v2 显式合法模型与参数不得被默认值替换", () => {
