@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "createdAt": "2026-09-17T19:44:17.060Z",
+  "createdAt": "2026-09-17T20:29:45.298Z",
   "baseCommit": "efd66af5d3d38322d9e5f5c8860d9287dd008883",
-  "changeFingerprintSha256": "011d96a480d8608970e3ba130a5b469ea397ba48704409957f8d265309d490cb",
+  "changeFingerprintSha256": "e72fc53dc0f80a3a571f11ab8d22fc4822a420cf06d9ca25f1aced975dcb2c18",
   "knowledgeSnapshotId": "2026-09-02T12-55-56.022Z-a90bb31d7f8c13df",
   "knowledgeSnapshotSha256": "a90bb31d7f8c13df5505179dc18bfcaeba35f5344c2f624f75ac48ebf3c5e7a8",
   "query": "参考图 多图 顺序 编辑 提示词约束",
   "affectedPaths": [
+    "docs/ai/evaluation/README.md",
     "docs/ai/evaluation/evaluation-manifest-v1.json",
     "docs/ai/evaluation/evaluation-plan-v1.json",
     "docs/ai/evaluation/evaluation-plan-v2.json",
@@ -99,6 +100,6 @@
       "sha256": "d7721c9c62e893e672390f2eee66ee80d11ff50c3be5221a8a3758461b385834"
     }
   ],
-  "decisionSummary": "移除参考图角色体系（角色指定/角色确认/角色驱动的提示词约束），仅保留参考图顺序语义：提示词改为按序参考图列表（参考图:参考图1、…），评估发布链移除 referenceRoleProfile 与 referenceRoleFidelity 维度，evaluation-review CLI 移除 reference-profile-file 参数，旧数据按未知字段容忍。依据阶段 0 local kb search 命中的多图编辑页（FLUX image-edit、GPT Image 2 / GPT Image 2 VIP image-edit、Seedream overview/image-edit、Grok Imagine image-edit）确认「顺序」是这些模型的原生参考图语义，而「角色」不是。",
+  "decisionSummary": "移除参考图角色体系后仅保留参考图顺序语义；评估单位唯一键不再含 referenceRoleProfile（与实现一致）。依据阶段 0 命中的多图编辑页确认顺序是模型原生语义、角色不是。",
   "unresolvedChoices": []
 }
