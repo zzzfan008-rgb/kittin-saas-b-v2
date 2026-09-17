@@ -216,19 +216,19 @@ function PromptPresetPicker({
               >
                 <span className="flex items-center justify-between gap-2 text-[10px] text-[var(--gc-text)]">
                   <span>{preset.name}</span>
-                  <span className="shrink-0 text-[9px] text-[var(--gc-accent)]">{preset.aspectRatio}</span>
+                  <span className="shrink-0 text-[10px] text-[var(--gc-accent)]">{preset.aspectRatio}</span>
                 </span>
                 <span className="mt-0.5 block text-[10px] leading-relaxed text-[var(--gc-text-muted)]">{preset.description}</span>
                 <span className="mt-1 block text-[10px] text-[var(--gc-text-muted)]">
                   {preset.templateName} · case {preset.exampleCaseIds.join(", ")}
                 </span>
               </Button>
-              {reason && <p id={reasonId} className="px-1 text-[9px] leading-relaxed text-amber-500/90">{reason}</p>}
+              {reason && <p id={reasonId} className="px-1 text-[10px] leading-relaxed text-amber-500/90">{reason}</p>}
             </div>
           );
         })}
         {activePending && (
-          <div aria-live="polite" className="space-y-2 rounded-md border border-[var(--gc-accent)]/40 bg-black/20 p-2 text-[9px] text-[var(--gc-text-muted)]">
+          <div aria-live="polite" className="space-y-2 rounded-md border border-[var(--gc-accent)]/40 bg-black/20 p-2 text-[10px] text-[var(--gc-text-muted)]">
             <p className="font-medium text-[var(--gc-text)]">确认应用：{activePending.preset.name}</p>
             <dl className="space-y-1">
               <div className="space-y-0.5"><dt>提示词变体</dt><dd className="break-all font-mono text-[var(--gc-text)]">{activePending.variant.variantId}</dd></div>
@@ -285,7 +285,7 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
       <p className="text-[10px] font-medium text-[var(--gc-text-muted)]">快捷建图</p>
       {groups.map((group) => (
         <div key={group.direction} className="space-y-1">
-          <div className="flex items-center justify-between text-[9px] text-neutral-600">
+          <div className="flex items-center justify-between text-[10px] text-neutral-600">
             <span>{group.label}</span>
             {group.disabled && <span>输入已满</span>}
           </div>
@@ -300,7 +300,7 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
                   disabled={disabled}
                   title={!productPolicy.canCreate ? productPolicy.reason : undefined}
                   onClick={() => add(nextKind, group.direction)}
-                  className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[9px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] transition-colors hover:border-[var(--gc-accent)] hover:text-[var(--gc-accent)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {group.direction === "upstream" ? "← " : "+ "}{NODE_SPECS[nextKind].title}
                   {!productPolicy.canCreate && " · unsupported"}
@@ -310,7 +310,7 @@ function QuickConnect({ nodeId, kind }: { nodeId: string; kind: NodeKind }) {
           </div>
         </div>
       ))}
-      <p className="text-[9px] leading-relaxed text-neutral-600">新增节点与连线属于同一次撤销操作。</p>
+      <p className="text-[10px] leading-relaxed text-neutral-600">新增节点与连线属于同一次撤销操作。</p>
     </section>
   );
 }
@@ -387,7 +387,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
         <section
           aria-label="节点产品支持状态"
           data-product-support="unsupported"
-          className="rounded-md border border-amber-700/50 bg-amber-950/25 p-2 text-[9px] leading-relaxed text-amber-300"
+          className="rounded-md border border-amber-700/50 bg-amber-950/25 p-2 text-[10px] leading-relaxed text-amber-300"
         >
           <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
           <p className="mt-0.5">{productPolicy.reason}</p>
@@ -416,12 +416,12 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
             <option value="edit">参考图编辑（至少 1 张）</option>
           </select>
           {d.operationModeNeedsConfirmation && (
-            <span className="text-[9px] leading-relaxed text-amber-500">旧项目模式无法可靠推断，请确认后再运行。</span>
+            <span className="text-[10px] leading-relaxed text-amber-500">旧项目模式无法可靠推断，请确认后再运行。</span>
           )}
         </label>
       )}
       {d.kind === "ai-modify" && (
-        <p className="text-[9px] text-neutral-500">操作模式：参考图编辑（节点固定）</p>
+        <p className="text-[10px] text-neutral-500">操作模式：参考图编辑（节点固定）</p>
       )}
 
       {spec.providerId && referenceRows.length > 0 && (
@@ -451,7 +451,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
               rows={12}
               className={`${inputClass} resize-none`}
             />
-            <span className="text-[9px] text-neutral-600">每条入边的参考角色必须确认；可连接最多 8 张参考图，按连线顺序传入</span>
+            <span className="text-[10px] text-neutral-600">每条入边的参考角色必须确认；可连接最多 8 张参考图，按连线顺序传入</span>
           </label>
           {(d.kind === "sketch-to-render" || d.kind === "ai-modify") && (
             <PromptPresetPicker
@@ -548,7 +548,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       )}
 
       {modelParameterError && (
-        <p className="rounded-md border border-amber-800/50 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-400">
+        <p className="rounded-md border border-amber-800/50 bg-amber-950/20 p-2 text-[10px] leading-relaxed text-amber-400">
           当前模式的模型参数未确认：{modelParameterError}
         </p>
       )}

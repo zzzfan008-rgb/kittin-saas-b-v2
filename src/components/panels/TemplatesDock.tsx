@@ -132,7 +132,7 @@ export function TemplatesDock() {
         >
           <span className="text-[13px] leading-none">▦</span>
           模板库
-          <span className="text-[9px] text-neutral-500">{open ? "▲" : "▼"}</span>
+          <span className="text-[10px] text-neutral-500">{open ? "▲" : "▼"}</span>
         </button>
       </div>
 
@@ -219,7 +219,7 @@ export function TemplatesDock() {
                           {tpl.name}
                         </span>
                         {tpl.builtIn && (
-                          <span className={`shrink-0 rounded-sm border px-1 py-px text-[8px] ${
+                          <span className={`shrink-0 rounded-sm border px-1 py-px text-[10px] ${
                             unavailable
                               ? "border-amber-600/50 text-amber-400"
                               : "border-gold/40 text-gold"
@@ -234,7 +234,7 @@ export function TemplatesDock() {
                         </p>
                       )}
                       {unavailable && (
-                        <p id={reasonId} className="text-[9px] leading-relaxed text-amber-500">
+                        <p id={reasonId} className="text-[10px] leading-relaxed text-amber-500">
                           {productPolicy.reason}
                         </p>
                       )}

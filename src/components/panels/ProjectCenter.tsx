@@ -419,7 +419,7 @@ export function ProjectCenter({
                         <span className="block p-3">
                           <span className="flex items-center gap-2">
                             <span className={PROJECT_CENTER_TITLE_CLASS}>继续草稿</span>
-                            <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">自动保存</span>
+                            <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[10px] text-[var(--gc-accent)]">自动保存</span>
                           </span>
                           <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">{initialDraft.projectName}</span>
                         </span>
@@ -440,7 +440,7 @@ export function ProjectCenter({
                           <span className="block p-3">
                             <span className="flex items-center gap-2">
                               <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
-                              {openTab && <span className="shrink-0 text-[8px] text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                              {openTab && <span className="shrink-0 text-[10px] text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
                             </span>
                             <span className="mt-1 block truncate text-[10px] text-[var(--gc-text-muted)]">
                               {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
@@ -482,7 +482,7 @@ export function ProjectCenter({
                           <span className="block p-3">
                             <span className="flex items-center gap-2">
                               <span className={PROJECT_CENTER_TITLE_CLASS}>{template.name}</span>
-                              <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[8px] ${
+                              <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
                                 unavailable
                                   ? "border-amber-600/50 text-amber-500"
                                   : "border-[var(--gc-accent)]/40 text-[var(--gc-accent)]"
@@ -494,7 +494,7 @@ export function ProjectCenter({
                               {template.description || "从此工作流模板创建一个新项目"}
                             </span>
                             {unavailable && (
-                              <span id={reasonId} className="mt-1 block text-[9px] leading-relaxed text-amber-500">
+                              <span id={reasonId} className="mt-1 block text-[10px] leading-relaxed text-amber-500">
                                 {productPolicy.reason}
                               </span>
                             )}
@@ -572,7 +572,7 @@ export function ProjectCenter({
                             >
                               {template.name}
                             </button>
-                            <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[8px] text-[var(--gc-accent)]">我的</span>
+                            <span className="shrink-0 rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[10px] text-[var(--gc-accent)]">我的</span>
                           </div>
                           <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--gc-text-muted)]">
                             {template.description || "从此工作流模板创建一个新项目"}

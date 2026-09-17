@@ -112,7 +112,7 @@ function NodeList() {
               <span className="flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]">
                 <span>{spec.title}</span>
                 {unavailable && (
-                  <span className="shrink-0 rounded border border-amber-600/50 px-1 py-0.5 text-[8px] font-medium text-amber-400">
+                  <span className="shrink-0 rounded border border-amber-600/50 px-1 py-0.5 text-[10px] font-medium text-amber-400">
                     unsupported
                   </span>
                 )}
@@ -121,7 +121,7 @@ function NodeList() {
                 {spec.description}
               </span>
               {unavailable && (
-                <span id={`node-policy-${kind}`} className="text-[9px] leading-relaxed text-amber-500">
+                <span id={`node-policy-${kind}`} className="text-[10px] leading-relaxed text-amber-500">
                   首版尚无独立提示词、参数档案和真实评估，暂不可新建或付费运行。
                 </span>
               )}

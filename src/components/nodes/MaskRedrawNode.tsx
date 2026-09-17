@@ -129,7 +129,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             }}
           />
         )}
-        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[9px] leading-4 text-neutral-500">
+        <p className="rounded-md border border-[#2b2b2b] bg-[#111] px-2.5 py-2 text-[10px] leading-4 text-neutral-500">
           涂抹需要修改的大致区域，再描述要添加、替换或调整的内容。涂抹区不是裁切框，新内容会结合整幅服装自动延展并融合。
         </p>
         <div className="space-y-1 rounded-md border border-[#2b2b2b] bg-[#111] p-2">
@@ -143,10 +143,10 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             应用 GPT Image 2 局部修改专轨
           </button>
           {!presetAvailability.enabled && (
-            <p id={`${id}-mask-preset-reason`} className="text-[9px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
+            <p id={`${id}-mask-preset-reason`} className="text-[10px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
           )}
           {presetPending && presetVariant && presetProfile && (
-            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] text-amber-200">
+            <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[10px] text-amber-200">
               <p>将写入独立提示词变体、契约哈希、参数档案与后处理版本；模型仍为 gpt-image-2，业务画幅跟随来源图片。</p>
               <dl className="space-y-0.5">
                 <div><dt>提示词变体</dt><dd className="break-all font-mono text-neutral-200">{presetVariant.variantId}</dd></div>

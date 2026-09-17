@@ -110,7 +110,7 @@ export function FabricRecolorNode({
                 type="button"
                 onClick={() => toggleColor(hex)}
                 title={`${nameOfColor(hex)} ${hex} · 点击移除`}
-                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[9px] text-neutral-300 hover:border-red-400/60"
+                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[10px] text-neutral-300 hover:border-red-400/60"
               >
                 <span
                   className="h-2.5 w-2.5 rounded-[2px]"
@@ -173,7 +173,7 @@ export function FabricRecolorNode({
                       style={{ backgroundColor: c.hex }}
                     />
                     <span
-                      className={`w-full truncate text-center text-[8px] leading-tight ${
+                      className={`w-full truncate text-center text-[10px] leading-tight ${
                         active ? "text-gold" : "text-neutral-500"
                       }`}
                     >

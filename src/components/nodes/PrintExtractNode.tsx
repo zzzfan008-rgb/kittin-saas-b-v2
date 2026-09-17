@@ -47,7 +47,7 @@ export function PrintExtractNode({ id, data, selected }: NodeProps<Node<PrintExt
             placeholder='可选：如"只要胸前那朵花"'
             className={`${inputClass} resize-none`}
           />
-          <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
+          <span className="text-[10px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} disabled={running} referenceRows={admission.referenceRows} />
         <RunButton

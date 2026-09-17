@@ -68,7 +68,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
   }, [images, autoSave, supported, directoryName, permission, saveAll]);
 
   if (!supported) {
-    return <p className="text-[9px] text-neutral-600">当前浏览器不支持保存到文件夹，已回退为逐张下载。</p>;
+    return <p className="text-[10px] text-neutral-600">当前浏览器不支持保存到文件夹，已回退为逐张下载。</p>;
   }
 
   const onChoose = async () => {
@@ -128,7 +128,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
       >
         保存全部到文件夹
       </button>
-      {status && <p className="text-[9px] text-neutral-500">{status}</p>}
+      {status && <p className="text-[10px] text-neutral-500">{status}</p>}
     </div>
   );
 }

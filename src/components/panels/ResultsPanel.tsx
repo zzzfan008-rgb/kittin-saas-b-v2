@@ -114,7 +114,7 @@ export function ResultsPanel({
                     <span className="text-[10px] text-gold">
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-[9px] text-neutral-500">
+                    <span className="w-full truncate text-center text-[10px] text-neutral-500">
                       {r.nodeLabel}
                     </span>
                   </button>
@@ -135,7 +135,7 @@ export function ResultsPanel({
                     <span className={`text-[10px] ${r.status === "cancelled" ? "text-neutral-500" : "text-red-400"}`}>
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-[9px] text-neutral-500">
+                    <span className="w-full truncate text-center text-[10px] text-neutral-500">
                       {r.nodeLabel}
                     </span>
                   </button>
@@ -171,7 +171,7 @@ export function ResultsPanel({
                       />
                     </button>
                     {compareIds.includes(r.id) && (
-                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[9px] font-bold text-ink">
+                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[10px] font-bold text-ink">
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}

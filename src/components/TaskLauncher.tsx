@@ -49,7 +49,7 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
       >
         <div className="relative overflow-hidden">
           <TemplateCover template={template} />
-          <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[8px] backdrop-blur-sm ${
+          <span className={`absolute right-3 top-3 rounded border px-1.5 py-0.5 text-[10px] backdrop-blur-sm ${
             unavailable
               ? "border-amber-400/60 bg-amber-950/80 text-amber-200"
               : "border-white/30 bg-black/55 text-white"
@@ -63,7 +63,7 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
             {template.description || "从此工作流模板创建一个新项目"}
           </span>
           {unavailable && (
-            <span id={reasonId} className="mt-1 block text-[9px] leading-relaxed text-amber-500">
+            <span id={reasonId} className="mt-1 block text-[10px] leading-relaxed text-amber-500">
               {productPolicy.reason}
             </span>
           )}

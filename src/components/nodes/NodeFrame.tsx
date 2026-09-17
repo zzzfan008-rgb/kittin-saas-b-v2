@@ -168,7 +168,7 @@ export function RunButton({
               : label}
       </button>
       {!active && !newGenerationBlocked && disabledReason && (
-        <p className="text-[9px] leading-relaxed text-amber-400">{disabledReason}</p>
+        <p className="text-[10px] leading-relaxed text-amber-400">{disabledReason}</p>
       )}
     </div>
   );
@@ -182,7 +182,7 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     <div
       role="note"
       data-product-support="unsupported"
-      className="rounded-md border border-amber-700/50 bg-amber-950/25 px-2 py-1.5 text-[9px] leading-relaxed text-amber-300"
+      className="rounded-md border border-amber-700/50 bg-amber-950/25 px-2 py-1.5 text-[10px] leading-relaxed text-amber-300"
     >
       <p className="font-medium uppercase tracking-wide">unsupported · 首版暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>

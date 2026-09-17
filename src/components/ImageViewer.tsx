@@ -35,11 +35,11 @@ export function ReferenceEvidenceList({
                 decoding="async"
                 className="aspect-square w-full rounded-sm border border-[#333] object-cover"
               />
-              <p className="mt-1 truncate text-[8px] text-neutral-500">
+              <p className="mt-1 truncate text-[10px] text-neutral-500">
                 {item.order + 1}. {roleLabel} · {stateLabel}
               </p>
               {item.sourceNodeId && (
-                <p className="truncate text-[8px] text-neutral-600">来源：{item.sourceNodeId}</p>
+                <p className="truncate text-[10px] text-neutral-600">来源：{item.sourceNodeId}</p>
               )}
             </div>
           );

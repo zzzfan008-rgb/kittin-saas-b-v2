@@ -49,7 +49,7 @@ export function ModelControls({
       <label className="block space-y-1">
         <span className="text-[10px] text-neutral-500">图片模型</span>
         {retiredModelId && (
-          <span role="alert" className="block rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-300">
+          <span role="alert" className="block rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[10px] leading-relaxed text-amber-300">
             原模型 {retiredModelId} 已退出产品范围，系统没有自动换模。请手动选择一个新模型后再配置提示词与参数。
           </span>
         )}

@@ -99,7 +99,7 @@ function ThemeSwitcher() {
                 <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
                   {item.label}
                 </span>
-                <span className="mt-0.5 block truncate text-[9px] text-[var(--gc-text-muted)]">{item.desc}</span>
+                <span className="mt-0.5 block truncate text-[10px] text-[var(--gc-text-muted)]">{item.desc}</span>
               </span>
             </DropdownMenuRadioItem>
           ))}

@@ -47,7 +47,6 @@ body {
   background-color: #0a0a0a;
   color: #e5e5e5;
   font-family:
-    "Inter",
     -apple-system,
     "Segoe UI",
     "PingFang SC",
@@ -58,17 +57,17 @@ body {
 
 .login-brand-title {
   font-family:
-    "Helvetica Neue",
-    "Avenir Next",
-    "Inter",
     -apple-system,
     "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
     sans-serif;
   font-feature-settings: "kern" 1, "liga" 1;
 }
 
 :root {
   --gc-media-overlay-text: #f4f4f4;
+  --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 }
 
 /* ---- 深色滚动条 ---- */
@@ -217,6 +216,31 @@ body {
 
 .btn-running-breathe {
   animation: develop-breathe 1.6s ease-in-out infinite;
+}
+
+/* ---- 减弱动态效果全局兜底 ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .develop-overlay .develop-gridlines,
+  .develop-overlay .develop-scanline,
+  .btn-running-breathe {
+    animation: none !important;
+  }
+
+  .react-flow__handle,
+  .react-flow__node:not(.dragging):hover .gc-node-card,
+  .react-flow__node:not(.dragging):hover .react-flow__handle,
+  [data-theme] .gc-node-library-card:hover {
+    transition: none !important;
+  }
 }
 
 /* ---- 主题：简白（白色为主） ---- */
@@ -512,6 +536,7 @@ body {
 /* shadcn/Base UI 直接桥接到现有 data-theme 语义，不引入第二套主题状态。 */
 @theme inline {
   --font-heading: inherit;
+  --font-mono: var(--gc-font-mono);
   --color-background: var(--gc-shell);
   --color-foreground: var(--gc-text);
   --color-card: var(--gc-panel);
