@@ -140,7 +140,7 @@ export function TutorialOverlay() {
         >
         <header className="flex items-start justify-between gap-6 border-b border-[var(--gc-border)] px-7 py-5">
           <div>
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--gc-accent)]">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--gc-accent)]">
               <span>Workspace guide</span>
               <span aria-label={`教程版本 ${WORKBENCH_TUTORIAL_VERSION}`} className="rounded-full border border-[var(--gc-border)] px-2 py-0.5 tracking-normal text-[var(--gc-text-muted)]">
                 {WORKBENCH_TUTORIAL_VERSION}
@@ -179,7 +179,7 @@ export function TutorialOverlay() {
                         : "text-[var(--gc-text-muted)]"
                     }`}
                   >
-                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[11px] ${
                       index < step
                         ? "border-[var(--gc-accent)] bg-[var(--gc-accent)] text-black"
                         : "border-[var(--gc-border)]"
@@ -210,7 +210,7 @@ export function TutorialOverlay() {
                 <div className="flex size-12 items-center justify-center rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] text-[var(--gc-accent)]">
                   <StepIcon aria-hidden="true" className="size-6" />
                 </div>
-                <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
+                <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
                   Step {step + 1} / {STEPS.length}
                 </p>
                 <h2 className="mt-2 text-lg font-semibold text-[var(--gc-text)]">{current.title}</h2>

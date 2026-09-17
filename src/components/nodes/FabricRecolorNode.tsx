@@ -95,14 +95,14 @@ export function FabricRecolorNode({
       />
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
-        <div className="rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-[10px] leading-relaxed text-neutral-500">
+        <div className="rounded-md border border-[#262626] bg-[#0f0f0f] px-2 py-1.5 text-[11px] leading-relaxed text-neutral-500">
           左侧输入口：上 = 款式/补充参考，下 = 面料参考；总计最多 8 图
         </div>
 
         {/* 已选配色（最多 3 色，点击移除） */}
         <div className="flex min-h-[22px] flex-wrap items-center gap-1 rounded-md border border-[#262626] bg-[#0f0f0f] px-1.5 py-1">
           {colors.length === 0 ? (
-            <span className="text-[10px] text-neutral-600">已选配色（最多 8 色，每色出 1 张图）</span>
+            <span className="text-[11px] text-neutral-600">已选配色（最多 8 色，每色出 1 张图）</span>
           ) : (
             colors.map((hex) => (
               <button
@@ -110,7 +110,7 @@ export function FabricRecolorNode({
                 type="button"
                 onClick={() => toggleColor(hex)}
                 title={`${nameOfColor(hex)} ${hex} · 点击移除`}
-                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[9px] text-neutral-300 hover:border-red-400/60"
+                className="flex items-center gap-1 rounded-xs border border-[#333] bg-[#161616] px-1 py-0.5 text-[11px] text-neutral-300 hover:border-red-400/60"
               >
                 <span
                   className="h-2.5 w-2.5 rounded-[2px]"
@@ -130,7 +130,7 @@ export function FabricRecolorNode({
                 key={cat.id}
                 type="button"
                 onClick={() => setCategoryId(cat.id)}
-                className={`rounded-xs border px-1 py-1 text-[10px] transition-colors ${
+                className={`rounded-xs border px-1 py-1 text-[11px] transition-colors ${
                   cat.id === categoryId
                     ? "border-gold bg-gold/15 text-gold"
                     : "border-[#333] text-neutral-400 hover:border-gold/40"
@@ -143,7 +143,7 @@ export function FabricRecolorNode({
 
           <div className="grid max-h-[132px] grid-cols-6 gap-1 overflow-y-auto pr-0.5">
             {activeSwatches.length === 0 && categoryId === CUSTOM_CATEGORY_ID ? (
-              <span className="col-span-6 py-2 text-center text-[10px] text-neutral-600">
+              <span className="col-span-6 py-2 text-center text-[11px] text-neutral-600">
                 还没有自定义颜色，用下方取色器添加
               </span>
             ) : (
@@ -173,7 +173,7 @@ export function FabricRecolorNode({
                       style={{ backgroundColor: c.hex }}
                     />
                     <span
-                      className={`w-full truncate text-center text-[8px] leading-tight ${
+                      className={`w-full truncate text-center text-[11px] leading-tight ${
                         active ? "text-gold" : "text-neutral-500"
                       }`}
                     >
@@ -200,13 +200,13 @@ export function FabricRecolorNode({
                 onChange={(e) => setHexInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
                 placeholder="#RRGGBB"
-                className="h-6 flex-1 rounded-xs border border-[#333] bg-[#0f0f0f] px-1.5 font-mono text-[10px] text-neutral-200 outline-hidden focus:border-gold/60"
+                className="h-6 flex-1 rounded-xs border border-[#333] bg-[#0f0f0f] px-1.5 font-mono text-[11px] text-neutral-200 outline-hidden focus:border-gold/60"
               />
               <button
                 type="button"
                 onClick={addCustomHex}
                 disabled={!isValidHex(hexInput)}
-                className="h-6 rounded-xs border border-[#333] px-2 text-[10px] text-neutral-300 hover:border-gold/60 disabled:opacity-40"
+                className="h-6 rounded-xs border border-[#333] px-2 text-[11px] text-neutral-300 hover:border-gold/60 disabled:opacity-40"
               >
                 添加
               </button>

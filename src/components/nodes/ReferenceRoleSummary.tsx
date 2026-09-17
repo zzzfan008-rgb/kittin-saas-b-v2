@@ -80,8 +80,8 @@ export function ReferenceRoleSummary({
       className="space-y-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] p-2"
     >
       <div className="space-y-0.5">
-        <p className="text-[10px] font-medium text-[var(--gc-text)]">本次参考图</p>
-        <p className="text-[9px] leading-relaxed text-[var(--gc-text-muted)]">
+        <p className="text-[11px] font-medium text-[var(--gc-text)]">本次参考图</p>
+        <p className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
           按实际输入顺序确认每张图的唯一职责；待确认或不可用时不能运行。
         </p>
       </div>
@@ -117,7 +117,7 @@ export function ReferenceRoleSummary({
                 ) : (
                   <div
                     aria-label={`参考图 ${reference.order + 1}：${reference.sourceLabel} 不可用`}
-                    className="flex aspect-square items-center justify-center text-[8px] text-amber-400"
+                    className="flex aspect-square items-center justify-center text-[11px] text-amber-400"
                   >
                     不可用
                   </div>
@@ -125,7 +125,7 @@ export function ReferenceRoleSummary({
               </div>
 
               <div className="min-w-0 space-y-1">
-                <div className="flex items-center justify-between gap-2 text-[9px]">
+                <div className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="min-w-0 truncate text-[var(--gc-text)]">
                     图 {reference.order + 1} · {reference.sourceLabel}
                   </span>
@@ -185,7 +185,7 @@ export function ReferenceRoleSummary({
                     aria-label={selectorLabel}
                     aria-describedby={!reference.available && reference.unavailableReason ? reasonId : undefined}
                     disabled={selectorDisabled}
-                    className="h-7 rounded-sm border-[var(--gc-border)] bg-[var(--gc-panel)] px-2 text-[10px]"
+                    className="h-7 rounded-sm border-[var(--gc-border)] bg-[var(--gc-panel)] px-2 text-[11px]"
                   >
                     <SelectValue>{roleDefinition.label}</SelectValue>
                   </SelectTrigger>
@@ -204,13 +204,13 @@ export function ReferenceRoleSummary({
                   </SelectPortal>
                 </Select>
 
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] leading-relaxed text-[var(--gc-text-muted)]">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
                   <span>{roleDefinition.label}</span>
                   {duplicate && <span className="text-amber-400">重复角色</span>}
                   {!reference.available && <span className="text-amber-400">不可用</span>}
                 </div>
                 {!reference.available && reference.unavailableReason && (
-                  <p id={reasonId} className="text-[8px] leading-relaxed text-amber-400">
+                  <p id={reasonId} className="text-[11px] leading-relaxed text-amber-400">
                     {reference.unavailableReason}
                   </p>
                 )}

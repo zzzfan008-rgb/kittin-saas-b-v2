@@ -85,7 +85,7 @@ function ThemeSwitcher() {
         className="w-64 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 text-[var(--gc-text)] shadow-2xl shadow-black/60 ring-0"
       >
         <DropdownMenuRadioGroup value={theme} onValueChange={selectTheme} className="space-y-1">
-          <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
+          <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
             主题
           </DropdownMenuLabel>
           {THEMES.map((item) => (
@@ -99,7 +99,7 @@ function ThemeSwitcher() {
                 <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
                   {item.label}
                 </span>
-                <span className="mt-0.5 block truncate text-[9px] text-[var(--gc-text-muted)]">{item.desc}</span>
+                <span className="mt-0.5 block truncate text-[11px] text-[var(--gc-text-muted)]">{item.desc}</span>
               </span>
             </DropdownMenuRadioItem>
           ))}
@@ -113,7 +113,7 @@ function ShortcutRow({ label, shortcut }: WorkbenchShortcutRow) {
   return (
     <div className="flex min-h-8 items-center justify-between gap-3 rounded-md px-2 text-[11px] text-[var(--gc-text)] hover:bg-[var(--gc-panel-hover)]">
       <span>{label}</span>
-      <DropdownMenuShortcut className="shrink-0 text-[10px] tracking-normal text-[var(--gc-text-muted)]">
+      <DropdownMenuShortcut className="shrink-0 text-[11px] tracking-normal text-[var(--gc-text-muted)]">
         {shortcut}
       </DropdownMenuShortcut>
     </div>
@@ -201,7 +201,7 @@ export function TopBar() {
           </Button>
         )}
         {readOnly && (
-          <span className="rounded-md border border-blue-400/40 px-2 py-1 text-[10px] text-blue-400">管理员只读</span>
+          <span className="rounded-md border border-blue-400/40 px-2 py-1 text-[11px] text-blue-400">管理员只读</span>
         )}
         <Button
           type="button"

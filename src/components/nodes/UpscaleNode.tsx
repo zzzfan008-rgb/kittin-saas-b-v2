@@ -23,7 +23,7 @@ export function UpscaleNode({ id, data, selected }: NodeProps<Node<UpscaleNodeDa
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
         <div className="space-y-1">
-          <span className="text-[10px] text-neutral-500">放大档位</span>
+          <span className="text-[11px] text-neutral-500">放大档位</span>
           <div className="grid grid-cols-2 gap-2">
             {IMAGE_SIZES.map(({ value, label }) => {
               const active = data.imageSize === value;

@@ -25,7 +25,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <NodeProductPolicyNotice kind={data.kind} />
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">裂变数量</span>
+          <span className="text-[11px] text-neutral-500">裂变数量</span>
           <select
             value={data.count}
             onChange={(e) => updateNodeData(id, { count: Number(e.target.value) })}
@@ -39,7 +39,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
           </select>
         </label>
         <label className="block space-y-1">
-          <span className="text-[10px] text-neutral-500">补充说明</span>
+          <span className="text-[11px] text-neutral-500">补充说明</span>
           <textarea
             value={data.prompt}
             {...promptEdit.bind}
@@ -47,7 +47,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
             placeholder="可选：如「保持花卉元素，换一种排列」"
             className={`${inputClass} resize-none`}
           />
-          <span className="text-[9px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
+          <span className="text-[11px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>
         <ModelControls nodeId={id} modelId={data.modelId} retiredModelId={data.retiredModelId} modelOptions={data.modelOptions} disabled={running} referenceRows={admission.referenceRows} />
         <RunButton

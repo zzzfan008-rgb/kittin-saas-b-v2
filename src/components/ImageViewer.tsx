@@ -18,7 +18,7 @@ export function ReferenceEvidenceList({
   const normalizedEvidence = normalizeReferenceImageEvidence(evidence, images.length);
   return (
     <div className="mt-4">
-      <p className="text-[10px] text-neutral-500">参考图 · {images.length} 张</p>
+      <p className="text-[11px] text-neutral-500">参考图 · {images.length} 张</p>
       <div className="mt-2 grid grid-cols-4 gap-2">
         {images.map((image, index) => {
           const item = normalizedEvidence[index]!;
@@ -35,11 +35,11 @@ export function ReferenceEvidenceList({
                 decoding="async"
                 className="aspect-square w-full rounded-sm border border-[#333] object-cover"
               />
-              <p className="mt-1 truncate text-[8px] text-neutral-500">
+              <p className="mt-1 truncate text-[11px] text-neutral-500">
                 {item.order + 1}. {roleLabel} · {stateLabel}
               </p>
               {item.sourceNodeId && (
-                <p className="truncate text-[8px] text-neutral-600">来源：{item.sourceNodeId}</p>
+                <p className="truncate text-[11px] text-neutral-600">来源：{item.sourceNodeId}</p>
               )}
             </div>
           );
@@ -148,7 +148,7 @@ export function ImageViewer() {
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-medium text-neutral-100">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
-            <p className="mt-1 text-[10px] text-neutral-500">{record?.projectName ?? "当前项目"}</p>
+            <p className="mt-1 text-[11px] text-neutral-500">{record?.projectName ?? "当前项目"}</p>
           </div>
           <button type="button" onClick={closeViewer} className="text-sm text-neutral-500 hover:text-white">✕</button>
         </div>
@@ -162,10 +162,10 @@ export function ImageViewer() {
             ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
           ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-neutral-500">{label}</dt><dd className="text-right text-neutral-300">{value}</dd></div>)}
         </dl>
-        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[10px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[#333] px-2 py-1 text-[10px] text-neutral-400 hover:text-white">复制提示词</button></div>}
+        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-[11px] text-neutral-500">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[#2b2b2b] bg-[#0f0f0f] p-3 text-[11px] leading-relaxed text-neutral-300">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[#333] px-2 py-1 text-[11px] text-neutral-400 hover:text-white">复制提示词</button></div>}
         {providerOriginals.length > 0 && (
           <div className="mt-4">
-            <p className="text-[10px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
+            <p className="text-[11px] text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {providerOriginals.map((image, index) => (
                 <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
@@ -178,7 +178,7 @@ export function ImageViewer() {
         {record?.referenceImages && record.referenceImages.length > 0 && (
           <ReferenceEvidenceList images={record.referenceImages} evidence={record.referenceInputs} />
         )}
-        {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[#2b2b2b] p-3 text-[10px] text-neutral-400"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
+        {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[#2b2b2b] p-3 text-[11px] text-neutral-400"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
         <div className="mt-5 flex flex-wrap gap-2">
           <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
