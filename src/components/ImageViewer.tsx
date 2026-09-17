@@ -3,7 +3,6 @@ import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
-import { getReferenceRoleDefinition } from "@/lib/referenceRoles";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 2;
@@ -22,8 +21,6 @@ export function ReferenceEvidenceList({
       <div className="mt-2 grid grid-cols-4 gap-2">
         {images.map((image, index) => {
           const item = normalizedEvidence[index]!;
-          // TODO(R-02/R-03): 移除角色后删除此守卫
-          const roleLabel = getReferenceRoleDefinition(item.role ?? "generic").label;
           const stateLabel = item.evidenceState === "confirmed"
             ? "已确认"
             : item.evidenceState === "legacy" ? "历史证据，待复核" : "证据不可用，待复核";
@@ -31,13 +28,13 @@ export function ReferenceEvidenceList({
             <div key={`${image}-${index}`} className="min-w-0">
               <img
                 src={thumbnailImageUrl(image)}
-                alt={`参考图 ${item.order + 1}：${roleLabel}`}
+                alt={`参考图 ${item.order + 1}`}
                 loading="lazy"
                 decoding="async"
                 className="aspect-square w-full rounded-sm border border-[var(--gc-border)] object-cover"
               />
               <p className="mt-1 truncate text-[11px] text-neutral-500">
-                {item.order + 1}. {roleLabel} · {stateLabel}
+                参考图 {item.order + 1} · {stateLabel}
               </p>
               {item.sourceNodeId && (
                 <p className="truncate text-[11px] text-neutral-600">来源：{item.sourceNodeId}</p>

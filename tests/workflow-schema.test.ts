@@ -24,12 +24,6 @@ import {
 } from "../server/lib/workflowSchema";
 import { ensureBuiltinTemplates } from "../server/routes/templates";
 import { getImageModelContract, MASK_REDRAW_MODEL_ID } from "../src/types/imageModels";
-import {
-  legacyV0Workflow,
-  legacyV4Workflow,
-  legacyV5Workflow,
-  missingImageWorkflow,
-} from "./fixtures/reference-role-workflows";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -69,7 +63,6 @@ function imageInputFlow(imageUrl: string) {
         kind: "image-input",
         label: "原图",
         status: "idle",
-        imageRole: "reference",
         imageUrl,
       },
     }],
@@ -100,39 +93,6 @@ function maskFlow(mask: string, maskSourceRef = PNG_DATA_URL, prompt = "局部�
   };
 }
 
-function strictReferenceFlow() {
-  return {
-    schemaVersion: 6,
-    nodes: [
-      {
-        id: "source",
-        type: "image-input",
-        position: { x: 0, y: 0 },
-        data: {
-          kind: "image-input",
-          label: "参考图",
-          status: "idle",
-          imageRole: "garment_full",
-          roleNeedsConfirmation: false,
-          imageUrl: PNG_DATA_URL,
-        },
-      },
-      {
-        id: "result",
-        type: "result",
-        position: { x: 320, y: 0 },
-        data: { kind: "result", label: "结果", status: "idle", images: [] },
-      },
-    ],
-    edges: [{
-      id: "source-result",
-      source: "source",
-      target: "result",
-      data: { role: "garment_full", roleNeedsConfirmation: false } as Record<string, unknown>,
-    }],
-  };
-}
-
 let passed = 0;
 async function test(name: string, run: () => unknown | Promise<unknown>) {
   try {
@@ -160,26 +120,7 @@ const legacyAiFlow = () => ({
 async function main() {
   console.log("工作流 Schema / 图片 / SSRF 回归测试");
 
-  await test("共享 fixture：v0、v4、v5 迁移保持确定性并进入当前 schema", () => {
-    for (const fixture of [legacyV0Workflow(), legacyV4Workflow(), legacyV5Workflow()]) {
-      const first = validateAndMigrateFlow(fixture);
-      const second = validateAndMigrateFlow(first);
-      assert.equal(first.schemaVersion, 6);
-      assert.deepEqual(second, first);
-    }
-  });
-
-  await test("共享 fixture：缺失图片保留已确认角色但不会在后续输入门禁中伪造图片", () => {
-    const flow = validateAndMigrateFlow(missingImageWorkflow());
-    assert.equal(flow.edges[0].data.role, "identity");
-    assert.equal(flow.edges[0].data.roleNeedsConfirmation, false);
-    const source = flow.nodes.find((node) => node.id === "source");
-    assert.equal(source?.data.kind, "image-input");
-    if (source?.data.kind !== "image-input") throw new Error("missing image fixture source missing");
-    assert.equal(source.data.imageUrl, undefined);
-  });
-
-  await test("无版本 v0 确定性迁移到 v6，并补模型、模式与边角色默认字段", () => {
+  await test("无版本 v0 确定性迁移到 v6，并补模型、模式默认字段", () => {
     const first = validateAndMigrateFlow(legacyAiFlow());
     const second = validateAndMigrateFlow(first);
     assert.equal(first.schemaVersion, 6);
@@ -245,7 +186,6 @@ async function main() {
           kind: "image-input",
           label: `历史参考图 ${index + 1}`,
           status: "idle",
-          imageRole: "reference",
           imageUrl: PNG_DATA_URL,
         },
       } as never);
@@ -260,65 +200,6 @@ async function main() {
     assert.equal(migrated.schemaVersion, 6);
     assert.equal(migrated.edges.length, 8);
     assert.deepEqual(validateAndMigrateFlow(migrated), migrated);
-  });
-
-  await test("v4 旧边即使已有空 data 也保守迁移，且仅采用已确认图片输入默认角色", () => {
-    const migrated = validateAndMigrateFlow({
-      schemaVersion: 4,
-      nodes: [
-        {
-          id: "identity",
-          type: "image-input",
-          position: { x: 0, y: 0 },
-          data: {
-            kind: "image-input",
-            label: "人物",
-            status: "idle",
-            imageUrl: PNG_DATA_URL,
-            imageRole: "identity",
-            roleNeedsConfirmation: false,
-          },
-        },
-        {
-          id: "provider-output",
-          type: "ai-modify",
-          position: { x: 200, y: 0 },
-          data: {
-            kind: "ai-modify",
-            label: "历史 AI 输出",
-            status: "idle",
-            prompt: "保留服装",
-            outputImages: [PNG_DATA_URL],
-          },
-        },
-        {
-          id: "result",
-          type: "result",
-          position: { x: 400, y: 0 },
-          data: { kind: "result", label: "结果", status: "idle", images: [] },
-        },
-      ],
-      edges: [
-        { id: "identity-edge", source: "identity", target: "result", data: {} },
-        { id: "provider-edge", source: "provider-output", target: "result", data: {} },
-      ],
-    });
-
-    assert.equal(migrated.schemaVersion, 6);
-    assert.deepEqual(migrated.edges.map((edge) => edge.data), [
-      { role: "identity", roleNeedsConfirmation: false },
-      { role: "generic", roleNeedsConfirmation: true },
-    ]);
-
-    const missingCurrentEdgeData = structuredClone(migrated) as unknown as {
-      edges: Array<Record<string, unknown>>;
-    };
-    delete missingCurrentEdgeData.edges[0].data;
-    assert.throws(
-      () => validateAndMigrateFlow(missingCurrentEdgeData),
-      /flow\.edges\[0\]\.data/,
-      "v6 不得把缺失边角色静默当成已确认",
-    );
   });
 
   await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {
@@ -417,7 +298,7 @@ async function main() {
           target: "n2",
           sourceHandle: "images",
           targetHandle: null,
-          data: { role: "generic", roleNeedsConfirmation: true },
+          data: {},
         },
       ],
     });
@@ -574,7 +455,6 @@ async function main() {
           kind: "image-input",
           label: `ref${index}`,
           status: "idle",
-          imageRole: "reference",
         },
       } as never);
       flow.edges.push({ id: `e${index}`, source: `ref${index}`, target: "n1" } as never);
@@ -592,7 +472,6 @@ async function main() {
           kind: "image-input",
           label: "单图上传",
           status: "idle",
-          imageRole: "reference",
           imageUrl: ["/api/files/one.png", "/api/files/two.png"],
         },
       }],
@@ -769,8 +648,8 @@ async function main() {
       const migrated = validateAndMigrateFlow(legacy.flow);
       assert.equal(migrated.schemaVersion, 6);
       assert.deepEqual(migrated.edges.slice(0, 2).map((edge) => edge.data), [
-        { role: "identity", roleNeedsConfirmation: false },
-        { role: "background", roleNeedsConfirmation: false },
+        {},
+        {},
       ]);
     } finally {
       if (originalDataDir === undefined) delete process.env.DATA_DIR;

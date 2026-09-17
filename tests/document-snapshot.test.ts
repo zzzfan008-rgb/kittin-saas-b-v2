@@ -35,8 +35,6 @@ const source = {
         label: "款式参考",
         status: "running",
         error: "runtime-only",
-        imageRole: "garment_full",
-        roleNeedsConfirmation: false,
         imageUrl: "/api/files/garment.png",
         selectedResultId: "result-runtime",
         unknownData: "drop-me",
@@ -199,7 +197,7 @@ const source = {
       targetHandle: "image-input",
       selected: true,
       animated: true,
-      data: { role: "fabric", roleNeedsConfirmation: false, runId: "drop-me" },
+      data: { runId: "drop-me" },
       unknownEdge: "drop-me",
     },
     {
@@ -242,8 +240,6 @@ assert.deepEqual(snapshot, {
       data: {
         kind: "image-input",
         label: "款式参考",
-        imageRole: "garment_full",
-        roleNeedsConfirmation: false,
         imageUrl: "/api/files/garment.png",
       },
     },
@@ -387,13 +383,13 @@ assert.deepEqual(snapshot, {
       target: "sketch",
       sourceHandle: null,
       targetHandle: "image-input",
-      data: { role: "fabric", roleNeedsConfirmation: false },
+      data: { runId: "drop-me" },
     },
     {
       id: "edge-without-handles",
       source: "sketch",
       target: "result",
-      data: { role: "generic", roleNeedsConfirmation: true },
+      data: {},
     },
   ],
 });
@@ -443,7 +439,7 @@ const reloadedWireSnapshot = createDocumentSnapshot({
   nodes: wire.nodes,
   edges: wire.edges,
 });
-assert.deepEqual(reloadedWireSnapshot.edges, snapshot.edges, "保存并重载不得丢失显式 edge role");
+assert.deepEqual(reloadedWireSnapshot.edges, snapshot.edges, "保存并重载不得丢失显式 edge data");
 
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
@@ -515,7 +511,7 @@ assert.deepEqual({
 }, expectedMaskBinding, "重载后必须保留完整蒙版提示词绑定");
 assert.equal(evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(
   { ...reloadedMaskNode.data, status: "idle" },
-  [{ order: 0, role: "garment_full", roleNeedsConfirmation: false }],
+  [{ order: 0, sourceNodeId: "mask-binding" }],
 ), { evaluationRun: true }).code, "evaluation-only", "重载后的蒙版绑定必须通过评估运行准入");
 
 console.log("通过 2 项纯文档快照边界测试（覆盖 9 种节点及蒙版绑定往返）");

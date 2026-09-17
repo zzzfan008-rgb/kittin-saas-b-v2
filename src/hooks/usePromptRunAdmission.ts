@@ -12,19 +12,12 @@ import {
   type PromptRunGraphEdge,
   type PromptRunGraphNode,
 } from "@/lib/promptRunAdmission";
-import {
-  isReferenceRole,
-  resolveReferenceEdgeData,
-  type ReferenceRole,
-} from "@/types/workflow";
 
 export interface PromptRunBrowserReference {
   order: number;
   edgeId?: string;
   sourceNodeId: string;
   sourceLabel: string;
-  role: ReferenceRole;
-  roleNeedsConfirmation: boolean;
   imageUrl?: string;
   available: boolean;
   unavailableReason?: string;
@@ -57,8 +50,6 @@ export function promptRunBrowserReferencesFromGraph(
   for (const edge of edges) {
     if (edge.target !== targetNodeId) continue;
     const source = nodes.find((node) => node.id === edge.source);
-    const target = nodes.find((node) => node.id === targetNodeId);
-    const role = resolveReferenceEdgeData(edge.data, source?.data, target?.data.kind, edge.targetHandle);
     const edgeId = typeof (edge as { id?: unknown }).id === "string"
       ? (edge as unknown as { id: string }).id
       : undefined;
@@ -70,14 +61,11 @@ export function promptRunBrowserReferencesFromGraph(
         ...(edgeId ? { edgeId } : {}),
         sourceNodeId: edge.source,
         sourceLabel: source?.data.label ?? edge.source,
-        // TODO(R-02/R-03): 移除角色后删除此守卫
-        role: isReferenceRole(role.role) ? role.role : "generic",
-        roleNeedsConfirmation: role.roleNeedsConfirmation !== false,
         ...(imageUrl ? { imageUrl } : {}),
         available,
         ...(available ? {} : {
           unavailableReason: source
-            ? `来源“${source.data.label}”尚未产出可读取图片`
+            ? `来源"${source.data.label}"尚未产出可读取图片`
             : `来源节点 ${edge.source} 不存在或不可读取`,
         }),
       });

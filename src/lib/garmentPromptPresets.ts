@@ -1,5 +1,5 @@
 import { imageModelContractHash, type ImageModelId } from "../types/imageModels";
-import type { NodeKind, ReferenceRole } from "../types/workflow";
+import type { NodeKind } from "../types/workflow";
 
 /**
  * awesome-gpt-image-2 只为这三个任务族提供分类、标签和提示词编写方法。
@@ -9,8 +9,6 @@ export type GarmentPromptPresetId = "fashion-lookbook" | "commerce-hero" | "desi
 export type GarmentPromptFamilyId = GarmentPromptPresetId | "mask-local-edit";
 export type PromptOperationMode = "generate" | "edit" | "mask-edit";
 export type PromptSupportStatus = "unsupported" | "unverified" | "experimental" | "verified" | "recommended";
-
-export type PromptReferenceRole = ReferenceRole;
 
 export interface GarmentPromptPreset {
   id: GarmentPromptPresetId;
@@ -29,7 +27,6 @@ export interface PromptVariant {
   mode: PromptOperationMode;
   promptLocale: "zh-CN";
   fullPrompt: string;
-  requiredRoles: readonly PromptReferenceRole[];
   parameterProfileId: string;
   supportStatus: PromptSupportStatus;
   contractHash: `sha256:${string}`;
@@ -198,12 +195,6 @@ const MODEL_PROMPTS: Record<StandardModelId, StandardPromptSet> = {
   },
 };
 
-const REQUIRED_EDIT_ROLES: Record<GarmentPromptPresetId, readonly PromptReferenceRole[]> = {
-  "fashion-lookbook": ["identity", "pose_composition", "garment_top", "garment_bottom"],
-  "commerce-hero": ["garment_full"],
-  "design-sheet": ["garment_full"],
-};
-
 function makeStandardVariants(): PromptVariant[] {
   const variants: PromptVariant[] = [];
   for (const modelId of STANDARD_MODEL_IDS) {
@@ -217,7 +208,6 @@ function makeStandardVariants(): PromptVariant[] {
           mode,
           promptLocale: "zh-CN",
           fullPrompt: MODEL_PROMPTS[modelId][preset.id][mode],
-          requiredRoles: mode === "generate" ? [] : REQUIRED_EDIT_ROLES[preset.id],
           parameterProfileId: `${modelId}:${preset.id}:${mode}:v1`,
           supportStatus: "unverified",
           contractHash: imageModelContractHash(modelId),
@@ -240,7 +230,6 @@ const GPT_IMAGE_2_MASK_VARIANT: PromptVariant = {
   fullPrompt: `GPT Image 2 服装局部修改。仅编辑 Alpha PNG 蒙版标记的可编辑区域，执行指定的局部替换、改款或清除；先移除旧物件边缘、阴影和残影，再生成新结构。
 新内容与相邻服装的版型、面料、缝线、图案、光线、透视和褶皱自然融合，蒙版边界不出现光晕、硬边、重影或纹理断裂。
 输出与源图同尺寸、同画幅和同构图。蒙版之外的像素是受保护的非目标区域：人物身份、脸部、发型、肤色、身材、姿势、未选中服装、配饰、背景和画幅完全不变；不扩大语义修改目标，不新增装饰、文字、Logo 或水印。`,
-  requiredRoles: ["garment_full"],
   parameterProfileId: "gpt-image-2:mask-local-edit:mask-edit:v1",
   supportStatus: "unverified",
   contractHash: imageModelContractHash("gpt-image-2"),

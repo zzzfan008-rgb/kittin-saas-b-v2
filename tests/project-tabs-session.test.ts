@@ -72,7 +72,6 @@ function storedSelectionNode(id: string, selected?: boolean) {
       kind: "image-input",
       label: id,
       status: "idle",
-      imageRole: "default",
     },
     ...(selected === undefined ? {} : { selected }),
   };
@@ -108,7 +107,7 @@ const recentKey = "garment-canvas-recent-results";
 const restoredEdge = { id: "edge-a-b", source: "node-a", target: "node-b" };
 const normalizedRestoredEdge = {
   ...restoredEdge,
-  data: { role: "generic", roleNeedsConfirmation: true },
+  data: {},
 };
 const storedSession = {
   activeTabId: "tab-a",
@@ -126,7 +125,6 @@ const storedSession = {
             kind: "image-input",
             label: "输入",
             status: "idle",
-            imageRole: "default",
           },
         },
         {
@@ -286,7 +284,7 @@ console.log("项目页签会话恢复测试");
 
 assert.deepEqual(document.edges, [normalizedRestoredEdge]);
 assert.deepEqual(state.tabs[0].edges, [normalizedRestoredEdge]);
-console.log("  ✓ 刷新恢复活动页签的完整连线，旧边角色保持待确认");
+console.log("  ✓ 刷新恢复活动页签的完整连线");
 
 assert.equal(document.saveState, "idle");
 assert.equal(state.tabs[0].saveState, "idle");
@@ -747,7 +745,7 @@ useFlowStore.getState().openFlowTab({
     type: "image-input",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image-input", label: "原图", status: "idle", imageRole: "default",
+      kind: "image-input", label: "原图", status: "idle",
       imageUrl: "/api/files/quota-source.png",
     },
   }, {
@@ -890,7 +888,7 @@ useFlowStore.getState().loadFlow({
     id: "drag-session-node",
     type: "image-input",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
   }],
   edges: [],
 });
@@ -1037,7 +1035,7 @@ useFlowStore.getState().loadFlow({
     id: "drag-session-node",
     type: "image-input",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
   }],
   edges: [],
 });
@@ -1049,7 +1047,7 @@ useFlowStore.getState().openFlowTab({
     id: "drag-session-target-node",
     type: "image-input",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "目标节点", status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label: "目标节点", status: "idle" },
   }],
   edges: [],
 });
@@ -1111,7 +1109,6 @@ const unsafeDocumentEdge = {
   target: "pure-boundary-result",
   sourceHandle: "output",
   targetHandle: "input",
-  data: { role: "garment_full", roleNeedsConfirmation: false },
   selected: true,
   unknownEdgeShell: "不得持久化",
 };
@@ -1199,8 +1196,8 @@ assert.deepEqual(
   ["data", "id", "source", "sourceHandle", "target", "targetHandle"],
 );
 assert.deepEqual(
-  (projectPayload.flow.edges[0] as { data: unknown }).data,
-  { role: "garment_full", roleNeedsConfirmation: false },
+  (projectPayload.flow.edges[0] as { data?: unknown }).data,
+  {},
 );
 assert.deepEqual(sessionTab.selectedNodeIds, []);
 assert.equal(sessionTab.selectedNodeId, null);

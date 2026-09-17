@@ -32,11 +32,6 @@ const unit: PromptEvaluationUnit = {
   nodeKind: "ai-modify",
   modelId: "gemini-3.1-flash-image",
   operationMode: "edit",
-  referenceRoleProfile: [
-    { order: 0, role: "identity" },
-    { order: 1, role: "pose_composition" },
-    { order: 2, role: "garment_full" },
-  ],
   parameterProfileId: "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
   parameterProfileVersion: "1.0.0",
 };
@@ -48,7 +43,7 @@ const versions: PromptEvaluationVersionVector = {
   resolvedModelVersion: "gemini-3.1-flash-image-observed-v1",
   providerPromptRendererVersion: PROVIDER_PROMPT_RENDERER_VERSION,
   providerPromptRendererHash: PROVIDER_PROMPT_RENDERER_HASH,
-  inputNormalizationVersion: "reference-role-input-v1",
+  inputNormalizationVersion: "reference-order-input-v1",
   postprocessingVersion: "fit-contain-dominant-webp-v1",
   goldenSetVersion: "garment-gold-v1",
   scoringRubricVersion: "garment-rubric-v1",
@@ -77,25 +72,19 @@ function snapshotInput(
     },
     references: [
       {
-        role: "identity",
         order: 0,
         assetSha256: "a".repeat(64),
         sourceNodeId: "identity-node",
-        roleNeedsConfirmation: false,
       },
       {
-        role: "pose_composition",
         order: 1,
         assetSha256: "b".repeat(64),
         sourceNodeId: "pose-node",
-        roleNeedsConfirmation: false,
       },
       {
-        role: "garment_full",
         order: 2,
         assetSha256: "c".repeat(64),
         sourceNodeId: "garment-node",
-        roleNeedsConfirmation: false,
       },
     ],
     requestedImageCount: 1,
@@ -144,10 +133,10 @@ assert.equal(snapshot.contractHash, versions.providerContractVersion);
 assert.equal(snapshot.promptVersion, versions.presetVersion);
 assert.equal(snapshot.postprocessVersion, versions.postprocessingVersion);
 assert.equal(snapshot.references.length, 3);
-assert.deepEqual(snapshot.references.map(({ role, order, assetSha256 }) => ({ role, order, assetSha256 })), [
-  { role: "identity", order: 0, assetSha256: "a".repeat(64) },
-  { role: "pose_composition", order: 1, assetSha256: "b".repeat(64) },
-  { role: "garment_full", order: 2, assetSha256: "c".repeat(64) },
+assert.deepEqual(snapshot.references.map(({ order, assetSha256 }) => ({ order, assetSha256 })), [
+  { order: 0, assetSha256: "a".repeat(64) },
+  { order: 1, assetSha256: "b".repeat(64) },
+  { order: 2, assetSha256: "c".repeat(64) },
 ]);
 assert.equal(snapshot.resolvedPromptSha256.length, 64);
 assert.equal(snapshot.requestSnapshotSha256.length, 64);
@@ -170,27 +159,10 @@ assert.equal(
 assert.throws(
   () => buildEvaluationCaseSnapshot(snapshotInput({
     references: snapshotInput().references.map((reference, index) => (
-      index === 0 ? { ...reference, roleNeedsConfirmation: true } : reference
-    )),
-  })),
-  /role must be explicitly confirmed/,
-);
-assert.throws(
-  () => buildEvaluationCaseSnapshot(snapshotInput({
-    references: snapshotInput().references.map((reference, index) => (
       index === 1 ? { ...reference, order: 2 } : reference
     )),
   })),
   /reference order must be contiguous/,
-);
-assert.throws(
-  () => buildEvaluationCaseSnapshot(snapshotInput({
-    unit: { ...unit, referenceRoleProfile: [
-      { order: 0, role: "identity" },
-      { order: 1, role: "garment_full" },
-    ] },
-  })),
-  /referenceRoleProfile does not match/,
 );
 assert.throws(
   () => buildEvaluationCaseSnapshot(snapshotInput({
@@ -218,7 +190,6 @@ assert.throws(
 const scores: PromptEvaluationScores = {
   garmentMaterialFidelity: 90,
   instructionFollowing: 80,
-  referenceRoleFidelity: 70,
   artifactControl: 60,
   commercialUsability: 50,
 };
@@ -254,7 +225,7 @@ const successRecord = buildEvaluationCaseEvidenceRecord({
     scores,
     taskPassed: false,
     validForScoring: true,
-    notes: "The reference roles were traceable, but identity changed.",
+    notes: "The reference images were traceable, but identity changed.",
     hardBlockers: [{
       code: "garment-identity-corruption",
       detail: "The model changed the evaluated identity reference.",
@@ -270,8 +241,6 @@ assert.equal(successRecord.postprocessed[0].sourceEvidenceId, provider.evidenceI
 assert.equal(successRecord.postprocessed[0].pipelineVersion, snapshot.postprocessVersion);
 assert.equal(successRecord.request.totalLatencyMs, 1_250);
 assert.deepEqual(successRecord.request.requestIndexes, [1]);
-assert.equal(successRecord.manualAssessment?.weightedScore, 75);
-assert.equal(successRecord.manualAssessment?.baselineWeightedScore, undefined);
 assert.equal(successRecord.manualAssessment?.taskPassed, false);
 assert.equal(successRecord.manualAssessment?.validForScoring, true);
 assert.deepEqual(successRecord.manualAssessment?.hardBlockers, [{

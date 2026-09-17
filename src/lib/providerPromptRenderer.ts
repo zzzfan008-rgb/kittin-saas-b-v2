@@ -1,56 +1,49 @@
 import type { ImageModelId } from "../types/imageModels";
-import {
-  REFERENCE_ROLE_CATALOG,
-  getReferenceRoleDefinition,
-} from "./referenceRoles";
 import type {
   ImageOperationMode,
   NodeKind,
-  ReferenceImageInput,
 } from "../types/workflow";
 
-export const PROVIDER_PROMPT_RENDERER_VERSION = "provider-prompt-renderer-v3";
+export const PROVIDER_PROMPT_RENDERER_VERSION = "provider-prompt-renderer-v4";
 
-type ProviderPromptRoleWrapperMatrix = {
+type ProviderPromptReferenceListIntroMatrix = {
   "gpt-image-2": Record<"mask-edit", string>;
 } & {
   [Model in Exclude<ImageModelId, "gpt-image-2">]: Record<"generate" | "edit", string>;
 };
 
-/** Every supported model/mode pair has its own wrapper; there is no fallback. */
-const PROVIDER_PROMPT_ROLE_WRAPPERS = {
+/** Every supported model/mode pair has its own intro; there is no fallback. */
+const PROVIDER_PROMPT_REFERENCE_LIST_INTROS = {
   "gpt-image-2": {
-    "mask-edit": "局部修改参考角色：{{LIST}}。只处理蒙版指定区域；每张图只承担其声明职责，蒙版外及非目标内容保持不变。",
+    "mask-edit": "局部修改参考图:",
   },
   "gpt-image-2-vip": {
-    generate: "GPT Image 2 VIP 文生图参考职责：{{LIST}}。严格按图号使用，每张图只承担其声明职责，不得交换身份、服装、姿势或造型语义。",
-    edit: "GPT Image 2 VIP 多图编辑参考职责：{{LIST}}。严格按图号使用，每张图只承担其声明职责，不得交换身份、服装、姿势或造型语义。",
+    generate: "参考图:",
+    edit: "参考图:",
   },
   "gemini-3.1-flash-image": {
-    generate: "Gemini 文生图输入图片 parts 按以下顺序和职责解读：{{LIST}}。每个 part 只承担其声明职责，不得跨角色借用。",
-    edit: "Gemini 多图编辑输入图片 parts 按以下顺序和职责解读：{{LIST}}。每个 part 只承担其声明职责，不得跨角色借用。",
+    generate: "参考图:",
+    edit: "参考图:",
   },
   "flux-2-pro": {
-    generate: "FLUX 文生图参考图顺序与职责：{{LIST}}。按输入顺序使用正向、明确的保留描述，每张图只承担其声明职责。",
-    edit: "FLUX 多图编辑参考图顺序与职责：{{LIST}}。按输入顺序使用正向、明确的保留描述，每张图只承担其声明职责，不做跨角色融合。",
+    generate: "参考图:",
+    edit: "参考图:",
   },
   "seedream-5-0-260128": {
-    generate: "Seedream 文生图参考图顺序与职责：{{LIST}}。参考图顺序不得改变，每张图只承担其声明职责。",
-    edit: "Seedream 多图编辑参考图顺序与职责：{{LIST}}。参考图顺序不得改变，每张图只承担其声明职责；仅应用目标修改，非目标内容保持不变。",
+    generate: "参考图:",
+    edit: "参考图:",
   },
-} as const satisfies ProviderPromptRoleWrapperMatrix;
+} as const satisfies ProviderPromptReferenceListIntroMatrix;
 
 /**
  * Semantic prompt-renderer contract. The reviewed release vector embeds this
- * value as well as its SHA-256 identity, so template/role/wrapper drift changes
+ * value as well as its SHA-256 identity, so template drift changes
  * the vector even if a version bump is accidentally omitted.
  */
 export const PROVIDER_PROMPT_RENDERER_CONTRACT = {
   version: PROVIDER_PROMPT_RENDERER_VERSION,
   separator: "\n",
-  roleCatalog: REFERENCE_ROLE_CATALOG,
-  roleWrappers: PROVIDER_PROMPT_ROLE_WRAPPERS,
-  pendingRoleSuffix: "（角色待确认，不得推断为人物或服装）",
+  referenceListIntro: PROVIDER_PROMPT_REFERENCE_LIST_INTROS,
   maskReferenceTemplates: {
     single: "参考图1是完整原图；最后一张参考图（参考图2）是区域引导图",
     two: "参考图1是完整原图；参考图2是用户提供的目标内容参考图，用户提示词中的图号始终对应这些用户参考图；最后一张参考图（参考图{{GUIDE_INDEX}}）才是区域引导图",
@@ -60,11 +53,11 @@ export const PROVIDER_PROMPT_RENDERER_CONTRACT = {
 } as const;
 
 /** SHA-256(JSON.stringify(PROVIDER_PROMPT_RENDERER_CONTRACT)). */
-export const PROVIDER_PROMPT_RENDERER_HASH = "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4";
+export const PROVIDER_PROMPT_RENDERER_HASH = "sha256:4313c68a0ec4a8fe1507d0159c328cd4fe4058571addded5399f959f680407e5";
 
 export interface ProviderPromptReference {
-  role: ReferenceImageInput["role"];
-  roleNeedsConfirmation?: boolean;
+  /** 占位：参考图顺序已由数组位置决定，不再需要角色字段。 */
+  readonly _?: never;
 }
 
 export interface ProviderPromptRenderInput {
@@ -116,44 +109,23 @@ function maskReferenceRolePrompt(userReferenceCount: number): string {
   });
 }
 
-function providerPromptRoleWrapper(
+function providerPromptReferenceListIntro(
   modelId: ImageModelId,
   mode: ImageOperationMode,
 ): string {
-  const modelWrappers = PROVIDER_PROMPT_RENDERER_CONTRACT.roleWrappers[modelId] as
+  const modelIntros = PROVIDER_PROMPT_RENDERER_CONTRACT.referenceListIntro[modelId] as
     Partial<Record<ImageOperationMode, string>> | undefined;
-  const wrapper = modelWrappers?.[mode];
-  if (!wrapper) {
+  const intro = modelIntros?.[mode];
+  if (!intro) {
     throw new Error(`Provider prompt renderer does not support ${modelId}/${mode}`);
   }
-  return wrapper;
-}
-
-/** Convert confirmed canvas roles to model-specific ordered input instructions. */
-export function referenceRolePrompt(
-  modelId: ImageModelId,
-  mode: ImageOperationMode,
-  references: readonly ProviderPromptReference[],
-): string {
-  const template = providerPromptRoleWrapper(modelId, mode);
-  if (references.length === 0) return "";
-  const list = references.map((reference, index) => {
-    // TODO(R-02/R-03): 移除角色后删除此守卫
-    const definition = getReferenceRoleDefinition(reference.role ?? "generic");
-    const pending = reference.roleNeedsConfirmation
-      ? PROVIDER_PROMPT_RENDERER_CONTRACT.pendingRoleSuffix
-      : "";
-    return `图${index + 1}=${definition.label}（${definition.id}）${pending}`
-      + `｜职责：${definition.responsibility}`
-      + `｜禁止影响：${definition.forbiddenInfluence}`;
-  }).join("；\n");
-  return interpolate(template, { LIST: list });
+  return intro;
 }
 
 /**
  * The only renderer used to construct a Provider-bound garment prompt in both
- * ordinary and evaluation runs. It owns ordered role instructions and the mask
- * wrapper; callers supply only the reviewed task prompt/user intent.
+ * ordinary and evaluation runs. It owns ordered reference list intros and the
+ * mask wrapper; callers supply only the reviewed task prompt/user intent.
  */
 export function renderProviderPrompt(input: ProviderPromptRenderInput): string {
   const rawTaskPrompt = input.taskPrompt.trim();
@@ -168,12 +140,10 @@ export function renderProviderPrompt(input: ProviderPromptRenderInput): string {
       MASK_REFERENCE_ROLES: maskReferenceRolePrompt(input.references.length),
     });
   }
-  const rolePrompt = referenceRolePrompt(
-    input.modelId,
-    input.operationMode,
-    input.references,
-  );
-  return rolePrompt
-    ? `${taskPrompt}${PROVIDER_PROMPT_RENDERER_CONTRACT.separator}${rolePrompt}`
-    : taskPrompt;
+  if (input.references.length > 0) {
+    const intro = providerPromptReferenceListIntro(input.modelId, input.operationMode);
+    const list = input.references.map((_reference, index) => `参考图${index + 1}`).join("、");
+    return `${taskPrompt}${PROVIDER_PROMPT_RENDERER_CONTRACT.separator}${intro}${list}`;
+  }
+  return taskPrompt;
 }

@@ -1,8 +1,4 @@
-import {
-  isReferenceRole,
-  type ReferenceImageEvidence,
-  type ReferenceRole,
-} from "@/types/workflow";
+import type { ReferenceImageEvidence } from "@/types/workflow";
 
 export type ReferenceEvidenceState = "confirmed" | "legacy" | "unavailable";
 
@@ -34,30 +30,22 @@ export function normalizeReferenceImageEvidence(
     const raw = rawEntries[index];
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return {
-        role: "generic" as ReferenceRole,
         order: index,
         assetSha256: "",
-        roleNeedsConfirmation: true,
         evidenceState: "unavailable" as const,
       };
     }
 
     const candidate = raw as Record<string, unknown>;
-    const role = isReferenceRole(candidate.role) ? candidate.role : "generic";
     const hash = isSha256(candidate.assetSha256) ? candidate.assetSha256 : "";
     const sourceNodeId = sourceNodeIdOf(candidate.sourceNodeId);
     const orderMatches = candidate.order === index;
-    const confirmed = isReferenceRole(candidate.role)
-      && hash.length > 0
-      && orderMatches
-      && candidate.roleNeedsConfirmation === false;
+    const confirmed = hash.length > 0 && orderMatches;
 
     return {
-      role,
       order: index,
       assetSha256: hash,
       ...(sourceNodeId ? { sourceNodeId } : {}),
-      roleNeedsConfirmation: !confirmed,
       evidenceState: confirmed ? "confirmed" : "legacy",
     };
   });

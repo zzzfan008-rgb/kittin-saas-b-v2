@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import {
   beginMaskWork,
-  selectActiveEdges,
   selectActiveDocumentTarget,
   selectActiveNodeInputImages,
-  selectActiveNodes,
   selectActiveReadOnly,
   selectDocumentForTab,
   selectNodeInputImages,
@@ -24,11 +22,7 @@ import { maskRedrawReadiness } from "@/lib/maskRedraw";
 import { saveMaskDraft } from "@/lib/maskUpload";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
-import { ReferenceRoleSummary } from "./ReferenceRoleSummary";
-import {
-  promptRunReferenceRoleProfile,
-  promptRunReferenceSnapshotsFromGraph,
-} from "@/lib/promptRunAdmission";
+import { ReferenceImageList } from "./ReferenceImageList";
 import {
   buildGarmentPrompt,
 } from "@/lib/garmentPromptPresets";
@@ -45,22 +39,14 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const updateNodeDataInTab = useFlowStore((state) => state.updateNodeDataInTab);
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
-  const updateEdgeReferenceRole = useFlowStore((state) => state.updateEdgeReferenceRole);
   const documentTarget = useFlowStore(useShallow(selectActiveDocumentTarget));
   const moveReferenceEdgeInTab = useFlowStore((state) => state.moveReferenceEdgeInTab);
   const removeReferenceEdgeInTab = useFlowStore((state) => state.removeReferenceEdgeInTab);
   const runNode = useFlowStore((state) => state.runNode);
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const activeNodes = useFlowStore(selectActiveNodes);
-  const activeEdges = useFlowStore(selectActiveEdges);
   const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
   const admission = usePromptRunAdmission(id, data);
-  const presetReferenceRoleProfile = useMemo(() => promptRunReferenceRoleProfile({
-    nodeKind: "mask-redraw",
-    operationMode: "mask-edit",
-    references: promptRunReferenceSnapshotsFromGraph(activeNodes, activeEdges, id),
-  }), [activeEdges, activeNodes, id]);
   const presetAvailability = getRuntimePromptVariantAvailability(
     {
       familyId: "mask-local-edit",
@@ -68,7 +54,6 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
       nodeKind: "mask-redraw",
       mode: "mask-edit",
     },
-    { referenceRoleProfile: presetReferenceRoleProfile },
   );
   const presetVariant = presetAvailability.variant;
   const presetProfile = presetVariant
@@ -115,12 +100,9 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           <span className="font-mono text-neutral-300">gpt-image-2</span>
         </div>
         {admission.referenceRows.length > 0 && (
-          <ReferenceRoleSummary
+          <ReferenceImageList
             references={admission.referenceRows}
             disabled={running || readOnly}
-            onRoleChange={(reference, role) => {
-              if (reference.edgeId) updateEdgeReferenceRole(reference.edgeId, role);
-            }}
             onMove={(reference, direction) => {
               if (reference.edgeId) moveReferenceEdgeInTab(documentTarget, reference.edgeId, direction);
             }}

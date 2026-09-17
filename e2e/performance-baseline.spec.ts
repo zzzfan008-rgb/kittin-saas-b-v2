@@ -52,8 +52,6 @@ test("capture 100-node desktop render latency and browser memory", async ({ page
           kind: "image-input",
           label: `Performance ${index}`,
           status: "idle",
-          imageRole: "generic",
-          roleNeedsConfirmation: false,
         },
       }));
       const started = performance.now();

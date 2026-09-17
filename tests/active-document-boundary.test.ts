@@ -79,7 +79,7 @@ function imageNode(id: string, label: string): FlowNode {
     id,
     type: "image-input",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label, status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label, status: "idle" },
   };
 }
 

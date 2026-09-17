@@ -1,26 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveDocumentTarget, useFlowStore } from "@/store/flowStore";
-import {
-  normalizeImageInputReferenceRole,
-  type ImageInputNodeData,
-  type ReferenceRole,
-} from "@/types/workflow";
-import { REFERENCE_ROLE_CATALOG } from "@/lib/referenceRoles";
+import type { ImageInputNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
-import { NodeFrame, inputClass } from "./NodeFrame";
-import {
-  Select,
-  SelectItem,
-  SelectList,
-  SelectPopup,
-  SelectPortal,
-  SelectPositioner,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { NodeFrame } from "./NodeFrame";
 
 interface NormalizedUploadResponse {
   id: string;
@@ -88,7 +73,6 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const normalizedRole = normalizeImageInputReferenceRole(data.imageRole, data.roleNeedsConfirmation);
 
   const openAssetPicker = useCallback(() => {
     const detail: AssetPickerRequest = {
@@ -148,49 +132,6 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
   return (
     <>
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
-        <label className="nodrag block space-y-1">
-          <span className="flex items-center justify-between text-[11px] text-neutral-500">
-            <span>新连线默认角色</span>
-            {normalizedRole.roleNeedsConfirmation && (
-              <span className="text-amber-400">待确认</span>
-            )}
-          </span>
-          <Select
-            value={normalizedRole.roleNeedsConfirmation ? undefined : normalizedRole.role}
-            onValueChange={(value) => {
-              if (typeof value !== "string") return;
-              updateNodeDataInTab(
-                selectActiveDocumentTarget(useFlowStore.getState()),
-                id,
-                {
-                  imageRole: value as ReferenceRole,
-                  roleNeedsConfirmation: false,
-                },
-              );
-            }}
-          >
-            <SelectTrigger
-              aria-label="新连线默认角色"
-              className="nodrag nopan h-7 w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-control)] px-2 text-[10px] text-[var(--gc-text)] focus:border-gold"
-            >
-              <SelectValue placeholder="请确认这张图的用途" />
-            </SelectTrigger>
-            <SelectPortal>
-              <SelectPositioner>
-                <SelectPopup>
-                  <SelectList>
-                    {REFERENCE_ROLE_CATALOG.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>{role.label}</SelectItem>
-                    ))}
-                  </SelectList>
-                </SelectPopup>
-              </SelectPositioner>
-            </SelectPortal>
-          </Select>
-          <span className="block text-[11px] leading-relaxed text-neutral-600">
-            已存在的连线请在目标节点 Inspector 中逐条确认，不会随这里静默改变。
-          </span>
-        </label>
         {data.imageUrl ? (
           <div className="nodrag overflow-hidden rounded-md border border-[var(--gc-node-border)]">
             <button

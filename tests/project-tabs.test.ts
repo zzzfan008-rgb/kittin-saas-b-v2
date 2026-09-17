@@ -40,9 +40,8 @@ const aiTestVariant = requireGarmentPromptVariant({
 });
 // These tests exercise store concurrency and persistence after admission. Keep
 // the production catalog closed while modelling reviewed evidence in-process.
-(aiTestVariant as { requiredRoles: PromptVariant["requiredRoles"] }).requiredRoles = [];
+(aiTestVariant as { requiredRoles?: unknown }).requiredRoles = [];
 promotePromptVariantForTest(aiTestVariant);
-promotePromptVariantForTest(aiTestVariant, "verified", [{ order: 0, role: "garment_full" }]);
 const aiTestProfile = getModelParameterProfile(aiTestVariant.parameterProfileId)!;
 const aiTestParameters = materializeModelParameterProfile(aiTestProfile);
 const AI_TEST_PROMPT = buildGarmentPrompt(aiTestVariant.variantId, "修改衣领");
@@ -84,7 +83,7 @@ function imageNode(id: string, label: string): FlowNode {
     id,
     type: "image-input",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label, status: "idle", imageRole: "default" },
+    data: { kind: "image-input", label, status: "idle" },
   };
 }
 
@@ -119,8 +118,6 @@ function runnableAiGraph(node: FlowNode): { nodes: FlowNode[]; edges: Edge[] } {
   const reference = imageNode(`${node.id}-reference`, `${node.data.label}参考图`);
   if (reference.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
   reference.data.imageUrl = `/api/files/${node.id}-reference.png`;
-  reference.data.imageRole = "garment_full";
-  reference.data.roleNeedsConfirmation = false;
   return {
     nodes: [reference, node],
     edges: [{ id: `${node.id}-reference-edge`, source: reference.id, target: node.id }],
@@ -191,7 +188,7 @@ await test("切换页签保留各自画布与项目名称", () => {
   assert.equal(activeDocument().nodes[0].data.label, "B 上传节点");
 });
 
-await test("参考边编辑按目标文档作用域执行并保留边角色身份", () => {
+await test("参考边编辑按目标文档作用域执行", () => {
   const sharedSource = imageNode("scoped-shared-source", "共享参考图");
   const secondSource = imageNode("scoped-second-source", "第二参考图");
   const targetA = aiNode("scoped-target-a", "目标 A");
@@ -200,19 +197,16 @@ await test("参考边编辑按目标文档作用域执行并保留边角色身�
     id: "scoped-edge-a",
     source: sharedSource.id,
     target: targetA.id,
-    data: { role: "generic", roleNeedsConfirmation: true },
   };
   const edgeB = {
     id: "scoped-edge-b",
     source: secondSource.id,
     target: targetA.id,
-    data: { role: "garment_top", roleNeedsConfirmation: false },
   };
   const otherTargetEdge = {
     id: "scoped-other-target-edge",
     source: sharedSource.id,
     target: targetB.id,
-    data: { role: "identity", roleNeedsConfirmation: false },
   };
   useFlowStore.getState().openFlowTab({
     projectId: "scoped-edge-edit-project",
@@ -222,16 +216,6 @@ await test("参考边编辑按目标文档作用域执行并保留边角色身�
   });
   const testTabId = useFlowStore.getState().activeTabId;
   const target = selectActiveDocumentTarget(useFlowStore.getState());
-
-  assert.equal(
-    useFlowStore.getState().updateEdgeReferenceRoleInTab(target, edgeA.id, "identity"),
-    true,
-  );
-  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
-    { role: "identity", roleNeedsConfirmation: false },
-    { role: "garment_top", roleNeedsConfirmation: false },
-    { role: "identity", roleNeedsConfirmation: false },
-  ]);
 
   assert.equal(useFlowStore.getState().moveReferenceEdgeInTab(target, edgeB.id, "up"), true);
   assert.deepEqual(activeDocument().edges.map((edge) => edge.id), [
@@ -251,12 +235,6 @@ await test("参考边编辑按目标文档作用域执行并保留边角色身�
     edgeB.id,
     otherTargetEdge.id,
   ]);
-  assert.equal(
-    activeDocument().nodes.find((node) => node.id === sharedSource.id)?.data.kind === "image-input"
-      ? activeDocument().nodes.find((node) => node.id === sharedSource.id)?.data.imageRole
-      : undefined,
-    "default",
-  );
   useFlowStore.getState().closeTab(testTabId);
   useFlowStore.getState().switchTab(tabB);
 });
@@ -272,23 +250,14 @@ await test("非活动页签可定向编辑，旧 documentEpoch 请求不会穿�
       id: "scoped-inactive-edge",
       source: source.id,
       target: targetNode.id,
-      data: { role: "generic", roleNeedsConfirmation: true },
     }],
   });
   const inactiveTarget = selectActiveDocumentTarget(useFlowStore.getState());
   const inactiveTabId = inactiveTarget.tabId;
   useFlowStore.getState().switchTab(tabA);
 
-  assert.equal(
-    useFlowStore.getState().updateEdgeReferenceRoleInTab(
-      inactiveTarget,
-      "scoped-inactive-edge",
-      "garment_full",
-    ),
-    true,
-  );
   useFlowStore.getState().switchTab(inactiveTabId);
-  assert.equal(activeDocument().edges[0].data.role, "garment_full");
+  assert.equal(activeDocument().edges[0].data, undefined);
 
   const staleTarget = selectActiveDocumentTarget(useFlowStore.getState());
   useFlowStore.getState().loadFlow({
@@ -299,7 +268,7 @@ await test("非活动页签可定向编辑，旧 documentEpoch 请求不会穿�
   });
   const before = activeDocument();
   assert.equal(
-    useFlowStore.getState().updateEdgeReferenceRoleInTab(staleTarget, "scoped-inactive-edge", "identity"),
+    useFlowStore.getState().removeReferenceEdgeInTab(staleTarget, "scoped-inactive-edge"),
     false,
   );
   assert.equal(activeDocument().projectId, "scoped-replacement-project");
@@ -553,10 +522,7 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   assert.equal(activeDocument().edges.length, 1);
   assert.equal(activeDocument().edges[0].source, anchor.id);
   assert.equal(activeDocument().edges[0].target, addedId);
-  assert.deepEqual(activeDocument().edges[0].data, {
-    role: "generic",
-    roleNeedsConfirmation: true,
-  }, "含糊图片输入创建的边必须保持待确认");
+  assert.deepEqual(activeDocument().edges[0].data, {});
   assert.equal(activeDocument().selectedNodeId, addedId);
   assert.equal(activeDocument().revision, beforeRevision + 1);
 
@@ -569,8 +535,6 @@ await test("新连线只采用已确认图片输入默认角色，显式 edge ro
   const confirmedSource = imageNode("confirmed-edge-source", "已确认人物");
   if (confirmedSource.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
   confirmedSource.data.imageUrl = "/api/files/confirmed-person.png";
-  confirmedSource.data.imageRole = "identity";
-  confirmedSource.data.roleNeedsConfirmation = false;
   const firstTarget = aiNode("confirmed-edge-target", "第一目标");
   const secondTarget = aiNode("explicit-edge-target", "第二目标");
   useFlowStore.getState().openFlowTab({
@@ -591,12 +555,11 @@ await test("新连线只采用已确认图片输入默认角色，显式 edge ro
     target: secondTarget.id,
     sourceHandle: null,
     targetHandle: null,
-    data: { role: "garment_top", roleNeedsConfirmation: false },
-  } as never);
+  });
 
   assert.deepEqual(activeDocument().edges.map((candidate) => candidate.data), [
-    { role: "identity", roleNeedsConfirmation: false },
-    { role: "garment_top", roleNeedsConfirmation: false },
+    {},
+    {},
   ]);
 });
 
@@ -638,13 +601,12 @@ await test("专用面料节点句柄在新连线时持久化固定角色", () =>
     target: targetId,
     sourceHandle: null,
     targetHandle: "garment",
-    data: { role: "identity", roleNeedsConfirmation: false },
-  } as never);
+  });
 
   assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
-    { role: "fabric", roleNeedsConfirmation: false },
-    { role: "identity", roleNeedsConfirmation: false },
-  ], "显式边角色必须优先于专用句柄固定角色");
+    {},
+    {},
+  ]);
 });
 
 await test("快捷建图复用输入上限与只读门禁", () => {
@@ -780,8 +742,6 @@ await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", 
   const referenceNode = imageNode("same-tab-async-reference", "旧项目参考图");
   if (referenceNode.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
   referenceNode.data.imageUrl = "/api/files/garment-reference.png";
-  referenceNode.data.imageRole = "garment_full";
-  referenceNode.data.roleNeedsConfirmation = false;
   const sourceNode = aiNode(sharedNodeId, "旧项目节点");
   sourceNode.data.status = "idle";
   useFlowStore.getState().loadFlow({
@@ -1317,8 +1277,6 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   generationNode.data.outputImages = [];
   const invariantUpload = imageNode("model-invariant-upload", "异步上传");
   if (invariantUpload.data.kind !== "image-input") throw new Error("测试上传节点类型错误");
-  invariantUpload.data.imageRole = "garment_full";
-  invariantUpload.data.roleNeedsConfirmation = false;
   useFlowStore.getState().openFlowTab({
     projectId: "model-invariant-project",
     projectName: "模型保真项目",
@@ -1451,8 +1409,6 @@ await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", ()
     /imageModelAspectRatioPatch\(selectedModelId, selectedModelOptions, e\.target\.value\)/,
     "Inspector 修改画幅时必须同步业务比例与 provider modelOptions",
   );
-  assert.match(inspectorSource, /每条入边的参考角色/);
-  assert.match(inspectorSource, /updateEdgeReferenceRole\(edge\.id/);
   for (const source of [aiModifySource, sketchSource]) {
     assert.match(
       source,
@@ -1668,7 +1624,6 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           kind: "image-input",
           label: "蒙版原图",
           status: "success",
-          imageRole: "default",
           imageUrl: sourceRef,
         },
       },

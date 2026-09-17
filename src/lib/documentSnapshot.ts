@@ -10,12 +10,10 @@ import {
   allowedOperationModesForNode,
   WORKFLOW_SCHEMA_VERSION,
   type BatchSize,
-  type ImageInputRole,
   type NodeKind,
   type PersistedWorkflow,
   type ReferenceEdgeData,
   type WorkflowNodeData,
-  resolveReferenceEdgeData,
 } from "../types/workflow";
 
 interface PromptBindingDocumentFields {
@@ -40,8 +38,6 @@ export type DocumentNodeData =
   | {
       kind: "image-input";
       label: string;
-      imageRole: ImageInputRole;
-      roleNeedsConfirmation: boolean;
       imageUrl?: string;
     }
   | ({
@@ -216,9 +212,6 @@ function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
       return {
         kind: data.kind,
         label: data.label,
-        // TODO(R-02/R-03): 移除角色后删除此守卫（ImageInputNodeData.imageRole 已放宽为 unknown，快照边界保留原值）
-        imageRole: data.imageRole as ImageInputRole,
-        roleNeedsConfirmation: data.roleNeedsConfirmation !== false,
         ...optionalString("imageUrl", data.imageUrl),
       };
     case "sketch-to-render":
@@ -369,8 +362,8 @@ function createDocumentNode(node: NodeLike): DocumentNode {
 
 function createDocumentEdge(
   edge: EdgeLike,
-  sourceData?: WorkflowNodeData,
-  targetData?: WorkflowNodeData,
+  _sourceData?: WorkflowNodeData,
+  _targetData?: WorkflowNodeData,
 ): DocumentEdge {
   return {
     id: edge.id,
@@ -378,7 +371,9 @@ function createDocumentEdge(
     target: edge.target,
     ...(edge.sourceHandle === undefined ? {} : { sourceHandle: edge.sourceHandle }),
     ...(edge.targetHandle === undefined ? {} : { targetHandle: edge.targetHandle }),
-    data: resolveReferenceEdgeData(edge.data, sourceData, targetData?.kind, edge.targetHandle),
+    data: (typeof edge.data === "object" && edge.data !== null && !Array.isArray(edge.data)
+      ? edge.data as ReferenceEdgeData
+      : {}) as ReferenceEdgeData,
   };
 }
 

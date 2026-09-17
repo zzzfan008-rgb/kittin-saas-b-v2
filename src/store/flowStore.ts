@@ -18,21 +18,16 @@ import {
 export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 import {
   NODE_SPECS,
-  LEGACY_IMAGE_ROLE_VALUES,
-  REFERENCE_ROLE_VALUES,
   allowedOperationModesForNode,
   defaultOperationModeForNode,
   isNodeRunActive,
   isNodeRunTerminal,
-  isReferenceRole,
-  resolveReferenceEdgeData,
   type Asset,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
   type ImageInputNodeData,
   type PersistedWorkflow,
-  type ReferenceRole,
   type ReferenceImageEvidence,
 } from "@/types/workflow";
 import {
@@ -218,15 +213,7 @@ export interface FlowState {
   /** 复制/粘贴等调用方已有完整节点时，仍通过此入口维护 revision/dirty。 */
   addExistingNode: (node: FlowNode) => void;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
-  /** 显式确认一条入边在当前目标中的参考角色；作为一次可撤销文档修改。 */
-  updateEdgeReferenceRole: (edgeId: string, role: ReferenceRole) => void;
-  /** 在指定文档作用域内确认一条参考边，拒绝过期页签/项目/epoch。 */
-  updateEdgeReferenceRoleInTab: (
-    target: DocumentTarget,
-    edgeId: string,
-    role: ReferenceRole,
-  ) => boolean;
-  /** 在指定目标节点的入边集合中移动参考边，保持边与角色绑定。 */
+  /** 在指定目标节点的入边集合中移动参考边。 */
   moveReferenceEdgeInTab: (
     target: DocumentTarget,
     edgeId: string,
@@ -757,35 +744,6 @@ function commitDocumentMutationForTarget(
   return true;
 }
 
-function edgeDataWithReferenceRole(edge: Edge, role: ReferenceRole): Record<string, unknown> {
-  const data = typeof edge.data === "object" && edge.data !== null && !Array.isArray(edge.data)
-    ? edge.data as Record<string, unknown>
-    : {};
-  return { ...data, role, roleNeedsConfirmation: false };
-}
-
-function referenceEdgeMutation(
-  edgeId: string,
-  role: ReferenceRole,
-): DocumentMutation {
-  return (tab) => {
-    const edge = tab.edges.find((candidate) => candidate.id === edgeId);
-    if (!edge) return {};
-    const nextData = edgeDataWithReferenceRole(edge, role);
-    if (
-      edge.data &&
-      typeof edge.data === "object" &&
-      !Array.isArray(edge.data) &&
-      JSON.stringify(edge.data) === JSON.stringify(nextData)
-    ) return {};
-    return {
-      edges: tab.edges.map((candidate) => candidate.id === edgeId
-        ? { ...candidate, data: nextData }
-        : candidate),
-    };
-  };
-}
-
 function moveReferenceEdgeMutation(
   edgeId: string,
   direction: "up" | "down",
@@ -1088,7 +1046,7 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
   const base = { label: spec.title, status: "idle" as NodeRunStatus };
   switch (kind) {
     case "image-input":
-      return { ...base, kind, imageRole: "generic", roleNeedsConfirmation: true };
+      return { ...base, kind };
     case "sketch-to-render":
       return {
         ...base, kind, prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
@@ -1380,22 +1338,17 @@ export function isDocumentConnectionValid(
 }
 
 function connectionWithReferenceData(
-  nodes: readonly FlowNode[],
+  _nodes: readonly FlowNode[],
   connection: Connection,
-): Connection & { data: ReturnType<typeof resolveReferenceEdgeData> } {
-  const source = nodes.find((node) => node.id === connection.source);
-  const target = nodes.find((node) => node.id === connection.target);
+): Connection & { data: Record<string, unknown> } {
   const explicitData = "data" in connection
     ? (connection as Connection & { data?: unknown }).data
     : undefined;
   return {
     ...connection,
-    data: resolveReferenceEdgeData(
-      explicitData,
-      source?.data,
-      target?.data.kind,
-      connection.targetHandle,
-    ),
+    data: (typeof explicitData === "object" && explicitData !== null && !Array.isArray(explicitData)
+      ? explicitData
+      : {}) as Record<string, unknown>,
   };
 }
 
@@ -1835,13 +1788,6 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
 
   switch (kind) {
     case "image-input":
-      data.imageRole = typeof input.imageRole === "string" && [
-        ...REFERENCE_ROLE_VALUES,
-        ...LEGACY_IMAGE_ROLE_VALUES,
-      ].includes(input.imageRole as never)
-        ? input.imageRole
-        : "generic";
-      data.roleNeedsConfirmation = input.roleNeedsConfirmation === false ? false : true;
       if (typeof input.imageUrl !== "string") delete data.imageUrl;
       break;
     case "sketch-to-render":
@@ -1917,12 +1863,9 @@ function normalizeSessionEdge(
     id: raw.id,
     source: raw.source,
     target: raw.target,
-    data: resolveReferenceEdgeData(
-      raw.data,
-      nodesById.get(raw.source)?.data,
-      nodesById.get(raw.target)?.data.kind,
-      typeof raw.targetHandle === "string" ? raw.targetHandle : null,
-    ),
+    data: (typeof raw.data === "object" && raw.data !== null && !Array.isArray(raw.data)
+      ? raw.data
+      : {}) as Record<string, unknown>,
   } as Edge;
 }
 
@@ -3178,14 +3121,6 @@ export const useFlowStore = create<FlowState>()(
             n.id === id ? { ...n, data: { ...n.data, ...patch } as WorkflowNodeData } : n,
           ),
         });
-      },
-      updateEdgeReferenceRole: (edgeId, role) => {
-        const target = selectActiveDocumentTarget(get());
-        commitDocumentMutationForTarget(target, referenceEdgeMutation(edgeId, role));
-      },
-      updateEdgeReferenceRoleInTab: (target, edgeId, role) => {
-        if (!isReferenceRole(role)) return false;
-        return commitDocumentMutationForTarget(target, referenceEdgeMutation(edgeId, role));
       },
       moveReferenceEdgeInTab: (target, edgeId, direction) => {
         if (direction !== "up" && direction !== "down") return false;

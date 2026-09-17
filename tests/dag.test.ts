@@ -21,7 +21,6 @@ import type {
   NodeExecution,
   NodeKind,
   ReferenceImageSource,
-  ReferenceRole,
   WorkflowNodeData,
 } from "../src/types/workflow";
 
@@ -87,7 +86,7 @@ function ok(name: string, fn: () => void | Promise<void>): Promise<void> {
     });
 }
 
-function imgNode(id: string, imageUrl?: string, imageRole: ReferenceRole = "generic"): FlowNode {
+function imgNode(id: string, imageUrl?: string): FlowNode {
   return {
     id,
     type: "image-input",
@@ -96,8 +95,6 @@ function imgNode(id: string, imageUrl?: string, imageRole: ReferenceRole = "gene
       label: id,
       status: "idle",
       imageUrl,
-      imageRole,
-      roleNeedsConfirmation: false,
     } as WorkflowNodeData as FlowNode["data"],
   };
 }
@@ -138,8 +135,7 @@ function resultNode(id: string): FlowNode {
 const edge = (
   source: string,
   target: string,
-  data?: { role: ReferenceRole; roleNeedsConfirmation: boolean },
-): FlowEdge => ({ source, target, ...(data ? { data } : {}) });
+): FlowEdge => ({ source, target });
 
 interface RecordedProviderCall {
   method: "generate" | "edit";
@@ -206,8 +202,6 @@ async function main() {
     assert.deepStrictEqual(modify.upstream, [{
       nodeId: "render",
       images: [],
-      referenceRole: "generic",
-      roleNeedsConfirmation: true,
     }]);
     assert.deepStrictEqual(modify.inputImages, []);
   });
@@ -262,8 +256,8 @@ async function main() {
     const transfer = aiNode("transfer", "ai-modify", "edit");
     const plan = buildExecutionPlan(
       [
-        imgNode("subject", "/api/files/person.png", "identity"),
-        imgNode("scene", "/api/files/scene.png", "background"),
+        imgNode("subject", "/api/files/person.png"),
+        imgNode("scene", "/api/files/scene.png"),
         transfer,
       ],
       [edge("subject", "transfer"), edge("scene", "transfer")],
@@ -273,14 +267,10 @@ async function main() {
       {
         nodeId: "subject",
         images: ["/api/files/person.png"],
-        referenceRole: "identity",
-        roleNeedsConfirmation: false,
       },
       {
         nodeId: "scene",
         images: ["/api/files/scene.png"],
-        referenceRole: "background",
-        roleNeedsConfirmation: false,
       },
     ]);
     assert.deepStrictEqual(step.inputImages, [
@@ -289,20 +279,18 @@ async function main() {
     ]);
   });
 
-  await ok("edge role 按实际多输出展开，保留重复角色、来源与连线顺序", () => {
+  await ok("edge 按实际多输出展开，保留来源与连线顺序", () => {
     const garment = aiNode(
       "garment-output",
       "ai-modify",
       "edit",
       ["/api/files/top-front.png", "/api/files/top-back.png"],
     );
-    const identity = imgNode("identity-source", "/api/files/person.png", "background");
+    const identity = imgNode("identity-source", "/api/files/person.png");
     const target = aiNode("edge-role-target", "ai-modify", "edit");
-    const garmentRole = { role: "garment_top" as const, roleNeedsConfirmation: false };
-    const identityRole = { role: "identity" as const, roleNeedsConfirmation: false };
     const orderedEdges = [
-      edge(garment.id, target.id, garmentRole),
-      edge(identity.id, target.id, identityRole),
+      edge(garment.id, target.id),
+      edge(identity.id, target.id),
     ];
     const step = buildExecutionPlan([garment, identity, target], orderedEdges, {
       onlyNodeId: target.id,
@@ -317,22 +305,16 @@ async function main() {
     assert.deepStrictEqual(step.inputReferences, [
       {
         imageRef: "/api/files/top-front.png",
-        role: "garment_top",
-        roleNeedsConfirmation: false,
         sourceNodeId: "garment-output",
         order: 0,
       },
       {
         imageRef: "/api/files/top-back.png",
-        role: "garment_top",
-        roleNeedsConfirmation: false,
         sourceNodeId: "garment-output",
         order: 1,
       },
       {
         imageRef: "/api/files/person.png",
-        role: "identity",
-        roleNeedsConfirmation: false,
         sourceNodeId: "identity-source",
         order: 2,
       },
@@ -343,112 +325,41 @@ async function main() {
       [orderedEdges[1], orderedEdges[0]],
       { onlyNodeId: target.id, includeDownstream: false },
     ).steps[0];
-    assert.deepStrictEqual(reordered.inputReferences?.map(({ imageRef, role }) => ({ imageRef, role })), [
-      { imageRef: "/api/files/person.png", role: "identity" },
-      { imageRef: "/api/files/top-front.png", role: "garment_top" },
-      { imageRef: "/api/files/top-back.png", role: "garment_top" },
+    assert.deepStrictEqual(reordered.inputReferences?.map(({ imageRef }) => ({ imageRef })), [
+      { imageRef: "/api/files/person.png" },
+      { imageRef: "/api/files/top-front.png" },
+      { imageRef: "/api/files/top-back.png" },
     ]);
   });
 
-  await ok("生成上游的当前输出仍继承边角色，并在未确认时保持待确认", () => {
+  await ok("生成上游的当前输出仍按连线顺序进入下游 inputReferences", () => {
     const generated = aiNode("generated", "ai-modify", "edit", ["/api/files/generated.png"]);
     const target = aiNode("target", "ai-modify", "edit");
-    const role = { role: "garment_full" as const, roleNeedsConfirmation: true };
     const plan = buildExecutionPlan(
       [generated, target],
-      [{ ...edge(generated.id, target.id, role), sourceHandle: "images", targetHandle: "reference" }],
+      [{ ...edge(generated.id, target.id), sourceHandle: "images", targetHandle: "reference" }],
       { onlyNodeId: target.id, includeDownstream: false },
     );
     assert.deepEqual(plan.steps[0].inputReferences, [{
       imageRef: "/api/files/generated.png",
-      role: "garment_full",
-      roleNeedsConfirmation: true,
       sourceNodeId: "generated",
       order: 0,
     }]);
   });
 
-  await ok("同一来源连到不同目标时分别采用各自显式 edge role", () => {
-    const source = imgNode("shared-source", "/api/files/shared.png", "background");
+  await ok("同一来源连到不同目标时分别采用各自连线顺序", () => {
+    const source = imgNode("shared-source", "/api/files/shared.png");
     const first = aiNode("first-target", "ai-modify", "edit");
     const second = aiNode("second-target", "ai-modify", "edit");
     const plan = buildExecutionPlan(
       [source, first, second],
       [
-        edge(source.id, first.id, { role: "identity", roleNeedsConfirmation: false }),
-        edge(source.id, second.id, { role: "fabric", roleNeedsConfirmation: false }),
+        edge(source.id, first.id),
+        edge(source.id, second.id),
       ],
     );
-    assert.equal(plan.steps.find((step) => step.nodeId === first.id)?.inputReferences?.[0]?.role, "identity");
-    assert.equal(plan.steps.find((step) => step.nodeId === second.id)?.inputReferences?.[0]?.role, "fabric");
-  });
-
-  await ok("专用语义输入句柄提供固定角色且覆盖来源节点默认", () => {
-    const source = imgNode("fabric-source", "/api/files/fabric.png", "generic");
-    const target: FlowNode = {
-      id: "recolor-target",
-      type: "fabric-recolor",
-      data: {
-        kind: "fabric-recolor",
-        label: "面料换色",
-        status: "idle",
-        prompt: "test",
-        colors: ["#111111"],
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2-vip",
-        modelOptions: { size: "auto" },
-        outputImages: [],
-      },
-    };
-    const plan = buildExecutionPlan([
-      source,
-      target,
-    ], [{
-      ...edge(source.id, target.id),
-      targetHandle: "fabric",
-    }]);
-    assert.deepEqual(plan.steps.find((step) => step.nodeId === target.id)?.inputReferences, [{
-      imageRef: "/api/files/fabric.png",
-      role: "fabric",
-      roleNeedsConfirmation: false,
-      sourceNodeId: source.id,
-      order: 0,
-    }]);
-  });
-
-  await ok("文档解析与浏览器门禁对专用句柄保持相同固定角色", () => {
-    const source = {
-      ...imgNode("handle-source", "/api/files/handle.png", "generic"),
-      position: { x: 0, y: 0 },
-    };
-    const target: FlowNode = {
-      id: "handle-target",
-      type: "fabric-recolor",
-      data: {
-        kind: "fabric-recolor",
-        label: "面料换色",
-        status: "idle",
-        prompt: "test",
-        colors: ["#111111"],
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2-vip",
-        modelOptions: { size: "auto" },
-        outputImages: [],
-      },
-      position: { x: 0, y: 0 },
-    };
-    const edges = [{ ...edge(source.id, target.id), targetHandle: "fabric" }];
-    const migrated = validateAndMigrateFlow({
-      schemaVersion: 5,
-      nodes: [source, target],
-      edges: edges.map((value) => ({ ...value, id: "handle-edge" })),
-    });
-    assert.deepEqual(migrated.edges[0].data, {
-      role: "fabric",
-      roleNeedsConfirmation: false,
-    });
+    assert.equal(plan.steps.find((step) => step.nodeId === first.id)?.inputReferences?.[0]?.imageRef, "/api/files/shared.png");
+    assert.equal(plan.steps.find((step) => step.nodeId === second.id)?.inputReferences?.[0]?.imageRef, "/api/files/shared.png");
   });
 
   await ok("带提示词的 AI 节点最多接受 8 张参考图", () => {
@@ -528,8 +439,6 @@ async function main() {
       {
         nodeId: "render",
         images: ["/api/files/rendered.png"],
-        referenceRole: "generic",
-        roleNeedsConfirmation: true,
       },
     ]);
   });
@@ -550,8 +459,6 @@ async function main() {
       {
         nodeId: "input",
         images: ["/api/files/seed.png"],
-        referenceRole: "generic",
-        roleNeedsConfirmation: false,
       },
     ]);
   });
@@ -676,7 +583,7 @@ async function main() {
       modelId: "gpt-image-2-vip",
       operationMode: "edit",
       taskPrompt: prompt,
-      references: [{ role: "generic", roleNeedsConfirmation: true }],
+      references: [{}],
     });
     assert.strictEqual(calls[0].request.prompt, expectedPrompt);
     assert.strictEqual(calls[0].request.aspectRatio, "3:4");
@@ -722,10 +629,7 @@ async function main() {
         modelId: "gpt-image-2-vip",
         operationMode: "edit",
         taskPrompt: prompt,
-        references: [
-          { role: "generic", roleNeedsConfirmation: true },
-          { role: "generic", roleNeedsConfirmation: true },
-        ],
+        references: [{}, {}],
       }),
     );
     assert.strictEqual(calls[0].request.batchSize, 4);
@@ -734,21 +638,17 @@ async function main() {
     assert.strictEqual(result.providerRequests, 1);
   });
 
-  await ok("runner 请求按 edge 展开的逐图角色与顺序写入 Provider references", async () => {
+  await ok("runner 请求按 edge 展开的逐图顺序写入 Provider references", async () => {
     const referenceSources: ReferenceImageSource[] = [
       {
         imageRef: SEED_DATA_URL,
-        role: "garment_top",
         order: 0,
         sourceNodeId: "multi-output-source",
-        roleNeedsConfirmation: false,
       },
       {
         imageRef: SECOND_DATA_URL,
-        role: "garment_top",
         order: 1,
         sourceNodeId: "multi-output-source",
-        roleNeedsConfirmation: false,
       },
     ];
     const { calls, result } = await runRecordedAiStep(
@@ -761,28 +661,22 @@ async function main() {
 
     assert.equal(calls.length, 1);
     assert.deepStrictEqual(calls[0].request.references?.map((reference) => ({
-      role: reference.role,
       order: reference.order,
       sourceNodeId: reference.sourceNodeId,
-      roleNeedsConfirmation: reference.roleNeedsConfirmation,
     })), [
       {
-        role: "garment_top",
         order: 0,
         sourceNodeId: "multi-output-source",
-        roleNeedsConfirmation: false,
       },
       {
-        role: "garment_top",
         order: 1,
         sourceNodeId: "multi-output-source",
-        roleNeedsConfirmation: false,
       },
     ]);
     assert.match(calls[0].request.references?.[0]?.assetSha256 ?? "", /^[a-f0-9]{64}$/);
-    assert.deepStrictEqual(result.references?.map(({ role, order }) => ({ role, order })), [
-      { role: "garment_top", order: 0 },
-      { role: "garment_top", order: 1 },
+    assert.deepStrictEqual(result.references?.map(({ order }) => ({ order })), [
+      { order: 0 },
+      { order: 1 },
     ]);
   });
 
@@ -795,10 +689,8 @@ async function main() {
       undefined,
       [{
         imageRef: SEED_DATA_URL,
-        role: "garment_full",
         order: 0,
         sourceNodeId: "garment-source",
-        roleNeedsConfirmation: false,
       }],
     );
     assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
@@ -808,26 +700,21 @@ async function main() {
     for (const call of calls) {
       assert.deepStrictEqual(call.request.referenceImages, [SEED_DATA_URL, SECOND_DATA_URL]);
       assert.deepStrictEqual(
-        call.request.references?.map(({ dataUrl, role, order, sourceNodeId, roleNeedsConfirmation }) => ({
-          dataUrl, role, order, sourceNodeId, roleNeedsConfirmation,
+        call.request.references?.map(({ dataUrl, order, sourceNodeId }) => ({
+          dataUrl, order, sourceNodeId,
         })),
         [
           {
             dataUrl: SEED_DATA_URL,
-            role: "garment_full",
             order: 0,
             sourceNodeId: "garment-source",
-            roleNeedsConfirmation: false,
           },
           {
             dataUrl: SECOND_DATA_URL,
-            role: "fabric",
             order: 1,
             sourceNodeId: "runner-fabric-recolor",
-            roleNeedsConfirmation: false,
           },
         ],
-        "fabric 必须先进入 canonical references，兼容数组再按同序派生",
       );
       assert.deepStrictEqual(
         call.request.referenceImages,
@@ -856,10 +743,8 @@ async function main() {
     };
     const damagedSources: ReferenceImageSource[] = [{
       imageRef: "/api/files/must-not-be-resolved.png",
-      role: "garment_full",
       order: 1,
       sourceNodeId: "damaged-garment",
-      roleNeedsConfirmation: false,
     }];
     await assert.rejects(
       () => executeStep({
@@ -982,7 +867,7 @@ async function main() {
     assert.deepStrictEqual(providerIds, ["gpt-image-2"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
-    assert.strictEqual(calls[0].request.maskMode, undefined);
+    assert.strictEqual((calls[0].request as unknown as Record<string, unknown>).maskMode, undefined);
     assert.strictEqual(calls[0].request.referenceImages?.length, 2);
     assert.strictEqual(calls[0].request.referenceImages?.[0], MASK_SOURCE_DATA_URL);
     assert.notStrictEqual(calls[0].request.referenceImages?.[1], MASK_SOURCE_DATA_URL);

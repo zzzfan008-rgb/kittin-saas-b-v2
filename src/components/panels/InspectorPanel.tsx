@@ -20,7 +20,7 @@ import {
 } from "@/types/workflow";
 import { inputClass, RunButton, STATUS_TEXT } from "../nodes/NodeFrame";
 import { ModelControls } from "../nodes/ModelControls";
-import { ReferenceRoleSummary } from "../nodes/ReferenceRoleSummary";
+import { ReferenceImageList } from "../nodes/ReferenceImageList";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -49,7 +49,6 @@ import {
 import { getRuntimePromptVariantAvailability } from "@/lib/promptEvaluationRelease";
 import {
   evaluatePromptRunAdmission,
-  promptRunReferenceRoleProfile,
   promptRunAdmissionInputFromNode,
   promptRunReferenceSnapshotsFromGraph,
   type PromptRunReferenceSnapshot,
@@ -95,8 +94,6 @@ function PromptPresetPicker({
   modelId,
   nodeKind,
   operationMode,
-  references,
-  hasUnconfirmedReferences,
   disabled,
   onApply,
 }: {
@@ -107,8 +104,6 @@ function PromptPresetPicker({
   modelId?: GenerationImageModelId;
   nodeKind: "sketch-to-render" | "ai-modify";
   operationMode: PromptOperationMode;
-  references: readonly PromptRunReferenceSnapshot[];
-  hasUnconfirmedReferences: boolean;
   disabled: boolean;
   onApply: (application: {
     preset: GarmentPromptPreset;
@@ -126,23 +121,15 @@ function PromptPresetPicker({
     parameters: MaterializedModelParameterProfile;
     prompt: string;
   } | null>(null);
-  const referenceRoleProfile = promptRunReferenceRoleProfile({
-    nodeKind,
-    operationMode,
-    references,
-  });
-  const roleSet = new Set(references.map((reference) => reference.role));
   const contextKey = JSON.stringify({
     currentAspectRatio,
     currentBatchSize,
     currentModelOptions: currentModelOptions ?? {},
     currentPrompt,
     disabled,
-    hasUnconfirmedReferences,
     modelId: modelId ?? null,
     nodeKind,
     operationMode,
-    referenceRoleProfile,
   });
   const activePending = pending?.contextKey === contextKey ? pending : null;
 
@@ -169,7 +156,6 @@ function PromptPresetPicker({
                   nodeKind,
                   mode: operationMode,
                 },
-                { referenceRoleProfile },
               )
             : { enabled: false, reason: "请先选择明确的图片模型。" };
           const variant = availability.variant;
@@ -180,18 +166,12 @@ function PromptPresetPicker({
             && profile.familyId === variant.familyId
             && profile.mode === variant.mode,
           );
-          const missingRoles = variant?.requiredRoles.filter((role) => !roleSet.has(role)) ?? [];
-          const referenceReason = hasUnconfirmedReferences
-            ? "参考图中存在待确认角色，不能用于已验证变体。"
-            : missingRoles.length > 0
-              ? `缺少参考角色：${missingRoles.join("、")}`
-              : "";
           const reason = !availability.enabled
             ? availability.reason
             : !profileMatches
               ? "参数档案缺失或与模型、任务族、模式不一致。"
-              : referenceReason;
-          const enabled = !disabled && availability.enabled && profileMatches && !referenceReason;
+              : "";
+          const enabled = !disabled && availability.enabled && profileMatches;
           const reasonId = `prompt-preset-${nodeKind}-${preset.id}-reason`;
           return (
             <div key={preset.id} className="space-y-1">
@@ -320,7 +300,6 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
   const activeEdges = useFlowStore(selectActiveEdges);
   const node = activeNodes.find((candidate) => candidate.id === nodeId);
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
-  const updateEdgeReferenceRole = useFlowStore((s) => s.updateEdgeReferenceRole);
   const documentTarget = useFlowStore(useShallow(selectActiveDocumentTarget));
   const moveReferenceEdgeInTab = useFlowStore((s) => s.moveReferenceEdgeInTab);
   const removeReferenceEdgeInTab = useFlowStore((s) => s.removeReferenceEdgeInTab);
@@ -425,13 +404,9 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
       )}
 
       {spec.providerId && referenceRows.length > 0 && (
-        <ReferenceRoleSummary
+        <ReferenceImageList
           references={referenceRows}
           disabled={readOnly || isNodeRunActive(d.status)}
-          onRoleChange={(reference, role) => {
-            const edge = activeEdges.find((candidate) => candidate.id === reference.edgeId);
-            if (edge) updateEdgeReferenceRole(edge.id, role);
-          }}
           onMove={(reference, direction) => {
             if (reference.edgeId) moveReferenceEdgeInTab(documentTarget, reference.edgeId, direction);
           }}
@@ -451,7 +426,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
               rows={12}
               className={`${inputClass} resize-none`}
             />
-            <span className="text-[11px] text-neutral-600">每条入边的参考角色必须确认；可连接最多 8 张参考图，按连线顺序传入</span>
+            <span className="text-[11px] text-neutral-600">可连接最多 8 张参考图，按连线顺序传入</span>
           </label>
           {(d.kind === "sketch-to-render" || d.kind === "ai-modify") && (
             <PromptPresetPicker
@@ -463,8 +438,6 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
               modelId={selectedModelId}
               nodeKind={d.kind}
               operationMode={d.operationMode}
-              references={incomingReferenceState}
-              hasUnconfirmedReferences={incomingReferenceState.some((reference) => reference.roleNeedsConfirmation)}
               disabled={readOnly || isNodeRunActive(d.status)}
               onApply={({ variant, profile, parameters, prompt }) => {
                 promptEdit.flush();

@@ -36,10 +36,10 @@ const params = {
   modelOptions: materialized.modelOptions,
 };
 const references = [
-  { order: 0, role: "identity" as const, roleNeedsConfirmation: false },
-  { order: 1, role: "pose_composition" as const, roleNeedsConfirmation: false },
-  { order: 2, role: "garment_top" as const, roleNeedsConfirmation: false },
-  { order: 3, role: "garment_bottom" as const, roleNeedsConfirmation: false },
+  { order: 0, sourceNodeId: "multi-output" },
+  { order: 1, sourceNodeId: "multi-output" },
+  { order: 2, sourceNodeId: "identity" },
+  { order: 3, sourceNodeId: "garment-top" },
 ];
 
 const graphNodes: PromptRunGraphNode[] = [
@@ -66,8 +66,6 @@ const graphNodes: PromptRunGraphNode[] = [
       label: "人物",
       status: "idle",
       imageUrl: "identity-image",
-      imageRole: "identity",
-      roleNeedsConfirmation: false,
     },
   },
   {
@@ -76,67 +74,27 @@ const graphNodes: PromptRunGraphNode[] = [
       kind: "image-input",
       label: "尚未上传",
       status: "idle",
-      imageRole: "garment_full",
-      roleNeedsConfirmation: false,
     },
   },
 ];
 assert.deepEqual(promptRunReferenceSnapshotsFromGraph(graphNodes, [
-  {
-    source: "multi-output",
-    target: "target",
-    data: { role: "garment_top", roleNeedsConfirmation: false },
-  },
-  {
-    source: "identity",
-    target: "target",
-    data: { role: "pose_composition", roleNeedsConfirmation: false },
-  },
+  { source: "multi-output", target: "target" },
+  { source: "identity", target: "target" },
   { source: "empty-garment", target: "target" },
 ], "target"), [
-  {
-    order: 0,
-    role: "garment_top",
-    roleNeedsConfirmation: false,
-    sourceNodeId: "multi-output",
-  },
-  {
-    order: 1,
-    role: "garment_top",
-    roleNeedsConfirmation: false,
-    sourceNodeId: "multi-output",
-  },
-  {
-    order: 2,
-    role: "pose_composition",
-    roleNeedsConfirmation: false,
-    sourceNodeId: "identity",
-  },
-], "显式 edge role 必须优先，并像 DAG 一样按连线顺序逐图片展开重复角色");
+  { order: 0, sourceNodeId: "multi-output" },
+  { order: 1, sourceNodeId: "multi-output" },
+  { order: 2, sourceNodeId: "identity" },
+], "必须像 DAG 一样按连线顺序逐图片展开，跳过未上传的空节点");
 
 assert.deepEqual(promptRunReferenceSnapshotsFromGraph(graphNodes, [
   { source: "multi-output", target: "legacy-target" },
   { source: "identity", target: "legacy-target" },
 ], "legacy-target"), [
-  {
-    order: 0,
-    role: "generic",
-    roleNeedsConfirmation: true,
-    sourceNodeId: "multi-output",
-  },
-  {
-    order: 1,
-    role: "generic",
-    roleNeedsConfirmation: true,
-    sourceNodeId: "multi-output",
-  },
-  {
-    order: 2,
-    role: "identity",
-    roleNeedsConfirmation: false,
-    sourceNodeId: "identity",
-  },
-], "旧 Provider 边不得继承含糊角色；已确认 image-input 可作为明确默认");
+  { order: 0, sourceNodeId: "multi-output" },
+  { order: 1, sourceNodeId: "multi-output" },
+  { order: 2, sourceNodeId: "identity" },
+], "旧 Provider 边同样按连线顺序逐图片展开");
 
 const input = promptRunAdmissionInputFromParams("ai-modify", params, references);
 assert.equal(evaluatePromptRunAdmission(input).code, "support-status-blocked");
@@ -147,22 +105,6 @@ assert.equal(evaluatePromptRunAdmission({ ...input, promptVariantId: undefined }
 assert.equal(evaluatePromptRunAdmission({ ...input, contractHash: `sha256:${"0".repeat(64)}` }).code, "binding-mismatch");
 assert.equal(evaluatePromptRunAdmission({ ...input, prompt: `${params.prompt}\n额外静默改写` }).code, "prompt-drift");
 assert.equal(evaluatePromptRunAdmission({ ...input, modelOptions: { imageSize: "4K" } }).code, "parameter-drift");
-assert.equal(evaluatePromptRunAdmission({
-  ...input,
-  references: references.map((reference, index) => index === 0
-    ? { ...reference, roleNeedsConfirmation: true }
-    : reference),
-}).code, "reference-role-unconfirmed");
-const missingConfirmationDecision = evaluatePromptRunAdmission({
-  ...input,
-  references: references.map(({ order, role }) => ({ order, role })),
-}, { evaluationRun: true });
-assert.equal(missingConfirmationDecision.code, "reference-role-unconfirmed");
-assert.deepEqual(missingConfirmationDecision.references, references.map(({ order }) => ({
-  order,
-  reason: "roleNeedsConfirmation is not false",
-})));
-assert.equal(evaluatePromptRunAdmission({ ...input, references: references.slice(0, 2) }).code, "reference-role-missing");
 assert.equal(evaluatePromptRunAdmission(input, {
   evaluationRun: true,
   shutdownRules: [{
@@ -215,8 +157,7 @@ assert.equal(evaluatePromptRunAdmission({
   ...input,
   references: Array.from({ length: 9 }, (_value, order) => ({
     order,
-    role: "generic" as const,
-    roleNeedsConfirmation: false,
+    sourceNodeId: `source-${order}`,
   })),
 }).code, "reference-limit-exceeded", "现役模型超过 8 张参考图仍必须在准入层拒绝");
 const invalidReferenceDecision = evaluatePromptRunAdmission({
@@ -227,32 +168,18 @@ const invalidReferenceDecision = evaluatePromptRunAdmission({
     ...(index === 0 ? { sourceNodeId: "identity-source" } : {}),
   })),
 });
-assert.equal(invalidReferenceDecision.code, "reference-role-invalid");
+assert.equal(invalidReferenceDecision.code, "reference-structure-invalid");
 assert.deepEqual(invalidReferenceDecision.references, [{
   order: 0,
   sourceNodeId: "identity-source",
   reason: "references[0].order must be a safe integer equal to 0",
 }], "无效顺序必须定位到权威数组中的具体参考图");
-const invalidRoleDecision = evaluatePromptRunAdmission({
-  ...input,
-  references: references.map((reference, index) => index === 1
-    ? { ...reference, role: "unsupported-role", sourceNodeId: "pose-source" }
-    : reference),
-});
-assert.equal(invalidRoleDecision.code, "reference-role-invalid");
-assert.deepEqual(invalidRoleDecision.references, [{
-  order: 1,
-  sourceNodeId: "pose-source",
-  reason: "references[1].role must be a supported reference role",
-}]);
 
 const originalSupport = variant.supportStatus;
 try {
   (variant as { supportStatus: string }).supportStatus = "verified";
-  const releasedProfile = references.map(({ order, role }) => ({ order, role }));
   const release = createPromptEvaluationReleaseSnapshot(
     variant,
-    releasedProfile,
     "verified",
     "test-only:exact-reference-profile",
     {
@@ -277,20 +204,20 @@ try {
       releases: [release],
       currentCodeSha: TEST_PROMPT_RELEASE_CODE_SHA,
     }).code,
-    "support-status-blocked",
-    "一个 referenceRoleProfile 的 verified 发布不得泛化到顺序不同的输入",
+    "verified",
+    "顺序变化不再影响 verified 发布的准入判定",
   );
   const duplicateReferences = [
     ...references,
-    { order: 4, role: "garment_bottom" as const, roleNeedsConfirmation: false },
+    { order: 4, sourceNodeId: "garment-bottom" },
   ];
   assert.equal(
     evaluatePromptRunAdmission({ ...input, references: duplicateReferences }, {
       releases: [release],
       currentCodeSha: TEST_PROMPT_RELEASE_CODE_SHA,
     }).code,
-    "support-status-blocked",
-    "一个 referenceRoleProfile 的 verified 发布不得泛化到数量或重复不同的输入",
+    "verified",
+    "数量或重复不同不再影响 verified 发布的准入判定",
   );
 } finally {
   (variant as { supportStatus: string }).supportStatus = originalSupport;
@@ -314,7 +241,7 @@ const maskInput = promptRunAdmissionInputFromParams("mask-redraw", {
   evaluationVersion: maskVariant.evaluationVersion,
   postprocessVersion: maskProfile.postprocess.version,
   modelOptions: {},
-}, [{ order: 0, role: "garment_full", roleNeedsConfirmation: false }]);
+}, [{ order: 0, sourceNodeId: "mask-source" }]);
 assert.equal(evaluatePromptRunAdmission(maskInput).allowed, false);
 assert.equal(evaluatePromptRunAdmission(maskInput, { evaluationRun: true }).code, "evaluation-only");
 

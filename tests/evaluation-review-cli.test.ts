@@ -221,7 +221,6 @@ try {
   });
   const baseRelease = createPromptEvaluationReleaseSnapshot(
     variant,
-    [],
     "experimental",
     `promotions/${SHA}.json`,
     {
@@ -234,7 +233,6 @@ try {
   );
   const secondRelease = createPromptEvaluationReleaseSnapshot(
     variant,
-    [{ order: 0, role: "identity" }],
     "experimental",
     `promotions/${"b".repeat(64)}.json`,
     {
@@ -259,12 +257,11 @@ const delay = Number(process.argv[4]);
 withEvaluationReleaseRegistryLock(root, (locked) => {
   const current = locked.read(true);
   if (delay > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
-  const key = JSON.stringify([release.variantId, release.referenceRoleProfile]);
+  const key = JSON.stringify([release.variantId]);
   const releases = current.registry.releases
-    .filter((candidate) => JSON.stringify([candidate.variantId, candidate.referenceRoleProfile]) !== key)
+    .filter((candidate) => JSON.stringify([candidate.variantId]) !== key)
     .concat(release)
-    .sort((left, right) => left.variantId.localeCompare(right.variantId)
-      || JSON.stringify(left.referenceRoleProfile).localeCompare(JSON.stringify(right.referenceRoleProfile)));
+    .sort((left, right) => left.variantId.localeCompare(right.variantId));
   locked.compareAndSwap(current.registryFileSha256, {
     schemaVersion: 1,
     generatedAt: "2026-09-03T00:00:00.000Z",

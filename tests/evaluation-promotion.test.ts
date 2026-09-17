@@ -44,7 +44,6 @@ function scores(value: number): PromptEvaluationScores {
   return {
     garmentMaterialFidelity: value,
     instructionFollowing: value,
-    referenceRoleFidelity: value,
     artifactControl: value,
     commercialUsability: value,
   };
@@ -159,7 +158,6 @@ function evaluate(
 ) {
   return evaluateEvidenceBundlesForStage({
     variantId: variant.variantId,
-    referenceRoleProfile: [],
     stage,
     bundles,
     previousReceipts,
@@ -482,7 +480,6 @@ const contractArtifactBase = {
   schemaVersion: 1 as const,
   artifactType: "prompt-evaluation-contract-check" as const,
   variantId: variant.variantId,
-  referenceRoleProfile: [],
   codeSha: CODE_SHA,
   commands: EVALUATION_CONTRACT_CHECK_COMMANDS.map((file) => ({ file, stdoutSha256: SHA })),
   knowledgeBase: {
