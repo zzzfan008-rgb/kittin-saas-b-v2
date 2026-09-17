@@ -450,7 +450,7 @@ test("adding a local edit node keeps the canvas mounted and exposes one clear wo
   const addedNode = nodes.last();
   await expect(addedNode.getByText(/涂抹区不是裁切框/)).toBeVisible();
   await expect(addedNode.getByRole("button", { name: "未验证不可运行" })).toBeDisabled();
-  await expect(addedNode.getByText(/mask-edit 模式至少需要一张已确认角色的参考图/)).toBeVisible();
+  await expect(addedNode.getByText(/mask-edit 模式至少需要一张参考图/)).toBeVisible();
   await expect(page.getByRole("group", { name: "蒙版处理方式" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "取消" })).toHaveCount(0);
   await expect(page.getByText("页面出现异常")).toHaveCount(0);

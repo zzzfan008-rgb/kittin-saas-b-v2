@@ -31,10 +31,10 @@
 
 唯一键由以下字段共同组成：
 
-`taskFamilyId × promptVariantId × presetId × presetVersion × nodeKind × modelId × operationMode × referenceRoleProfile × parameterProfileId × parameterProfileVersion`
+`taskFamilyId × promptVariantId × presetId × presetVersion × nodeKind × modelId × operationMode × parameterProfileId × parameterProfileVersion`
 
-- `referenceRoleProfile` 是实际 Provider 输入的有序 `{order, role}` 列表；顺序、数量和重复角色全部保留，蒙版轨还包括系统区域引导图与 mask。任何差异都会形成不同单位。
-- 切换模型、节点、生成/编辑模式、参考角色顺序/数量、提示词版本、Provider 提示词 renderer 或参数版本，都会生成新的评估单位，禁止借用旧单位结论。
+- 参考图只保留**顺序**语义（参考图角色体系已于 2026-09-17 移除，见 `docs/design/2026-09-17-remove-reference-roles/plan.md`）。
+- 切换模型、节点、生成/编辑模式、参考图顺序/数量、提示词版本、Provider 提示词 renderer 或参数版本，都会生成新的评估单位，禁止借用旧单位结论。
 - 运行授权使用该单位的规范 JSON 生成 `sha256:...` 形式的 `evaluationUnitKey`。除上述字段外，精确授权键还绑定契约哈希、评估版本、后处理版本、业务画幅、输出数和完整模型原生参数；任何变化都会使旧授权失配。
 - `sampleId` 标识黄金集或实验集中的原始样本，`caseId` 标识该样本的一次具体运行。两者都必填；获准重跑时保留 `sampleId`，但必须使用新的 `caseId` 和新授权。
 - `providerContractVersion`、实际解析模型版本、Provider 提示词 renderer 版本/hash、输入归一化、后处理、黄金集或评分规则任一变化，已验证状态自动降为 `unverified`，重新跑完整评估。

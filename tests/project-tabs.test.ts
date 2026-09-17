@@ -530,8 +530,8 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   assert.equal(activeDocument().edges.length, 0);
 });
 
-await test("新连线只采用已确认图片输入默认角色，显式 edge role 优先", () => {
-  const confirmedSource = imageNode("confirmed-edge-source", "已确认人物");
+await test("新连线不再写入角色数据（edge data 为空对象）", () => {
+  const confirmedSource = imageNode("confirmed-edge-source", "参考人物");
   if (confirmedSource.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
   confirmedSource.data.imageUrl = "/api/files/confirmed-person.png";
   const firstTarget = aiNode("confirmed-edge-target", "第一目标");
@@ -562,8 +562,8 @@ await test("新连线只采用已确认图片输入默认角色，显式 edge ro
   ]);
 });
 
-await test("专用面料节点句柄在新连线时持久化固定角色", () => {
-  const source = imageNode("dedicated-handle-source", "待确认来源");
+await test("专用面料节点句柄在新连线时不再写入角色数据", () => {
+  const source = imageNode("dedicated-handle-source", "参考来源");
   const targetId = "dedicated-handle-target";
   const target = {
     id: targetId,
@@ -1607,6 +1607,27 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
   );
   assert.ok(source.includes("const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);"));
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
+});
+
+await test("羽化宽度滑块使用项目本地 shadcn Slider 并写入 featherRadius", () => {
+  const redrawSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    "utf8",
+  );
+  const editorSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(redrawSource, /import \{ Slider \} from "@\/components\/ui\/slider"/);
+  assert.match(redrawSource, /min=\{FEATHER_RADIUS_MIN\}/);
+  assert.match(redrawSource, /max=\{FEATHER_RADIUS_MAX\}/);
+  assert.match(redrawSource, /aria-label="羽化宽度（像素）"/);
+  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: next \}\)/);
+  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: undefined \}\)/);
+  assert.match(redrawSource, /featherRadius=\{normalizeFeatherRadius\(data\.featherRadius\)\}/);
+  assert.doesNotMatch(redrawSource, /<input[^>]*type="range"/);
+  assert.match(editorSource, /featherRadius\?: number/);
+  assert.match(editorSource, /adaptiveMaskFeatherRadius\(overlay\.width, overlay\.height, expansionRadius\)/);
 });
 
 await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点击", () => {

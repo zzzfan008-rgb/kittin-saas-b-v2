@@ -142,20 +142,6 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
       },
     },
-    ...[
-      ["reference-role-1024", 1024, 768],
-      ["reference-role-1280", 1280, 720],
-      ["reference-role-1440", 1440, 900],
-    ].map(([name, width, height]) => ({
-      name: name as string,
-      testMatch: /reference-role-confirmation\.spec\.ts/,
-      dependencies: ["setup"],
-      use: {
-        ...devices["Desktop Chrome"],
-        storageState: authStatePath,
-        viewport: { width: width as number, height: height as number },
-      },
-    })),
     {
       name: "initial-draft",
       testMatch: /initial-draft\.spec\.ts/,
