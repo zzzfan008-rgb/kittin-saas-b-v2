@@ -24,8 +24,6 @@ import {
 } from "../engine/dag";
 import {
   promptRunAdmissionFailurePayload,
-  promptRunReferenceSnapshotsFromGraph,
-  type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
 import type { RunEvent } from "../engine/runner";
 import {
@@ -42,7 +40,6 @@ import {
 } from "../engine/runQueue";
 import {
   validateAndMigrateFlow,
-  WorkflowReferenceRoleValidationError,
   WorkflowValidationError,
 } from "../lib/workflowSchema";
 import { requestUser } from "../lib/auth";
@@ -77,62 +74,6 @@ function hasExactExecutionEdgeSemantics(
       && (submitted.sourceHandle ?? null) === (saved.sourceHandle ?? null)
       && (submitted.targetHandle ?? null) === (saved.targetHandle ?? null);
   });
-}
-
-function referenceRoleIssueReason(
-  error: WorkflowReferenceRoleValidationError,
-  order: number,
-): string {
-  if (error.field === "data") return `references[${order}] must be an object`;
-  if (error.field === "role") return `references[${order}].role must be a supported reference role`;
-  if (error.issueKind === "missing") return "roleNeedsConfirmation is not false";
-  return `references[${order}].roleNeedsConfirmation must be a boolean`;
-}
-
-function mapSubmittedReferenceRoleError(
-  error: WorkflowReferenceRoleValidationError,
-  submittedEdges: readonly unknown[],
-  savedFlow: PersistedWorkflow,
-  basePlan: ExecutionPlan,
-): PromptRunAdmissionError {
-  if (!hasExactExecutionEdgeSemantics(submittedEdges, savedFlow.edges)) throw error;
-
-  const targetStep = basePlan.steps.find((step) => step.nodeId === error.targetNodeId);
-  if (!targetStep || !NODE_SPECS[targetStep.kind].providerId) throw error;
-  const savedEdge = savedFlow.edges[error.edgeIndex];
-  if (
-    !savedEdge
-    || savedEdge.source !== error.sourceNodeId
-    || savedEdge.target !== error.targetNodeId
-  ) {
-    throw error;
-  }
-
-  const before = promptRunReferenceSnapshotsFromGraph(
-    savedFlow.nodes,
-    savedFlow.edges.slice(0, error.edgeIndex),
-    error.targetNodeId,
-  );
-  const through = promptRunReferenceSnapshotsFromGraph(
-    savedFlow.nodes,
-    savedFlow.edges.slice(0, error.edgeIndex + 1),
-    error.targetNodeId,
-  );
-  const affectedReferences = through.slice(before.length);
-  if (affectedReferences.length === 0) throw error;
-
-  const unconfirmed = error.field === "roleNeedsConfirmation" && error.issueKind === "missing";
-  const decision: PromptRunAdmissionDecision = {
-    allowed: false,
-    code: unconfirmed ? "reference-role-unconfirmed" : "reference-role-invalid",
-    reason: unconfirmed ? "参考图角色尚未全部确认" : "参考图角色或顺序无效。",
-    references: affectedReferences.map((reference) => ({
-      order: reference.order,
-      ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-      reason: referenceRoleIssueReason(error, reference.order),
-    })),
-  };
-  return new PromptRunAdmissionError(error.targetNodeId, decision);
 }
 
 export function requestedCountForStep(kind: string, params: Record<string, unknown>): number {
@@ -317,19 +258,11 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
         includeDownstream: includeDownstream ?? false,
       };
       const basePlan = buildExecutionPlan(flow.nodes, flow.edges, planOptions);
-      let submittedFlow: PersistedWorkflow;
-      try {
-        submittedFlow = validateAndMigrateFlow({
-          schemaVersion: WORKFLOW_SCHEMA_VERSION,
-          nodes,
-          edges,
-        });
-      } catch (error) {
-        if (error instanceof WorkflowReferenceRoleValidationError) {
-          throw mapSubmittedReferenceRoleError(error, edges, flow, basePlan);
-        }
-        throw error;
-      }
+      const submittedFlow = validateAndMigrateFlow({
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes,
+        edges,
+      });
       const submittedPlan = buildExecutionPlan(submittedFlow.nodes, submittedFlow.edges, planOptions);
       if (
         !hasExactExecutionEdgeSemantics(submittedFlow.edges, flow.edges)

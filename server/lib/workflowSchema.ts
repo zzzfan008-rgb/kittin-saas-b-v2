@@ -2,20 +2,15 @@ import {
   WORKFLOW_SCHEMA_VERSION,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
-  LEGACY_IMAGE_ROLE_VALUES,
-  REFERENCE_ROLE_VALUES,
   type NodeKind,
   type PersistedWorkflow,
   type PersistedWorkflowEdge,
   type PersistedWorkflowNode,
-  type ReferenceEdgeData,
   type WorkflowNodeData,
   BATCH_SIZES,
   IMAGE_OPERATION_MODE_VALUES,
   allowedOperationModesForNode,
   defaultOperationModeForNode,
-  resolveReferenceEdgeData,
-  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -66,7 +61,6 @@ const STATUSES = [
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
 ] as const;
-const IMAGE_ROLES = [...REFERENCE_ROLE_VALUES, ...LEGACY_IMAGE_ROLE_VALUES] as const;
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
 const IMAGE_SIZES = ["2K", "4K"] as const;
 export const MAX_WORKFLOW_NODES = 500;
@@ -85,38 +79,6 @@ export class WorkflowValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "WorkflowValidationError";
-  }
-}
-
-export type WorkflowReferenceRoleValidationField =
-  | "data"
-  | "role"
-  | "roleNeedsConfirmation";
-
-export class WorkflowReferenceRoleValidationError extends WorkflowValidationError {
-  readonly edgeIndex: number;
-  readonly sourceNodeId: string;
-  readonly targetNodeId: string;
-  readonly field: WorkflowReferenceRoleValidationField;
-  readonly issueKind: "missing" | "invalid";
-
-  constructor(
-    message: string,
-    details: {
-      edgeIndex: number;
-      sourceNodeId: string;
-      targetNodeId: string;
-      field: WorkflowReferenceRoleValidationField;
-      issueKind: "missing" | "invalid";
-    },
-  ) {
-    super(message);
-    this.name = "WorkflowReferenceRoleValidationError";
-    this.edgeIndex = details.edgeIndex;
-    this.sourceNodeId = details.sourceNodeId;
-    this.targetNodeId = details.targetNodeId;
-    this.field = details.field;
-    this.issueKind = details.issueKind;
   }
 }
 
@@ -274,11 +236,7 @@ function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<s
   // v0/v1 文件保留现有值，只补后来新增且运行时依赖的确定性默认字段。
   switch (kind) {
     case "image-input":
-      return {
-        ...raw,
-        imageRole: raw.imageRole ?? "generic",
-        roleNeedsConfirmation: raw.roleNeedsConfirmation === false ? false : true,
-      };
+      return { ...raw };
     case "sketch-to-render":
       return {
         prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
@@ -410,10 +368,6 @@ function validateData(kind: NodeKind, rawValue: unknown, path: string): Workflow
 
   switch (kind) {
     case "image-input":
-      oneOf(raw.imageRole, IMAGE_ROLES, `${path}.imageRole`);
-      if (typeof raw.roleNeedsConfirmation !== "boolean") {
-        fail(`${path}.roleNeedsConfirmation`, "must be a boolean");
-      }
       optionalImageReference(raw.imageUrl, `${path}.imageUrl`);
       break;
     case "sketch-to-render":
@@ -485,59 +439,7 @@ function validateNode(value: unknown, index: number, migrateLegacy: boolean): Pe
   return { ...raw, id, type, position: { ...position, x: position.x as number, y: position.y as number }, data } as PersistedWorkflowNode;
 }
 
-function validateReferenceEdgeData(
-  value: unknown,
-  edgeIndex: number,
-  sourceNodeId: string,
-  targetNodeId: string,
-): ReferenceEdgeData {
-  const path = `flow.edges[${edgeIndex}].data`;
-  const failReferenceRole = (
-    field: WorkflowReferenceRoleValidationField,
-    issueKind: "missing" | "invalid",
-    fieldPath: string,
-    message: string,
-  ): never => {
-    throw new WorkflowReferenceRoleValidationError(`${fieldPath}: ${message}`, {
-      edgeIndex,
-      sourceNodeId,
-      targetNodeId,
-      field,
-      issueKind,
-    });
-  };
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    failReferenceRole("data", value === undefined ? "missing" : "invalid", path, "must be an object");
-  }
-  const raw = value as Record<string, unknown>;
-  // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceEdgeData 现为 Record<string, unknown>，此处先校验再窄化）
-  if (!REFERENCE_ROLE_VALUES.includes(raw.role as ReferenceRole)) {
-    failReferenceRole(
-      "role",
-      raw.role === undefined ? "missing" : "invalid",
-      `${path}.role`,
-      `must be one of: ${REFERENCE_ROLE_VALUES.join(", ")}`,
-    );
-  }
-  const role = raw.role as ReferenceRole;
-  if (typeof raw.roleNeedsConfirmation !== "boolean") {
-    failReferenceRole(
-      "roleNeedsConfirmation",
-      raw.roleNeedsConfirmation === undefined ? "missing" : "invalid",
-      `${path}.roleNeedsConfirmation`,
-      "must be a boolean",
-    );
-  }
-  return { role, roleNeedsConfirmation: raw.roleNeedsConfirmation as boolean };
-}
-
-function validateEdge(
-  value: unknown,
-  index: number,
-  migrateLegacy: boolean,
-  sourceDataByNodeId: ReadonlyMap<string, WorkflowNodeData>,
-  targetDataByNodeId: ReadonlyMap<string, WorkflowNodeData>,
-): PersistedWorkflowEdge {
+function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   const path = `flow.edges[${index}]`;
   const raw = record(value, path);
   const id = stringValue(raw.id, `${path}.id`, { nonEmpty: true });
@@ -548,14 +450,10 @@ function validateEdge(
   if (!SAFE_ID.test(target)) fail(`${path}.target`, "must be a valid node id");
   if (raw.sourceHandle !== undefined && raw.sourceHandle !== null) stringValue(raw.sourceHandle, `${path}.sourceHandle`);
   if (raw.targetHandle !== undefined && raw.targetHandle !== null) stringValue(raw.targetHandle, `${path}.targetHandle`);
-  const data = migrateLegacy
-    ? resolveReferenceEdgeData(
-      raw.data,
-      sourceDataByNodeId.get(source),
-      targetDataByNodeId.get(target)?.kind,
-      typeof raw.targetHandle === "string" ? raw.targetHandle : null,
-    )
-    : validateReferenceEdgeData(raw.data, index, source, target);
+  // 角色字段已废弃：边 data 存在即忽略，不报错、不写回。
+  const data = typeof raw.data === "object" && raw.data !== null && !Array.isArray(raw.data)
+    ? raw.data as Record<string, unknown>
+    : {};
   return { ...raw, id, source, target, data } as PersistedWorkflowEdge;
 }
 
@@ -581,15 +479,7 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
 
   const nodes = raw.nodes.map((node, index) => validateNode(node, index, migrateLegacy));
-  const sourceDataByNodeId = new Map(nodes.map((node) => [node.id, node.data]));
-  const targetDataByNodeId = sourceDataByNodeId;
-  const edges = raw.edges.map((edge, index) => validateEdge(
-    edge,
-    index,
-    migrateLegacy,
-    sourceDataByNodeId,
-    targetDataByNodeId,
-  ));
+  const edges = raw.edges.map((edge, index) => validateEdge(edge, index));
   const nodeIds = new Set<string>();
   for (const node of nodes) {
     if (nodeIds.has(node.id)) fail("flow.nodes", `duplicate node id: ${node.id}`);

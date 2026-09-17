@@ -22,7 +22,6 @@ import { lockActiveOwner, lockActiveOwnerMutation } from "../lib/ownerMutation";
 import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
 import {
   WORKFLOW_SCHEMA_VERSION,
-  type ReferenceRole,
   type WorkflowTemplate,
 } from "../../src/types/workflow";
 import {
@@ -50,10 +49,6 @@ function templatePath(sub: "builtin" | "user", id: string): string {
 // ---------- 内置模板（flow 为 React Flow 格式，data 默认值同前端 flowStore.defaultNodeData）----------
 const BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
 
-function confirmedReferenceEdgeData(role: ReferenceRole) {
-  return { role, roleNeedsConfirmation: false } as const;
-}
-
 function builtinTemplates(): WorkflowTemplate[] {
   return [
     {
@@ -72,7 +67,6 @@ function builtinTemplates(): WorkflowTemplate[] {
             position: { x: 0, y: 0 },
             data: {
               kind: "image-input", label: "图片上传", status: "idle",
-              imageRole: "pose_composition", roleNeedsConfirmation: false,
             },
           },
           {
@@ -132,15 +126,15 @@ function builtinTemplates(): WorkflowTemplate[] {
         edges: [
           {
             id: "e1", source: "n1", target: "n2",
-            data: confirmedReferenceEdgeData("pose_composition"),
+            data: {},
           },
           {
             id: "e2", source: "n2", target: "n3",
-            data: confirmedReferenceEdgeData("garment_full"),
+            data: {},
           },
           {
             id: "e3", source: "n3", target: "n4", targetHandle: "garment",
-            data: confirmedReferenceEdgeData("garment_full"),
+            data: {},
           },
         ],
       },
@@ -161,7 +155,6 @@ function builtinTemplates(): WorkflowTemplate[] {
             position: { x: 0, y: 0 },
             data: {
               kind: "image-input", label: "图片上传", status: "idle",
-              imageRole: "pose_composition", roleNeedsConfirmation: false,
             },
           },
           {
@@ -202,11 +195,11 @@ function builtinTemplates(): WorkflowTemplate[] {
         edges: [
           {
             id: "e1", source: "n1", target: "n2",
-            data: confirmedReferenceEdgeData("pose_composition"),
+            data: {},
           },
           {
             id: "e2", source: "n2", target: "n3",
-            data: confirmedReferenceEdgeData("garment_full"),
+            data: {},
           },
         ],
       },
@@ -259,7 +252,7 @@ function builtinTemplates(): WorkflowTemplate[] {
         ],
         edges: [{
           id: "e1", source: "n1", target: "n2", targetHandle: "garment",
-          data: confirmedReferenceEdgeData("garment_full"),
+          data: {},
         }],
       },
     },
@@ -306,7 +299,7 @@ function builtinTemplates(): WorkflowTemplate[] {
         ],
         edges: [{
           id: "generate-to-result", source: "generate", target: "result",
-          data: confirmedReferenceEdgeData("generic"),
+          data: {},
         }],
       },
     },
@@ -328,8 +321,6 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图1 · 人物主体",
               status: "idle",
-              imageRole: "identity",
-              roleNeedsConfirmation: false,
             },
           },
           {
@@ -340,8 +331,6 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图2 · 场景背景",
               status: "idle",
-              imageRole: "background",
-              roleNeedsConfirmation: false,
             },
           },
           {
@@ -378,15 +367,15 @@ function builtinTemplates(): WorkflowTemplate[] {
         edges: [
           {
             id: "subject-to-transfer", source: "subject", target: "transfer",
-            data: confirmedReferenceEdgeData("identity"),
+            data: {},
           },
           {
             id: "scene-to-transfer", source: "scene", target: "transfer",
-            data: confirmedReferenceEdgeData("background"),
+            data: {},
           },
           {
             id: "transfer-to-result", source: "transfer", target: "result",
-            data: confirmedReferenceEdgeData("generic"),
+            data: {},
           },
         ],
       },
@@ -409,8 +398,6 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图1 · 原始图案",
               status: "idle",
-              imageRole: "garment_full",
-              roleNeedsConfirmation: false,
             },
           },
           {
@@ -421,8 +408,6 @@ function builtinTemplates(): WorkflowTemplate[] {
               kind: "image-input",
               label: "图2 · 风格参考",
               status: "idle",
-              imageRole: "styling_only",
-              roleNeedsConfirmation: false,
             },
           },
           {
@@ -459,15 +444,15 @@ function builtinTemplates(): WorkflowTemplate[] {
         edges: [
           {
             id: "pattern-to-transfer", source: "pattern", target: "transfer",
-            data: confirmedReferenceEdgeData("garment_full"),
+            data: {},
           },
           {
             id: "style-to-transfer", source: "style", target: "transfer",
-            data: confirmedReferenceEdgeData("styling_only"),
+            data: {},
           },
           {
             id: "transfer-to-result", source: "transfer", target: "result",
-            data: confirmedReferenceEdgeData("generic"),
+            data: {},
           },
         ],
       },

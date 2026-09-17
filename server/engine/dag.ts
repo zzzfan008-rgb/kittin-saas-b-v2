@@ -15,10 +15,6 @@ import {
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
   allowedOperationModesForNode,
-  isReferenceRole,
-  referenceRoleForTargetHandle,
-  resolveReferenceEdgeData,
-  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
   MASK_REDRAW_MODEL_ID,
@@ -47,32 +43,6 @@ export interface FlowEdge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
   data?: unknown;
-}
-
-/**
- * A visibly labelled target handle is an explicit role selection made by the
- * user while connecting the edge. Keep this map narrow: ordinary handles and
- * all unknown nodes remain pending unless the edge already carries a role.
- */
-function resolveExecutionReferenceRole(
-  edge: FlowEdge,
-  targetKind: NodeKind,
-  sourceData: WorkflowNodeData,
-): { role: ReferenceRole; roleNeedsConfirmation: boolean } {
-  // TODO(R-02/R-03): 移除角色后删除此守卫（resolveReferenceEdgeData 现返回 Record<string, unknown>）
-  const explicit = resolveReferenceEdgeData(edge.data, sourceData);
-  const explicitRole: { role: ReferenceRole; roleNeedsConfirmation: boolean } = {
-    role: isReferenceRole(explicit.role) ? explicit.role : "generic",
-    roleNeedsConfirmation: explicit.roleNeedsConfirmation !== false,
-  };
-  if (edge.data && typeof edge.data === "object" && !Array.isArray(edge.data)) {
-    const raw = edge.data as Record<string, unknown>;
-    if (Object.hasOwn(raw, "role")) return explicitRole;
-  }
-  const fixedRole = referenceRoleForTargetHandle(targetKind, edge.targetHandle);
-  return fixedRole
-    ? { role: fixedRole, roleNeedsConfirmation: false }
-    : explicitRole;
 }
 
 export class DagError extends Error {
@@ -106,10 +76,7 @@ export function assertPromptRunAdmissions(
   for (const step of plan.steps) {
     if (!NODE_SPECS[step.kind].providerId) continue;
     const references = (step.inputReferences ?? []).map((reference, order) => ({
-      // TODO(R-02/R-03): 移除角色后删除此守卫
-      role: reference.role as ReferenceRole,
       order,
-      roleNeedsConfirmation: reference.roleNeedsConfirmation,
       sourceNodeId: reference.sourceNodeId,
     }));
     const decision = evaluatePromptRunAdmission(
@@ -299,20 +266,15 @@ export function buildExecutionPlan(
     for (const e of edges) {
       if (e.target !== id) continue;
       const srcData = nodeMap.get(e.source)!.data;
-      const reference = resolveExecutionReferenceRole(e, data.kind, srcData);
       upstream.push({
         nodeId: e.source,
         images: extractOutputImages(srcData),
-        referenceRole: reference.role,
-        roleNeedsConfirmation: reference.roleNeedsConfirmation,
       });
     }
 
     const inputImages = upstream.flatMap((source) => source.images);
     const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({
       imageRef,
-      role: source.referenceRole ?? "generic",
-      roleNeedsConfirmation: source.roleNeedsConfirmation,
       sourceNodeId: source.nodeId,
     }))).map((reference, order) => ({ ...reference, order }));
     if (inputReferences.length !== inputImages.length) {
@@ -399,7 +361,7 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
   };
   switch (data.kind) {
     case "image-input":
-      return { imageUrl: data.imageUrl, imageRole: data.imageRole };
+      return { imageUrl: data.imageUrl };
     case "sketch-to-render":
       return {
         prompt: data.prompt, aspectRatio: data.aspectRatio, batchSize: data.batchSize,

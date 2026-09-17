@@ -16,7 +16,6 @@ import {
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
 import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import type { ReferenceRole } from "../../../src/types/workflow";
 import {
   completeEvaluationCaseEvidence,
   failEvaluationCaseEvidence,
@@ -178,10 +177,8 @@ export async function processNextGenerationJob(
           const admission = evaluateClaimedJobPromptAdmission(
             job,
             runtimeUserReferences.map((reference) => ({
-              // TODO(R-02/R-03): 移除角色后删除此守卫
-              role: reference.role as ReferenceRole,
               order: reference.order,
-              roleNeedsConfirmation: reference.roleNeedsConfirmation,
+              ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
             })),
           );
           if (!admission.allowed) {

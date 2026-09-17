@@ -17,7 +17,6 @@ const HARD_BLOCKER_CODES = new Set<EvaluationHardBlockerCode>([
   "contract-mismatch",
   "missing-provider-original",
   "missing-postprocessed-output",
-  "reference-role-bleed",
   "garment-identity-corruption",
   "duplicate-billing",
   "unsafe-output",
@@ -502,7 +501,6 @@ function averageScores(events: readonly EvaluationManualAssessmentReviewEvent[])
   const keys = [
     "garmentMaterialFidelity",
     "instructionFollowing",
-    "referenceRoleFidelity",
     "artifactControl",
     "commercialUsability",
   ] as const;

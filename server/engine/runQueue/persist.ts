@@ -12,7 +12,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { isReferenceRole, NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS } from "../../../src/types/workflow";
 import { isImageModelId } from "../../../src/types/imageModels";
 import { db, query, queryOne, transaction } from "../../lib/database";
 import {
@@ -319,18 +319,11 @@ export async function inputImagesForStep(
   const runtimeInputs = step.upstream.flatMap((upstream) => {
     const images = outputs.get(upstream.nodeId) ?? upstream.images;
     const providerImages = providerOutputs.get(upstream.nodeId) ?? [];
-    const explicitRole = isReferenceRole(upstream.referenceRole)
-      ? upstream.referenceRole
-      : undefined;
     return images.map((imageRef, index) => ({
       imageRef,
       providerImage: providerImages.length === images.length ? providerImages[index] : undefined,
-      role: explicitRole ?? "generic",
       sourceNodeId: upstream.nodeId,
       order: 0,
-      // A stale false confirmation bit cannot turn a missing/invalid role into
-      // an accepted generic reference. Only an explicit supported role may be confirmed.
-      roleNeedsConfirmation: explicitRole === undefined || upstream.roleNeedsConfirmation !== false,
     }));
   }).map((reference, order) => ({ ...reference, order }));
   const references = runtimeInputs.map(({ providerImage: _providerImage, ...reference }) => reference);

@@ -1,7 +1,5 @@
 import sharp from "sharp";
 import {
-  canonicalReferenceRoleProfile,
-  canonicalReferenceRoleSet,
   GOLDEN_GARMENT_SET_VERSION,
   PROMPT_SCORING_RUBRIC_VERSION,
   promptEvaluationUnitKey,
@@ -16,7 +14,6 @@ import {
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import type {
   EvaluationHardBlocker,
-  EvaluationReferenceRole,
   PostprocessedEvidence,
   PromptEvaluationScores,
   PromptEvaluationUnit,
@@ -33,11 +30,9 @@ import {
 import {
   NODE_SPECS,
   allowedOperationModesForNode,
-  isReferenceRole,
   type ExecutionPlan,
   type ImageGenRequest,
   type NodeExecution,
-  type ReferenceRole,
 } from "../../src/types/workflow";
 import {
   getModelParameterProfile,
@@ -93,15 +88,12 @@ export type EvaluationBillingStatus =
 export type EvaluationImageLayer = "provider-original" | "postprocessed";
 
 export interface EvaluationReferenceEvidenceInput {
-  role: EvaluationReferenceRole;
   order: number;
   assetSha256: string;
   sourceNodeId?: string;
-  roleNeedsConfirmation?: boolean;
 }
 
 export interface EvaluationReferenceEvidence {
-  readonly role: EvaluationReferenceRole;
   readonly order: number;
   readonly assetSha256: string;
   readonly sourceNodeId?: string;
@@ -276,24 +268,6 @@ export interface EvaluationCaseEvidenceRecord {
   readonly evidenceRecordSha256: string;
 }
 
-function canonicalRoleSet(roles: readonly EvaluationReferenceRole[]): EvaluationReferenceRole[] {
-  const order: readonly EvaluationReferenceRole[] = [
-    "identity",
-    "pose_composition",
-    "garment_top",
-    "garment_bottom",
-    "garment_full",
-    "fabric",
-    "accessory",
-    "styling_only",
-    "background",
-    "generic",
-    "mask",
-  ];
-  const found = new Set(roles);
-  return order.filter((role) => found.has(role));
-}
-
 function requireExactProviderStep(plan: ExecutionPlan, step: NodeExecution): NodeExecution {
   const providerSteps = plan.steps.filter((candidate) => NODE_SPECS[candidate.kind].providerId);
   if (providerSteps.length !== 1) {
@@ -336,12 +310,9 @@ function evaluationReferenceInputs(request: ImageGenRequest, step: NodeExecution
       }
     }
     return {
-      // TODO(R-02/R-03): 移除角色后删除此守卫
-      role: reference.role as ReferenceRole,
       order: reference.order,
       assetSha256: actualSha256,
       ...(reference.sourceNodeId === undefined ? {} : { sourceNodeId: reference.sourceNodeId }),
-      roleNeedsConfirmation: reference.roleNeedsConfirmation,
     };
   });
   if (request.operationMode === "mask-edit") {
@@ -349,7 +320,6 @@ function evaluationReferenceInputs(request: ImageGenRequest, step: NodeExecution
       throw new Error("mask-edit evaluation request must carry the exact Provider mask bytes");
     }
     evidence.push({
-      role: "mask",
       order: evidence.length,
       assetSha256: sha256(validateImageDataUrl(request.mask).buffer),
       sourceNodeId: `${step.nodeId}:provider-mask`,
@@ -435,11 +405,7 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   const promptReferences = (input.request.references ?? []).filter((reference) => (
     reference.sourceNodeId !== `${step.nodeId}:mask-guide`
   ));
-  // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceImageInput.role 已放宽为可选）
-  const providerPromptReferences: ProviderPromptReference[] = promptReferences.map((reference) => ({
-    role: reference.role,
-    roleNeedsConfirmation: reference.roleNeedsConfirmation,
-  }));
+  const providerPromptReferences: ProviderPromptReference[] = promptReferences.map(() => ({}));
   const expectedResolvedPrompt = renderProviderPrompt({
     nodeKind: step.kind,
     modelId,
@@ -495,16 +461,6 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   }
 
   const references = evaluationReferenceInputs(input.request, step);
-  const actualRoleSet = canonicalReferenceRoleSet(references.map((reference) => reference.role));
-  const actualRoleProfile = canonicalReferenceRoleProfile(references.map((reference) => ({
-    order: reference.order,
-    role: reference.role,
-  })));
-  for (const requiredRole of variant.requiredRoles) {
-    if (!actualRoleSet.includes(requiredRole)) {
-      throw new Error(`actual ImageGenRequest is missing required reference role ${requiredRole}`);
-    }
-  }
   if (variant.nodeKind === "image-input" || variant.nodeKind === "result") {
     throw new Error("evaluation prompt variants must target a Provider-backed node kind");
   }
@@ -516,7 +472,6 @@ export function buildEvaluationCaseSnapshotFromRuntime(
     nodeKind: variant.nodeKind,
     modelId: variant.modelId,
     operationMode: variant.mode,
-    referenceRoleProfile: actualRoleProfile,
     parameterProfileId: profile.profileId,
     parameterProfileVersion: profile.version,
   };
@@ -579,20 +534,12 @@ export function buildEvaluationCaseSnapshotFromRuntime(
 
 function validateReferences(
   references: readonly EvaluationReferenceEvidenceInput[],
-  unit: PromptEvaluationUnit,
 ): readonly EvaluationReferenceEvidence[] {
   if (!Array.isArray(references) || references.length > MAX_EVALUATION_REFERENCES) {
     throw new RangeError(`references must contain at most ${MAX_EVALUATION_REFERENCES} items`);
   }
   const result = references.map((reference, index): EvaluationReferenceEvidence => {
     if (!reference || typeof reference !== "object") throw new TypeError(`references[${index}] is invalid`);
-    const role = reference.role;
-    if (role !== "mask" && !isReferenceRole(role)) {
-      throw new TypeError(`references[${index}].role is invalid`);
-    }
-    if (role !== "mask" && reference.roleNeedsConfirmation !== false) {
-      throw new Error(`references[${index}] role must be explicitly confirmed`);
-    }
     if (!Number.isSafeInteger(reference.order) || reference.order !== index) {
       throw new Error("reference order must be contiguous, zero-based, and match array order");
     }
@@ -604,20 +551,11 @@ function validateReferences(
       assertString(reference.sourceNodeId, `references[${index}].sourceNodeId`, { max: 256 });
     }
     return {
-      role,
       order: reference.order,
       assetSha256: reference.assetSha256,
       ...(reference.sourceNodeId === undefined ? {} : { sourceNodeId: reference.sourceNodeId }),
     };
   });
-  const expectedProfile = canonicalReferenceRoleProfile(unit.referenceRoleProfile);
-  const actualProfile = canonicalReferenceRoleProfile(result.map((reference) => ({
-    order: reference.order,
-    role: reference.role,
-  })));
-  if (stableJson(expectedProfile) !== stableJson(actualProfile)) {
-    throw new Error("unit.referenceRoleProfile does not match the exact ordered reference evidence roles");
-  }
   return result;
 }
 
@@ -679,7 +617,7 @@ export function buildEvaluationCaseSnapshot(
   if (Buffer.byteLength(JSON.stringify(canonicalNative), "utf8") > MAX_NATIVE_PARAMETERS_BYTES) {
     throw new RangeError(`nativeParameters exceeds ${MAX_NATIVE_PARAMETERS_BYTES} bytes`);
   }
-  const references = validateReferences(input.references, input.unit);
+  const references = validateReferences(input.references);
   const unit = cloneCanonical(input.unit);
   const versions = cloneCanonical(input.versions);
   const hashPayload = {
@@ -807,13 +745,12 @@ export function validateManualScores(value: unknown): PromptEvaluationScores {
   const expected = [
     "garmentMaterialFidelity",
     "instructionFollowing",
-    "referenceRoleFidelity",
     "artifactControl",
     "commercialUsability",
   ] as const;
   const keys = Object.keys(value as Record<string, unknown>).sort();
   if (!sameStrings(keys, [...expected].sort())) {
-    throw new TypeError("manual scores must contain exactly the five rubric criteria");
+    throw new TypeError("manual scores must contain exactly the four rubric criteria");
   }
   const scores = Object.fromEntries(expected.map((criterion) => [
     criterion,

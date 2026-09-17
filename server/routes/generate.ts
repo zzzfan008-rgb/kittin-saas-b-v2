@@ -13,7 +13,6 @@ import {
   type ImageGenRequest,
   type NodeKind,
   type ReferenceImageSource,
-  type ReferenceRole,
 } from "../../src/types/workflow";
 import { postProcessGeneratedOutputImages } from "../engine/runner";
 import { EXACT_ASPECT_DIMENSIONS } from "../lib/imagePostProcessing";
@@ -310,27 +309,16 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   };
   const admissionReferences: PromptRunReferenceSnapshot[] = structuredReferences.length > 0
     ? structuredReferences.map((reference) => ({
-      // TODO(R-02/R-03): 移除角色后删除此守卫
-      role: reference.role as ReferenceRole,
       order: reference.order,
       ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-      roleNeedsConfirmation: reference.roleNeedsConfirmation,
     }))
-    : requestReferenceImages.map((_imageRef, order) => ({
-      role: "generic",
-      order,
-      roleNeedsConfirmation: true,
-    }));
+    : requestReferenceImages.map((_imageRef, order) => ({ order }));
   const inputReferences: ReferenceImageSource[] = requestReferenceImages.map((imageRef, order) => ({
     imageRef,
-    role: structuredReferences[order]?.role ?? "generic" as const,
     order,
     ...(structuredReferences[order]?.sourceNodeId
       ? { sourceNodeId: structuredReferences[order].sourceNodeId }
       : {}),
-    // This canonical plan is reachable only after admission validates the raw
-    // submitted order/role state below. Legacy-only inputs remain pending.
-    roleNeedsConfirmation: structuredReferences[order]?.roleNeedsConfirmation ?? true,
   }));
   // Preserve the exact request order for failure evidence. Auxiliary inputs
   // append one-by-one so their indexes stay unambiguous even if node policies

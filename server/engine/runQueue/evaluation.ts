@@ -6,7 +6,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { isReferenceRole, NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS } from "../../../src/types/workflow";
 import type { EvaluationRunPolicy } from "../../lib/evaluationRunPolicy";
 import {
   consumeEvaluationRunAuthorization,
@@ -85,15 +85,13 @@ export function assertEvaluationRuntimeReferenceBinding(
       inputImages: runtimeUserReferences.map((reference) => reference.dataUrl),
       inputReferences: runtimeUserReferences.map((reference) => ({
         imageRef: reference.dataUrl,
-        role: reference.role,
         order: reference.order,
         ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-        roleNeedsConfirmation: reference.roleNeedsConfirmation,
       })),
     };
     const runtimeTarget = evaluationAuthorizationTargetFromPlan({ steps: [runtimeStep] });
     if (runtimeTarget.evaluationUnitKey !== staticTarget.evaluationUnitKey) {
-      throw new Error("本次运行时用户参考角色顺序或数量已偏离已消费的 exact-unit 授权");
+      throw new Error("本次运行时用户参考图顺序或数量已偏离已消费的 exact-unit 授权");
     }
   } catch (error) {
     throw new PromptAdmissionBlockedBeforeProviderCall(

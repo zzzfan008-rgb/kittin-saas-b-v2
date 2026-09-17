@@ -19,7 +19,6 @@ import { detectImageMime, MAX_IMAGE_BYTES, validateImageDataUrl } from "../lib/i
 import { withImageProcessingSlot } from "../lib/imageProcessingLimit";
 import {
   referenceDataUrls,
-  referenceInputIssues,
   referenceInputsError,
 } from "../../src/lib/referenceInputs";
 import {
@@ -56,16 +55,6 @@ function referenceData(req: ImageGenRequest, modelId: ImageModelId): string[] {
   const structuredError = referenceInputsError(req);
   if (structuredError) {
     throw new ProviderError(`参考图契约无效：${structuredError}`, 400, modelId, "invalid_request");
-  }
-  const unresolvedRoleIssue = referenceInputIssues(req.references)
-    .find((issue) => issue.code === "reference-role-unconfirmed");
-  if (unresolvedRoleIssue) {
-    throw new ProviderError(
-      `参考图角色未确认：${unresolvedRoleIssue.reason}`,
-      400,
-      modelId,
-      "invalid_request",
-    );
   }
   const refs = referenceDataUrls(req);
   const max = modelMaxReferenceImages(modelId);

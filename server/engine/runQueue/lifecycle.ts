@@ -10,7 +10,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { isReferenceRole, NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS } from "../../../src/types/workflow";
 import { transaction } from "../../lib/database";
 import {
   deleteStoredImage,
@@ -164,11 +164,9 @@ export async function completeJobSuccess(
     throw new Error("Provider step completion requires one captured original per business output");
   }
   const referenceEvidence = (result.references ?? []).map((reference: ReferenceImageInput) => ({
-    role: reference.role,
     order: reference.order,
     assetSha256: reference.assetSha256,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-    roleNeedsConfirmation: reference.roleNeedsConfirmation !== false,
   }));
   const evaluationPolicy = persistedEvaluationPolicy(job);
   await transaction(async (client) => {

@@ -92,7 +92,7 @@ export interface StepResult {
   images: string[];
   /** 业务补边/缩放/WebP 转换前的 Provider 原图。 */
   providerImages?: string[];
-  /** 实际发给 Provider 的角色化参考图证据。 */
+  /** 实际发给 Provider 的参考图证据。 */
   references?: ReferenceImageInput[];
   model?: string;
   prompts?: string[];
@@ -144,9 +144,7 @@ function fallbackReferenceSources(step: NodeExecution, inputImages: string[]): R
   }
   return inputImages.map((imageRef, order) => ({
     imageRef,
-    role: "generic",
     order,
-    roleNeedsConfirmation: true,
   }));
 }
 
@@ -207,11 +205,9 @@ export async function resolveReferenceInputs(
     if (!dataUrl) throw new Error(`referenceSources[${source.order}] did not resolve to an image`);
     return {
       dataUrl,
-      role: source.role,
       order: source.order,
       assetSha256: assetSha256(dataUrl),
       ...(source.sourceNodeId ? { sourceNodeId: source.sourceNodeId } : {}),
-      roleNeedsConfirmation: source.roleNeedsConfirmation !== false,
     };
   });
 }
@@ -289,18 +285,12 @@ export async function executeStep(
       const referenceSources = step.kind === "fabric-recolor" && fabricImageUrl
         ? [...inputReferenceSources, {
           imageRef: fabricImageUrl,
-          role: "fabric" as const,
           order: inputReferenceSources.length,
           sourceNodeId: step.nodeId,
-          roleNeedsConfirmation: false,
         }]
         : inputReferenceSources;
       const references = await resolveReferenceInputs(referenceSources);
-      // TODO(R-02/R-03): 移除角色后删除此守卫（ReferenceImageInput.role 已放宽为可选，Provider 边界仍要求 role 字段存在）
-      const promptReferences: ProviderPromptReference[] = references.map((reference) => ({
-        role: reference.role,
-        roleNeedsConfirmation: reference.roleNeedsConfirmation,
-      }));
+      const promptReferences: ProviderPromptReference[] = references.map(() => ({}));
       const referenceImages = references.map((reference) => reference.dataUrl);
       const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
       const maxUserReferences = step.kind === "mask-redraw"
@@ -444,11 +434,9 @@ export async function executeStep(
             ...references.slice(1),
             {
               dataUrl: preparedMask.guide,
-              role: "generic" as const,
               order: references.length,
               assetSha256: assetSha256(preparedMask.guide),
               sourceNodeId: `${step.nodeId}:mask-guide`,
-              roleNeedsConfirmation: false,
             },
           ]
         : references;

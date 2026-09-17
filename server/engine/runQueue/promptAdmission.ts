@@ -7,7 +7,6 @@ import type {
   NodeExecution,
   ReferenceImageInput,
   ReferenceImageSource,
-  ReferenceRole,
 } from "../../../src/types/workflow";
 import { NODE_SPECS } from "../../../src/types/workflow";
 import { validateImageDataUrl } from "../../lib/imageValidation";
@@ -68,10 +67,7 @@ export function evaluateClaimedJobPromptAdmission(
     };
   }
   const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
-    // TODO(R-02/R-03): 移除角色后删除此守卫
-    role: reference.role as ReferenceRole,
     order: reference.order,
-    roleNeedsConfirmation: reference.roleNeedsConfirmation,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
   }));
   return evaluatePromptRunAdmission(
@@ -139,19 +135,15 @@ export function runtimeUserReferenceInputs(
       reference.sourceNodeId === maskGuideSourceNodeId ? [index] : []
     ));
     const guideIndex = guideIndexes[0];
-    const guide = guideIndex === undefined ? undefined : references[guideIndex];
     if (
       guideIndexes.length !== 1
       || guideIndex !== references.length - 1
-      || guide?.role !== "generic"
-      || guide?.roleNeedsConfirmation !== false
     ) {
       throw new PromptAdmissionBlockedBeforeProviderCall(
-        "蒙版 Provider 请求必须且只能在用户参考图之后附加一张已确认的系统引导图。",
+        "蒙版 Provider 请求必须且只能在用户参考图之后附加一张系统引导图。",
       );
     }
-    // promptRunReferenceRoleProfile owns the synthetic generic-guide + mask
-    // suffix. Removing the runtime guide here prevents double-counting it.
+    // 移除系统引导图，避免在 admission 快照中重复计数。
     userReferences = references.slice(0, -1);
   } else if (references.some((reference) => reference.sourceNodeId === maskGuideSourceNodeId)) {
     throw new PromptAdmissionBlockedBeforeProviderCall(
@@ -161,10 +153,8 @@ export function runtimeUserReferenceInputs(
 
   return userReferences.map((reference) => ({
     dataUrl: reference.dataUrl,
-    role: reference.role,
     order: reference.order,
     assetSha256: reference.assetSha256,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-    roleNeedsConfirmation: reference.roleNeedsConfirmation,
   }));
 }

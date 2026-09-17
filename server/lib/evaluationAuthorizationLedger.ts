@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { isImageModelId, type ImageModelId } from "../../src/types/imageModels";
-import { promptRunReferenceRoleProfile } from "../../src/lib/promptRunAdmission";
-import { NODE_SPECS, type ExecutionPlan, type NodeExecution, type ReferenceRole } from "../../src/types/workflow";
+import { NODE_SPECS, type ExecutionPlan, type NodeExecution } from "../../src/types/workflow";
 import type { AuthUser } from "./auth";
 import {
   EVALUATION_AUTHORIZATION_ID_PATTERN,
@@ -132,23 +131,12 @@ export function evaluationAuthorizationTargetFromPlan(plan: ExecutionPlan): Eval
   if (!isImageModelId(modelId) || typeof promptVariantId !== "string" || !promptVariantId.trim()) {
     throw new EvaluationRunPolicyError("真实评估计划缺少明确的模型或提示词变体绑定", 400);
   }
-  const referenceRoleProfile = promptRunReferenceRoleProfile({
-    nodeKind: step.kind,
-    operationMode: step.params.operationMode,
-    references: (step.inputReferences ?? []).map((reference) => ({
-      order: reference.order,
-      // TODO(R-02/R-03): 移除角色后删除此守卫
-      role: reference.role as ReferenceRole,
-      roleNeedsConfirmation: reference.roleNeedsConfirmation,
-    })),
-  });
   const unitEnvelope = {
     nodeKind: step.kind,
     modelId,
     promptVariantId,
     promptFamilyId: step.params.promptFamilyId,
     operationMode: step.params.operationMode,
-    referenceRoleProfile,
     parameterProfileId: step.params.parameterProfileId,
     contractHash: step.params.contractHash,
     evaluationVersion: step.params.evaluationVersion,

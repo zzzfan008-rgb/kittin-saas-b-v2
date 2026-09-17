@@ -452,7 +452,6 @@ function verifyReceiptChain(
         contract.artifactSha256 !== receipt.contractCheckSha256
         || contract.variantId !== receipt.variantId
         || contract.codeSha !== receipt.codeSha
-        || !canonicalEqual(contract.referenceRoleProfile, receipt.unit.referenceRoleProfile)
       ) {
         throw new Error("contract-stage receipt differs from its contract-check artifact");
       }
@@ -469,7 +468,6 @@ function expectedRuntimeRelease(artifact: EvaluationPromotionArtifact): Record<s
   const expected: Record<string, unknown> = {
     schemaVersion: 1,
     variantId: artifact.variantId,
-    referenceRoleProfile: artifact.unit.referenceRoleProfile,
     supportStatus: artifact.supportStatus,
     evaluationStage: artifact.evaluationStage,
     evaluationVersion: variant.evaluationVersion,

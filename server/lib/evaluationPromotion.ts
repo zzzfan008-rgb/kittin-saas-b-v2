@@ -4,7 +4,6 @@ import {
   PROMPT_EVALUATION_STAGE_ORDER,
   PROMPT_EVALUATION_THRESHOLDS,
   PROMPT_SCORING_RUBRIC_VERSION,
-  canonicalReferenceRoleProfile,
   evaluatePromptEvaluationGate,
   promptEvaluationUnitKey,
   scorePromptEvaluation,
@@ -31,7 +30,6 @@ import { getImageModelContract, IMAGE_MODEL_IDS } from "../../src/types/imageMod
 import { getModelParameterProfile } from "../../src/types/modelParameterProfiles";
 import type {
   EvaluationHardBlocker,
-  EvaluationReferenceRoleProfileEntry,
   PromptEvaluationAttempt,
   PromptEvaluationGateResult,
   PromptEvaluationScores,
@@ -105,7 +103,6 @@ export interface EvaluationContractCheckArtifact {
   schemaVersion: 1;
   artifactType: "prompt-evaluation-contract-check";
   variantId: string;
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[];
   codeSha: string;
   commands: readonly { file: string; stdoutSha256: string }[];
   knowledgeBase: {
@@ -245,7 +242,7 @@ function assertStringArray(value: unknown, field: string, sha256 = false): reado
 
 const UNIT_FIELDS = [
   "taskFamilyId", "promptVariantId", "presetId", "presetVersion", "nodeKind",
-  "modelId", "operationMode", "referenceRoleProfile", "parameterProfileId",
+  "modelId", "operationMode", "parameterProfileId",
   "parameterProfileVersion",
 ] as const;
 const VERSION_FIELDS = [
@@ -255,7 +252,7 @@ const VERSION_FIELDS = [
   "scoringRubricVersion",
 ] as const;
 const SCORE_FIELDS = [
-  "garmentMaterialFidelity", "instructionFollowing", "referenceRoleFidelity",
+  "garmentMaterialFidelity", "instructionFollowing",
   "artifactControl", "commercialUsability",
 ] as const;
 
@@ -263,10 +260,7 @@ function validatePersistedUnit(value: unknown, field: string): PromptEvaluationU
   const unit = record(value, field);
   assertExactFields(unit, UNIT_FIELDS, field);
   const variantId = requiredString(unit.promptVariantId, `${field}.promptVariantId`);
-  const profile = canonicalReferenceRoleProfile(
-    unit.referenceRoleProfile as readonly EvaluationReferenceRoleProfileEntry[],
-  );
-  const current = currentEvaluationPromotionTarget(variantId, profile).unit;
+  const current = currentEvaluationPromotionTarget(variantId).unit;
   if (!exactJson(unit, current)) throw new Error(`${field} differs from the current exact evaluation unit`);
   return unit as unknown as PromptEvaluationUnit;
 }
@@ -279,10 +273,7 @@ function validatePersistedVersions(
   const versions = record(value, field);
   assertExactFields(versions, VERSION_FIELDS, field);
   for (const name of VERSION_FIELDS) requiredString(versions[name], `${field}.${name}`);
-  const expected = currentEvaluationPromotionTarget(
-    unit.promptVariantId,
-    unit.referenceRoleProfile,
-  ).versions;
+  const expected = currentEvaluationPromotionTarget(unit.promptVariantId).versions;
   if (!exactJson(versions, expected)) throw new Error(`${field} differs from the current exact version vector`);
   return versions as unknown as PromptEvaluationVersionVector;
 }
@@ -569,7 +560,6 @@ export function assertEvaluationGateSnapshot(
 
 export function currentEvaluationPromotionTarget(
   variantId: string,
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[],
 ): { unit: PromptEvaluationUnit; versions: PromptEvaluationVersionVector } {
   const variant = getGarmentPromptVariantById(variantId);
   if (!variant) throw new Error(`prompt variant ${variantId} is not in the reviewed catalog`);
@@ -586,7 +576,6 @@ export function currentEvaluationPromotionTarget(
     nodeKind: variant.nodeKind,
     modelId: variant.modelId,
     operationMode: variant.mode,
-    referenceRoleProfile: canonicalReferenceRoleProfile(referenceRoleProfile),
     parameterProfileId: profile.profileId,
     parameterProfileVersion: profile.version,
   };
@@ -613,7 +602,7 @@ export function validateEvaluationContractCheckArtifact(
 ): EvaluationContractCheckArtifact {
   const artifact = record(value, "contract check artifact");
   assertExactFields(artifact, [
-    "schemaVersion", "artifactType", "variantId", "referenceRoleProfile", "codeSha",
+    "schemaVersion", "artifactType", "variantId", "codeSha",
     "commands", "knowledgeBase", "gatewayModelCatalog", "approvedBy", "auditReason",
     "createdAt", "artifactSha256",
   ], "contract check artifact");
@@ -621,10 +610,7 @@ export function validateEvaluationContractCheckArtifact(
     throw new Error("contract check artifact schema is invalid");
   }
   const variantId = requiredString(artifact.variantId, "contract check artifact.variantId");
-  const referenceRoleProfile = canonicalReferenceRoleProfile(
-    artifact.referenceRoleProfile as readonly EvaluationReferenceRoleProfileEntry[],
-  );
-  currentEvaluationPromotionTarget(variantId, referenceRoleProfile);
+  currentEvaluationPromotionTarget(variantId);
   assertCodeSha(artifact.codeSha, "contract check artifact.codeSha");
   if (!Array.isArray(artifact.commands)
     || artifact.commands.length !== EVALUATION_CONTRACT_CHECK_COMMANDS.length) {
@@ -710,7 +696,6 @@ function averageScores(
   const keys = [
     "garmentMaterialFidelity",
     "instructionFollowing",
-    "referenceRoleFidelity",
     "artifactControl",
     "commercialUsability",
   ] as const;
@@ -1065,7 +1050,6 @@ function assertPreviousReceipts(
 
 export function evaluateEvidenceBundlesForStage(input: {
   variantId: string;
-  referenceRoleProfile: readonly EvaluationReferenceRoleProfileEntry[];
   stage: PromptEvaluationStage;
   bundles: readonly EvaluationCaseEvidenceBundle[];
   previousReceipts?: readonly EvaluationGateReceipt[];
@@ -1075,7 +1059,7 @@ export function evaluateEvidenceBundlesForStage(input: {
   if (!CODE_SHA_PATTERN.test(input.codeSha)) {
     throw new Error("promotion codeSha must be exactly 40 or 64 lowercase hexadecimal characters");
   }
-  const { unit, versions } = currentEvaluationPromotionTarget(input.variantId, input.referenceRoleProfile);
+  const { unit, versions } = currentEvaluationPromotionTarget(input.variantId);
   const passedStages = assertPreviousReceipts(
     input.stage,
     input.previousReceipts ?? [],
@@ -1404,7 +1388,6 @@ export function createEvaluationPromotionArtifact(input: {
   const supportStatus = supportForStage(gateReceipt.stage);
   const releaseVector = promptEvaluationReleaseVector(
     variant,
-    input.reEvaluated.unit.referenceRoleProfile,
     gateReceipt.codeSha,
   );
   const base: Omit<EvaluationPromotionArtifact, "artifactSha256"> = {
@@ -1438,7 +1421,6 @@ export function createEvaluationPromotionArtifact(input: {
   if (!profile) throw new Error("promotion parameter profile is no longer available");
   const release = createPromptEvaluationReleaseSnapshot(
     variant,
-    input.reEvaluated.unit.referenceRoleProfile,
     supportStatus,
     `promotions/${artifact.artifactSha256}.json`,
     {
@@ -1518,7 +1500,6 @@ export function parseEvaluationPromotionArtifactStructure(value: unknown): Evalu
   if (!variant) throw new Error("promotion artifact variant is not in the current catalog");
   if (artifact.releaseVector !== promptEvaluationReleaseVector(
     variant,
-    unit.referenceRoleProfile,
     artifact.codeSha,
   )) {
     throw new Error("promotion artifact release vector differs from the current reviewed content");
