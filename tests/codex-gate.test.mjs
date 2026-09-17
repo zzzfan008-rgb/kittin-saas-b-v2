@@ -584,6 +584,46 @@ for (const [label, graph, expected] of [
   assert.match(result.stderr, /选定的 Git 差异为空/);
 }
 
+{
+  // --commit 精确范围：只评审所选提交本身（base=HEAD^，head=所选提交），而不是 base..HEAD
+  // 的多提交区间。此处用两个连续提交验证：--commit HEAD 只能纳入第二个提交改动的文件。
+  const f = fixture();
+  writeFileSync(join(f.root, "first.txt"), "first commit\n");
+  git(f.root, "add", "first.txt");
+  git(f.root, "commit", "-qm", "first candidate");
+  writeFileSync(join(f.root, "second.txt"), "second commit\n");
+  git(f.root, "add", "second.txt");
+  git(f.root, "commit", "-qm", "second candidate");
+  const head = git(f.root, "rev-parse", "HEAD");
+  const scopeCopy = tempCopy("commit-scope");
+  f.env.GATE_SCOPE_COPY = scopeCopy;
+  const result = runGate(f, "--commit", head, "--review-only");
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const scope = JSON.parse(readFileSync(scopeCopy, "utf8"));
+  assert.equal(scope.selection.headSha, head, "--commit 必须把所选提交作为精确 head");
+  assert.equal(scope.selection.baseSha, `${head}^`, "--commit 必须把所选提交的父提交作为精确 base");
+  assert.deepEqual(
+    scope.included.map((file) => file.path),
+    ["second.txt"],
+    "--commit 精确范围只包含所选提交改动的文件，不得把父提交的改动一并纳入",
+  );
+}
+
+{
+  // --commit 精确范围必须绑定当前 HEAD：选择非 HEAD 的提交必须 fail-closed。
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "first candidate\n");
+  git(f.root, "add", "tracked.txt");
+  git(f.root, "commit", "-qm", "first candidate");
+  const first = git(f.root, "rev-parse", "HEAD");
+  writeFileSync(join(f.root, "tracked.txt"), "second candidate\n");
+  git(f.root, "add", "tracked.txt");
+  git(f.root, "commit", "-qm", "second candidate");
+  const result = runGate(f, "--commit", first, "--review-only");
+  assert.notEqual(result.status, 0, "--commit 选择非当前 HEAD 的提交必须失败");
+  assert.match(result.stderr, /--commit 必须等于当前 HEAD/);
+}
+
 // ---------------------------------------------------------------- 评审段（Hermes 子进程）
 
 {
