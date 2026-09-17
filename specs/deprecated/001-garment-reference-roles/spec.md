@@ -1,3 +1,5 @@
+Status: Deprecated by docs/design/2026-09-17-remove-reference-roles/plan.md
+
 # Feature Specification: 服装多参考图角色确认与提示词约束
 
 **Current Git Checkout**: `codex/p0-provider-download-and-p2-presets`
