@@ -78,7 +78,7 @@ for (const relativePath of [
 ]) {
   const source = fs.readFileSync(path.resolve(testRoot, relativePath), "utf-8");
   assert.match(source, /templateProductPolicy/);
-  assert.match(source, /unsupported/);
+  assert.match(source, /暂不支持/);
 }
 
 for (const relativePath of [
@@ -98,7 +98,7 @@ for (const relativePath of [
 ]) {
   const source = fs.readFileSync(path.resolve(testRoot, relativePath), "utf-8");
   assert.match(source, /nodeProductPolicy/);
-  assert.match(source, /unsupported/);
+  assert.match(source, /暂不支持/);
 }
 
 console.log("节点首版产品政策测试通过");
