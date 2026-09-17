@@ -1,0 +1,166 @@
+/* ============================================================
+   Garment Canvas · Design Tokens · 2026-09-17
+   机读唯一事实源：所有尺寸/颜色/间距/动效常量只在此出现一次。
+   人读规范见同目录 design.md（引用本文件，不复述数值）。
+   迁移策略：现有 --gc-* 变量名保持不变，值按本文件对齐；
+   新增语义槽位（状态色/CTA/字阶/间距）逐步接入组件。
+   ============================================================ */
+
+:root {
+  /* ---- 0. 字阶（中文可读性底线） ---- */
+  --gc-font-ui: 12px;            /* 常规界面文字下限 */
+  --gc-font-body: 13px;          /* 正文 */
+  --gc-font-label: 11px;         /* 中文最小可用字号（标签/说明） */
+  --gc-font-meta-en: 10px;       /* 仅限纯英文徽章/坐标/时间戳 */
+  --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --gc-leading: 1.5;             /* 中文正文行高 */
+
+  /* ---- 1. 间距（4pt 网格） ---- */
+  --gc-space-1: 4px;
+  --gc-space-2: 8px;
+  --gc-space-3: 12px;
+  --gc-space-4: 16px;
+  --gc-space-5: 20px;
+  --gc-space-6: 24px;
+  --gc-space-8: 32px;
+  --gc-node-pad: 12px;           /* 节点内容区内边距 */
+  --gc-node-gap: 12px;           /* 节点内元素纵向间距 */
+
+  /* ---- 2. 组件几何 ---- */
+  --gc-node-width: 280px;        /* 保持现行宽度 */
+  --gc-radius-node: 12px;
+  --gc-radius-ctl: 8px;          /* 按钮/输入 */
+  --gc-radius-chip: 999px;
+  --gc-border-hairline: 1px;
+  --gc-dot-status: 10px;         /* 状态点直径（原 8px 提级） */
+  --gc-ctl-height-sm: 26px;      /* 节点内控件高度 */
+  --gc-ctl-height-md: 32px;      /* 面板内控件高度 */
+  --gc-focus-ring: 2px;          /* focus-visible 描边 */
+
+  /* ---- 3. 语义状态色（全主题共享，一色一义） ---- */
+  --gc-status-queued: #eab308;   /* 9.18:1 on 暗金 panel */
+  --gc-status-running: #60a5fa;  /* 6.93:1 */
+  --gc-status-retry: #fb923c;    /* 7.78:1 */
+  --gc-status-success: #34d399;  /* 9.16:1 */
+  --gc-status-error: #f87171;    /* 6.37:1 */
+  --gc-status-unknown: #a78bfa;  /* 与 retry 区分：紫 */
+  --gc-status-idle: #8b9198;     /* 5.54:1，中性灰 */
+  --gc-warn-text: #fbbf24;       /* 警示文字专用（不再借用品牌金） */
+
+  /* ---- 4. 动效 ---- */
+  --gc-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --gc-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --gc-dur-fast: 120ms;          /* hover/按压 */
+  --gc-dur-base: 200ms;          /* 面板开合/展开 */
+}
+
+/* ---- 5a. 主题：经典暗金（默认，仅修订值） ---- */
+:root,
+[data-theme="current"] {
+  --gc-shell: #101214;
+  --gc-canvas: #0d0f11;
+  --gc-panel: #17191c;
+  --gc-panel-hover: #222529;
+  --gc-control: #0f1113;
+  --gc-text: #e5e7eb;
+  --gc-text-muted: #8b9198;
+  --gc-border: #2b2e32;
+  --gc-border-strong: #3d4147;   /* 新增：连线/外框提级色 */
+  --gc-accent: #9a7333;          /* 品牌金：仅品牌/主CTA/选中态 */
+  --gc-accent-cta-ink: #0a0a0a;  /* 金底按钮文字（4.60:1） */
+  --gc-accent-deep: #6f521f;     /* 浅色表面上的金文字（6.46:1） */
+  --gc-primary-foreground: #0a0a0a;
+  --gc-node-main: #f1f2f4;
+  --gc-node-header: #ffffff;
+  --gc-node-inner: #f8f9fa;
+  --gc-node-inner-hover: #ffffff;
+  --gc-node-border: #ccd0d5;
+  --gc-node-text: #25282c;
+  --gc-node-muted: #676c73;
+  --gc-node-accent: #9a7333;
+  --gc-edge: #6b7076;            /* 新增：连线色（从边框色解耦提级） */
+  --gc-handle-highlight: #f2ddb2;
+  --gc-handle-mid: #b18745;
+  --gc-handle-dark: #61451f;
+  --gc-handle-ring: rgba(154, 115, 51, 0.75);
+  --gc-handle-glow: rgba(176, 138, 74, 0.78);
+}
+
+/* ---- 5b. 主题：墨白（原「黑白」，accent 粉→墨，全对验证 ≥4.6:1） ---- */
+[data-theme="white"] {
+  --gc-shell: #f6f5f2;
+  --gc-canvas: #eceae6;
+  --gc-panel: #fffefb;
+  --gc-panel-hover: #eceae6;
+  --gc-control: #f2f0ec;
+  --gc-text: #26282c;
+  --gc-text-muted: #696d73;
+  --gc-border: #d5d2cc;
+  --gc-border-strong: #b8b4ac;
+  --gc-accent: #1d1d1f;          /* 墨色 accent：16.69:1 on panel */
+  --gc-accent-cta-ink: #ffffff;  /* 墨底白字 16.83:1 */
+  --gc-accent-deep: #1d1d1f;
+  --gc-primary-foreground: #ffffff;
+  --gc-node-main: #2e3136;       /* 深节点（保留反转方向，压深一档） */
+  --gc-node-header: #383c42;
+  --gc-node-inner: #3a3e44;
+  --gc-node-inner-hover: #474c53;
+  --gc-node-border: #565b63;
+  --gc-node-text: #f5f6f7;       /* 12.06:1 on node-main */
+  --gc-node-muted: #c3c7cc;      /* 7.68:1 on node-main */
+  --gc-node-accent: #d9a441;     /* 深节点上的金：呼应品牌 */
+  --gc-edge: #8a8e95;
+  --gc-handle-highlight: #ffe9b8;
+  --gc-handle-mid: #c89a4b;
+  --gc-handle-dark: #7a5a1e;
+  --gc-handle-ring: rgba(217, 164, 65, 0.78);
+  --gc-handle-glow: rgba(217, 164, 65, 0.8);
+}
+
+/* ---- 5c. 主题：护眼绿 v2（节点族改绿灰同族，accent 改深绿） ---- */
+[data-theme="eye"] {
+  --gc-shell: #d9e4d2;
+  --gc-canvas: #c8d8c0;
+  --gc-panel: #e5eedf;
+  --gc-panel-hover: #d1e0ca;
+  --gc-control: #edf3e9;
+  --gc-text: #1e301c;
+  --gc-text-muted: #4c6347;
+  --gc-border: #a9bfa2;
+  --gc-border-strong: #7e9a76;
+  --gc-accent: #2c5a31;          /* 深绿 accent（替换藏蓝） */
+  --gc-accent-cta-ink: #f8fafc;
+  --gc-accent-deep: #234827;
+  --gc-primary-foreground: #f8fafc;
+  --gc-node-main: #dce8d2;       /* 绿灰同族（替换蓝灰） */
+  --gc-node-header: #d3e2c7;
+  --gc-node-inner: #e6f0dd;
+  --gc-node-inner-hover: #eef5e7;
+  --gc-node-border: #9db88e;
+  --gc-node-text: #1e301c;       /* 11.05:1 on node-main */
+  --gc-node-muted: #4c6347;      /* 5.19:1（原 3.43:1 已修复） */
+  --gc-node-accent: #2e5d33;     /* 6.05:1 */
+  --gc-edge: #6d8566;
+  --gc-handle-highlight: #cfe3c2;
+  --gc-handle-mid: #3f7a46;
+  --gc-handle-dark: #1c3d20;
+  --gc-handle-ring: rgba(46, 93, 51, 0.78);
+  --gc-handle-glow: rgba(58, 108, 64, 0.75);
+}
+
+/* ---- 6. 全局 reduced-motion 兜底（覆盖 keyframes 与 Tailwind 动画） ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- 7. 焦点可见性 ---- */
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: var(--gc-focus-ring) solid var(--gc-accent);
+  outline-offset: 2px;
+}

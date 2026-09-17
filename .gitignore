@@ -3,6 +3,7 @@ node_modules
 
 # Local agent worktrees
 .claude/worktrees/
+.worktrees/
 
 # Build and release outputs
 /dist/
