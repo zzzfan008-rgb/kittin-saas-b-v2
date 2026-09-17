@@ -53,7 +53,6 @@ try {
   });
   const release = createPromptEvaluationReleaseSnapshot(
     variant,
-    [],
     "verified",
     "evaluation-artifact:external-build-test",
     {
@@ -74,7 +73,6 @@ try {
 
   const detachedRecommendation = createPromptEvaluationReleaseSnapshot(
     variant,
-    [],
     "recommended",
     "evaluation-artifact:detached-recommendation-build-test",
     {

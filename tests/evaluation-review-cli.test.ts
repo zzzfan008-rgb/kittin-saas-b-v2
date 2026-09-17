@@ -83,7 +83,6 @@ try {
     "--admin-id", "admin-test",
     "--audit-reason", "offline contract review",
     "--variant-id", "variant-test",
-    "--reference-profile-file", path.join(tempRoot, "profile.json"),
     "--code-sha", CODE_SHA,
   ]);
   assert.equal(parsed.flags.get("release-root")?.[0], explicit);
@@ -231,8 +230,14 @@ try {
       codeSha: CODE_SHA,
     },
   );
+  const secondVariant = requireGarmentPromptVariant({
+    familyId: "mask-local-edit",
+    modelId: "gpt-image-2",
+    nodeKind: "mask-redraw",
+    mode: "mask-edit",
+  });
   const secondRelease = createPromptEvaluationReleaseSnapshot(
-    variant,
+    secondVariant,
     "experimental",
     `promotions/${"b".repeat(64)}.json`,
     {
@@ -427,8 +432,6 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
   );
   console.log("  ✓ registry artifact ID 的 path escape 与目录 symlink 均 fail-closed");
 
-  const profilePath = path.join(tempRoot, "profile.json");
-  fs.writeFileSync(profilePath, "[]\n");
   const approvedSyntheticCatalog = Buffer.from('{"data":[{"id":"alpha"},{"id":"beta"}]}\n', "utf8");
   const equivalentSyntheticCatalog = Buffer.from('{\n  "data": [{"id":"beta"}, {"id":"alpha"}, {"id":"alpha"}]\n}\n', "utf8");
   const syntheticCanonicalSha256 = createHash("sha256")
@@ -560,7 +563,6 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
     "--admin-id", "admin-does-not-exist",
     "--audit-reason", "prove catalog evidence gates fail before database access",
     "--variant-id", variant.variantId,
-    "--reference-profile-file", profilePath,
     "--code-sha", CODE_SHA,
   ], {
     cwd: PROJECT_ROOT,
@@ -600,7 +602,6 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
         "--admin-id", "admin-does-not-exist",
         "--audit-reason", "prove checked model-list paths cannot be replaced before open",
         "--variant-id", variant.variantId,
-        "--reference-profile-file", profilePath,
         "--code-sha", CODE_SHA,
       ]),
       {

@@ -44,7 +44,6 @@ import {
   type PromptEvaluationReleaseRegistry,
 } from "../src/lib/promptEvaluationReleaseRegistry";
 import {
-  canonicalReferenceRoleProfile,
   PROMPT_EVALUATION_STAGE_ORDER,
 } from "../src/lib/promptEvaluation";
 import { getGarmentPromptVariantById } from "../src/lib/garmentPromptPresets";
@@ -54,7 +53,6 @@ import {
 } from "../src/types/imageModels";
 import type {
   EvaluationHardBlocker,
-  EvaluationReferenceRoleProfileEntry,
   PromptEvaluationScores,
   PromptEvaluationStage,
 } from "../src/types/promptEvaluation";
@@ -109,11 +107,11 @@ function allowedFlags(command: CommandName): ReadonlySet<string> {
       "hard-blockers-file", "task-passed", "review-note",
     ],
     "contract-check": [
-      ...commonAdmin, ...releaseRoot, "variant-id", "reference-profile-file", "code-sha",
+      ...commonAdmin, ...releaseRoot, "variant-id", "code-sha",
       "model-list",
     ],
     gate: [
-      ...commonAdmin, ...releaseRoot, "stage", "variant-id", "reference-profile-file", "cases-file",
+      ...commonAdmin, ...releaseRoot, "stage", "variant-id", "cases-file",
       "previous-receipt", "code-sha", "contract-check", "campaign-id",
     ],
     promote: [
@@ -624,15 +622,6 @@ function exactCleanCodeIdentity(codeSha: string): void {
     GARMENT_CANVAS_CODE_SHA: codeSha,
   });
   if (identity.dirty) throw new Error("evaluation review artifacts require a clean exact-SHA worktree");
-}
-
-function referenceProfile(command: ParsedEvaluationReviewCommand): readonly EvaluationReferenceRoleProfileEntry[] {
-  const raw = jsonFile<unknown>(required(command, "reference-profile-file"), "reference profile file");
-  if (!Array.isArray(raw)) throw new Error("reference profile file must contain an array");
-  const profile = raw.map((entry, order) => (
-    typeof entry === "string" ? { order, role: entry } : entry
-  )) as EvaluationReferenceRoleProfileEntry[];
-  return canonicalReferenceRoleProfile(profile);
 }
 
 function caseLocators(command: ParsedEvaluationReviewCommand): readonly EvaluationCaseLocator[] {
@@ -1232,7 +1221,6 @@ function verifyGateReceiptChain(
         contract.artifactSha256 !== receipt.contractCheckSha256
         || contract.variantId !== receipt.variantId
         || contract.codeSha !== receipt.codeSha
-        || !canonicalEqual(contract.referenceRoleProfile, receipt.unit.referenceRoleProfile)
       ) {
         throw new Error("contract-stage receipt differs from its contract-check artifact");
       }
@@ -1344,7 +1332,6 @@ async function commandContractCheck(
   const { adminId, auditReason } = requiredAdminAudit(command);
   const codeSha = required(command, "code-sha");
   const variantId = required(command, "variant-id");
-  const roles = referenceProfile(command);
   const modelCatalog = gatewayModelCatalogEvidence(command, testHooks);
   const commands = runOfflineContractChecks();
   const knowledgeBase = knowledgeBaseEvidence();
@@ -1356,7 +1343,6 @@ async function commandContractCheck(
       schemaVersion: 1,
       artifactType: "prompt-evaluation-contract-check",
       variantId,
-      referenceRoleProfile: roles,
       codeSha,
       commands,
       knowledgeBase,
@@ -1404,7 +1390,6 @@ async function commandGate(command: ParsedEvaluationReviewCommand): Promise<Reco
   const root = releaseRoot(command);
   exactCleanCodeIdentity(codeSha);
   const variantId = required(command, "variant-id");
-  const roles = referenceProfile(command);
   const receipts = previousReceipts(command, root);
   const contractFile = optional(command, "contract-check");
   if (evaluatedStage === "contract" && !contractFile) throw new Error("contract stage requires --contract-check");
@@ -1412,8 +1397,8 @@ async function commandGate(command: ParsedEvaluationReviewCommand): Promise<Reco
   let contractCheckSha256: string | null = null;
   if (contractFile) {
     const contract = verifyContractCheckFile(root, contractFile, releaseChainState());
-    if (contract.variantId !== variantId || contract.codeSha !== codeSha || !canonicalEqual(contract.referenceRoleProfile, roles)) {
-      throw new Error("contract check does not match this exact variant/profile/code SHA");
+    if (contract.variantId !== variantId || contract.codeSha !== codeSha) {
+      throw new Error("contract check does not match this exact variant/code SHA");
     }
     contractCheckSha256 = contract.artifactSha256;
   }
@@ -1434,7 +1419,6 @@ async function commandGate(command: ParsedEvaluationReviewCommand): Promise<Reco
     );
     const evaluated = evaluateEvidenceBundlesForStage({
       variantId,
-      referenceRoleProfile: roles,
       stage: evaluatedStage,
       bundles,
       previousReceipts: receipts,
@@ -1827,7 +1811,6 @@ function verifyEvaluationReleaseRegistryArtifactsFromSnapshot(
     if (!variant) throw new Error(`release ${release.variantId} variant is not in the reviewed catalog`);
     const expectedRelease = createPromptEvaluationReleaseSnapshot(
       variant,
-      artifact.unit.referenceRoleProfile,
       artifact.supportStatus,
       `promotions/${artifact.artifactSha256}.json`,
       {
@@ -1897,7 +1880,6 @@ async function commandPromote(command: ParsedEvaluationReviewCommand): Promise<R
     const bundles = await loadBundles(database, actor, gateReceipt.cases);
     const reEvaluated = evaluateEvidenceBundlesForStage({
       variantId: gateReceipt.variantId,
-      referenceRoleProfile: gateReceipt.unit.referenceRoleProfile,
       stage: gateReceipt.stage,
       bundles,
       previousReceipts: receipts,
@@ -1927,11 +1909,8 @@ async function commandPromote(command: ParsedEvaluationReviewCommand): Promise<R
         );
       }
       const releases = [...current.registry.releases];
-      const key = JSON.stringify([release.variantId, release.referenceRoleProfile]);
-      const index = releases.findIndex((candidate) => JSON.stringify([
-        candidate.variantId,
-        candidate.referenceRoleProfile,
-      ]) === key);
+      const key = release.variantId;
+      const index = releases.findIndex((candidate) => candidate.variantId === key);
       const rank = { experimental: 1, verified: 2, recommended: 3 } as const;
       if (index >= 0 && rank[releases[index].supportStatus] > rank[release.supportStatus]) {
         throw new Error("promotion cannot downgrade an existing release");
@@ -1941,10 +1920,7 @@ async function commandPromote(command: ParsedEvaluationReviewCommand): Promise<R
       const nextRegistry: PromptEvaluationReleaseRegistry = {
         schemaVersion: 1,
         generatedAt: artifact.approvedAt,
-        releases: releases.sort((left, right) => (
-          left.variantId.localeCompare(right.variantId)
-          || JSON.stringify(left.referenceRoleProfile).localeCompare(JSON.stringify(right.referenceRoleProfile))
-        )),
+        releases: releases.sort((left, right) => left.variantId.localeCompare(right.variantId)),
       };
       const checked = validatePromptEvaluationReleaseRegistry(nextRegistry);
       if (checked.errors.length) throw new Error(`generated registry is invalid:\n${checked.errors.join("\n")}`);
