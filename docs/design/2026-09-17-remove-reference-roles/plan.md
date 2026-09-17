@@ -4,7 +4,7 @@
 - 作者: architect
 - 需求来源: `docs/requests/2026-09-17-remove-reference-roles.md`
 - 关联特性(将被废止): `specs/001-garment-reference-roles/`
-- 状态: 待用户审阅(D1-D5 已有建议结论,待用户确认后才允许动工)
+- 状态: 已实施（R-01~R-05 全部合入 main；用户裁定见 §10；实施修正见 §11）
 
 ---
 

@@ -97,7 +97,9 @@ instruction, then verify drift-prone repository and release state live.
 - Keep destructive multi-table operations and ownership/reference updates
   transactional. Preserve recovery windows and referenced-asset deletion guards.
 - Never expose AI gateway keys to clients or logs. Retain provider request limits,
-  reference-image ordering, and non-stretching resize semantics. Automated tests
+  ordered reference-image semantics (order only; the reference-image role system was
+  removed by `docs/design/2026-09-17-remove-reference-roles/plan.md`), and
+  non-stretching resize semantics. Automated tests
   must not call paid or real AI providers unless the user explicitly authorizes it.
 - Option A's 25-unit/9-probe manifest is planning evidence only and never
   authorizes a paid call. The immutable Campaign/Slot ledger is implemented:
@@ -113,7 +115,7 @@ instruction, then verify drift-prone repository and release state live.
 ## 5. API易 Local Knowledge Gate
 
 - Before changing API易 providers, model IDs/contracts/parameters, prompt variants,
-  reference-image roles or ordering, image normalization, generation retries/timeouts,
+  reference-image ordering, image normalization, generation retries/timeouts,
   billing/outcome handling, provider-output persistence, or evaluation/admission logic,
   MUST first verify the offline snapshot with `npm run docs:apiyi:kb:check` and
   inspect the relevant pages with `npm run docs:apiyi:search`. After the reviewed
