@@ -6,6 +6,18 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const planSkill = readFileSync(
+  resolve(repoRoot, ".claude/skills/speckit-plan/SKILL.md"),
+  "utf8",
+);
+const implementSkill = readFileSync(
+  resolve(repoRoot, ".claude/skills/speckit-implement/SKILL.md"),
+  "utf8",
+);
+const tasksToIssuesSkill = readFileSync(
+  resolve(repoRoot, ".claude/skills/speckit-taskstoissues/SKILL.md"),
+  "utf8",
+);
 const prerequisiteScript = readFileSync(
   resolve(repoRoot, ".specify/scripts/bash/check-prerequisites.sh"),
   "utf8",
@@ -15,44 +27,33 @@ const bundledWorkflow = readFileSync(
   "utf8",
 );
 
-// Spec Kit 的 Codex 集成已整体移除：Codex 不再参与本项目。以下断言是"移除后不得
-// 悄悄回退"的守卫 —— 若该集成被重新装回，测试会失败，而不是让旧配置静默复活。
-// 被移除的是 Codex 侧的技能副本（`.agents/skills/`）与安装清单；prerequisite 脚本、
-// 捆绑工作流与 speckit 清单哈希仍然受约束，见本文件后半部分。
-assert.equal(
-  existsSync(resolve(repoRoot, ".agents/skills")),
-  false,
-  "Codex 侧的 Spec Kit 技能目录 .agents/skills 不得存在",
-);
-assert.equal(
-  existsSync(resolve(repoRoot, ".specify/integrations/codex.manifest.json")),
-  false,
-  "Codex 集成清单 .specify/integrations/codex.manifest.json 不得存在",
-);
+for (const requiredArtifact of [
+  "IMPL_PLAN",
+  "research.md",
+  "data-model.md",
+  "contracts/",
+  "quickstart.md",
+]) {
+  assert.match(
+    planSkill,
+    new RegExp(`Write the completed[\\s\\S]*${requiredArtifact.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}`),
+    `speckit-plan must require persisting ${requiredArtifact}`,
+  );
+}
 
-const integrationState = JSON.parse(
-  readFileSync(resolve(repoRoot, ".specify/integration.json"), "utf8"),
-);
-assert.deepEqual(
-  integrationState.installed_integrations,
-  [],
-  "Spec Kit 不得声明已安装任何 agent 集成",
-);
-assert.deepEqual(
-  integrationState.integration_settings,
-  {},
-  "Spec Kit 不得保留已移除集成的设置",
-);
-assert.equal(
-  integrationState.integration ?? null,
-  null,
-  "Spec Kit 不得声明当前集成",
-);
-assert.equal(
-  integrationState.default_integration ?? null,
-  null,
-  "Spec Kit 不得声明默认集成",
-);
+assert.match(planSkill, /Re-read each required output after writing it/);
+assert.match(planSkill, /do not report an artifact as generated when it exists only in the conversation/);
+assert.match(implementSkill, /--require-spec --require-tasks/);
+assert.match(implementSkill, /\*\*REQUIRED\*\*: Read spec\.md/);
+assert.match(implementSkill, /Parse every `## Phase` section in file order/);
+assert.match(implementSkill, /including[\s\S]*Convergence phase/);
+assert.match(implementSkill, /do not skip an unrecognized phase name/);
+assert.match(tasksToIssuesSkill, /`search_issues` tool/);
+assert.match(tasksToIssuesSkill, /`repository_full_name`/);
+assert.match(tasksToIssuesSkill, /`topn: 100`/);
+assert.match(tasksToIssuesSkill, /is:issue in:title T001/);
+assert.doesNotMatch(tasksToIssuesSkill, /server's `list_issues` tool/);
+assert.doesNotMatch(tasksToIssuesSkill, /Request `perPage: 100`/);
 
 const currentFeatureDirectory = "specs/002-whole-project-audit";
 const prerequisites = JSON.parse(execFileSync(
@@ -77,6 +78,82 @@ assert.ok(prerequisites.AVAILABLE_DOCS.includes("tasks.md"));
 assert.match(prerequisiteScript, /printf '\{"FEATURE_DIR":"%s","TASKS":"%s","AVAILABLE_DOCS":%s/);
 assert.doesNotMatch(bundledWorkflow, /^  scope:/m);
 assert.doesNotMatch(bundledWorkflow, /backend-only|frontend-only/);
+
+// Codex 侧集成已整体移除：Codex 不再参与本项目，Spec Kit 现指向 Claude Code。
+// 这些守卫同时固定当前集成、并确保 Codex 集成不会悄悄回来。
+assert.equal(
+  existsSync(resolve(repoRoot, ".agents/skills")),
+  false,
+  "Codex 侧的 Spec Kit 技能目录 .agents/skills 不得存在",
+);
+assert.equal(
+  existsSync(resolve(repoRoot, ".specify/integrations/codex.manifest.json")),
+  false,
+  "Codex 集成清单 .specify/integrations/codex.manifest.json 不得存在",
+);
+
+const integrationState = JSON.parse(readFileSync(
+  resolve(repoRoot, ".specify/integration.json"),
+  "utf8",
+));
+assert.deepEqual(
+  integrationState.installed_integrations,
+  ["claude"],
+  "Spec Kit 当前只应安装 Claude Code 集成",
+);
+assert.deepEqual(
+  integrationState.integration_settings,
+  { claude: { script: "sh", invoke_separator: "-" } },
+  "Claude Code 集成设置必须与 spec-kit 的 shell 集成形态一致",
+);
+assert.equal(
+  integrationState.default_integration,
+  "claude",
+  "Spec Kit 默认集成必须是 Claude Code",
+);
+assert.equal(
+  integrationState.integration,
+  "claude",
+  "Spec Kit 当前集成必须是 Claude Code，而不是任何 Codex 集成",
+);
+
+const claudeManifest = JSON.parse(readFileSync(
+  resolve(repoRoot, ".specify/integrations/claude.manifest.json"),
+  "utf8",
+));
+assert.equal(claudeManifest.integration, "claude", "集成清单必须声明 claude");
+
+const claudeSkillNames = [
+  "speckit-analyze",
+  "speckit-checklist",
+  "speckit-clarify",
+  "speckit-constitution",
+  "speckit-converge",
+  "speckit-implement",
+  "speckit-plan",
+  "speckit-specify",
+  "speckit-tasks",
+  "speckit-taskstoissues",
+];
+assert.deepEqual(
+  Object.keys(claudeManifest.files).sort(),
+  claudeSkillNames.map((name) => `.claude/skills/${name}/SKILL.md`).sort(),
+  "集成清单必须恰好列出全部 10 个 Spec Kit 技能",
+);
+
+for (const name of claudeSkillNames) {
+  const relativePath = `.claude/skills/${name}/SKILL.md`;
+  const body = readFileSync(resolve(repoRoot, relativePath), "utf8");
+  assert.equal(
+    claudeManifest.files[relativePath],
+    createHash("sha256").update(body).digest("hex"),
+    `Spec Kit integration manifest must match the persisted ${name} skill bytes`,
+  );
+  assert.ok(
+    body.startsWith(`---\nname: "${name}"\n`),
+    `${name} 必须保留 spec-kit 生成的 name frontmatter`,
+  );
+}
 
 const speckitManifest = JSON.parse(readFileSync(
   resolve(repoRoot, ".specify/integrations/speckit.manifest.json"),
