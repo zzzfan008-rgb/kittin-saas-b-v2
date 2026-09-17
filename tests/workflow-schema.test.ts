@@ -20,7 +20,6 @@ import {
 } from "../server/lib/imageValidation";
 import {
   validateAndMigrateFlow,
-  WorkflowReferenceRoleValidationError,
   WorkflowValidationError,
 } from "../server/lib/workflowSchema";
 import { ensureBuiltinTemplates } from "../server/routes/templates";
@@ -195,6 +194,15 @@ async function main() {
     assert.deepEqual(second, first);
   });
 
+  await test("v6 含旧角色字段（imageRole/边 data.role/roleNeedsConfirmation）读取容忍且不抛错", () => {
+    const legacyRoleFlow = strictReferenceFlow();
+    // 旧角色字段存在即忽略：不报错、不写回。
+    const normalized = validateAndMigrateFlow(legacyRoleFlow);
+    assert.equal(normalized.schemaVersion, 6);
+    assert.equal(normalized.nodes[0].id, "source");
+    assert.equal(normalized.edges[0].id, "source-result");
+  });
+
   await test("v2 显式合法模型与参数不得被默认值替换", () => {
     const flow = { ...legacyAiFlow(), schemaVersion: 2 };
     Object.assign(flow.nodes[0].data, {
@@ -311,85 +319,6 @@ async function main() {
       /flow\.edges\[0\]\.data/,
       "v6 不得把缺失边角色静默当成已确认",
     );
-  });
-
-  await test("v6 参考边仅用专用子类标记角色与确认类型错误", () => {
-    const cases: Array<{
-      mutate: (flow: ReturnType<typeof strictReferenceFlow>) => void;
-      field: "data" | "role" | "roleNeedsConfirmation";
-      issueKind: "missing" | "invalid";
-      message: RegExp;
-    }> = [
-      {
-        mutate: (flow) => { delete flow.edges[0].data.role; },
-        field: "role",
-        issueKind: "missing",
-        message: /flow\.edges\[0\]\.data\.role/,
-      },
-      {
-        mutate: (flow) => { flow.edges[0].data.role = "unsupported-role"; },
-        field: "role",
-        issueKind: "invalid",
-        message: /must be one of/,
-      },
-      {
-        mutate: (flow) => { delete flow.edges[0].data.roleNeedsConfirmation; },
-        field: "roleNeedsConfirmation",
-        issueKind: "missing",
-        message: /flow\.edges\[0\]\.data\.roleNeedsConfirmation/,
-      },
-      {
-        mutate: (flow) => { flow.edges[0].data.roleNeedsConfirmation = "false"; },
-        field: "roleNeedsConfirmation",
-        issueKind: "invalid",
-        message: /must be a boolean/,
-      },
-    ];
-
-    for (const testCase of cases) {
-      const flow = strictReferenceFlow();
-      testCase.mutate(flow);
-      let thrown: unknown;
-      try {
-        validateAndMigrateFlow(flow);
-      } catch (error) {
-        thrown = error;
-      }
-      assert.ok(thrown instanceof WorkflowReferenceRoleValidationError);
-      assert.match(thrown.message, testCase.message);
-      assert.deepEqual({
-        edgeIndex: thrown.edgeIndex,
-        sourceNodeId: thrown.sourceNodeId,
-        targetNodeId: thrown.targetNodeId,
-        field: thrown.field,
-        issueKind: thrown.issueKind,
-      }, {
-        edgeIndex: 0,
-        sourceNodeId: "source",
-        targetNodeId: "result",
-        field: testCase.field,
-        issueKind: testCase.issueKind,
-      });
-    }
-
-    const otherSchemaError = strictReferenceFlow();
-    otherSchemaError.edges[0].id = "invalid edge id";
-    assert.throws(
-      () => validateAndMigrateFlow(otherSchemaError),
-      (error: unknown) => (
-        error instanceof WorkflowValidationError
-        && !(error instanceof WorkflowReferenceRoleValidationError)
-      ),
-    );
-
-    const ignoredOrder = strictReferenceFlow();
-    ignoredOrder.edges[0].data.order = 99;
-    const normalized = validateAndMigrateFlow(ignoredOrder);
-    assert.deepEqual(normalized.edges.map((edge) => edge.id), ["source-result"]);
-    assert.deepEqual(normalized.edges[0].data, {
-      role: "garment_full",
-      roleNeedsConfirmation: false,
-    });
   });
 
   await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {

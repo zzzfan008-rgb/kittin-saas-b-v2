@@ -209,38 +209,6 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("Provider 最终防线拒绝结构化参考图的缺失或 true 角色确认", async () => {
-      let calls = 0;
-      const restoreFetch = installFetchMock(() => {
-        calls += 1;
-        return Response.json(pngPayload(white));
-      });
-      try {
-        for (const pending of [undefined, true] as const) {
-          await assert.rejects(
-            () => apiyiProviders["gpt-image-2-vip"].edit({
-              prompt: "不得发出",
-              operationMode: "edit",
-              references: [{
-                dataUrl: white,
-                role: "garment_full",
-                order: 0,
-                assetSha256: "a".repeat(64),
-                ...(pending === undefined ? {} : { roleNeedsConfirmation: pending }),
-              }],
-              modelOptions: { size: "1280x1280" },
-            }),
-            (error: unknown) => error instanceof ProviderError
-              && error.category === "invalid_request"
-              && /roleNeedsConfirmation is not false/.test(error.message),
-          );
-        }
-        assert.equal(calls, 0, "角色证据未确认时不得接触网络出口");
-      } finally {
-        restoreFetch();
-      }
-    });
-
     await test("gpt-image-2-vip 文生图与多参考图编辑使用文档字段", async () => {
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
