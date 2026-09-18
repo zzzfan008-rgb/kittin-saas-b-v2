@@ -36,11 +36,11 @@ test("login V4 split layout: brand pane + token card at desktop widths", async (
     const card = page.getByTestId("login-card");
     await expect(card).toBeVisible();
 
-    // 品牌区（左侧）在所有验收宽度可见
+    // 品牌区（左侧）在所有验收宽度可见（aria-hidden 子树对 role 查询不可见，用文本+定位器断言）
     const brandPane = page.locator("aside[aria-hidden='true']");
     await expect(brandPane).toBeVisible();
-    await expect(page.getByRole("heading", { name: "让每一张面料，" })).toBeVisible();
-    await expect(page.getByText("无限画布")).toBeVisible();
+    await expect(brandPane.getByText("让每一张面料，")).toBeVisible();
+    await expect(brandPane.getByText("无限画布")).toBeVisible();
 
     const cardBox = await card.boundingBox();
     const brandBox = await brandPane.boundingBox();

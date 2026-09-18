@@ -108,7 +108,7 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
 
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
   await page.getByRole("menuitem", { name: "退出登录" }).click();
-  await expect(page.getByRole("heading", { name: "登录服装设计工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
   await page.getByRole("textbox", { name: "账号" }).fill(accountId);
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
@@ -159,7 +159,7 @@ test("relogin opens the latest saved project instead of bootstrapping a blank pa
   });
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
   await page.getByRole("menuitem", { name: "退出登录" }).click();
-  await expect(page.getByRole("heading", { name: "登录服装设计工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
   await page.getByRole("textbox", { name: "账号" }).fill(accountId);
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
