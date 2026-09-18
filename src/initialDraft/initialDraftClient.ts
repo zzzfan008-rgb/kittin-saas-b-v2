@@ -227,6 +227,23 @@ export async function abandonInitialDraft(input: {
   return { purgeAfter: body.purgeAfter };
 }
 
+/**
+ * 强制清除当前用户的初始草稿（无需 id/revision）。
+ * 用于草稿数据损坏到无法解析时的自救场景。
+ * 若服务端端点尚不存在（404），返回 false，调用方应继续本地清除并提示用户。
+ */
+export async function forceClearInitialDraft(): Promise<boolean> {
+  const response = await fetch("/api/projects/initial-draft/force-clear", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
+  if (response.status === 404) return false;
+  const body = await json(response);
+  if (typeof body.ok !== "boolean") throw new Error("强制清除草稿响应格式无效");
+  return body.ok === true;
+}
+
 export function isServerInitialDraftPristine(draft: ServerInitialDraftSnapshot): boolean {
   if (!/^未修改项目名称\d{8}000000$/.test(draft.name) || draft.flow.edges.length !== 0) return false;
   if (draft.flow.nodes.length !== 1) return false;

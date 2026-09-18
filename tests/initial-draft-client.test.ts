@@ -22,6 +22,7 @@ import {
   copyProjectScopedMasks,
   fetchSavedProject,
   fetchSavedProjects,
+  forceClearInitialDraft,
   isServerInitialDraftPristine,
   parseInitialDraft,
   syncInitialDraft,
@@ -191,6 +192,28 @@ try {
   globalThis.fetch = originalFetch;
 }
 console.log("  ✓ 自动同步携带乐观锁版本");
+
+// 强制清除端点：端点存在时返回 true，不存在（404）时返回 false
+globalThis.fetch = async (input) => {
+  if (String(input) === "/api/projects/initial-draft/force-clear") {
+    return Response.json({ ok: true });
+  }
+  return Response.json({ error: "not found" }, { status: 404 });
+};
+try {
+  const cleared = await forceClearInitialDraft();
+  assert.equal(cleared, true);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+globalThis.fetch = async () => Response.json({ error: "not found" }, { status: 404 });
+try {
+  const cleared = await forceClearInitialDraft();
+  assert.equal(cleared, false);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log("  ✓ 强制清除草稿端点：可用时清除，404 时降级");
 
 const projectFlow = persistedWorkflowForProjectTab(tab({ projectId: "saved-project" }));
 globalThis.fetch = async (input) => {
@@ -459,6 +482,16 @@ assert.match(flowStoreSource, /tab\.draftRevision \?\? ""/);
 assert.match(flowStoreSource, /tab\.draftSyncedRevision \?\? ""/);
 assert.match(flowStoreSource, /tab\.draftCreatedAt \?\? ""/);
 console.log("  ✓ 云端同步元数据变化会触发本机会话分片持久化");
+
+const initialDraftWorkspaceSource = readFileSync(
+  new URL("../src/initialDraft/InitialDraftWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(initialDraftWorkspaceSource, /清除草稿并重新开始/);
+assert.match(initialDraftWorkspaceSource, /clearDraftAndRestart/);
+assert.match(initialDraftWorkspaceSource, /clearProjectTabSessionStorage/);
+assert.match(initialDraftWorkspaceSource, /setClearDraftDialogOpen\(true\)/);
+console.log("  ✓ 错误态阻断页提供清除草稿自救按钮，经 AlertDialog 二次确认后清理本地并重建");
 
 const taskLauncherSource = readFileSync(
   new URL("../src/components/TaskLauncher.tsx", import.meta.url),

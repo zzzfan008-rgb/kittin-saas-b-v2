@@ -9,9 +9,20 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangleIcon, CloudIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { readWorkspaceOwner } from "@/auth/session";
+import { clearProjectTabSessionStorage } from "@/lib/tabSessionStorage";
 import {
   applyServerInitialDraftToTab,
   createFreshLocalTabForInitialDraft,
@@ -33,6 +44,7 @@ import {
   fetchSavedProject,
   fetchSavedProjects,
   fetchInitialDraft,
+  forceClearInitialDraft,
   InitialDraftApiError,
   isServerInitialDraftPristine,
   syncInitialDraft,
@@ -119,10 +131,14 @@ function BlockingScreen({
   state,
   error,
   onRetry,
+  onClearDraft,
+  clearDraftBusy,
 }: {
   state: GateState;
   error: string | null;
   onRetry: () => void;
+  onClearDraft: () => void;
+  clearDraftBusy: boolean;
 }) {
   return (
     <div className="flex h-full min-w-[1024px] items-center justify-center bg-ink px-8 text-neutral-200">
@@ -141,10 +157,24 @@ function BlockingScreen({
             : error ?? "请重试连接；本机草稿仍然保留。"}
         </p>
         {state === "error" && (
-          <Button type="button" className="mt-5" onClick={onRetry}>
-            <RefreshCwIcon aria-hidden="true" className="size-4" />
-            重试恢复
-          </Button>
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <Button type="button" onClick={onRetry}>
+              <RefreshCwIcon aria-hidden="true" className="size-4" />
+              重试恢复
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={clearDraftBusy}
+              onClick={onClearDraft}
+            >
+              {clearDraftBusy && <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />}
+              清除草稿并重新开始
+            </Button>
+            <p className="text-[11px] text-[var(--gc-text-muted)]">
+              清除后不可恢复；系统会创建一份全新的空白草稿。
+            </p>
+          </div>
         )}
       </div>
     </div>
@@ -517,6 +547,71 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     }
   }, [abandoningTabId, synchronizeTab]);
 
+  const [clearDraftDialogOpen, setClearDraftDialogOpen] = useState(false);
+  const [clearDraftBusy, setClearDraftBusy] = useState(false);
+
+  const clearDraftAndRestart = useCallback(async () => {
+    if (clearDraftBusy) return;
+    setClearDraftBusy(true);
+    setClearDraftDialogOpen(false);
+    try {
+      // 优先尝试强制清除云端草稿（无需 id/revision，适用于草稿损坏到无法解析的场景）
+      let serverCleared = false;
+      try {
+        serverCleared = await forceClearInitialDraft();
+      } catch {
+        // 端点不存在或清除失败，降级为尝试用本机已知 id 清除
+      }
+
+      // 如果强制清除端点不可用，尝试用本机 initial_draft tab 的信息清除
+      if (!serverCleared) {
+        const state = useFlowStore.getState();
+        const initialDraftTab = state.tabs.find(
+          (tab) => projectTabLifecycle(tab) === "initial_draft",
+        );
+        if (initialDraftTab) {
+          try {
+            await abandonInitialDraft({
+              id: initialDraftTab.projectId,
+              expectedRevision: initialDraftTab.draftRevision ?? 0,
+            });
+            serverCleared = true;
+          } catch {
+            // 云端清除失败（可能 id 不匹配或 revision 冲突），继续本地清除
+          }
+        }
+      }
+
+      // 清除本机 sessionStorage 中的草稿数据
+      clearProjectTabSessionStorage(window.sessionStorage);
+
+      // 重置内存状态：替换 initial_draft tab 为 fresh local tab，或创建新 tab
+      const state = useFlowStore.getState();
+      const initialDraftTab = state.tabs.find(
+        (tab) => projectTabLifecycle(tab) === "initial_draft",
+      );
+      const freshTab = replaceAbandonedInitialDraftWithFreshLocalTab(
+        initialDraftTab?.id ?? state.activeTabId,
+      );
+      if (!freshTab) {
+        // 如果当前 tab 不是 initial_draft，直接创建新 tab
+        useFlowStore.getState().createBlankTab();
+      }
+
+      if (!serverCleared) {
+        // 云端草稿未能清除，提示用户需要服务端支持
+        setGateState("error");
+        setGateError("本地草稿已清除，但云端草稿未能清除。请刷新后重试；若问题持续，请联系管理员。");
+        return;
+      }
+
+      // 重新初始化（会触发 bootstrap 或 restore）
+      setAttempt((value) => value + 1);
+    } finally {
+      setClearDraftBusy(false);
+    }
+  }, [clearDraftBusy]);
+
   const context = useMemo<InitialDraftContextValue>(() => ({
     syncState,
     syncError,
@@ -526,7 +621,41 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
   }), [abandon, abandoningTabId, retrySync, syncError, syncState]);
 
   if (gateState !== "ready") {
-    return <BlockingScreen state={gateState} error={gateError} onRetry={() => setAttempt((value) => value + 1)} />;
+    return (
+      <>
+        <BlockingScreen
+          state={gateState}
+          error={gateError}
+          onRetry={() => setAttempt((value) => value + 1)}
+          onClearDraft={() => setClearDraftDialogOpen(true)}
+          clearDraftBusy={clearDraftBusy}
+        />
+        <AlertDialog open={clearDraftDialogOpen} onOpenChange={setClearDraftDialogOpen}>
+          <AlertDialogContent
+            overlayClassName="z-[70] bg-black/75 backdrop-blur-sm"
+            className="z-[71] border border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text)] ring-0"
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>清除未保存草稿？</AlertDialogTitle>
+              <AlertDialogDescription className="text-xs text-[var(--gc-text-muted)]">
+                这将丢弃当前无法恢复的未保存草稿并创建一份全新的空白草稿。本地内容会被立即清除；云端内容会尝试同步清除。此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="border-[var(--gc-border)] bg-[var(--gc-panel-soft)]">
+              <AlertDialogCancel disabled={clearDraftBusy}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={clearDraftBusy}
+                onClick={() => void clearDraftAndRestart()}
+              >
+                {clearDraftBusy && <LoaderCircleIcon aria-hidden="true" className="size-3.5 animate-spin" />}
+                确认清除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
   }
   return (
     <InitialDraftContext.Provider value={context}>
