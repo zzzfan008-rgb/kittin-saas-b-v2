@@ -187,7 +187,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
         )}
         {data.imageUrl && (
           <div className="nodrag flex gap-1.5">
-            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-text)] focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/60">
+            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-text)] focus-within:border-gold focus-within:ring-2 focus-within:ring-gold/60">
               {fileInput}
               <span className="pointer-events-none">重新上传</span>
             </div>

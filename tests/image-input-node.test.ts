@@ -43,7 +43,7 @@ function assertDirectFileInput(html: string, label: string): void {
   assert.doesNotMatch(fileInputs[0], /\bmultiple(?:=|\s|>)/);
   assert.doesNotMatch(fileInputs[0], /\bdisabled(?:=|\s|>)/);
   assert.doesNotMatch(fileInputs[0], /pointer-events-none/);
-  assert.match(html, /focus-within:ring-1/);
+  assert.match(html, /focus-within:ring-2/);
 }
 
 const baseData: ImageInputNodeData = {
@@ -57,7 +57,7 @@ console.log("图片上传节点文件选择测试");
 test("空节点的整个上传区域由原生文件控件直接接收点击", () => {
   const html = renderNode(baseData);
   assertDirectFileInput(html, "上传图片");
-  assert.match(html, /点击 \/ 拖拽 \/ 选中后 Ctrl\+V/);
+  assert.match(html, /点击 \/ 拖拽 \/ Ctrl\+V/);
 });
 
 test("已有图片时重新上传区域仍由原生文件控件直接接收点击", () => {
