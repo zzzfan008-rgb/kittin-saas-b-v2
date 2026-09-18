@@ -38,6 +38,16 @@ completion ledgers, review notes, and screenshots are historical evidence only. 
 they conflict with this file, follow this file and the user's latest explicit
 instruction, then verify drift-prone repository and release state live.
 
+Technology stack documentation index —
+[`docs/reference/tech-stack-official-docs.md`](docs/reference/tech-stack-official-docs.md) —
+pins the official documentation entry point for every runtime, framework, library and
+local tool in this repo, at the version this repo actually locks. It also records which
+official sites are version-specific and which only serve the latest release (Vite,
+TypeScript, Express, Playwright, nanoid, ast-grep are all behind upstream), so a claim
+about library behavior can be cited against the right version. It is reference material,
+not a runtime contract: `package.json` / `package-lock.json` and this file still win, and
+a dependency change must update it in the same delivery batch.
+
 ## 1. Product Scope
 
 - Garment Canvas is a desktop-only web product. The supported minimum width is
