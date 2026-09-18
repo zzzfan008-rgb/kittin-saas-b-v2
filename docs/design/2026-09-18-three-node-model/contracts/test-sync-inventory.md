@@ -5,6 +5,7 @@
 - v2：Q1=B 新增 text 运行路径测试条目（§1.A 尾部）；Q4=A 后 kind 特化循环相关断言删除并入 workflow-schema/dag 重写。
 - v3：Q3=A 补充 fabric handle 特例移除条目（§1.A 尾部）。
 - v3.1（缺口修复）：text-run 条目对齐 runtime.md §0/§1b；§1.A 尾部补边顺序编辑与变体撤销的运行拒绝条目（runtime.md §5b/§5d）。
+- v3.2（R-39）：§1.A 尾部「边顺序」条目改写为序号派生/补位重排/选中态重算口径（手动排序用例作废）；graph-invariants.md §4 的 R-39 测试契约与本文件同源。
 
 ## 1. tests/（37 个文件）
 
@@ -35,10 +36,11 @@
   - `tests/canvas-connection` 中 fabric/garment 双 handle 连线用例 — **删除**，替换为统一 reference handle 的顺序语义用例（多 image 边按序进入参考图列表）。
   - `tests/workflow-schema.test.ts` 新增反例：flow JSON 中出现 `targetHandle: "fabric"` 应被 v7 schema 拒绝（未知 handle 类型）。
   - `tests/dag.test.ts` 中 fabric-recolor 的 garment/fabric 前置检查断言 — **删除**（`assertPlanInputs` 不再按 handle 特化检查）。
-- 【v3.1 新增】边顺序与变体撤销：
-  - `tests/reference-inputs.test.ts`（或并入 `tests/dag.test.ts`）— 边顺序重排后参考图解析顺序随之变化；`maskSourceRef` 在第一条图片入边变更后按新顺序重新校验（不匹配则运行拒绝）。
+- 【v3.1 新增，v3.2 按 R-39 改写】序号派生 / 补位重排 / 变体撤销：
+  - `tests/reference-ordinals.test.ts`（新文件，或并入 `tests/reference-inputs.test.ts`）— `selectReferenceOrdinals` 纯函数：连入 3 条 image 边 → 序号 1/2/3；删除中间边 → 补位连续（1..N 无空洞）；`selectedTargetId=null` → 空 Map；text 边不编号；同一源图连两目标各自独立派生；**切换选中目标重算**（t1 序号 2 → t2 序号 1，断言无跨目标缓存，契约 graph-invariants.md §2b.2）；`DocumentSnapshot`/flow_json 序列化无 ordinal 字段（不持久化断言）。
+  - `tests/reference-inputs.test.ts`（或并入 `tests/dag.test.ts`）— 边数组顺序变化后参考图解析顺序随之变化；`maskSourceRef` 在第一条图片入边变更后按新顺序重新校验（不匹配则运行拒绝）；蒙版源图补位成新第一条时 maskSourceRef 仍匹配（自洽路径，graph-invariants.md §2b.4）。
   - `tests/prompt-run-admission.test.ts` — 变体撤销后存量引用节点运行拒绝（`variant.revoked` 文案键）；未撤销的旧 ID 在并行期继续可用。
-  - `tests/canvas-connection`（或 P2-c e2e）— 悬浮窗口参考图列表的上移/下移操作改变 edges 数组顺序，运行前预览按新顺序展示。
+  - `tests/canvas-connection`（或 P2-c e2e）— 拉线后源节点徽标即时出现且数字正确；删除中间边后徽标刷新为补位序号；取消选中徽标消失；选中另一目标徽标按新目标重排（几何/样式以 R-38 视觉规范为准）。**v3.1 的「悬浮窗口上移/下移改变 edges 顺序」用例作废**——R-39 后无手动排序控件，参考图列表只读。
 
 ### B. 改断言（逻辑保留，硬校验 → warning）
 - `tests/provider-contract.test.ts` — `imageModelOptionsError` 硬失败断言改 warning 断言
