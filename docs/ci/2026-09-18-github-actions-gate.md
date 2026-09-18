@@ -105,6 +105,20 @@ playwright 配置额外硬校验(见 `playwright.config.ts` / `playwright.produc
 - 两步骤各自把原始 JSON 写到工作区文件再解析,与本地 gate 的
   「按 PATH 解析 + JSON 证据」同构,便于排障时对照本地结果。
 
+安装步骤契约(2026-09-18 R-21 补充):
+
+- **`code-intelligence` job 必须在 `setup-node` 之后、任何 `node_modules/.bin/*`
+  或 `npm run` / `npx` 调用之前执行 `npm ci`。** R-17 把「Install gate tools」
+  (`npm install --no-save`)改为从 `node_modules/.bin` 直调时漏掉了安装步骤,
+  导致首次 CI 复跑 `depcruise` 退出码 127(可执行文件不存在);R-21 补上
+  `- run: npm ci`,与其它 4 个 job 的写法一致。
+- 推广到所有 job:任何依赖 `node_modules/.bin/*`、`npm run`、`npx` 或
+  已安装包内脚本的步骤,前置必须存在 `npm ci`(或等价的依赖安装步骤)。
+  新增 job 时把这条作为自查清单的第一项。
+- 为什么本地预跑发现不了:本地 `node_modules` 长期存在,即使 workflow YAML
+  漏写 `npm ci`,本地按 job 命令手动复跑也能跑通——只有 CI 的干净容器才暴露
+  这个缺陷。此类「缺失安装步骤」只能依靠 CI 复跑发现,无法在本地预知。
+
 ## 7. 所需 secrets 清单
 
 **当前 CI 不需要任何仓库 secret**。所有步骤使用的值要么是 CI 内部 dummy,
@@ -174,6 +188,12 @@ playwright 配置额外硬校验(见 `playwright.config.ts` / `playwright.produc
    开发机 `.env` 里的端口/口令差异不会被 CI 发现。
 7. **并发数据库冲突**:本地 runner 的 per-worktree 锁防止两个本地测试撞库;
    CI 每个 job 一个独立容器,不存在该问题,但本地并发场景 CI 无法验证。
+8. **「缺失安装步骤」类缺陷无法在本地预知**(2026-09-18 R-21 补):本地
+   `node_modules` 长期存在,workflow YAML 漏写 `npm ci` 时本地按 job 命令
+   手动复跑仍然能跑通;只有 CI 的干净容器才会以 `exit 127` 暴露。R-17
+   改 `code-intelligence` job 时就漏了这一步,首次 CI 复跑才发现。
+   防范手段是把「任何 `node_modules/.bin/*` / `npm run` / `npx` 调用之前
+   必须存在 `npm ci`」列为新增/修改 job 时的自查清单第一项(见 §6)。
 
 ## 11. 验证状态
 

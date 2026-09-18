@@ -158,6 +158,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - run: npm ci
       # ast-grep 与 dependency-cruiser 已固定进 devDependencies，npm ci 后
       # 直接从 node_modules/.bin 调用，与本地 gate 的 resolveExecutable 顺序一致。
       # depcruise 需要 NODE_PATH 指向仓库 node_modules 才能用本仓库的 typescript 解析
