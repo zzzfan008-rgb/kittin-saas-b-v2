@@ -18,6 +18,7 @@
   --gc-accent:#B7F35A; --gc-accent-ink:#131313;
   --node-card:#ffffff; --node-inner:#f2f3f5; --node-inner-hover:#e9eaee;
   --node-divider:#e4e6ea; --node-text:#1d1d1f; --node-muted:#6b7075;
+  --node-chip:#f1f3f6; --node-chip-text:#3a3f46;
   --node-shadow:0 0 0 0.5px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
   --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.42), 0 8px 18px rgba(0,0,0,.4), 0 28px 60px rgba(0,0,0,.56);
   --edge:#B7F35A;
@@ -35,6 +36,7 @@
   --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
   --node-card:#ffffff; --node-inner:#f5f5f7; --node-inner-hover:#ececf0;
   --node-divider:rgba(0,0,0,.07); --node-text:#1d1d1f; --node-muted:#6e6e73;
+  --node-chip:#eceef2; --node-chip-text:#48484a;
   --node-shadow:0 0 0 0.5px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 8px rgba(0,0,0,.05), 0 20px 44px rgba(0,0,0,.11);
   --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.06), 0 8px 16px rgba(0,0,0,.08), 0 28px 60px rgba(0,0,0,.15);
   --edge:#0071e3;
@@ -51,6 +53,7 @@
   --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
   --node-card:#ffffff; --node-inner:#f0f6f1; --node-inner-hover:#e5efe7;
   --node-divider:#e2ece4; --node-text:#123B2B; --node-muted:#47685A;
+  --node-chip:#e4eee7; --node-chip-text:#2c5443;
   --node-shadow:0 0 0 0.5px rgba(18,59,43,.06), 0 1px 2px rgba(18,59,43,.05), 0 4px 10px rgba(18,59,43,.06), 0 20px 44px rgba(18,59,43,.11);
   --node-shadow-lift:0 0 0 0.5px rgba(18,59,43,.07), 0 2px 4px rgba(18,59,43,.06), 0 8px 18px rgba(18,59,43,.09), 0 28px 60px rgba(18,59,43,.16);
   --edge:#0B7A43;
@@ -110,8 +113,8 @@ body{background:var(--board-bg);color:var(--board-ink);
 section{margin-top:80px}
 
 /* ---- 画布舞台 ---- */
-.stage{position:relative;border-radius:18px;overflow:hidden;
-  background:var(--gc-canvas);min-height:620px;box-shadow:var(--node-shadow)}
+.stage{position:relative;height:1050px;border-radius:20px;overflow:hidden;
+  background:var(--gc-canvas);min-height:700px;box-shadow:var(--node-shadow)}
 .stage::before{content:"";position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(circle, var(--gc-border) 1px, transparent 1.3px) 0 0/24px 24px}
 .stagelabel{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--board-muted);opacity:.85}
@@ -120,13 +123,13 @@ section{margin-top:80px}
 .ct-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 
 /* ---- 节点卡 ---- */
-.node{position:absolute;width:300px;border-radius:12px;background:var(--node-card);color:var(--node-text);box-shadow:var(--node-shadow);border:none}
+.node{position:absolute;width:320px;border-radius:12px;background:var(--node-card);color:var(--node-text);box-shadow:var(--node-shadow);border:none}
 .node.selected{box-shadow:0 0 0 2px var(--gc-accent),0 0 0 6px color-mix(in srgb,var(--gc-accent) 10%,transparent),var(--node-shadow-lift)}
-.node-head{display:flex;align-items:center;gap:10px;padding:14px 18px 12px}
+.node-head{display:flex;align-items:center;gap:10px;padding:16px 20px 12px}
 .node-head .title{flex:1;min-width:0;font-size:13.5px;font-weight:600;letter-spacing:-0.25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .node-head .kind{font-size:10px;color:var(--node-muted);font-family:var(--mono);letter-spacing:.1em}
-.node-body{padding:0 18px 18px;display:flex;flex-direction:column;gap:14px}
-.node-head + .node-body{padding-top:2px;border-top:1px solid var(--node-divider);padding-top:14px;margin-top:2px}
+.node-body{padding:0 20px 20px;display:flex;flex-direction:column;gap:14px}
+.node-head + .node-body{padding-top:2px;border-top:1px solid var(--node-divider);padding-top:16px;margin-top:2px}
 
 .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;position:relative}
 .dot.idle{background:var(--st-idle)}.dot.queued{background:var(--st-queued)}
@@ -176,6 +179,137 @@ section{margin-top:80px}
 [data-theme="apple"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
 [data-theme="eye"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
 [data-theme="obsidian"] .run.running{background:#1f2b1a;color:#B7F35A;border:1px solid #3d521f}
+
+/* 可灵节点语言:chip 提示词板(文本节点) + 缩略图槽(图片节点) */
+.prompt-chip{
+  background:var(--node-chip);color:var(--node-chip-text);
+  border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.55;letter-spacing:-0.1px;
+}
+.thumb{
+  width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;position:relative;
+  background:linear-gradient(135deg,#dbe7ef 0%,#c3d6e4 45%,#b7cfdc 100%);
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(0,0,0,.32);font-size:11px;font-family:var(--mono);letter-spacing:.08em;
+}
+[data-theme="obsidian"] .thumb{background:linear-gradient(135deg,#262b33 0%,#1d2127 60%,#232830 100%);color:rgba(255,255,255,.3)}
+[data-theme="eye"] .thumb{background:linear-gradient(135deg,#d6e6da 0%,#c4dcc9 55%,#d0e4d4 100%);color:rgba(18,59,43,.35)}
+.thumb.small{aspect-ratio:16/9;height:64px}
+
+/* ---- 可灵结果过渡动画:Reveal(图片/视频通用) ---- */
+@keyframes gcShimmer{
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+@keyframes gcReveal{
+  0%{opacity:0;transform:scale(.96);filter:blur(10px) saturate(.9)}
+  60%{opacity:1;transform:scale(1.004);filter:blur(0) saturate(1.06)}
+  100%{opacity:1;transform:scale(1);filter:blur(0) saturate(1)}
+}
+@keyframes gcProgress{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(100%)}
+}
+
+/* 生成中:shimmer 骨架(可灵的"呼吸"加载态) */
+.result-shimmer{
+  position:absolute;inset:0;
+  background:linear-gradient(105deg,
+    transparent 30%,
+    rgba(255,255,255,.06) 45%,
+    rgba(255,255,255,.16) 50%,
+    rgba(255,255,255,.06) 55%,
+    transparent 70%);
+  background-size:200% 100%;
+  animation:gcShimmer 1.6s ease-in-out infinite;
+  border-radius:inherit;pointer-events:none;
+}
+[data-theme="apple"] .result-shimmer,
+[data-theme="eye"] .result-shimmer{
+  background:linear-gradient(105deg,
+    transparent 30%,
+    rgba(255,255,255,.25) 45%,
+    rgba(255,255,255,.55) 50%,
+    rgba(255,255,255,.25) 55%,
+    transparent 70%);
+  background-size:200% 100%;
+}
+
+/* 结果到达:blur→clear 揭示 + 边框呼吸 */
+.result-reveal{
+  position:absolute;inset:0;border-radius:inherit;
+  animation:gcReveal .5s cubic-bezier(.2,.8,.2,1) forwards;
+  background:inherit;
+}
+.result-done-ring{
+  position:absolute;inset:-2px;border-radius:inherit;
+  border:2px solid var(--gc-accent);
+  animation:gcDoneRing .6s var(--ease-out) forwards;
+  pointer-events:none;
+}
+@keyframes gcDoneRing{
+  0%{opacity:0;transform:scale(1)}
+  30%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.015)}
+}
+
+/* 生成中进度条(底部细条) */
+.result-progress{
+  position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:color-mix(in srgb,var(--gc-accent) 20%,transparent);
+  overflow:hidden;border-radius:0 0 10px 10px;
+}
+.result-progress::after{
+  content:"";position:absolute;inset:0;width:40%;
+  background:var(--gc-accent);border-radius:inherit;
+  animation:gcProgress 1.4s ease-in-out infinite;
+}
+
+/* 视频结果专属:play 按钮脉冲 */
+@keyframes gcPlayPulse{
+  0%,100%{opacity:.85;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.06)}
+}
+.result-play{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+}
+.result-play::before{
+  content:"▶";width:40px;height:40px;border-radius:50%;
+  background:rgba(0,0,0,.55);color:#fff;font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+  padding-left:2px;
+  animation:gcPlayPulse 2s ease-in-out infinite;
+}
+
+/* 状态标签(角标) */
+.result-badge{
+  position:absolute;top:8px;left:8px;
+  font-size:9.5px;font-family:var(--mono);letter-spacing:.08em;
+  padding:2.5px 7px;border-radius:980px;
+  background:var(--gc-accent);color:var(--gc-accent-ink);
+  font-weight:700;
+}
+[data-theme="apple"] .result-badge,
+[data-theme="eye"] .result-badge{background:#166534;color:#fff}
+.result-badge.running{
+  background:var(--st-running);color:#fff;
+}
+[data-theme="obsidian"] .result-badge.running{
+  background:#1f2b1a;color:#B7F35A;
+}
+
+/* 减少动态 */
+@media (prefers-reduced-motion:reduce){
+  .result-shimmer,.result-progress::after,.result-play::before{animation:none}
+  .result-reveal{animation:gcReveal .1s ease-out forwards}
+  .result-done-ring{animation:none;opacity:0}
+}
+
+/* 三主题覆盖运行态按钮 */
+[data-theme="apple"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
+[data-theme="eye"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
+[data-theme="obsidian"] .run.running{background:#1f2b1a;color:#B7F35A;border:1px solid #3d521f}
+.node-foot{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+.node-foot .hint{font-size:11px;color:var(--node-muted)}
 
 .warn-line{font-size:11.5px;color:var(--st-retry);line-height:1.5}
 
@@ -250,14 +384,14 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
 <section class="wrap" id="stage">
   <div class="sechead">
     <h2>节点三连。绿线即语义。</h2>
-    <p>荧光绿只落在曜黑章的主 CTA 与连线；简白/护眼绿 CTA 用深绿 #166534。胶囊标签让数据流一眼可读。</p>
+    <p>图片节点用缩略图槽（替代虚线拖放区）；文本节点用 chip 提示词板（替代输入框）。荧光绿只落在曜黑章的主 CTA 与连线；简白/护眼绿 CTA 用深绿 #166534。</p>
   </div>
   <div class="stage">
     <span class="stagelabel tl">GARMENT CANVAS · V4</span>
     <span class="stagelabel tr">1280 × AUTO</span>
     <span class="stagelabel bl">GRID 24</span>
     <span class="stagelabel br">REVIEW</span>
-    <svg class="ct-svg" viewBox="0 0 1140 620" preserveAspectRatio="none">
+    <svg class="ct-svg" viewBox="0 0 1140 1050" preserveAspectRatio="none">
       <defs>
         <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--gc-accent)"/>
@@ -265,13 +399,64 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       </defs>
       <path d="M 330 150 C 400 150, 410 330, 480 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
       <path d="M 330 470 C 400 470, 410 344, 480 342" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
-      <path d="M 790 340 C 856 340, 866 332, 916 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 790 340 C 828 340, 830 330, 836 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
     </svg>
 
     <!-- 连线语义标签 -->
     <span class="edge-label" style="left:415px;top:252px">图片</span>
     <span class="edge-label" style="left:415px;top:430px">图片</span>
-    <span class="edge-label" style="left:856px;top:340px">图片</span>
+    <span class="edge-label" style="left:820px;top:336px">图片</span>
+
+    <div class="node" style="left:40px; top:700px;">
+      <div class="node-head">
+        <span class="dot running"></span>
+        <span class="title">迁移结果 · 生成中</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-shimmer"></div>
+          <div class="result-badge running">RUNNING</div>
+          <div class="result-progress"></div>
+        </div>
+        <div class="node-foot"><span class="hint">预计 12s · 排队 2</span><span class="hint">Kling v1.6</span></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:796px; top:238px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-reveal"></div>
+          <div class="result-done-ring"></div>
+          <span>IMAGE · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:796px; top:436px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">视频迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-play"></div>
+          <div class="result-badge">VIDEO</div>
+          <span>VIDEO · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">00:08 · 24fps · 1080p</span><span class="hint">Kling v1.6</span></div>
+      </div>
+    </div>
 
     <div class="node" style="left:40px; top:96px;">
       <div class="node-head">
@@ -281,8 +466,8 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
         <span class="handle out"></span>
       </div>
       <div class="node-body">
-        <div class="drop"><span class="glyph">⬒</span>点击 / 拖拽 / Ctrl+V<small>JPG · PNG · WEBP · BMP</small></div>
-        <div class="field"><label>引用角色</label><div class="val">garment_full · 主体保真</div></div>
+        <div class="thumb"><span>IMAGE · 原图槽位</span></div>
+        <div class="node-foot"><span class="hint">garment_full · 主体保真</span><span class="hint">1 / 1</span></div>
       </div>
     </div>
 
@@ -294,8 +479,59 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
         <span class="handle out"></span>
       </div>
       <div class="node-body">
-        <div class="drop"><span class="glyph">⬒</span>点击 / 拖拽 / Ctrl+V<small>JPG · PNG · WEBP · BMP</small></div>
-        <div class="field"><label>引用角色</label><div class="val">styling_only · 仅风格</div></div>
+        <div class="thumb"><span>IMAGE · 参考槽位</span></div>
+        <div class="node-foot"><span class="hint">styling_only · 仅风格</span><span class="hint">1 / 1</span></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:40px; top:700px;">
+      <div class="node-head">
+        <span class="dot running"></span>
+        <span class="title">迁移结果 · 生成中</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-shimmer"></div>
+          <div class="result-badge running">RUNNING</div>
+          <div class="result-progress"></div>
+        </div>
+        <div class="node-foot"><span class="hint">预计 12s · 排队 2</span><span class="hint">Kling v1.6</span></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:796px; top:238px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-reveal"></div>
+          <div class="result-done-ring"></div>
+          <span>IMAGE · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:796px; top:436px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">视频迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-play"></div>
+          <div class="result-badge">VIDEO</div>
+          <span>VIDEO · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">00:08 · 24fps · 1080p</span><span class="hint">Kling v1.6</span></div>
       </div>
     </div>
 
@@ -307,7 +543,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
         <span class="handle in"></span><span class="handle out"></span>
       </div>
       <div class="node-body">
-        <div class="field"><label>指令</label><input class="input" value="以图2的材质与色彩语言重绘图1"></div>
+        <div class="prompt-chip">以图2的材质与色彩语言重绘图1</div>
         <div class="row2">
           <div class="field"><label>模型</label><select class="select"><option>GPT Image 2 · hi</option></select></div>
           <div class="field"><label>输出尺寸</label><input class="input mono" value="1536 × 2048"></div>
@@ -320,7 +556,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       </div>
     </div>
 
-    <div class="node" style="left:916px; top:238px;">
+    <div class="node" style="left:796px; top:238px;">
       <div class="node-head">
         <span class="dot idle"></span>
         <span class="title">迁移结果</span>
