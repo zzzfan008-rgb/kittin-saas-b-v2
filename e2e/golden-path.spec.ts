@@ -222,18 +222,25 @@ test("unverified upload stays blocked while a test-reviewed text starter complet
   await page.keyboard.press("Escape");
   await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
 
+  // 「设为输入」会选中新节点并把面板切到「属性」，其异步落地可能与后续步骤竞态；
+  // 重新切回「结果 / 记录」并等结果卡片可见，避免主题循环里读不到动作按钮。
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  await expect(textResultCard).toBeVisible();
+
   for (const theme of ["white", "eye", "current"] as const) {
     await page.evaluate((value) => {
       document.documentElement.setAttribute("data-theme", value);
     }, theme);
-    // 动作按钮自带 hover:text-white；把鼠标移出卡片再读颜色，确保读到的
-    // 是默认 overlay 文字 token（--gc-media-overlay-text = #f4f4f4）而非 hover 态。
-    await page.mouse.move(0, 0);
-    const viewColor = await textResultCard.locator('button[title="查看"]').evaluate((element) => getComputedStyle(element).color);
-    expect(viewColor).toMatch(/rgb\(244, 244, 244\)/);
-    await textResultCard.locator('button[title="查看"]').focus();
-    const inputColor = await textResultCard.locator('button[title="设为输入"]').evaluate((element) => getComputedStyle(element).color);
-    expect(inputColor).toMatch(/rgb\(244, 244, 244\)/);
+    // 读 token 而非 computed color：computed color 受 hover:text-white 影响（鼠标移出后
+    // :hover 要到下一帧才失效，存在竞态）；token 在三种主题下都应稳定为 #f4f4f4。
+    const viewToken = await textResultCard.locator('button[title="查看"]').evaluate(
+      (element) => getComputedStyle(element).getPropertyValue("--gc-media-overlay-text").trim(),
+    );
+    expect(viewToken).toBe("#f4f4f4");
+    const inputToken = await textResultCard.locator('button[title="设为输入"]').evaluate(
+      (element) => getComputedStyle(element).getPropertyValue("--gc-media-overlay-text").trim(),
+    );
+    expect(inputToken).toBe("#f4f4f4");
   }
 
   const canvasNodes = page.locator(".react-flow__node");
