@@ -159,9 +159,10 @@ instruction, then verify drift-prone repository and release state live.
   or whose database name does not end in `_test`, and holds a per-worktree lock. Do not
   bypass it with ad-hoc database resets, and never point test runs at the development
   database.
-- Before delivery or commit, run the relevant focused tests, `npm run check`,
-  `npm run build`, `git diff --check`, and the ast-grep plus dependency-cruiser scans
-  described above. Report any
+- Before delivery, run `npm run check`, `npm run build`, `git diff --check`, and the
+  ast-grep plus dependency-cruiser scans described above. During iteration and before
+  individual commits, run only the focused tests covering the files you changed plus
+  `tsc --noEmit`; do not run the full suite on every commit or push. Report any
   unavailable or degraded gate instead of treating it as passed.
 - GitHub Actions is not a project gate. Run `npm run gate:codex -- --base origin/main`
   for a feature branch, or select an exact commit with `--commit SHA`. This runs the
