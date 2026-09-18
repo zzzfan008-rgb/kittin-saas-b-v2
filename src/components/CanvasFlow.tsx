@@ -34,24 +34,59 @@ export const DND_MIME = "application/garment-node";
 
 const edgeTypes = { pulse: PulseEdge };
 
+function isVisibleControl(element: HTMLElement): boolean {
+  // offsetParent 为 null 表示 display:none 或不在渲染树中；
+  // visibility:hidden 会让 focus() 静默失败，必须跳过。
+  if (element.offsetParent === null) return false;
+  const style = window.getComputedStyle(element);
+  return style.visibility !== "hidden" && style.display !== "none";
+}
+
 function landingControl(nodeId: string): HTMLElement | null {
   const node = document.querySelector<HTMLElement>(
     `.react-flow__node[data-id="${CSS.escape(nodeId)}"]`,
   );
   if (!node) return null;
-  return node.querySelector<HTMLElement>(
-    'input[type="file"], textarea, input:not([type="hidden"]), select, button',
+  // 优先 textarea（文本节点的提示词输入框），再考虑其他可聚焦控件。
+  // 跳过 visibility:hidden / display:none 的控件（如 opacity-0 的 file input），
+  // 否则 focus() 会静默失败，导致「本地偶过 / CI 必挂」的焦点竞态。
+  const textareas = Array.from(node.querySelectorAll<HTMLElement>("textarea"));
+  for (const textarea of textareas) {
+    if (isVisibleControl(textarea)) return textarea;
+  }
+  const controls = Array.from(
+    node.querySelectorAll<HTMLElement>(
+      'input[type="file"], input:not([type="hidden"]), select, button',
+    ),
   );
+  for (const control of controls) {
+    if (isVisibleControl(control)) return control;
+  }
+  return null;
 }
 
-function focusLandingControl(intent: CanvasLandingIntent, attempts = 8): void {
+/**
+ * 把焦点落到新落地节点的首个可聚焦控件上。
+ *
+ * 不能用 requestAnimationFrame 做重试：无头/未聚焦页面 rAF 会被节流甚至不触发，
+ * 导致「本地偶过 / CI 必挂」的焦点竞态。改为同步 layout 读取 + focus + 立即验证，
+ * 失败时用 setTimeout(0) 重试（宏任务不受 rAF 节流影响）。
+ */
+function focusLandingControl(intent: CanvasLandingIntent, attempts = 20): void {
   if (!intent.nodeId) return;
   const control = landingControl(intent.nodeId);
   if (!control) {
-    if (attempts > 0) requestAnimationFrame(() => focusLandingControl(intent, attempts - 1));
+    if (attempts > 0) setTimeout(() => focusLandingControl(intent, attempts - 1), 0);
     return;
   }
+  // 强制同步 layout，确保 Chromium 在 focus 前已完成样式计算；
+  // React 18 concurrent + React Flow 初始化时序下，rAF 回调里的 focus 会被静默吞掉。
+  void control.getBoundingClientRect();
   control.focus({ preventScroll: true });
+  if (document.activeElement !== control && attempts > 0) {
+    setTimeout(() => focusLandingControl(intent, attempts - 1), 0);
+    return;
+  }
   if (
     intent.selectText &&
     (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement)
@@ -243,7 +278,7 @@ export function CanvasFlow() {
       if (intent.fitView) {
         await fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 1, duration: 0 });
       }
-      if (!cancelled) requestAnimationFrame(() => focusLandingControl(intent));
+      if (!cancelled) focusLandingControl(intent);
     })();
     return () => {
       cancelled = true;
