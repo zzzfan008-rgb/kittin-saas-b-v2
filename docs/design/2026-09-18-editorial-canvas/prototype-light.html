@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>纸感编者 · 浅色 — Coin AI Canvas P1 原型</title>
+<style>
+@import url("tokens.css");
+
+/* ---------- 原型专用打底（非交付 token，仅排版容器） ---------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--gc-shell);
+  color: var(--gc-text);
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--gc-accent); outline-offset: 1px; }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ---------- 顶栏（N 型：字标 + 编号区段 + 胶囊 CTA） ---------- */
+.topbar {
+  height: 56px; flex: none;
+  display: flex; align-items: center; gap: 24px;
+  padding: 0 20px;
+  background: var(--gc-shell);
+  border-bottom: 1px solid var(--gc-border);
+}
+.brand {
+  display: flex; align-items: baseline; gap: 10px; flex: none;
+}
+.brand .wordmark {
+  font-family: var(--gc-font-display);
+  font-size: 22px; letter-spacing: var(--gc-tracking-display); line-height: 1;
+}
+.brand .wordmark em { font-style: italic; color: var(--gc-accent); }
+.brand .meta { font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); color: var(--gc-text-muted); }
+.topbar nav { display: flex; gap: 4px; }
+.topbar nav a {
+  font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta);
+  text-transform: uppercase; text-decoration: none; color: var(--gc-text-muted);
+  padding: 6px 10px; border-radius: 6px;
+  transition: color 180ms ease-out, background-color 180ms ease-out;
+}
+.topbar nav a[aria-current] { color: var(--gc-accent); }
+.topbar nav a:hover { color: var(--gc-text); background: var(--gc-panel-hover); }
+.topbar .spacer { flex: 1; }
+.cta {
+  background: var(--gc-accent); color: var(--gc-accent-cta-ink);
+  border: none; border-radius: 999px; padding: 8px 18px;
+  font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta);
+  transition: background-color 180ms ease-out;
+}
+.cta:hover { background: var(--gc-accent-deep); }
+.theme-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta);
+  color: var(--gc-text-muted); background: none; border: 1px solid var(--gc-border);
+  border-radius: 999px; padding: 6px 12px;
+}
+.theme-chip i { width: 8px; height: 8px; border-radius: 999px; background: var(--gc-accent); }
+
+/* ---------- 项目页签（编号系统落点） ---------- */
+.tabs {
+  flex: none; display: flex; align-items: stretch; gap: 0;
+  background: var(--gc-shell); border-bottom: 1px solid var(--gc-border);
+  padding: 0 20px; height: 44px; overflow-x: auto;
+}
+.tab {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px; background: none; border: none;
+  border-right: 1px solid var(--gc-border);
+  color: var(--gc-text-muted);
+  transition: background-color 180ms ease-out;
+}
+.tab:first-child { border-left: 1px solid var(--gc-border); }
+.tab .idx { font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); }
+.tab .name { font-size: 12px; }
+.tab[aria-selected="true"] {
+  background: var(--gc-panel); color: var(--gc-text);
+  box-shadow: inset 0 2px 0 var(--gc-accent);
+}
+.tab .dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.dot-running { background: var(--gc-status-running); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc-status-running) 30%, transparent); }
+.dot-success { background: var(--gc-status-success); }
+.dot-idle { background: var(--gc-status-idle); }
+.tab-add {
+  align-self: center; margin-left: 8px;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px dashed var(--gc-border-strong); background: none; color: var(--gc-text-muted);
+  font-size: 14px; line-height: 1;
+}
+
+/* ---------- 主区三栏 ---------- */
+.main { flex: 1; display: grid; grid-template-columns: clamp(200px, 20vw, 264px) minmax(0, 1fr) clamp(248px, 23vw, 320px); min-height: 0; }
+
+/* 左栏：节点库（列表行 + Plate 微缩） */
+.library {
+  border-right: 1px solid var(--gc-border);
+  background: var(--gc-shell);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.section-head {
+  padding: 18px 18px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.section-head .desc { font-size: 12px; color: var(--gc-text-muted); line-height: 1.6; }
+.lib-list { overflow-y: auto; flex: 1; }
+.lib-item {
+  display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) 44px;
+  gap: 12px; align-items: center;
+  padding: 12px 18px; border-top: 1px solid var(--gc-border);
+  cursor: grab; transition: transform 500ms ease-out, background-color 180ms ease-out;
+}
+.lib-item:hover { background: var(--gc-panel-hover); transform: translateY(-2px); }
+.lib-item .idx { font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); color: var(--gc-text-muted); }
+.lib-item .name { font-size: 12px; font-weight: 500; }
+.lib-item .sub { font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta); color: var(--gc-text-muted); margin-top: 3px; text-transform: uppercase; }
+.lib-item .plate { width: 44px; height: 32px; border: 1px solid var(--gc-border); }
+
+/* 画布 */
+.canvas {
+  position: relative; background: var(--gc-canvas); overflow: hidden;
+  background-image: radial-gradient(circle, rgba(36,35,31,0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(12, 1fr);
+  padding: 24px;
+  gap: 0;
+}
+.node {
+  position: relative;         /* 覆盖绝对定位，落轨布局 */
+  width: auto; min-width: 0;
+  max-width: min(280px, 100%);
+  align-self: start; justify-self: center;
+}
+/* 1024 档画布过窄时节点收窄一档（≤260px），保证不溢出 */
+@media (max-width: 1180px) {
+  .node { max-width: 220px; }
+  .node .thumb { height: 88px; }
+  .node-foot { flex-direction: column; align-items: flex-start; gap: 4px; }
+}
+.edge-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.edge-svg .edge { fill: none; stroke: var(--gc-edge); stroke-width: 1.5; }
+.edge-svg .arrow { fill: var(--gc-edge); stroke: none; }
+
+/* 节点卡：白卡语言 + 无衬线业务面，编号进入卡头 */
+.node {
+  position: absolute; width: 280px;
+  background: var(--gc-node-main);
+  border: 1px solid var(--gc-node-border);
+  border-radius: 12px;
+  box-shadow: 0 0 0 0.5px rgba(36,35,31,0.06), 0 2px 6px rgba(36,35,31,0.06), 0 10px 28px rgba(36,35,31,0.10);
+  transition: box-shadow 180ms ease-out;
+}
+.node:hover {
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gc-node-accent) 55%, transparent),
+    0 0 0 0.5px rgba(36,35,31,0.06), 0 18px 38px rgba(36,35,31,0.16);
+}
+.node.selected { box-shadow: 0 0 0 2px var(--gc-node-accent), 0 12px 30px rgba(36,35,31,0.16); }
+.node-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--gc-node-border);
+}
+.node-head .idx { font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); color: var(--gc-node-muted); }
+.node-head .title { font-size: 12px; font-weight: 600; flex: 1; }
+.node-head .dot { width: 10px; height: 10px; border-radius: 999px; }
+.node-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.thumb {
+  height: 120px; border-radius: 8px; border: 1px solid var(--gc-node-border);
+  position: relative; overflow: hidden;
+}
+.thumb.photo {
+  background:
+    radial-gradient(90px 70px at 30% 30%, rgba(220,165,106,0.55), transparent 70%),
+    radial-gradient(120px 90px at 75% 70%, rgba(101,185,170,0.45), transparent 70%),
+    linear-gradient(160deg, #efe9dd, #d9cfbc);
+}
+.thumb .tag {
+  position: absolute; left: 8px; bottom: 8px;
+  font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta);
+  background: rgba(251,250,247,0.85); padding: 3px 7px; border-radius: 4px; color: var(--gc-node-text);
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; color: var(--gc-node-muted); }
+.field .val {
+  background: var(--gc-node-inner); border: 1px solid var(--gc-node-border);
+  border-radius: 6px; padding: 7px 10px; font-size: 12px; color: var(--gc-node-text);
+}
+.field .val.mono { font-family: var(--gc-font-mono); font-size: 11px; }
+.node-foot { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 12px; }
+.node-foot .meta { font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta); color: var(--gc-node-muted); text-transform: uppercase; }
+.handle {
+  position: absolute; width: 12px; height: 12px; border-radius: 999px;
+  background: var(--gc-node-main);
+  border: 1.5px solid var(--gc-node-muted);
+  box-shadow: 0 0 0 2px var(--gc-node-accent);   /* 静态强调环：可辨识，非常亮 */
+  transition: transform 140ms ease-out;
+}
+.handle:hover {
+  background: var(--gc-accent); border-color: var(--gc-accent);
+  transform: scale(1.25);
+}
+.handle.l { left: -7px; top: 50%; margin-top: -7px; }
+.handle.r { right: -7px; top: 50%; margin-top: -7px; }
+
+/* 画布角落：硬投影板（唯一装饰位） */
+.canvas-plate {
+  position: absolute; right: 28px; bottom: 28px;
+  width: 168px; height: 112px;
+  border: 1px solid var(--gc-border-strong);
+}
+.canvas-plate .label {
+  position: absolute; left: 10px; bottom: 8px; z-index: 2;
+  font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta);
+  color: rgba(255,255,255,0.9);
+}
+.canvas-note {
+  position: absolute; right: 28px; bottom: 148px; width: 168px;
+  font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta);
+  color: var(--gc-text-muted); text-transform: uppercase; text-align: left;
+}
+
+/* 右栏：Inspector */
+.inspector {
+  border-left: 1px solid var(--gc-border);
+  background: var(--gc-shell);
+  overflow-y: auto; min-height: 0;
+}
+.inspector .section-head { border-bottom: 1px solid var(--gc-border); padding-bottom: 14px; }
+.inspector h2 {
+  font-family: var(--gc-font-display); font-weight: 400;
+  font-size: 26px; letter-spacing: var(--gc-tracking-display); line-height: 1.06;
+}
+.insp-group { padding: 16px 18px; border-bottom: 1px solid var(--gc-border); }
+.insp-group .g-title { font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); text-transform: uppercase; color: var(--gc-text-muted); margin-bottom: 12px; }
+.insp-row { display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 10px; align-items: center; padding: 7px 0; }
+.insp-row .k { font-size: 11px; color: var(--gc-text-muted); }
+.insp-row .v { font-size: 12px; }
+.insp-row .v.mono { font-family: var(--gc-font-mono); font-size: 11px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta); text-transform: uppercase;
+  border: 1px solid var(--gc-border-strong); border-radius: 999px; padding: 3px 9px;
+}
+.chip .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--gc-plate-coral); }
+.insp-actions { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.btn-secondary {
+  background: none; border: 1px solid var(--gc-border-strong); color: var(--gc-text);
+  border-radius: 999px; padding: 8px 16px;
+  font-family: var(--gc-font-mono); font-size: 10px; letter-spacing: var(--gc-tracking-meta); text-transform: uppercase;
+  transition: background-color 180ms ease-out;
+}
+.btn-secondary:hover { background: var(--gc-panel-hover); }
+
+/* 统计条：浅纸带 + 衬线数字（反色带不移植，理由见 design.md） */
+.stat-strip {
+  border-top: 1px solid var(--gc-border);
+  padding: 14px 18px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+}
+.stat-strip .stat { padding: 2px 12px; }
+.stat-strip .stat + .stat { border-left: 1px solid var(--gc-border); }
+.stat-strip .stat b { display: block; font-family: var(--gc-font-display); font-weight: 400; font-size: 24px; letter-spacing: var(--gc-tracking-display); }
+.stat-strip .stat span { font-family: var(--gc-font-mono); font-size: 9px; letter-spacing: var(--gc-tracking-meta); text-transform: uppercase; color: var(--gc-text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="wordmark">Coin <em>AI</em></span>
+      <span class="meta">CANVAS / 工作台</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="theme-chip"><i></i>纸感编者</button>
+    <button class="cta">运行工作流</button>
+  </header>
+
+  <!-- 项目页签 -->
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true">
+      <span class="idx">01</span><span class="name">秋冬外套·主系列</span><span class="dot dot-running"></span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false">
+      <span class="idx">02</span><span class="name">印花实验·A 组</span><span class="dot dot-success"></span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false">
+      <span class="idx">03</span><span class="name">廓形参考归档</span><span class="dot dot-idle"></span>
+    </button>
+    <button class="tab-add" aria-label="新建项目">+</button>
+  </div>
+
+  <div class="main">
+    <!-- 左栏：节点库 -->
+    <aside class="library">
+      <div class="section-head">
+        <span class="gc-meta-index">节点库 · 6 类</span>
+      </div>
+      <div class="lib-list">
+        <div class="lib-item"><span class="idx">01</span><div><div class="name">图像输入</div><div class="sub">IMAGE / INPUT</div></div><div class="plate gc-plate"></div></div>
+        <div class="lib-item"><span class="idx">02</span><div><div class="name">线稿转渲染</div><div class="sub">SKETCH / RENDER</div></div><div class="plate gc-plate gc-plate-alt"></div></div>
+        <div class="lib-item"><span class="idx">03</span><div><div class="name">AI 局部修改</div><div class="sub">AI / MODIFY</div></div><div class="plate gc-plate"></div></div>
+        <div class="lib-item"><span class="idx">04</span><div><div class="name">面料换色</div><div class="sub">FABRIC / RECOLOR</div></div><div class="plate gc-plate gc-plate-alt"></div></div>
+        <div class="lib-item"><span class="idx">05</span><div><div class="name">印花提取</div><div class="sub">PRINT / EXTRACT</div></div><div class="plate gc-plate"></div></div>
+        <div class="lib-item"><span class="idx">06</span><div><div class="name">超分放大</div><div class="sub">UPSCALE</div></div><div class="plate gc-plate gc-plate-alt"></div></div>
+      </div>
+      <div class="stat-strip">
+        <div class="stat"><b>6</b><span>节点类型</span></div>
+        <div class="stat"><b>128</b><span>本月运行</span></div>
+        <div class="stat"><b>92%</b><span>成功率</span></div>
+      </div>
+    </aside>
+
+    <!-- 画布：12 轨定位网格；节点落轨、随面板宽度收缩 -->
+    <main class="canvas">
+      <svg class="edge-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <path class="edge" d="M 34.5 22 C 37.5 22, 36.5 8, 39.8 8" vector-effect="non-scaling-stroke" marker-end="url(#ah)"/>
+        <path class="edge" d="M 69.5 8 C 74 8, 73 64, 76.5 64" vector-effect="non-scaling-stroke" marker-end="url(#ah)"/>
+      </svg>
+
+      <div class="node" style="grid-column: 1 / span 4; grid-row: 3;">
+        <div class="node-head"><span class="idx">N-01</span><span class="title">图像输入</span><span class="dot dot-success"></span></div>
+        <div class="node-body">
+          <div class="thumb photo"><span class="tag">外套·正面.jpg</span></div>
+          <div class="field"><label>参考强度</label><div class="val mono">0.72</div></div>
+        </div>
+        <div class="node-foot"><span class="meta">IMG / 2048px</span><span class="meta">✓ 已完成</span></div>
+        <span class="handle l"></span><span class="handle r"></span>
+      </div>
+
+      <div class="node selected" style="grid-column: 5 / span 4; grid-row: 1;">
+        <div class="node-head"><span class="idx">N-02</span><span class="title">线稿转渲染</span><span class="dot dot-running"></span></div>
+        <div class="node-body">
+          <div class="thumb photo"></div>
+          <div class="field"><label>模型</label><div class="val mono">kling-v2.1 / std</div></div>
+          <div class="field"><label>提示词</label><div class="val">羊毛混纺 · 侧光</div></div>
+        </div>
+        <div class="node-foot"><span class="meta">显影中 · 00:41</span><span class="meta">SLOT 02</span></div>
+        <span class="handle l"></span><span class="handle r"></span>
+      </div>
+
+      <div class="node" style="grid-column: 9 / span 4; grid-row: 8;">
+        <div class="node-head"><span class="idx">N-03</span><span class="title">结果输出</span><span class="dot dot-idle"></span></div>
+        <div class="node-body">
+          <div class="field"><label>输出</label><div class="val mono">自动 · 2048px PNG</div></div>
+        </div>
+        <div class="node-foot"><span class="meta">RESULT</span><span class="meta">QUEUED</span></div>
+        <span class="handle l"></span>
+      </div>
+
+      
+      <div class="canvas-plate gc-plate"><span class="label">PLATE / 01 · 本季色板</span></div>
+    </main>
+
+    <!-- 右栏：Inspector -->
+    <aside class="inspector">
+      <div class="section-head">
+        <span class="gc-meta-index">属性面板 · N-02</span>
+        <h2>线稿转渲染</h2>
+      </div>
+      <div class="insp-group">
+        <div class="g-title">参数 / PARAMETERS</div>
+        <div class="insp-row"><span class="k">模型</span><span class="v mono">kling-v2.1</span></div>
+        <div class="insp-row"><span class="k">分辨率</span><span class="v mono">2048 × 2048</span></div>
+        <div class="insp-row"><span class="k">种子</span><span class="v mono">88421036</span></div>
+        <div class="insp-row"><span class="k">参考强度</span><span class="v mono">0.72</span></div>
+      </div>
+      <div class="insp-group">
+        <div class="g-title">运行 / RUN</div>
+        <div class="insp-row"><span class="k">状态</span><span class="v"><span class="chip"><span class="dot"></span>RUNNING</span></span></div>
+        <div class="insp-row"><span class="k">耗时</span><span class="v mono">00:41 / ~02:00</span></div>
+        <div class="insp-row"><span class="k">槽位</span><span class="v mono">CAMPAIGN-07 · SLOT 02</span></div>
+      </div>
+      <div class="insp-actions">
+        <button class="btn-secondary">设为输入</button>
+        <button class="cta" style="border-radius:999px;">重跑此节点</button>
+      </div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>

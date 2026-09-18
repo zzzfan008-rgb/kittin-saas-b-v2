@@ -1,0 +1,178 @@
+/* ============================================================
+   Coin AI · Canvas — 第 4 主题「纸感编者」Editorial Paper
+   机读唯一事实源（token 层）。design.md 人读版只引用 token 名。
+   主题 id: data-theme="paper"（浅色） / "paper-dark"（深色变体）
+   配色全部经 WCAG 程序预验证（见 design.md §对比度审计）。
+   ============================================================ */
+
+/* ---------- 浅色 · 纸感编者（默认形态） ---------- */
+[data-theme="paper"] {
+  /* -- 壳层 / 画布 / 面板 -- */
+  --gc-shell: #fbfaf7;              /* 暖米白 */
+  --gc-canvas: #f5f2ec;             /* 画布纸底（比壳层深半档） */
+  --gc-panel: #ffffff;              /* 面板卡 = 纯白（白卡语言延续） */
+  --gc-panel-hover: #ebe7dc;        /* 浅卡其 */
+  --gc-control: #fbfaf7;            /* 输入框等内控底 */
+  --gc-text: #24231f;               /* 墨黑棕 */
+  --gc-text-muted: #767571;         /* 正文次级（= ink/62 on paper, 4.42:1） */
+  --gc-border: rgba(36, 35, 31, 0.15);   /* 分隔线一律 ink/15 */
+  --gc-border-strong: rgba(36, 35, 31, 0.38);
+
+  /* -- 行动色：编辑紫（一色一义） -- */
+  --gc-accent: #4a42b8;             /* 白字 7.60:1 / 米白上 7.28:1（加深的编辑紫） */
+  --gc-accent-cta-ink: #ffffff;
+  --gc-accent-deep: #3f38a8;        /* hover 加深（白字 8.96:1） */
+  --gc-primary-foreground: #ffffff;
+
+  /* -- 编者装饰板（仅装饰，不载文本） -- */
+  --gc-plate-coral: #ef6b7a;        /* 珊瑚：plate / 状态点 / 硬投影（装饰） */
+  --gc-plate-acid: #d9f23a;         /* 酸绿：plate 第三色带 */
+  --gc-plate-teal: #65b9aa;         /* 青：plate 备选 / 空态板 */
+  --gc-plate-brick: #dca56a;        /* 砖橙：plate 备选 */
+  --gc-deco-text: #c9334e;          /* 珊瑚的「文字安全」变体 4.95:1（badge 文字） */
+
+  /* -- 节点卡：纯白语言延续 -- */
+  --gc-node-main: #ffffff;
+  --gc-node-header: #ffffff;
+  --gc-node-inner: #fbfaf7;
+  --gc-node-inner-hover: #f1eee6;
+  --gc-node-border: rgba(36, 35, 31, 0.15);
+  --gc-node-text: #24231f;
+  --gc-node-muted: #767571;
+  --gc-node-accent: #4a42b8;
+  --gc-edge: #4a42b8;               /* 连线 = 强调紫单色 */
+  --gc-handle-highlight: #d9d5f5;
+  --gc-handle-mid: #7d76e0;
+  --gc-handle-dark: #3f38a8;
+  --gc-handle-ring: rgba(74, 66, 184, 0.75);
+  --gc-handle-glow: rgba(125, 118, 224, 0.8);
+
+  /* -- 状态色浅底覆盖（与同族浅底主题同规则；queued 避开紫族用琥珀） -- */
+  --gc-status-queued: #a16207;      /* 4.72:1 on paper（替代 2.71:1 的亮琥珀） */
+  --gc-status-running: #3b82f6;
+  --gc-status-retry: #ea8a00;
+  --gc-status-success: #1d7a3e;
+  --gc-status-error: #c9334e;       /* 与编者珊瑚同族加深，4.95:1 */
+  --gc-status-unknown: #0f766e;     /* 青 5.24:1（与紫 6.28 距离足够） */
+  --gc-status-idle: #8a8880;
+  --gc-warn-text: #92600a;
+
+  /* -- 排版角色（本主题独有新增 token） -- */
+  --gc-font-display: Georgia, "Songti SC", "Noto Serif SC", "STSong", serif;
+  --gc-font-editorial-meta: var(--gc-font-mono);   /* 编号/标签沿用等宽栈 */
+  --gc-tracking-display: -0.04em;   /* 展示字负字距（≤48px 尺度） */
+  --gc-tracking-meta: 0.14em;       /* 全大写 mono 标签字距 */
+  --gc-elev-hard: 4px 4px 0 var(--gc-plate-coral);  /* 硬投影，零模糊，仅 1 处/屏 */
+}
+
+/* ---------- 深色变体 · 纸感编者·墨（夜间等价形态） ---------- */
+/* 反色带母题的自然延伸：暖墨底 + 米白墨 + 提亮紫 */
+[data-theme="paper-dark"] {
+  --gc-shell: #1d1a17;
+  --gc-canvas: #23201b;             /* 暖墨画布 */
+  --gc-panel: #2b2823;              /* 面板 = 提亮墨（深底不用纯白卡，见 design.md §决策 4） */
+  --gc-panel-hover: #38342d;
+  --gc-control: #262320;
+  --gc-text: #f5f2ec;               /* 米白墨 */
+  --gc-text-muted: #a09d98;         /* = ink/60 on ground, 6.21:1 */
+  --gc-border: rgba(245, 242, 236, 0.16);
+  --gc-border-strong: rgba(245, 242, 236, 0.38);
+
+  --gc-accent: #9c96f2;             /* 提亮编辑紫 6.23:1 on canvas */
+  --gc-accent-cta-ink: #1d1a17;     /* CTA 上反用深字 7.9:1 级 */
+  --gc-accent-deep: #b3aef7;
+  --gc-primary-foreground: #1d1a17;
+
+  --gc-plate-coral: #f28390;        /* 装饰板提亮，6.51:1 */
+  --gc-plate-acid: #d9f23a;
+  --gc-plate-teal: #7ccabf;
+  --gc-plate-brick: #e0b384;
+  --gc-deco-text: #f28390;
+
+  --gc-node-main: #fbfaf7;          /* 节点卡深底用「米白纸卡」而非纯白：保持纸感 */
+  --gc-node-header: #fbfaf7;
+  --gc-node-inner: #f1eee6;
+  --gc-node-inner-hover: #e7e2d6;
+  --gc-node-border: rgba(245, 242, 236, 0.22);
+  --gc-node-text: #24231f;
+  --gc-node-muted: #767571;
+  --gc-node-accent: #5149cf;        /* 纸卡上回到浅底紫 */
+  --gc-edge: #9c96f2;               /* 画布连线用提亮紫 */
+  --gc-handle-highlight: #d9d5f5;
+  --gc-handle-mid: #9c96f2;
+  --gc-handle-dark: #5a52d9;
+  --gc-handle-ring: rgba(156, 150, 242, 0.75);
+  --gc-handle-glow: rgba(156, 150, 242, 0.8);
+
+  --gc-status-queued: #f5b83d;      /* 9.44:1 on ground */
+  --gc-status-running: #60a5fa;
+  --gc-status-retry: #fb923c;
+  --gc-status-success: #34d399;
+  --gc-status-error: #f28390;
+  --gc-status-unknown: #5eead4;     /* 11.35:1 */
+  --gc-status-idle: #8a8880;
+  --gc-warn-text: #fbbf24;
+
+  --gc-font-display: Georgia, "Songti SC", "Noto Serif SC", "STSong", serif;
+  --gc-font-editorial-meta: var(--gc-font-mono);
+  --gc-tracking-display: -0.04em;
+  --gc-tracking-meta: 0.14em;
+  --gc-elev-hard: 4px 4px 0 rgba(242, 131, 144, 0.85);
+}
+
+/* ---------- 共享装饰工具类（token 化，禁内联 hex） ---------- */
+/* 几何色卡 Plate：三色硬边斜切带 + 白描圆/方 + 角落编号 */
+.gc-plate {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--gc-accent) 0 38%,
+    var(--gc-plate-coral) 38% 71%,
+    var(--gc-plate-acid) 71%
+  );
+}
+.gc-plate-alt {  /* 备选配色板：青/砖族 */
+  background: linear-gradient(
+    135deg,
+    var(--gc-plate-teal) 0 38%,
+    var(--gc-plate-brick) 38% 71%,
+    var(--gc-accent) 71%
+  );
+}
+.gc-plate::before {  /* 白描边圆 */
+  content: "";
+  position: absolute;
+  left: 18%; top: 19%;
+  width: 34%; aspect-ratio: 1;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+.gc-plate::after {   /* 白描边方 */
+  content: "";
+  position: absolute;
+  right: 17%; bottom: 17%;
+  width: 22%; aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+/* 编号系统：mono + 全大写 + 宽字距（消费方负责 content，如 "01 / CANVAS"） */
+.gc-meta-index {
+  font-family: var(--gc-font-editorial-meta);
+  font-size: 10px;
+  letter-spacing: var(--gc-tracking-meta);
+  text-transform: uppercase;
+  color: var(--gc-text-muted);
+}
+
+/* 展示衬线标题（区块级 28–48px 档；营销页 clamp 巨字不移植） */
+.gc-display {
+  font-family: var(--gc-font-display);
+  font-weight: 400;
+  letter-spacing: var(--gc-tracking-display);
+  line-height: 1.06;
+  color: var(--gc-text);
+}
+
+/* 硬投影卡（每屏至多 1 处：项目页签主卡或空态 CTA 卡） */
+.gc-elev-hard { box-shadow: var(--gc-elev-hard); }

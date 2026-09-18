@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garment Canvas · 可灵绿方向 · 决策板 V4</title>
+<style>
+/* ============================================================
+   V4 · 可灵灵动画布参考:曜黑章换荧光绿;简白章 CTA 深绿白字;
+   护眼绿保持翡翠。连线带语义标签(图片/文本)。全值过 WCAG。
+   ============================================================ */
+
+/* ---- 曜黑 · 荧光绿 ---- */
+:root, [data-theme="obsidian"] {
+  --gc-canvas:#16181d; --gc-shell:#1a1c22; --gc-panel:#21242a; --gc-panel-hover:#2b2f36;
+  --gc-control:#1e2126; --gc-text:#e8eaee; --gc-text-muted:#9ba1a9;
+  --gc-border:#33373f; --gc-border-strong:#454a53;
+  --gc-accent:#B7F35A; --gc-accent-ink:#131313;
+  --node-card:#ffffff; --node-inner:#f2f3f5; --node-inner-hover:#e9eaee;
+  --node-divider:#e4e6ea; --node-text:#1d1d1f; --node-muted:#6b7075;
+  --node-shadow:0 0 0 0.5px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
+  --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.42), 0 8px 18px rgba(0,0,0,.4), 0 28px 60px rgba(0,0,0,.56);
+  --edge:#B7F35A;
+  --st-idle:#8e8e93; --st-queued:#eab308; --st-running:#60a5fa; --st-retry:#fb923c;
+  --st-success:#34d399; --st-error:#f87171; --st-unknown:#a78bfa;
+  --board-bg:#101116; --board-ink:#e8eaee; --board-muted:#9ba1a9; --board-line:#2a2d34;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+}
+/* ---- 简白 · Apple + 深绿 CTA ---- */
+[data-theme="apple"] {
+  --gc-canvas:#f5f5f7; --gc-shell:#f5f5f7; --gc-panel:rgba(255,255,255,.72);
+  --gc-panel-hover:#e8e8ed; --gc-control:#ffffff; --gc-text:#1d1d1f; --gc-text-muted:#6e6e73;
+  --gc-border:rgba(0,0,0,.08); --gc-border-strong:rgba(0,0,0,.16);
+  --gc-accent:#0071e3; --gc-accent-ink:#ffffff;
+  --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
+  --node-card:#ffffff; --node-inner:#f5f5f7; --node-inner-hover:#ececf0;
+  --node-divider:rgba(0,0,0,.07); --node-text:#1d1d1f; --node-muted:#6e6e73;
+  --node-shadow:0 0 0 0.5px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 8px rgba(0,0,0,.05), 0 20px 44px rgba(0,0,0,.11);
+  --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.06), 0 8px 16px rgba(0,0,0,.08), 0 28px 60px rgba(0,0,0,.15);
+  --edge:#0071e3;
+  --st-idle:#8e8e93; --st-queued:#c79002; --st-running:#3b82f6; --st-retry:#ea8a00;
+  --st-success:#1d7a3e; --st-error:#d30000; --st-unknown:#6e54b3;
+  --board-bg:#f5f5f7; --board-ink:#1d1d1f; --board-muted:#6e6e73; --board-line:rgba(0,0,0,.08);
+}
+/* ---- 护眼绿 · 薄荷翡翠(不变) ---- */
+[data-theme="eye"] {
+  --gc-canvas:#E9F1EA; --gc-shell:#EDF4EE; --gc-panel:#ffffff; --gc-panel-hover:#DCE9DD;
+  --gc-control:#f4f9f5; --gc-text:#123B2B; --gc-text-muted:#47685A;
+  --gc-border:#c9dccc; --gc-border-strong:#a8c2ac;
+  --gc-accent:#0B7A43; --gc-accent-ink:#ffffff;
+  --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
+  --node-card:#ffffff; --node-inner:#f0f6f1; --node-inner-hover:#e5efe7;
+  --node-divider:#e2ece4; --node-text:#123B2B; --node-muted:#47685A;
+  --node-shadow:0 0 0 0.5px rgba(18,59,43,.06), 0 1px 2px rgba(18,59,43,.05), 0 4px 10px rgba(18,59,43,.06), 0 20px 44px rgba(18,59,43,.11);
+  --node-shadow-lift:0 0 0 0.5px rgba(18,59,43,.07), 0 2px 4px rgba(18,59,43,.06), 0 8px 18px rgba(18,59,43,.09), 0 28px 60px rgba(18,59,43,.16);
+  --edge:#0B7A43;
+  --st-idle:#6d8d7c; --st-queued:#a1801a; --st-running:#2f6db5; --st-retry:#c07a10;
+  --st-success:#1d7a3e; --st-error:#c23a3a; --st-unknown:#5e50a8;
+  --board-bg:#DDE9DF; --board-ink:#123B2B; --board-muted:#47685A; --board-line:#c2d5c5;
+}
+:root{ --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  --ease-out:cubic-bezier(0.16,1,0.3,1); --dur-1:120ms; --dur-2:180ms;
+}
+/* 焦点环 */
+:where(a,button,input,select,[role="button"]):focus-visible{
+  outline:2px solid var(--gc-accent); outline-offset:2px; border-radius:inherit;
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:clip}
+body{background:var(--board-bg);color:var(--board-ink);
+  font-family:system-ui,-apple-system,"PingFang SC","Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.47;letter-spacing:-0.16px;padding-bottom:100px;transition:background .3s}
+
+/* ---- 顶栏 ---- */
+.glassnav{position:sticky;top:0;z-index:60;height:52px;
+  background:var(--gc-panel);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid var(--board-line);display:flex;align-items:center;gap:28px;padding:0 32px}
+.glassnav .brand{font-size:15px;font-weight:600;letter-spacing:-0.3px}
+.glassnav .brand span{color:var(--gc-accent)}
+.glassnav nav{display:flex;gap:22px;margin-left:8px}
+.glassnav nav a{font-size:12.5px;color:var(--board-muted);text-decoration:none}
+.theme-pills{margin-left:auto;display:flex;gap:8px}
+.tp{height:30px;padding:0 16px;border-radius:980px;font-size:12px;letter-spacing:-0.1px;
+  border:1px solid var(--board-line);background:transparent;color:var(--board-muted);
+  font-family:inherit;cursor:pointer;transition:color var(--dur-2) var(--ease-out),border-color var(--dur-2) var(--ease-out),background-color var(--dur-2) var(--ease-out)}
+.tp:hover{color:var(--board-ink);border-color:var(--gc-border-strong)}
+.tp.on{background:var(--gc-accent);border-color:transparent;color:var(--gc-accent-ink);font-weight:500}
+
+/* ---- Hero ---- */
+.hero{text-align:center;padding:96px 32px 64px}
+.hero .kicker{font-size:17px;font-weight:600;letter-spacing:-0.3px;color:var(--gc-accent);margin-bottom:6px}
+.hero h1{font-size:clamp(36px,4.6vw,60px);font-weight:650;letter-spacing:-0.5px;line-height:1.08;margin:0 auto 14px;max-width:18ch}
+.hero .sub{font-size:clamp(17px,1.9vw,22px);color:var(--board-muted);max-width:46ch;margin:0 auto 28px;letter-spacing:-0.3px}
+.hero .ctas{display:flex;gap:14px;justify-content:center}
+.pill{height:40px;padding:0 24px;border-radius:980px;font-size:15px;font-family:inherit;cursor:pointer;letter-spacing:-0.2px;
+  display:inline-flex;align-items:center;transition:background-color var(--dur-2) var(--ease-out),transform var(--dur-1) var(--ease-out)}
+.pill.filled{background:var(--gc-cta-bg,var(--gc-accent));color:var(--gc-cta-ink,var(--gc-accent-ink));border:1px solid transparent}
+.pill.filled:hover{filter:brightness(1.06)}
+.pill.filled:active{transform:scale(.97)}
+.pill.ghost{background:transparent;border:1px solid var(--gc-border-strong);color:var(--board-ink)}
+.pill.ghost:hover{border-color:var(--gc-accent);color:var(--gc-accent)}
+
+/* ---- 分区 ---- */
+.wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+.sechead{text-align:center;margin-bottom:32px}
+.sechead h2{font-size:clamp(28px,3.2vw,44px);font-weight:650;letter-spacing:-0.5px;line-height:1.08}
+.sechead p{font-size:15px;color:var(--board-muted);margin-top:10px;letter-spacing:-0.2px}
+section{margin-top:80px}
+
+/* ---- 画布舞台 ---- */
+.stage{position:relative;border-radius:18px;overflow:hidden;
+  background:var(--gc-canvas);min-height:620px;box-shadow:var(--node-shadow)}
+.stage::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle, var(--gc-border) 1px, transparent 1.3px) 0 0/24px 24px}
+.stagelabel{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--board-muted);opacity:.85}
+.stagelabel.tl{top:16px;left:20px}.stagelabel.tr{top:16px;right:20px}
+.stagelabel.bl{bottom:16px;left:20px}.stagelabel.br{bottom:16px;right:20px}
+.ct-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* ---- 节点卡 ---- */
+.node{position:absolute;width:300px;border-radius:12px;background:var(--node-card);color:var(--node-text);box-shadow:var(--node-shadow);border:none}
+.node.selected{box-shadow:0 0 0 2px var(--gc-accent),0 0 0 6px color-mix(in srgb,var(--gc-accent) 10%,transparent),var(--node-shadow-lift)}
+.node-head{display:flex;align-items:center;gap:10px;padding:14px 18px 12px}
+.node-head .title{flex:1;min-width:0;font-size:13.5px;font-weight:600;letter-spacing:-0.25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-head .kind{font-size:10px;color:var(--node-muted);font-family:var(--mono);letter-spacing:.1em}
+.node-body{padding:0 18px 18px;display:flex;flex-direction:column;gap:14px}
+.node-head + .node-body{padding-top:2px;border-top:1px solid var(--node-divider);padding-top:14px;margin-top:2px}
+
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;position:relative}
+.dot.idle{background:var(--st-idle)}.dot.queued{background:var(--st-queued)}
+.dot.running{background:var(--st-running)}
+.dot.running::after,.dot.retry::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:1.5px solid currentColor;opacity:.45}
+.dot.running{color:var(--st-running)}.dot.retry{background:var(--st-retry);color:var(--st-retry)}
+.dot.success{background:var(--st-success)}.dot.error{background:var(--st-error)}.dot.unknown{background:var(--st-unknown)}
+
+.handle{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--edge);
+  border:2.5px solid var(--node-card);box-shadow:0 1px 3px rgba(0,0,0,.18);
+  cursor:crosshair;transition:transform .15s var(--ease-out),background .15s var(--ease-out)}
+.node:hover .handle,.handle:hover,.handle.connecting{background:var(--gc-accent);transform:scale(1.2)}
+.handle.out{right:-7px;top:24px}.handle.in{left:-7px;top:24px}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label{font-size:11.5px;color:var(--node-muted);letter-spacing:-0.1px;font-weight:500;min-height:1lh}
+.field .val{font-family:var(--mono);font-size:11.5px;color:var(--node-text)}
+.input,.select{width:100%;height:32px;border-radius:8px;padding:0 11px;border:1px solid var(--gc-border);
+  background:var(--node-inner);color:var(--node-text);font-size:12.5px;font-family:inherit;letter-spacing:-0.15px;
+  transition:border-color var(--dur-2) var(--ease-out);outline:2px solid transparent;outline-offset:1px}
+.input:hover,.select:hover{border-color:var(--gc-border-strong)}
+.input:focus-visible,.select:focus-visible{outline-color:var(--gc-accent);border-color:var(--gc-accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--gc-accent) 18%,transparent)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* CTA:曜黑=荧光绿墨字;简白/护眼=深绿白字 */
+.run{width:100%;height:34px;border:0;border-radius:980px;cursor:pointer;
+  background:var(--gc-cta-bg,var(--gc-accent));color:var(--gc-cta-ink,var(--gc-accent-ink));
+  font-size:13px;font-weight:500;font-family:inherit;letter-spacing:-0.15px;
+  transition:background-color var(--dur-2) var(--ease-out),transform var(--dur-1) var(--ease-out)}
+.run:hover{filter:brightness(1.06)}
+.run:active{transform:scale(.98)}
+.run.running{
+  background:#e8f5ec;
+  color:#166534;
+  border:1px solid #bfe3cc;
+}
+.run:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;background:var(--gc-control);color:var(--gc-text-muted);border:1px solid var(--gc-border)}
+
+/* 连线语义标签 */
+.edge-label{position:absolute;transform:translate(-50%,-50%);
+  background:var(--node-card);color:var(--node-muted);
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  padding:3px 8px;border-radius:980px;border:1px solid var(--gc-border);
+  pointer-events:none;white-space:nowrap}
+
+[data-theme="apple"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
+[data-theme="eye"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
+[data-theme="obsidian"] .run.running{background:#1f2b1a;color:#B7F35A;border:1px solid #3d521f}
+
+.warn-line{font-size:11.5px;color:var(--st-retry);line-height:1.5}
+
+.drop{border:1.5px dashed var(--gc-border-strong);border-radius:10px;height:96px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--node-muted);font-size:12px;transition:border-color .15s var(--ease-out)}
+.drop:hover{border-color:var(--gc-accent)}
+.drop .glyph{font-size:17px;opacity:.6}
+.drop small{font-size:10px;font-family:var(--mono);opacity:.75}
+
+/* ---- 控件架 ---- */
+.shelf{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.shelf-card{background:var(--node-card);border-radius:14px;padding:24px;box-shadow:var(--node-shadow);display:flex;flex-direction:column;gap:16px}
+.shelf-card h3{font-size:17px;font-weight:600;letter-spacing:-0.3px}
+.shelf-card .demo{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn2{height:32px;padding:0 18px;border-radius:980px;font-size:13px;font-family:inherit;cursor:pointer;
+  letter-spacing:-0.15px;border:1px solid var(--gc-border);background:var(--node-card);
+  color:var(--node-text);box-shadow:var(--node-shadow);
+  transition:color var(--dur-2) var(--ease-out),border-color var(--dur-2) var(--ease-out),transform var(--dur-1) var(--ease-out)}
+.btn2:hover{border-color:var(--gc-accent);color:var(--gc-accent)}
+.btn2:active{transform:scale(.97)}
+.btn2.primary{background:var(--gc-cta-bg,var(--gc-accent));color:var(--gc-cta-ink,var(--gc-accent-ink));border-color:transparent}
+.btn2.ghost{background:transparent;box-shadow:none;border-color:transparent;color:var(--node-muted)}
+input[type=range]{accent-color:var(--gc-accent);width:160px}
+
+/* ---- 主题三联卡 ---- */
+.theme3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.t3{border-radius:14px;padding:26px;min-height:230px;position:relative;overflow:hidden;box-shadow:var(--node-shadow)}
+.t3 h4{font-size:19px;font-weight:650;letter-spacing:-0.35px;margin-bottom:6px}
+.t3 p{font-size:12.5px;line-height:1.55;opacity:.72;max-width:30ch}
+.t3 .sw{position:absolute;bottom:22px;left:26px;display:flex;gap:8px}
+.t3 .sw i{width:26px;height:26px;border-radius:7px;display:block}
+.t3.a{background:#f5f5f7;color:#1d1d1f}
+.t3.b{background:#16181d;color:#e8eaee}
+.t3.c{background:#E9F1EA;color:#123B2B}
+
+/* ---- 决策落款 ---- */
+.decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.dec{background:var(--node-card);border-radius:12px;padding:22px 24px;box-shadow:var(--node-shadow)}
+.dec .no{font-family:var(--mono);font-size:10px;color:var(--gc-accent);letter-spacing:.16em;margin-bottom:8px}
+.dec b{display:block;font-size:15px;font-weight:600;letter-spacing:-0.25px;margin-bottom:6px}
+.dec span{font-size:12.5px;color:var(--node-muted);line-height:1.6}
+
+.colophon{max-width:1200px;margin:100px auto 0;padding:26px 32px 0;border-top:1px solid var(--board-line);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--board-muted)}
+</style>
+</head>
+<body data-theme="obsidian">
+
+<header class="glassnav">
+  <div class="brand">Garment <span>Canvas</span></div>
+  <nav><a href="#stage">画布</a><a href="#controls">控件</a><a href="#themes">主题</a></nav>
+  <div class="theme-pills">
+    <button class="tp on" data-t="obsidian">曜黑 · 荧光绿</button>
+    <button class="tp" data-t="apple">简白 · Apple</button>
+    <button class="tp" data-t="eye">护眼绿</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="kicker">V4 · 可灵灵动画布参考</div>
+  <h1>绿，只属于动作。</h1>
+  <p class="sub">曜黑画布 + 荧光绿主行动 + 深绿 CTA。简白与护眼绿保持各自 accent，连线语义标签化。</p>
+  <div class="ctas">
+    <a class="pill ghost" href="#stage" style="text-decoration:none">先看画布</a>
+    <a class="pill filled" href="#themes" style="text-decoration:none">对比三主题</a>
+  </div>
+</div>
+
+<!-- 01 画布 -->
+<section class="wrap" id="stage">
+  <div class="sechead">
+    <h2>节点三连。绿线即语义。</h2>
+    <p>荧光绿只落在曜黑章的主 CTA 与连线；简白/护眼绿 CTA 用深绿 #166534。胶囊标签让数据流一眼可读。</p>
+  </div>
+  <div class="stage">
+    <span class="stagelabel tl">GARMENT CANVAS · V4</span>
+    <span class="stagelabel tr">1280 × AUTO</span>
+    <span class="stagelabel bl">GRID 24</span>
+    <span class="stagelabel br">REVIEW</span>
+    <svg class="ct-svg" viewBox="0 0 1140 620" preserveAspectRatio="none">
+      <defs>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--gc-accent)"/>
+        </marker>
+      </defs>
+      <path d="M 330 150 C 400 150, 410 330, 480 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 330 470 C 400 470, 410 344, 480 342" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 790 340 C 856 340, 866 332, 916 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+    </svg>
+
+    <!-- 连线语义标签 -->
+    <span class="edge-label" style="left:415px;top:252px">图片</span>
+    <span class="edge-label" style="left:415px;top:430px">图片</span>
+    <span class="edge-label" style="left:856px;top:340px">图片</span>
+
+    <div class="node" style="left:40px; top:96px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">图1 · 原始图案</span>
+        <span class="kind">INPUT</span>
+        <span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop"><span class="glyph">⬒</span>点击 / 拖拽 / Ctrl+V<small>JPG · PNG · WEBP · BMP</small></div>
+        <div class="field"><label>引用角色</label><div class="val">garment_full · 主体保真</div></div>
+      </div>
+    </div>
+
+    <div class="node" style="left:40px; top:416px;">
+      <div class="node-head">
+        <span class="dot idle"></span>
+        <span class="title">图2 · 风格参考</span>
+        <span class="kind">INPUT</span>
+        <span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop"><span class="glyph">⬒</span>点击 / 拖拽 / Ctrl+V<small>JPG · PNG · WEBP · BMP</small></div>
+        <div class="field"><label>引用角色</label><div class="val">styling_only · 仅风格</div></div>
+      </div>
+    </div>
+
+    <div class="node selected" style="left:480px; top:200px;">
+      <div class="node-head">
+        <span class="dot running"></span>
+        <span class="title">图案风格迁移</span>
+        <span class="kind">AI</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="field"><label>指令</label><input class="input" value="以图2的材质与色彩语言重绘图1"></div>
+        <div class="row2">
+          <div class="field"><label>模型</label><select class="select"><option>GPT Image 2 · hi</option></select></div>
+          <div class="field"><label>输出尺寸</label><input class="input mono" value="1536 × 2048"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>生成数量</label><select class="select"><option>1 张</option></select></div>
+          <div class="field"><label>参考图</label><div class="val">2 / 8</div></div>
+        </div>
+        <button class="run running">运行中 · 轻点取消</button>
+      </div>
+    </div>
+
+    <div class="node" style="left:916px; top:238px;">
+      <div class="node-head">
+        <span class="dot idle"></span>
+        <span class="title">迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span>
+      </div>
+      <div class="node-body">
+        <div class="drop" style="height:110px;"><span class="glyph">◍</span>等待上游输出</div>
+        <button class="run" disabled>未验证不可运行</button>
+        <p class="warn-line">该流程尚未通过评估，暂不可付费运行。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 控件 -->
+<section class="wrap" id="controls">
+  <div class="sechead">
+    <h2>控件，一套语言。</h2>
+    <p>胶囊 CTA 随主题换底色：曜黑荧光绿墨字、简白/护眼深绿白字。</p>
+  </div>
+  <div class="shelf">
+    <div class="shelf-card">
+      <h3>按钮 · 三级</h3>
+      <div class="demo">
+        <button class="btn2 primary">运行</button>
+        <button class="btn2">从素材库选择</button>
+        <button class="btn2 ghost">取消</button>
+        <button class="btn2" disabled style="opacity:.4;cursor:not-allowed">未验证不可运行</button>
+      </div>
+    </div>
+    <div class="shelf-card">
+      <h3>输入 · 数值与校验</h3>
+      <div class="demo">
+        <input class="input mono" style="width:132px" value="1536 × 2048">
+        <input class="input" placeholder="节点名称…">
+        <span class="field" style="width:150px">
+          <label>输出尺寸</label>
+          <input class="input" style="border-color:var(--st-error)" value="1536 × 9999" aria-invalid="true">
+          <span class="helper error" style="color:var(--st-error);font-size:11.5px">尺寸超上限，支持 ≤ 4096</span>
+        </span>
+      </div>
+    </div>
+    <div class="shelf-card">
+      <h3>滑杆与下拉</h3>
+      <div class="demo">
+        <span class="field" style="flex-direction:row;align-items:center;gap:10px">
+          <label style="margin:0">重绘强度</label>
+          <input type="range" min="0" max="100" value="60" aria-label="重绘强度">
+          <span class="val" style="font-family:var(--mono)">0.60</span>
+        </span>
+        <span class="field" style="width:170px">
+          <label>图片模型</label>
+          <select class="select"><option>GPT Image 2 · hi</option></select>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 主题 -->
+<section class="wrap" id="themes">
+  <div class="sechead">
+    <h2>三块画布，一个产品。</h2>
+    <p>曜黑为默认工作主题；简白与护眼绿保留各自 accent，CTA 统一深绿。</p>
+  </div>
+  <div class="theme3">
+    <div class="t3 a">
+      <h4>简白 · Apple</h4>
+      <p>#f5f5f7 画布 + 白卡。蓝连线/焦点，CTA 深绿 #166534 白字（7.13:1）。</p>
+      <div class="sw"><i style="background:#f5f5f7;border:1px solid rgba(0,0,0,.1)"></i><i style="background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,.15)"></i><i style="background:#0071e3"></i><i style="background:#166534"></i></div>
+    </div>
+    <div class="t3 b">
+      <h4>曜黑 · 荧光绿</h4>
+      <p>#16181d 提亮黑画布 + 白卡 + 荧光绿 #B7F35A（13.5:1）。连线即绿。</p>
+      <div class="sw"><i style="background:#16181d"></i><i style="background:#ffffff"></i><i style="background:#B7F35A"></i><i style="background:#eab308"></i></div>
+    </div>
+    <div class="t3 c">
+      <h4>护眼绿 · 薄荷翡翠</h4>
+      <p>#E9F1EA 薄荷画布 + 白卡 + 翡翠绿 #0B7A43。清爽不浑浊。</p>
+      <div class="sw"><i style="background:#E9F1EA"></i><i style="background:#ffffff;box-shadow:0 0 0 1px rgba(18,59,43,.12)"></i><i style="background:#0B7A43"></i><i style="background:#123B2B"></i></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 决策落款 -->
+<section class="wrap">
+  <div class="sechead"><h2>待签字。</h2></div>
+  <div class="decisions">
+    <div class="dec">
+      <div class="no">D1 · 曜黑</div>
+      <b>活力黄 → 荧光绿 #B7F35A</b>
+      <span>黄在黑底上 11.6:1，绿 13.5:1；荧光绿更年轻、更时尚。连线/handle/CTA 统一绿。</span>
+    </div>
+    <div class="dec">
+      <div class="no">D2 · 简白</div>
+      <b>CTA 改深绿 #166534（白字 7.13:1），蓝只做连线/焦点</b>
+      <span>深绿与荧光绿同色相呼（曜黑章），与 Apple 蓝明度拉开；Apple 蓝保留给连线/焦点环/链接。运行态 = 浅绿底深绿字（#e8f5ec/#166534，6.35:1），禁用 = 中性灰。</span>
+    </div>
+    <div class="dec">
+      <div class="no">D3 · 护眼绿</div>
+      <b>翡翠 #0B7A43 不变，CTA 同深绿 #166534</b>
+      <span>与薄荷画布同族且对比达标；CTA 与简白统一为深绿，跨章一致。</span>
+    </div>
+    <div class="dec">
+      <div class="no">D4 · 连线</div>
+      <b>加语义标签「图片 / 文本」</b>
+      <span>可灵 DNA：连线上胶囊标签让数据流一眼可读，成本极低。</span>
+    </div>
+  </div>
+</section>
+
+<div class="colophon">
+  <span>GARMENT CANVAS · V4 · KELING REFERENCE</span>
+  <span>CONTRAST VERIFIED · B7F35A 13.5:1 · 166534 7.86:1</span>
+  <span>PAGE 01 / 01</span>
+</div>
+
+<script>
+document.querySelectorAll('.tp').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tp').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.body.dataset.theme=btn.dataset.t;
+  });
+});
+</script>
+</body>
+</html>
