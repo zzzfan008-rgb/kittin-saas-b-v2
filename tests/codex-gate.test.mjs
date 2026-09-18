@@ -846,8 +846,8 @@ for (const [label, graph, expected] of [
   assert.equal(result.status, 0, `最终 clean-HEAD 门禁应通过：${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
     readFileSync(npmLog, "utf8").trim().split("\n"),
-    ["ci", "run check", "run test:e2e", "run build", "run test:e2e:production"],
-    "完整门禁必须先执行 npm ci，再按固定顺序执行验证套件",
+    ["ci", "run check", "run test:e2e", "run build:server", "run test:e2e:production"],
+    "完整门禁必须先执行 npm ci，再按固定顺序执行验证套件；build:web 已由 check 覆盖，此处只补跑 build:server",
   );
   assert.equal(existsSync(apiyiLog), false, "普通最终差异不得启动 API易知识库门禁");
   assert.match(readFileSync(depCruiseLog, "utf8"), /--config \.dependency-cruiser\.cjs --output-type json src server scripts e2e/);

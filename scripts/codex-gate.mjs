@@ -133,6 +133,26 @@ function run(command, args, options = {}) {
   }
 }
 
+/**
+ * 阶段计时（纯新增日志，不改判定逻辑）：给门禁的每个阶段打点，输出
+ * `[gate] <label>: X.Xs`，便于后续优化有据可依。fn 抛错时同样记时并原样重抛。
+ */
+function timedStage(label, fn) {
+  const startedAt = process.hrtime.bigint();
+  try {
+    const result = fn();
+    console.log(`[gate] ${label}: ${stageElapsedSeconds(startedAt)}s`);
+    return result;
+  } catch (error) {
+    console.log(`[gate] ${label}: ${stageElapsedSeconds(startedAt)}s (failed)`);
+    throw error;
+  }
+}
+
+function stageElapsedSeconds(startedAt) {
+  return (Number(process.hrtime.bigint() - startedAt) / 1e9).toFixed(1);
+}
+
 function nodeVersionAtLeast(version, minimumVersion = REQUIRED_NODE_VERSION) {
   const current = version.replace(/^v/, "").split(".").map(Number);
   const minimum = minimumVersion.replace(/^v/, "").split(".").map(Number);
@@ -978,6 +998,7 @@ if (!cliArgs.includes("--review-only") && !nodeVersionAtLeast(process.versions.n
 
 const selection = reviewSelection(cliArgs);
 console.log(`Gate: ${selection.label}`);
+const gateStartedAt = process.hrtime.bigint();
 
 const initialHead = output("git", ["rev-parse", "HEAD"]);
 const initialStatus = output("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
@@ -989,15 +1010,17 @@ if (selection.finalEvidence) {
   }
 }
 
-verifyApiyiKnowledge(selection);
+timedStage("apiyi knowledge gate", () => verifyApiyiKnowledge(selection));
 
 if (!process.argv.includes("--review-only")) {
-  run("npm", ["ci"]);
-  run("npm", ["run", "check"]);
-  run("npm", ["run", "test:e2e"]);
-  run("npm", ["run", "build"]);
-  run("npm", ["run", "test:e2e:production"]);
-  checkSelectedDiff(selection);
+  timedStage("npm ci", () => run("npm", ["ci"]));
+  timedStage("npm run check", () => run("npm", ["run", "check"]));
+  timedStage("npm run test:e2e", () => run("npm", ["run", "test:e2e"]));
+  // `check` 内部已跑过 build:web（tsc -b + vite build + 预算/样式校验），这里只补跑
+  // 缺失的 server 构建，避免把 web 构建重复执行一遍。
+  timedStage("npm run build:server", () => run("npm", ["run", "build:server"]));
+  timedStage("npm run test:e2e:production", () => run("npm", ["run", "test:e2e:production"]));
+  timedStage("git diff --check", () => checkSelectedDiff(selection));
   const finalHead = output("git", ["rev-parse", "HEAD"]);
   const finalSnapshot = workspaceSnapshot();
   if (finalHead !== initialHead || finalSnapshot !== initialSnapshot) {
@@ -1007,12 +1030,13 @@ if (!process.argv.includes("--review-only")) {
   console.warn("仅重跑模型评审段；该结果不能单独作为完整门禁证据。");
 }
 
-const codeIntelligenceEvidence = verifyCodeIntelligence(selection);
+const codeIntelligenceEvidence = timedStage("code intelligence", () => verifyCodeIntelligence(selection));
 const reviewerCodeIntelligenceEvidence = compactCodeIntelligenceEvidence(codeIntelligenceEvidence);
 const reviewBudgetSeconds = Math.max(1, Math.floor(reviewTimeoutMs() / 1000));
 const reviewerTerminationTimeoutMs = reviewTimeoutMs() + reviewTerminationGraceMs();
 
 const workDir = mkdtempSync(join(tmpdir(), "garment-canvas-codex-gate-"));
+const reviewStartedAt = process.hrtime.bigint();
 
 try {
   const scopeEvidence = reviewScope(selection);
@@ -1156,4 +1180,6 @@ ${REVIEW_SENTINEL_CLOSE}`;
   }
 } finally {
   rmSync(workDir, { recursive: true, force: true });
+  console.log(`[gate] hermes review: ${stageElapsedSeconds(reviewStartedAt)}s`);
+  console.log(`[gate] total: ${stageElapsedSeconds(gateStartedAt)}s`);
 }
