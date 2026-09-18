@@ -1,12 +1,12 @@
 # 三基础节点模型重构 — 架构方案（P1：只出方案，不写产品代码）
 
-- 状态：**已定稿 v3.2**（Q1=B / Q2=A / Q3=A / Q4=A / Q5=A + 缺口评审 D1/D2/D3 + R-39 参考图序号「拉线自动定序 + 节点显示」裁定落地）
-- 日期：2026-09-18（v3 同日：Q3 裁定落地；v3.1 同日：orchestrator 缺口评审 16 条修复 + D1 有账无闸 / D2 媒体连导 / D3 视频容量不设限裁定落地；v3.2 同日：R-39 序号口径取代 v3 的 B1/B2）
-- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q3=A、Q4=A、Q5=A、D1=B 有账无闸、D2=A 媒体连导、D3 视频容量不设限、R-39 拉线自动定序 + 节点显示）
+- 状态：**已定稿 v3.3**（Q1=B / Q2=A / Q3=A / Q4=A / Q5=A + 缺口评审 D1/D2/D3 + R-39 参考图序号「拉线自动定序 + 节点显示」裁定落地 + R-41 功能定义契约补章）
+- 日期：2026-09-18（v3 同日：Q3 裁定落地；v3.1 同日：orchestrator 缺口评审 16 条修复 + D1 有账无闸 / D2 媒体连导 / D3 视频容量不设限裁定落地；v3.2 同日：R-39 序号口径取代 v3 的 B1/B2；v3.3 同日：R-41 PromptVariant 完整 schema + 六族迁移对照补章）
+- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q3=A、Q4=A、Q5=A、D1=B 有账无闸、D2=A 媒体连导、D3 视频容量不设限、R-39 拉线自动定序 + 节点显示）+ R-41 用户指出「功能节点没有讲清楚，要怎么设置」
 - 作者：architect
 
-> 本方案对每条需求/约束标注可追溯挂靠（R1–R10、§3.1–§3.8、R-39）。
-> Q1–Q5 全部裁定已落地；orchestrator 缺口评审（A1–A4/B1–B10/C1–C2）已全部回应；R-39 序号口径已落地，方案定稿，可直接进入 P2。
+> 本方案对每条需求/约束标注可追溯挂靠（R1–R10、§3.1–§3.8、R-39、R-41）。
+> Q1–Q5 全部裁定已落地；orchestrator 缺口评审（A1–A4/B1–B10/C1–C2）已全部回应；R-39 序号口径已落地；R-41 功能定义契约（PromptVariant 完整 schema + 六族迁移对照）已补章，方案定稿，可直接进入 P2。
 
 ---
 
@@ -174,6 +174,18 @@ export interface ImageModelOptions {
 | CI 5 个必需检查 | **不变**。本次改动不新增/删除 CI job；`unit` job 内相关测试按上表改断言 | `.github/workflows/ci.yml` 无需改动 |
 
 关键判断：R5 放开的是**模型参数的取值硬校验**，不是放开**模型清单契约**。`IMAGE_MODEL_IDS` 与 `model-contracts.json` 的一致性断言（`imageModels.ts` 顶部 throw）**保留不动**——那道防线守的是"契约外模型不得进入运行时"，与 R5 无关。
+
+### 1.5 功能定义契约（R-41 补章，2026-09-18 晚）
+
+「一个功能由哪些字段定义」与「旧六族功能 → 新变体清单的迁移对照」的完整契约，定版在 **`contracts/prompt-variant-schema.md`**。本节只做入口与裁定挂靠，正文不复制：
+
+- **PromptVariant 完整 schema**（新模型下定版）：逐字段去留 + `needsMask` 新增（Q4=A 落地）+ `mode` 归属反转（节点自描述 → 变体携带）+ `nodeKind` 取值域 9→3——见 `contracts/prompt-variant-schema.md` §1。
+- **查询键契约**：四键（family×model×kind×mode）保留，`modelId` 维度仍需保留（同 family/mode 在不同模型上的 `fullPrompt` 写法差异是实质的，不做跨模型共享变体），`listGarmentPromptVariants` 的 filter 口径——见 `contracts/prompt-variant-schema.md` §2。
+- **六族迁移对照表**（用户最想要的那张表）：upscale / print-extract / print-mutate / fabric-recolor / ai-modify / sketch-to-render 逐条列「新变体 id / 提示词正文逐字迁移源 / 适用 kind / needsMask / 备注」+ 蒙版族迁移（mask-redraw 路径不同：ID 不变 + `needsMask: true` 显式化）+ 文本族新增（prompt-polish / prompt-generate，Q1=B）+ 视频族新增（P2-e 落地）+ 被合并/取消的旧行为明文清单（一色一图循环、分批出图、fabricImageUrl、{colors} 占位拼接）——见 `contracts/prompt-variant-schema.md` §3。
+- **新增一个功能的设置流程**（操作性说明）：从提出（逐字段填齐 + supportStatus=unverified）→ PR 评审合入 → 评估 campaign → release registry 发布 → 回滚——见 `contracts/prompt-variant-schema.md` §4，与 §3.6 治理衔接。
+- **与 R-40 悬浮窗口的分工**：本文定「功能是什么」（数据/契约口径），窗口长什么样归 R-40——分工表与冲突回报路径见 `contracts/prompt-variant-schema.md` §5。
+
+裁定记录见 §6。
 
 ---
 
@@ -383,11 +395,13 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 
 ---
 
-## 6. 裁定记录（Q1–Q5 + R-39，全部落定）
+## 6. 裁定记录（Q1–Q5 + R-39 + R-41，全部落定）
 
 > v1 提出 5 问；v2 收到 Q1=B、Q2=A、Q4=A、Q5=A；v3 收到 Q3=A（2026-09-18 晚，经 designer 对比材料 `q3-canvas-forms/comparison.md` 评审后用户拍板）。至此 Q1–Q5 全部裁定完毕，**方案定稿**。
 >
 > **R-39（2026-09-18 晚，orchestrator 中继用户原话）**：「正常应该是在用户拉线的时候，自动给图片节点排序打标，并且把顺序在图片的右上角显示出来」——**取代** v3 中 B1/B2 的「边顺序编辑归悬浮窗口」口径：用户要的是**拉线自动定序 + 序号在节点上直接可见**，不是去悬浮窗口手动调顺序。落地位置：§1.3「参考图序号的展示语义」段、contracts/graph-invariants.md §2b、contracts/runtime.md §5b 改写、contracts/test-sync-inventory.md §1.A 序号重排测试条目。视觉与交互规范由 designer 在 R-38（`ref-ordinal-badge/`）产出，本方案只定数据与契约口径。
+>
+> **R-41（2026-09-18 晚，用户指出）**：「功能节点没有讲清楚，要怎么设置」——v3.2 把「功能」从节点类型退化为系统提示词变体，但**没给出 PromptVariant 的完整字段定义契约**，也没给**旧六族功能 → 新变体清单的迁移对照表**。补章落地位置：新增 **`contracts/prompt-variant-schema.md`**（§1 完整 schema + §2 查询键契约 + §3 六族迁移对照 + §4 新增功能设置流程 + §5 与 R-40 悬浮窗口的分工边界）；plan.md §1.5 为入口小节。本条不改 v3.2 已定的任何裁定（Q1–Q5 / D1–D3 / R-39），只补「功能是什么」的定义契约。
 
 | 问题 | 裁定 | 落地位置 |
 |---|---|---|
@@ -450,6 +464,7 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 | `contracts/purge-runbook.md` | 清理执行手册：范围/导出/删除顺序/回执格式（§4） |
 | `contracts/model-proposals.md` | 文本/视频模型对比全文（§5，含知识库页面引用与 SHA） |
 | `contracts/test-sync-inventory.md` | §3.2 要求的 37 个测试 + 3 个 e2e 的逐项处置清单 |
+| `contracts/prompt-variant-schema.md` | R-41 补章：PromptVariant 完整 schema + 查询键契约 + 六族迁移对照表 + 新增功能设置流程 + 与 R-40 悬浮窗口分工边界（§1.5） |
 
 ---
 
