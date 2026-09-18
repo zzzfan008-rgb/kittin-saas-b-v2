@@ -146,6 +146,7 @@ module.exports = {
     // 使用 tsconfig 的 compilerOptions（含 @/* 与 @server/* 路径别名），
     // 否则相对路径之外的别名导入会变成 unresolved，规则会静默漏判。
     tsConfig: { fileName: "tsconfig.json" },
+    tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default"],

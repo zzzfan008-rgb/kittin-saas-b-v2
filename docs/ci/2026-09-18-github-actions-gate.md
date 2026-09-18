@@ -79,13 +79,16 @@ playwright 配置额外硬校验(见 `playwright.config.ts` / `playwright.produc
 `code-intelligence` job 复刻本地 gate 的确定性代码智能证据,但**不含 LLM 评审段**
 (见 §9 未覆盖环节)。
 
-工具来源的差异(必须知情):
+工具来源与版本策略(2026-09-18 R-17 修订):
 
-- 本地 `ast-grep` / `depcruise` 是 brew 全局安装,不在 `package.json` 依赖里;
-  本地 gate 的 `resolveExecutable` 优先仓库 `node_modules/.bin`,再退到 PATH。
-- CI 使用 `npm install --no-save @ast-grep/cli@0.39.5 dependency-cruiser@17.2.0`
-  固定版本拉取,**不改 `package.json`**:是否把门禁工具升级为运行依赖是另一个决策,
-  不应混进「启用 CI」这批改动。
+- `ast-grep` 与 `dependency-cruiser` 已作为 devDependencies 固定进 `package.json`
+  (`@ast-grep/cli@0.39.5`、`dependency-cruiser@18.3.0`),`npm ci` 后从
+  `node_modules/.bin` 直接调用,本地 gate 与 CI 使用同一 lock 文件中的同一版本。
+  版本漂移(本地 brew 18.3.0 vs CI npm 17.2.0)曾导致 CI 的 depcruise 输出
+  不可解析 JSON;根因是 17.2.0 在 `import type` 解析与循环检测上的行为差异,
+  升级 18.3.0 并在 `.dependency-cruiser.cjs` 中显式启用 `tsPreCompilationDeps: true`
+  后消除。ast-grep 0.39.5 为 CI 首轮实测可用版本,与本地 brew 0.45.3 的规则集
+  兼容;若后续升级需同步验证 `sgconfig.yml` 全部规则。
 - 版本号固定到具体版本而非 range,保证 CI 可复现;升级走显式改动。
 - dependency-cruiser 步骤通过 `NODE_PATH=$PWD/node_modules` 指向仓库依赖,
   与本地 gate 一致——缺失时会静默漏掉全部 TS 模块(见 codex-gate.mjs 注释)。

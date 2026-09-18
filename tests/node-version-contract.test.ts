@@ -44,11 +44,57 @@ assert.match(
 );
 
 assert.equal(read(".nvmrc").trim(), "24.20.0", ".nvmrc 必须固定最低受支持版本");
-assert.equal(
-  fs.existsSync(new URL("../.github/workflows/ci.yml", import.meta.url)),
-  false,
-  "GitHub Actions CI 已由本地交付门禁替代",
+
+// GitHub Actions CI 是项目门禁载体（AGENTS.md §6）。下面的断言把「workflow 必须存在
+// 且关键面正确」固化成契约,防止意外回退到「没有 CI」或「CI 配置漂移」状态。
+// 与 docs/ci/2026-09-18-github-actions-gate.md 同义,但不复制 YAML 条文。
+const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url);
+assert.ok(
+  fs.existsSync(ciWorkflowPath),
+  ".github/workflows/ci.yml 必须存在：GitHub Actions 是项目门禁载体",
 );
+const ciWorkflow = read(".github/workflows/ci.yml");
+assert.match(
+  ciWorkflow,
+  /^on:\s*\n\s+push:/m,
+  "CI 必须在 push 事件触发",
+);
+assert.match(
+  ciWorkflow,
+  /^  pull_request:\s*\n\s+branches:\s*\[main\]/m,
+  "CI 必须在目标是 main 的 pull_request 事件触发",
+);
+for (const job of ["static", "unit", "e2e", "production-smoke", "code-intelligence"]) {
+  assert.match(
+    ciWorkflow,
+    new RegExp(`^  ${job}:\\s*$`, "m"),
+    `CI 必须包含 ${job} job`,
+  );
+}
+// 凡是要起 PostgreSQL 的 job,库名必须以 _test 结尾（scripts/test-with-postgres.mjs 硬校验）
+// 且镜像必须是 postgres:18（AGENTS.md §1「PostgreSQL 18 is the production source of truth」）。
+assert.match(
+  ciWorkflow,
+  /image:\s*postgres:18/,
+  "CI 的 PostgreSQL service 必须使用 postgres:18",
+);
+assert.match(
+  ciWorkflow,
+  /POSTGRES_DB:\s*garment_canvas_test/,
+  "CI 的 PostgreSQL service 库名必须以 _test 结尾",
+);
+// Node 版本必须从 .nvmrc 读取（node-version-file）,不允许在 YAML 里复制版本号。
+assert.match(
+  ciWorkflow,
+  /node-version-file:\s*\.nvmrc/,
+  "CI 必须用 node-version-file 从 .nvmrc 读取 Node 版本",
+);
+assert.doesNotMatch(
+  ciWorkflow,
+  /node-version:\s*["']?\d/,
+  "CI 不得用 node-version 字面量固定 Node 版本（应以 .nvmrc 为唯一事实来源）",
+);
+
 const codexGate = read("scripts/codex-gate.mjs");
 assert.match(
   codexGate,

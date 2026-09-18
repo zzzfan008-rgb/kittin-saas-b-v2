@@ -158,11 +158,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      # ast-grep 与 dependency-cruiser 不在 package.json 依赖里（本地靠 brew 安装），
-      # CI 用 npx 固定版本拉取，避免把门禁工具升级为运行依赖的决策混进本批改动。
-      - name: Install gate tools
-        run: |
-          npm install --no-save --no-audit --no-fund @ast-grep/cli@0.39.5 dependency-cruiser@17.2.0
+      # ast-grep 与 dependency-cruiser 已固定进 devDependencies，npm ci 后
+      # 直接从 node_modules/.bin 调用，与本地 gate 的 resolveExecutable 顺序一致。
       # depcruise 需要 NODE_PATH 指向仓库 node_modules 才能用本仓库的 typescript 解析
       # TS 模块；缺失时会静默漏掉全部 TS 模块（与本地 gate 行为一致，见 codex-gate.mjs）。
       # dependency-cruiser 的 JSON reporter 退出码恒为 0，「跑失败」只能由 stdout 是否
@@ -171,7 +168,7 @@ jobs:
       - name: dependency-cruiser scan
         run: |
           set +e
-          NODE_PATH="$PWD/node_modules" npx depcruise --config .dependency-cruiser.cjs --output-type json src server scripts e2e > depcruise-report.json
+          NODE_PATH="$PWD/node_modules" node_modules/.bin/depcruise --config .dependency-cruiser.cjs --output-type json src server scripts e2e > depcruise-report.json
           status=$?
           set -e
           if [ "$status" -ne 0 ] && [ ! -s depcruise-report.json ]; then
@@ -201,7 +198,7 @@ jobs:
       - name: ast-grep scan
         run: |
           set +e
-          npx ast-grep scan --config sgconfig.yml --json src server scripts e2e > ast-grep-findings.json
+          node_modules/.bin/ast-grep scan --config sgconfig.yml --json src server scripts e2e > ast-grep-findings.json
           status=$?
           set -e
           if [ "$status" -ne 0 ] && [ ! -s ast-grep-findings.json ]; then
