@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 test("login form exposes its validation and errors", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "登录服装设计工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
   const account = page.getByRole("textbox", { name: "账号" });
   const password = page.getByLabel("密码");
   const submit = page.getByRole("button", { name: "登录" });
@@ -22,7 +22,7 @@ test("login form exposes its validation and errors", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveText("账号或密码错误");
 });
 
-test("login composition stays inside the right-side safe area at desktop widths", async ({ page }) => {
+test("login V4 split layout: brand pane + token card at desktop widths", async ({ page }) => {
   const viewports = [
     { width: 1024, height: 768 },
     { width: 1280, height: 720 },
@@ -33,58 +33,54 @@ test("login composition stays inside the right-side safe area at desktop widths"
     await page.setViewportSize(viewport);
     await page.goto("/");
 
-    const brand = page.getByTestId("login-brand");
     const card = page.getByTestId("login-card");
-    const background = page.locator('img[src="/assets/login/coin-ai-canvas-studio.webp"]');
-
-    await expect(brand).toBeVisible();
     await expect(card).toBeVisible();
-    await expect(background).toBeVisible();
-    await expect(page.getByRole("heading", { name: "COIN AI CANVAS" })).toBeVisible();
-    await expect(brand).toContainText("回到你的设计画布，继续这一季的创作吧！");
 
-    const brandBox = await brand.boundingBox();
+    // 品牌区（左侧）在所有验收宽度可见
+    const brandPane = page.locator("aside[aria-hidden='true']");
+    await expect(brandPane).toBeVisible();
+    await expect(page.getByRole("heading", { name: "让每一张面料，" })).toBeVisible();
+    await expect(page.getByText("无限画布")).toBeVisible();
+
     const cardBox = await card.boundingBox();
-    const backgroundBox = await background.boundingBox();
-    expect(brandBox).not.toBeNull();
+    const brandBox = await brandPane.boundingBox();
     expect(cardBox).not.toBeNull();
-    expect(backgroundBox).not.toBeNull();
-    if (!brandBox || !cardBox || !backgroundBox) throw new Error("login geometry is unavailable");
+    expect(brandBox).not.toBeNull();
+    if (!cardBox || !brandBox) throw new Error("login geometry is unavailable");
 
-    expect(brandBox.x).toBeGreaterThan(viewport.width * 0.52);
-    expect(cardBox.x).toBeGreaterThan(viewport.width * 0.52);
+    // 登录卡在右侧列内，不溢出视口
+    expect(cardBox.x).toBeGreaterThan(viewport.width * 0.5);
     expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(viewport.width - 24);
     expect(cardBox.width).toBeGreaterThanOrEqual(340);
-    expect(cardBox.width).toBeLessThanOrEqual(viewport.width >= 1440 ? 500 : 440);
-    if (viewport.width >= 1440) expect(cardBox.width).toBeGreaterThanOrEqual(480);
-    expect(Math.abs((brandBox.x + brandBox.width / 2) - (cardBox.x + cardBox.width / 2))).toBeLessThanOrEqual(1);
-    expect(brandBox.y + brandBox.height).toBeLessThan(cardBox.y);
+    expect(cardBox.width).toBeLessThanOrEqual(400);
     expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(viewport.height - 24);
-    expect(backgroundBox.x).toBeCloseTo(0, 0);
-    expect(backgroundBox.y).toBeCloseTo(0, 0);
-    expect(backgroundBox.width).toBeCloseTo(viewport.width, 0);
-    expect(backgroundBox.height).toBeCloseTo(viewport.height, 0);
 
-    const cardStyle = await card.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return { backgroundColor: style.backgroundColor, backdropFilter: style.backdropFilter };
-    });
-    expect(
-      cardStyle.backgroundColor.includes("/ 0.72") || cardStyle.backgroundColor.endsWith(", 0.72)"),
-    ).toBe(true);
-    expect(cardStyle.backdropFilter).toContain("blur(");
+    // 品牌区占左侧（x 起点小于视口一半）
+    expect(brandBox.x).toBeLessThan(viewport.width * 0.5);
+    expect(brandBox.width).toBeGreaterThan(viewport.width * 0.4);
 
+    // 无横向溢出
     const documentMetrics = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
     }));
     expect(documentMetrics.scrollWidth).toBeLessThanOrEqual(documentMetrics.viewportWidth);
 
-    const imageMetrics = await background.evaluate((image: HTMLImageElement) => ({
-      complete: image.complete,
-      naturalWidth: image.naturalWidth,
-      naturalHeight: image.naturalHeight,
-    }));
-    expect(imageMetrics).toEqual({ complete: true, naturalWidth: 3840, naturalHeight: 2143 });
+    // 登录卡使用主题 token（不透明面板色，非旧玻璃拟态）
+    const cardStyle = await card.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { backgroundColor: style.backgroundColor, backdropFilter: style.backdropFilter };
+    });
+    expect(cardStyle.backgroundColor).not.toContain("0.72");
+    expect(cardStyle.backdropFilter === "none" || cardStyle.backdropFilter === "").toBe(true);
+
+    // 输入框可见且可聚焦
+    const accountInput = page.locator('input[name="accountId"]');
+    await expect(accountInput).toBeVisible();
+    await accountInput.focus();
+    await expect(accountInput).toBeFocused();
+
+    const passwordInput = page.locator('input[name="password"]');
+    await expect(passwordInput).toBeVisible();
   }
 });

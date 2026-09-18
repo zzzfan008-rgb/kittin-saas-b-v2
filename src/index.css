@@ -66,6 +66,7 @@ body {
     sans-serif;
   font-feature-settings: "kern" 1, "liga" 1;
 }
+/* V4 登录页已改为分屏结构（LoginPage.tsx），旧标题类保留作为字体特性兜底 */
 
 :root {
   --gc-media-overlay-text: #f4f4f4;

@@ -41,102 +41,135 @@ export function LoginPage() {
   };
 
   return (
-    <main className="relative isolate h-full overflow-y-auto bg-[#c9c5c0] text-[#151719]">
-      <img
+    <main className="relative isolate grid h-full overflow-y-auto bg-[var(--gc-canvas)] text-[var(--gc-text)] lg:grid-cols-[1fr_480px]">
+      {/* 左:品牌叙事区(1024 以下隐藏) */}
+      <aside
         aria-hidden="true"
-        alt=""
-        src="/assets/login/coin-ai-canvas-studio.webp"
-        className="absolute inset-0 h-full w-full object-cover object-center"
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,12,14,0.04)_0%,rgba(10,12,14,0.01)_48%,rgba(246,244,240,0.08)_62%,rgba(246,244,240,0.24)_100%)]"
-      />
-
-      <section className="relative z-10 ml-auto flex min-h-full w-[46%] min-w-[440px] items-center justify-center px-[clamp(2rem,4vw,5.5rem)] py-10">
-        <div className="w-full max-w-[440px] min-[1440px]:max-w-[500px]">
-          <header className="text-center text-[#111315]" data-testid="login-brand">
-            <h1 className="login-brand-title whitespace-nowrap text-[clamp(2.625rem,4vw,4rem)] leading-none font-light tracking-[-0.055em] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:[animation-fill-mode:both] motion-reduce:animate-none">
-              <span className="block">COIN AI CANVAS</span>
-            </h1>
-            <p className="mt-5 whitespace-nowrap text-[clamp(1rem,1.35vw,1.125rem)] leading-7 font-medium tracking-[-0.02em] text-[#373a3d] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-safe:[animation-delay:80ms] motion-safe:[animation-fill-mode:both] motion-reduce:animate-none">
-              <span className="block">回到你的设计画布，继续这一季的创作吧！</span>
-            </p>
-          </header>
-
-          <form
-            onSubmit={submit}
-            data-testid="login-card"
-            className="relative mt-7 w-full overflow-hidden rounded-[28px] border border-white/60 bg-[#f8f6f1]/72 p-7 shadow-[0_28px_80px_rgba(22,24,26,0.16),inset_0_1px_0_rgba(255,255,255,0.38)] backdrop-blur-xl backdrop-saturate-125 before:pointer-events-none before:absolute before:inset-x-7 before:top-0 before:h-px before:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.95),transparent)] before:content-[''] min-[1440px]:p-8 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500 motion-safe:[animation-delay:160ms] motion-safe:[animation-fill-mode:both] motion-reduce:animate-none"
-          >
-            <div className="mb-6 min-[1440px]:mb-7">
-              <p className="text-[11px] font-semibold tracking-[0.26em] text-[#62666a] uppercase min-[1440px]:text-[11px]">Designer workspace</p>
-              <h2 className="mt-2 text-xl font-semibold tracking-[-0.025em] text-[#151719] min-[1440px]:text-[1.375rem]">登录服装设计工作台</h2>
-              <p className="mt-1.5 text-xs leading-5 text-[#62666a] min-[1440px]:text-[13px]">账号由管理员创建，同一账号仅允许一个设备在线。</p>
-            </div>
-
-            <label className="block space-y-2">
-              <span className="text-xs font-medium text-[#303337] min-[1440px]:text-[13px]">账号</span>
-              <Input
-                autoFocus
-                name="accountId"
-                value={accountId}
-                onChange={(event) => setAccountId(event.target.value)}
-                autoComplete="username"
-                placeholder="请输入账号"
-                className="h-12 rounded-xl border-[#202327]/15 bg-white/58 px-4 text-sm text-[#151719] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] placeholder:text-[#6b6f73] focus-visible:border-[#707b86] focus-visible:bg-white/72 focus-visible:ring-[#8a96a2]/22 min-[1440px]:h-14 min-[1440px]:text-[15px]"
-              />
-            </label>
-
-            <div className="mt-4">
-              <label htmlFor="login-password" className="block text-xs font-medium text-[#303337] min-[1440px]:text-[13px]">密码</label>
-              <div className="mt-2 flex h-12 overflow-hidden rounded-xl border border-[#202327]/15 bg-white/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition-[border-color,box-shadow,background-color] focus-within:border-[#707b86] focus-within:bg-white/72 focus-within:ring-3 focus-within:ring-[#8a96a2]/22 min-[1440px]:h-14">
-                <Input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="current-password"
-                  placeholder="请输入密码"
-                  className="h-full flex-1 rounded-none border-0 bg-transparent px-4 text-sm text-[#151719] shadow-none placeholder:text-[#6b6f73] focus-visible:border-transparent focus-visible:ring-0 min-[1440px]:text-[15px]"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={showPassword ? "隐藏输入内容" : "显示输入内容"}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  className="h-full w-12 shrink-0 rounded-none text-[#6b6f73] hover:bg-[#151719]/7 hover:text-[#151719] focus-visible:ring-[#8a96a2]/32 motion-reduce:transition-none min-[1440px]:w-14"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M2.4 12s3.5-6 9.6-6 9.6 6 9.6 6-3.5 6-9.6 6-9.6-6-9.6-6Z" />
-                    <circle cx="12" cy="12" r="2.8" />
-                    {showPassword && <path d="m4 4 16 16" />}
-                  </svg>
-                </Button>
-              </div>
-            </div>
-
-            {error && (
-              <p role="alert" className="mt-4 rounded-xl border border-red-800/20 bg-red-50/70 px-3 py-2 text-xs text-red-800">
-                {error}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              disabled={submitting || !accountId || !password}
-              aria-busy={submitting}
-              className="mt-6 h-12 w-full rounded-xl bg-[#121416] text-sm font-semibold tracking-[0.08em] text-white shadow-[0_12px_28px_rgba(18,20,22,0.22)] transition-[transform,background-color,box-shadow] hover:-translate-y-px hover:bg-black hover:shadow-[0_16px_34px_rgba(18,20,22,0.28)] focus-visible:ring-[#8a96a2]/38 active:translate-y-0 disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none min-[1440px]:h-14 min-[1440px]:text-[15px]"
-            >
-              {submitting ? "登录中…" : "登录"}
-            </Button>
-
-            <p className="mt-4 text-center text-[11px] leading-5 text-[#686c70] min-[1440px]:text-xs">如需重置密码，请联系管理员</p>
-          </form>
+        className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 20% 80%, color-mix(in srgb, var(--gc-accent) 6%, transparent), transparent), linear-gradient(160deg, var(--gc-shell) 0%, var(--gc-panel) 100%)",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{
+            background:
+              "radial-gradient(circle, color-mix(in srgb, var(--gc-text-muted) 18%, transparent) 1px, transparent 1.3px) 0 0/28px 28px",
+          }}
+        />
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--gc-accent)] text-sm font-extrabold tracking-tight text-[var(--gc-accent-cta-ink)] shadow-[0_2px_8px_color-mix(in_srgb,var(--gc-accent)_30%,transparent)]">
+            GC
+          </span>
+          <span className="text-[15px] font-bold tracking-tight">Garment Canvas</span>
         </div>
+        <div className="relative z-10 max-w-[520px]">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
+            COIN AI · CANVAS STUDIO
+          </p>
+          <h1 className="mt-4 text-[clamp(36px,4vw,52px)] font-bold leading-[1.08] tracking-[-0.03em]">
+            让每一张面料，
+            <br />
+            都有<span className="text-[var(--gc-accent)]">无限画布</span>。
+          </h1>
+          <p className="mt-[18px] max-w-[400px] text-[15px] leading-relaxed text-[var(--gc-text-muted)]">
+            节点式 AI 工作台，为服装设计师而生。从草图到成衣效果图，从图案迁移到视频展示——在一个画布里完成。
+          </p>
+        </div>
+        <div className="relative z-10 flex gap-8">
+          {["节点式工作流", "多模型生成", "团队项目空间"].map((feature) => (
+            <span key={feature} className="flex items-center gap-2.5 text-xs tracking-tight text-[var(--gc-text-muted)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--gc-accent)] shadow-[0_0_8px_color-mix(in_srgb,var(--gc-accent)_50%,transparent)]" />
+              {feature}
+            </span>
+          ))}
+        </div>
+      </aside>
+
+      {/* 右:登录卡 */}
+      <section className="relative z-10 flex min-h-full items-center justify-center bg-[var(--gc-canvas)] px-10 py-10">
+        <form
+          onSubmit={submit}
+          data-testid="login-card"
+          className="w-full max-w-[400px] rounded-[20px] bg-[var(--gc-panel)] p-9 text-[var(--gc-text)] shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--gc-border)_60%,transparent),0_1px_2px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.1),0_20px_44px_rgba(0,0,0,0.18)]"
+        >
+          <div className="mb-7">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
+              Designer workspace
+            </p>
+            <h2 className="mt-2 text-[22px] font-bold tracking-[-0.02em]">登录工作台</h2>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--gc-text-muted)]">
+              账号由管理员创建，同一账号仅允许一个设备在线。
+            </p>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold tracking-tight">账号</span>
+            <Input
+              autoFocus
+              name="accountId"
+              value={accountId}
+              onChange={(event) => setAccountId(event.target.value)}
+              autoComplete="username"
+              placeholder="请输入账号"
+              className="h-11 rounded-[10px] border-[var(--gc-border)] bg-[var(--gc-control)] px-3.5 text-[13.5px] placeholder:text-[var(--gc-text-muted)] focus-visible:border-[var(--gc-accent)] focus-visible:ring-[color-mix(in_srgb,var(--gc-accent)_18%,transparent)] focus-visible:ring-[3px]"
+            />
+          </label>
+
+          <div className="mt-4">
+            <label htmlFor="login-password" className="block text-xs font-semibold tracking-tight">
+              密码
+            </label>
+            <div className="mt-1.5 flex h-11 overflow-hidden rounded-[10px] border border-[var(--gc-border)] bg-[var(--gc-control)] transition-[border-color,box-shadow] focus-within:border-[var(--gc-accent)] focus-within:ring-[3px] focus-within:ring-[color-mix(in_srgb,var(--gc-accent)_18%,transparent)]">
+              <Input
+                id="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="请输入密码"
+                className="h-full flex-1 rounded-none border-0 bg-transparent px-3.5 text-[13.5px] shadow-none placeholder:text-[var(--gc-text-muted)] focus-visible:border-transparent focus-visible:ring-0"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={showPassword ? "隐藏输入内容" : "显示输入内容"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="h-full w-11 shrink-0 rounded-none text-[var(--gc-text-muted)] hover:bg-[color-mix(in_srgb,var(--gc-text)_7%,transparent)] hover:text-[var(--gc-text)] focus-visible:ring-[color-mix(in_srgb,var(--gc-accent)_32%,transparent)] motion-reduce:transition-none"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M2.4 12s3.5-6 9.6-6 9.6 6 9.6 6-3.5 6-9.6 6-9.6-6-9.6-6Z" />
+                  <circle cx="12" cy="12" r="2.8" />
+                  {showPassword && <path d="m4 4 16 16" />}
+                </svg>
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 rounded-[10px] border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-[var(--gc-status-error,--gc-status-error,#dc2626)]"
+            >
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            disabled={submitting || !accountId || !password}
+            aria-busy={submitting}
+            className="mt-6 h-[46px] w-full rounded-[980px] bg-[var(--gc-accent)] text-sm font-bold tracking-[0.02em] text-[var(--gc-accent-cta-ink)] shadow-[0_4px_14px_color-mix(in_srgb,var(--gc-accent)_30%,transparent)] transition-[transform,filter,box-shadow] hover:-translate-y-px hover:brightness-105 focus-visible:ring-[color-mix(in_srgb,var(--gc-accent)_38%,transparent)] focus-visible:ring-[3px] focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:opacity-40 disabled:shadow-none motion-reduce:transform-none motion-reduce:transition-none"
+          >
+            {submitting ? "登录中…" : "登录"}
+          </Button>
+
+          <p className="mt-5 text-center text-[11px] leading-5 text-[var(--gc-text-muted)]">如需重置密码，请联系管理员</p>
+        </form>
       </section>
     </main>
   );
