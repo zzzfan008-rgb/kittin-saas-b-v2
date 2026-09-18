@@ -2,6 +2,7 @@
 
 - 来源：plan.md §2；需求挂靠 R2/R3/R5/R6/R8、§3.3/§3.4/§3.5
 - v2：Q1=B（text 运行路径 §1b 新增）、Q2=A（video 路径 §2 定稿）、Q4=A（kind 特化循环删除）、Q5=A（§5 run 记录口径）已落地。
+- v3：Q3=A（fabric handle 抹平）——`fabricImageUrl` 特化删除，图片入边统一为 reference 顺序语义（§4 末段）。
 
 ## 1. 渲染器组装顺序（image 节点）
 
@@ -103,7 +104,7 @@ export interface VideoProvider {
 | image | §1 统一路径 | 同步 images |
 | video | §2 异步路径 | submit + worker 轮询 + MP4 落地（Q2=A） |
 
-`assertNoRemoteWorkerReferences` 等远程引用防线保留（图片入边/fabricImageUrl 特化删除，mask 保留）。
+`assertNoRemoteWorkerReferences` 等远程引用防线保留（图片入边统一为 reference 语义，fabricImageUrl 特化随 fabric-recolor 旧 kind 一并删除，mask 保留）。
 
 ## 5. result 归位后的运行记录
 

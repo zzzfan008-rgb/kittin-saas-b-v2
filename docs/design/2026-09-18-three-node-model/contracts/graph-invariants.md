@@ -2,7 +2,7 @@
 
 - 来源：plan.md §1.3；需求挂靠 R3、§3.5
 - 本文是三处实现（画布 / schema / 运行前置）的**统一语义来源**；任何一处改动必须同步另两处并由同一条测试断言覆盖。
-- v2：Q1=B 新增 text→text 串联边；Q3 双分支写全（§2 末），默认分支 A。
+- v2：Q1=B 新增 text→text 串联边；Q3 已裁定 A（抹平 fabric handle），无新增规则。
 
 ## 1. 不变量
 
@@ -38,12 +38,16 @@ INV-2（内容）：
 - image 边数量上限：image 节点 ≤ 8；video 节点 ≤ 1（首帧，Q2=A 已裁定）。
 - text→text 串联不触发 INV-1（INV-1 只约束 image/video 节点）；串联成环由 DAG 拓扑环检测兜底（不变）。
 
-### Q3 双分支（待 designer 对比图后用户裁定，默认分支 A）
+### Q3 已裁定：形态 A（抹平）
 
-- **分支 A（默认）：抹平 fabric handle。** 上表即全部边类型；面料参考图是普通 image 边，顺序语义。画布零新增 handle；本文件无新增规则。
-- **分支 B：保留面料专用 handle。** 上表追加一行：fabric 边（image → image，`targetHandle="fabric"`），仅当目标节点选中变体声明 `needsFabricRef: true` 时可用；schema 层追加规则「声明 needsFabricRef 的变体对应节点必须有 ≥1 条 fabric 边」。画布 ImageNode 渲染第三个入边锚点。运行时无差异（参考图仍是顺序数组，fabric 边在数组中的位置由 schema 固定为末位）。
+上表即全部边类型；面料参考图是普通 image 边，顺序语义。画布零新增 handle；本文件无新增规则。
 
-两分支均不改动 INV-1/INV-2 本文。
+- 用户裁定：Q3 = **A（抹平）**，2026-09-18 晚。
+- 依据：`q3-canvas-forms/comparison.md`（含「连错线后果」分析，推荐 A）+ 用户拍板。
+- 语义承载位置：「谁是面料」由选中的系统提示词正文声明（如「参考图 2 = 面料」），顺序即语义。
+- 风险：顺序错导致静默跑偏，由运行前预览（参考图列表按顺序展示缩略图）兜底。
+
+原分支 B（保留 fabric 专用 handle）已否决，不再写入契约。
 
 ## 3. 三处实现点
 
@@ -59,4 +63,4 @@ INV-2（内容）：
 - `tests/dag.test.ts`：INV-2 正例/反例（text 空、text 全空白、多 text 上游拼接顺序）；text 运行路径的输入组装（上游 outputText ?? text 的取值顺序）。
 - `tests/canvas-connection`（或并入现有 e2e）：非法连线 UI 反馈 + 自动补 text 节点行为；text→text 连线的画布允许。
 - 一条跨层一致性测试：同一组非法 flow JSON，schema 拒绝文案与画布 tooltip 文案共享同一 i18n 键。
-- Q3 裁定后补：分支 B 被选中时，fabric 边的 schema 规则与画布锚点测试（分支 A 则无需新增）。
+- Q3=A 后无需新增 fabric handle 测试；原 `targetHandle="fabric"` 特例测试（`FabricRecolorNode.tsx` 中 `selectActiveEdges(...).some(e => e.targetHandle === "fabric")`）随旧节点退役一并删除。

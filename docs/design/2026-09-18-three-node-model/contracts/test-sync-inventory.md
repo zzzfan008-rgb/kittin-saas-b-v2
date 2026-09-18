@@ -3,6 +3,7 @@
 - 来源：plan.md §7；需求挂靠 §3.2
 - 枚举方式：grep -lE 对旧 9 kind 在 tests/ e2e/ 的实际执行结果（2026-09-18）
 - v2：Q1=B 新增 text 运行路径测试条目（§1.A 尾部）；Q4=A 后 kind 特化循环相关断言删除并入 workflow-schema/dag 重写。
+- v3：Q3=A 补充 fabric handle 特例移除条目（§1.A 尾部）。
 
 ## 1. tests/（37 个文件）
 
@@ -28,6 +29,11 @@
 - `tests/selection-consistency.test.ts` — 选择/查看器一致性夹具
 - `tests/schema-migrations.test.ts` — 旧迁移测试删除，改测"v6 及以下一律拒绝"
 - 【Q1=B 新增】`tests/text-run.test.ts`（新文件）— text 运行路径：输入串联组装（上游 outputText ?? text 取值）、变体准入（未选变体不可运行）、同步 Provider 调用 mock、`outputText` 写回且不覆盖 `text`、`generation_runs` kind='text' 记录与 token 计量事件
+- 【Q3=A 新增】fabric handle 特例移除：
+  - `tests/fabric-recolor-*.test.ts` 或现有测试中针对 `targetHandle === "fabric"` 的连线/校验断言 — **删除**（随 fabric-recolor 旧 kind 退役）。
+  - `tests/canvas-connection` 中 fabric/garment 双 handle 连线用例 — **删除**，替换为统一 reference handle 的顺序语义用例（多 image 边按序进入参考图列表）。
+  - `tests/workflow-schema.test.ts` 新增反例：flow JSON 中出现 `targetHandle: "fabric"` 应被 v7 schema 拒绝（未知 handle 类型）。
+  - `tests/dag.test.ts` 中 fabric-recolor 的 garment/fabric 前置检查断言 — **删除**（`assertPlanInputs` 不再按 handle 特化检查）。
 
 ### B. 改断言（逻辑保留，硬校验 → warning）
 - `tests/provider-contract.test.ts` — `imageModelOptionsError` 硬失败断言改 warning 断言

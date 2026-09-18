@@ -2,7 +2,8 @@
 
 - 来源：plan.md §1；需求挂靠 R1/R2/R3/R4/R5/R8
 - 性质：字段级契约。P2 实现以本文为准；改动需回归本方案评审。
-- v2：Q1=B（text 可运行文本模型）、Q2=A（视频落地形态）、Q4=A（mask 保留、循环取消）、Q5=A（清理范围）已落地；Q3 双分支见 §6 附注。
+- v2：Q1=B（text 可运行文本模型）、Q2=A（视频落地形态）、Q4=A（mask 保留、循环取消）、Q5=A（清理范围）已落地。
+- v3：Q3=A（fabric handle 抹平）——边类型仅 `prompt`/`reference` 两种，见 contracts/graph-invariants.md §2。
 
 ## 1. NodeKind
 

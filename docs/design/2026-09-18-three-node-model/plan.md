@@ -1,12 +1,12 @@
 # 三基础节点模型重构 — 架构方案（P1：只出方案，不写产品代码）
 
-- 状态：v2 已定稿（Q1/Q2/Q4/Q5 用户裁定落地；Q3 待 designer 对比图后用户裁定，不阻塞其余部分）
-- 日期：2026-09-18（v2 更新同日）
-- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q4=A、Q5=A）
+- 状态：**已定稿**（Q1=B / Q2=A / Q3=A / Q4=A / Q5=A 全部用户裁定落地，无待确认项）
+- 日期：2026-09-18（v3 更新同日：Q3 裁定落地）
+- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q3=A、Q4=A、Q5=A）
 - 作者：architect
 
 > 本方案对每条需求/约束标注可追溯挂靠（R1–R10、§3.1–§3.8）。
-> Q3 双分支已写全（§1.3 与 contracts/graph-invariants.md §2），其余部分可直接进入 P2。
+> Q1–Q5 全部裁定已落地，方案定稿，可直接进入 P2。
 
 ---
 
@@ -117,12 +117,14 @@ export interface VideoNodeData extends BaseNodeData {
 
 **text 节点的串联入边**（Q1=B 新增）：text 节点接受 0..N 条 text 入边，运行时把上游各 text 输出按边顺序拼接后与自身正文合成输入，用于"多段正文 → 一次润色"的玩法。这条入边只影响 text 运行路径，不改变 R3 对 image/video 的约束。
 
-**Q3（待 designer 对比图后用户裁定）fabric-recolor 的 garment/fabric handle 语义**，两条分支均写全，不阻塞其余定稿：
+**Q3 已裁定：形态 A（抹平）**。image 节点只保留统一通用图片入口（`targetHandle="reference"`），不再有 `targetHandle="fabric"` 专用入口；「谁是面料」的角色语义由**选中的系统提示词正文**声明（如「参考图 2 = 面料」），顺序即语义。
 
-- **分支 A（推荐）：抹平为顺序语义。** 面料参考图就是一条普通图片入边，由系统提示词在正文里说明"参考图 N 是面料"。画布组件零改动（单 `reference` handle）；graph-invariants 无需新增 handle 规则。代价：用户要记住图片顺序，接错顺序即得到错误结果且无结构提示。
-- **分支 B：保留面料专用 handle。** image 节点在 `prompt`/`reference` 之外增加可选 `fabric` handle（仅当选中变体声明 `needsFabricRef: true` 时出现）；schema 校验该变体必须有 fabric 入边；画布节点渲染第三个入边锚点。代价：handle 模型多一条特例规则，连线校验与节点组件各多一处分支。
+- 画布组件零改动：单 `reference` handle，无新增锚点。
+- graph-invariants 无新增 handle 规则：面料参考图就是普通 image 边，数量上限 ≤ 8，顺序 = 边数组顺序。
+- 运行时无差异：`assertPlanInputs` 的 fabric 检查随 fabric-recolor 旧 kind 一并退役；参考图解析仍是顺序数组。
+- 风险与缓解：顺序错导致静默跑偏的风险由运行前预览（参考图列表按顺序展示缩略图）兜底，该列表 UI 已存在。
 
-两分支对运行时无差异（参考图解析都是顺序数组，分支 B 只是画布/schema 层的命名约束）。**默认按分支 A 执行；designer 对比图交付后由用户裁定。**
+裁定记录见 §6。
 
 ### 1.4 参数 schema（R5：取消硬校验，保留推荐值）
 
@@ -356,15 +358,15 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 
 ---
 
-## 6. 裁定记录（Q1–Q5）
+## 6. 裁定记录（Q1–Q5，全部落定）
 
-> v1 提出 5 问；v2 收到 orchestrator 中继的用户裁定：Q1=B、Q2=A、Q4=A、Q5=A 已落地到正文各节；Q3 待 designer 对比图后裁定，双分支已写全于 §1.3。
+> v1 提出 5 问；v2 收到 Q1=B、Q2=A、Q4=A、Q5=A；v3 收到 Q3=A（2026-09-18 晚，经 designer 对比材料 `q3-canvas-forms/comparison.md` 评审后用户拍板）。至此 Q1–Q5 全部裁定完毕，**方案定稿**。
 
 | 问题 | 裁定 | 落地位置 |
 |---|---|---|
 | Q1：text 节点是否调用文本模型 | **B：可运行**（如「AI 润色 / 生成提示词」） | §1.1/§1.2 TextNodeData、§2.1 text 运行路径、§5.1 文本模型设计、contracts/data-model.md §3、contracts/runtime.md §1-text |
 | Q2：视频持久化与首帧形态 | **A：files 表扩 video/mp4，服务端拉 MP4 落地自有存储；首帧缩略图 + 点击播放；video 节点 0..1 图片入边作首帧；本期仍落 `data/` 文件存储** | §1.1、contracts/runtime.md §2、contracts/data-model.md §7 |
-| Q3：fabric handle 是否抹平 | **待定**：等 designer 两种画布形态对比图；双分支已写全，默认分支 A（抹平） | §1.3 Q3 段、contracts/graph-invariants.md §2 |
+| Q3：fabric handle 是否抹平 | **A：抹平为统一 reference 入口**。面料角色语义由系统提示词正文声明，顺序即语义；无 `targetHandle="fabric"` 专用入口。裁定时间 2026-09-18 晚，依据 designer 对比材料 `q3-canvas-forms/comparison.md` + 用户拍板 | §1.3 Q3 段、contracts/graph-invariants.md §2 |
 | Q4：蒙版与多色/裂变形态 | **A：蒙版保留为 image 节点能力（变体声明 needsMask 驱动）；一色一图循环与印花裂变批量取消，由系统提示词 + batchSize 表达；runner 最后一条 kind 特化循环删除** | §1.2 mask 字段、§2.1 末段、contracts/runtime.md §1 |
 | Q5：清理范围 | **A：删 generation_runs/outputs/usage_events；保留 assets 素材库；六族旧功能新变体「上线即 unverified，评估另行排期」接受** | §4.1 范围矩阵、§4.3、contracts/purge-runbook.md |
 
@@ -376,7 +378,7 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 
 | 阶段 | 内容 | 验证标准 |
 |---|---|---|
-| **P1（本方案）** | 方案 + 契约文档 | 本文档评审通过；Q1–Q5 全部裁定（Q3 待 designer 对比图，不阻塞 P2-a/b 开工） |
+| **P1（本方案）** | 方案 + 契约文档 | 本文档评审通过；Q1–Q5 全部裁定（Q3=A 已于 2026-09-18 晚落地，方案定稿） |
 | **P2-a 契约与类型** | `NodeKind` 三值化、`WORKFLOW_SCHEMA_VERSION=7`、`model-contracts.json` 加 `recommendedOptions`、文本模型契约区块（Q1=B）、知识库门禁回执 | `tsc --noEmit` 通过（大量红即是改动面清单）；`docs:apiyi:guard` 通过 |
 | **P2-b 服务端** | workflowSchema v7 校验（含 R3 图级规则）、dag/runner 三分支执行路径（含 text 同步链路 + 文本 Provider）、清理脚本、模板路由适配 | `tests/workflow-schema`、`tests/dag`、`tests/run-queue` 重写后通过 |
 | **P2-c 前端画布** | 三个节点组件（TextNode 含运行状态与采纳交互 / ImageNode / VideoNode）、悬浮窗口（功能/参数/模型）、连线约束、模板启动 | e2e golden-path 重写后通过；1024/1280/1440 三档几何断言 |
