@@ -666,9 +666,12 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   const contextCanvasRect = await rect(canvas);
   expect(Math.abs((await rect(dock)).right - contextCanvasRect.left)).toBeLessThanOrEqual(1);
   expectInside(await rect(zoomControls), contextCanvasRect);
-  const contextMinimapRect = await rect(page.locator(".react-flow__minimap"));
+  const contextMinimap = page.locator(".react-flow__minimap");
+  const contextMinimapRect = await rect(contextMinimap);
   expectInside(contextMinimapRect, contextCanvasRect);
-  expect(contextMinimapRect.width).toBe(contextCanvasRect.width < 760 ? 128 : 200);
+  // 响应式 minimap 宽度经 ResizeObserver → setState → 重渲染才收敛，须等待而非同步断言。
+  await expect.poll(async () => (await rect(contextMinimap)).width)
+    .toBe(contextCanvasRect.width < 760 ? 128 : 200);
   await expectFlowCenter(canvas, originalFlowCenter);
 
   // 两个 Tab Panel 必须保持挂载；切换与 Dock 关闭不能丢失 Results DOM/滚动状态。
@@ -769,9 +772,11 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   const canvasRect = await rect(canvas);
   expect(Math.abs((await rect(dock)).right - canvasRect.left)).toBeLessThanOrEqual(1);
   expectInside(await rect(zoomControls), canvasRect);
-  const minimapRect = await rect(page.locator(".react-flow__minimap"));
+  const minimap = page.locator(".react-flow__minimap");
+  const minimapRect = await rect(minimap);
   expectInside(minimapRect, canvasRect);
-  expect(minimapRect.width).toBe(canvasRect.width < 760 ? 128 : 200);
+  await expect.poll(async () => (await rect(minimap)).width)
+    .toBe(canvasRect.width < 760 ? 128 : 200);
   await expectFlowCenter(canvas, originalFlowCenter);
 
   // 模板浮层必须按当前 Dock 后的中心宽度收缩，不能被画布容器裁切。
