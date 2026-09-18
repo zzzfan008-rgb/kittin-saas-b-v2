@@ -3,6 +3,7 @@
 - 来源：plan.md §1.3；需求挂靠 R3、§3.5
 - 本文是三处实现（画布 / schema / 运行前置）的**统一语义来源**；任何一处改动必须同步另两处并由同一条测试断言覆盖。
 - v2：Q1=B 新增 text→text 串联边；Q3 已裁定 A（抹平 fabric handle），无新增规则。
+- v3.1（缺口修复）：INV-2 注释对齐 runtime.md §0 的下游读取规则；§4 消除重复行并补 i18n 键清单与可访问性要求。
 
 ## 1. 不变量
 
@@ -15,6 +16,7 @@ INV-1（结构）：
 
 INV-2（内容）：
   对 INV-1 中至少一条 text 边的源节点 t：t.data.text.trim() ≠ ""
+  （注：下游读取一律取 data.text 已采纳正文，不取 outputText——统一定义见 runtime.md §0）
 ```
 
 - INV-1 在**保存/加载/模板实例化**时强制（schema 层）。
@@ -60,7 +62,32 @@ INV-2（内容）：
 ## 4. 测试契约（P2 必须落地）
 
 - `tests/workflow-schema.test.ts`：INV-1 正例/反例（无 text 边、text 边来自错误 kind、handle 错误）；text→text 串联边的合法性（允许）与 image→text 边的拒绝。
-- `tests/dag.test.ts`：INV-2 正例/反例（text 空、text 全空白、多 text 上游拼接顺序）；text 运行路径的输入组装（上游 outputText ?? text 的取值顺序）。
+- `tests/dag.test.ts`：INV-2 正例/反例（text 空、text 全空白、多 text 上游拼接顺序）；text 运行路径的输入组装（上游读取按 runtime.md §0 规则：一律 `data.text`，含「上游有未采纳 outputText 时仍取 text」反例）。
 - `tests/canvas-connection`（或并入现有 e2e）：非法连线 UI 反馈 + 自动补 text 节点行为；text→text 连线的画布允许。
 - 一条跨层一致性测试：同一组非法 flow JSON，schema 拒绝文案与画布 tooltip 文案共享同一 i18n 键。
 - Q3=A 后无需新增 fabric handle 测试；原 `targetHandle="fabric"` 特例测试（`FabricRecolorNode.tsx` 中 `selectActiveEdges(...).some(e => e.targetHandle === "fabric")`）随旧节点退役一并删除。
+
+## 5. 新增 UI 文案与 i18n 键清单（本期语言范围：仅中文）
+
+本方案新增的**全部用户可见文案**必须走 i18n 键（禁止硬编码中文字面量），键清单如下（P2-c/P2-d 实现时按此登记；本期语言范围**仅中文**，多语言扩展随产品国际化另行排期）：
+
+| 键（命名空间.名称） | 中文文案 | 出现位置 |
+|---|---|---|
+| `nodes.text.title` / `nodes.image.title` / `nodes.video.title` | 文本 / 图片 / 视频 | 三节点默认 label |
+| `inspector.function` / `inspector.parameters` / `inspector.model` | 功能 / 参数 / 模型 | 悬浮窗口三项配置分区（R4） |
+| `inspector.unverifiedParams` / `inspector.evaluatedParams` | 自定义参数（未评估）/ 已评估参数 | R5 评估绑定标记（runtime.md §5c） |
+| `inspector.orderChanged` | 顺序已变更，角色对应关系以新顺序为准 | 边顺序编辑一次性提示（runtime.md §5b） |
+| `inv1.missingTextUpstream` | 「{节点label}」需要至少一个上游文本节点提供提示词 | INV-1 拒绝（schema 422 + 画布 tooltip 共享此键） |
+| `inv2.emptyTextUpstream` | 「{节点label}」的上游文本节点还没有填写提示词 | INV-2 运行拒绝 + 节点错误徽标 |
+| `variant.revoked` | 所选功能已被撤销，请重新选择 | 变体撤销后的运行拒绝（runtime.md §5d） |
+| `textRun.truncated` | 输出超长已截断 | text 运行 outputText 截断标记（runtime.md §1b） |
+| `textRun.timeout` | 文本模型响应超时 | text 同步链路超时错误（runtime.md §1b） |
+| `textRun.noVariant` | 先在悬浮窗口选择功能 | 未选变体的 text 节点运行按钮提示 |
+| `textRun.unadoptedProposal` | 有未采纳的提案 | 下游读取规则提示（runtime.md §0） |
+
+**可访问性要求**（项目 UI 质量线，AGENTS.md §2 既有要求的落地枚举）：
+
+- 悬浮窗口（Node Inspector Popover）与三个节点组件：键盘可达（Tab 顺序覆盖全部交互控件）、可见焦点环、Esc 关闭悬浮窗口并归还焦点到触发节点、焦点不逃逸（窗口打开时焦点陷在窗口内，关闭后还原）。
+- 顺序编辑列表：上移/下移按钮有 `aria-label`（如「上移 参考图 2」），顺序变更后有 `aria-live="polite"` 播报。
+- 节点错误徽标、R5 参数标记、撤销提示：均有文本等价物（不只颜色/图标），`role="status"` 或等价 aria 标注。
+- 文案键清单内的每条都需有对应的可访问名称（图标按钮不得裸图标）。

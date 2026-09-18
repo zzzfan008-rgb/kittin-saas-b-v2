@@ -4,6 +4,7 @@
 - 性质：字段级契约。P2 实现以本文为准；改动需回归本方案评审。
 - v2：Q1=B（text 可运行文本模型）、Q2=A（视频落地形态）、Q4=A（mask 保留、循环取消）、Q5=A（清理范围）已落地。
 - v3：Q3=A（fabric handle 抹平）——边类型仅 `prompt`/`reference` 两种，见 contracts/graph-invariants.md §2。
+- v3.1（缺口修复）：§3 补 `outputText` 超长处置与持久化口径；§7 定版首帧缩略图（前端渲染，无 ffmpeg 依赖）与 `outputVideos` 语义；§7 补视频容量策略裁定。
 
 ## 1. NodeKind
 
@@ -41,9 +42,12 @@ export interface TextNodeData extends BaseNodeData {
   promptVariantId?: string;              // 文本功能变体（如"提示词润色"），走同一 promptRunAdmission
   modelId?: TextModelId;                 // 见 §5
   modelOptions?: TextModelOptions;       // 自由 key-value（R5），契约提供 recommendedOptions
-  /** 最近一次文本运行的输出（展示态；「采纳」是显式 UI 动作，把 outputText 复制进 text） */
+  /** 最近一次文本运行的输出（展示态；「采纳」是显式 UI 动作，把 outputText 复制进 text）。
+   *  长度上限同 text（MAX_TEXT_LENGTH = 20_000），Provider 返回超长时截断写回并标记
+   *  truncated（见 contracts/runtime.md §1b 超长处置）。
+   *  随文档持久化：进 DocumentSnapshot 与 flow_json，刷新/重开不丢失未采纳提案。 */
   outputText?: string;
-  /** 最近一次运行的输入快照（上游串联 + 当时正文），用于可追溯展示 */
+  /** 最近一次运行的输入快照（上游串联 + 当时正文），用于可追溯展示；不受 20_000 限制 */
   lastRunInput?: string;
 }
 
@@ -75,7 +79,11 @@ export interface VideoNodeData extends BaseNodeData {
   evaluationVersion?: string;
   modelId?: VideoModelId;
   modelOptions?: VideoModelOptions;  // 见 §5
-  outputVideos: string[];            // /api/files/xxx，files 表 video/mp4
+  /** 输出视频引用（/api/files/xxx，files 表 video/mp4）。
+   *  语义：当前产物数组，非历史——一次 run 覆盖写（当前 Provider 一次任务产出一个 MP4，
+   *  长度恒 0 或 1；保留数组形状只为与未来多产物 Provider 对齐，不做多余 UI 分支）。
+   *  历史产物由 generation_runs/generation_outputs 与最近结果面板承载（与 image 同构）。 */
+  outputVideos: string[];
 }
 ```
 
@@ -179,6 +187,6 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
 - `files.mime_type` 放行 `video/mp4`（及 Seedance 的 `video/quicktime` mov）。
 - **服务端拉 MP4 落地自有存储是强制步骤**（Veo 官转明确不返 CDN URL；Seedance 远端留存期不作依赖）；落地后画布引用 `/api/files/xxx`，不持有远端 URL。
 - 校验：`validateImageDataUrl` 不适用于视频；视频一律走 multipart 上传或服务端落地（Provider MP4 拉取后写 files），不接受 dataURL 入库存储。
-- 画布显示：首帧缩略图 + 点击播放（缩略图由服务端落地时抽帧生成或前端 `<video>` 首帧渲染，P2-e 定其一）。
-- 存储：本期仍落 `data/` 文件存储（与图片一致）；对象存储二期。
+- 画布显示：首帧缩略图 + 点击播放。**定版：前端 `<video preload="metadata">` 首帧渲染，不做服务端抽帧**——不引入 ffmpeg 运行时依赖（理由与代价见 contracts/runtime.md §2）。
+- 存储：本期仍落 `data/` 文件存储（与图片一致）；对象存储二期。**容量/保留策略：有意不设限**（用户裁定，2026-09-18 晚）——不设保留期、不设容量上限、不加自动清理；磁盘监控属运维常规动作，不在本方案范围。
 - `width/height/byte_length` 语义沿用；新增可选元数据（时长/码率）存 `files` 扩展列或 `source_type='generation'` 的既有 JSON 旁路——P2-e 定。

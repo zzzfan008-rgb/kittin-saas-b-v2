@@ -1,12 +1,12 @@
 # 三基础节点模型重构 — 架构方案（P1：只出方案，不写产品代码）
 
-- 状态：**已定稿**（Q1=B / Q2=A / Q3=A / Q4=A / Q5=A 全部用户裁定落地，无待确认项）
-- 日期：2026-09-18（v3 更新同日：Q3 裁定落地）
-- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q3=A、Q4=A、Q5=A）
+- 状态：**已定稿 v3.1**（Q1=B / Q2=A / Q3=A / Q4=A / Q5=A + 缺口评审 D1/D2/D3 全部用户裁定落地）
+- 日期：2026-09-18（v3 同日：Q3 裁定落地；v3.1 同日：orchestrator 缺口评审 16 条修复 + D1 有账无闸 / D2 媒体导出 / D3 视频容量不设限裁定落地）
+- 输入：`docs/requests/2026-09-18-three-node-model.md`（R1–R10 用户逐项裁定 + §3 八条既有约束）+ orchestrator 中继的用户裁定（Q1=B、Q2=A、Q3=A、Q4=A、Q5=A、D1=B 有账无闸、D2=A 媒体连导、D3 视频容量不设限）
 - 作者：architect
 
 > 本方案对每条需求/约束标注可追溯挂靠（R1–R10、§3.1–§3.8）。
-> Q1–Q5 全部裁定已落地，方案定稿，可直接进入 P2。
+> Q1–Q5 全部裁定已落地；orchestrator 缺口评审（A1–A4/B1–B10/C1–C2）已全部回应，方案定稿，可直接进入 P2。
 
 ---
 
@@ -197,7 +197,7 @@ export interface ImageModelOptions {
 5. 产生 generation_runs 记录（kind='text'）与 usage_events（按 token 计费）
 ```
 
-设计要点：text 节点的运行结果是**建议**，不是覆写。这条纪律保证 R2「正文由文本节点承载」的所有权始终属于用户——AI 只能提案，落笔由人。
+设计要点：text 节点的运行结果是**建议**，不是覆写。这条纪律保证 R2「正文由文本节点承载」的所有权始终属于用户——AI 只能提案，落笔由人。**下游读取规则的统一定义见 contracts/runtime.md §0**：任何下游消费者一律读 `data.text`（已采纳正文），不读 `outputText`。
 
 `providerPromptRenderer` 的版本/hash 契约（`PROVIDER_PROMPT_RENDERER_HASH`）**继续有效**，但其 `nodeKind` 入参的取值集合变化（9 → 3），release vector 中 `nodeKind` 字段相应变化——这意味着**全部已发布变体需要按新 nodeKind 重新登记**，归入 P2 的提示词目录重写（§4.3）。
 
@@ -278,7 +278,8 @@ export interface ImageModelOptions {
 | `projects` 表全部行（含 `lifecycle='saved'` 与 `lifecycle='initial_draft'`） | **物理删除** | R7 明确"已保存项目全部清掉" |
 | 用户模板 `data/templates/user/*.json` | **物理删除** | R7 明确旧模板清掉 |
 | 内置模板 `data/templates/builtin/*.json`（6 套） | **重写为新格式**（不是删除） | 内置模板是产品资产不是用户数据；按 §3.1 新格式重做，随 P2 交付 |
-| `generation_runs` / `generation_outputs` / `usage_events` | **物理删除**（Q5=A 确认） | 历史运行记录引用旧 kind 与旧节点 ID，留着无法在新 UI 呈现；用量统计随重构清零重计 |
+| `generation_runs` / `generation_outputs` | **物理删除全部行**（Q5=A 确认） | 历史运行记录引用旧 kind 与旧节点 ID，留着无法在新 UI 呈现 |
+| `usage_events` | **删除全部存量行，表结构保留**（D1 裁定：有账无闸） | 用量账必须连续：新 kind 计量行（text token / video billed / image 沿用）继续写入同一张表，统计口径自清理时点起重计。扩展点见 §4.4 |
 | `files` 表中 `source_type='generation'` 且仅被已删 run/项目引用的行 | 级联删除（现有 purge 机制） | 随上一条联动 |
 | `assets`（印花/面料素材库） | **保留**（Q5=A 确认） | assets 是用户显式保存的素材，不属于"旧草稿/旧模板/已保存项目" |
 | `project_asset_refs` | 随 projects 级联删除 | 引用关系随主体 |
@@ -289,7 +290,7 @@ export interface ImageModelOptions {
 
 新增一次性管理脚本 `scripts/three-node-migration-purge.mjs`（P2 实现，本方案只定契约）：
 
-1. **前置导出**（§3.7"是否给用户一次导出机会"）：脚本先对 `projects` 全表导出 `flow_json` 到 `data/migration-export-<timestamp>/projects/*.json`（含 owner 分目录），对用户模板目录整体复制。导出完成并校验行数一致后才执行删除。**这是防御性兜底**，不提供 UI 入口，不承诺向后兼容读取。
+1. **前置导出**（§3.7"是否给用户一次导出机会"；D2 裁定：要，连媒体一起导）：脚本先对 `projects` 全表导出 `flow_json` 到 `data/migration-export-<timestamp>/projects/*.json`（含 owner 分目录），对用户模板目录整体复制，**并将所有待删 `files` 行对应的磁盘媒体文件（图片/视频）复制到 `<导出目录>/files/`（按 files 表 id 平铺）**。导出完整性校验为双重：DB 侧文件数 == 行数；媒体侧文件数 == 待删 files 行数且总字节数 == `byte_length` 合计。校验通过后才执行删除。**这是防御性兜底**，不提供 UI 入口，不承诺向后兼容读取。完整契约见 contracts/purge-runbook.md §2。
 2. **删除**：单事务内按 FK 依赖序删除（`usage_events` → `generation_outputs` → `generation_runs` → `project_asset_refs` → `projects`），随后删用户模板文件。脚本打印逐表行数回执。
 3. **不可逆提示**：脚本交互式确认两次（输入 `DELETE-ALL-PROJECTS` 与二次 YES），并在 CI/部署文档中标注"上线即执行"。
 4. **schema 版本闸**：`WORKFLOW_SCHEMA_VERSION` 升 `7`；`validateAndMigrateFlow` 对 v6 及以下**一律拒绝**（删除现有 v0–v5 迁移路径）。拒绝文案提示"该项目为旧版本格式，已随三节点重构清理"。
@@ -301,6 +302,20 @@ export interface ImageModelOptions {
 - 功能变体重写为 `image`/`video` 语义（upscale / print-extract / print-mutate / fabric-recolor / ai-modify / sketch-to-render 六族功能文案迁移为系统提示词）；
 - 所有变体 `supportStatus` 重置为 `unverified`，按既有评估链重新走 campaign（**不需要重新付费评估才可上线**——上线门槛由 release registry 的发布动作控制，评估节奏由 orchestrator 另行排期；Q5=A 附带裁定已接受此口径，与现状 25 变体全 unverified 一致）；
 - `prompt-release-registry.json` 当前为空（`releases: []`），无历史 release 需要作废。
+
+### 4.4 用量治理裁定（D1：有账无闸）与撤销/改版语义（引用语义边界）
+
+**D1 裁定（2026-09-18 晚，orchestrator 中继）：「有账无闸」是有意选择。**
+
+- **不加任何 per-user 配额/预算上限**——运行准入不拒跑。
+- **用量账必须保留**：`usage_events` 删行不删表（§4.1），text 的 token 计量、video 的 billed 证据、image 的既有计量全部继续写入同一张表，它是唯一用量账。
+- **扩展点（将来要加闸时在哪加）**：配额检查位预留在 `promptRunAdmission` 准入链路（`assertPromptRunAdmissions`）——该处已是「变体是否可运行」的集中判定点，加配额闸时在该函数内追加「用量是否超配额」检查即可，不需要翻改 `usage_events` 表结构或 Provider 调用层。本期不实现该检查，仅记录扩展位置，避免下次改造翻工。
+
+**撤销/目录改版的存量节点语义**（治理缺口修复，完整口径在 contracts/runtime.md §5d）：
+
+- 变体被撤销 → 存量引用节点**运行时拒绝**（fail-closed，错误文案「所选功能已被撤销，请重新选择」），不自动回退、不改用户文档。
+- 目录版本推进 = 新变体 ID + 旧 ID 走撤销流程；存量节点钉住旧 ID，无「原地变更」路径。
+- 目录正文修订默认遵守「修订必改 ID」纪律；若未来要支持同 ID 多 release（`evaluationVersion` 递增），须先扩展 registry schema（现状按 variantId 唯一键拒绝重复）——默认不启动。
 
 ---
 
@@ -400,6 +415,8 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 | R5 放开后用户填错参数导致 Provider 报错增多 | 低 | UI 推荐值默认填充 + warning 可见；Provider 错误文案已有用户可读映射 |
 | mask 能力与"选提示词"模型的耦合（needsMask 声明） | 低 | 变体声明驱动，契约测试覆盖 |
 | 多色「一色一图」精确控制变弱（Q4=A：改 batchSize 表达） | 低 | 系统提示词正文可写配色清单；batchSize ≤ 8 覆盖原循环上限 |
+| 视频落 `data/` 的磁盘增长（单文件 5–50MB） | 低 | **有意不设限**（D3 裁定，用户原话）：不设保留期/容量上限/自动清理；磁盘监控属运维常规动作，不在本方案范围 |
+| DocumentSnapshot 多 tab/并发编辑合并语义 | 低（结论：现状足够，无需同步调整） | 新字段全部内嵌在节点 `data` 内（`outputText`/`lastRunInput`/`outputVideos`），合并边界仍是节点级——与 v6 一致；snapshot 只换夹具 kind，合并算法零改动（contracts/test-sync-inventory.md §1.A `document-snapshot.test.ts` 条目已覆盖） |
 
 ### 7.3 回滚
 
@@ -421,3 +438,21 @@ API易 当前可用视频家族（快照内均有完整 API 页）：
 | `contracts/purge-runbook.md` | 清理执行手册：范围/导出/删除顺序/回执格式（§4） |
 | `contracts/model-proposals.md` | 文本/视频模型对比全文（§5，含知识库页面引用与 SHA） |
 | `contracts/test-sync-inventory.md` | §3.2 要求的 37 个测试 + 3 个 e2e 的逐项处置清单 |
+
+---
+
+## 9. 同批更新的文档清单（C1：方案外的同步义务）
+
+本方案自身只改本目录；以下**方案外文档**必须在对应 P2 批次内同批更新，不允许滞后（AGENTS.md 维护规则：文档与交付同批）：
+
+| 文档 | 需要更新的内容 | 同批批次 |
+|---|---|---|
+| `AGENTS.md` | 若 P2 实际改动涉及 §4/§5 引用的具体机制名（如 usage_events 处置、model-contracts 评审流程），同步修订条文措辞；本次方案层面预计**无需改条文**（D1 保表与 §4 不冲突，R5 改语义在 §5 门禁流程内） | 各 P2 批次自查；如需改，随该批次 PR 同交 |
+| `docs/reference/tech-stack-official-docs.md` | 新增文本模型 Provider 链路（chat completions）与视频 Provider 链路（异步任务）的官方文档入口与版本钉扎；**无需新增 ffmpeg 条目**（首帧缩略图已定版前端渲染，A4 闭环） | P2-b（文本链路）/ P2-e（视频链路） |
+| `docs/ai/apiyi/change-scope.json` 与知识库回执 | P2 改 `model-contracts.json`（`recommendedOptions` 块 + `textModels` 区块）时命中 scope，按 §5 门禁走 `docs:apiyi:check` / `docs:apiyi:search` / `docs:apiyi:lookup` 回执 | P2-a |
+| `docs/ai/evaluation/README.md` | 治理节补：修订必改 ID 纪律（§4.4）、R5 后「已评估」口径弱化（runtime.md §5c）、变体撤销流程 | P2-d |
+| `docs/ai/apiyi/video-model-contracts.json`（新文件） | 视频模型契约产物（data-model.md §5 已声明） | P2-e |
+| 部署文档 / Dockerfile 注释 | 视频 MP4 落 `data/` 的磁盘增长说明（D3：有意不设限，仅备注运维监控属常规动作）；**无需新增 ffmpeg 安装步骤** | P2-e |
+| `docs/design/2026-09-18-three-node-model/`（本目录） | 本方案与 7 份契约即本次交付物 | P1（本批） |
+
+**多 tab / 并发编辑结论（C2）**：现状 `DocumentSnapshot` 合并语义**足够，无需同步调整**——新节点字段（`outputText`/`lastRunInput`/`outputVideos`/`modelOptions`）全部内嵌在节点 `data` 对象内，合并边界仍是「节点级整换」；v6 的 tabId+projectId+documentEpoch 绑定纪律不变。依据与覆盖测试见 §7.2 风险登记末行。
