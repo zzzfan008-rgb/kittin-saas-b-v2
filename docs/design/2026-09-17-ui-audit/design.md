@@ -1,211 +1,70 @@
----
-version: alpha
-name: Garment Canvas Themes
-description: 服装设计 AI 工作台三主题系统——简白(Apple)、曜黑(活力黄)、护眼绿(薄荷翡翠)。2026-09-18 定稿。
-colors:
-  primary: "#0071e3"
-  secondary: "#6e6e73"
-  # ---- 简白 · Apple(默认工作主题) ----
-  aw-canvas: "#f5f5f7"
-  aw-panel: "#ffffff"
-  aw-panel-translucent: "rgba(255,255,255,0.72)"
-  aw-ink: "#1d1d1f"
-  aw-ink-secondary: "#6e6e73"
-  aw-ink-tertiary: "rgba(0,0,0,0.48)"
-  aw-accent: "#0071e3"
-  aw-accent-hover: "#0068d4"
-  aw-accent-ink: "#ffffff"
-  aw-card-inner: "#f5f5f7"
-  aw-link: "#0066cc"
-  aw-disabled-bg: "#ececf0"
-  aw-disabled-ink: "#75757b"
-  aw-border: "rgba(0,0,0,0.08)"
-  aw-border-strong: "rgba(0,0,0,0.16)"
-  # ---- 曜黑 · 活力黄 ----
-  ob-canvas: "#16181d"
-  ob-shell: "#1a1c22"
-  ob-panel: "#21242a"
-  ob-panel-hover: "#2b2f36"
-  ob-ink: "#e8eaee"
-  ob-ink-secondary: "#9ba1a9"
-  ob-accent: "#FFC940"
-  ob-accent-ink: "#131313"
-  ob-card: "#ffffff"
-  ob-card-inner: "#f2f3f5"
-  ob-card-ink: "#1d1d1f"
-  ob-card-ink-secondary: "#6b7075"
-  ob-border: "#33373f"
-  ob-border-strong: "#454a53"
-  # ---- 护眼绿 · 薄荷翡翠 ----
-  eg-canvas: "#E9F1EA"
-  eg-shell: "#EDF4EE"
-  eg-panel: "#ffffff"
-  eg-panel-hover: "#DCE9DD"
-  eg-ink: "#123B2B"
-  eg-ink-secondary: "#47685A"
-  eg-accent: "#0B7A43"
-  eg-accent-ink: "#ffffff"
-  eg-card: "#ffffff"
-  eg-card-inner: "#f0f6f1"
-  eg-border: "#c9dccc"
-  eg-border-strong: "#a8c2ac"
-  # ---- 语义状态色(浅底版 / 深底版) ----
-  st-idle: "#8e8e93"
-  st-queued-light: "#c79002"
-  st-queued-dark: "#2dd4bf"
-  st-running-light: "#3b82f6"
-  st-running-dark: "#60a5fa"
-  st-retry-light: "#ea8a00"
-  st-success-light: "#1d7a3e"
-  st-success-dark: "#34d399"
-  st-error-light: "#d30000"
-  st-error-dark: "#f87171"
-  st-unknown-light: "#6e54b3"
-  st-unknown-dark: "#a78bfa"
-  st-warn-light: "#b45309"
-typography:
-  body:
-    fontFamily: system-ui
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.47
-    letterSpacing: "-0.16px"
-  node-title:
-    fontFamily: system-ui
-    fontSize: 13.5px
-    fontWeight: 600
-    lineHeight: 1.3
-    letterSpacing: "-0.25px"
-  section-heading:
-    fontFamily: system-ui
-    fontSize: 40px
-    fontWeight: 650
-    lineHeight: 1.08
-    letterSpacing: "-0.55px"
-  field-label:
-    fontFamily: system-ui
-    fontSize: 11.5px
-    fontWeight: 500
-    lineHeight: 1.4
-    letterSpacing: "-0.1px"
-  mono-value:
-    fontFamily: SF Mono
-    fontSize: 11.5px
-    fontWeight: 400
-    lineHeight: 1.4
-    letterSpacing: 0px
-rounded:
-  node: 12px
-  input: 8px
-  pill: 980px
-  stage: 18px
-  card: 14px
-spacing:
-  node-pad: 18px
-  node-gap: 14px
-  field-gap: 6px
-  section: 88px
-components:
-  node-card:
-    backgroundColor: "{colors.aw-panel}"
-    textColor: "{colors.aw-ink}"
-    rounded: "{rounded.node}"
-  run-button:
-    backgroundColor: "{colors.aw-accent}"
-    textColor: "{colors.aw-accent-ink}"
-    rounded: "{rounded.pill}"
-    height: 34px
-  run-button-hover:
-    backgroundColor: "{colors.aw-accent-hover}"
-    textColor: "{colors.aw-accent-ink}"
-  run-button-disabled:
-    backgroundColor: "{colors.aw-disabled-bg}"
-    textColor: "{colors.aw-disabled-ink}"
-  run-button-loading:
-    # loading 非静态对比场景:spinner 与文字同色系渐进,基色对 5.07:1(ink-secondary on card-inner)
-    backgroundColor: "{colors.aw-card-inner}"
-    textColor: "{colors.aw-ink-secondary}"
-  canvas-edge:
-    backgroundColor: "{colors.aw-accent}"
-  field-input:
-    backgroundColor: "{colors.aw-card-inner}"
-    textColor: "{colors.aw-ink}"
-    rounded: "{rounded.input}"
-    height: 32px
+# Garment Canvas 设计规范（人读版）· Rev.1
+
+日期：2026-09-18 · 状态：**已实施 + 评审修复完毕**
+机读唯一事实源：[`DESIGN.md`](./DESIGN.md)（Google DESIGN.md 格式，lint 0 error；导出 [`theme.css`](./theme.css) / [`tailwind.theme.json`](./tailwind.theme.json) / [`tokens.json`](./tokens.json)）——本文件只引用 token 名，不复述数值。
+视觉证据：[`shots/`](./shots/)（prototype-v3 迭代 + acceptance 验收 + fix-white-* 修复复验）· 问题清单 [`audit-report.md`](./audit-report.md) · 评审清单 [`review-checklist.md`](./review-checklist.md)。
+
 ---
 
-# Garment Canvas · 三主题设计系统
+## 0. 设计立场
 
-## Overview
+服装设计师的生产工具，不是通用 AI SaaS 仪表盘。三条铁律：
 
-服装设计 AI 工作台的三主题系统。核心理念:**画布优先、一色一义、白卡语言**。
-三主题共享同一节点结构(300px 卡、18px 内边距、分栏字段、9px 状态点、胶囊 CTA),
-只交换色彩语义。连线三主题统一为强调色单色线。
+1. **画布优先**——chrome 退后，节点与服装图像是主角；
+2. **一色一义**——每主题一个行动色，只落在主 CTA、选中描边、焦点环、连线四处；
+3. **白卡语言**——三主题节点卡统一纯白 + 四层软阴影，无边框。
 
-## Colors
+## 1. 三主题（Rev.1 定稿）
 
-### 简白 · Apple(默认工作主题)
-- **aw-canvas #f5f5f7**:工作画布,微蓝灰调防苍白,非纯白。
-- **aw-accent #0071e3**:Apple Blue,唯一交互色——主 CTA、选中描边、焦点环、连线。hover 提亮为 #0077ed(色值过渡,禁用 filter:brightness)。
-- **aw-ink #1d1d1f**:近黑主文字,禁纯黑 #000。
+| 主题 | ThemeId | 画布 | 节点卡 | 行动色 |
+|---|---|---|---|---|
+| **曜黑·活力黄**（默认） | `current` | ob-canvas 提亮黑 | 纯白 | ob-accent 活力黄 |
+| **简白·Apple** | `white` | aw-canvas 微蓝灰白 | 纯白 | aw-accent Apple Blue |
+| **护眼绿·薄荷翡翠** | `eye` | eg-canvas 薄荷 | 纯白 | eg-accent 翡翠绿 |
 
-### 曜黑 · 活力黄
-- **ob-canvas #16181d**:提亮黑,非死黑,有透气感。
-- **ob-accent #FFC940**:活力黄(11.6:1 on canvas);CTA 墨字 #131313(12.1:1)。
-- **ob-card #ffffff**:节点卡纯白——「干净」的来源。
-- queued 状态用青 #2dd4bf(8.4:1),避免与强调黄撞色。
+- 连线三主题统一 = 各自强调色单色线（`--gc-edge`），箭头同色。
+- handle 圆点默认中性色，hover/连线/选中才亮强调色。
+- ThemeId 保持 `current/white/eye` 不变，localStorage 旧值无缝兼容。
+- 各主题关键对比度：黄 on 曜黑 11.6:1、白字 on 翡翠 5.4:1、白字 on 蓝 4.7:1（hover 加深后 5.34:1）。
 
-### 护眼绿 · 薄荷翡翠
-- **eg-canvas #E9F1EA**:薄荷画布,低饱和偏冷,不浑浊。
-- **eg-accent #0B7A43**:翡翠绿(4.7:1 on canvas),白字 CTA(5.4:1)。
+## 2. 状态色三档机制（Rev.1 核心修复）
 
-### 语义状态色(8 态)
-与强调色彻底解耦。浅底用 -light 版、深底(曜黑)用 -dark 版。
-idle 与 cancelled 共用 st-idle 中性灰,以文字区分;running/retry 状态点加同色描边环。
+状态语义与强调色彻底解耦，**按底色分配**：
 
-## Typography
+- `:root` 默认 = 深底亮色版（曜黑章）——**queued 用青 st-queued-dark，不是黄**（与强调黄撞色是设计错误）；
+- `[data-theme="white"]` 覆盖 st-*-light 系；
+- `[data-theme="eye"]` 覆盖 st-*-eye 系（暖化加深适配薄荷底）。
 
-- 系统栈,零网络字体:`system-ui, -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei"`。
-- 数值语境(坐标/尺寸/百分比/时间戳)走 `"SF Mono", ui-monospace, Menlo` 等宽栈。
-- 中文最小字号 11px;负字距全尺寸覆盖(section-heading -0.55px / body -0.16px / field-label -0.1px)。
-- 大标题紧行高 1.08,Apple 式 billboard 气质。
+8 态：idle / queued / running / retry / success / error / unknown / cancelled。idle 与 cancelled 共用中性灰靠文字区分；running/retry 加同色描边环。
 
-## Layout
+## 3. gold 工具类（Rev.1 决策）
 
-- 节点卡固定宽 300px;字段两列栅格 gap 10px;字段组纵向 gap 14px。
-- handle 圆点 14px:默认中性色(--edge),hover/连线/选中时才亮强调色并放大 1.2×。
-- 玻璃导航高 52px:`backdrop-filter: saturate(180%) blur(20px)`。
+历史 `text-gold / border-gold / bg-gold` Tailwind 类**跟随各主题 accent**：曜黑→活力黄、简白→蓝、护眼绿→翡翠。`@theme` 回退值 = 活力黄（与默认主题一致）。禁止再引入第二金色。
 
-## Elevation
+## 4. 字体 / 排版 / 几何
 
-每主题一组四层软阴影(node-shadow / node-shadow-lift):0.5px 轮廓线 + 接触阴影 + 中层扩散 + 大范围环境影。简白最轻,曜黑最深(0.5px 轮廓加深至 rgba(0,0,0,.5))。选中态 = 强调色 2px 描边 + 10% 同色晕 + lift 阴影。
+系统栈零网络字体；数值语境走 mono 栈；中文最小 11px；负字距全尺寸；大标题紧行高 1.08。圆角五档、四层软阴影、玻璃导航——详见 DESIGN.md §Typography/§Layout/§Elevation/§Shapes。
 
-## Shapes
+## 5. 组件契约
 
-五档圆角:节点 12 / 输入 8 / 胶囊 980 / 舞台 18 / 卡片 14。矩形圆角禁超过 12px(胶囊除外)。
+- **run-button**：唯一填充强调色控件；loading = 浅底 + 内联 spinner；disabled = 中性灰底（WCAG 豁免，3.89:1 为有意下限）。
+- **field-input**：1px 边框恒定（状态切换零布局位移）；焦点环即时出现永不动画；错误 = 红边 + helper 位（min-height:1lh）+ aria-invalid。
+- **canvas-edge**：强调色贝塞尔 + 同色箭头，三主题同规则。
 
-## Components
+## 6. 动效纪律
 
-- **run-button** 主行动:唯一填充强调色的控件。loading 态 = 浅底 + 内联 spinner(currentColor 环 0.8s linear);disabled = 中性灰底(aw-disabled-bg/ink,3.9:1),禁用蓝色残留。
-- **field-input**:1px 边框恒定不变(状态切换零布局位移);`outline: 2px solid transparent` 预留焦点槽位;焦点环即时出现、永不参与过渡。错误态 = 红边 + helper 位(min-height:1lh)红色说明 + aria-invalid,错误文字永不占 label 位。
-- **canvas-edge**:强调色单色贝塞尔线 + 同色箭头 marker,三主题同规则。
+命名 token 三曲线（--ease-out/in/in-out）+ 三档时长（--dur-1/2/3 = 120/180/250ms）；`transition: all` 与动画焦点环为禁止项；全局 reduced-motion 兜底（duration + iteration-count）。
 
-## Do's and Don'ts
+## 7. 实施映射（给 frontend 的约定）
 
-**Do**
-- 每主题一个行动色,只落在四处:主 CTA、选中描边、焦点环、连线。
-- 动效只用命名 token:--ease-out / --ease-in / --ease-in-out 三曲线 + --dur-1/2/3(120/180/250ms)三档。
-- 全局 `prefers-reduced-motion` 兜底(transition-duration / animation-duration / animation-iteration-count 三属性)。
-- 状态变化除颜色外必配第二信号(文字/图标/描边环)。
+- 主题机制：`data-theme` + `--gc-*` 单一事实源（AGENTS.md §2）。
+- token 前缀 ↔ 运行时：aw-* ↔ white 段、ob-* ↔ :root/current 段、eg-* ↔ eye 段、st-* ↔ --gc-status-*。
+- 工具类反查段只保留存活选择器；**新组件直接用 `var(--gc-*)`，不再新增反查规则**。
+- 主题标签/色卡在 `src/lib/theme.ts` THEMES；TopBar themePreviewColors 必须同步（长期应改读 var）。
 
-**Don't**
-- `transition: all`(禁止,列显式属性)。
-- `filter: brightness()` 做 hover 态(用具体色值)。
-- 状态色与强调色混用;仅颜色承载状态。
-- 焦点信号做任何动画;focus 用 focus-visible(键盘专用)。
+## 8. 版本记录
 
-## Provenance
-
-2026-09-17 UI 审核(docs/design/2026-09-17-ui-audit/)迭代定稿:
-V1 工程审计板(否)→ V2 时装版房 Atelier(方向对)→ V3 简白 Apple 重设计(popular-web-designs/apple.md 词汇表)→ Hallmark 交互精修(7 处违规清零)→ 三主题终配色(曜黑·活力黄 / 护眼绿 v3 薄荷翡翠 / 连线=强调色)。
-全部色值经程序 WCAG 对比度验证(黄 on 曜黑 11.6:1、白字 on 翡翠 5.4:1 等);视觉证据 shots/prototype-v3/;交互原型 prototype-v3.html。
+- **2026-09-17 审核**：15 项发现（4C/6M/5m）→ V1 工程板（否）→ V2 Atelier（方向对）→ V3 简白 Apple（Hallmark 精修 7 处违规清零）→ 三主题终配色。
+- **2026-09-18 定稿实施**（`bd8b1fd`）：三主题 token + 13 处槽位修正 + 连线强调色 + e2e 同步。
+- **Rev.1 评审修复**（`92af4f7`）：独立评审 BLOCK（P0 white 反查段错配 / P1 queued 未落地 / P2×2 缩略图过期与双金并存 / P3 死选择器）→ 全部修复，全门禁绿 + 简白面板展开实截复验通过。
+- 历史方案（暖象牙纸样卡、墨白深节点、护眼绿绿灰同族）已被取代，原型存档 prototype-v2.html。
