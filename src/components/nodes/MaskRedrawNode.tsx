@@ -14,7 +14,7 @@ import {
   isNodeRunActive,
   type MaskRedrawNodeData,
 } from "@/types/workflow";
-import { Developing, inputClass, NodeFrame, RunButton } from "./NodeFrame";
+import { Developing, inputClass, promptChipClass, NodeFrame, RunButton } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { MaskEditor } from "./MaskEditor";
 import { thumbnailImageUrl } from "@/lib/images";
@@ -209,7 +209,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             placeholder="如：将选中区域改成银色金属拉链"
             aria-invalid={promptRequired}
             aria-describedby={promptRequired ? `${id}-prompt-required` : undefined}
-            className={`${inputClass} resize-none ${promptRequired ? "border-red-500" : ""}`}
+            className={`${promptChipClass} resize-none ${promptRequired ? "border-red-500" : ""}`}
           />
           {promptRequired && (
             <span id={`${id}-prompt-required`} className="block text-[11px] text-red-400">

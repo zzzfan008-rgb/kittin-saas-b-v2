@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { useFlowStore } from "@/store/flowStore";
 import { BATCH_SIZES, isNodeRunActive, type SketchToRenderNodeData } from "@/types/workflow";
 import { imageModelAspectRatioPatch } from "@/types/imageModels";
-import { NodeFrame, RunButton, Developing, inputClass } from "./NodeFrame";
+import { NodeFrame, RunButton, Developing, inputClass, promptChipClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -34,7 +34,7 @@ export function SketchToRenderNode({
             {...promptEdit.bind}
             rows={9}
             placeholder="如：写实摄影风，柔和自然光，白底服装效果图"
-            className={`${inputClass} resize-none`}
+            className={`${promptChipClass} resize-none`}
           />
           <span className="text-[11px] text-neutral-600">可连接 0–8 张参考图，按连线顺序传入</span>
         </label>

@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type PrintMutateNodeData } from "@/types/workflow";
-import { NodeFrame, NodeProductPolicyNotice, RunButton, Developing, inputClass } from "./NodeFrame";
+import { NodeFrame, NodeProductPolicyNotice, RunButton, Developing, inputClass, promptChipClass } from "./NodeFrame";
 import { ImageGrid } from "./ImageGrid";
 import { ModelControls } from "./ModelControls";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -45,7 +45,7 @@ export function PrintMutateNode({ id, data, selected }: NodeProps<Node<PrintMuta
             {...promptEdit.bind}
             rows={3}
             placeholder="可选：如「保持花卉元素，换一种排列」"
-            className={`${inputClass} resize-none`}
+            className={`${promptChipClass} resize-none`}
           />
           <span className="text-[11px] text-neutral-600">可连接 1–8 张参考图，按连线顺序传入</span>
         </label>

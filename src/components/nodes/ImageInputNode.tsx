@@ -133,7 +133,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
     <>
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         {data.imageUrl ? (
-          <div className="nodrag overflow-hidden rounded-md border border-[var(--gc-node-border)]">
+          <div className="nodrag overflow-hidden rounded-[10px] border border-[var(--gc-node-border)]">
             <button
               type="button"
               className="block w-full cursor-zoom-in"
@@ -161,15 +161,18 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative cursor-pointer rounded-md border border-dashed bg-[var(--gc-node-inner)] py-6 text-center text-[10px] leading-relaxed transition-colors focus-within:ring-1 focus-within:ring-gold/60 ${
+            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 ${
               dragOver
-                ? "border-gold bg-gold/5 text-gold"
-                : "border-[var(--gc-node-border)] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)]"
+                ? "border-gold bg-gold/8 text-gold"
+                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
             }`}
           >
             {fileInput}
-            <span className="pointer-events-none whitespace-pre-line">
-              {uploading ? "素材处理中…" : "每个上传节点仅支持 1 张图\n点击 / 拖拽 / 选中后 Ctrl+V"}
+            <span className="pointer-events-none font-mono text-[10px] tracking-wider opacity-70">
+              {uploading ? "素材处理中…" : "IMAGE · 槽位"}
+            </span>
+            <span className="pointer-events-none text-[10px] leading-relaxed opacity-50">
+              点击 / 拖拽 / Ctrl+V
             </span>
           </div>
         )}

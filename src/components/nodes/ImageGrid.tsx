@@ -29,7 +29,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
       {safeImages.map((url, i) => (
         <div
           key={`${url}-${i}`}
-          className="nodrag group overflow-hidden rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)]"
+          className="nodrag group overflow-hidden rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] motion-safe:animate-[gc-result-reveal_0.5s_cubic-bezier(.2,.8,.2,1)_both] motion-reduce:animate-none"
         >
           <button
             type="button"
@@ -41,7 +41,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
               alt={`生成结果 ${i + 1}`}
               loading="lazy"
               decoding="async"
-              className="aspect-square w-full object-cover transition-transform group-hover:scale-105"
+              className="aspect-square w-full object-cover transition-transform group-hover:scale-105 motion-reduce:transition-none"
             />
           </button>
           {renderAction?.(url, i)}

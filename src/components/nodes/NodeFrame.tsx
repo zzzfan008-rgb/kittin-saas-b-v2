@@ -233,3 +233,7 @@ export function Developing() {
 
 export const inputClass =
   "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";
+
+/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义） */
+export const promptChipClass =
+  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden";
