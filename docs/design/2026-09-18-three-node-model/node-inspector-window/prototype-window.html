@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="current">
+<head>
+<meta charset="UTF-8">
+<title>R-40 · 悬浮窗口(功能设置)原型(示意)</title>
+<style>
+  /* ============ 主题 token —— 1:1 取自 src/index.css 三主题 ============ */
+  :root{
+    --font:"Inter","SF Pro Display","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --gc-font-label:11px; --gc-font-body:13px; --gc-font-ui:12px;
+    --gc-dot-status:10px;
+    --gc-status-queued:#2dd4bf; --gc-status-running:#60a5fa; --gc-status-retry:#fb923c;
+    --gc-status-success:#34d399; --gc-status-error:#f87171; --gc-status-unknown:#a78bfa; --gc-status-idle:#8b9198;
+    --gc-warn-text:#fbbf24;
+  }
+  [data-theme="current"]{
+    --gc-shell:#1a1c22; --gc-canvas:#16181d; --gc-panel:#21242a; --gc-panel-soft:#1e2126;
+    --gc-text:#e8eaee; --gc-text-muted:#9ba1a9; --gc-border:#33373f; --gc-border-strong:#454a53;
+    --gc-accent:#FFC940; --gc-accent-cta-ink:#131313;
+    --gc-node-main:#ffffff; --gc-node-inner:#f2f3f5; --gc-node-border:#e4e6ea;
+    --gc-node-text:#1d1d1f; --gc-node-muted:#6b7075; --gc-node-accent:#FFC940;
+    --gc-edge:#FFC940;
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --dot:#262930;
+  }
+  [data-theme="white"]{
+    --gc-shell:#f5f5f7; --gc-canvas:#f5f5f7; --gc-panel:#ffffff; --gc-panel-soft:#f5f5f7;
+    --gc-text:#1d1d1f; --gc-text-muted:#6e6e73; --gc-border:rgba(0,0,0,.08); --gc-border-strong:rgba(0,0,0,.16);
+    --gc-accent:#0071e3; --gc-accent-cta-ink:#ffffff;
+    --gc-node-main:#ffffff; --gc-node-inner:#f5f5f7; --gc-node-border:rgba(0,0,0,.08);
+    --gc-node-text:#1d1d1f; --gc-node-muted:#6e6e73; --gc-node-accent:#0071e3;
+    --gc-edge:#0071e3;
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --dot:rgba(0,0,0,.10);
+    /* 浅底状态色变体(1:1 取自 src/index.css 白主题段) */
+    --gc-status-queued:#0d9488; --gc-status-running:#2563eb; --gc-status-retry:#c2410c;
+    --gc-status-success:#1d7a3e; --gc-status-error:#dc2626; --gc-status-unknown:#7c3aed; --gc-status-idle:#6e6e73;
+    --gc-warn-text:#b45309;
+  }
+  [data-theme="eye"]{ --gc-shell:#EDF4EE; --gc-canvas:#E9F1EA; --gc-panel:#ffffff; --gc-panel-soft:#f4f9f5;
+    --gc-text:#123B2B; --gc-text-muted:#47685A; --gc-border:#c9dccc; --gc-border-strong:#a8c2ac;
+    --gc-accent:#0B7A43; --gc-accent-cta-ink:#ffffff;
+    --gc-node-main:#ffffff; --gc-node-inner:#f0f6f1; --gc-node-border:#e2ece4;
+    --gc-node-text:#123B2B; --gc-node-muted:#47685A; --gc-node-accent:#0B7A43;
+    --gc-edge:#0B7A43;
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --dot:rgba(18,59,43,.12);
+    --gc-status-queued:#0d9488; --gc-status-running:#2563eb; --gc-status-retry:#c2410c;
+    --gc-status-success:#1d7a3e; --gc-status-error:#dc2626; --gc-status-unknown:#7c3aed; --gc-status-idle:#47685A;
+    --gc-warn-text:#b45309;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--gc-shell);font-family:var(--font);padding:24px 32px 40px;color:var(--gc-text);transition:background .2s}
+
+  /* ---- 文档头 + 主题/场景切换 ---- */
+  .doc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .doc-head h1{font-size:20px;font-weight:700;letter-spacing:.01em}
+  .doc-head p{font-size:12px;color:var(--gc-text-muted);margin-top:5px;max-width:700px;line-height:1.6}
+  .switchers{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex:none}
+  .switch{display:flex;gap:6px;background:var(--gc-panel);border:1px solid var(--gc-border);border-radius:999px;padding:4px}
+  .switch button{border:0;background:transparent;color:var(--gc-text-muted);font-family:var(--font);font-size:11.5px;font-weight:600;padding:5px 14px;border-radius:999px;cursor:pointer}
+  .switch button[aria-pressed="true"]{background:var(--gc-accent);color:var(--gc-accent-cta-ink)}
+
+  /* ============ 画布 —— 结构 1:1(--gc-canvas + 20px 圆点网格) ============ */
+  .canvas{
+    position:relative;height:820px;border-radius:14px;overflow:hidden;
+    background:var(--gc-canvas);
+    background-image:radial-gradient(circle,var(--dot) 1px,transparent 1px);
+    background-size:20px 20px;
+    border:1px solid var(--gc-border);
+  }
+
+  /* ---- 节点卡(1:1 现有白卡语言,示意) ---- */
+  .node{
+    position:absolute;width:284px;border-radius:12px;background:var(--gc-node-main);
+    color:var(--gc-node-text);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 2px 6px rgba(0,0,0,.06),0 8px 20px rgba(0,0,0,.10);
+  }
+  .node.selected{box-shadow:0 0 0 2px var(--gc-accent),0 0 0 6px color-mix(in srgb,var(--gc-accent) 18%,transparent),0 2px 6px rgba(0,0,0,.06),0 12px 28px rgba(0,0,0,.14)}
+  .node-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--gc-node-border)}
+  .node-head .title{font-size:12px;font-weight:700}
+  .node-head .dot{width:var(--gc-dot-status);height:var(--gc-dot-status);border-radius:50%;flex:none}
+  .node-body{padding:12px 14px}
+  .thumb{border-radius:8px;background:repeating-linear-gradient(135deg,#d9dbe0 0 8px,#eceef1 8px 16px);height:120px;position:relative}
+  .thumb .badge{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--gc-media-overlay);color:var(--gc-media-overlay-text);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
+  .text-lines span{display:block;height:8px;border-radius:4px;background:var(--gc-node-inner);margin:6px 0}
+  .node .fn-entry{margin:0 14px 12px;display:flex;align-items:center;gap:8px;border:1px solid var(--gc-node-border);background:var(--gc-node-inner);border-radius:999px;padding:7px 12px;font-size:11.5px;color:var(--gc-node-muted);cursor:pointer}
+  .node .fn-entry .chev{margin-left:auto;color:var(--gc-accent);font-weight:700}
+  .handle{position:absolute;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff 0 9%,var(--gc-accent) 55%,color-mix(in srgb,var(--gc-accent) 60%,#000) 100%);border:3px solid var(--gc-canvas);box-shadow:0 0 0 1px color-mix(in srgb,var(--gc-accent) 70%,transparent),0 3px 7px rgba(0,0,0,.35);z-index:5}
+  .handle.out{right:-9px;top:56px}
+  .handle.in{left:-9px;top:56px;background:#e8eaee;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 3px 7px rgba(0,0,0,.25)}
+
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  svg.edges path{stroke:var(--gc-edge);stroke-width:1.5;fill:none}
+
+  /* ============ 悬浮窗口(本原型主体) ============ */
+  .iw{
+    position:absolute;width:320px;border-radius:14px;background:#ffffff;color:#1d1d1f;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 2px 6px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.14),0 24px 64px rgba(0,0,0,.10);
+    display:flex;flex-direction:column;max-height:calc(100% - 16px);z-index:20;
+  }
+  .iw-head{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px 0 16px;border-bottom:1px solid rgba(0,0,0,.08);flex:none}
+  .iw-head .dot{width:var(--gc-dot-status);height:var(--gc-dot-status);border-radius:50%;flex:none}
+  .iw-head .name{font-size:13px;font-weight:700}
+  .iw-head .st{font-size:11px;color:#6e6e73}
+  .iw-head .close{margin-left:auto;width:26px;height:26px;border-radius:8px;border:0;background:transparent;color:#6e6e73;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .iw-head .close:hover{background:#f2f3f5}
+  .iw-body{overflow-y:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:20px}
+  .iw-foot{flex:none;border-top:1px solid rgba(0,0,0,.08);padding:14px 16px}
+
+  .sec-label{font-size:11px;font-weight:600;color:#6e6e73;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .sec-label .chip{margin-left:auto}
+
+  /* 功能目录 */
+  .cat-group{font-size:11px;font-weight:700;color:#6e6e73;height:28px;display:flex;align-items:center;letter-spacing:.02em}
+  .cat-item{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:8px 12px;margin-bottom:6px;cursor:pointer;background:#fff}
+  .cat-item:hover{border-color:var(--gc-accent)}
+  .cat-item.sel{box-shadow:0 0 0 1.5px var(--gc-accent);border-color:transparent}
+  .cat-item .nm{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
+  .cat-item .nm .tag{font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:#f2f3f5;color:#6e6e73}
+  .cat-item .nm .tag.mask{background:color-mix(in srgb,var(--gc-accent) 14%,#fff);color:#1d1d1f}
+  .cat-item .ds{font-size:11px;color:#6e6e73;margin-top:3px;line-height:1.5}
+  .cat-item.revoked{opacity:.62;cursor:default}
+  .cat-item.revoked:hover{border-color:rgba(0,0,0,.08)}
+  .cat-scroll{max-height:232px;overflow-y:auto}
+
+  /* 撤销条(R-39 口径:运行拒绝+提示重选) */
+  .revoke-bar{display:flex;gap:10px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--gc-status-error) 35%,#fff);background:color-mix(in srgb,var(--gc-status-error) 7%,#fff);border-radius:10px;padding:10px 12px;font-size:11.5px;line-height:1.55}
+  .revoke-bar .ic{color:var(--gc-status-error);font-weight:700;flex:none}
+  .revoke-bar b{color:var(--gc-status-error)}
+  .revoke-bar .mono{font-family:var(--mono);font-size:10.5px}
+
+  /* 参数编辑器 */
+  .param-row{display:flex;align-items:center;gap:8px;min-height:34px}
+  .param-row .k{font-family:var(--mono);font-size:11px;color:#6e6e73;width:96px;flex:none}
+  .param-row .v{flex:1;background:#f5f5f7;border:1px solid transparent;border-radius:8px;padding:6px 10px;font-size:12.5px;font-family:var(--mono)}
+  .param-row .v:focus{outline:none;border-color:var(--gc-accent);background:#fff}
+  .param-row .x{width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:#6e6e73;cursor:pointer;flex:none}
+  .param-row .x:hover{background:#f2f3f5}
+  .param-add{border:1px dashed rgba(0,0,0,.16);border-radius:8px;background:transparent;color:#6e6e73;font-size:11.5px;padding:6px 10px;cursor:pointer;width:100%;text-align:left}
+  .param-add:hover{border-color:var(--gc-accent);color:var(--gc-accent)}
+  .chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.4}
+  .chip.eval{background:color-mix(in srgb,var(--gc-status-success) 14%,#fff);color:var(--gc-status-success)}
+  .chip.custom{background:color-mix(in srgb,var(--gc-warn-text) 16%,#fff);color:var(--gc-warn-text)}
+  .warn-line{display:flex;gap:6px;align-items:flex-start;font-size:11px;line-height:1.55;color:var(--gc-warn-text);margin-top:6px}
+  .warn-line .ic{flex:none;font-weight:700}
+
+  /* 模型选择 */
+  .model-row{display:flex;align-items:center;gap:10px;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:8px 12px;margin-bottom:6px;cursor:pointer;background:#fff}
+  .model-row:hover{border-color:var(--gc-accent)}
+  .model-row.sel{box-shadow:0 0 0 1.5px var(--gc-accent);border-color:transparent}
+  .model-row .m-name{font-size:12.5px;font-weight:600;font-family:var(--mono)}
+  .model-row .m-tier{font-size:10px;color:#6e6e73;margin-top:2px}
+  .model-row .fit{margin-left:auto;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;flex:none}
+  .fit.ok{background:color-mix(in srgb,var(--gc-status-success) 14%,#fff);color:var(--gc-status-success)}
+  .fit.warn{background:color-mix(in srgb,var(--gc-warn-text) 16%,#fff);color:var(--gc-warn-text)}
+
+  /* 蒙版入口条 */
+  .mask-strip{display:flex;align-items:center;gap:10px;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:6px 12px 6px 6px;background:#fff}
+  .mask-strip .mth{width:28px;height:28px;border-radius:6px;background:repeating-conic-gradient(#d9dbe0 0 25%,#fff 0 50%) 0 0/12px 12px;flex:none;position:relative}
+  .mask-strip .mth::after{content:"";position:absolute;inset:0;border-radius:6px;background:radial-gradient(circle at 40% 45%,rgba(0,0,0,.85) 0 30%,transparent 32%)}
+  .mask-strip .mt{font-size:12px;font-weight:600}
+  .mask-strip .ms{font-size:10.5px;color:#6e6e73}
+  .mask-strip button{margin-left:auto;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:8px;font-size:11.5px;font-weight:600;padding:6px 12px;cursor:pointer;color:#1d1d1f}
+  .mask-strip button:hover{border-color:var(--gc-accent)}
+
+  /* 运行区 */
+  .run-btn{width:100%;height:36px;border:0;border-radius:999px;background:var(--gc-accent);color:var(--gc-accent-cta-ink);font-size:13px;font-weight:700;cursor:pointer}
+  .run-btn:disabled{background:#f2f3f5;color:#9ba1a9;cursor:not-allowed}
+  .run-status{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#6e6e73}
+  .run-status .dot{width:var(--gc-dot-status);height:var(--gc-dot-status);border-radius:50%;flex:none}
+
+  /* text 采纳区 */
+  .output-box{border:1px solid rgba(0,0,0,.08);border-radius:10px;background:#f5f5f7;padding:10px 12px;font-size:12.5px;line-height:1.7;max-height:160px;overflow-y:auto}
+  .accept-row{display:flex;gap:8px;margin-top:8px}
+  .btn-ghost{flex:1;height:32px;border:1px solid rgba(0,0,0,.12);border-radius:999px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#1d1d1f}
+  .btn-ghost:hover{border-color:var(--gc-accent)}
+  .btn-accept{flex:2;height:32px;border:0;border-radius:999px;background:var(--gc-accent);color:var(--gc-accent-cta-ink);font-size:12px;font-weight:700;cursor:pointer}
+  .adopt-note{font-size:10.5px;color:#6e6e73;margin-top:6px;line-height:1.5}
+
+  /* 空态 */
+  .empty{border:1px dashed rgba(0,0,0,.16);border-radius:10px;padding:16px 12px;text-align:center;font-size:11.5px;color:#6e6e73;line-height:1.6}
+
+  .kbd{font-family:var(--mono);font-size:10px;border:1px solid rgba(0,0,0,.16);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:#6e6e73;background:#fff}
+
+  .scene-caption{font-size:12px;color:var(--gc-text-muted);margin:22px 0 10px;line-height:1.7;max-width:960px}
+  .scene-caption b{color:var(--gc-text)}
+  .frame-tag{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--gc-accent);border:1px solid color-mix(in srgb,var(--gc-accent) 55%,transparent);border-radius:4px;padding:0 6px;margin-right:8px}
+
+  .legend{margin-top:22px;border:1px solid var(--gc-border);border-radius:12px;background:var(--gc-panel);padding:14px 16px;font-size:11.5px;color:var(--gc-text-muted);line-height:1.9}
+  .legend b{color:var(--gc-text)}
+
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header class="doc-head">
+  <div>
+    <h1>R-40 · 悬浮窗口(功能设置)— 示意原型</h1>
+    <p>Command/Inspect 面:钻取单个节点的属性编辑。节点卡/handle/连线/画布网格/三主题 token 1:1 取自 <span class="kbd" style="font-size:10px">src/index.css</span>;悬浮窗口视觉为本提案新设计(tokens.css 为唯一事实源)。四个场景覆盖验收要求:S1 功能选择+参数 warning、S2 撤销态、S3 蒙版入口、S4 text 节点运行+采纳。</p>
+  </div>
+  <div class="switchers">
+    <div class="switch" id="themeSwitch" role="group" aria-label="主题切换">
+      <button data-theme="current" aria-pressed="true">曜黑·活力黄</button>
+      <button data-theme="white" aria-pressed="false">简白</button>
+      <button data-theme="eye" aria-pressed="false">护眼绿</button>
+    </div>
+    <div class="switch" id="sceneSwitch" role="group" aria-label="场景切换">
+      <button data-scene="s1" aria-pressed="true">S1 选功能</button>
+      <button data-scene="s2" aria-pressed="false">S2 撤销态</button>
+      <button data-scene="s3" aria-pressed="false">S3 蒙版</button>
+      <button data-scene="s4" aria-pressed="false">S4 采纳</button>
+    </div>
+  </div>
+</header>
+
+<!-- ================= S1: image 节点选功能(含参数 warning) ================= -->
+<div class="scene" data-scene="s1">
+  <p class="scene-caption"><span class="frame-tag">S1</span><b>image 节点 · 已选功能「草图转效果图」+ 自定义参数 warning</b> — 窗口锚定节点右侧 12px;目录按功能族分组、只列已发布变体(R6);参数区显示「自定义参数(未评估)」徽标与行内 warning(不阻断,§R5);选中项 1.5px accent 描边。</p>
+  <div class="canvas">
+    <svg class="edges"><path d="M 300 220 C 380 220 400 220 470 220"/><path d="M 300 400 C 380 400 400 220 470 220"/></svg>
+    <div class="node" style="left:16px;top:150px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">款式草图</span></div>
+      <div class="node-body"><div class="thumb"><span class="badge">1</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node" style="left:16px;top:330px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">面料特写</span></div>
+      <div class="node-body"><div class="thumb" style="height:80px"><span class="badge">2</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node selected" style="left:480px;top:140px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">效果图 A</span></div>
+      <div class="node-body"><div class="thumb" style="height:100px"></div></div>
+      <button class="fn-entry">⚙ 草图转效果图<span class="chev">›</span></button>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+
+    <!-- 悬浮窗口 -->
+    <div class="iw" style="left:776px;top:132px" role="dialog" aria-label="效果图 A · 功能设置">
+      <div class="iw-head">
+        <span class="dot" style="background:var(--gc-status-idle)"></span>
+        <span class="name">效果图 A</span><span class="st">· 待运行</span>
+        <button class="close" aria-label="关闭(Esc)">✕</button>
+      </div>
+      <div class="iw-body">
+        <section>
+          <div class="sec-label">功能(系统提示词)<span style="font-weight:400">只列已发布</span></div>
+          <div class="cat-scroll" style="max-height:150px">
+            <div class="cat-group">出图</div>
+            <div class="cat-item sel">
+              <div class="nm">草图转效果图 <span class="tag">已发布</span></div>
+              <div class="ds">线稿 → 写实上身效果图,保留构图与廓形。</div>
+            </div>
+            <div class="cat-item">
+              <div class="nm">高清放大 <span class="tag">已发布</span></div>
+              <div class="ds">2× 超分,细节织理增强。</div>
+            </div>
+            <div class="cat-group">改款</div>
+            <div class="cat-item">
+              <div class="nm">面料换色 <span class="tag">已发布</span></div>
+              <div class="ds">按参考图 2 的面料替换主体面料。</div>
+            </div>
+            <div class="cat-item">
+              <div class="nm">局部重绘 <span class="tag mask">需蒙版</span></div>
+              <div class="ds">在蒙版区域内重绘,其余保持不变。</div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">技术参数 <span class="chip custom">自定义参数(未评估)</span></div>
+          <div class="param-row"><span class="k">size</span><input class="v" value="2048x2048" aria-label="size"><button class="x" aria-label="移除 size">✕</button></div>
+          <div class="param-row"><span class="k">quality</span><input class="v" value="ultra" aria-label="quality"><button class="x" aria-label="移除 quality">✕</button></div>
+          <div class="warn-line"><span class="ic">⚠</span><span>quality 推荐值为 high;ultra 未在该变体的评估覆盖内,Provider 可能拒绝或产生额外费用。仍可运行。</span></div>
+          <button class="param-add" style="margin-top:8px">+ 添加参数</button>
+        </section>
+        <section>
+          <div class="sec-label">模型</div>
+          <div class="model-row sel">
+            <div><div class="m-name">gpt-image-2.5-flare-vip</div><div class="m-tier">旗舰 · 已评估绑定的发布模型</div></div>
+            <span class="fit ok">适用</span>
+          </div>
+          <div class="model-row">
+            <div><div class="m-name">gemini-3.6-flash-image</div><div class="m-tier">轻量 · 速度快,草稿档</div></div>
+            <span class="fit warn">可用 · 非发布绑定模型</span>
+          </div>
+        </section>
+      </div>
+      <div class="iw-foot">
+        <button class="run-btn">运 行</button>
+        <div class="run-status"><span class="dot" style="background:var(--gc-status-idle)"></span>已选「草图转效果图」· 参考图 2 张 · 参数有 1 条提示(不阻断)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= S2: 功能被撤销态 ================= -->
+<div class="scene hidden" data-scene="s2">
+  <p class="scene-caption"><span class="frame-tag">S2</span><b>已选功能被撤销(R-39 口径:运行拒绝 + 提示重选)</b> — 撤销条置顶,运行按钮禁用并说明原因;变体 ID 保留不回退,等用户手动改选;目录中该变体灰显标注「已撤销」。</p>
+  <div class="canvas">
+    <div class="node selected" style="left:48px;top:120px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-error)"></span><span class="title">效果图 B</span></div>
+      <div class="node-body"><div class="thumb" style="height:100px"></div></div>
+      <button class="fn-entry">⚙ 印花裂变 v2(已撤销)<span class="chev">›</span></button>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+    <div class="iw" style="left:344px;top:64px" role="dialog" aria-label="效果图 B · 功能设置">
+      <div class="iw-head">
+        <span class="dot" style="background:var(--gc-status-error)"></span>
+        <span class="name">效果图 B</span><span class="st">· 配置失效</span>
+        <button class="close" aria-label="关闭(Esc)">✕</button>
+      </div>
+      <div class="iw-body">
+        <div class="revoke-bar" role="alert">
+          <span class="ic">⛔</span>
+          <div><b>所选功能已被撤销,请重新选择。</b><br>当前绑定 <span class="mono">print-mutate.v2</span> 已从发布目录撤销(2026-09-17)。节点数据保留不动,运行将被拒绝;请在下方目录改选其他已发布变体。</div>
+        </div>
+        <section>
+          <div class="sec-label">功能(系统提示词)<span style="font-weight:400">只列已发布</span></div>
+          <div class="cat-scroll" style="max-height:150px">
+            <div class="cat-group">改款</div>
+            <div class="cat-item revoked" aria-disabled="true">
+              <div class="nm">印花裂变 v2 <span class="tag" style="background:color-mix(in srgb,var(--gc-status-error) 12%,#fff);color:var(--gc-status-error)">已撤销</span></div>
+              <div class="ds">当前节点绑定的变体,已不可运行。</div>
+            </div>
+            <div class="cat-item">
+              <div class="nm">印花裂变 v3 <span class="tag">已发布</span></div>
+              <div class="ds">同一功能族的现行版本,由 batchSize 控制裂变张数。</div>
+            </div>
+            <div class="cat-item">
+              <div class="nm">面料换色 <span class="tag">已发布</span></div>
+              <div class="ds">按参考图的面料替换主体面料。</div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">技术参数 <span class="chip eval">已评估参数</span></div>
+          <div class="param-row"><span class="k">size</span><input class="v" value="2048x2048" aria-label="size"><button class="x" aria-label="移除 size">✕</button></div>
+        </section>
+        <section>
+          <div class="sec-label">模型</div>
+          <div class="model-row sel">
+            <div><div class="m-name">gpt-image-2.5-flare-vip</div><div class="m-tier">旗舰 · 发布绑定模型</div></div>
+            <span class="fit ok">适用</span>
+          </div>
+        </section>
+      </div>
+      <div class="iw-foot">
+        <button class="run-btn" disabled>运 行</button>
+        <div class="run-status"><span class="dot" style="background:var(--gc-status-error)"></span>无法运行:所选功能已被撤销,请重新选择。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= S3: needsMask 蒙版入口 ================= -->
+<div class="scene hidden" data-scene="s3">
+  <p class="scene-caption"><span class="frame-tag">S3</span><b>选中声明 needsMask 的功能 → 蒙版入口条自动出现</b> — 缩略图(棋盘底+已涂区域)+ 羽化值 +「编辑蒙版」复用现有 MaskEditor;未涂蒙版时运行禁用并说明。</p>
+  <div class="canvas">
+    <svg class="edges"><path d="M 300 200 C 380 200 400 200 470 200"/></svg>
+    <div class="node" style="left:16px;top:130px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">成衣照片</span></div>
+      <div class="node-body"><div class="thumb"><span class="badge">1</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node selected" style="left:480px;top:120px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">领口重绘</span></div>
+      <div class="node-body"><div class="thumb" style="height:100px"></div></div>
+      <button class="fn-entry">⚙ 局部重绘<span class="chev">›</span></button>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+    <div class="iw" style="left:776px;top:112px" role="dialog" aria-label="领口重绘 · 功能设置">
+      <div class="iw-head">
+        <span class="dot" style="background:var(--gc-status-idle)"></span>
+        <span class="name">领口重绘</span><span class="st">· 待运行</span>
+        <button class="close" aria-label="关闭(Esc)">✕</button>
+      </div>
+      <div class="iw-body">
+        <section>
+          <div class="sec-label">功能(系统提示词)</div>
+          <div class="cat-item sel">
+            <div class="nm">局部重绘 <span class="tag mask">需蒙版</span></div>
+            <div class="ds">在蒙版区域内重绘,其余保持不变。蒙版源 = 参考图 1。</div>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">蒙版 <span style="font-weight:400">该功能要求</span></div>
+          <div class="mask-strip">
+            <div class="mth" aria-hidden="true"></div>
+            <div><div class="mt">已涂区域 · 领口</div><div class="ms">羽化 12px · 源:参考图 1</div></div>
+            <button>编辑蒙版</button>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">技术参数 <span class="chip eval">已评估参数</span></div>
+          <div class="param-row"><span class="k">size</span><input class="v" value="2048x2048" aria-label="size"><button class="x" aria-label="移除 size">✕</button></div>
+          <div class="param-row"><span class="k">quality</span><input class="v" value="high" aria-label="quality"><button class="x" aria-label="移除 quality">✕</button></div>
+        </section>
+      </div>
+      <div class="iw-foot">
+        <button class="run-btn">运 行</button>
+        <div class="run-status"><span class="dot" style="background:var(--gc-status-idle)"></span>蒙版已就绪 · 参数与发布推荐值一致</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= S4: text 节点运行 + 采纳 ================= -->
+<div class="scene hidden" data-scene="s4">
+  <p class="scene-caption"><span class="frame-tag">S4</span><b>text 节点 · 运行成功 + 「采纳」动作</b> — 结果写 outputText(预览只读,可「复制」/「采纳」);采纳 = 显式动作把结果复制进正文,正文所有权永远属于用户;未采纳前下游读旧正文。</p>
+  <div class="canvas">
+    <div class="node selected" style="left:120px;top:140px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-success)"></span><span class="title">润色:设计说明</span></div>
+      <div class="node-body"><div class="text-lines"><span style="width:96%"></span><span style="width:88%"></span><span style="width:60%"></span></div></div>
+      <button class="fn-entry">⚙ AI 润色<span class="chev">›</span></button>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+    <div class="iw" style="left:416px;top:132px" role="dialog" aria-label="润色:设计说明 · 功能设置">
+      <div class="iw-head">
+        <span class="dot" style="background:var(--gc-status-success)"></span>
+        <span class="name">润色:设计说明</span><span class="st">· 运行成功</span>
+        <button class="close" aria-label="关闭(Esc)">✕</button>
+      </div>
+      <div class="iw-body">
+        <section>
+          <div class="sec-label">文本功能</div>
+          <div class="cat-item sel">
+            <div class="nm">AI 润色 <span class="tag">已发布</span></div>
+            <div class="ds">保持事实不变,提升面料/工艺描述的专业度。</div>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">模型</div>
+          <div class="model-row sel">
+            <div><div class="m-name">gpt-5.3</div><div class="m-tier">文本旗舰 · 推荐主力</div></div>
+            <span class="fit ok">适用</span>
+          </div>
+        </section>
+        <section>
+          <div class="sec-label">运行结果(outputText)<span style="font-weight:400">建议,未落笔</span></div>
+          <div class="output-box">本季核心款式以高支棉府绸为基底,肩线采用落肩剪裁营造松弛廓形;领口手工包边,针距 3mm,与袖口卷边工艺呼应……</div>
+          <div class="accept-row">
+            <button class="btn-ghost">复 制</button>
+            <button class="btn-accept">采纳进正文</button>
+          </div>
+          <p class="adopt-note">采纳是把结果<b>复制进正文</b>的显式动作;AI 只能提案,落笔由人。未采纳前,下游节点读取的仍是原正文。</p>
+        </section>
+      </div>
+      <div class="iw-foot">
+        <button class="run-btn">重新运行</button>
+        <div class="run-status"><span class="dot" style="background:var(--gc-status-success)"></span>2.4s · 成功 · 结果未采纳</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <b>图例与真实性标注</b> — 节点卡 / handle / 连线 / 画布圆点网格 / 三主题色 / 状态色 8 槽位 / 运行胶囊按钮:<b>1:1 取自 src/index.css 与 NodeFrame</b>(示意数据:文案、缩略图为斜纹占位)。悬浮窗口(白卡浮层、分区、目录卡片、参数行、徽标、撤销条、蒙版条、采纳区):<b>本提案新设计</b>,数值唯一事实源 = <span style="font-family:var(--mono)">tokens.css</span>。交互规则(打开/关闭/Esc/单例/锚定翻转)见 design.md §2。
+</div>
+
+<script>
+  const root = document.documentElement;
+  document.getElementById("themeSwitch").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    root.dataset.theme = b.dataset.theme;
+    for (const x of e.currentTarget.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+  });
+  document.getElementById("sceneSwitch").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of e.currentTarget.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    for (const s of document.querySelectorAll(".scene")) s.classList.toggle("hidden", s.dataset.scene !== b.dataset.scene);
+  });
+  // 支持 ?theme= & ?scene= 便于脚本实截
+  const q = new URLSearchParams(location.search);
+  if (q.get("theme")) root.dataset.theme = q.get("theme");
+  if (q.get("scene")) {
+    for (const s of document.querySelectorAll(".scene")) s.classList.toggle("hidden", s.dataset.scene !== q.get("scene"));
+    for (const x of document.querySelectorAll("#sceneSwitch button")) x.setAttribute("aria-pressed", String(x.dataset.scene === q.get("scene")));
+  }
+</script>
+</body>
+</html>
