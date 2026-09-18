@@ -610,10 +610,18 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   await expect.poll(
     () => node.evaluate((element) => (element as HTMLElement).style.transform),
   ).toBe(endTransform);
+
+  // 还原到拖拽前位置：拖拽/撤销/重做会持久化节点位置，若不还原，后续视口的
+  // 用例会读到被拖动的节点（位置漂移甚至与相邻节点重叠，使 header hover 被拦截）。
+  await page.keyboard.press(`${modifier}+z`);
+  await expect.poll(
+    () => node.evaluate((element) => (element as HTMLElement).style.transform),
+  ).toBe(startTransform);
 });
 
 test("dragging a node near the canvas edge never auto-pans the viewport", async ({ page }) => {
-  const nodeHeader = page.locator(".react-flow__node").first().locator(".gc-node-header");
+  const node = page.locator(".react-flow__node").first();
+  const nodeHeader = node.locator(".gc-node-header");
   const pane = page.locator(".react-flow__pane");
   const viewport = page.locator(".react-flow__viewport");
 
@@ -622,6 +630,7 @@ test("dragging a node near the canvas edge never auto-pans the viewport", async 
   const paneBox = await pane.boundingBox();
   if (!handle || !paneBox) throw new Error("Workflow node or React Flow pane is missing");
 
+  const initialTransform = await node.evaluate((element) => (element as HTMLElement).style.transform);
   const initialViewport = await viewport.evaluate((element) => getComputedStyle(element).transform);
   await page.mouse.move(handle.x + Math.min(24, handle.width / 2), handle.y + handle.height / 2);
   await page.mouse.down();
@@ -638,6 +647,13 @@ test("dragging a node near the canvas edge never auto-pans the viewport", async 
 
   expect(viewportWhileDragging).toBe(initialViewport);
   expect(viewportAfterRelease).toBe(initialViewport);
+
+  // 还原被拖到边缘的节点：该用例把节点拖到画布右缘后并不需要保留位置，若不撤销，
+  // 会污染后续用例（节点漂移到边缘、与相邻节点重叠，导致后续 header hover 被拦截）。
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
+  await expect.poll(
+    () => node.evaluate((element) => (element as HTMLElement).style.transform),
+  ).toBe(initialTransform);
 });
 
 test("left dock and horizontal zoom controls preserve canvas identity, geometry, focus, and results", async ({ page }, testInfo) => {

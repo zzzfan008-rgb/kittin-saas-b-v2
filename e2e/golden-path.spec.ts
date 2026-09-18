@@ -47,7 +47,6 @@ async function installTestOnlyReviewedTextVariant(page: import("@playwright/test
     const releases = registry.PROMPT_EVALUATION_RELEASES as unknown as Array<unknown>;
     releases.push(releaseTools.createPromptEvaluationReleaseSnapshot(
       variant,
-      [],
       "verified",
       "e2e-test-only-evidence",
       {
@@ -195,7 +194,7 @@ test("unverified upload stays blocked while a test-reviewed text starter complet
   await properties.getByRole("button", { name: "确认应用" }).click();
 
   await textNode.getByRole("button", { name: "生成效果图" }).click();
-  await expect(textNode.getByTitle("成功")).toBeVisible();
+  await expect(textNode.getByLabel("状态：成功")).toBeVisible();
   await expect.poll(() => runs.length).toBe(1);
   await expect.poll(() => saves.length).toBe(1);
   expect(runs[0].nodes).toEqual(saves[0].flow.nodes);
@@ -227,7 +226,9 @@ test("unverified upload stays blocked while a test-reviewed text starter complet
     await page.evaluate((value) => {
       document.documentElement.setAttribute("data-theme", value);
     }, theme);
-    await textResultCard.hover();
+    // 动作按钮自带 hover:text-white；把鼠标移出卡片再读颜色，确保读到的
+    // 是默认 overlay 文字 token（--gc-media-overlay-text = #f4f4f4）而非 hover 态。
+    await page.mouse.move(0, 0);
     const viewColor = await textResultCard.locator('button[title="查看"]').evaluate((element) => getComputedStyle(element).color);
     expect(viewColor).toMatch(/rgb\(244, 244, 244\)/);
     await textResultCard.locator('button[title="查看"]').focus();
