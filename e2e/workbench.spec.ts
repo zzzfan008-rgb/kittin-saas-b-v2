@@ -1,4 +1,4 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import {
   WORKFLOW_SCHEMA_VERSION,
   type WorkflowTemplate,
@@ -187,10 +187,49 @@ async function expectFlowCenter(
   }).toBeLessThanOrEqual(1);
 }
 
+/**
+ * 结束 pristine 初始草稿的「首次创作」启动器浮层，让画布指针事件可命中节点。
+ *
+ * 该浮层（TaskLauncher，`开始第一个创作任务`）是产品在有且仅有一个未编辑的
+ * image-input 节点、从未重命名/保存的初始草稿上显示的首次引导，属正确产品行为，
+ * 而非缺陷。工作台用例断言的是「已开始项目」的画布节点拖拽/几何机制；若 before
+ * 钩子不先结束 pristine 状态，z-20 覆盖层会拦截 pointer 事件，使 nodeHeader.hover()
+ * 超时。这里用「重命名初始草稿」这一真实用户动作结束 pristine（保持单一 image-input
+ * 节点不变，不绕过产品行为），与 initial-draft 用例既有的重命名做法一致。
+ */
+async function dismissPristineLauncher(page: Page): Promise<void> {
+  const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
+  if (!(await launcher.isVisible())) return;
+
+  const draftResponse = await page.context().request.get("/api/projects/initial-draft");
+  expect(draftResponse.ok()).toBeTruthy();
+  const { draft } = await draftResponse.json() as {
+    draft: { id: string; name: string; revision: number; flow: unknown } | null;
+  };
+  if (!draft) throw new Error("Workbench tests require an existing initial draft");
+
+  const renameResponse = await page.context().request.put(
+    `/api/projects/initial-draft/${draft.id}`,
+    {
+      data: {
+        expectedRevision: draft.revision,
+        name: `E2E 工作台画布 ${draft.id}`,
+        flow: draft.flow,
+      },
+    },
+  );
+  expect(renameResponse.ok(), await renameResponse.text()).toBeTruthy();
+
+  await page.reload();
+  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
+  await expect(launcher).toBeHidden();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
+  await dismissPristineLauncher(page);
 });
 
 test("unverified prompt variants stay disabled with an explicit runtime reason", async ({ page }) => {
@@ -520,6 +559,12 @@ test("node drag is one undo transaction and selection stays canonical", async ({
   await page.mouse.move(pointer.x, pointer.y);
   await page.mouse.down();
   await page.mouse.move(pointer.x + dragDelta.x, pointer.y + dragDelta.y, { steps: 12 });
+  // React Flow 通过 rAF 异步落地最后一次 position change；`mouse.move` 返回时最后一帧的
+  // transform 可能尚未写入 DOM，此刻采样 boundingBox 会读到差一步（160/12≈13px、90/12≈7px）
+  // 的旧位置，把「最后一帧位移」误判成释放瞬间的跳变。等两帧再采样「释放前」位置。
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
   const beforeRelease = await node.boundingBox();
   const viewportBeforeRelease = await page.locator(".react-flow__viewport").evaluate(
     (element) => getComputedStyle(element).transform,
