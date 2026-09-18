@@ -73,7 +73,7 @@ function ThemeSwitcher() {
       <DropdownMenuTrigger
         type="button"
         aria-label={`切换主题，当前为${current.label}`}
-        className="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] font-medium text-[var(--gc-text)] outline-hidden transition-colors hover:border-[var(--gc-accent)] focus-visible:ring-2 focus-visible:ring-[var(--gc-accent)]/50"
+        className="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] font-medium text-[var(--gc-text)] outline-hidden transition-colors hover:border-[var(--gc-accent)] focus-visible:ring-3 focus-visible:ring-[var(--gc-accent)]/50"
       >
         <PaletteIcon aria-hidden="true" className="size-3.5 text-[var(--gc-accent)]" />
         <span>{current.label}</span>

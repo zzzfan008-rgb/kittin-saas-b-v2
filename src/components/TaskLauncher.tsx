@@ -44,7 +44,7 @@ function TemplateCard({ template, onSelect }: { template: WorkflowTemplate; onSe
         disabled={unavailable}
         title={productPolicy.reason}
         aria-describedby={unavailable ? reasonId : undefined}
-        className="block w-full text-left disabled:cursor-not-allowed disabled:opacity-75"
+        className="block w-full flex-1 text-left disabled:cursor-not-allowed disabled:opacity-75"
         aria-label={`使用内置模板：${template.name}`}
       >
         <div className="relative overflow-hidden">

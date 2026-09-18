@@ -204,28 +204,32 @@ export function ProjectTabs() {
                   )}
                 </div>
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => switchTab(tab.id)}
                   onDoubleClick={() => beginRename(tab)}
-                  className="min-w-0 flex-1 truncate text-left text-[11px]"
+                  className="h-auto min-w-0 flex-1 justify-start truncate rounded-sm px-0 py-0 text-[11px] font-normal hover:bg-transparent"
                   title={tab.readOnly ? `${tab.projectName}（只读）` : `${tab.projectName} · 双击重命名`}
                 >
                   {tab.projectName}
-                </button>
+                </Button>
               )}
 
               {!editing && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => void requestClose(tab)}
                   disabled={abandoningTabId === tab.id}
                   aria-label={`关闭 ${tab.projectName}`}
                   title="关闭页签"
-                  className="ml-1 rounded-sm px-1 text-[13px] leading-5 text-[var(--gc-text-muted)] hover:bg-white/5 hover:text-[var(--gc-text)] disabled:cursor-wait disabled:opacity-40"
+                  className="ml-1 size-auto rounded-sm px-1 py-0 text-[13px] font-normal leading-5 text-[var(--gc-text-muted)] hover:bg-white/5 hover:text-[var(--gc-text)] disabled:cursor-wait disabled:opacity-40"
                 >
                   ×
-                </button>
+                </Button>
               )}
             </div>
           );
