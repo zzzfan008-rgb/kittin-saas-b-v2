@@ -90,6 +90,7 @@ export type DocumentNodeData =
       prompt: string;
       mask?: string;
       maskSourceRef?: string;
+      featherRadius?: number;
       outputImages: string[];
       modelId: typeof MASK_REDRAW_MODEL_ID;
       modelOptions: ImageModelOptions;
@@ -325,6 +326,9 @@ function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
         prompt: data.prompt,
         ...optionalString("mask", data.mask),
         ...optionalString("maskSourceRef", data.maskSourceRef),
+        ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+          ? { featherRadius: Math.max(0, Math.min(64, Math.round(data.featherRadius))) }
+          : {}),
         outputImages: [...data.outputImages],
         modelId: MASK_REDRAW_MODEL_ID,
         // 蒙版输出尺寸由服务端按原图逐次计算，不能写入项目文档形成陈旧参数。

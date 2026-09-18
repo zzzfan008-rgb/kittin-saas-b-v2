@@ -470,6 +470,7 @@ const maskBindingSnapshot = createDocumentSnapshot({
       status: "idle",
       prompt: maskPrompt,
       mask: "/api/files/mask-binding.png",
+      featherRadius: 12,
       outputImages: [],
       modelId: "gpt-image-2",
       modelOptions: {},
@@ -483,6 +484,11 @@ const maskBindingSnapshot = createDocumentSnapshot({
 const savedMaskNode = maskBindingSnapshot.nodes[0];
 assert.equal(savedMaskNode?.data.kind, "mask-redraw");
 if (savedMaskNode?.data.kind !== "mask-redraw") throw new Error("蒙版快照节点丢失");
+assert.equal(
+  savedMaskNode.data.featherRadius,
+  12,
+  "保存快照必须保留用户指定的羽化宽度",
+);
 assert.deepEqual({
   promptVariantId: savedMaskNode.data.promptVariantId,
   promptFamilyId: savedMaskNode.data.promptFamilyId,
@@ -501,6 +507,11 @@ const reloadedMaskSnapshot = createDocumentSnapshot({
 const reloadedMaskNode = reloadedMaskSnapshot.nodes[0];
 assert.equal(reloadedMaskNode?.data.kind, "mask-redraw");
 if (reloadedMaskNode?.data.kind !== "mask-redraw") throw new Error("重载后的蒙版节点丢失");
+assert.equal(
+  reloadedMaskNode.data.featherRadius,
+  12,
+  "重载后必须保留用户指定的羽化宽度",
+);
 assert.deepEqual({
   promptVariantId: reloadedMaskNode.data.promptVariantId,
   promptFamilyId: reloadedMaskNode.data.promptFamilyId,

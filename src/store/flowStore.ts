@@ -1830,6 +1830,15 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       data.outputImages = stringList(input.outputImages);
       if (typeof input.mask !== "string") delete data.mask;
       if (typeof input.maskSourceRef !== "string") delete data.maskSourceRef;
+      // 羽化宽度仅接受 0–64 的有限数值；缺省/非数值维持自适应羽化（不写该字段）。
+      if (
+        typeof input.featherRadius !== "number"
+        || !Number.isFinite(input.featherRadius)
+      ) {
+        delete data.featherRadius;
+      } else {
+        data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
+      }
       break;
     case "result":
       data.images = stringList(input.images);

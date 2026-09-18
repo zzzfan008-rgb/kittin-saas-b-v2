@@ -31,6 +31,18 @@ import {
   getModelParameterProfile,
   materializeModelParameterProfile,
 } from "@/types/modelParameterProfiles";
+import { MASK_REDRAW_MODEL_ID } from "@/types/imageModels";
+import { Slider } from "@/components/ui/slider";
+
+/** 羽化宽度可调范围（px），与后端 resolveMaskFeatherRadius 的夹取范围一致。 */
+const FEATHER_RADIUS_MIN = 0;
+const FEATHER_RADIUS_MAX = 64;
+const FEATHER_RADIUS_DEFAULT_MANUAL = 16;
+
+function normalizeFeatherRadius(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(FEATHER_RADIUS_MIN, Math.min(FEATHER_RADIUS_MAX, Math.round(value)));
+}
 
 export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedrawNodeData>>) {
   const [editing, setEditing] = useState(false);
@@ -47,10 +59,13 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
   const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);
   const running = isNodeRunActive(data.status);
   const admission = usePromptRunAdmission(id, data);
+  // undefined = 自适应羽化（服务端现有行为）；0 = 硬边；1–64 = 按像素羽化。
+  const featherAuto = normalizeFeatherRadius(data.featherRadius) === undefined;
+  const featherValue = normalizeFeatherRadius(data.featherRadius) ?? FEATHER_RADIUS_DEFAULT_MANUAL;
   const presetAvailability = getRuntimePromptVariantAvailability(
     {
       familyId: "mask-local-edit",
-      modelId: "gpt-image-2",
+      modelId: MASK_REDRAW_MODEL_ID,
       nodeKind: "mask-redraw",
       mode: "mask-edit",
     },
@@ -211,6 +226,52 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
           {data.mask && !staleMask ? "编辑蒙版" : "绘制蒙版"}
         </button>
         {staleMask && <p className="text-[11px] text-orange-400">原图已变化，请重新绘制蒙版</p>}
+        <div className="space-y-1.5 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-2">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-neutral-500">羽化宽度</span>
+            <label className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+              <input
+                type="checkbox"
+                checked={featherAuto}
+                disabled={running || readOnly}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    // 恢复自适应：从节点 data 移除该字段。
+                    updateNodeData(id, { featherRadius: undefined });
+                  } else {
+                    updateNodeData(id, { featherRadius: featherValue });
+                  }
+                }}
+                className="nodrag accent-gold disabled:opacity-40"
+              />
+              自动
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Slider
+              aria-label="羽化宽度（像素）"
+              value={[featherValue]}
+              min={FEATHER_RADIUS_MIN}
+              max={FEATHER_RADIUS_MAX}
+              step={1}
+              disabled={featherAuto || running || readOnly}
+              onValueChange={(value) => {
+                const next = value[0];
+                if (typeof next === "number") updateNodeData(id, { featherRadius: next });
+              }}
+              className="nodrag w-full"
+            />
+            <output
+              aria-live="polite"
+              className="min-w-9 text-right text-[10px] tabular-nums text-[var(--gc-node-muted)]"
+            >
+              {featherAuto ? "自动" : `${featherValue}px`}
+            </output>
+          </div>
+          <p className="text-[9px] leading-4 text-[var(--gc-node-muted)]">
+            自动 = 按图片与选区自适应柔和过渡；0 = 硬边；数值越大边缘越柔和。
+          </p>
+        </div>
         <RunButton
           status={data.status}
           onClick={run}
@@ -226,6 +287,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
         <MaskEditor
           source={source}
           initialMask={data.maskSourceRef === source ? data.mask : undefined}
+          featherRadius={normalizeFeatherRadius(data.featherRadius)}
           onClose={() => setEditing(false)}
           onSave={async (mask) => {
             const releaseUploadPending = beginMaskWork();

@@ -6,6 +6,8 @@ import { adaptiveMaskExpansionRadius, adaptiveMaskFeatherRadius } from "@/lib/ma
 interface MaskEditorProps {
   source: string;
   initialMask?: string;
+  /** 用户指定羽化宽度（px）。undefined = 沿用自适应羽化预览。 */
+  featherRadius?: number;
   onSave: (mask: string) => void | Promise<void>;
   onClose: () => void;
 }
@@ -14,7 +16,7 @@ type BrushMode = "edit" | "preserve";
 const MAX_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_HISTORY = 12;
 
-export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorProps) {
+export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose }: MaskEditorProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -74,10 +76,13 @@ export function MaskEditor({ source, initialMask, onSave, onClose }: MaskEditorP
       ? { width: right - left + 1, height: bottom - top + 1 }
       : { width: 1, height: 1 };
     const expansionRadius = adaptiveMaskExpansionRadius(overlay.width, overlay.height, extent);
-    const featherRadius = adaptiveMaskFeatherRadius(overlay.width, overlay.height, expansionRadius);
+    // 用户未指定时沿用自适应羽化；指定后按该值预览（0 = 硬边）。
+    const featherRadiusPreview = typeof featherRadius === "number" && Number.isFinite(featherRadius)
+      ? Math.max(0, Math.min(64, Math.round(featherRadius)))
+      : adaptiveMaskFeatherRadius(overlay.width, overlay.height, expansionRadius);
     if (expansionRadius > 0) {
       context.save();
-      context.filter = `blur(${Math.max(2, Math.round((expansionRadius + featherRadius) / 2))}px)`;
+      context.filter = `blur(${Math.max(2, Math.round((expansionRadius + featherRadiusPreview) / 2))}px)`;
       context.drawImage(selectionLayer("rgba(245, 158, 11, 0.3)"), 0, 0);
       context.restore();
     }

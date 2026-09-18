@@ -204,6 +204,11 @@ export interface MaskRedrawNodeData extends BaseNodeData, Pick<ModelSelectableNo
   prompt: string;
   mask?: string;
   maskSourceRef?: string;
+  /**
+   * 用户可调羽化宽度（px，0–64）。undefined/非数值 = 服务端自适应羽化（现有行为）；
+   * 0 = 硬边（不羽化）；1–64 = 按像素羽化。仅 mask-redraw 使用。
+   */
+  featherRadius?: number;
   outputImages: string[];
 }
 
