@@ -3,8 +3,8 @@
 > 本文件是 **参考资料**,不是运行时契约。任何冲突以 `package.json` / `package-lock.json`、
 > 代码与 [`AGENTS.md`](../AGENTS.md) 的当前规则为准。
 >
-> - 快照时间:2026-09-18T16:06:52+08:00 (CST);精确固定策略于 2026-09-18T16:29:44+0800 追加核实;锚头刷新于 2026-09-18T18:21:22+0800(仅重锚,第 1–6 节版本值未改动)
-> - 仓库 HEAD:`2eec80f`(`main`);该 SHA 已推送且等于 `origin/main`,CI run `35333888603` 在它上面五个必需检查(static / unit / e2e / production-smoke / code-intelligence)全部 success —— 锚因此外部可验证。版本基线原采集于 `722900d`;本次刷新已重新对 `package-lock.json` 逐项复核第 1–6 节,26 个 npm 版本零不一致
+> - 快照时间:2026-09-18T16:06:52+08:00 (CST);精确固定策略于 2026-09-18T16:29:44+0800 追加核实;锚头刷新于 2026-09-18T18:21:22+0800(仅重锚,第 1–6 节版本值未改动);锚句措辞修正于 2026-09-18T18:28:45+0800(去掉会随 main 前进而失效的等值断言)
+> - 仓库锚:`2eec80f`(`main`);该 SHA 已推送到 `origin`,刷新当时即 `origin/main`,CI run `35333888603` 在该精确 SHA 上五个必需检查(static / unit / e2e / production-smoke / code-intelligence)全部 success。锚的外部可验证性由此成立:任何人 `git checkout 2eec80f` 都能复核。**锚落后于 `origin/main` 属正常**:main 每有一次新提交就会前进,而本表的版本事实绑定 `package-lock.json`,只在依赖真的变动时才需要更新(见第 9 节),不要把「锚不在 main 顶端」误读为文档失效。版本基线原采集于 `722900d`;本次刷新已重新对 `package-lock.json` 逐项复核第 1–6 节,26 个 npm 版本零不一致
 > - 版本事实来源:`package.json` + `package-lock.json`(lockfileVersion 3) + `node_modules/<pkg>/package.json` 实测 + `.nvmrc` + `Dockerfile` + `compose.yaml`
 > - 链接可达性:2026-09-18 对本文件内 75 个真实链接 URL 用 `curl -4 -s -L` 逐个实测,**除第 5 节标注的 Gemini 一项(302,本环境不可达)外全部 HTTP 200**;方法与重跑命令见第 7 节
 
