@@ -41,6 +41,24 @@ if (!authRelativePath || authRelativePath.startsWith("..") || isAbsolute(authRel
 }
 const webPort = new URL(baseURL).port || "80";
 
+// 并行 worker 数由环境变量覆盖，便于本地/CI 取不同值；默认 1 保持既有串行语义。
+// 注意：桌面工作台三视口（desktop-1024/1280/1440）、golden-path 与 initial-draft 共用
+// 同一账号（单设备会话，新登录会吊销旧会话）与同一初始草稿（expectedRevision 乐观锁），
+// 并发会让旧会话收到 SESSION_REPLACED、让草稿 PUT 收到 409 revision_conflict，导致偶发失败。
+// 因此在完成「按 worker 隔离账号/草稿」之前，这些 project 必须保持串行。
+const e2eWorkers = (() => {
+  const raw = process.env.E2E_WORKERS?.trim();
+  if (!raw) return 1;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`E2E_WORKERS must be a positive integer, got "${raw}"`);
+  }
+  return value;
+})();
+
+// 复用已运行的 test server（仅本地迭代用）；CI 不设置此变量，保持 false 以避免跨 run 污染。
+const e2eReuseExistingServer = process.env.E2E_REUSE_SERVER === "1";
+
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "test-results",
@@ -49,7 +67,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: e2eWorkers,
   reporter: process.env.CI
     ? [["line"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
@@ -67,7 +85,7 @@ export default defineConfig({
     {
       command: "tsx server/index.ts",
       url: `${apiURL}/api/ready`,
-      reuseExistingServer: false,
+      reuseExistingServer: e2eReuseExistingServer,
       timeout: 120_000,
       stdout: "pipe",
       stderr: "pipe",
@@ -75,7 +93,7 @@ export default defineConfig({
     {
       command: `vite --host 127.0.0.1 --port ${webPort} --strictPort`,
       url: baseURL,
-      reuseExistingServer: false,
+      reuseExistingServer: e2eReuseExistingServer,
       timeout: 120_000,
       stdout: "pipe",
       stderr: "pipe",
