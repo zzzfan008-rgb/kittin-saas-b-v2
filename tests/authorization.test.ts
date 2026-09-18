@@ -2273,6 +2273,144 @@ await test("草稿权限统一隐藏，放弃需确认且 15 天内可恢复", a
   }
 });
 
+await test("强制清除草稿：按当前用户定位、需确认、幂等且只影响本人", async () => {
+  const ownerDraftId = "force-clear-owner-draft";
+  const otherDraftId = "force-clear-other-draft";
+  const ownerMaskId = "force-clear-owner-mask";
+  try {
+    for (const [user, id] of [["owner", ownerDraftId], ["other", otherDraftId]] as const) {
+      const bootstrap = await request("/projects/initial-draft/bootstrap", user, {
+        method: "POST",
+        body: JSON.stringify({ id, flow: flow() }),
+      });
+      assert.equal(bootstrap.status, 201, await bootstrap.text());
+    }
+    await query(`
+      INSERT INTO files (
+        id, owner_id, source_type, mime_type, project_id, node_id, created_at, deleted_at, purge_after
+      ) VALUES ($1, $2, 'mask', 'image/png', $3, 'mask-node', $4, NULL, NULL)
+    `, [ownerMaskId, users.owner.id, ownerDraftId, now]);
+
+    const missingConfirm = await request("/projects/initial-draft/force-clear", "owner", {
+      method: "POST",
+      body: "{}",
+    });
+    assert.equal(missingConfirm.status, 400, await missingConfirm.text());
+    assert.equal((await queryOne<{ deleted_at: string | null }>(
+      "SELECT deleted_at FROM projects WHERE id = $1",
+      [ownerDraftId],
+    ))?.deleted_at, null);
+
+    const beforeClear = Date.now();
+    const cleared = await request("/projects/initial-draft/force-clear", "owner", {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    });
+    const clearedPayload = await cleared.json() as { ok?: boolean; purgeAfter?: string; error?: string };
+    assert.equal(cleared.status, 200, clearedPayload.error);
+    assert.equal(clearedPayload.ok, true);
+    const purgeAfterMs = new Date(clearedPayload.purgeAfter ?? "").getTime();
+    assert.ok(purgeAfterMs >= beforeClear + 15 * 24 * 60 * 60 * 1_000 - 2_000);
+    assert.ok(purgeAfterMs <= Date.now() + 15 * 24 * 60 * 60 * 1_000 + 2_000);
+    const ownerRow = await queryOne<{ deleted_at: string | null; purge_after: string | null }>(
+      "SELECT deleted_at, purge_after FROM projects WHERE id = $1",
+      [ownerDraftId],
+    );
+    assert.ok(ownerRow?.deleted_at);
+    assert.equal(ownerRow?.purge_after, clearedPayload.purgeAfter);
+    assert.equal((await (await request("/projects/initial-draft", "owner")).json() as { draft: unknown }).draft, null);
+    const ownerMask = await queryOne<{ deleted_at: string | null; purge_after: string | null }>(
+      "SELECT deleted_at, purge_after FROM files WHERE id = $1",
+      [ownerMaskId],
+    );
+    assert.ok(ownerMask?.deleted_at);
+    assert.equal(ownerMask?.purge_after, clearedPayload.purgeAfter);
+
+    const otherRow = await queryOne<{ deleted_at: string | null }>(
+      "SELECT deleted_at FROM projects WHERE id = $1",
+      [otherDraftId],
+    );
+    assert.equal(otherRow?.deleted_at, null);
+
+    const idempotent = await request("/projects/initial-draft/force-clear", "owner", {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    });
+    assert.equal(idempotent.status, 200);
+    const idempotentPayload = await idempotent.json() as { ok?: boolean; error?: string };
+    assert.equal(idempotentPayload.ok, true);
+
+    const otherCleared = await request("/projects/initial-draft/force-clear", "other", {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    });
+    assert.equal(otherCleared.status, 200, await otherCleared.text());
+    assert.ok((await queryOne<{ deleted_at: string | null }>(
+      "SELECT deleted_at FROM projects WHERE id = $1",
+      [otherDraftId],
+    ))?.deleted_at);
+  } finally {
+    await query("DELETE FROM files WHERE id = ANY($1::text[])", [[ownerMaskId]]);
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[ownerDraftId, otherDraftId]]);
+  }
+});
+
+await test("强制清除草稿：含退役 modelId 的损坏草稿无需解析即可清除并重新 bootstrap", async () => {
+  const corruptedDraftId = "force-clear-corrupted-draft";
+  const reboundDraftId = "force-clear-rebound-draft";
+  const retiredModelFlow = {
+    schemaVersion: 6,
+    nodes: [{
+      id: "retired-model-node",
+      type: "sketch-to-render",
+      position: { x: 0, y: 0 },
+      data: {
+        kind: "sketch-to-render",
+        label: "退役模型节点",
+        status: "idle",
+        modelId: "gpt-image-2-vip",
+        operationMode: "generate",
+        prompt: "旧草稿提示词",
+        aspectRatio: "1:1",
+        batchSize: 1,
+        outputImages: [],
+      },
+    }],
+    edges: [],
+  };
+  try {
+    await query(`
+      INSERT INTO projects (
+        id, owner_id, name, flow_json, lifecycle, draft_revision, updated_at, created_at
+      ) VALUES ($1, $2, '损坏草稿', $3, 'initial_draft', 0, $4, $4)
+    `, [corruptedDraftId, users.owner.id, JSON.stringify(retiredModelFlow), now]);
+
+    const blocked = await request("/projects/initial-draft", "owner");
+    assert.equal(blocked.status, 422, await blocked.text());
+
+    const cleared = await request("/projects/initial-draft/force-clear", "owner", {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    });
+    const clearedPayload = await cleared.json() as { ok?: boolean; purgeAfter?: string; error?: string };
+    assert.equal(cleared.status, 200, clearedPayload.error);
+    assert.equal(clearedPayload.ok, true);
+    assert.ok(typeof clearedPayload.purgeAfter === "string" && clearedPayload.purgeAfter);
+    assert.ok((await queryOne<{ deleted_at: string | null }>(
+      "SELECT deleted_at FROM projects WHERE id = $1",
+      [corruptedDraftId],
+    ))?.deleted_at);
+
+    const rebound = await request("/projects/initial-draft/bootstrap", "owner", {
+      method: "POST",
+      body: JSON.stringify({ id: reboundDraftId, flow: flow() }),
+    });
+    assert.equal(rebound.status, 201, await rebound.text());
+  } finally {
+    await query("DELETE FROM projects WHERE id = ANY($1::text[])", [[corruptedDraftId, reboundDraftId]]);
+  }
+});
+
 await test("账号转移遇到双方各自的初始草稿时明确拒绝且不改变归属", async () => {
   const sourceDraftId = "transfer-source-initial-draft";
   const targetDraftId = "transfer-target-initial-draft";

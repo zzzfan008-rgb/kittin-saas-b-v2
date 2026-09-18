@@ -641,6 +641,46 @@ projectsRouter.delete("/initial-draft/:id", asyncHandler(async (req, res) => {
   res.json({ ok: true, purgeAfter: outcome.purgeAfter });
 }));
 
+// 强制清除当前用户自己的初始草稿（无需 id / revision），用于草稿数据损坏到无法解析时的自救。
+// 幂等：无草稿时同样返回成功，避免前端把「无草稿」误判为端点不存在的降级信号。
+projectsRouter.post("/initial-draft/force-clear", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { confirm } = req.body as { confirm?: unknown };
+  if (confirm !== true) {
+    res.status(400).json({ error: "confirm must be true to force-clear an initial draft" });
+    return;
+  }
+
+  const outcome = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+    const existing = await findInitialDraft(client, user.id, true);
+    if (!existing) return { status: "none" as const };
+
+    const deletedAt = new Date();
+    const purgeAfter = new Date(deletedAt.getTime() + INITIAL_DRAFT_TRASH_RETENTION_MS);
+    const deletedAtIso = deletedAt.toISOString();
+    const purgeAfterIso = purgeAfter.toISOString();
+    await client.query(`
+      UPDATE projects
+      SET deleted_at = $1, purge_after = $2, updated_at = $1
+      WHERE id = $3 AND owner_id = $4 AND lifecycle = 'initial_draft' AND deleted_at IS NULL
+    `, [deletedAtIso, purgeAfterIso, existing.id, user.id]);
+    await client.query(`
+      UPDATE files
+      SET deleted_at = $1, purge_after = $2
+      WHERE owner_id = $3 AND project_id = $4
+        AND source_type = 'mask' AND deleted_at IS NULL AND purge_after IS NULL
+    `, [deletedAtIso, purgeAfterIso, user.id, existing.id]);
+    return { status: "cleared" as const, purgeAfter: purgeAfterIso };
+  });
+
+  if (outcome.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能清除初始草稿" });
+    return;
+  }
+  res.json(outcome.status === "cleared" ? { ok: true, purgeAfter: outcome.purgeAfter } : { ok: true });
+}));
+
 projectsRouter.post("/initial-draft/:id/restore", asyncHandler(async (req, res) => {
   const user = requestUser(req);
   if (!PROJECT_ID_PATTERN.test(req.params.id)) {
