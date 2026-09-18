@@ -22,7 +22,7 @@
   --node-shadow:0 0 0 0.5px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
   --node-shadow-lift:0 0 0 0.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.42), 0 8px 18px rgba(0,0,0,.4), 0 28px 60px rgba(0,0,0,.56);
   --edge:#B7F35A;
-  --st-idle:#8e8e93; --st-queued:#eab308; --st-running:#60a5fa; --st-retry:#fb923c;
+  --st-idle:#8e8e93; --st-queued:#2dd4bf; --st-running:#60a5fa; --st-retry:#fb923c;
   --st-success:#34d399; --st-error:#f87171; --st-unknown:#a78bfa;
   --board-bg:#101116; --board-ink:#e8eaee; --board-muted:#9ba1a9; --board-line:#2a2d34;
   --mono:"SF Mono",ui-monospace,Menlo,monospace;
@@ -171,8 +171,8 @@ section{margin-top:80px}
 
 /* 连线语义标签 */
 .edge-label{position:absolute;transform:translate(-50%,-50%);
-  background:var(--node-card);color:var(--node-muted);
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  font-size:10px;font-family:var(--mono);letter-spacing:.06em;font-weight:500;
+  color:var(--board-ink);background:var(--gc-panel);
   padding:3px 8px;border-radius:980px;border:1px solid var(--gc-border);
   pointer-events:none;white-space:nowrap}
 
@@ -183,16 +183,17 @@ section{margin-top:80px}
 /* 可灵节点语言:chip 提示词板(文本节点) + 缩略图槽(图片节点) */
 .prompt-chip{
   background:var(--node-chip);color:var(--node-chip-text);
+  border:1px solid var(--node-divider);
   border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.55;letter-spacing:-0.1px;
 }
 .thumb{
   width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;position:relative;
   background:linear-gradient(135deg,#dbe7ef 0%,#c3d6e4 45%,#b7cfdc 100%);
   display:flex;align-items:center;justify-content:center;
-  color:rgba(0,0,0,.32);font-size:11px;font-family:var(--mono);letter-spacing:.08em;
+  color:rgba(0,0,0,.62);font-size:11px;font-family:var(--mono);letter-spacing:.08em;
 }
-[data-theme="obsidian"] .thumb{background:linear-gradient(135deg,#262b33 0%,#1d2127 60%,#232830 100%);color:rgba(255,255,255,.3)}
-[data-theme="eye"] .thumb{background:linear-gradient(135deg,#d6e6da 0%,#c4dcc9 55%,#d0e4d4 100%);color:rgba(18,59,43,.35)}
+[data-theme="obsidian"] .thumb{background:linear-gradient(135deg,#262b33 0%,#1d2127 60%,#232830 100%);color:rgba(255,255,255,.55)}
+[data-theme="eye"] .thumb{background:linear-gradient(135deg,#d6e6da 0%,#c4dcc9 55%,#d0e4d4 100%);color:rgba(18,59,43,.62)}
 .thumb.small{aspect-ratio:16/9;height:64px}
 
 /* ---- 可灵结果过渡动画:Reveal(图片/视频通用) ---- */
@@ -295,6 +296,12 @@ section{margin-top:80px}
 }
 [data-theme="obsidian"] .result-badge.running{
   background:#1f2b1a;color:#B7F35A;
+}
+.result-badge.done{
+  background:var(--st-success);color:#fff;
+}
+[data-theme="obsidian"] .result-badge.done{
+  background:#1a2e1a;color:#4ade80;
 }
 
 /* 减少动态 */
@@ -486,6 +493,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
         <div class="thumb" style="position:relative;">
           <div class="result-reveal"></div>
           <div class="result-done-ring"></div>
+          <div class="result-badge done">✓ DONE</div>
           <span>IMAGE · 结果槽位</span>
         </div>
         <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
