@@ -15,8 +15,8 @@ const stagedCounts: readonly EvaluationBudgetStageInput[] = [
 
 const budget = buildWorstCaseEvaluationBudget([
   {
-    unitId: "gpt-image-2-vip:fashion-lookbook:generate",
-    modelId: "gpt-image-2-vip",
+    unitId: "gpt-image-2.5-flare-vip:fashion-lookbook:generate",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "generate",
     currency: "CNY",
     priceMinorPerProviderRequest: 12,
@@ -37,7 +37,7 @@ assert.deepEqual(budget, {
   worstCaseCostMinor: 4_921,
   units: [
     {
-      unitId: "gpt-image-2-vip:fashion-lookbook:generate",
+      unitId: "gpt-image-2.5-flare-vip:fashion-lookbook:generate",
       maximumProviderRequests: 133,
       worstCaseCostMinor: 1_596,
     },
@@ -52,7 +52,7 @@ assert.deepEqual(budget, {
 assert.throws(
   () => buildWorstCaseEvaluationBudget([{ ...({
     unitId: "missing-price",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "generate",
     currency: "CNY",
     stages: stagedCounts,
@@ -62,7 +62,7 @@ assert.throws(
 assert.throws(() => buildWorstCaseEvaluationBudget([
   {
     unitId: "cny-unit",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "generate",
     currency: "CNY",
     priceMinorPerProviderRequest: 1,

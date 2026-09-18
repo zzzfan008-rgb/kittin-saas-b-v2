@@ -39,7 +39,7 @@ function aiNode(id = "coalesced-text-node"): FlowNode {
       aspectRatio: "1:1",
       batchSize: 1,
       outputImages: [],
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,

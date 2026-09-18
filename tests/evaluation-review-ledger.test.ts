@@ -74,7 +74,7 @@ await database.transaction((client) => campaignLedger.createSealedEvaluationCamp
   campaignId,
   ownerId: admin.id,
   stage: "internal-experiment",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   authorizationUnitKey: `sha256:${hash("a")}`,
   codeSha: "b".repeat(40),
   maxProviderRequests: 1,
@@ -120,7 +120,7 @@ await database.query(`
     reserved_provider_requests, used_provider_requests, reserved_budget_minor,
     used_budget_minor, created_at, consumed_at
   ) VALUES (
-    $1, $2, $2, $3, $4, 'evaluation-unit', 'gpt-image-2-vip', NULL, $5, 1,
+    $1, $2, $2, $3, $4, 'evaluation-unit', 'gpt-image-2.5-flare-vip', NULL, $5, 1,
     50, 50, 'CNY', '复核测试授权', $6, 'consumed', $7, $8,
     1, 1, 50, 50, $9, $10
   )
@@ -157,9 +157,9 @@ await database.query(`
     created_at, updated_at
   ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8,
-    $9, 'build-identity', FALSE, 'gpt-image-2-vip', 'gpt-image-2-vip',
+    $9, 'build-identity', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
     'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
-    'fashion-lookbook-gpt-image-2-vip-generate-v1', 'prompt-v1', $10,
+    'fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1', 'prompt-v1', $10,
     'evaluation-v1', $11, $12, 'profile-v1', '1.0.0', 'fit-pad-v1',
     'reference-input-sha256-v1', 'garment-gold-v1', 'garment-rubric-v1',
     '完整提示词', '{}', '[]', 2, $13, '{}', 'succeeded', 1, $14,
@@ -195,7 +195,7 @@ await database.query(`
     budget_currency, billing_reconciliation_status
   ) VALUES (
     $1, $2, $3, 1, $4, $5, '{}', '{}', '[]', 'succeeded',
-    'gpt-image-2-vip', '["2048x2048","2048x2048"]', 2,
+    'gpt-image-2.5-flare-vip', '["2048x2048","2048x2048"]', 2,
     $6, $7, $8, 50, 'CNY', 'pending'
   )
 `, [requestEvidenceId, caseEvidenceId, runId, hash("e"), hash("c"), startedAt, finishedAt, finishedAt - startedAt]);
@@ -522,8 +522,8 @@ assert.equal(bundle.images.length, 4);
 assert.equal(bundle.billingEvents.length, 2);
 assert.equal(bundle.manualAssessmentEvents.length, 4);
 assert.deepEqual(bundle.caseEvidence.snapshot, {});
-assert.equal(bundle.caseEvidence.model_id, "gpt-image-2-vip");
-assert.equal(bundle.providerRequests[0]?.provider_model, "gpt-image-2-vip");
+assert.equal(bundle.caseEvidence.model_id, "gpt-image-2.5-flare-vip");
+assert.equal(bundle.providerRequests[0]?.provider_model, "gpt-image-2.5-flare-vip");
 assert.equal(bundle.billingEvents[1].previousEventSha256, bundle.billingEvents[0].eventSha256);
 assert.equal(bundle.manualAssessmentEvents[2].previousEventSha256, bundle.manualAssessmentEvents[1].eventSha256);
 assert.equal(bundle.manualAssessmentEvents[3].previousEventSha256, bundle.manualAssessmentEvents[2].eventSha256);

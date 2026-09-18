@@ -23,9 +23,9 @@ const expected = createExpectedNodePromptParameterMatrix();
 
 assert.doesNotThrow(checkMaterializedNodePromptParameterMatrix);
 assert.deepEqual(actual, expected, "物化矩阵必须由当前提示词、参数、Provider 和产品策略精确重算");
-assert.equal(actual.scope.entryCount, 35);
+assert.equal(actual.scope.entryCount, 63);
 assert.equal(actual.scope.supportedEntryCount, 9);
-assert.equal(actual.scope.unsupportedEntryCount, 26);
+assert.equal(actual.scope.unsupportedEntryCount, 54);
 assert.deepEqual(actual.scope.modelIds, IMAGE_MODEL_IDS);
 assert.deepEqual(actual.scope.nodeKinds, [
   "sketch-to-render",
@@ -46,8 +46,8 @@ const supported = actual.entries.filter((entry) => entry.supportStatus === "unve
 const unsupported = actual.entries.filter((entry) => entry.supportStatus === "unsupported");
 
 assert.equal(supported.length, 9);
-assert.equal(unsupported.length, 26);
-assert.equal(new Set(actual.entries.map((entry) => `${entry.nodeKind}\u0000${entry.modelId}`)).size, 35);
+assert.equal(unsupported.length, 54);
+assert.equal(new Set(actual.entries.map((entry) => `${entry.nodeKind}\u0000${entry.modelId}`)).size, 63);
 
 function assertPromptChecklist(variant: PromptVariant): void {
   const prompt = variant.fullPrompt;
@@ -110,11 +110,11 @@ for (const entry of supported) {
   }
 }
 
-const maskEntry = actual.entries.find((entry) => entry.nodeKind === "mask-redraw" && entry.modelId === "gpt-image-2");
+const maskEntry = actual.entries.find((entry) => entry.nodeKind === "mask-redraw" && entry.modelId === "gpt-image-2.5-sunburst");
 assert.ok(maskEntry);
 assert.equal(maskEntry.supportStatus, "unverified");
-assert.deepEqual(maskEntry.promptVariantIds, ["mask-local-edit.gpt-image-2.mask-edit.v1"]);
-assert.deepEqual(maskEntry.parameterProfileIds, ["gpt-image-2:mask-local-edit:mask-edit:v1"]);
+assert.deepEqual(maskEntry.promptVariantIds, ["mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1"]);
+assert.deepEqual(maskEntry.parameterProfileIds, ["gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1"]);
 assert.deepEqual(maskEntry.providerRequests[0]?.requiredFields, [
   "model",
   "prompt",
@@ -161,13 +161,13 @@ for (const entry of unsupported) {
   assert.deepEqual(entry.providerRequests, []);
 }
 
-for (const entry of actual.entries.filter((candidate) => candidate.modelId === "gpt-image-2")) {
+for (const entry of actual.entries.filter((candidate) => candidate.modelId === "gpt-image-2.5-sunburst")) {
   if (entry.nodeKind === "mask-redraw") continue;
   assert.equal(entry.supportStatus, "unsupported");
   assert.match(entry.failClosedReason ?? "", /仅允许 mask-redraw/);
 }
 
-for (const entry of actual.entries.filter((candidate) => candidate.nodeKind === "mask-redraw" && candidate.modelId !== "gpt-image-2")) {
+for (const entry of actual.entries.filter((candidate) => candidate.nodeKind === "mask-redraw" && candidate.modelId !== "gpt-image-2.5-sunburst")) {
   assert.equal(entry.supportStatus, "unsupported");
   assert.match(entry.failClosedReason ?? "", /只支持 GPT Image 2/);
 }

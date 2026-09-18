@@ -397,7 +397,7 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
         || Object.keys(data.modelOptions).length > 0
       ) {
         throw new DagError(
-          "Node data for mask-redraw requires gpt-image-2, mask-edit, and empty modelOptions",
+          `Node data for mask-redraw requires ${MASK_REDRAW_MODEL_ID}, mask-edit, and empty modelOptions`,
         );
       }
       return {
@@ -405,6 +405,9 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
         maskPipelineVersion: MASK_PIPELINE_VERSION,
         operationMode: "mask-edit", operationModeNeedsConfirmation: false,
         modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
+        ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+          ? { featherRadius: data.featherRadius }
+          : {}),
         ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
         ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),

@@ -14,6 +14,16 @@ const GPT_IMAGE_MAX_SIDE = 3840;
 const GPT_IMAGE_MIN_PIXELS = 655_360;
 const GPT_IMAGE_MAX_PIXELS = 8_294_400;
 const GPT_IMAGE_MAX_ASPECT_RATIO = 3;
+const MAX_USER_FEATHER_RADIUS = 64;
+
+/**
+ * 用户可选的羽化宽度（像素）。undefined/非数值 → 走自适应；
+ * 0 → 硬边（不羽化）；1..64 → 按像素羽化（超出夹取到 64）。
+ */
+export function resolveMaskFeatherRadius(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.min(MAX_USER_FEATHER_RADIUS, Math.round(value)));
+}
 
 export interface ValidatedMaskPair {
   sourceBuffer: Buffer;
@@ -155,11 +165,15 @@ function selectionExtent(alpha: Buffer, width: number, height: number): { width:
     : { width: 1, height: 1 };
 }
 
-async function maskCompositeGeometry(pair: ValidatedMaskPair): Promise<MaskCompositeGeometry> {
+async function maskCompositeGeometry(
+  pair: ValidatedMaskPair,
+  featherRadiusOverride?: number,
+): Promise<MaskCompositeGeometry> {
   const coreAlpha = await editableAlpha(pair, { expansionRadius: 0 });
   const extent = selectionExtent(coreAlpha, pair.width, pair.height);
   const expansionRadius = adaptiveMaskExpansionRadius(pair.width, pair.height, extent);
-  const featherRadius = adaptiveMaskFeatherRadius(pair.width, pair.height, expansionRadius);
+  const featherRadius = resolveMaskFeatherRadius(featherRadiusOverride)
+    ?? adaptiveMaskFeatherRadius(pair.width, pair.height, expansionRadius);
   const innerAlpha = expansionRadius > 0
     ? await editableAlpha(pair, { expansionRadius, harden: true })
     : Buffer.from(coreAlpha);
@@ -312,10 +326,11 @@ export async function validateMaskForSource(
 export async function prepareMaskForGeneration(
   sourceDataUrl: string,
   maskDataUrl: string,
+  options: { featherRadius?: number } = {},
 ): Promise<PreparedMaskGeneration> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
   const dimensions = maskGenerationDimensions(pair.width, pair.height);
-  const geometry = await withImageProcessingSlot(() => maskCompositeGeometry(pair));
+  const geometry = await withImageProcessingSlot(() => maskCompositeGeometry(pair, options.featherRadius));
   // 模型获得完整的“核心 + 延展 + 外圈融合”区域；用户涂抹区不会成为硬裁切边界。
   const providerMask = await withImageProcessingSlot(() => (
     rgbaMaskFromAlpha(geometry.outerAlpha, pair.width, pair.height, true)
@@ -413,6 +428,7 @@ export async function compositeMaskedEdit(
   sourceDataUrl: string,
   maskDataUrl: string,
   generatedDataUrl: string,
+  options: { featherRadius?: number } = {},
 ): Promise<string> {
   const pair = await validateMaskForSource(sourceDataUrl, maskDataUrl);
   const generated = validateImageDataUrl(generatedDataUrl);
@@ -433,7 +449,7 @@ export async function compositeMaskedEdit(
         .raw()
         .toBuffer();
     const source = await sharp(pair.sourceBuffer, SHARP_MASK_INPUT).ensureAlpha().raw().toBuffer();
-    const geometry = await maskCompositeGeometry(pair);
+    const geometry = await maskCompositeGeometry(pair, options.featherRadius);
     const generatedLayer = await unifiedGeneratedLayer(
       source, alignedGenerated, geometry, pair.width, pair.height,
     );

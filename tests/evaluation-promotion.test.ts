@@ -34,7 +34,7 @@ const AUTHORIZATION_UNIT_KEY = `sha256:${"b".repeat(64)}` as const;
 const CREATED_AT = "2026-09-03T00:00:00.000Z";
 const variant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });
@@ -494,8 +494,12 @@ const contractArtifactBase = {
     reviewedBaselineSha256: SHA,
     reviewedRawExportSha256: SHA,
     expectedGatewayModelIds: [
-      "gpt-image-2",
-      "gpt-image-2-vip",
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-all",
+      "gpt-image-2.5-sunburst-vip",
+      "gpt-image-2.5-flare-vip",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
       "flux-2-pro",
       "seedream-5-0-260128",

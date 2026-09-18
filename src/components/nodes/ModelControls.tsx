@@ -80,7 +80,7 @@ export function ModelControls({
         </select>
       </label>
 
-      {!retiredModelId && modelId === "gpt-image-2-vip" && (
+      {!retiredModelId && modelId === "gpt-image-2.5-flare-vip" && (
         <SelectOption
           label="输出尺寸"
           value={options.size ?? "auto"}

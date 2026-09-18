@@ -8,8 +8,8 @@ import {
 assert.equal(MODEL_PARAMETER_PROFILES.length, 25, "4 个普通模型 × 3 任务族 × 2 模式 + 1 蒙版轨");
 assert.equal(new Set(MODEL_PARAMETER_PROFILES.map((profile) => profile.profileId)).size, 25);
 
-const vip = getModelParameterProfile("gpt-image-2-vip:fashion-lookbook:edit:v1");
-assert.equal(vip?.modelId, "gpt-image-2-vip");
+const vip = getModelParameterProfile("gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1");
+assert.equal(vip?.modelId, "gpt-image-2.5-flare-vip");
 assert.deepEqual(vip?.native.kind === "gpt-image-2-vip" ? vip.native.omittedFields : [], [
   "quality", "n", "aspect_ratio",
 ]);
@@ -26,7 +26,7 @@ if (seedream?.native.kind === "seedream-image") {
   assert.equal(seedream.postprocess.finalAspectRatio, "4:3");
 }
 
-const mask = getModelParameterProfile("gpt-image-2:mask-local-edit:mask-edit:v1");
+const mask = getModelParameterProfile("gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1");
 assert.equal(mask?.native.kind, "gpt-image-2-mask");
 assert.equal(mask?.businessFrame.aspectRatio, "source");
 assert.equal(getModelParameterProfile("missing-profile"), undefined, "不得静默回退");

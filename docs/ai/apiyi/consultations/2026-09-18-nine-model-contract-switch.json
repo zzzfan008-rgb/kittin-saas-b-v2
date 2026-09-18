@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-18T04:52:42.883Z",
+  "baseCommit": "557058af2434d24b71e2cc32fc0131401b5f3e8d",
+  "changeFingerprintSha256": "7cc348551509d01ed32bf3498336bf1edd97fe00cbbecf08cca80e9164884419",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "九模型目录切换 gpt-image-2.5-sunburst gpt-image-2.5-flare-vip nano-banana gemini-3-pro-image",
+  "affectedPaths": [
+    "docs/ai/apiyi/candidates/apiyi-refresh-2026-09-17T19-28-44.924Z.json",
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/model-knowledge.json",
+    "docs/ai/apiyi/models/gpt-image-2.5-all.md",
+    "docs/ai/apiyi/models/nano-banana-lite-image.md",
+    "docs/ai/apiyi/models/nano-banana-pro-image.md",
+    "docs/ai/apiyi/site/current.json",
+    "docs/ai/apiyi/sources.json",
+    "docs/ai/evaluation/evaluation-manifest-v1.json",
+    "docs/ai/evaluation/evaluation-plan-v2.json",
+    "docs/ai/evaluation/node-prompt-parameter-matrix-v1.json",
+    "scripts/apiyi-docs.mjs",
+    "scripts/node-prompt-parameter-matrix.ts",
+    "server/engine/dag.ts",
+    "server/engine/runner.ts",
+    "server/providers/apiyi.ts",
+    "server/routes/aiDiagnostics.ts",
+    "src/lib/garmentPromptPresets.ts",
+    "src/lib/promptEvaluationRelease.ts",
+    "src/lib/providerPromptRenderer.ts",
+    "src/types/imageModels.ts",
+    "src/types/modelParameterProfiles.ts",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-05/gemini-3-pro-image-recovered",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-05/gemini-3-pro-image-recovered.md",
+      "pageLocalPath": "pages/en/live/2026-05/gemini-3-pro-image-recovered.md",
+      "title": "gemini-3-pro-image-preview back to stable",
+      "sha256": "0e3b7edfebdfb148f2ebac6422753e4b277d428e3725c723df1540dd9602b599"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-05/gemini-3-pro-image-recovered",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-05/gemini-3-pro-image-recovered.md",
+      "pageLocalPath": "pages/live/2026-05/gemini-3-pro-image-recovered.md",
+      "title": "gemini-3-pro-image-preview 已恢复平稳",
+      "sha256": "79429390b28db304fa1016250c572ff510c72fc103bd16654deb9c0bf31ba0b7"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-06/gemini-3-pro-image-uptime-monitor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-06/gemini-3-pro-image-uptime-monitor.md",
+      "pageLocalPath": "pages/en/live/2026-06/gemini-3-pro-image-uptime-monitor.md",
+      "title": "gemini-3-pro-image-preview Wobble Tied to Google Compute · Third-Party Monitor",
+      "sha256": "19a4b15551a94bc5b6a1848d4a44a3f0bda10f6d604f40970f7d80e64600c3e8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/gemini-3-pro-image-google-capacity",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-09/gemini-3-pro-image-google-capacity.md",
+      "pageLocalPath": "pages/en/live/2026-09/gemini-3-pro-image-google-capacity.md",
+      "title": "gemini-3-pro-image Slow Due to Google-Side Capacity Shortage, Official Account and Quota Are Normal",
+      "sha256": "1ad91343890031201221806c4b23202284253bfe2f76339f24b46f23b7bdec0e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-06/gemini-3-pro-image-uptime-monitor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-06/gemini-3-pro-image-uptime-monitor.md",
+      "pageLocalPath": "pages/live/2026-06/gemini-3-pro-image-uptime-monitor.md",
+      "title": "gemini-3-pro-image-preview 波动跟官方算力有关 · 第三方监测可稳",
+      "sha256": "007bc8223f62ce69d5017605ce9bc7332d6cb9392d6b1bdb6765f7bf3ee5627d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-09/gemini-3-pro-image-google-capacity",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-09/gemini-3-pro-image-google-capacity.md",
+      "pageLocalPath": "pages/live/2026-09/gemini-3-pro-image-google-capacity.md",
+      "title": "gemini-3-pro-image 受谷歌算力紧张影响持续卡顿，官转账号与配额均正常",
+      "sha256": "4d10e3b64de5e282bc6842f9e0adc133b04d707ee064eef9b2e06a5f5c0c9bb0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/skills",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/nano-banana-image/skills.md",
+      "pageLocalPath": "pages/api-capabilities/nano-banana-image/skills.md",
+      "title": "Nano Banana Pro Agent 技能",
+      "sha256": "e42fd191c54f742ad3e7328093f5c0eb78e76bf065cd0aff479d1c8f7f388eba"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-image/skills",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-image/skills.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-image/skills.md",
+      "title": "Nano Banana Pro Agent Skill",
+      "sha256": "4957c2b38ba19f6ccd7227f72ea499dedf7bb4efca06a5f7f0198814f0964ca7"
+    }
+  ],
+  "decisionSummary": "九模型目录切换：API易网关模型目录从 5 模型扩到 9 模型（gpt-image-2→gpt-image-2.5-sunburst、gpt-image-2-vip→gpt-image-2.5-flare-vip；新增 gpt-image-2.5-all、gpt-image-2.5-sunburst-vip、gemini-3-pro-image-preview、gemini-3.1-flash-lite-image、nano-banana-pro/lite）。已刷新本地知识库快照并把 sources.json 精选来源哈希、model-contracts.json、model-knowledge.json 对齐到 9 模型。reviewedExportSha256 置 null 等待 reviewer 人工语义评审回填。",
+  "unresolvedChoices": []
+}

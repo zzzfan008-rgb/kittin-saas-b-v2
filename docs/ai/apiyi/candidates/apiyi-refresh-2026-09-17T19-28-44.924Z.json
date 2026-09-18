@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-17T19:28:44.924Z",
+  "mode": "review-candidate-only",
+  "baselineCapturedAt": "2026-09-02T05:02:00Z",
+  "baselineContractHash": "8df175616c2be7e3c6315f46cee1e3d6da76e397025a1e062ac6de3f8026ffdb",
+  "productionFilesModified": false,
+  "automaticContractUpdateAllowed": false,
+  "changes": [
+    {
+      "sourceId": "apiyi-gpt-image-2-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md",
+      "oldSha256": "ed653fdc134c607049eda8ec5aae83f605e66b176609a3ca1994278d59ee9988",
+      "candidateSha256": "2c91629dced4429d69901985232644d058397c99940bed931e776ef5a4765e54",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:42 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md",
+      "oldSha256": "da73585e328b3fb282bb61053219f0743b653ae4da737295ff0064fe98a349d0",
+      "candidateSha256": "f5d330c454b5a1db6e9ba94260298d0fddabc15d14a54ee8bdd225311cd9be0d",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:43 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2"
+      ],
+      "semanticReviewChecklist": [
+        "edit-endpoint",
+        "reference-fields",
+        "forbidden-input-fidelity"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-mask",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md",
+      "oldSha256": "82c9e3ebc7ba9716bf0aef90982e670c34b1f8c80d61ab30b13c51ebc4680c0b",
+      "candidateSha256": "33924a0effb12bc86432e27a419fe365fe4997deb6b56eca4936dcf17174bb5e",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:43 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2"
+      ],
+      "semanticReviewChecklist": [
+        "alpha-mask-semantics",
+        "mask-dimension-match",
+        "mask-size-limit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-transparent-background",
+      "markdownUrl": "https://docs.apiyi.com/faq/image-transparent-background.md",
+      "oldSha256": "746238d07631fb05faeea28ef9e116de7bbae8946ef71105856174b0818952a9",
+      "candidateSha256": "298c40e4b10f5e59844e7d7c1d0cb574af1da72beb09deefaff34fb5e608c446",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:42 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2"
+      ],
+      "semanticReviewChecklist": [
+        "transparent-output-format",
+        "alpha-validation"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview.md",
+      "oldSha256": "2ed97c1500398dc939bd6b77e8e121227ef3906b1ae6a794658f1e75f967fdd0",
+      "candidateSha256": "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:43 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-vip"
+      ],
+      "semanticReviewChecklist": [
+        "apiyi-exclusive-route",
+        "thirty-size-values",
+        "single-output"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "oldSha256": "7a39b7f014135fba139ff65816714df76aea6da51263ffb049881f66d1a1d6c6",
+      "candidateSha256": "d401937aa35853a773d42717042803df628f1d7243f10b9525bd032f34020fe1",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:43 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-vip"
+      ],
+      "semanticReviewChecklist": [
+        "generation-endpoint",
+        "size-enum",
+        "forbidden-quality-n-aspect-ratio"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "oldSha256": "bdff0e86d802ea1498a5b4e2cc14fc6af60460579942a22884a6996347a1c09f",
+      "candidateSha256": "66e7644327d9d790c12a4bed1786dfb488d4824450489d6a81b25cd626fbcc6e",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:43 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-vip"
+      ],
+      "semanticReviewChecklist": [
+        "multipart-edit",
+        "ordered-references",
+        "eight-reference-limit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-seedream-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview.md",
+      "oldSha256": "a0c84cf7d8cf2b4e736fd03392eb36a6db2604eeb2207fc9578f7f0922a476da",
+      "candidateSha256": "63865a7a093865a85c9aa594b9c605a0677b34a263bfffd69a33b45ec6d2fc52",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:44 GMT"
+      },
+      "affectedModelAliases": [
+        "seedream-5-0-260128",
+        "Seedream 5.0"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "2k-3k-size-policy",
+        "actual-output-size"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-seedream-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit.md",
+      "oldSha256": "1b83db2c465fd5259c1a2e116fa2b2585471d67da0c900ee583ed656ff2fab55",
+      "candidateSha256": "80934bf8a852e07a24e78dd86ba75f31b3f4e574b9158a1edf59ac348605915f",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:44 GMT"
+      },
+      "affectedModelAliases": [
+        "seedream-5-0-260128"
+      ],
+      "semanticReviewChecklist": [
+        "ordered-image-array",
+        "gateway-reference-limit",
+        "no-native-aspect-ratio"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-image-best-practices",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices.md",
+      "oldSha256": "e3c70183eb5bf2dc23e23363ad52a1da218a3f15d1214711b0cebde50f856c1a",
+      "candidateSha256": "c561a3191bcd1be14be14fe51a0823aba063dcd6cc1955032f09030daedf73cc",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Thu, 17 Sep 2026 19:28:45 GMT"
+      },
+      "affectedModelAliases": [
+        "*"
+      ],
+      "semanticReviewChecklist": [
+        "input-normalization",
+        "temporary-url-persistence",
+        "error-handling"
+      ],
+      "reviewStatus": "needs-human-review"
+    }
+  ],
+  "failures": [],
+  "requiredNextStep": "Review each semantic claim, update the curated contract explicitly, then rerun all affected evaluations."
+}

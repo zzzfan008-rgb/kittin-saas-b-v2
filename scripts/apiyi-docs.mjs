@@ -153,15 +153,15 @@ export function validateDocuments({
   const expectedIds = ensureArray(sources.modelCatalog?.expectedGatewayModelIds);
   const contractIds = ensureArray(contracts.models).map((model) => model.id);
   const knowledgeIds = ensureArray(knowledge.models).map((model) => model.id);
-  if (expectedIds.length !== 5) errors.push(`expected exactly five gateway model IDs, received ${expectedIds.length}`);
+  if (expectedIds.length !== 9) errors.push(`expected exactly nine gateway model IDs, received ${expectedIds.length}`);
   if (expectedIds.some((id) => typeof id !== "string" || !id.trim())) {
     errors.push("expected gateway model IDs must be non-empty strings");
   }
   if (new Set(expectedIds).size !== expectedIds.length) {
     errors.push("expected gateway model IDs must not contain duplicates");
   }
-  if (!sameSet(expectedIds, contractIds)) errors.push("runtime contract model IDs do not match the reviewed five-model catalog");
-  if (!sameSet(expectedIds, knowledgeIds)) errors.push("knowledge model IDs do not match the reviewed five-model catalog");
+  if (!sameSet(expectedIds, contractIds)) errors.push("runtime contract model IDs do not match the reviewed nine-model catalog");
+  if (!sameSet(expectedIds, knowledgeIds)) errors.push("knowledge model IDs do not match the reviewed nine-model catalog");
 
   const sourceIds = new Set();
   for (const source of ensureArray(sources.sources)) {

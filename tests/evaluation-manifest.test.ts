@@ -44,24 +44,25 @@ assert.equal(Object.hasOwn(maskUnit ?? {}, "versions"), false, "版本向量只�
 assert.equal(new Set(units.map(promptEvaluationUnitKey)).size, 25);
 assert.ok(manifest.baseUnits.every(({ releaseVectorSha256 }) => /^sha256:[a-f0-9]{64}$/.test(releaseVectorSha256)));
 assert.ok(manifest.baseUnits.every(({ unit }) => unit.modelId !== ("grok-imagine-image" as never)));
+const variantModelIds = [...new Set(GARMENT_PROMPT_VARIANTS.map(({ modelId }) => modelId))].sort();
 assert.deepEqual(
   [...new Set(units.map(({ modelId }) => modelId))].sort(),
-  [...IMAGE_MODEL_IDS].sort(),
-  "基础单元必须精确覆盖当前五模型集合",
+  variantModelIds,
+  "基础单元必须精确覆盖当前有提示词变体的模型集合",
 );
 assert.deepEqual(
-  Object.fromEntries(IMAGE_MODEL_IDS.map((modelId) => [
+  Object.fromEntries(variantModelIds.map((modelId) => [
     modelId,
     units.filter((unit) => unit.modelId === modelId).length,
   ])),
   {
-    "gpt-image-2": 1,
-    "gpt-image-2-vip": 6,
+    "gpt-image-2.5-sunburst": 1,
+    "gpt-image-2.5-flare-vip": 6,
     "gemini-3.1-flash-image": 6,
     "flux-2-pro": 6,
     "seedream-5-0-260128": 6,
   },
-  "五模型基础单元分布必须保持四个普通模型各 6 个、GPT Image 2 为 1 个（6+6+6+6+1）",
+  "基础单元分布必须保持四个普通模型各 6 个、GPT Image 2 为 1 个（6+6+6+6+1）",
 );
 
 const manifestVariantIds = manifest.baseUnits.map(({ unit }) => unit.promptVariantId);
@@ -123,10 +124,10 @@ assert.doesNotMatch(source, /from\s+["'](?:undici|node:https|node:http)["']/);
 assert.doesNotMatch(source, /\bfetch\s*\(/);
 
 const sourceUnit = manifest.baseUnits.find(({ unitId }) => (
-  unitId === "commerce-hero.gpt-image-2-vip.generate.v1"
+  unitId === "commerce-hero.gpt-image-2.5-flare-vip.generate.v1"
 ));
 const targetUnit = manifest.baseUnits.find(({ unitId }) => (
-  unitId === "fashion-lookbook.gpt-image-2-vip.generate.v1"
+  unitId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1"
 ));
 assert.ok(sourceUnit);
 assert.ok(targetUnit);

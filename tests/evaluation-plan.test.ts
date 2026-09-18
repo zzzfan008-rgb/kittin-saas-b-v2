@@ -27,7 +27,7 @@ const plan = JSON.parse(readFileSync(
 assert.equal(plan.version, "garment-evaluation-plan-v2");
 assert.equal(plan.supersedes, "garment-evaluation-plan-v1");
 assert.equal(plan.status, "unverified-no-paid-runs");
-assert.deepEqual(plan.fairComparison.modelIds, IMAGE_MODEL_IDS.filter((id) => id !== "gpt-image-2"));
+assert.deepEqual(plan.fairComparison.modelIds, IMAGE_MODEL_IDS.filter((id) => id !== "gpt-image-2.5-sunburst"));
 assert.equal(plan.fairComparison.outputCount, 1);
 assert.equal(plan.fairComparison.businessAspectRatio, "1:1");
 assert.equal(plan.fairComparison.maximumReferenceImages, 4);
@@ -48,7 +48,7 @@ assert.ok(plan.scenarioAxes.every((axis) => axis.operationMode === "generate" ||
 
 const extensions = new Map(plan.capabilityExtensions.map((extension) => [extension.id, extension]));
 assert.deepEqual(extensions.get("five-to-eight-reference-images")?.modelIds, [
-  "gpt-image-2-vip",
+  "gpt-image-2.5-flare-vip",
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
@@ -57,8 +57,8 @@ for (const modelId of extensions.get("five-to-eight-reference-images")?.modelIds
   assert.ok(getImageModelContract(modelId as never).edit.maxReferences >= 8);
 }
 assert.equal(extensions.has("grok-native-multi-output"), false);
-assert.deepEqual(extensions.get("gpt-image-2-mask-edit")?.modelIds, ["gpt-image-2"]);
-assert.equal(getImageModelContract("gpt-image-2").edit.maxUserReferences, 7);
+assert.deepEqual(extensions.get("gpt-image-2.5-sunburst-mask-edit")?.modelIds, ["gpt-image-2.5-sunburst"]);
+assert.equal(getImageModelContract("gpt-image-2.5-sunburst").edit.maxUserReferences, 7);
 
 for (const rule of [
   "fixedOperationMode",

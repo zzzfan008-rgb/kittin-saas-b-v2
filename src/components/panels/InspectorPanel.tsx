@@ -319,7 +319,7 @@ function PropertyEditor({ nodeId }: { nodeId: string }) {
   const spec = NODE_SPECS[d.kind];
   const productPolicy = nodeProductPolicy(d.kind);
   const selectedModelId: GenerationImageModelId | undefined =
-    "modelId" in d && isImageModelId(d.modelId) && d.modelId !== "gpt-image-2" ? d.modelId : undefined;
+    "modelId" in d && isImageModelId(d.modelId) && d.modelId !== "gpt-image-2.5-sunburst" ? d.modelId : undefined;
   const selectedModelOptions = "modelOptions" in d && typeof d.modelOptions === "object" && d.modelOptions !== null
     ? d.modelOptions as ImageModelOptions
     : undefined;

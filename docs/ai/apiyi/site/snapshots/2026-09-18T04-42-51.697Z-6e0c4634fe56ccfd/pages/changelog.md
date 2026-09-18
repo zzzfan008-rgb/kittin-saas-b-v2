@@ -1,0 +1,133 @@
+> ## Documentation Index
+> Fetch the complete documentation index at: https://docs.apiyi.com/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+# 网站公告
+
+> API易最新动态、模型更新、价格调整等重要公告
+
+欢迎来到 API易 的更新日志页面。在这里，您可以了解到我们的最新模型上线、价格调整、功能更新等重要信息。我们致力于为您提供最优质、最具性价比的 AI 服务。
+
+<Note>
+  **收藏更新**：Ctrl+D 收藏本网页，查看我们的公告，第一时间获取模型上新和优惠信息，不错过任何重要更新！
+</Note>
+
+## 🔥 最新动态
+
+<Update label="2026/9/14 · 4 款 Realtime 实时语音模型上架" description="新模型 · OpenAI / Alibaba">
+  ### 4 款 Realtime 实时语音模型上架
+
+  **默认分组直接调用，按厂商官方价计费，欢迎测试对接**
+
+  `gpt-realtime-2.1` / `gpt-realtime-2.1-mini`（OpenAI GA 协议）与 `qwen3.5-omni-plus-realtime` / `qwen3.5-omni-flash-realtime`（百炼协议）结束内测，令牌勾选默认分组即可走 `wss://api.apiyi.com/v1/realtime`，VIP / SVIP 分组同样可用。文本、音频、图片按厂商官方价逐 token 计费（2.1 音频 \$32/\$64、mini \$10/\$20），40 路并发实测 120/120 成功。缓存读暂按全价、只支持 WebSocket，文档缺漏欢迎反馈。
+
+  📖 [Realtime 语音概览](/api-capabilities/realtime/overview) | ⚡ [实时动态](/live/2026-09/realtime-models-launch)
+</Update>
+
+<Update label="2026/9/9 · GPT-image-2.5 双模型上线" description="新模型 · OpenAI">
+  ### GPT-image-2.5 双模型上线
+
+  **Flare 更快、Sunburst 更准，价格与 gpt-image-2 相同**
+
+  OpenAI 9/8 发布的新一代出图模型官转已上线：`gpt-image-2.5-flare` 速度优先，时延比 `gpt-image-2` 最多低 **50%**；`gpt-image-2.5-sunburst` 画质与编辑精度优先。`quality` 新增 `xhigh` / `max` 两档，价格仍为 \$5/\$8/\$30 每百万 tokens，`Default` / `image2Enterprise` 分组可用。官逆侧同步推出 `gpt-image-2.5-all`，\$0.03/张不变。
+
+  📖 [查看详情](/news/gpt-image-2-5-launch) | 🔗 [充值活动](/faq/recharge-promotions)
+</Update>
+
+<Update label="2026/9/8 · GLM-5.3 与 GLM-5.3-Flash 上线" description="新模型 · Zhipu">
+  ### GLM-5.3 与 GLM-5.3-Flash 上线
+
+  **智谱编程旗舰与多模态轻量版，定价与官网一致**
+
+  智谱 8 月发布的两款新模型同步上线：`glm-5.3` 沿用 753B MoE 基座只扩后训练，Z.ai Code Bench 比 5.2 提升 **50%**；`glm-5.3-flash` 是 GLM-5 系列首个原生多模态，Terminal-Bench 2.1 **84.3** 逼近 Claude Opus 4.8。定价与官网逐项一致：旗舰输入 \$1.40 / 输出 \$4.396，Flash 输入 \$0.15 / 输出 \$0.50 每百万 tokens，`default` / `svip` 分组可用，叠加充值加赠实付约为定价的 83%～91%。
+
+  📖 [查看详情](/news/glm-5-3-launch) | 🔗 [充值活动](/faq/recharge-promotions)
+</Update>
+
+<Update label="2026/9/5 · GPT-6 Astra 上线" description="新模型 · OpenAI">
+  ### GPT-6 Astra 上线
+
+  **OpenAI 新旗舰主打电脑操作与长程 Agent，官方同价**
+
+  OpenAI 9/3 发布的新一代旗舰，1.05M 上下文、推理力度新增 `xhigh` / `max` 共五档，Terminal-Bench 4.0 由 37.3% 提到 **57.9%**。定价输入 \$10 / 输出 \$50 每百万 tokens，缓存读取 \$1，**四项计费与官网逐项一致**，`default` / `svip` 官转分组可用，`Codex_Reverse` 分组按 0.5 折扣同步上线。
+
+  📖 [查看详情](/news/gpt-6-astra-launch) | 🔗 [充值活动](/faq/recharge-promotions)
+</Update>
+
+<Update label="2026/9/3 · GPT-5.6 Sol 同步官网降价" description="价格变动 · OpenAI">
+  ### GPT-5.6 Sol 同步官网降价
+
+  **输入降 20%、输出降 33%，旗舰档比 gpt-5.5 还便宜**
+
+  OpenAI 9/3 下调 GPT-5.6 Sol 价格，API易 已同步：`gpt-5.6-sol` 输入 \$5 → **\$4**、输出 \$30 → **\$20** 每百万 tokens，缓存读 \$0.40，限时优惠期至少到 2026 年 11 月 21 日。同为旗舰档，Sol 现在比上代 `gpt-5.5`（\$5 / \$30）更便宜，存量代码只改 `model` 字段即可迁移。
+
+  📖 [查看详情](/live/2026-09/gpt-5-6-sol-price-cut) | 🔗 [模型详情](/models/gpt-5-6-sol)
+</Update>
+
+<Update label="2026/9/2 · Gemini 3.8 Flash 上线" description="新模型 · Google">
+  ### Gemini 3.8 Flash 上线
+
+  **跑在官方文档前面，与 3.7 同价平迁**
+
+  谷歌 9/2 推出的新一版 Flash，**官方模型文档与发布博客尚未收录**，API易 已开放调用。定价与 `gemini-3.7-flash` 逐项一致：输入 \$0.75 / 输出 \$3.75 每百万 tokens，平迁零成本变化。上线前跑了 **150 例双协议成对实测**，能力与 3.7 逐项对齐、无独有回退。
+
+  📖 [查看详情](/news/gemini-3-8-flash-launch) | 🔗 [充值活动](/faq/recharge-promotions)
+</Update>
+
+<Update label="2026/9/2 · Claude Fable 5.1 上线" description="新模型 · Anthropic">
+  ### Claude Fable 5.1 上线
+
+  **同价升级，缓存读取直降四分之一**
+
+  Anthropic 9/1 发布的 Mythos 级新旗舰，最显著的变化是缓存读取从 \$1.00 降到 **\$0.25 / 百万 tokens**；输入 \$10 / 输出 \$50 保持不变。API易 已同步下调，**四项计费与官网逐项一致**。注意三项破坏性变更：强制工具调用报 400、思考块与模型绑定、编辑历史会让思考块失效。
+
+  📖 [查看详情](/news/claude-fable-5-1-launch) | 🔗 [充值活动](/faq/recharge-promotions)
+</Update>
+
+<Update label="2026/8/31 · Seedance 2.5 与 2.0 系统一分组" description="价格变动 · ByteDance">
+  ### Seedance 2.5 与 2.0 系统一分组
+
+  **一把令牌通吃四个模型**
+
+  2.5 与 2.0 系四个模型统一收在 **`SeeDance2`（0.18x）** 分组下管理，一把令牌即可全调，不必为 2.5 单独建令牌，代码不用改。实测单价分两档：输入不含视频 \$12.60 / 百万 tokens（480p / 720p / 1080p 同价），输入含视频（多模态参考、视频编辑 / 延长）走更低的 \$7.56。
+
+  📖 [查看详情](/live/2026-08/seedance-2-5-group-merge) | 🔗 [分组与定价](/api-capabilities/seedance2/overview)
+</Update>
+
+<Update label="2026/8/28 · Seedance 2.5 上线" description="新模型 · ByteDance">
+  ### Seedance 2.5 上线
+
+  **30 秒直出、30 张参考图，能力全面拉高**
+
+  模型名 `doubao-seedance-2-5-260628`，端点与请求结构和 2.0 完全一致，**只改 `model` 一个字段**。时长上限 15 秒提到 **30 秒**、参考图 9 张提到 **30 张**，音频可单独作参考，新增 `mov` 输出与视频编辑 / 延长的显式任务类型。**最新的分组与定价见上方 8/31 那条。**
+
+  📖 [查看详情](/live/2026-08/seedance-2-5-launch) | 🔗 [能力与定价](/api-capabilities/seedance2/overview)
+</Update>
+
+<Update label="2026/8/21 · DeepSeek 视觉模型上线" description="新模型 · DeepSeek">
+  ### DeepSeek 视觉模型上线
+
+  **看图不额外加价，与纯文本 V4 Flash 同价**
+
+  `deepseek-v4-flash-vision-exp` 是 DeepSeek 首个视觉模型，在 V4 Flash 底座上加了图像输入，1M 上下文与思考、函数调用、缓存全部保留。图片按尺寸折成输入 tokens、**单图最多 384**，定价与纯文本版一致：输入 \$0.44、输出 \$1.32 每 1M tokens。OpenAI 格式用 `default` 分组，Anthropic 格式用 `ClaudeCode` 分组。
+
+  📖 [查看详情](/live/2026-08/deepseek-v4-flash-vision-exp) | 🔗 [接入文档](/api-capabilities/deepseek-v4-flash-vision/overview)
+</Update>
+
+***
+
+> 📖 以上是最近 10 条公告。查看更早的更新请访问 [公告归档](/changelog/archive)，可按月份、分类、厂商三种维度浏览。
+
+<CardGroup cols={3}>
+  <Card title="深度解读" icon="newspaper" href="/news/gemini-3-7-flash-launch" horizontal>
+    查看 AI风向标栏目
+  </Card>
+
+  <Card title="实时动态" icon="radio-tower" href="/live" horizontal>
+    模型状态与服务播报
+  </Card>
+
+  <Card title="充值活动" icon="gift" href="/faq/recharge-promotions" horizontal>
+    查看当前加赠比例
+  </Card>
+</CardGroup>

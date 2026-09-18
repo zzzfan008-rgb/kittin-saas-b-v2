@@ -76,7 +76,7 @@ const RESULTS_DENSITY_FIXTURES = [
     projectId: "e2e-project-1",
     projectName: "演示项目",
     prompt: "检查结果卡片动作与布局",
-    model: "gpt-image-2",
+    model: "gpt-image-2.5-flare-vip",
     startedAt: 1760000000000,
     finishedAt: 1760000001000,
     status: "success" as const,

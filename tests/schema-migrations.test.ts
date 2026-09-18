@@ -646,7 +646,7 @@ await query(`
     evaluation_unit_key, code_sha, max_provider_requests, budget_limit_minor,
     budget_currency, status, manifest_sha256, created_at
   ) VALUES (
-    $1, $2, $2, 'internal-experiment', 'gpt-image-2-vip',
+    $1, $2, $2, 'internal-experiment', 'gpt-image-2.5-flare-vip',
     $3, $4, 1, 1, 'CNY', 'ready', $5, $6
   )
 `, [
@@ -702,7 +702,7 @@ await query(`
     reserved_provider_requests, used_provider_requests, reserved_budget_minor,
     used_budget_minor, created_at, consumed_at
   ) VALUES (
-    $1, $2, $2, $3, $4, 'evaluation-unit', 'gpt-image-2-vip', NULL, $5, 1,
+    $1, $2, $2, $3, $4, 'evaluation-unit', 'gpt-image-2.5-flare-vip', NULL, $5, 1,
     1, 1, 'CNY', 'migration 18 fail-closed regression', $6, 'consumed', $7, $8,
     1, 0, 1, 0, $9, $10
   )
@@ -738,7 +738,7 @@ await query(`
     started_at, created_at, updated_at
   ) VALUES (
     $1, $2, $3, $4, 'legacy-sample', $5, $6, $7,
-    $8, 'deployment-env', FALSE, 'gpt-image-2-vip', 'gpt-image-2-vip',
+    $8, 'deployment-env', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
     'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
     'legacy-variant', 'legacy-prompt-v1', $9, 'legacy-evaluation-v1', $10,
     $11, 'legacy-profile', '1.0.0', 'fit-pad-v1',

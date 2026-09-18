@@ -2,15 +2,19 @@ import contracts from "../../docs/ai/apiyi/model-contracts.json";
 import type { ImageOperationMode } from "./imageOperations";
 
 export const IMAGE_MODEL_IDS = [
-  "gpt-image-2",
-  "gpt-image-2-vip",
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2.5-all",
+  "gpt-image-2.5-sunburst-vip",
+  "gpt-image-2.5-flare-vip",
+  "gemini-3-pro-image-preview",
+  "gemini-3.1-flash-lite-image",
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
 ] as const;
 
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number];
-export type GenerationImageModelId = Exclude<ImageModelId, "gpt-image-2">;
+export type GenerationImageModelId = Exclude<ImageModelId, "gpt-image-2.5-sunburst">;
 
 export interface ImageModelOptions {
   size?: string;
@@ -19,6 +23,7 @@ export interface ImageModelOptions {
   width?: number;
   height?: number;
   outputFormat?: "jpeg" | "png" | "webp";
+  quality?: string;
 }
 
 export interface ReviewedModelCatalogBaseline {
@@ -60,6 +65,7 @@ export interface ImageModelContract {
   sizes?: string[];
   aspectRatios?: string[];
   imageSizes?: string[];
+  qualityValues?: string[];
   outputFormats?: string[];
   resolutions?: string[];
   outputCounts?: { min: number; max: number };
@@ -130,8 +136,8 @@ export function hasReviewedModelCatalogBaseline(): boolean {
     && REVIEWED_MODEL_CATALOG_BASELINE.reviewedRawExportSha256 !== null;
 }
 
-export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2-vip";
-export const MASK_REDRAW_MODEL_ID = "gpt-image-2" as const;
+export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare-vip";
+export const MASK_REDRAW_MODEL_ID = "gpt-image-2.5-sunburst" as const;
 
 export const GENERATION_IMAGE_MODEL_IDS = IMAGE_MODEL_IDS.filter(
   (id): id is GenerationImageModelId => id !== MASK_REDRAW_MODEL_ID,
@@ -190,10 +196,26 @@ export function defaultImageModelOptions(
   preferredAspectRatio = "1:1",
 ): ImageModelOptions {
   switch (modelId) {
-    case "gpt-image-2":
+    case "gpt-image-2.5-sunburst":
+    case "gpt-image-2.5-all":
       return {};
-    case "gpt-image-2-vip":
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip":
       return { size: VIP_SIZE_BY_RATIO[preferredAspectRatio] ?? VIP_SIZE_BY_RATIO["1:1"] };
+    case "gemini-3-pro-image-preview": {
+      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
+      return {
+        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
+        imageSize: "2K",
+      };
+    }
+    case "gemini-3.1-flash-lite-image": {
+      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
+      return {
+        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
+        imageSize: "1K",
+      };
+    }
     case "gemini-3.1-flash-image": {
       const allowed = getImageModelContract(modelId).aspectRatios ?? [];
       return {
@@ -224,7 +246,7 @@ export function normalizeImageModelOptions(
   const raw = objectValue(value);
   const defaults = defaultImageModelOptions(modelId, preferredAspectRatio);
   switch (modelId) {
-    case "gpt-image-2": {
+    case "gpt-image-2.5-sunburst": {
       const dimensions = getImageModelContract(modelId).dimensions!;
       const match = typeof raw.size === "string" ? /^(\d+)x(\d+)$/.exec(raw.size) : null;
       const width = Number(match?.[1]);
@@ -238,11 +260,35 @@ export function normalizeImageModelOptions(
         && width * height >= (dimensions.minPixels ?? 0)
         && width * height <= dimensions.maxPixels
         && aspectRatio <= (dimensions.maxAspectRatio ?? Number.POSITIVE_INFINITY);
-      return valid ? { size: raw.size as string } : {};
+      const result: ImageModelOptions = {};
+      if (valid) result.size = raw.size as string;
+      const qualityValues = getImageModelContract(modelId).qualityValues ?? [];
+      if (typeof raw.quality === "string" && qualityValues.includes(raw.quality)) result.quality = raw.quality;
+      return result;
     }
-    case "gpt-image-2-vip": {
+    case "gpt-image-2.5-all":
+      return {};
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip": {
       const sizes = getImageModelContract(modelId).sizes ?? [];
-      return { size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size };
+      const result: ImageModelOptions = {
+        size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size,
+      };
+      const qualityValues = getImageModelContract(modelId).qualityValues ?? [];
+      if (typeof raw.quality === "string" && qualityValues.includes(raw.quality)) result.quality = raw.quality;
+      return result;
+    }
+    case "gemini-3-pro-image-preview":
+    case "gemini-3.1-flash-lite-image": {
+      const contract = getImageModelContract(modelId);
+      return {
+        aspectRatio: typeof raw.aspectRatio === "string" && contract.aspectRatios?.includes(raw.aspectRatio)
+          ? raw.aspectRatio
+          : defaults.aspectRatio,
+        imageSize: typeof raw.imageSize === "string" && contract.imageSizes?.includes(raw.imageSize)
+          ? raw.imageSize
+          : defaults.imageSize,
+      };
     }
     case "gemini-3.1-flash-image": {
       const contract = getImageModelContract(modelId);
@@ -282,11 +328,15 @@ export function imageModelOptionsForAspectRatio(
 ): ImageModelOptions {
   const normalized = normalizeImageModelOptions(modelId, current, aspectRatio);
   switch (modelId) {
-    case "gpt-image-2":
+    case "gpt-image-2.5-sunburst":
+    case "gpt-image-2.5-all":
     case "seedream-5-0-260128":
       return normalized;
-    case "gpt-image-2-vip":
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip":
       return { ...normalized, size: VIP_SIZE_BY_RATIO[aspectRatio] ?? normalized.size };
+    case "gemini-3-pro-image-preview":
+    case "gemini-3.1-flash-lite-image":
     case "gemini-3.1-flash-image": {
       const allowed = getImageModelContract(modelId).aspectRatios ?? [];
       return allowed.includes(aspectRatio) ? { ...normalized, aspectRatio } : normalized;
@@ -315,8 +365,12 @@ export function imageModelOptionsError(modelId: ImageModelId, value: unknown): s
   const raw = value as Record<string, unknown>;
   const normalized = normalizeImageModelOptions(modelId, raw);
   const allowedKeys: Record<ImageModelId, readonly string[]> = {
-    "gpt-image-2": ["size"],
-    "gpt-image-2-vip": ["size"],
+    "gpt-image-2.5-sunburst": ["size", "quality"],
+    "gpt-image-2.5-all": [],
+    "gpt-image-2.5-sunburst-vip": ["size", "quality"],
+    "gpt-image-2.5-flare-vip": ["size", "quality"],
+    "gemini-3-pro-image-preview": ["aspectRatio", "imageSize"],
+    "gemini-3.1-flash-lite-image": ["aspectRatio", "imageSize"],
     "gemini-3.1-flash-image": ["aspectRatio", "imageSize"],
     "flux-2-pro": ["width", "height", "outputFormat"],
     "seedream-5-0-260128": ["size"],

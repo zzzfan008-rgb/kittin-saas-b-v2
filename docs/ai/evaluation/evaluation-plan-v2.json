@@ -11,7 +11,11 @@
   ],
   "fairComparison": {
     "modelIds": [
-      "gpt-image-2-vip",
+      "gpt-image-2.5-all",
+      "gpt-image-2.5-sunburst-vip",
+      "gpt-image-2.5-flare-vip",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
       "flux-2-pro",
       "seedream-5-0-260128"
@@ -64,7 +68,7 @@
     {
       "id": "five-to-eight-reference-images",
       "modelIds": [
-        "gpt-image-2-vip",
+        "gpt-image-2.5-flare-vip",
         "gemini-3.1-flash-image",
         "flux-2-pro",
         "seedream-5-0-260128"
@@ -77,9 +81,9 @@
       "outputCount": 1
     },
     {
-      "id": "gpt-image-2-mask-edit",
+      "id": "gpt-image-2.5-sunburst-mask-edit",
       "modelIds": [
-        "gpt-image-2"
+        "gpt-image-2.5-sunburst"
       ],
       "operationMode": "mask-edit",
       "referenceCounts": [
@@ -93,8 +97,8 @@
     {
       "id": "model-native-high-resolution",
       "modelIds": [
-        "gpt-image-2",
-        "gpt-image-2-vip",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare-vip",
         "gemini-3.1-flash-image",
         "flux-2-pro",
         "seedream-5-0-260128"

@@ -56,7 +56,7 @@ const generationVariant = requireGarmentPromptVariant({
 });
 const editVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "ai-modify",
   mode: "edit",
 });
@@ -175,7 +175,7 @@ function editFlow(imageUrl: string) {
           kind: "ai-modify",
           label: "改款",
           status: "idle",
-          modelId: "gpt-image-2-vip",
+          modelId: "gpt-image-2.5-flare-vip",
           modelOptions: editParameters.modelOptions,
           operationMode: "edit",
           prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
@@ -352,7 +352,7 @@ async function waitForDatabaseCondition(
 function directGenerateBody(referenceImage: string, projectId?: string, clientRequestId = "direct-request") {
   return {
     clientRequestId,
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     kind: "ai-modify",
     projectId,
     projectName: "客户端伪造名称",
@@ -986,7 +986,7 @@ await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归
   const invalidFlow = editFlow(PNG_DATA_URL);
   invalidFlow.nodes[1].data.modelOptions = {
     ...invalidFlow.nodes[1].data.modelOptions,
-    quality: "high",
+    aspect_ratio: "16:9",
   } as never;
   const response = await request("/projects", "owner", {
     method: "POST",
@@ -998,7 +998,7 @@ await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /quality/);
+  assert.match(responseText, /aspect_ratio/);
   assert.equal(
     await queryOne("SELECT id FROM projects WHERE id = 'invalid-model-options-project'"),
     undefined,
@@ -1012,7 +1012,7 @@ await test("直连生成在入队前拒绝未知 modelOptions", async () => {
   const body = directGenerateBody(PNG_DATA_URL);
   body.request.modelOptions = {
     ...body.request.modelOptions,
-    quality: "high",
+    aspect_ratio: "16:9",
   } as never;
   const response = await request("/generate", "owner", {
     method: "POST",
@@ -1020,7 +1020,7 @@ await test("直连生成在入队前拒绝未知 modelOptions", async () => {
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /quality/);
+  assert.match(responseText, /aspect_ratio/);
   const after = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
@@ -1075,10 +1075,10 @@ await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且�
   assert.equal(save.status, 200, await save.text());
 
   const invalidSubmittedFlow = structuredClone(savedFlow);
-  invalidSubmittedFlow.nodes[0].data.modelId = "gpt-image-2-vip" as never;
+  invalidSubmittedFlow.nodes[0].data.modelId = "gpt-image-2.5-flare-vip" as never;
   invalidSubmittedFlow.nodes[0].data.modelOptions = {
     size: "2048x2048",
-    quality: "high",
+    aspect_ratio: "16:9",
   } as never;
   const response = await request("/run-plan", "owner", {
     method: "POST",
@@ -1091,7 +1091,7 @@ await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且�
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /quality/);
+  assert.match(responseText, /aspect_ratio/);
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
     WHERE client_request_id = 'invalid-model-options-run-plan'

@@ -32,7 +32,7 @@ const PNG = Buffer.from(
 const PNG_DATA_URL = `data:image/png;base64,${PNG.toString("base64")}`;
 const MASK_CONTRACT = getImageModelContract(MASK_REDRAW_MODEL_ID).edit.mask;
 
-if (!MASK_CONTRACT) throw new Error("gpt-image-2 mask contract missing");
+if (!MASK_CONTRACT) throw new Error("gpt-image-2.5-sunburst mask contract missing");
 
 async function halfEditablePng(
   width: number,
@@ -128,7 +128,7 @@ async function main() {
     if (first.nodes[0].data.kind !== "ai-modify") throw new Error("unexpected node kind");
     assert.equal(first.nodes[0].data.aspectRatio, "1:1");
     assert.equal(first.nodes[0].data.batchSize, 1);
-    assert.equal(first.nodes[0].data.modelId, "gpt-image-2-vip");
+    assert.equal(first.nodes[0].data.modelId, "gpt-image-2.5-flare-vip");
     assert.deepEqual(first.nodes[0].data.modelOptions, { size: "2048x2048" });
     assert.equal(first.nodes[0].data.operationMode, "edit");
     assert.equal(first.nodes[0].data.operationModeNeedsConfirmation, false);
@@ -263,7 +263,7 @@ async function main() {
             aspectRatio: "1:1",
             batchSize: 1,
             outputImages: [],
-            modelId: "gpt-image-2-vip",
+            modelId: "gpt-image-2.5-flare-vip",
             modelOptions: { size: "2048x2048", unknownModelOption: "must-not-survive" },
             unknownDataField: "must-not-survive",
           },
@@ -309,7 +309,7 @@ async function main() {
             aspectRatio: "1:1",
             batchSize: 1,
             outputImages: [],
-            modelId: "gpt-image-2-vip",
+            modelId: "gpt-image-2.5-flare-vip",
             modelSelectionNeedsConfirmation: false,
             modelOptions: { size: "2048x2048" },
             operationMode: "edit",
@@ -353,7 +353,7 @@ async function main() {
     Object.assign(invalidModelOptions.nodes[0].data, {
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "unsupported-size", unknownModelOption: true },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -373,18 +373,18 @@ async function main() {
     const current = validateAndMigrateFlow({ ...legacyAiFlow(), schemaVersion: 2 });
     const invalidCases: Array<{ name: string; patch: Record<string, unknown>; pattern: RegExp }> = [
       {
-        name: "VIP extra quality",
+        name: "VIP forbidden aspect_ratio",
         patch: {
-          modelId: "gpt-image-2-vip",
-          modelOptions: { size: "2048x2048", quality: "high" },
+          modelId: "gpt-image-2.5-flare-vip",
+          modelOptions: { size: "2048x2048", aspect_ratio: "16:9" },
           operationMode: "edit",
         },
-        pattern: /quality/,
+        pattern: /aspect_ratio/,
       },
       {
         name: "VIP receives Gemini fields",
         patch: {
-          modelId: "gpt-image-2-vip",
+          modelId: "gpt-image-2.5-flare-vip",
           modelOptions: { size: "2048x2048", aspectRatio: "1:1", imageSize: "2K" },
           operationMode: "edit",
         },
@@ -446,7 +446,7 @@ async function main() {
     const data = migrated.nodes[0].data;
     assert.equal(data.kind, "ai-modify");
     if (data.kind !== "ai-modify") throw new Error("unexpected node kind");
-    assert.equal(data.modelId, "gpt-image-2-vip", "内部安全默认值不得冒充用户已选择的新模型");
+    assert.equal(data.modelId, "gpt-image-2.5-flare-vip", "内部安全默认值不得冒充用户已选择的新模型");
     assert.equal(data.retiredModelId, "grok-imagine-image");
     assert.equal(data.modelSelectionNeedsConfirmation, true);
     assert.deepEqual(data.modelOptions, { size: "2048x2048" });

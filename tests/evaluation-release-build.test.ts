@@ -47,7 +47,7 @@ try {
 
   const variant = requireGarmentPromptVariant({
     familyId: "commerce-hero",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     nodeKind: "sketch-to-render",
     mode: "generate",
   });

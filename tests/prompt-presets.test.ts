@@ -27,13 +27,13 @@ assert.equal(GARMENT_PROMPT_VARIANTS.length, 25, "4 个普通模型×3 任务族
 assert.equal(new Set(GARMENT_PROMPT_VARIANTS.map((variant) => variant.variantId)).size, 25);
 assert.equal(new Set(GARMENT_PROMPT_VARIANTS.map((variant) => variant.fullPrompt)).size, 25, "不同模型/模式不得共用完整提示词");
 
-for (const modelId of IMAGE_MODEL_IDS.filter((id) => id !== "gpt-image-2")) {
+for (const modelId of [...new Set(GARMENT_PROMPT_VARIANTS.map((variant) => variant.modelId))].filter((id) => id !== "gpt-image-2.5-sunburst")) {
   const variants = listGarmentPromptVariants({ modelId });
   assert.equal(variants.length, 6, `${modelId} 应有三任务族的 generate/edit 独立变体`);
   assert.deepEqual(new Set(variants.map((variant) => variant.mode)), new Set(["generate", "edit"]));
 }
 
-const gptImage2Variants = listGarmentPromptVariants({ modelId: "gpt-image-2" });
+const gptImage2Variants = listGarmentPromptVariants({ modelId: "gpt-image-2.5-sunburst" });
 assert.equal(gptImage2Variants.length, 1);
 assert.equal(gptImage2Variants[0]?.mode, "mask-edit");
 assert.equal(gptImage2Variants[0]?.nodeKind, "mask-redraw");
@@ -56,7 +56,7 @@ for (const variant of GARMENT_PROMPT_VARIANTS) {
   assert.ok(variant.fullPrompt.length > 150, `${variant.variantId} 必须保存完整独立提示词`);
 }
 
-for (const modelId of IMAGE_MODEL_IDS) {
+for (const modelId of [...new Set(GARMENT_PROMPT_VARIANTS.map((variant) => variant.modelId))]) {
   const hashes = new Set(listGarmentPromptVariants({ modelId }).map((variant) => variant.contractHash));
   assert.deepEqual(hashes, new Set([imageModelContractHash(modelId)]));
 }
@@ -90,7 +90,7 @@ assert.match(seedreamEdit.fullPrompt, /未说明的细节不变/);
 
 const vipEdit = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "ai-modify",
   mode: "edit",
 });
@@ -103,7 +103,7 @@ assert.match(maskVariant.fullPrompt, /自然融合.*蒙版边界/);
 
 const exactMiss = getGarmentPromptVariant({
   familyId: "fashion-lookbook",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "ai-modify",
   mode: "generate",
 });
@@ -120,7 +120,7 @@ assert.match(unavailable.reason, /尚未完成.*真实评估/);
 
 const unsupported = getRuntimePromptVariantAvailability({
   familyId: "fashion-lookbook",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });

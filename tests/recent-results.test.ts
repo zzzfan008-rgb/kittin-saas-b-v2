@@ -73,13 +73,13 @@ test("排队卡收到运行事件后原地更新，不重复新建", () => {
     type: "node-status",
     nodeId: "node-1",
     status: "running",
-    model: "gpt-image-2",
+    model: "gpt-image-2.5-sunburst",
     startedAt: 1_200,
   });
   assert.equal(result.length, 1);
   assert.equal(result[0].id, queued.id);
   assert.equal(result[0].status, "running");
-  assert.equal(result[0].model, "gpt-image-2");
+  assert.equal(result[0].model, "gpt-image-2.5-sunburst");
   assert.equal(result[0].startedAt, 1_200);
 });
 

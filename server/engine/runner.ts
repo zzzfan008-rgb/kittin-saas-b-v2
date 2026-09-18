@@ -40,7 +40,7 @@ import {
   modelMaxReferenceImages,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
-import { compositeMaskedEdit, prepareMaskForGeneration } from "../lib/maskProcessing";
+import { compositeMaskedEdit, prepareMaskForGeneration, resolveMaskFeatherRadius } from "../lib/maskProcessing";
 import { renderProviderPrompt, type ProviderPromptReference } from "../../src/lib/providerPromptRenderer";
 import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
@@ -424,8 +424,11 @@ export async function executeStep(
         throw new Error("局部修改必须先保存 PNG 蒙版");
       }
       const mask = typeof maskReference === "string" ? await normalizeImageRef(maskReference) : undefined;
+      const maskFeatherRadius = step.kind === "mask-redraw"
+        ? resolveMaskFeatherRadius(step.params.featherRadius)
+        : undefined;
       const preparedMask = step.kind === "mask-redraw"
-        ? await prepareMaskForGeneration(referenceImages[0], mask!)
+        ? await prepareMaskForGeneration(referenceImages[0], mask!, { featherRadius: maskFeatherRadius })
         : undefined;
       const providerMask = preparedMask?.mask ?? mask;
       const providerReferences = preparedMask
@@ -465,7 +468,7 @@ export async function executeStep(
       );
       const providerImages = step.kind === "mask-redraw"
         ? await Promise.all(result.images.map((image) => (
-            compositeMaskedEdit(referenceImages[0], mask!, image)
+            compositeMaskedEdit(referenceImages[0], mask!, image, { featherRadius: maskFeatherRadius })
           )))
         : result.images;
       const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);

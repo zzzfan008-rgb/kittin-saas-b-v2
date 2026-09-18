@@ -64,7 +64,7 @@ function aiNode(id = "history-node"): FlowNode {
       aspectRatio: "1:1",
       batchSize: 1,
       outputImages: ["/api/files/previous.png"],
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,

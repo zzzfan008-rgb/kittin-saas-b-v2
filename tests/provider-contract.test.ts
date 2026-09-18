@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   const mask = await halfEditableMask(4, 2);
 
   try {
-    await test("本地知识库与 Provider 注册表严格覆盖当前五个模型", () => {
+    await test("本地知识库与 Provider 注册表严格覆盖当前九个模型", () => {
       assert.deepEqual(Object.keys(apiyiProviders).sort(), [...IMAGE_MODEL_IDS].sort());
       assert.equal(Object.hasOwn(apiyiProviders, "grok-imagine-image"), false, "退役模型不得保留 Provider 入口");
       for (const modelId of IMAGE_MODEL_IDS) {
@@ -127,10 +127,10 @@ async function main(): Promise<void> {
         assert.equal(getImageModelContract(modelId).id, modelId);
         assert.ok(getImageModelContract(modelId).upstreamModelId);
       }
-      assert.equal(getImageModelContract("gpt-image-2").generation, null);
+      assert.equal(getImageModelContract("gpt-image-2.5-sunburst").generation, null);
     });
 
-    await test("五模型契约哈希绑定同一份 reviewed model catalog baseline", () => {
+    await test("九模型契约哈希绑定同一份 reviewed model catalog baseline", () => {
       const expectedBaseline = {
         reviewedExportHashScope: sources.modelCatalog.reviewedExportHashScope,
         reviewedExportSha256: sources.modelCatalog.reviewedExportSha256,
@@ -140,16 +140,10 @@ async function main(): Promise<void> {
       assert.deepEqual(REVIEWED_MODEL_CATALOG_BASELINE, expectedBaseline);
       assert.deepEqual(expectedBaseline.expectedGatewayModelIds, IMAGE_MODEL_IDS);
       assert.equal(expectedBaseline.reviewedExportHashScope, "sha256-canonical-model-id-set-v1");
-      assert.equal(
-        expectedBaseline.reviewedExportSha256,
-        "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
-      );
-      assert.equal(
-        expectedBaseline.reviewedRawExportSha256,
-        "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
-      );
-      assert.equal(sources.modelCatalog.reviewedExportCapturedAt, "2026-09-03T13:22:48.000Z");
-      assert.equal(hasReviewedModelCatalogBaseline(), true, "经人工批准的完整 /v1/models 指纹必须进入运行时基线");
+      assert.equal(expectedBaseline.reviewedExportSha256, null);
+      assert.equal(expectedBaseline.reviewedRawExportSha256, null);
+      assert.equal(sources.modelCatalog.reviewedExportCapturedAt, null);
+      assert.equal(hasReviewedModelCatalogBaseline(), false, "新九模型目录尚未经人工评审，运行时基线应保持 null");
       for (const modelId of IMAGE_MODEL_IDS) {
         assert.deepEqual(getImageModelContract(modelId).reviewedModelCatalogBaseline, expectedBaseline);
         assert.match(getImageModelContract(modelId).contractHash, /^sha256:[a-f0-9]{64}$/);
@@ -209,14 +203,14 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2-vip 文生图与多参考图编辑使用文档字段", async () => {
+    await test("gpt-image-2.5-flare-vip 文生图与多参考图编辑使用文档字段", async () => {
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init });
         return Response.json(pngPayload(white));
       });
       try {
-        const generated = await apiyiProviders["gpt-image-2-vip"].generate({
+        const generated = await apiyiProviders["gpt-image-2.5-flare-vip"].generate({
           prompt: "礼服",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },
@@ -225,14 +219,15 @@ async function main(): Promise<void> {
         assert.equal(captures[0].url, "https://gateway.example/v1/images/generations");
         assert.equal(new Headers(captures[0].init?.headers).get("authorization"), "Bearer apiyi-test-key");
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "gpt-image-2-vip",
+          model: "gpt-image-2.5-flare-vip",
           prompt: "礼服",
           size: "1280x1280",
+          quality: "high",
         });
         const generateDispatcher = (captures[0].init as RequestInit & { dispatcher?: unknown })?.dispatcher;
         assert.ok(generateDispatcher, "API易请求必须显式携带专属 Undici dispatcher");
 
-        await apiyiProviders["gpt-image-2-vip"].edit({
+        await apiyiProviders["gpt-image-2.5-flare-vip"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white, blue],
@@ -240,12 +235,12 @@ async function main(): Promise<void> {
         });
         const form = captures[1].init?.body as FormData;
         assert.equal(captures[1].url, "https://gateway.example/v1/images/edits");
-        assert.equal(form.get("model"), "gpt-image-2-vip");
+        assert.equal(form.get("model"), "gpt-image-2.5-flare-vip");
         assert.equal(form.get("size"), "2048x2048");
         assert.equal(form.get("response_format"), null);
         assert.equal(form.getAll("image").length, 2);
         assert.equal(form.getAll("image[]").length, 0);
-        assert.equal(form.get("quality"), null);
+        assert.equal(form.get("quality"), "high");
         assert.equal(form.get("n"), null);
         assert.equal(form.get("aspect_ratio"), null);
         assert.equal(
@@ -258,7 +253,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
+    await test("gpt-image-2.5-sunburst 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
       let calls = 0;
       const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
@@ -268,19 +263,19 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].generate({
+          () => apiyiProviders["gpt-image-2.5-sunburst"].generate({
             prompt: "禁止文生图",
             operationMode: "generate",
           }),
           (error: unknown) => error instanceof ProviderError &&
             error.category === "invalid_request" &&
-            error.message === "gpt-image-2 首版仅支持 mask-edit 模式",
+            error.message === "gpt-image-2.5-sunburst 首版仅支持 mask-edit 模式",
         );
         assert.equal(calls, 0);
 
         const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].edit({
+          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: jpegMask, modelOptions: {},
           }),
@@ -290,7 +285,7 @@ async function main(): Promise<void> {
 
         const opaqueMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 });
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].edit({
+          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: opaqueMask, modelOptions: {},
           }),
@@ -300,7 +295,7 @@ async function main(): Promise<void> {
 
         const wrongSizeMask = await halfEditableMask(2, 2);
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].edit({
+          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
           }),
@@ -309,14 +304,14 @@ async function main(): Promise<void> {
         assert.equal(calls, 0);
 
         const oversizedMask = await halfEditableMask(1024, 1024, 0);
-        const maskContract = getImageModelContract("gpt-image-2").edit.mask;
+        const maskContract = getImageModelContract("gpt-image-2.5-sunburst").edit.mask;
         assert.ok(maskContract);
         assert.ok(
           Buffer.from(oversizedMask.split(",")[1], "base64").length > maskContract.maxBytes,
           "fixture 必须超过蒙版字节上限",
         );
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2"].edit({
+          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: oversizedMask, modelOptions: {},
           }),
@@ -324,12 +319,12 @@ async function main(): Promise<void> {
         );
         assert.equal(calls, 0);
 
-        await apiyiProviders["gpt-image-2"].edit({
+        await apiyiProviders["gpt-image-2.5-sunburst"].edit({
           prompt: "局部改红", operationMode: "mask-edit", referenceImages: [blue], mask,
           modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
-        assert.equal(capturedForms[0].get("model"), "gpt-image-2");
+        assert.equal(capturedForms[0].get("model"), "gpt-image-2.5-sunburst");
         assert.equal(capturedForms[0].get("n"), null);
         assert.equal(capturedForms[0].get("size"), "1152x576");
         assert.equal(capturedForms[0].get("output_format"), "png");
@@ -518,7 +513,7 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2-vip"].generate({
+          () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
             prompt: "截断", operationMode: "generate", modelOptions: { size: "1280x1280" },
           }),
           (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
@@ -550,7 +545,7 @@ async function main(): Promise<void> {
         });
         return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
       });
-      const request = () => apiyiProviders["gpt-image-2-vip"].generate({
+      const request = () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
         prompt: "尾部恢复", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -582,7 +577,7 @@ async function main(): Promise<void> {
         calls += 1;
         return Response.json(payload);
       });
-      const vipRequest = () => apiyiProviders["gpt-image-2-vip"].generate({
+      const vipRequest = () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
         prompt: "响应校验", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -663,7 +658,7 @@ async function main(): Promise<void> {
       try {
         for (const scenario of [
           { status: 401, message: "content policy violation while validating the API key" },
-          { status: 403, message: "model gpt-image-2 is not available for this API key" },
+          { status: 403, message: "model gpt-image-2.5-sunburst is not available for this API key" },
         ]) {
           status = scenario.status;
           responseMessage = scenario.message;
@@ -681,7 +676,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("AI 诊断列出五个 API易模型且 gpt-image-2 只开放改图探针", async () => {
+    await test("AI 诊断列出九个 API易模型且 gpt-image-2.5-sunburst 只开放改图探针", async () => {
       const app = express();
       app.use(express.json());
       app.use((req, _res, next) => {
@@ -711,7 +706,7 @@ async function main(): Promise<void> {
         assert.equal(body.gateway, "gateway.example");
         assert.deepEqual(body.providers.map((item) => item.providerId), IMAGE_MODEL_IDS);
         assert.ok(body.providers.every((item) => item.configured));
-        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2")?.probes, ["edit"]);
+        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2.5-sunburst")?.probes, ["edit"]);
 
         const invalid = {
           method: "POST", headers: { "Content-Type": "application/json" },

@@ -10,7 +10,10 @@
   },
   "releasePolicy": {
     "defaultEvidenceStatus": "unverified",
-    "productionSelectableStatuses": ["verified", "recommended"],
+    "productionSelectableStatuses": [
+      "verified",
+      "recommended"
+    ],
     "contractOrSourceDriftDowngradesTo": "unverified",
     "automaticPaidProbes": false
   },
@@ -18,19 +21,33 @@
   "runtime": {
     "upstreamMode": "synchronous",
     "businessQueue": "postgresql",
-    "retryableHttpStatuses": [429, 503],
+    "retryableHttpStatuses": [
+      429,
+      503
+    ],
     "maxAutomaticRetries": 3,
     "ambiguousTransportFailure": "outcome_unknown",
     "persistTemporaryUrlsImmediately": true
   },
   "inputNormalization": {
-    "acceptedMimeTypes": ["image/png", "image/jpeg", "image/webp", "image/gif"],
-    "outputMimeTypes": ["image/png", "image/jpeg"],
+    "acceptedMimeTypes": [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/gif"
+    ],
+    "outputMimeTypes": [
+      "image/png",
+      "image/jpeg"
+    ],
     "maxInputBytes": 20971520,
     "maxInputPixels": 40000000,
     "maxLongEdge": 4096,
     "targetBytes": 1500000,
-    "jpegQuality": {"initial": 92, "minimum": 80},
+    "jpegQuality": {
+      "initial": 92,
+      "minimum": 80
+    },
     "animationPolicy": "first-frame",
     "applyExifOrientation": true,
     "outputColourspace": "srgb",
@@ -38,17 +55,34 @@
   },
   "models": [
     {
-      "id": "gpt-image-2",
+      "id": "gpt-image-2.5-sunburst",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:ba3586e5f7b4db85fbfe839f5c5da4a07181c2b2c8a0253a99576563ce2c8b57",
-      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
-      "gatewayModelId": "gpt-image-2",
-      "upstreamModelId": "gpt-image-2",
-      "vendorModelId": "gpt-image-2",
+      "contractHash": "sha256:c143bba099efdd135195e26d5af141e0b7304bf61414551fd3931d9d4fc98001",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-sunburst",
+      "upstreamModelId": "gpt-image-2.5-sunburst",
+      "vendorModelId": "gpt-image-2.5-sunburst",
       "evidenceStatus": "unverified",
-      "label": "GPT Image 2 局部修改",
+      "label": "GPT Image 2.5 Sunburst 局部修改",
       "channel": "official",
-      "allowedNodeKinds": ["mask-redraw"],
+      "allowedNodeKinds": [
+        "mask-redraw"
+      ],
       "timeoutMs": 360000,
       "generation": null,
       "edit": {
@@ -63,7 +97,9 @@
         "mask": {
           "required": true,
           "pipelineVersion": 3,
-          "mimeTypes": ["image/png"],
+          "mimeTypes": [
+            "image/png"
+          ],
           "maxBytes": 4194304,
           "requiresAlpha": true,
           "mustMatchFirstImageDimensions": true,
@@ -74,96 +110,620 @@
           "finalPixelProtection": "local-adaptive-blend-window"
         },
         "background": {
-          "supportedValues": ["auto", "opaque", "transparent"],
+          "supportedValues": [
+            "auto",
+            "opaque",
+            "transparent"
+          ],
           "transparentStatus": "preview",
-          "transparentOutputFormats": ["png", "webp"],
+          "transparentOutputFormats": [
+            "png",
+            "webp"
+          ],
           "projectOutputFormat": "png",
           "projectRequestValue": "opaque",
           "projectResponseConvention": "full-canvas-edited-image",
           "projectCompositePolicy": "unified-local-adaptive-blend-with-exact-outside-protection"
         }
       },
-      "dimensions": {"multipleOf": 16, "minSide": 16, "maxSide": 3840, "minPixels": 655360, "maxPixels": 8294400, "maxAspectRatio": 3},
-      "forbiddenParameters": ["input_fidelity", "response_format"],
-      "output": {"kind": "openai-image", "fields": ["b64_json"], "maxImages": 1}
+      "dimensions": {
+        "multipleOf": 16,
+        "minSide": 16,
+        "maxSide": 3840,
+        "minPixels": 655360,
+        "maxPixels": 8294400,
+        "maxAspectRatio": 3
+      },
+      "qualityValues": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "forbiddenParameters": [
+        "input_fidelity",
+        "response_format"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json"
+        ],
+        "maxImages": 1
+      }
     },
     {
-      "id": "gpt-image-2-vip",
+      "id": "gpt-image-2.5-all",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:4716e427b0ed8244a58cbacf9e4dd33156bf27d64c3d654aa941196c924aae72",
-      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
-      "gatewayModelId": "gpt-image-2-vip",
-      "upstreamModelId": "gpt-image-2-vip",
+      "contractHash": "sha256:3fc8ddff6557099e3e7ea16647da0a4b76add30acfe2c0c7bce89362c8484b4a",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-all",
+      "upstreamModelId": "gpt-image-2.5-all",
       "vendorModelId": null,
       "evidenceStatus": "unverified",
-      "label": "GPT Image 2 VIP",
-      "channel": "reverse-codex",
-      "allowedNodeKinds": ["image-generation"],
-      "timeoutMs": 300000,
-      "generation": {"path": "/v1/images/generations", "contentType": "application/json"},
-      "edit": {"path": "/v1/images/edits", "contentType": "multipart/form-data", "minReferences": 1, "maxReferences": 8, "singleImageField": "image", "multipleImageField": "image"},
-      "sizes": ["auto", "1280x1280", "848x1280", "1280x848", "960x1280", "1280x960", "1024x1280", "1280x1024", "720x1280", "1280x720", "1280x544", "2048x2048", "1360x2048", "2048x1360", "1536x2048", "2048x1536", "1632x2048", "2048x1632", "1152x2048", "2048x1152", "2048x864", "2880x2880", "2336x3520", "3520x2336", "2480x3312", "3312x2480", "2560x3216", "3216x2560", "2160x3840", "3840x2160", "3840x1632"],
-      "forbiddenParameters": ["quality", "n", "aspect_ratio"],
-      "output": {"kind": "openai-image", "fields": ["b64_json", "url"], "maxImages": 1}
+      "label": "GPT Image 2.5 All",
+      "channel": "reverse",
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
+      "timeoutMs": 90000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "forbiddenParameters": [
+        "size",
+        "quality",
+        "n",
+        "aspect_ratio"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      }
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-vip",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:2b577588de58adff5800643a00a080b4ff0f73c4e080e8e2c5ab05a8bebd400a",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-sunburst-vip",
+      "upstreamModelId": "gpt-image-2.5-sunburst-vip",
+      "vendorModelId": null,
+      "evidenceStatus": "unverified",
+      "label": "GPT Image 2.5 Sunburst VIP",
+      "channel": "reverse",
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
+      "timeoutMs": 150000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "sizes": [
+        "auto",
+        "1280x1280",
+        "848x1280",
+        "1280x848",
+        "960x1280",
+        "1280x960",
+        "1024x1280",
+        "1280x1024",
+        "720x1280",
+        "1280x720",
+        "1280x544",
+        "2048x2048",
+        "1360x2048",
+        "2048x1360",
+        "1536x2048",
+        "2048x1536",
+        "1632x2048",
+        "2048x1632",
+        "1152x2048",
+        "2048x1152",
+        "2048x864",
+        "2880x2880",
+        "2336x3520",
+        "3520x2336",
+        "2480x3312",
+        "3312x2480",
+        "2560x3216",
+        "3216x2560",
+        "2160x3840",
+        "3840x2160",
+        "3840x1632"
+      ],
+      "qualityValues": [
+        "auto",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "forbiddenParameters": [
+        "n",
+        "aspect_ratio"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      }
+    },
+    {
+      "id": "gpt-image-2.5-flare-vip",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-flare-vip",
+      "upstreamModelId": "gpt-image-2.5-flare-vip",
+      "vendorModelId": null,
+      "evidenceStatus": "unverified",
+      "label": "GPT Image 2.5 Flare VIP",
+      "channel": "reverse",
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
+      "timeoutMs": 150000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "sizes": [
+        "auto",
+        "1280x1280",
+        "848x1280",
+        "1280x848",
+        "960x1280",
+        "1280x960",
+        "1024x1280",
+        "1280x1024",
+        "720x1280",
+        "1280x720",
+        "1280x544",
+        "2048x2048",
+        "1360x2048",
+        "2048x1360",
+        "1536x2048",
+        "2048x1536",
+        "1632x2048",
+        "2048x1632",
+        "1152x2048",
+        "2048x1152",
+        "2048x864",
+        "2880x2880",
+        "2336x3520",
+        "3520x2336",
+        "2480x3312",
+        "3312x2480",
+        "2560x3216",
+        "3216x2560",
+        "2160x3840",
+        "3840x2160",
+        "3840x1632"
+      ],
+      "qualityValues": [
+        "auto",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "forbiddenParameters": [
+        "n",
+        "aspect_ratio"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      }
+    },
+    {
+      "id": "gemini-3-pro-image-preview",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:03916d7adc0842ad26d7f572826f094f93cd94f5989c22aa0988fc1a81998397",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gemini-3-pro-image-preview",
+      "upstreamModelId": "gemini-3-pro-image-preview",
+      "vendorModelId": "gemini-3-pro-image-preview",
+      "evidenceStatus": "unverified",
+      "label": "Gemini 3 Pro Image",
+      "channel": "official",
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8
+      },
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "imageSizes": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "output": {
+        "kind": "gemini-parts",
+        "fields": [
+          "inlineData"
+        ],
+        "scanAllParts": true
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-lite-image",
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:a645c5bfafac02beecab4095e53e1f4938322758c9b52f5566fc1362f46b5677",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
+      "gatewayModelId": "gemini-3.1-flash-lite-image",
+      "upstreamModelId": "gemini-3.1-flash-lite-image",
+      "vendorModelId": "gemini-3.1-flash-lite-image",
+      "evidenceStatus": "unverified",
+      "label": "Gemini 3.1 Flash Lite Image",
+      "channel": "official",
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8
+      },
+      "aspectRatios": [
+        "1:1",
+        "1:4",
+        "4:1",
+        "1:8",
+        "8:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "imageSizes": [
+        "1K"
+      ],
+      "output": {
+        "kind": "gemini-parts",
+        "fields": [
+          "inlineData"
+        ],
+        "scanAllParts": true
+      }
     },
     {
       "id": "gemini-3.1-flash-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:39bc269861dbe032bc6bea2a0c2c5d8338ecfa83a579b523900ccff2f6e65beb",
-      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "contractHash": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
       "gatewayModelId": "gemini-3.1-flash-image",
       "upstreamModelId": "gemini-3.1-flash-image",
       "vendorModelId": "gemini-3.1-flash-image",
       "evidenceStatus": "unverified",
       "label": "Gemini 3.1 Flash Image",
       "channel": "official",
-      "allowedNodeKinds": ["image-generation"],
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
       "timeoutMs": 360000,
-      "generation": {"path": "/v1beta/models/{model}:generateContent", "contentType": "application/json"},
-      "edit": {"path": "/v1beta/models/{model}:generateContent", "contentType": "application/json", "minReferences": 1, "maxReferences": 8},
-      "aspectRatios": ["1:1", "1:4", "4:1", "1:8", "8:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
-      "imageSizes": ["512", "1K", "2K", "4K"],
-      "output": {"kind": "gemini-parts", "fields": ["inlineData"], "scanAllParts": true}
+      "generation": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8
+      },
+      "aspectRatios": [
+        "1:1",
+        "1:4",
+        "4:1",
+        "1:8",
+        "8:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "imageSizes": [
+        "512",
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "output": {
+        "kind": "gemini-parts",
+        "fields": [
+          "inlineData"
+        ],
+        "scanAllParts": true
+      }
     },
     {
       "id": "flux-2-pro",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:f312288c704324980262a616edabf644d220f64c693f6243e8aeccf8181af5c2",
-      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "contractHash": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
       "gatewayModelId": "flux-2-pro",
       "upstreamModelId": "flux-2-pro",
       "vendorModelId": "flux-2-pro",
       "evidenceStatus": "unverified",
       "label": "FLUX.2 Pro",
       "channel": "official",
-      "allowedNodeKinds": ["image-generation"],
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
       "timeoutMs": 120000,
-      "generation": {"path": "/v1/images/generations", "contentType": "application/json"},
-      "edit": {"path": "/v1/images/generations", "contentType": "application/json", "minReferences": 1, "maxReferences": 8},
-      "dimensions": {"multipleOf": 16, "minSide": 64, "maxPixels": 4194304},
-      "outputFormats": ["jpeg", "png"],
-      "forbiddenParameters": ["n"],
-      "output": {"kind": "openai-image", "fields": ["url"], "maxImages": 1, "urlTtlSeconds": 600}
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8
+      },
+      "dimensions": {
+        "multipleOf": 16,
+        "minSide": 64,
+        "maxPixels": 4194304
+      },
+      "outputFormats": [
+        "jpeg",
+        "png"
+      ],
+      "forbiddenParameters": [
+        "n"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "url"
+        ],
+        "maxImages": 1,
+        "urlTtlSeconds": 600
+      }
     },
     {
       "id": "seedream-5-0-260128",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:5960debce29458f34563d6333002520031dc2c65833091a821f606660b8d7b82",
-      "reviewedModelCatalogBaseline": {"reviewedExportHashScope": "sha256-canonical-model-id-set-v1", "reviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d", "reviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408", "expectedGatewayModelIds": ["gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128"]},
+      "contractHash": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-all",
+          "gpt-image-2.5-sunburst-vip",
+          "gpt-image-2.5-flare-vip",
+          "gemini-3-pro-image-preview",
+          "gemini-3.1-flash-lite-image",
+          "gemini-3.1-flash-image",
+          "flux-2-pro",
+          "seedream-5-0-260128"
+        ]
+      },
       "gatewayModelId": "seedream-5-0-260128",
       "upstreamModelId": "seedream-5-0-260128",
       "vendorModelId": "seedream-5-0-260128",
       "evidenceStatus": "unverified",
       "label": "Seedream 5.0",
       "channel": "official",
-      "allowedNodeKinds": ["image-generation"],
+      "allowedNodeKinds": [
+        "image-generation"
+      ],
       "timeoutMs": 120000,
-      "generation": {"path": "/v1/images/generations", "contentType": "application/json"},
-      "edit": {"path": "/v1/images/generations", "contentType": "application/json", "minReferences": 1, "maxReferences": 8},
-      "sizes": ["2K", "3K"],
-      "requiredParameters": {"watermark": false, "sequential_image_generation": "disabled"},
-      "forbiddenParameters": ["n"],
-      "output": {"kind": "openai-image", "fields": ["url", "b64_json"], "recordActualSize": true}
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8
+      },
+      "sizes": [
+        "2K",
+        "3K"
+      ],
+      "requiredParameters": {
+        "watermark": false,
+        "sequential_image_generation": "disabled"
+      },
+      "forbiddenParameters": [
+        "n"
+      ],
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "url",
+          "b64_json"
+        ],
+        "recordActualSize": true
+      }
     }
   ]
 }

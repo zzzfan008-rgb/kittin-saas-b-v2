@@ -23,7 +23,7 @@ interface ParameterProfileBase {
 
 export type ModelParameterProfile =
   | (ParameterProfileBase & {
-      modelId: "gpt-image-2";
+      modelId: "gpt-image-2.5-sunburst";
       mode: "mask-edit";
       native: {
         kind: "gpt-image-2-mask";
@@ -34,7 +34,7 @@ export type ModelParameterProfile =
       };
     })
   | (ParameterProfileBase & {
-      modelId: "gpt-image-2-vip";
+      modelId: "gpt-image-2.5-flare-vip";
       native: {
         kind: "gpt-image-2-vip";
         size: string;
@@ -97,17 +97,17 @@ const FLUX_DIMENSIONS: Record<"1:1" | "3:4" | "4:3", { width: number; height: nu
   "4:3": { width: 2048, height: 1536 },
 };
 
-const GENERAL_MODELS: readonly GenerationImageModelId[] = [
-  "gpt-image-2-vip",
+const GENERAL_MODELS = [
+  "gpt-image-2.5-flare-vip",
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
-];
+] as const satisfies readonly GenerationImageModelId[];
 const GENERAL_MODES: readonly Exclude<ImageOperationMode, "mask-edit">[] = ["generate", "edit"];
 const FAMILIES = Object.keys(FAMILY_FRAMES) as GarmentTaskFamilyId[];
 
 function generalProfile(
-  modelId: GenerationImageModelId,
+  modelId: (typeof GENERAL_MODELS)[number],
   familyId: GarmentTaskFamilyId,
   mode: "generate" | "edit",
 ): ModelParameterProfile {
@@ -126,7 +126,7 @@ function generalProfile(
     },
   };
   switch (modelId) {
-    case "gpt-image-2-vip":
+    case "gpt-image-2.5-flare-vip":
       return { ...base, modelId, native: {
         kind: "gpt-image-2-vip", size: VIP_SIZE[aspectRatio], referenceLimit: 8,
         omittedFields: ["quality", "n", "aspect_ratio"],
@@ -152,10 +152,10 @@ function generalProfile(
 }
 
 const maskProfile: ModelParameterProfile = {
-  profileId: "gpt-image-2:mask-local-edit:mask-edit:v1",
+  profileId: "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
   version: "1.0.0",
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   mode: "mask-edit",
   businessFrame: { aspectRatio: "source", requestedOutputs: 1 },
   native: {

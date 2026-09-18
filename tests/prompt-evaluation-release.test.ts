@@ -29,7 +29,7 @@ const TEST_SHA256 = "0".repeat(64);
 
 const catalogVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });
@@ -143,7 +143,7 @@ const editVariant = requireGarmentPromptVariant({
 });
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "mask-redraw",
   mode: "mask-edit",
 });

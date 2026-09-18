@@ -52,7 +52,7 @@ await database.initializeDatabase();
 
 const queueVariant = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });
@@ -64,7 +64,7 @@ const queueParameters = materializeModelParameterProfile(queueProfile);
 
 const runtimeEditVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "ai-modify",
   mode: "edit",
 });
@@ -74,7 +74,7 @@ const runtimeEditParameters = materializeModelParameterProfile(runtimeEditProfil
 
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "mask-redraw",
   mode: "mask-edit",
 });
@@ -320,7 +320,7 @@ function resolver(
     return behavior(request, calls);
   };
   const provider: AIProvider = {
-    id: "gpt-image-2-vip",
+    id: "gpt-image-2.5-flare-vip",
     async generate(request) { return invoke(request); },
     async edit(request) { return invoke(request); },
   };
@@ -350,7 +350,7 @@ console.log("PostgreSQL 持久生成队列测试");
 
 await test("入队立即返回且数据库重连后 queued 任务仍可执行并重放事件", async () => {
   const fake = resolver(() => ({
-    images: [PNG_DATA_URL], model: "gpt-image-2-vip", providerOutputSizes: ["2048x2048"],
+    images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip", providerOutputSizes: ["2048x2048"],
   }));
   const runId = await enqueueSingle("restart");
   assert.equal(fake.calls(), 0, "入队阶段不得调用上游");
@@ -397,7 +397,7 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
 });
 
 await test("入队后发布状态降级时 Worker 二次准入且 Provider 零调用", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const runId = await enqueueSingle("worker-release-drift");
   const restoreRelease = withdrawPromptVariantReleasesForTest(queueVariant.variantId);
   try {
@@ -721,7 +721,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
 });
 
 await test("入队后命中运行时四级关闭规则时 Provider 零调用", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const runId = await enqueueSingle("worker-shutdown-drift");
   const rules = PROMPT_RUNTIME_SHUTDOWN_RULES as EvaluationShutdownRule[];
   const rule: EvaluationShutdownRule = {
@@ -772,11 +772,11 @@ await test("未登记 authorizationId 的真实评估在入队事务中阻断", 
 });
 
 await test("未验证变体仅在持久化 evaluation + no-retry 策略下可执行", async () => {
-  const ordinaryFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const ordinaryFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const evaluationProviderRequestId = `req-evaluation-success-${sequence + 1}`;
   const evaluationFake = resolver(() => ({
     images: [PNG_DATA_URL],
-    model: "gpt-image-2-vip",
+    model: "gpt-image-2.5-flare-vip",
     providerRequestId: evaluationProviderRequestId,
   }));
   const ordinaryNodeId = `worker-forged-evaluation-${++sequence}`;
@@ -973,7 +973,7 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
 });
 
 await test("评估策略快照损坏时 Provider 零调用并确定性终止", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const nodeId = `evaluation-policy-corrupt-${++sequence}`;
   const plan = { steps: [step(nodeId)] };
   const policy = await authorizeEvaluationPlan(plan, {
@@ -1140,7 +1140,7 @@ await test("179 条活动任务下两个不同请求并发入队时只接受一�
 });
 
 await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上游", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const runId = await enqueueSingle("soft-deleted");
   try {
     await database.query(`
@@ -1158,7 +1158,7 @@ await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上
 });
 
 await test("retry_wait 在 available_at 前不可领取，到期后才对 Worker 可见", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const runId = await enqueueSingle("available-at");
   const availableAt = tick(10_000);
   await database.query(
@@ -1197,7 +1197,7 @@ await test("队列结果文件按稳定键幂等落盘", async () => {
 });
 
 await test("成功事务回滚只补偿业务成品，Provider 原图证据保留", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const nodeId = `rollback-file-${++sequence}`;
   const evaluationPlan = { steps: [step(nodeId)] };
   const evaluationPolicy = await authorizeEvaluationPlan(evaluationPlan, {
@@ -1317,7 +1317,7 @@ await test("确认临时的 503 连续两次失败后第三次成功且请求数
     if (call <= 2) {
       throw new ProviderError("AI 服务暂时不可用，请稍后重试", 503, "stub", "gateway_unavailable");
     }
-    return { images: [PNG_DATA_URL], model: "gpt-image-2-vip" };
+    return { images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" };
   });
   const runId = await enqueueSingle("temporary-503");
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -1574,7 +1574,7 @@ await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放
 await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前阻断", async () => {
   const nodeId = `partial-unknown-${++sequence}`;
   const fake = resolver(() => ({
-    images: [PNG_DATA_URL], model: "gpt-image-2-vip", providerOutputSizes: ["2048x2048"],
+    images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip", providerOutputSizes: ["2048x2048"],
   }));
   const plan: ExecutionPlan = {
     steps: [{
@@ -1640,7 +1640,7 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
   };
   const fake = resolver((request) => ({
     images: Array.from({ length: Number(request.batchSize) || 1 }, () => PNG_DATA_URL),
-    model: "gpt-image-2-vip",
+    model: "gpt-image-2.5-flare-vip",
   }));
   const run = await queue.enqueueGenerationRun(plan, owner.id, {
     userId: owner.id,
@@ -1764,7 +1764,7 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   await database.query("UPDATE generation_runs SET status = 'running' WHERE id = $1", [safeRunId]);
   assert.equal(await queue.recoverExpiredGenerationJobs(expiredAt), 1);
   assert.equal((await runRow(safeRunId))?.status, "queued");
-  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2-vip" }));
+  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
   const safeNow = tick();
   assert.equal(await queue.processNextGenerationJob("worker-recovered", {
     resolveProvider: safeFake.resolveProvider, now: () => safeNow, random: () => 0,
@@ -2041,7 +2041,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientRequestId: "direct-mask-request",
-        modelId: "gpt-image-2",
+        modelId: "gpt-image-2.5-sunburst",
         kind: "mask-redraw",
         nodeId: "direct-mask-test",
         request: {
@@ -2089,7 +2089,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientRequestId: "direct-mask-over-limit",
-        modelId: "gpt-image-2",
+        modelId: "gpt-image-2.5-sunburst",
         kind: "mask-redraw",
         nodeId: "direct-mask-over-limit",
         request: {

@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { Router, type RequestHandler } from "express";
 import {
   IMAGE_MODEL_IDS,
+  MASK_REDRAW_MODEL_ID,
   getImageModelContract,
   isImageModelId,
   modelMaximumImagesPerRequest,
@@ -77,10 +78,16 @@ const getDiagnostics = asyncHandler(async (_req, res) => {
 
 function diagnosticModelOptions(modelId: ImageModelId): ImageModelOptions {
   switch (modelId) {
-    case "gpt-image-2":
+    case "gpt-image-2.5-sunburst":
+    case "gpt-image-2.5-all":
       return {};
-    case "gpt-image-2-vip":
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip":
       return { size: "1280x1280" };
+    case "gemini-3-pro-image-preview":
+      return { aspectRatio: "1:1", imageSize: "1K" };
+    case "gemini-3.1-flash-lite-image":
+      return { aspectRatio: "1:1", imageSize: "1K" };
     case "gemini-3.1-flash-image":
       return { aspectRatio: "1:1", imageSize: "512" };
     case "flux-2-pro":
@@ -142,9 +149,9 @@ const probeDiagnostics = asyncHandler(async (req, res) => {
           const images = await diagnosticImages();
           return provider.edit({
             prompt: "保持画面为纯白色方形色卡，不添加文字",
-            operationMode: providerId === "gpt-image-2" ? "mask-edit" : "edit",
+            operationMode: providerId === MASK_REDRAW_MODEL_ID ? "mask-edit" : "edit",
             referenceImages: [images.source],
-            mask: providerId === "gpt-image-2" ? images.mask : undefined,
+            mask: providerId === MASK_REDRAW_MODEL_ID ? images.mask : undefined,
             batchSize: 1,
             aspectRatio: "1:1",
             modelOptions,

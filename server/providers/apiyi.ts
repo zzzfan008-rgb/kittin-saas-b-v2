@@ -6,6 +6,7 @@ import {
   type ImageOperationMode,
 } from "../../src/types/workflow";
 import {
+  MASK_REDRAW_MODEL_ID,
   defaultImageModelOptions,
   getImageModelContract,
   imageModelOptionsErrorForOperation,
@@ -416,11 +417,11 @@ export async function validateApiyiRequest(
   if (mode !== req.operationMode) {
     throw new ProviderError("显式 operationMode 与 Provider 调用方法不一致", 400, modelId, "invalid_request");
   }
-  if (req.operationMode === "mask-edit" && modelId !== "gpt-image-2") {
+  if (req.operationMode === "mask-edit" && modelId !== MASK_REDRAW_MODEL_ID) {
     throw new ProviderError(`${modelId} 不支持 mask-edit 模式`, 400, modelId, "invalid_request");
   }
-  if (modelId === "gpt-image-2" && req.operationMode !== "mask-edit") {
-    throw new ProviderError("gpt-image-2 首版仅支持 mask-edit 模式", 400, modelId, "invalid_request");
+  if (modelId === MASK_REDRAW_MODEL_ID && req.operationMode !== "mask-edit") {
+    throw new ProviderError("gpt-image-2.5-sunburst 首版仅支持 mask-edit 模式", 400, modelId, "invalid_request");
   }
   requestOptions(modelId, req);
   const refs = referenceData(req, modelId);
@@ -431,9 +432,9 @@ export async function validateApiyiRequest(
     throw new ProviderError("文生图请求不能包含参考图", 400, modelId, "invalid_request");
   }
   refs.forEach((ref) => parsedReference(ref, modelId));
-  if (modelId === "gpt-image-2") {
+  if (modelId === MASK_REDRAW_MODEL_ID) {
     if (mode !== "mask-edit" || !req.mask) {
-      throw new ProviderError("gpt-image-2 仅用于带 PNG 蒙版的局部修改", 400, modelId, "invalid_request");
+      throw new ProviderError("gpt-image-2.5-sunburst 仅用于带 PNG 蒙版的局部修改", 400, modelId, "invalid_request");
     }
     await validateMaskForSource(refs[0], req.mask, modelId);
   } else if (req.mask) {
@@ -451,18 +452,34 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
   const options = requestOptions(modelId, req);
   let response: Response;
   switch (modelId) {
-    case "gpt-image-2":
-      throw new ProviderError("gpt-image-2 只能由局部修改节点调用", 400, modelId, "invalid_request");
-    case "gpt-image-2-vip":
+    case "gpt-image-2.5-sunburst":
+      throw new ProviderError("gpt-image-2.5-sunburst 只能由局部修改节点调用", 400, modelId, "invalid_request");
+    case "gpt-image-2.5-all":
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
-        body: JSON.stringify({ model: upstreamModelId(modelId), prompt: req.prompt, size: options.size }),
+        body: JSON.stringify({ model: upstreamModelId(modelId), prompt: req.prompt }),
       }));
       return parseApiyiImageResult(response, async () => ({
         images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
         model: modelId,
       }));
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip":
+      response = await fetchApiyi(modelId, contract.generation.path, () => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+        body: JSON.stringify({
+          model: upstreamModelId(modelId), prompt: req.prompt, size: options.size,
+          quality: options.quality ?? "high",
+        }),
+      }));
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
+        model: modelId,
+      }));
+    case "gemini-3-pro-image-preview":
+    case "gemini-3.1-flash-lite-image":
     case "gemini-3.1-flash-image":
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
@@ -522,12 +539,13 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
   const refs = referenceData(req, modelId);
   let response: Response;
   switch (modelId) {
-    case "gpt-image-2": {
+    case "gpt-image-2.5-sunburst": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
         const form = new FormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
         if (options.size) form.append("size", String(options.size));
+        form.append("quality", String(options.quality ?? "medium"));
         appendImages(form, refs, modelId);
         const mask = parseDataUrl(req.mask!);
         form.append("mask", new Blob([new Uint8Array(mask.buffer)], { type: "image/png" }), "mask.png");
@@ -540,12 +558,11 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         model: modelId,
       }));
     }
-    case "gpt-image-2-vip": {
+    case "gpt-image-2.5-all": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
         const form = new FormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
-        form.append("size", String(options.size));
         appendImages(form, refs, modelId);
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
       });
@@ -554,6 +571,24 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         model: modelId,
       }));
     }
+    case "gpt-image-2.5-sunburst-vip":
+    case "gpt-image-2.5-flare-vip": {
+      response = await fetchApiyi(modelId, contract.edit.path, () => {
+        const form = new FormData();
+        form.append("model", upstreamModelId(modelId));
+        form.append("prompt", req.prompt);
+        form.append("size", String(options.size));
+        form.append("quality", String(options.quality ?? "high"));
+        appendImages(form, refs, modelId);
+        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
+      });
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
+        model: modelId,
+      }));
+    }
+    case "gemini-3-pro-image-preview":
+    case "gemini-3.1-flash-lite-image":
     case "gemini-3.1-flash-image": {
       const parts = [{ text: req.prompt }, ...await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)))];
       response = await fetchApiyi(modelId, contract.edit.path, () => ({
@@ -621,7 +656,8 @@ export function createApiyiProvider(modelId: ImageModelId): AIProvider {
 
 export const apiyiProviders = Object.fromEntries(
   ([
-    "gpt-image-2", "gpt-image-2-vip", "gemini-3.1-flash-image",
-    "flux-2-pro", "seedream-5-0-260128",
+    "gpt-image-2.5-sunburst", "gpt-image-2.5-all", "gpt-image-2.5-sunburst-vip",
+    "gpt-image-2.5-flare-vip", "gemini-3-pro-image-preview", "gemini-3.1-flash-lite-image",
+    "gemini-3.1-flash-image", "flux-2-pro", "seedream-5-0-260128",
   ] as const).map((modelId) => [modelId, createApiyiProvider(modelId)]),
 ) as Record<ImageModelId, AIProvider>;

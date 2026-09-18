@@ -79,7 +79,7 @@ export const GARMENT_PROMPT_PRESETS: readonly GarmentPromptPreset[] = [
 ] as const;
 
 const STANDARD_MODEL_IDS = [
-  "gpt-image-2-vip",
+  "gpt-image-2.5-flare-vip",
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
@@ -89,7 +89,7 @@ type StandardPromptSet = Record<GarmentPromptPresetId, Record<"generate" | "edit
 
 /** 每个叶子都是完整可发送提示词；这里不存在跨模型 base prompt。 */
 const MODEL_PROMPTS: Record<StandardModelId, StandardPromptSet> = {
-  "gpt-image-2-vip": {
+  "gpt-image-2.5-flare-vip": {
     "fashion-lookbook": {
       generate: `GPT Image 2 VIP 写实穿搭生成。创建单人全身 3:4 品牌 Lookbook：平视机位、中远景、约 50mm 视角，人物完整入镜、主体居中并留呼吸空间；动作自然，可有轻微行走或衣摆运动，但不得摆拍僵硬。
 精确呈现指定服装的版型、颜色、分割线、图案、缝线、褶皱、垂坠与真实面料；柔和自然光，克制中性背景，真实肤质和可信的小瑕疵。
@@ -221,18 +221,18 @@ function makeStandardVariants(): PromptVariant[] {
 }
 
 const GPT_IMAGE_2_MASK_VARIANT: PromptVariant = {
-  variantId: "mask-local-edit.gpt-image-2.mask-edit.v1",
+  variantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "mask-redraw",
   mode: "mask-edit",
   promptLocale: "zh-CN",
   fullPrompt: `GPT Image 2 服装局部修改。仅编辑 Alpha PNG 蒙版标记的可编辑区域，执行指定的局部替换、改款或清除；先移除旧物件边缘、阴影和残影，再生成新结构。
 新内容与相邻服装的版型、面料、缝线、图案、光线、透视和褶皱自然融合，蒙版边界不出现光晕、硬边、重影或纹理断裂。
 输出与源图同尺寸、同画幅和同构图。蒙版之外的像素是受保护的非目标区域：人物身份、脸部、发型、肤色、身材、姿势、未选中服装、配饰、背景和画幅完全不变；不扩大语义修改目标，不新增装饰、文字、Logo 或水印。`,
-  parameterProfileId: "gpt-image-2:mask-local-edit:mask-edit:v1",
+  parameterProfileId: "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
   supportStatus: "unverified",
-  contractHash: imageModelContractHash("gpt-image-2"),
+  contractHash: imageModelContractHash("gpt-image-2.5-sunburst"),
   evaluationVersion: EVALUATION_VERSION,
   statusReason: UNVERIFIED_REASON,
 };

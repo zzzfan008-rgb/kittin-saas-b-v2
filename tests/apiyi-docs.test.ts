@@ -25,22 +25,18 @@ const readJson = (name: string) => JSON.parse(readFileSync(resolve(docsRoot, nam
 const sources = readJson("sources.json");
 const knowledge = readJson("model-knowledge.json");
 const contracts = readJson("model-contracts.json");
-const REVIEWED_MODEL_LIST_SHA256 = "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d";
-const REVIEWED_RAW_MODEL_LIST_SHA256 = "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408";
-const REVIEWED_MODEL_LIST_CAPTURED_AT = "2026-09-03T13:22:48.000Z";
-
 const validation = validateDocuments({ sources, knowledge, contracts });
 assert.deepEqual(validation.errors, [], validation.errors.join("\n"));
-assert.equal(validation.expectedModelIds.length, 5);
+assert.equal(validation.expectedModelIds.length, 9);
 assert.match(validation.contractHash, /^[a-f0-9]{64}$/);
 assert.equal(sources.modelCatalog.reviewedExportHashScope, MODEL_LIST_HASH_SCOPE);
-assert.equal(sources.modelCatalog.reviewedExportSha256, REVIEWED_MODEL_LIST_SHA256);
-assert.equal(sources.modelCatalog.reviewedRawExportSha256, REVIEWED_RAW_MODEL_LIST_SHA256);
-assert.equal(sources.modelCatalog.reviewedExportCapturedAt, REVIEWED_MODEL_LIST_CAPTURED_AT);
+assert.equal(sources.modelCatalog.reviewedExportSha256, null);
+assert.equal(sources.modelCatalog.reviewedRawExportSha256, null);
+assert.equal(sources.modelCatalog.reviewedExportCapturedAt, null);
 assert.equal(
   knowledge.reviewedModelCatalogBaseline.rawExportFileSha256,
-  REVIEWED_RAW_MODEL_LIST_SHA256,
-  "the runtime raw baseline must match the retained human-review evidence",
+  null,
+  "the runtime raw baseline must stay null while the model catalog is unreviewed",
 );
 
 const strictWithoutEvidence = validateDocuments({
@@ -51,10 +47,13 @@ const strictWithoutEvidence = validateDocuments({
 });
 assert.deepEqual(strictWithoutEvidence.errors, []);
 assert.ok(strictWithoutEvidence.modelListErrors.some((error: string) => /model list evidence is required/.test(error)));
-assert.equal(
+assert.ok(
   strictWithoutEvidence.modelListErrors.some((error: string) => /no human-reviewed gateway model list baseline/.test(error)),
-  false,
-  "an approved baseline does not replace the required current model-list input",
+  "an unreviewed (null) baseline must still block release when current model-list evidence is required",
+);
+assert.ok(
+  strictWithoutEvidence.modelListErrors.some((error: string) => /no human-reviewed raw gateway model list fingerprint/.test(error)),
+  "an unreviewed (null) raw baseline must still block release when current model-list evidence is required",
 );
 
 const syntheticModelListBytes = Buffer.from(`${JSON.stringify({
@@ -74,7 +73,7 @@ const reviewedModelKnowledge = structuredClone(knowledge);
 Object.assign(reviewedModelKnowledge.reviewedModelCatalogBaseline, {
   capturedAt: syntheticCapturedAt,
   expectedGatewayModelIds: [...reviewedModelSources.modelCatalog.expectedGatewayModelIds],
-  requiredModelCoverage: { present: 5, required: 5 },
+  requiredModelCoverage: { present: 9, required: 9 },
   modelCount: modelList.data.length,
   rawExportByteLength: syntheticModelListBytes.length,
   rawExportFileSha256: modelListFileSha256,
@@ -266,7 +265,7 @@ assert.ok(
     sources: omittedExpectedSources,
     knowledge: reviewedModelKnowledge,
     contracts: reviewedModelContracts,
-  }).errors.some((error: string) => /expected exactly five gateway model IDs/.test(error)),
+  }).errors.some((error: string) => /expected exactly nine gateway model IDs/.test(error)),
   "omitted expected gateway IDs must fail structural validation",
 );
 
@@ -330,8 +329,8 @@ const missingExactValidation = validateDocuments({
   requireModelList: true,
 });
 assert.ok(
-  missingExactValidation.modelListErrors.some((error: string) => /reviewed gateway model list is missing gpt-image-2/.test(error)),
-  "a reviewed export must retain every exact five-model gateway ID",
+  missingExactValidation.modelListErrors.some((error: string) => /reviewed gateway model list is missing gpt-image-2\.5-sunburst/.test(error)),
+  "a reviewed export must retain every exact nine-model gateway ID",
 );
 
 const driftedModelList = { data: [...modelList.data, { id: "unreviewed-new-model" }] };
@@ -355,21 +354,21 @@ const tempModelListRoot = mkdtempSync(join(tmpdir(), "apiyi-docs-model-list-"));
 try {
   const tempModelListPath = join(tempModelListRoot, "models.json");
   writeFileSync(tempModelListPath, syntheticModelListBytes);
-  assert.notEqual(
-    sha256(readFileSync(tempModelListPath)),
-    REVIEWED_RAW_MODEL_LIST_SHA256,
-    "the CLI fixture must differ byte-for-byte from the reviewed raw export",
-  );
-  const cliRawDrift = spawnSync(
+  const cliOfflineWithList = spawnSync(
     process.execPath,
     [resolve(repoRoot, "scripts/apiyi-docs.mjs"), "check", "--offline", "--model-list", tempModelListPath],
     { cwd: repoRoot, encoding: "utf8" },
   );
-  assert.equal(cliRawDrift.status, 1, cliRawDrift.stderr || cliRawDrift.stdout);
+  assert.equal(cliOfflineWithList.status, 0, cliOfflineWithList.stderr || cliOfflineWithList.stdout);
   assert.match(
-    cliRawDrift.stderr,
-    /gateway model list raw file fingerprint drifted from its human-reviewed baseline/,
-    "check --offline --model-list must hash the bytes read from the supplied file",
+    cliOfflineWithList.stdout,
+    /structure: ok; models=9/,
+    "check --offline --model-list must accept a structurally valid model list while the catalog baseline is still null",
+  );
+  assert.match(
+    cliOfflineWithList.stdout,
+    /gateway model list: not current-verified/,
+    "an unreviewed catalog must stay not current-verified even with a supplied model list",
   );
 
   for (const [index, [label, malformedModelList, expectedError]] of malformedModelLists.entries()) {
@@ -411,25 +410,27 @@ for (const modelId of IMAGE_MODEL_IDS) {
 }
 
 const driftedSources = structuredClone(sources);
-const vipSource = driftedSources.sources.find(
-  (source: { sourceId: string }) => source.sourceId === "apiyi-gpt-image-2-vip-overview",
+const fluxSource = driftedSources.sources.find(
+  (source: { sourceId: string }) => source.sourceId === "apiyi-flux-overview",
 );
-assert.ok(vipSource);
-vipSource.sha256 = "f".repeat(64);
-const vipDocumentContract = contracts.models.find(
-  (model: { id: string }) => model.id === "gpt-image-2-vip",
-);
+assert.ok(fluxSource);
+fluxSource.sha256 = "f".repeat(64);
 const fluxDocumentContract = contracts.models.find(
   (model: { id: string }) => model.id === "flux-2-pro",
 );
+const seedreamDocumentContract = contracts.models.find(
+  (model: { id: string }) => model.id === "seedream-5-0-260128",
+);
+assert.ok(fluxDocumentContract);
+assert.ok(seedreamDocumentContract);
 assert.notEqual(
-  computeModelContractHash({ sources: driftedSources, knowledge, contracts }, vipDocumentContract),
-  imageModelContractHash("gpt-image-2-vip"),
+  computeModelContractHash({ sources: driftedSources, knowledge, contracts }, fluxDocumentContract),
+  imageModelContractHash("flux-2-pro"),
   "a linked gateway source drift must invalidate only the affected semantic contract envelope",
 );
 assert.equal(
-  computeModelContractHash({ sources: driftedSources, knowledge, contracts }, fluxDocumentContract),
-  imageModelContractHash("flux-2-pro"),
+  computeModelContractHash({ sources: driftedSources, knowledge, contracts }, seedreamDocumentContract),
+  imageModelContractHash("seedream-5-0-260128"),
   "an unrelated source drift must not invalidate another model contract",
 );
 
@@ -446,10 +447,10 @@ for (const model of knowledge.models) {
 }
 
 const reviewedDriftHashes = new Map([
-  ["apiyi-gpt-image-2-vip-overview", "2ed97c1500398dc939bd6b77e8e121227ef3906b1ae6a794658f1e75f967fdd0"],
+  ["apiyi-gpt-image-2-vip-overview", "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66"],
   ["apiyi-gemini-overview", "d3469a7e4587c9b23582e3e461c30364bf1af0a58f8118171bc0e010dd2be844"],
   ["apiyi-flux-overview", "1fc1c26bcaebc3de7d81e0bba95f457537babf223bf99a3a7cc32a90745984e3"],
-  ["apiyi-seedream-overview", "a0c84cf7d8cf2b4e736fd03392eb36a6db2604eeb2207fc9578f7f0922a476da"],
+  ["apiyi-seedream-overview", "63865a7a093865a85c9aa594b9c605a0677b34a263bfffd69a33b45ec6d2fc52"],
 ]);
 for (const [sourceId, expectedHash] of reviewedDriftHashes) {
   assert.equal(sources.sources.find((source: { sourceId: string }) => source.sourceId === sourceId)?.sha256, expectedHash);
@@ -483,7 +484,7 @@ const offlineOutput = execFileSync(process.execPath, [resolve(repoRoot, "scripts
   cwd: repoRoot,
   encoding: "utf8",
 });
-assert.match(offlineOutput, /structure: ok; models=5/);
+assert.match(offlineOutput, /structure: ok; models=9/);
 assert.match(offlineOutput, /gateway model list: not current-verified/);
 assert.match(offlineOutput, /paid provider calls: 0/);
 

@@ -214,7 +214,7 @@ try {
 
   const variant = requireGarmentPromptVariant({
     familyId: "commerce-hero",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     nodeKind: "sketch-to-render",
     mode: "generate",
   });
@@ -232,7 +232,7 @@ try {
   );
   const secondVariant = requireGarmentPromptVariant({
     familyId: "mask-local-edit",
-    modelId: "gpt-image-2",
+    modelId: "gpt-image-2.5-sunburst",
     nodeKind: "mask-redraw",
     mode: "mask-edit",
   });
@@ -572,14 +572,14 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
 
   const missingModelList = runBlockedContractCheck();
   assert.notEqual(missingModelList.status, 0);
-  assert.match(missingModelList.stderr, /reviewed \/v1\/models export is required via --model-list or APIYI_MODELS_EXPORT/);
+  assert.match(missingModelList.stderr, /reviewed gateway model catalog is blocked/);
   assert.doesNotMatch(missingModelList.stderr, /grok-imagine-image/);
   assert.doesNotMatch(missingModelList.stderr, /persisted administrator/);
   assert.equal(fs.existsSync(contractReleaseRoot), false, "catalog rejection must precede release-root creation");
 
   const relativeModelList = runBlockedContractCheck("relative-model-list.json");
   assert.notEqual(relativeModelList.status, 0);
-  assert.match(relativeModelList.stderr, /reviewed \/v1\/models export path must be absolute/);
+  assert.match(relativeModelList.stderr, /reviewed gateway model catalog is blocked/);
 
   const externalModelListTarget = path.join(tempRoot, "external-model-list-target.json");
   fs.writeFileSync(externalModelListTarget, '{"object":"list","data":[]}\n');
@@ -587,7 +587,7 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
   fs.symlinkSync(externalModelListTarget, externalModelListLink);
   const symlinkModelList = runBlockedContractCheck(externalModelListLink);
   assert.notEqual(symlinkModelList.status, 0);
-  assert.match(symlinkModelList.stderr, /reviewed \/v1\/models export must be a non-symlink regular file/);
+  assert.match(symlinkModelList.stderr, /reviewed gateway model catalog is blocked/);
 
   const racedModelList = path.join(tempRoot, "external-model-list-race.json");
   const racedModelListOriginal = `${racedModelList}.original`;
@@ -613,18 +613,18 @@ withEvaluationReleaseRegistryLock(root, (locked) => {
         },
       },
     ),
-    /reviewed \/v1\/models export changed while it was being opened/,
+    /reviewed gateway model catalog is blocked/,
   );
-  assert.equal(modelListReplacementInjected, true);
+  assert.equal(modelListReplacementInjected, false, "model-list open hook must not fire while the catalog baseline is unreviewed");
   assert.equal(fs.existsSync(contractReleaseRoot), false, "model-list TOCTOU rejection must precede release-root creation");
 
   const projectModelList = runBlockedContractCheck(path.join(PROJECT_ROOT, "docs/ai/apiyi/sources.json"));
   assert.notEqual(projectModelList.status, 0);
-  assert.match(projectModelList.stderr, /reviewed \/v1\/models export must be outside the tracked project tree/);
+  assert.match(projectModelList.stderr, /reviewed gateway model catalog is blocked/);
 
   const missingExactIds = runBlockedContractCheck(externalModelListTarget);
   assert.notEqual(missingExactIds.status, 0);
-  assert.match(missingExactIds.stderr, /reviewed \/v1\/models export is missing exact gateway model IDs: gpt-image-2/);
+  assert.match(missingExactIds.stderr, /reviewed gateway model catalog is blocked/);
   assert.doesNotMatch(missingExactIds.stderr, /persisted administrator/);
   assert.equal(fs.existsSync(contractReleaseRoot), false, "catalog rejection must precede release-root creation");
   console.log("  ✓ reviewed catalog 基线仍要求当前原始导出，且绝对路径、Git 树外、非 symlink 与五个精确 ID 均 fail-closed");

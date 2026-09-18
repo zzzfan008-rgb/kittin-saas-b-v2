@@ -8,11 +8,15 @@
     "apiyi"
   ],
   "sourceContracts": {
-    "modelCatalogReviewedExportSha256": "43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d",
-    "modelCatalogReviewedRawExportSha256": "7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408",
+    "modelCatalogReviewedExportSha256": null,
+    "modelCatalogReviewedRawExportSha256": null,
     "modelContractIds": [
-      "gpt-image-2",
-      "gpt-image-2-vip",
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-all",
+      "gpt-image-2.5-sunburst-vip",
+      "gpt-image-2.5-flare-vip",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
       "flux-2-pro",
       "seedream-5-0-260128"
@@ -29,15 +33,19 @@
       "print-mutate"
     ],
     "modelIds": [
-      "gpt-image-2",
-      "gpt-image-2-vip",
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-all",
+      "gpt-image-2.5-sunburst-vip",
+      "gpt-image-2.5-flare-vip",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-flash-lite-image",
       "gemini-3.1-flash-image",
       "flux-2-pro",
       "seedream-5-0-260128"
     ],
-    "entryCount": 35,
+    "entryCount": 63,
     "supportedEntryCount": 9,
-    "unsupportedEntryCount": 26,
+    "unsupportedEntryCount": 54,
     "unsupportedNodesRemainFailClosed": true,
     "noProviderCallsPerformed": true,
     "imageGenerationOrEditCalls": 0
@@ -46,7 +54,7 @@
     {
       "nodeKind": "sketch-to-render",
       "nodeTitle": "草图→效果图",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "generate",
         "edit"
@@ -68,7 +76,51 @@
     {
       "nodeKind": "sketch-to-render",
       "nodeTitle": "草图→效果图",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gpt-image-2.5-flare-vip",
       "operationModes": [
         "generate",
         "edit"
@@ -79,13 +131,13 @@
       },
       "promptVariantId": null,
       "promptVariantIds": [
-        "fashion-lookbook.gpt-image-2-vip.generate.v1",
-        "commerce-hero.gpt-image-2-vip.generate.v1",
-        "design-sheet.gpt-image-2-vip.generate.v1"
+        "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+        "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
+        "design-sheet.gpt-image-2.5-flare-vip.generate.v1"
       ],
       "promptReview": [
         {
-          "promptVariantId": "fashion-lookbook.gpt-image-2-vip.generate.v1",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
           "familyId": "fashion-lookbook",
           "mode": "generate",
           "nodeKind": "sketch-to-render",
@@ -102,7 +154,7 @@
           ]
         },
         {
-          "promptVariantId": "commerce-hero.gpt-image-2-vip.generate.v1",
+          "promptVariantId": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
           "familyId": "commerce-hero",
           "mode": "generate",
           "nodeKind": "sketch-to-render",
@@ -119,7 +171,7 @@
           ]
         },
         {
-          "promptVariantId": "design-sheet.gpt-image-2-vip.generate.v1",
+          "promptVariantId": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
           "familyId": "design-sheet",
           "mode": "generate",
           "nodeKind": "sketch-to-render",
@@ -138,13 +190,13 @@
       ],
       "parameterProfileId": null,
       "parameterProfileIds": [
-        "gpt-image-2-vip:fashion-lookbook:generate:v1",
-        "gpt-image-2-vip:commerce-hero:generate:v1",
-        "gpt-image-2-vip:design-sheet:generate:v1"
+        "gpt-image-2.5-flare-vip:fashion-lookbook:generate:v1",
+        "gpt-image-2.5-flare-vip:commerce-hero:generate:v1",
+        "gpt-image-2.5-flare-vip:design-sheet:generate:v1"
       ],
       "parameterProfiles": [
         {
-          "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:generate:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:generate:v1",
           "familyId": "fashion-lookbook",
           "mode": "generate",
           "version": "1.0.0",
@@ -169,7 +221,7 @@
           }
         },
         {
-          "parameterProfileId": "gpt-image-2-vip:commerce-hero:generate:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:commerce-hero:generate:v1",
           "familyId": "commerce-hero",
           "mode": "generate",
           "version": "1.0.0",
@@ -194,7 +246,7 @@
           }
         },
         {
-          "parameterProfileId": "gpt-image-2-vip:design-sheet:generate:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:design-sheet:generate:v1",
           "familyId": "design-sheet",
           "mode": "generate",
           "version": "1.0.0",
@@ -227,7 +279,7 @@
             "path": "/v1/images/generations",
             "contentType": "application/json"
           },
-          "timeoutMs": 300000,
+          "timeoutMs": 150000,
           "requiredFields": [
             "model",
             "prompt",
@@ -263,7 +315,7 @@
             "path": "/v1/images/edits",
             "contentType": "multipart/form-data"
           },
-          "timeoutMs": 300000,
+          "timeoutMs": 150000,
           "requiredFields": [
             "model",
             "prompt",
@@ -295,6 +347,50 @@
         }
       ],
       "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "sketch-to-render",
+      "nodeTitle": "草图→效果图",
+      "modelId": "gemini-3.1-flash-lite-image",
+      "operationModes": [
+        "generate",
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
     },
     {
       "nodeKind": "sketch-to-render",
@@ -988,7 +1084,7 @@
     {
       "nodeKind": "ai-modify",
       "nodeTitle": "AI 改款",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "edit"
       ],
@@ -1009,7 +1105,49 @@
     {
       "nodeKind": "ai-modify",
       "nodeTitle": "AI 改款",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gpt-image-2.5-flare-vip",
       "operationModes": [
         "edit"
       ],
@@ -1019,13 +1157,13 @@
       },
       "promptVariantId": null,
       "promptVariantIds": [
-        "fashion-lookbook.gpt-image-2-vip.edit.v1",
-        "commerce-hero.gpt-image-2-vip.edit.v1",
-        "design-sheet.gpt-image-2-vip.edit.v1"
+        "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+        "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
+        "design-sheet.gpt-image-2.5-flare-vip.edit.v1"
       ],
       "promptReview": [
         {
-          "promptVariantId": "fashion-lookbook.gpt-image-2-vip.edit.v1",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
           "familyId": "fashion-lookbook",
           "mode": "edit",
           "nodeKind": "ai-modify",
@@ -1042,7 +1180,7 @@
           ]
         },
         {
-          "promptVariantId": "commerce-hero.gpt-image-2-vip.edit.v1",
+          "promptVariantId": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
           "familyId": "commerce-hero",
           "mode": "edit",
           "nodeKind": "ai-modify",
@@ -1059,7 +1197,7 @@
           ]
         },
         {
-          "promptVariantId": "design-sheet.gpt-image-2-vip.edit.v1",
+          "promptVariantId": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
           "familyId": "design-sheet",
           "mode": "edit",
           "nodeKind": "ai-modify",
@@ -1078,13 +1216,13 @@
       ],
       "parameterProfileId": null,
       "parameterProfileIds": [
-        "gpt-image-2-vip:fashion-lookbook:edit:v1",
-        "gpt-image-2-vip:commerce-hero:edit:v1",
-        "gpt-image-2-vip:design-sheet:edit:v1"
+        "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1",
+        "gpt-image-2.5-flare-vip:commerce-hero:edit:v1",
+        "gpt-image-2.5-flare-vip:design-sheet:edit:v1"
       ],
       "parameterProfiles": [
         {
-          "parameterProfileId": "gpt-image-2-vip:fashion-lookbook:edit:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1",
           "familyId": "fashion-lookbook",
           "mode": "edit",
           "version": "1.0.0",
@@ -1109,7 +1247,7 @@
           }
         },
         {
-          "parameterProfileId": "gpt-image-2-vip:commerce-hero:edit:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:commerce-hero:edit:v1",
           "familyId": "commerce-hero",
           "mode": "edit",
           "version": "1.0.0",
@@ -1134,7 +1272,7 @@
           }
         },
         {
-          "parameterProfileId": "gpt-image-2-vip:design-sheet:edit:v1",
+          "parameterProfileId": "gpt-image-2.5-flare-vip:design-sheet:edit:v1",
           "familyId": "design-sheet",
           "mode": "edit",
           "version": "1.0.0",
@@ -1167,7 +1305,7 @@
             "path": "/v1/images/edits",
             "contentType": "multipart/form-data"
           },
-          "timeoutMs": 300000,
+          "timeoutMs": 150000,
           "requiredFields": [
             "model",
             "prompt",
@@ -1199,6 +1337,48 @@
         }
       ],
       "failClosedReason": "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+    },
+    {
+      "nodeKind": "ai-modify",
+      "nodeTitle": "AI 改款",
+      "modelId": "gemini-3.1-flash-lite-image",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。"
     },
     {
       "nodeKind": "ai-modify",
@@ -1784,7 +1964,7 @@
     {
       "nodeKind": "mask-redraw",
       "nodeTitle": "局部修改",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "mask-edit"
       ],
@@ -1792,13 +1972,13 @@
       "productPolicy": {
         "status": "supported"
       },
-      "promptVariantId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+      "promptVariantId": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
       "promptVariantIds": [
-        "mask-local-edit.gpt-image-2.mask-edit.v1"
+        "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1"
       ],
       "promptReview": [
         {
-          "promptVariantId": "mask-local-edit.gpt-image-2.mask-edit.v1",
+          "promptVariantId": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
           "familyId": "mask-local-edit",
           "mode": "mask-edit",
           "nodeKind": "mask-redraw",
@@ -1815,13 +1995,13 @@
           ]
         }
       ],
-      "parameterProfileId": "gpt-image-2:mask-local-edit:mask-edit:v1",
+      "parameterProfileId": "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
       "parameterProfileIds": [
-        "gpt-image-2:mask-local-edit:mask-edit:v1"
+        "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1"
       ],
       "parameterProfiles": [
         {
-          "parameterProfileId": "gpt-image-2:mask-local-edit:mask-edit:v1",
+          "parameterProfileId": "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
           "familyId": "mask-local-edit",
           "mode": "mask-edit",
           "version": "1.0.0",
@@ -1887,7 +2067,91 @@
     {
       "nodeKind": "mask-redraw",
       "nodeTitle": "局部修改",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gpt-image-2.5-flare-vip",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "mask-edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+    },
+    {
+      "nodeKind": "mask-redraw",
+      "nodeTitle": "局部修改",
+      "modelId": "gemini-3.1-flash-lite-image",
       "operationModes": [
         "mask-edit"
       ],
@@ -1971,7 +2235,7 @@
     {
       "nodeKind": "fabric-recolor",
       "nodeTitle": "面料/配色替换",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "edit"
       ],
@@ -1992,7 +2256,91 @@
     {
       "nodeKind": "fabric-recolor",
       "nodeTitle": "面料/配色替换",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gpt-image-2.5-flare-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "fabric-recolor",
+      "nodeTitle": "面料/配色替换",
+      "modelId": "gemini-3.1-flash-lite-image",
       "operationModes": [
         "edit"
       ],
@@ -2076,7 +2424,7 @@
     {
       "nodeKind": "upscale",
       "nodeTitle": "高清放大",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "edit"
       ],
@@ -2097,7 +2445,91 @@
     {
       "nodeKind": "upscale",
       "nodeTitle": "高清放大",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gpt-image-2.5-flare-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "upscale",
+      "nodeTitle": "高清放大",
+      "modelId": "gemini-3.1-flash-lite-image",
       "operationModes": [
         "edit"
       ],
@@ -2181,7 +2613,7 @@
     {
       "nodeKind": "print-extract",
       "nodeTitle": "印花提取",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "edit"
       ],
@@ -2202,7 +2634,91 @@
     {
       "nodeKind": "print-extract",
       "nodeTitle": "印花提取",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gpt-image-2.5-flare-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-extract",
+      "nodeTitle": "印花提取",
+      "modelId": "gemini-3.1-flash-lite-image",
       "operationModes": [
         "edit"
       ],
@@ -2286,7 +2802,7 @@
     {
       "nodeKind": "print-mutate",
       "nodeTitle": "印花裂变",
-      "modelId": "gpt-image-2",
+      "modelId": "gpt-image-2.5-sunburst",
       "operationModes": [
         "edit"
       ],
@@ -2307,7 +2823,91 @@
     {
       "nodeKind": "print-mutate",
       "nodeTitle": "印花裂变",
-      "modelId": "gpt-image-2-vip",
+      "modelId": "gpt-image-2.5-all",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gpt-image-2.5-sunburst-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gpt-image-2.5-flare-vip",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gemini-3-pro-image-preview",
+      "operationModes": [
+        "edit"
+      ],
+      "supportStatus": "unsupported",
+      "productPolicy": {
+        "status": "unsupported",
+        "reason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+      },
+      "promptVariantId": null,
+      "promptVariantIds": [],
+      "promptReview": [],
+      "parameterProfileId": null,
+      "parameterProfileIds": [],
+      "parameterProfiles": [],
+      "providerRequests": [],
+      "failClosedReason": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。"
+    },
+    {
+      "nodeKind": "print-mutate",
+      "nodeTitle": "印花裂变",
+      "modelId": "gemini-3.1-flash-lite-image",
       "operationModes": [
         "edit"
       ],

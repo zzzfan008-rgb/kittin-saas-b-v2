@@ -199,7 +199,7 @@ export interface MaskRedrawNodeData extends BaseNodeData, Pick<ModelSelectableNo
   kind: "mask-redraw";
   operationMode: "mask-edit";
   operationModeNeedsConfirmation?: false;
-  modelId: "gpt-image-2";
+  modelId: "gpt-image-2.5-sunburst";
   modelOptions: ImageModelOptions;
   prompt: string;
   mask?: string;

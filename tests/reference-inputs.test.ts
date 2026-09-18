@@ -102,7 +102,7 @@ assert.match(
 {
   const promptA = renderProviderPrompt({
     nodeKind: "ai-modify",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}, {}],
@@ -111,14 +111,14 @@ assert.match(
   assert.equal(
     promptA,
     "换装\n参考图:参考图1、参考图2、参考图3",
-    "gpt-image-2-vip edit 3 张参考图渲染结果",
+    "gpt-image-2.5-flare-vip edit 3 张参考图渲染结果",
   );
 }
 
 {
   const promptB = renderProviderPrompt({
     nodeKind: "ai-modify",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}],
@@ -127,7 +127,7 @@ assert.match(
   assert.equal(
     promptB,
     "换装\n参考图:参考图1、参考图2",
-    "gpt-image-2-vip edit 2 张参考图渲染结果",
+    "gpt-image-2.5-flare-vip edit 2 张参考图渲染结果",
   );
 }
 
@@ -135,7 +135,7 @@ assert.match(
 {
   const rendered = renderProviderPrompt({
     nodeKind: "ai-modify",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}, {}],
@@ -143,7 +143,7 @@ assert.match(
   assert.equal(
     rendered,
     "换装\n参考图:参考图1、参考图2、参考图3",
-    "改后 gpt-image-2-vip edit 3 张参考图提示词实例",
+    "改后 gpt-image-2.5-flare-vip edit 3 张参考图提示词实例",
   );
   assert.ok(!rendered.includes("职责"), "改后提示词不得包含职责");
   assert.ok(!rendered.includes("禁止影响"), "改后提示词不得包含禁止影响");
@@ -153,7 +153,7 @@ assert.match(
 // ---- mask-redraw 渲染 ----
 const renderedMaskPrompt = renderProviderPrompt({
   nodeKind: "mask-redraw",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   operationMode: "mask-edit",
   taskPrompt: "将袖口改成银色拉链",
   references: [{}],
@@ -183,20 +183,24 @@ assert.deepEqual(
     [modelId, Object.keys(intros)]
   ))),
   {
-    "gpt-image-2": ["mask-edit"],
-    "gpt-image-2-vip": ["generate", "edit"],
+    "gpt-image-2.5-sunburst": ["mask-edit"],
+    "gpt-image-2.5-all": ["generate", "edit"],
+    "gpt-image-2.5-sunburst-vip": ["generate", "edit"],
+    "gpt-image-2.5-flare-vip": ["generate", "edit"],
+    "gemini-3-pro-image-preview": ["generate", "edit"],
+    "gemini-3.1-flash-lite-image": ["generate", "edit"],
     "gemini-3.1-flash-image": ["generate", "edit"],
     "flux-2-pro": ["generate", "edit"],
     "seedream-5-0-260128": ["generate", "edit"],
   },
-  "发布 hash material 必须覆盖五模型的全部显式合法模式 intro",
+  "发布 hash material 必须覆盖全部模型的显式合法模式 intro",
 );
 
 // ---- 空提示词必须抛错 ----
 for (const [modelId, operationMode] of [
-  ["gpt-image-2", "mask-edit"],
-  ["gpt-image-2-vip", "generate"],
-  ["gpt-image-2-vip", "edit"],
+  ["gpt-image-2.5-sunburst", "mask-edit"],
+  ["gpt-image-2.5-flare-vip", "generate"],
+  ["gpt-image-2.5-flare-vip", "edit"],
   ["gemini-3.1-flash-image", "generate"],
   ["gemini-3.1-flash-image", "edit"],
   ["flux-2-pro", "generate"],

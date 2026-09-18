@@ -27,7 +27,7 @@ const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport
 
 const storageGenerateVariant = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });
@@ -700,9 +700,9 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   const processNow = Date.now() + 10_000;
   const successProvider = {
-    id: "gpt-image-2-vip",
-    async generate() { return { images: [pngDataUrl], model: "gpt-image-2-vip" }; },
-    async edit() { return { images: [pngDataUrl], model: "gpt-image-2-vip" }; },
+    id: "gpt-image-2.5-flare-vip",
+    async generate() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare-vip" }; },
+    async edit() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare-vip" }; },
   };
   const successNodeId = "usage-success-node";
   const successRun = await enqueueGenerationRun(
@@ -731,7 +731,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
   }), true);
 
   const failureProvider = {
-    id: "gpt-image-2-vip",
+    id: "gpt-image-2.5-flare-vip",
     async generate() { throw new Error("timeout"); },
     async edit() { throw new Error("timeout"); },
   };

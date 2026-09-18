@@ -157,11 +157,11 @@ export function effectivePromptSupport(
 }
 
 function unsupportedReason(query: PromptVariantQuery): string {
-  if (query.modelId === "gpt-image-2") {
-    return "GPT Image 2 首版产品策略仅允许蒙版局部修改（mask-local-edit × mask-redraw × mask-edit）。";
+  if (query.modelId === "gpt-image-2.5-sunburst") {
+    return "GPT Image 2.5 Sunburst 首版产品策略仅允许蒙版局部修改（mask-local-edit × mask-redraw × mask-edit）。";
   }
   if (query.mode === "mask-edit" || query.nodeKind === "mask-redraw") {
-    return "局部蒙版专轨当前只支持 GPT Image 2。";
+    return "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst。";
   }
   return "该任务族×模型×节点×操作模式没有独立变体；系统不会回退到通用模板。";
 }

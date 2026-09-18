@@ -228,7 +228,7 @@ const maskLocal = tab({
       kind: "mask-redraw",
       label: "局部重绘",
       status: "idle",
-      modelId: "gpt-image-2",
+      modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
       operationMode: "mask-edit",
       operationModeNeedsConfirmation: false,

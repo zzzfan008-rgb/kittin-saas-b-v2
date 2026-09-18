@@ -7,6 +7,7 @@ import {
   compositeMaskedEdit,
   maskGenerationDimensions,
   prepareMaskForGeneration,
+  resolveMaskFeatherRadius,
 } from "../server/lib/maskProcessing";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -307,6 +308,26 @@ await test("节点只展示统一局部修改说明，不再暴露技术处理�
   assert.match(sourceCode, /整幅服装自动延展并融合/);
   assert.doesNotMatch(sourceCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
   assert.doesNotMatch(processingCode, /preserveGeneratedLayer|opaqueGeneratedLayer|MaskCompositeMode/);
+});
+
+await test("羽化宽度参数夹取与自适应回退", () => {
+  assert.equal(resolveMaskFeatherRadius(undefined), undefined);
+  assert.equal(resolveMaskFeatherRadius("12" as unknown), undefined);
+  assert.equal(resolveMaskFeatherRadius(Number.NaN), undefined);
+  assert.equal(resolveMaskFeatherRadius(0), 0);
+  assert.equal(resolveMaskFeatherRadius(-3), 0);
+  assert.equal(resolveMaskFeatherRadius(12.6), 13);
+  assert.equal(resolveMaskFeatherRadius(1000), 64);
+});
+
+await test("羽化宽度 0（硬边）与 64（软边）产生不同合成结果", async () => {
+  const generatedBuffer = await sharp({
+    create: { width, height, channels: 3, background: { r: 225, g: 42, b: 48 } },
+  }).png().toBuffer();
+  const generatedUrl = `data:image/png;base64,${generatedBuffer.toString("base64")}`;
+  const hard = await compositeMaskedEdit(source, mask, generatedUrl, { featherRadius: 0 });
+  const soft = await compositeMaskedEdit(source, mask, generatedUrl, { featherRadius: 64 });
+  assert.notDeepEqual(Buffer.from(hard.split(",")[1], "base64"), Buffer.from(soft.split(",")[1], "base64"));
 });
 
 console.log(`\n${passed} 项蒙版合成测试全部通过`);

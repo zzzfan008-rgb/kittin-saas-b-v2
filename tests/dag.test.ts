@@ -14,6 +14,7 @@ import sharp from "sharp";
 import { assertPlanInputs, buildExecutionPlan, DagError, type FlowEdge, type FlowNode } from "../server/engine/dag";
 import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
 import { renderProviderPrompt } from "../src/lib/providerPromptRenderer";
+import { MASK_REDRAW_MODEL_ID } from "../src/types/imageModels";
 import type {
   AIProvider,
   ImageOperationMode,
@@ -117,7 +118,7 @@ function aiNode(
       batchSize: 1,
       operationMode,
       operationModeNeedsConfirmation: false,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
       outputImages,
     } as WorkflowNodeData as FlowNode["data"],
@@ -176,7 +177,7 @@ async function runRecordedAiStep(
     kind,
     inputImages,
     inputReferences: referenceSources,
-    params: { modelId: "gpt-image-2-vip", ...params },
+    params: { modelId: "gpt-image-2.5-flare-vip", ...params },
   };
   const result = await executeStep(step, inputImages, (providerId) => {
     providerIds.push(providerId);
@@ -240,7 +241,7 @@ async function main() {
         outputImages: [],
         operationMode: "mask-edit",
         operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2",
+        modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: {},
       },
     });
@@ -250,6 +251,30 @@ async function main() {
     assert.equal(replaceStep.params.maskPipelineVersion, 3);
     assert.equal(legacyStep.params.maskMode, undefined);
     assert.equal(replaceStep.params.maskMode, undefined);
+  });
+
+  await ok("蒙版羽化宽度透传到执行参数，缺省回退自适应", () => {
+    const maskNode = (featherRadius?: number): FlowNode => ({
+      id: "mask-feather",
+      type: "mask-redraw",
+      data: {
+        kind: "mask-redraw",
+        label: "蒙版重绘",
+        status: "idle",
+        prompt: "替换胸前图案",
+        mask: MASK_DATA_URL,
+        maskSourceRef: MASK_SOURCE_DATA_URL,
+        outputImages: [],
+        operationMode: "mask-edit",
+        operationModeNeedsConfirmation: false,
+        modelId: MASK_REDRAW_MODEL_ID,
+        modelOptions: {},
+        ...(featherRadius !== undefined ? { featherRadius } : {}),
+      },
+    });
+    assert.equal(buildExecutionPlan([maskNode(24)], []).steps[0].params.featherRadius, 24);
+    assert.equal(buildExecutionPlan([maskNode(0)], []).steps[0].params.featherRadius, 0);
+    assert.equal(buildExecutionPlan([maskNode()], []).steps[0].params.featherRadius, undefined);
   });
 
   await ok("风格迁移：双参考图按人物、场景的连线顺序传入", () => {
@@ -398,7 +423,7 @@ async function main() {
         outputImages: [],
         operationMode: "mask-edit",
         operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2",
+        modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: {},
       } as WorkflowNodeData as FlowNode["data"],
     };
@@ -475,7 +500,7 @@ async function main() {
         prompt: "",
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelOptions: { size: "auto" },
         outputImages: [],
       },
@@ -506,7 +531,7 @@ async function main() {
         prompt: "",
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelOptions: { size: "auto" },
         outputImages: [],
       },
@@ -529,11 +554,11 @@ async function main() {
   });
 
   await ok("DAG 对 modelOptions 原样严格校验，不静默删除跨模型或运行时字段", () => {
-    const vipQuality = aiNode("vip-quality", "ai-modify", "edit");
-    vipQuality.data.modelOptions = { size: "2048x2048", quality: "high" } as never;
+    const vipAspectField = aiNode("vip-aspect-field", "ai-modify", "edit");
+    vipAspectField.data.modelOptions = { size: "2048x2048", aspectRatio: "3:4" } as never;
     assert.throws(
-      () => buildExecutionPlan([vipQuality], []),
-      /quality/,
+      () => buildExecutionPlan([vipAspectField], []),
+      /aspectRatio/,
     );
 
     const vipGeminiField = aiNode("vip-gemini-field", "ai-modify", "edit");
@@ -556,7 +581,7 @@ async function main() {
         outputImages: [],
         operationMode: "mask-edit",
         operationModeNeedsConfirmation: false,
-        modelId: "gpt-image-2",
+        modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: { size: "816x816" },
       },
     } as unknown as FlowNode;
@@ -573,14 +598,14 @@ async function main() {
       { prompt, aspectRatio: "3:4", batchSize: 2, operationMode: "edit" },
       [SEED_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.strictEqual(calls[0].request.operationMode, "edit");
     assert.deepStrictEqual(calls[0].request.referenceImages, [SEED_DATA_URL]);
     const expectedPrompt = renderProviderPrompt({
       nodeKind: "sketch-to-render",
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       operationMode: "edit",
       taskPrompt: prompt,
       references: [{}],
@@ -600,7 +625,7 @@ async function main() {
       { prompt, aspectRatio: "16:9", batchSize: 2, operationMode: "generate" },
       [],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "generate");
     assert.strictEqual(calls[0].request.operationMode, "generate");
@@ -618,7 +643,7 @@ async function main() {
       { prompt, aspectRatio: "1:1", batchSize: 4, operationMode: "edit" },
       [SEED_DATA_URL, SECOND_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.deepStrictEqual(calls[0].request.referenceImages, [SEED_DATA_URL, SECOND_DATA_URL]);
@@ -626,7 +651,7 @@ async function main() {
       calls[0].request.prompt,
       renderProviderPrompt({
         nodeKind: "ai-modify",
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         operationMode: "edit",
         taskPrompt: prompt,
         references: [{}, {}],
@@ -693,7 +718,7 @@ async function main() {
         sourceNodeId: "garment-source",
       }],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, colors.length);
     assert.ok(calls.every((call) => call.method === "edit"));
     assert.ok(calls.every((call) => call.request.batchSize === 1));
@@ -731,7 +756,7 @@ async function main() {
   await ok("runner 面料配色：损坏持久化顺序在图片解析和 Provider 前失败关闭", async () => {
     let providerCalls = 0;
     const provider: AIProvider = {
-      id: "gpt-image-2-vip",
+      id: "gpt-image-2.5-flare-vip",
       async generate() {
         providerCalls += 1;
         return { images: [SEED_DATA_URL], model: "runner-stub-model" };
@@ -753,7 +778,7 @@ async function main() {
         inputImages: ["/api/files/must-not-be-resolved.png"],
         inputReferences: damagedSources,
         params: {
-          modelId: "gpt-image-2-vip",
+          modelId: "gpt-image-2.5-flare-vip",
           operationMode: "edit",
           colors: ["#DE2910"],
           fabricImageUrl: SECOND_DATA_URL,
@@ -772,7 +797,7 @@ async function main() {
       { imageSize: "2K", operationMode: "edit" },
       [SEED_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.deepStrictEqual(calls[0].request.referenceImages, [SEED_DATA_URL]);
@@ -790,7 +815,7 @@ async function main() {
       { prompt: extra, operationMode: "edit" },
       [SEED_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.deepStrictEqual(calls[0].request.referenceImages, [SEED_DATA_URL]);
@@ -838,7 +863,7 @@ async function main() {
       { prompt: extra, count: 3, operationMode: "edit" },
       [SEED_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2-vip"]);
+    assert.deepStrictEqual(providerIds, ["gpt-image-2.5-flare-vip"]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.deepStrictEqual(calls[0].request.referenceImages, [SEED_DATA_URL]);
@@ -858,13 +883,13 @@ async function main() {
         operationMode: "mask-edit",
         mask: MASK_DATA_URL,
         maskSourceRef: MASK_SOURCE_DATA_URL,
-        modelId: "gpt-image-2",
+        modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: {},
       },
       [MASK_SOURCE_DATA_URL],
       [REPLACE_PROVIDER_DATA_URL],
     );
-    assert.deepStrictEqual(providerIds, ["gpt-image-2"]);
+    assert.deepStrictEqual(providerIds, [MASK_REDRAW_MODEL_ID]);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].method, "edit");
     assert.strictEqual((calls[0].request as unknown as Record<string, unknown>).maskMode, undefined);
@@ -903,7 +928,7 @@ async function main() {
         operationMode: "mask-edit",
         mask: MASK_DATA_URL,
         maskSourceRef: MASK_SOURCE_DATA_URL,
-        modelId: "gpt-image-2",
+        modelId: MASK_REDRAW_MODEL_ID,
         modelOptions: {},
       },
       [MASK_SOURCE_DATA_URL, SECOND_DATA_URL],
@@ -928,7 +953,7 @@ async function main() {
           operationMode: "mask-edit",
           mask: MASK_DATA_URL,
           maskSourceRef: MASK_SOURCE_DATA_URL,
-          modelId: "gpt-image-2",
+          modelId: MASK_REDRAW_MODEL_ID,
           modelOptions: {},
         },
         Array.from({ length: 8 }, (_, index) => index === 0 ? MASK_SOURCE_DATA_URL : SECOND_DATA_URL),

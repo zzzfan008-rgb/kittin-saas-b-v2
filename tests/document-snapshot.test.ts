@@ -77,7 +77,7 @@ const source = {
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/modify-a.png"],
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelOptions: { size: "1536x2048" },
       },
     },
@@ -150,7 +150,7 @@ const source = {
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/mutate-a.png"],
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelOptions: { size: "2048x2048" },
       },
     },
@@ -169,7 +169,7 @@ const source = {
         operationMode: "mask-edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/mask-a.png"],
-        modelId: "gpt-image-2",
+        modelId: "gpt-image-2.5-sunburst",
         modelOptions: {},
       },
     },
@@ -215,7 +215,7 @@ const snapshot = createDocumentSnapshot(source);
 assert.deepEqual(source, before, "创建快照不得改写 store 输入");
 
 for (const [name, nodeId, modelOptions, pattern] of [
-  ["VIP quality", "mutate", { size: "2048x2048", quality: "high" }, /quality/],
+  ["VIP forbidden aspect_ratio", "mutate", { size: "2048x2048", aspect_ratio: "16:9" }, /aspect_ratio/],
   ["VIP cross-model fields", "modify", { size: "1536x2048", imageSize: "2K" }, /imageSize/],
   ["mask runtime size", "mask", { size: "816x816" }, /must be empty/],
 ] as const) {
@@ -274,7 +274,7 @@ assert.deepEqual(snapshot, {
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/modify-a.png"],
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelSelectionNeedsConfirmation: false,
         modelOptions: { size: "1536x2048" },
       },
@@ -342,7 +342,7 @@ assert.deepEqual(snapshot, {
         operationMode: "edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/mutate-a.png"],
-        modelId: "gpt-image-2-vip",
+        modelId: "gpt-image-2.5-flare-vip",
         modelSelectionNeedsConfirmation: false,
         modelOptions: { size: "2048x2048" },
       },
@@ -360,7 +360,7 @@ assert.deepEqual(snapshot, {
         operationMode: "mask-edit",
         operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/mask-a.png"],
-        modelId: "gpt-image-2",
+        modelId: "gpt-image-2.5-sunburst",
         modelOptions: {},
       },
     },
@@ -443,7 +443,7 @@ assert.deepEqual(reloadedWireSnapshot.edges, snapshot.edges, "保存并重载不
 
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "mask-redraw",
   mode: "mask-edit",
 });
@@ -472,7 +472,7 @@ const maskBindingSnapshot = createDocumentSnapshot({
       mask: "/api/files/mask-binding.png",
       featherRadius: 12,
       outputImages: [],
-      modelId: "gpt-image-2",
+      modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
       operationMode: "mask-edit",
       operationModeNeedsConfirmation: false,

@@ -20,7 +20,7 @@ import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
 
 const boundaryVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "sketch-to-render",
   mode: "generate",
 });
@@ -465,7 +465,7 @@ assert.equal(migrated.tabs[0].dirty, true);
 console.log("  ✓ 旧会话逐节点补齐必需字段，并隔离坏节点和悬空边");
 
 const generalModelPairs = [
-  { modelId: "gpt-image-2-vip", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
+  { modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
   {
     modelId: "gemini-3.1-flash-image",
     modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
@@ -544,7 +544,7 @@ assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
 assert.equal(retiredModelData.kind, "ai-modify");
 if (retiredModelData.kind !== "ai-modify") throw new Error("unexpected retired node kind");
-assert.equal(retiredModelData.modelId, "gpt-image-2-vip");
+assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
 assert.equal(retiredModelData.retiredModelId, "grok-imagine-image");
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, true);
 assert.deepEqual(retiredModelData.modelOptions, { size: "2048x1536" });
@@ -573,7 +573,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换领型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -640,7 +640,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换袖型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -691,7 +691,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "保持运行",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -754,7 +754,7 @@ useFlowStore.getState().openFlowTab({
     position: { x: 300, y: 0 },
     data: {
       kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改色",
-      modelId: "gpt-image-2", modelOptions: {},
+      modelId: "gpt-image-2.5-sunburst", modelOptions: {},
       operationMode: "mask-edit", operationModeNeedsConfirmation: false,
       outputImages: [],
       mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
@@ -934,7 +934,7 @@ useFlowStore.getState().loadFlow({
       prompt: "生成成功",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -981,7 +981,7 @@ useFlowStore.getState().loadFlow({
       prompt: "生成成功",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -1091,7 +1091,7 @@ const unsafeDocumentNode = {
     aspectRatio: boundaryParameters.aspectRatio,
     batchSize: boundaryParameters.batchSize,
     outputImages: ["/api/files/pure-boundary-before.png"],
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     modelOptions: boundaryParameters.modelOptions,
     operationMode: "generate",
     promptVariantId: boundaryVariant.variantId,
@@ -1348,7 +1348,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "后台成功",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,

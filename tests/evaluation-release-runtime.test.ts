@@ -289,7 +289,7 @@ function buildExternalRelease(): {
   );
   const variant = requireGarmentPromptVariant({
     familyId: "commerce-hero",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     nodeKind: "sketch-to-render",
     mode: "generate",
   });
@@ -618,7 +618,7 @@ try {
     env: runtimeEnv,
     embeddedRegistry: build.registry,
     linuxMountInfoTextForTest: readOnlyMountInfo,
-  }), /contract check differs from the current reviewed \/v1\/models baseline/);
+  }), /reviewed evaluation releases are blocked until a human-reviewed \/v1\/models baseline exists/);
 
   const writablePromotionMountInfo = linuxMountInfo([
     { mountPoint: path.parse(externalRoot).root, options: "rw" },

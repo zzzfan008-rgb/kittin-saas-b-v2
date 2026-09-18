@@ -112,7 +112,7 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
       <NodeFrame nodeId={id} title={data.label} status={data.status} error={data.error} selected={selected}>
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-neutral-500">图片模型</span>
-          <span className="font-mono text-neutral-300">gpt-image-2</span>
+          <span className="font-mono text-neutral-300">gpt-image-2.5-sunburst</span>
         </div>
         {admission.referenceRows.length > 0 && (
           <ReferenceImageList
@@ -137,14 +137,14 @@ export function MaskRedrawNode({ id, data, selected }: NodeProps<Node<MaskRedraw
             onClick={() => setPresetPending(true)}
             className="nodrag w-full rounded-md border border-[var(--gc-node-border)] px-2 py-1.5 text-[10px] text-[var(--gc-text)] hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            应用 GPT Image 2 局部修改专轨
+            应用 GPT Image 2.5 Sunburst 局部修改专轨
           </button>
           {!presetAvailability.enabled && (
             <p id={`${id}-mask-preset-reason`} className="text-[11px] leading-relaxed text-amber-400">{presetAvailability.reason}</p>
           )}
           {presetPending && presetVariant && presetProfile && (
             <div aria-live="polite" className="space-y-1.5 rounded-md border border-amber-700/50 bg-amber-950/20 p-2 text-[11px] text-amber-200">
-              <p>将写入独立提示词变体、契约哈希、参数档案与后处理版本；模型仍为 gpt-image-2，业务画幅跟随来源图片。</p>
+              <p>将写入独立提示词变体、契约哈希、参数档案与后处理版本；模型仍为 gpt-image-2.5-sunburst，业务画幅跟随来源图片。</p>
               <dl className="space-y-0.5">
                 <div><dt>提示词变体</dt><dd className="break-all font-mono text-neutral-200">{presetVariant.variantId}</dd></div>
                 <div><dt>参数档案</dt><dd className="break-all font-mono text-neutral-200">{presetProfile.profileId}</dd></div>

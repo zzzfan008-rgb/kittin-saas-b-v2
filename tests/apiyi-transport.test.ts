@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     const body = `${JSON.stringify({ ok: true, data: "x".repeat(1_100) })} \n`;
     const events: ApiyiTailRecoveryEvent[] = [];
     const fixture = controlledResponse([{ afterMs: 0, bytes: encoder.encode(body) }]);
-    const parsed = await readApiyiJsonResponse(fixture.response, "gpt-image-2-vip", {
+    const parsed = await readApiyiJsonResponse(fixture.response, "gpt-image-2.5-flare-vip", {
       maxBytes: 4_096,
       graceMs: 5,
       onSalvaged: (event) => events.push(event),
@@ -106,7 +106,7 @@ async function main(): Promise<void> {
     assert.equal(fixture.cancelled(), 1);
     assert.deepEqual(events, [{
       event: "apiyi_tail_stall_salvaged",
-      providerId: "gpt-image-2-vip",
+      providerId: "gpt-image-2.5-flare-vip",
       bytes: encoder.encode(body).byteLength,
       graceMs: 5,
     }]);
@@ -355,7 +355,7 @@ async function main(): Promise<void> {
         }).response;
       }) as typeof fetch;
       await assert.rejects(
-        () => apiyiProviders["gpt-image-2-vip"].generate({
+        () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
           prompt: "body timeout",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },

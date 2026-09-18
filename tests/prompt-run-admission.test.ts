@@ -128,14 +128,14 @@ assert.equal(
 );
 const retiredDecision = evaluatePromptRunAdmission({
   ...input,
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   retiredModelId: "grok-imagine-image",
   modelSelectionNeedsConfirmation: true,
 }, { evaluationRun: true });
 assert.equal(retiredDecision.code, "retired-model");
 assert.equal(retiredDecision.allowed, false, "评估运行也不得绕过退役模型手选门禁");
 assert.match(retiredDecision.reason, /不会静默换模.*手动选择新模型/);
-assert.equal(evaluatePromptRunAdmission({ ...input, modelId: "gpt-image-2" }).code, "model-node-incompatible");
+assert.equal(evaluatePromptRunAdmission({ ...input, modelId: "gpt-image-2.5-sunburst" }).code, "model-node-incompatible");
 assert.equal(evaluatePromptRunAdmission({ ...input, operationMode: "generate" }).code, "operation-mode-incompatible");
 assert.equal(evaluatePromptRunAdmission({
   ...input,
@@ -225,7 +225,7 @@ try {
 
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
-  modelId: "gpt-image-2",
+  modelId: "gpt-image-2.5-sunburst",
   nodeKind: "mask-redraw",
   mode: "mask-edit",
 });

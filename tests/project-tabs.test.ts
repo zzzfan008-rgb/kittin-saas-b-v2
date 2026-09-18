@@ -34,7 +34,7 @@ import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
 
 const aiTestVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   nodeKind: "ai-modify",
   mode: "edit",
 });
@@ -578,7 +578,7 @@ await test("专用面料节点句柄在新连线时不再写入角色数据", ()
       outputImages: [],
       operationMode: "edit" as const,
       operationModeNeedsConfirmation: false,
-      modelId: "gpt-image-2" as const,
+      modelId: "gpt-image-2.5-sunburst" as const,
       modelOptions: {},
     },
   } satisfies FlowNode;
@@ -620,7 +620,7 @@ await test("快捷建图复用输入上限与只读门禁", () => {
       status: "idle",
       imageSize: "2K",
       outputImages: [],
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -1319,7 +1319,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
       label: "蒙版局部重绘",
       status: "idle",
       prompt: "仅替换被选中区域",
-      modelId: "gpt-image-2",
+      modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
       operationMode: "mask-edit",
       operationModeNeedsConfirmation: false,
@@ -1655,7 +1655,7 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           kind: "mask-redraw",
           label: "蒙版局部重绘",
           status: "idle",
-          modelId: "gpt-image-2",
+          modelId: "gpt-image-2.5-sunburst",
           modelOptions: {},
           operationMode: "mask-edit",
           operationModeNeedsConfirmation: false,

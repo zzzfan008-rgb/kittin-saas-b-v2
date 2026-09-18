@@ -73,7 +73,7 @@ assert.throws(
 
 const paidPlan: ExecutionPlan = { steps: [{
   nodeId: "generate", kind: "sketch-to-render", inputImages: [],
-  params: { modelId: "gpt-image-2-vip", operationMode: "generate", prompt: "test" },
+  params: { modelId: "gpt-image-2.5-flare-vip", operationMode: "generate", prompt: "test" },
 }] };
 assert.deepEqual(
   attachEvaluationRunPolicy(paidPlan, policy).steps[0].params.evaluationPolicy,

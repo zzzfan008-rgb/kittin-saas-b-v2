@@ -56,12 +56,12 @@ const evaluationPlan: ExecutionPlan = {
     inputImages: [],
     inputReferences: [],
     params: {
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       operationMode: "generate",
       prompt: "sealed campaign regression",
-      promptVariantId: "fashion-lookbook-gpt-image-2-vip-generate-v1",
+      promptVariantId: "fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1",
       promptFamilyId: "fashion-lookbook",
-      parameterProfileId: "gpt-image-2-vip-lookbook-v1",
+      parameterProfileId: "gpt-image-2.5-flare-vip-lookbook-v1",
       contractHash: `sha256:${"1".repeat(64)}`,
       evaluationVersion: "1.0.0",
       postprocessVersion: "fit-pad-v1",
@@ -275,9 +275,9 @@ async function persistSucceededEvidence(input: BoundCampaign): Promise<{
         created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, 'build-identity', FALSE, 'gpt-image-2-vip', 'gpt-image-2-vip',
+        $9, 'build-identity', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
         'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
-        'fashion-lookbook-gpt-image-2-vip-generate-v1', 'prompt-v1', $10,
+        'fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1', 'prompt-v1', $10,
         'evaluation-v1', $11, $12, 'profile-v1', '1.0.0', 'fit-pad-v1',
         'reference-input-sha256-v1', 'garment-gold-v1', 'garment-rubric-v1',
         'sealed campaign regression', '{}', '[]', 1, $13, '{}',
@@ -311,7 +311,7 @@ async function persistSucceededEvidence(input: BoundCampaign): Promise<{
         budget_currency, billing_reconciliation_status
       ) VALUES (
         $1, $2, $3, 1, $4, $5, '{}', '{}', '[]', 'succeeded',
-        'gpt-image-2-vip', '["2048x2048"]', 1, $6, $7, $8, $9, 'CNY', 'pending'
+        'gpt-image-2.5-flare-vip', '["2048x2048"]', 1, $6, $7, $8, $9, 'CNY', 'pending'
       )
     `, [
       providerRequestEvidenceId,

@@ -186,7 +186,7 @@ function parameterProfileEntry(profileId: string): ParameterProfileEntry {
   };
 }
 
-function standardProviderRequests(modelId: Exclude<ImageModelId, "gpt-image-2">, modes: readonly ImageOperationMode[]): ProviderRequestEntry[] {
+function standardProviderRequests(modelId: Exclude<ImageModelId, "gpt-image-2.5-sunburst">, modes: readonly ImageOperationMode[]): ProviderRequestEntry[] {
   const contract = getImageModelContract(modelId);
   const output = contractOutput(modelId);
   const outputFields = Array.isArray(output.fields) ? output.fields.filter((field): field is string => typeof field === "string") : [];
@@ -195,7 +195,7 @@ function standardProviderRequests(modelId: Exclude<ImageModelId, "gpt-image-2">,
   const requests: ProviderRequestEntry[] = [];
   for (const mode of modes) {
     if (mode === "mask-edit") continue;
-    if (modelId === "gpt-image-2-vip") {
+    if (modelId === "gpt-image-2.5-flare-vip") {
       requests.push({
         mode,
         endpoint: {
@@ -319,8 +319,8 @@ function standardProviderRequests(modelId: Exclude<ImageModelId, "gpt-image-2">,
 }
 
 function maskProviderRequest(): ProviderRequestEntry {
-  const contract = getImageModelContract("gpt-image-2");
-  const output = contractOutput("gpt-image-2");
+  const contract = getImageModelContract("gpt-image-2.5-sunburst");
+  const output = contractOutput("gpt-image-2.5-sunburst");
   return {
     mode: "mask-edit",
     endpoint: { method: "POST", path: contract.edit.path, contentType: "multipart/form-data" },
@@ -343,10 +343,10 @@ function maskProviderRequest(): ProviderRequestEntry {
 }
 
 function unsupportedReason(nodeKind: MatrixNodeKind, modelId: ImageModelId): string {
-  if (nodeKind === "mask-redraw" && modelId !== "gpt-image-2") {
+  if (nodeKind === "mask-redraw" && modelId !== "gpt-image-2.5-sunburst") {
     return "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。";
   }
-  if (nodeKind !== "mask-redraw" && modelId === "gpt-image-2") {
+  if (nodeKind !== "mask-redraw" && modelId === "gpt-image-2.5-sunburst") {
     return "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。";
   }
   if (["fabric-recolor", "upscale", "print-extract", "print-mutate"].includes(nodeKind)) {
@@ -367,11 +367,10 @@ function entry(nodeKind: MatrixNodeKind, modelId: ImageModelId): NodePromptParam
   const operationModes = allowedOperationModesForNode(nodeKind);
   const variants = variantsFor(nodeKind, modelId);
   const profiles = profilesFor(nodeKind, modelId);
-  const supported = (nodeKind === "mask-redraw" && modelId === "gpt-image-2")
-    || (nodeKind !== "mask-redraw" && nodeKind !== "fabric-recolor" && nodeKind !== "upscale" && nodeKind !== "print-extract" && nodeKind !== "print-mutate" && modelId !== "gpt-image-2");
-  const providerRequests = nodeKind === "mask-redraw" && modelId === "gpt-image-2"
+  const supported = variants.length > 0;
+  const providerRequests = nodeKind === "mask-redraw" && modelId === "gpt-image-2.5-sunburst"
     ? [maskProviderRequest()]
-    : supported ? standardProviderRequests(modelId as Exclude<ImageModelId, "gpt-image-2">, operationModes) : [];
+    : supported ? standardProviderRequests(modelId as Exclude<ImageModelId, "gpt-image-2.5-sunburst">, operationModes) : [];
   return {
     nodeKind,
     nodeTitle: NODE_SPECS[nodeKind].title,

@@ -365,7 +365,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 300, y: 0 },
         data: {
           kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改成银色",
-          modelId: "gpt-image-2", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
+          modelId: "gpt-image-2.5-sunburst", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
         },
       }],
       edges: [{ id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId }],

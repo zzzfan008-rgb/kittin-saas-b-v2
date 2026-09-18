@@ -17,7 +17,7 @@ function validArgs(): string[] {
     "--owner-id", "admin-2",
     "--campaign-id", "eval_cli_campaign",
     "--slot-id", "eval_cli_slot",
-    "--model-id", "gpt-image-2-vip",
+    "--model-id", "gpt-image-2.5-flare-vip",
     "--evaluation-unit-key", evaluationUnitKey,
     "--max-provider-requests", "2",
     "--price-minor-per-provider-request", "75",
@@ -40,7 +40,7 @@ assert.deepEqual(parsed.registration, {
   slotId: "eval_cli_slot",
   scope: {
     type: "evaluation-unit",
-    modelId: "gpt-image-2-vip",
+    modelId: "gpt-image-2.5-flare-vip",
     evaluationUnitKey,
   },
   maxProviderRequests: 2,
@@ -84,7 +84,7 @@ assert.equal(output.dryRun, true);
 assert.equal(output.priceMinorPerProviderRequest, 75);
 assert.deepEqual(output.scope, {
   type: "evaluation-unit",
-  modelId: "gpt-image-2-vip",
+  modelId: "gpt-image-2.5-flare-vip",
   evaluationUnitKey,
 });
 assert.equal(output.campaignId, "eval_cli_campaign");

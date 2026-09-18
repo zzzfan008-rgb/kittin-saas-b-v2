@@ -38,7 +38,7 @@ async function installTestOnlyReviewedTextVariant(page: import("@playwright/test
     }).process = { env: { GARMENT_CANVAS_CODE_SHA: codeSha } };
     const variant = catalog.getGarmentPromptVariant({
       familyId: "commerce-hero",
-      modelId: "gpt-image-2-vip",
+      modelId: "gpt-image-2.5-flare-vip",
       nodeKind: "sketch-to-render",
       mode: "generate",
     });
