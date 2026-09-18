@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="obsidian">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garment Canvas · 登录页 V4</title>
+<style>
+/* ============================================================
+   V4 登录页 · 与画布 V4 同语言
+   - 曜黑: 荧光绿 accent + 提亮黑 + 白卡
+   - 简白: Apple 蓝 accent + 深绿 CTA
+   - 护眼绿: 翡翠 accent + 深绿 CTA
+   - 分屏结构: 左侧品牌区(可灵式产品叙事) + 右侧登录卡
+   - 主题跟随 localStorage 的 data-theme,无需切换器
+   ============================ */
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --font-display:"SF Pro Display",-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  --dur-1:120ms;--dur-2:220ms;--dur-3:420ms;
+  --ease-out:cubic-bezier(.2,.8,.2,1);
+}
+[data-theme="obsidian"]{
+  --login-bg:#16181d;
+  --login-bg-2:#1d2026;
+  --login-ink:#e8eaee;
+  --login-muted:#9ba1a9;
+  --login-card:#ffffff;
+  --login-card-ink:#1d1d1f;
+  --login-card-muted:#6b7075;
+  --login-accent:#B7F35A;
+  --login-accent-ink:#131313;
+  --login-cta-bg:#B7F35A;
+  --login-cta-ink:#131313;
+  --login-input-bg:#f2f3f5;
+  --login-input-border:#e4e6ea;
+  --login-shadow:0 0 0 0.5px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
+}
+[data-theme="apple"]{
+  --login-bg:#f5f5f7;
+  --login-bg-2:#ececf0;
+  --login-ink:#1d1d1f;
+  --login-muted:#6e6e73;
+  --login-card:#ffffff;
+  --login-card-ink:#1d1d1f;
+  --login-card-muted:#6e6e73;
+  --login-accent:#0071e3;
+  --login-accent-ink:#ffffff;
+  --login-cta-bg:#0071e3;
+  --login-cta-ink:#ffffff;
+  --login-input-bg:#f5f5f7;
+  --login-input-border:rgba(0,0,0,.1);
+  --login-shadow:0 0 0 0.5px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 8px rgba(0,0,0,.05), 0 20px 44px rgba(0,0,0,.11);
+}
+[data-theme="eye"]{
+  --login-bg:#E9F1EA;
+  --login-bg-2:#dfe9e1;
+  --login-ink:#123B2B;
+  --login-muted:#47685A;
+  --login-card:#ffffff;
+  --login-card-ink:#123B2B;
+  --login-card-muted:#47685A;
+  --login-accent:#0B7A43;
+  --login-accent-ink:#ffffff;
+  --login-cta-bg:#166534;
+  --login-cta-ink:#ffffff;
+  --login-input-bg:#f0f6f1;
+  --login-input-border:#e2ece4;
+  --login-shadow:0 0 0 0.5px rgba(18,59,43,.06), 0 1px 2px rgba(18,59,43,.05), 0 4px 10px rgba(18,59,43,.06), 0 20px 44px rgba(18,59,43,.11);
+}
+
+html,body{height:100%}
+body{
+  font-family:var(--font-display);
+  background:var(--login-bg);
+  color:var(--login-ink);
+  overflow:hidden;
+}
+
+/* ===== 分屏结构 ===== */
+.login-split{
+  display:grid;
+  grid-template-columns:1fr 480px;
+  height:100vh;
+}
+
+/* ---- 左侧品牌区 ---- */
+.brand-pane{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:48px 56px;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, color-mix(in srgb, var(--login-accent) 6%, transparent), transparent),
+    linear-gradient(160deg, var(--login-bg) 0%, var(--login-bg-2) 100%);
+  overflow:hidden;
+}
+[data-theme="obsidian"] .brand-pane{
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, rgba(183,243,90,.05), transparent),
+    linear-gradient(160deg, #16181d 0%, #1a1d23 100%);
+}
+
+/* 点阵网格(与画布一致) */
+.brand-pane::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle, color-mix(in srgb, var(--login-muted) 18%, transparent) 1px, transparent 1.3px) 0 0/28px 28px;
+  opacity:.5;
+}
+
+.brand-top{position:relative;z-index:1;display:flex;align-items:center;gap:12px}
+.brand-mark{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--login-accent);color:var(--login-accent-ink);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:15px;letter-spacing:-0.5px;
+  box-shadow:0 2px 8px color-mix(in srgb, var(--login-accent) 30%, transparent);
+}
+.brand-name{font-size:15px;font-weight:700;letter-spacing:-0.2px}
+
+.brand-hero{position:relative;z-index:1;max-width:520px}
+.brand-eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+  color:var(--login-muted);text-transform:uppercase;
+}
+.brand-title{
+  margin-top:16px;
+  font-size:clamp(36px,4vw,52px);
+  font-weight:700;
+  line-height:1.08;
+  letter-spacing:-0.03em;
+}
+.brand-title .accent{color:var(--login-accent)}
+[data-theme="obsidian"] .brand-title .accent{color:#B7F35A}
+.brand-sub{
+  margin-top:18px;
+  font-size:15px;line-height:1.6;
+  color:var(--login-muted);
+  max-width:400px;
+}
+
+/* 底部特性条 */
+.brand-features{
+  position:relative;z-index:1;
+  display:flex;gap:32px;
+}
+.feature{display:flex;align-items:center;gap:10px}
+.feature .f-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--login-accent);
+  box-shadow:0 0 8px color-mix(in srgb, var(--login-accent) 50%, transparent);
+}
+.feature span{font-size:12px;color:var(--login-muted);letter-spacing:-0.1px}
+
+/* ---- 右侧登录卡 ---- */
+.login-pane{
+  display:flex;align-items:center;justify-content:center;
+  padding:40px;
+  background:var(--login-bg);
+}
+[data-theme="obsidian"] .login-pane{background:#131519}
+
+.login-card{
+  width:100%;max-width:400px;
+  background:var(--login-card);
+  border-radius:20px;
+  box-shadow:var(--login-shadow);
+  padding:36px 32px 32px;
+  color:var(--login-card-ink);
+}
+
+.login-head{margin-bottom:28px}
+.login-head .l-eyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  color:var(--login-card-muted);text-transform:uppercase;
+}
+.login-head h1{
+  margin-top:8px;
+  font-size:22px;font-weight:700;letter-spacing:-0.02em;
+}
+.login-head p{
+  margin-top:6px;
+  font-size:12.5px;line-height:1.5;
+  color:var(--login-card-muted);
+}
+
+/* 输入框 */
+.field{margin-bottom:16px}
+.field label{
+  display:block;
+  font-size:12px;font-weight:600;
+  color:var(--login-card-ink);
+  margin-bottom:6px;
+  letter-spacing:-0.1px;
+}
+.field .input-wrap{
+  position:relative;
+  display:flex;align-items:center;
+}
+.field input{
+  width:100%;height:44px;
+  background:var(--login-input-bg);
+  border:1px solid var(--login-input-border);
+  border-radius:10px;
+  padding:0 14px;
+  font-size:13.5px;
+  font-family:inherit;
+  color:var(--login-card-ink);
+  outline:none;
+  transition:border-color var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.field input::placeholder{color:color-mix(in srgb, var(--login-card-muted) 60%, transparent)}
+.field input:focus{
+  border-color:var(--login-accent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--login-accent) 18%, transparent);
+}
+
+/* 密码可见切换 */
+.pw-toggle{
+  position:absolute;right:6px;
+  width:32px;height:32px;
+  border:none;border-radius:8px;
+  background:transparent;
+  color:var(--login-card-muted);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.pw-toggle:hover{background:color-mix(in srgb, var(--login-card-muted) 10%, transparent);color:var(--login-card-ink)}
+.pw-toggle:focus-visible{outline:2px solid var(--login-accent);outline-offset:1px}
+
+/* CTA */
+.cta{
+  width:100%;height:46px;
+  margin-top:8px;
+  border:none;border-radius:980px;
+  background:var(--login-cta-bg);color:var(--login-cta-ink);
+  font-size:14px;font-weight:700;letter-spacing:0.02em;
+  font-family:inherit;
+  cursor:pointer;
+  transition:transform var(--dur-1) var(--ease-out), filter var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+  box-shadow:0 4px 14px color-mix(in srgb, var(--login-cta-bg) 30%, transparent);
+}
+.cta:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.cta:active{transform:scale(.98)}
+.cta:focus-visible{outline:2px solid var(--login-accent);outline-offset:3px}
+.cta:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none;filter:none}
+
+.login-foot{
+  margin-top:20px;
+  text-align:center;
+  font-size:11px;
+  color:var(--login-card-muted);
+}
+
+/* 错误提示 */
+.error{
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  color:#991b1b;
+  font-size:12px;
+  display:none;
+}
+.error.show{display:block}
+[data-theme="obsidian"] .error{background:#2a1215;border-color:#5c1f24;color:#fca5a5}
+
+/* 入场动画 */
+@keyframes loginFadeUp{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.login-card{animation:loginFadeUp var(--dur-3) var(--ease-out) both}
+.brand-hero{animation:loginFadeUp var(--dur-3) var(--ease-out) 80ms both}
+.brand-top{animation:loginFadeUp var(--dur-3) var(--ease-out) both}
+.brand-features{animation:loginFadeUp var(--dur-3) var(--ease-out) 160ms both}
+
+@media (prefers-reduced-motion:reduce){
+  .login-card,.brand-hero,.brand-top,.brand-features{animation:none}
+  .cta,.field input,.pw-toggle{transition:none}
+}
+
+/* 1024 断点 */
+@media (max-width:1200px){
+  .login-split{grid-template-columns:1fr 420px}
+  .brand-pane{padding:36px 40px}
+}
+@media (max-width:1024px){
+  .login-split{grid-template-columns:1fr}
+  .brand-pane{display:none}
+  .login-pane{background:var(--login-bg)}
+}
+
+/* 主题切换器(仅原型用) */
+.theme-switcher{
+  position:fixed;top:20px;right:20px;z-index:100;
+  display:flex;gap:8px;
+}
+.tp{
+  font-size:11px;font-family:var(--mono);
+  padding:6px 12px;border-radius:980px;
+  border:1px solid color-mix(in srgb, var(--login-muted) 30%, transparent);
+  background:color-mix(in srgb, var(--login-bg) 80%, transparent);
+  color:var(--login-muted);
+  cursor:pointer;backdrop-filter:blur(8px);
+  transition:all var(--dur-1) var(--ease-out);
+}
+.tp.on{background:var(--login-accent);color:var(--login-accent-ink);border-color:transparent;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="theme-switcher">
+  <button class="tp on" data-t="obsidian">曜黑·荧光绿</button>
+  <button class="tp" data-t="apple">简白·Apple</button>
+  <button class="tp" data-t="eye">护眼绿</button>
+</div>
+
+<div class="login-split">
+
+  <!-- 左:品牌区 -->
+  <aside class="brand-pane">
+    <div class="brand-top">
+      <div class="brand-mark">GC</div>
+      <span class="brand-name">Garment Canvas</span>
+    </div>
+
+    <div class="brand-hero">
+      <p class="brand-eyebrow">COIN AI · CANVAS STUDIO</p>
+      <h1 class="brand-title">
+        让每一张面料，<br>都有<span class="accent">无限画布</span>。
+      </h1>
+      <p class="brand-sub">
+        节点式 AI 工作台，为服装设计师而生。从草图到成衣效果图，从图案迁移到视频展示——在一个画布里完成。
+      </p>
+    </div>
+
+    <div class="brand-features">
+      <div class="feature"><span class="f-dot"></span><span>节点式工作流</span></div>
+      <div class="feature"><span class="f-dot"></span><span>多模型生成</span></div>
+      <div class="feature"><span class="f-dot"></span><span>团队项目空间</span></div>
+    </div>
+  </aside>
+
+  <!-- 右:登录卡 -->
+  <main class="login-pane">
+    <form class="login-card" data-testid="login-card">
+      <div class="login-head">
+        <p class="l-eyebrow">Designer workspace</p>
+        <h1>登录工作台</h1>
+        <p>账号由管理员创建，同一账号仅允许一个设备在线。</p>
+      </div>
+
+      <div class="field">
+        <label for="account">账号</label>
+        <div class="input-wrap">
+          <input id="account" type="text" placeholder="请输入账号" autocomplete="username" autofocus>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">密码</label>
+        <div class="input-wrap">
+          <input id="password" type="password" placeholder="请输入密码" autocomplete="current-password">
+          <button type="button" class="pw-toggle" aria-label="显示密码">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M2.4 12s3.5-6 9.6-6 9.6 6 9.6 6-3.5 6-9.6 6-9.6-6-9.6-6Z"/>
+              <circle cx="12" cy="12" r="2.8"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="error" role="alert">
+        账号或密码不正确，请重试。
+      </div>
+
+      <button type="submit" class="cta">登录</button>
+
+      <p class="login-foot">如需重置密码，请联系管理员</p>
+    </form>
+  </main>
+
+</div>
+
+<script>
+document.querySelectorAll('.tp').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tp').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.body.dataset.theme=btn.dataset.t;
+    document.documentElement.dataset.theme=btn.dataset.t;
+  });
+});
+</script>
+</body>
+</html>
