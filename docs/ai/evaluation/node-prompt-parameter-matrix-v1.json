@@ -62,7 +62,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -71,7 +71,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "sketch-to-render",
@@ -1091,7 +1091,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -1100,7 +1100,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "ai-modify",
@@ -2074,7 +2074,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2083,7 +2083,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2095,7 +2095,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2104,7 +2104,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2116,7 +2116,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2125,7 +2125,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2137,7 +2137,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2146,7 +2146,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2158,7 +2158,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2167,7 +2167,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2179,7 +2179,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2188,7 +2188,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2200,7 +2200,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2209,7 +2209,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "mask-redraw",
@@ -2221,7 +2221,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+        "reason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2230,7 +2230,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。"
+      "failClosedReason": "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。"
     },
     {
       "nodeKind": "fabric-recolor",
@@ -2242,7 +2242,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2251,7 +2251,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "fabric-recolor",
@@ -2431,7 +2431,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2440,7 +2440,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "upscale",
@@ -2620,7 +2620,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2629,7 +2629,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "print-extract",
@@ -2809,7 +2809,7 @@
       "supportStatus": "unsupported",
       "productPolicy": {
         "status": "unsupported",
-        "reason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+        "reason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
       },
       "promptVariantId": null,
       "promptVariantIds": [],
@@ -2818,7 +2818,7 @@
       "parameterProfileIds": [],
       "parameterProfiles": [],
       "providerRequests": [],
-      "failClosedReason": "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
+      "failClosedReason": "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。"
     },
     {
       "nodeKind": "print-mutate",

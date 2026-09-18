@@ -6,6 +6,7 @@ import {
   adaptiveMaskExpansionRadius,
   adaptiveMaskFeatherRadius,
 } from "../../src/lib/maskGeometry";
+import { MASK_REDRAW_MODEL_ID } from "../../src/types/imageModels";
 
 export const MAX_GPT_IMAGE_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_MASK_PIXELS = 40_000_000;
@@ -58,14 +59,14 @@ interface MaskCompositeGeometry {
  */
 export function maskGenerationDimensions(width: number, height: number): { width: number; height: number } {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-    throw new ProviderError("原图尺寸无效，无法准备蒙版生成", 400, "gpt-image-2", "invalid_request");
+    throw new ProviderError("原图尺寸无效，无法准备蒙版生成", 400, MASK_REDRAW_MODEL_ID, "invalid_request");
   }
   const sourceAspect = width / height;
   const symmetricAspect = Math.max(sourceAspect, 1 / sourceAspect);
   if (symmetricAspect > GPT_IMAGE_MAX_ASPECT_RATIO) {
     throw new ProviderError(
       "原图宽高比超过蒙版模型支持范围，请先裁剪至 3:1 以内",
-      400, "gpt-image-2", "invalid_request",
+      400, MASK_REDRAW_MODEL_ID, "invalid_request",
     );
   }
   const desiredPixels = Math.min(GPT_IMAGE_MAX_PIXELS, Math.max(GPT_IMAGE_MIN_PIXELS, width * height));
@@ -88,7 +89,7 @@ export function maskGenerationDimensions(width: number, height: number): { width
     if (!best || score < best.score) best = { width: candidateWidth, height: candidateHeight, score };
   }
   if (!best) {
-    throw new ProviderError("找不到可安全映射的蒙版输出尺寸", 400, "gpt-image-2", "invalid_request");
+    throw new ProviderError("找不到可安全映射的蒙版输出尺寸", 400, MASK_REDRAW_MODEL_ID, "invalid_request");
   }
   return { width: best.width, height: best.height };
 }
@@ -269,7 +270,7 @@ async function maskRegionGuide(
 export async function validateMaskForSource(
   sourceDataUrl: string,
   maskDataUrl: string,
-  providerId = "gpt-image-2",
+  providerId: string = MASK_REDRAW_MODEL_ID,
 ): Promise<ValidatedMaskPair> {
   const source = validateImageDataUrl(sourceDataUrl);
   const mask = validateImageDataUrl(maskDataUrl, MAX_GPT_IMAGE_MASK_BYTES);
@@ -414,7 +415,7 @@ async function unifiedGeneratedLayer(
   if (replacementWeight > 0 && generatedReplacementAlpha / replacementWeight < 250) {
     throw new ProviderError(
       "AI 返回的完整修改区仍有透明缺口，已保留原图；请重试",
-      502, "gpt-image-2", "invalid_response",
+      502, MASK_REDRAW_MODEL_ID, "invalid_response",
     );
   }
   return sharp(layer, { raw: { width, height, channels: 4 } }).png().toBuffer();
@@ -438,7 +439,7 @@ export async function compositeMaskedEdit(
     });
     const generatedMeta = await generatedImage.metadata();
     if (!generatedMeta.width || !generatedMeta.height) {
-      throw new ProviderError("无法读取 AI 返回图片尺寸", 502, "gpt-image-2", "invalid_response");
+      throw new ProviderError("无法读取 AI 返回图片尺寸", 502, MASK_REDRAW_MODEL_ID, "invalid_response");
     }
     // 输出以整幅画面为坐标系映射回源图；供应商返回尺寸不同不再把修改区当裁切框。
     const alignedGenerated = generatedMeta.width === pair.width && generatedMeta.height === pair.height

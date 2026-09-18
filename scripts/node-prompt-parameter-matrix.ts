@@ -344,10 +344,10 @@ function maskProviderRequest(): ProviderRequestEntry {
 
 function unsupportedReason(nodeKind: MatrixNodeKind, modelId: ImageModelId): string {
   if (nodeKind === "mask-redraw" && modelId !== "gpt-image-2.5-sunburst") {
-    return "局部蒙版专轨当前只支持 GPT Image 2；该模型不得接收 mask-edit 请求。";
+    return "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。";
   }
   if (nodeKind !== "mask-redraw" && modelId === "gpt-image-2.5-sunburst") {
-    return "GPT Image 2 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。";
+    return "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。";
   }
   if (["fabric-recolor", "upscale", "print-extract", "print-mutate"].includes(nodeKind)) {
     return `首版产品政策暂不支持「${NODE_SPECS[nodeKind].title}」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。`;
