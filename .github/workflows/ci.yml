@@ -1,0 +1,226 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# 同一分支的新 push 取代未跑完的旧 run，避免队列堆积；PR 同理（按 ref 分组）。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+
+jobs:
+  static:
+    name: static (lint / typecheck / web build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # npm run lint = tsc --noEmit（类型检查与 lint 合一，见 package.json）
+      - run: npm run lint
+      # build:web 含 tsc -b、vite build、构建产物 CSS 校验与 bundle 预算校验
+      - run: npm run build:web
+
+  unit:
+    name: unit (test:suite on PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: garment_canvas
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: garment_canvas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U garment_canvas -d garment_canvas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # 隔离 runner 硬校验：连接串必须是 127.0.0.1 且库名以 _test 结尾（scripts/test-with-postgres.mjs）。
+      # 这里的口令是 CI 一次性容器内的 dummy 值，不是任何真实凭据。
+      - run: npm run test
+        env:
+          DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test
+
+  e2e:
+    name: e2e (playwright chromium, dev mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: garment_canvas
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: garment_canvas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U garment_canvas -d garment_canvas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # 浏览器只装 chromium（playwright.config.ts 固定 browserName: "chromium"），
+      # --with-deps 安装 Linux 系统依赖；不装 firefox/webkit，与项目桌面契约一致。
+      - run: npx playwright install --with-deps chromium
+      # e2e-with-postgres.mjs 负责：重置 garment_canvas_test schema、保留字端口、
+      # 注入 dummy AI 凭据（APIYI_API_KEY=e2e-disabled）、拉起 server+vite。
+      - run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  production-smoke:
+    name: production-smoke (build + playwright against production bundle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: garment_canvas
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: garment_canvas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U garment_canvas -d garment_canvas_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # e2e-production-smoke.mjs 内部先跑 npm run build（含 build:server），再以
+      # NODE_ENV=production 起 dist-server 并用 playwright.production.config.ts 冒烟。
+      - run: npm run test:e2e:production
+        env:
+          DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: production-smoke-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  code-intelligence:
+    name: code-intelligence (ast-grep + dependency-cruiser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # ast-grep 与 dependency-cruiser 不在 package.json 依赖里（本地靠 brew 安装），
+      # CI 用 npx 固定版本拉取，避免把门禁工具升级为运行依赖的决策混进本批改动。
+      - name: Install gate tools
+        run: |
+          npm install --no-save --no-audit --no-fund @ast-grep/cli@0.39.5 dependency-cruiser@17.2.0
+      # depcruise 需要 NODE_PATH 指向仓库 node_modules 才能用本仓库的 typescript 解析
+      # TS 模块；缺失时会静默漏掉全部 TS 模块（与本地 gate 行为一致，见 codex-gate.mjs）。
+      # dependency-cruiser 的 JSON reporter 退出码恒为 0，「跑失败」只能由 stdout 是否
+      # 可解析 JSON 判定；失败语义与 codex-gate.mjs 对齐：error 级违规、或任何不在
+      # no-circular-baseline 豁免清单内的 warn 级命中，都让 job 失败。
+      - name: dependency-cruiser scan
+        run: |
+          set +e
+          NODE_PATH="$PWD/node_modules" npx depcruise --config .dependency-cruiser.cjs --output-type json src server scripts e2e > depcruise-report.json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ ! -s depcruise-report.json ]; then
+            echo "dependency-cruiser exited $status with no report"
+            exit "$status"
+          fi
+          node -e '
+            const fs = require("node:fs");
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync("./depcruise-report.json", "utf8"));
+            } catch (error) {
+              console.log(`dependency-cruiser output is not parseable JSON: ${error.message}`);
+              process.exit(1);
+            }
+            const violations = report.summary?.violations ?? [];
+            const unexpected = violations.filter((v) => v.rule.severity !== "warn" || v.rule.name !== "no-circular-baseline");
+            const errors = violations.filter((v) => v.rule.severity === "error");
+            console.log(`Dependency violations: ${errors.length}`);
+            console.log(`Baseline-exempted warnings: ${violations.filter((v) => v.rule.severity === "warn" && v.rule.name === "no-circular-baseline").length}`);
+            if (unexpected.length > 0) {
+              for (const v of unexpected) console.log(`${v.rule.severity} ${v.rule.name}: ${v.from} -> ${v.to}`);
+              process.exit(1);
+            }
+          '
+      # ast-grep 失败语义与本地 gate 对齐：任何结构规则命中即失败（当前规则集不含豁免项）。
+      - name: ast-grep scan
+        run: |
+          set +e
+          npx ast-grep scan --config sgconfig.yml --json src server scripts e2e > ast-grep-findings.json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ ! -s ast-grep-findings.json ]; then
+            echo "ast-grep exited $status with no evidence"
+            exit "$status"
+          fi
+          node -e '
+            const fs = require("node:fs");
+            let findings;
+            try {
+              findings = JSON.parse(fs.readFileSync("./ast-grep-findings.json", "utf8"));
+            } catch (error) {
+              console.log(`ast-grep output is not parseable JSON: ${error.message}`);
+              process.exit(1);
+            }
+            if (!Array.isArray(findings)) { console.log("ast-grep output is not a JSON array"); process.exit(1); }
+            console.log(`Structural findings (ast-grep): ${findings.length}`);
+            if (findings.length > 0) {
+              for (const f of findings) console.log(`${f.ruleId} ${f.file}:${(f.range?.start?.line ?? 0) + 1}`);
+              process.exit(1);
+            }
+          '

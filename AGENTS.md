@@ -164,16 +164,24 @@ instruction, then verify drift-prone repository and release state live.
   individual commits, run only the focused tests covering the files you changed plus
   `tsc --noEmit`; do not run the full suite on every commit or push. Report any
   unavailable or degraded gate instead of treating it as passed.
-- GitHub Actions is not a project gate. Run `npm run gate:codex -- --base origin/main`
-  for a feature branch, or select an exact commit with `--commit SHA`. This runs the
+- GitHub Actions is a project gate. The CI design lives in
+  `docs/ci/2026-09-18-github-actions-gate.md`; every push and every pull request
+  targeting `main` runs the workflow, and merging to `main` requires its status
+  checks to be green. A red or absent CI run blocks delivery; a skipped, cancelled,
+  or degraded job must be reported as such and never claimed as passed.
+- `npm run gate:codex -- --base origin/main` (or `--commit SHA`; use `--uncommitted`
+  for a pre-review of uncommitted work) remains available as an optional local
+  pre-check and acceleration tool; its result is advisory evidence, not the sole
+  authoritative gate. Run it before pushing to catch failures locally, but do not
+  substitute it for a green CI run on the exact head being delivered. It runs the
   deterministic local suites on the exact minimum Node.js version pinned by `.nvmrc`,
   then a structured review by an isolated Hermes Agent subagent (`hermes chat`, no
   `-m/--provider` override, so the user's configured default model is used). Code
   intelligence evidence comes from `ast-grep` structural rules plus
   `dependency-cruiser` architecture rules (`.dependency-cruiser.cjs`,
   `sgconfig.yml`, `tools/ast-grep-rules/`); GitNexus CLI and Codex CLI are no longer
-  part of the gate. Any actionable P0-P3 finding blocks
-  delivery. Record the exact base/head and the local result in the PR.
+  part of the gate. Any actionable P0-P3 finding blocks delivery. Record the exact
+  base/head and the result in the PR.
 
 ## 7. Git, Review, and Release Gates
 
@@ -182,10 +190,9 @@ instruction, then verify drift-prone repository and release state live.
 - The user message `通过` authorizes committing and pushing the approved batch plus
   a local exact-SHA review using the configured local review model. It does not
   authorize merging to `main`, tagging, releasing, or deploying.
-- The review path is the local delivery gate (Hermes reviewer +
-  ast-grep/dependency-cruiser code intelligence evidence), exact head/base
-  verification, and the user's explicit approval. GitHub Actions, CodeRabbit, and
-  any external cloud review service are not required evidence.
+- The review path is GitHub Actions status checks on the exact head being merged,
+  plus the user's explicit approval. Local `gate:codex` runs and external review
+  services (CodeRabbit, etc.) remain optional advisory evidence, not required gates.
 - Merging a PR, tagging, publishing a release, and deploying each require explicit
   user authorization. Never merge automatically.
 - Keep `.env`, `.env.local`, PATs, provider keys, credentials, uploads, database
