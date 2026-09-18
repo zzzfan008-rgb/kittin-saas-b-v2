@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="obsidian">
+<head>
+<meta charset="UTF-8">
+<title>R-38 · 参考图序号徽标原型(示意)</title>
+<style>
+  /* ============ 主题 token —— 1:1 取自 src/index.css 三主题 ============ */
+  :root{
+    --font:"Inter","SF Pro Display","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --dot:rgba(128,128,128,.35);
+  }
+  [data-theme="obsidian"]{
+    --gc-shell:#1a1c22; --gc-canvas:#16181d; --gc-panel:#21242a; --gc-panel-soft:#1e2126;
+    --gc-text:#e8eaee; --gc-text-muted:#9ba1a9; --gc-border:#33373f; --gc-border-strong:#454a53;
+    --gc-accent:#FFC940; --gc-accent-cta-ink:#131313;
+    --gc-node-main:#ffffff; --gc-node-inner:#f2f3f5; --gc-node-border:#e4e6ea;
+    --gc-node-text:#1d1d1f; --gc-node-muted:#6b7075; --gc-node-accent:#FFC940;
+    --gc-edge:#FFC940;
+    --gc-handle-highlight:#ffe9ac; --gc-handle-mid:#ffd469; --gc-handle-dark:#8a6d00;
+    --gc-handle-ring:rgba(255,201,64,.75);
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --gc-success:#34d399;
+    --dot:#262930;
+  }
+  [data-theme="apple"]{
+    --gc-shell:#f5f5f7; --gc-canvas:#f5f5f7; --gc-panel:#ffffff; --gc-panel-soft:#f5f5f7;
+    --gc-text:#1d1d1f; --gc-text-muted:#6e6e73; --gc-border:rgba(0,0,0,.08); --gc-border-strong:rgba(0,0,0,.16);
+    --gc-accent:#0071e3; --gc-accent-cta-ink:#ffffff;
+    --gc-node-main:#ffffff; --gc-node-inner:#f5f5f7; --gc-node-border:rgba(0,0,0,.08);
+    --gc-node-text:#1d1d1f; --gc-node-muted:#6e6e73; --gc-node-accent:#0071e3;
+    --gc-edge:#0071e3;
+    --gc-handle-highlight:#d6ecff; --gc-handle-mid:#66b2ff; --gc-handle-dark:#004a99;
+    --gc-handle-ring:rgba(0,113,227,.75);
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --gc-success:#1d7a3e;
+    --dot:rgba(0,0,0,.10);
+  }
+  [data-theme="eye"]{
+    --gc-shell:#EDF4EE; --gc-canvas:#E9F1EA; --gc-panel:#ffffff; --gc-panel-soft:#f4f9f5;
+    --gc-text:#123B2B; --gc-text-muted:#47685A; --gc-border:#c9dccc; --gc-border-strong:#a8c2ac;
+    --gc-accent:#0B7A43; --gc-accent-cta-ink:#ffffff;
+    --gc-node-main:#ffffff; --gc-node-inner:#f0f6f1; --gc-node-border:#e2ece4;
+    --gc-node-text:#123B2B; --gc-node-muted:#47685A; --gc-node-accent:#0B7A43;
+    --gc-edge:#0B7A43;
+    --gc-handle-highlight:#d2ecdc; --gc-handle-mid:#3fa46a; --gc-handle-dark:#0a5c33;
+    --gc-handle-ring:rgba(11,122,67,.75);
+    --gc-media-overlay:rgba(0,0,0,.62); --gc-media-overlay-text:#f4f4f4;
+    --gc-success:#1d7a3e;
+    --dot:rgba(18,59,43,.12);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--gc-shell);font-family:var(--font);padding:28px 36px 48px;color:var(--gc-text);transition:background .2s}
+
+  /* ---- 文档头 + 主题切换 ---- */
+  .doc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+  .doc-head h1{font-size:20px;font-weight:700;letter-spacing:.01em}
+  .doc-head p{font-size:12px;color:var(--gc-text-muted);margin-top:5px;max-width:660px;line-height:1.6}
+  .theme-switch{display:flex;gap:6px;background:var(--gc-panel);border:1px solid var(--gc-border);border-radius:999px;padding:4px;flex:none}
+  .theme-switch button{
+    border:0;background:transparent;color:var(--gc-text-muted);font-family:var(--font);
+    font-size:11.5px;font-weight:600;padding:5px 14px;border-radius:999px;cursor:pointer;
+  }
+  .theme-switch button[aria-pressed="true"]{background:var(--gc-accent);color:var(--gc-accent-cta-ink)}
+
+  .scene-label{display:flex;align-items:baseline;gap:10px;margin:26px 0 4px}
+  .scene-label .tag{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--gc-accent);border:1px solid var(--gc-handle-ring);border-radius:999px;padding:2px 10px}
+  .scene-label h2{font-size:15px;font-weight:700}
+  .scene-sub{font-size:11.5px;color:var(--gc-text-muted);margin-bottom:12px;max-width:900px;line-height:1.6}
+
+  .frames{display:flex;gap:28px;align-items:flex-start}
+  .frame{flex:1;min-width:0}
+  .frame-title{display:flex;align-items:baseline;gap:8px;font-size:12px;font-weight:700;margin-bottom:8px}
+  .frame-title .k{font-family:var(--mono);font-size:10px;color:var(--gc-accent);border:1px solid var(--gc-handle-ring);border-radius:4px;padding:0 5px}
+
+  /* ============ 画布 —— 结构 1:1(--gc-canvas + 20px 圆点网格) ============ */
+  .canvas{
+    position:relative;height:400px;border-radius:14px;overflow:hidden;
+    background:var(--gc-canvas);
+    background-image:radial-gradient(circle,var(--dot) 1px,transparent 1px);
+    background-size:20px 20px;
+    border:1px solid var(--gc-border);
+  }
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .edge-path{stroke:var(--gc-edge);stroke-width:1.8;fill:none}
+  .edge-selected{stroke-width:2.6}
+
+  /* ============ 节点卡 —— 1:1(白卡/软阴影/--gc-node-*) ============ */
+  .node{
+    position:absolute;width:216px;background:var(--gc-node-main);color:var(--gc-node-text);
+    border:1px solid var(--gc-node-border);border-radius:10px;
+    box-shadow:0 10px 28px rgba(8,14,22,.2);
+    font-size:11px;
+  }
+  .node.selected{border:2px solid var(--gc-node-accent);box-shadow:0 12px 32px rgba(8,14,22,.28)}
+  .node-header{
+    display:flex;align-items:center;gap:7px;padding:7px 10px;
+    border-bottom:1px solid var(--gc-node-border);font-weight:600;font-size:11.5px;
+  }
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--gc-success);flex:none}
+  .node-body{padding:9px 10px;display:flex;flex-direction:column;gap:7px}
+  .inner-box{
+    background:var(--gc-node-inner);border:1px solid var(--gc-node-border);border-radius:6px;
+    padding:6px 8px;color:var(--gc-node-muted);font-size:10px;line-height:1.55;
+  }
+  .inner-box b{color:var(--gc-node-text);font-weight:600}
+
+  /* 图片缩略图槽位:示意(斜纹占位 = 未提供真实图片素材) */
+  .img-slot{
+    position:relative;height:78px;border-radius:6px;overflow:hidden;
+    background:repeating-linear-gradient(135deg,#eceef1 0 8px,#e3e6ea 8px 16px);
+    border:1px solid var(--gc-node-border);
+  }
+  .img-slot::after{
+    content:"图片(示意)";position:absolute;left:8px;bottom:6px;font-size:9.5px;color:#9aa0a8;
+  }
+
+  /* ============ ★ R-38 序号徽标 —— 本原型的被评审对象 ============ */
+  .badge-ordinal{
+    position:absolute;top:6px;right:6px;z-index:3;
+    width:20px;height:20px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:11px;font-weight:700;line-height:1;
+    background:var(--gc-media-overlay);color:var(--gc-media-overlay-text);
+    /* 白描边:同时保证在浅色图与深色图上都可见 —— 不靠单一配色 */
+    border:1.5px solid #ffffff;
+    box-shadow:0 1px 4px rgba(0,0,0,.35);
+    pointer-events:none;
+  }
+  /* 对应确认高亮:徽标与正文 token 同时变强调色(位置+数字+颜色三重编码) */
+  .node.confirm .badge-ordinal{
+    background:var(--gc-accent);color:var(--gc-accent-cta-ink);
+    border-color:#ffffff;
+  }
+  .node.confirm .img-slot{outline:2px solid var(--gc-accent);outline-offset:1px}
+  .prompt-token{
+    font-family:var(--mono);font-weight:700;font-size:10.5px;
+    padding:0 4px;border-radius:3px;
+    background:var(--gc-node-inner);border:1px solid var(--gc-node-border);color:var(--gc-node-text);
+  }
+  .node.confirm .prompt-token{background:var(--gc-accent);color:var(--gc-accent-cta-ink);border-color:var(--gc-accent)}
+
+  /* handle —— 1:1(18px 径向渐变圆珠 + 3px 白边) */
+  .handle{
+    position:absolute;width:18px;height:18px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--gc-handle-highlight) 0 10%,var(--gc-handle-mid) 24%,var(--gc-edge) 56%,var(--gc-handle-dark) 100%);
+    border:3px solid #ffffff;
+    box-shadow:0 0 0 1px var(--gc-handle-ring),0 3px 7px rgba(0,0,0,.42),
+      inset -2px -3px 4px rgba(0,0,0,.28),inset 2px 2px 3px rgba(255,255,255,.55);
+    transform:translate(-50%,-50%);z-index:5;
+  }
+  .handle-label{
+    position:absolute;transform:translate(8px,-50%);
+    font-size:10px;color:var(--gc-text-muted);white-space:nowrap;
+    background:var(--gc-panel);padding:1px 7px;border-radius:4px;border:1px solid var(--gc-border);
+    pointer-events:none;
+  }
+
+  /* 图例(文档用,非产品 UI) */
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--gc-text-muted)}
+  .legend .item{display:flex;align-items:center;gap:7px}
+  .legend .demo-badge{
+    width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10px;font-weight:700;
+    background:var(--gc-media-overlay);color:var(--gc-media-overlay-text);border:1.5px solid #fff;
+  }
+  .legend .demo-badge.hot{background:var(--gc-accent);color:var(--gc-accent-cta-ink)}
+  .legend .demo-none{
+    width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    border:1.5px dashed var(--gc-border-strong);color:var(--gc-text-muted);font-size:11px;
+  }
+
+  .notes{margin-top:14px;font-size:11.5px;color:var(--gc-text-muted);line-height:1.75}
+  .notes li{margin-left:18px;margin-bottom:2px}
+  .num{color:var(--gc-accent);font-family:var(--mono);font-weight:700;margin-right:4px}
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div>
+    <h1>R-38 · 参考图序号徽标(示意原型,供评审)</h1>
+    <p>已按 2026-09-18 晚用户裁定收敛:<b>徽标跟随当前选中的目标显示</b> —— image/video 节点被选中时,连入它的各源图在<b>图片右上角</b>显示「自己在该目标入边数组中的序号」;<b>未选中目标时不显示任何徽标</b>。除徽标外,节点卡 / handle / 连线 1:1 取自 src/index.css 现有 token。</p>
+  </div>
+  <div class="theme-switch" role="group" aria-label="主题切换(仅文档用)">
+    <button data-theme="obsidian" aria-pressed="true">曜黑</button>
+    <button data-theme="apple" aria-pressed="false">简白</button>
+    <button data-theme="eye" aria-pressed="false">护眼绿</button>
+  </div>
+</div>
+
+<!-- ================= 场景 ① 单目标双图:选中 vs 未选中 ================= -->
+<div class="scene-label"><span class="tag">场景 ①</span><h2>单目标 · 双参考图 —— 选中显示 / 未选中隐藏</h2></div>
+<div class="scene-sub">同一个画布的两帧。左帧:目标「面料换色」被选中 → 两张源图右上角出现序号徽标,且用户刚点击提示词里的「参考图 2」,徽标 2 处于对应确认高亮。右帧:未选中任何目标 → <b>不显示任何徽标</b>(默认态与选中态的区分 = 徽标整体的有无,无歧义)。</div>
+<div class="frames">
+
+  <div class="frame">
+    <div class="frame-title"><span class="k">帧 A</span>目标「面料换色」已选中 → 徽标显示</div>
+    <div class="canvas">
+      <svg class="edges" viewBox="0 0 560 400" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="none" stroke="var(--gc-edge)" stroke-width="1.4"/>
+          </marker>
+        </defs>
+        <path class="edge-path" d="M 230 108 C 280 108, 280 192, 322 198" marker-end="url(#arrA)"/>
+        <path class="edge-path edge-selected" d="M 230 314 C 280 314, 280 230, 322 224" marker-end="url(#arrA)"/>
+      </svg>
+      <!-- 款式图(源)· 徽标 1 · 常态 -->
+      <div class="node" style="left:14px;top:52px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot"><span class="badge-ordinal">1</span></div></div>
+      </div>
+      <!-- 面料参考图(源)· 徽标 2 · 确认高亮 -->
+      <div class="node confirm" style="left:14px;top:258px">
+        <div class="node-header"><span class="status-dot"></span>面料参考图</div>
+        <div class="node-body"><div class="img-slot"><span class="badge-ordinal">2</span></div></div>
+      </div>
+      <!-- image 目标节点(选中) -->
+      <div class="node selected" style="left:324px;top:118px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 面料换色</div>
+        <div class="node-body">
+          <div class="inner-box">提示词正文:把 <span class="prompt-token">参考图 1</span> 的款式替换为 <span class="prompt-token">参考图 2</span> 的面料</div>
+          <div class="inner-box">参考图片 <b>2 / 8</b>(拉线顺序自动编号)</div>
+        </div>
+      </div>
+      <div class="handle" style="left:230px;top:108px"></div>
+      <div class="handle" style="left:230px;top:314px"></div>
+      <div class="handle" style="left:324px;top:211px"></div>
+      <div class="handle-label" style="left:332px;top:211px">图片输入(0–8)</div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-title"><span class="k">帧 B</span>未选中任何目标 → 徽标隐藏</div>
+    <div class="canvas">
+      <svg class="edges" viewBox="0 0 560 400" preserveAspectRatio="none">
+        <path class="edge-path" d="M 230 108 C 280 108, 280 192, 322 198" marker-end="url(#arrA)"/>
+        <path class="edge-path" d="M 230 314 C 280 314, 280 230, 322 224" marker-end="url(#arrA)"/>
+      </svg>
+      <div class="node" style="left:14px;top:52px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot"></div></div>
+      </div>
+      <div class="node" style="left:14px;top:258px">
+        <div class="node-header"><span class="status-dot"></span>面料参考图</div>
+        <div class="node-body"><div class="img-slot"></div></div>
+      </div>
+      <div class="node" style="left:324px;top:118px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 面料换色</div>
+        <div class="node-body">
+          <div class="inner-box">提示词正文:把 <span class="prompt-token">参考图 1</span> 的款式替换为 <span class="prompt-token">参考图 2</span> 的面料</div>
+          <div class="inner-box">参考图片 <b>2 / 8</b>(拉线顺序自动编号)</div>
+        </div>
+      </div>
+      <div class="handle" style="left:230px;top:108px"></div>
+      <div class="handle" style="left:230px;top:314px"></div>
+      <div class="handle" style="left:324px;top:211px"></div>
+      <div class="handle-label" style="left:332px;top:211px">图片输入(0–8)</div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li><span class="num">①</span>拉线即成号:第一条入边 = 1,第二条 = 2,<b>用户零操作</b>;断线后序号自动补位(规则见 design.md §2.4)。</li>
+  <li><span class="num">②</span>徽标贴在<b>源图右上角</b>(用户原话位置),半透明黑底 + 白描边,三主题同形同义 —— 不靠颜色区分。</li>
+  <li><span class="num">③</span>点击正文「参考图 2」→ 徽标 2 与正文 token 同步变强调色 + 缩略图描边,一眼确认「哪张是面料」。</li>
+  <li><span class="num">④</span>默认态 = <b>无徽标</b>(帧 B):选中/未选中的区分是徽标整体有无,而非样式变化,不存在混淆空间。</li>
+</ul>
+
+<!-- ================= 场景 ② 一源连双目标:两帧对照 ================= -->
+<div class="scene-label"><span class="tag">场景 ②</span><h2>一张源图 · 连两个目标 —— 序号随选中目标切换(两帧对照)</h2></div>
+<div class="scene-sub">款式图同时喂给「面料换色」与「草图→效果图」。序号没有全局意义:它在 A 里是第 1 张、在 B 里是第 2 张。徽标永远按<b>当前选中的目标</b>解释 —— 左帧选中 A,款式图 = 1;右帧选中 B,同一位置变为 2、草图 = 1。切换目标时数字 150ms 翻转,位置不动。</div>
+<div class="frames">
+
+  <div class="frame">
+    <div class="frame-title"><span class="k">帧 A</span>选中「面料换色」→ 款式图 = 1(草图不连它,无标)</div>
+    <div class="canvas">
+      <svg class="edges" viewBox="0 0 560 400" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="none" stroke="var(--gc-edge)" stroke-width="1.4"/>
+          </marker>
+        </defs>
+        <path class="edge-path edge-selected" d="M 230 168 C 285 168, 285 92, 322 88" marker-end="url(#arrB)"/>
+        <path class="edge-path" d="M 230 168 C 285 168, 285 322, 322 318" marker-end="url(#arrB)"/>
+        <path class="edge-path" d="M 230 358 C 285 358, 285 346, 322 344" marker-end="url(#arrB)"/>
+      </svg>
+      <!-- 款式图(源)· 相对 A = 1 -->
+      <div class="node" style="left:14px;top:112px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot"><span class="badge-ordinal">1</span></div></div>
+      </div>
+      <!-- 草图(源)· 不连 A → 无标 -->
+      <div class="node" style="left:14px;top:302px">
+        <div class="node-header"><span class="status-dot"></span>款式草图</div>
+        <div class="node-body"><div class="img-slot"></div></div>
+      </div>
+      <!-- 目标 A(选中) -->
+      <div class="node selected" style="left:324px;top:26px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 面料换色</div>
+        <div class="node-body">
+          <div class="inner-box">参考图片 <b>1 / 8</b> · <span class="prompt-token">参考图 1</span> = 款式图</div>
+        </div>
+      </div>
+      <!-- 目标 B(未选中) -->
+      <div class="node" style="left:324px;top:262px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 草图→效果图</div>
+        <div class="node-body">
+          <div class="inner-box">参考图片 <b>2 / 8</b> · <span class="prompt-token">参考图 1</span> = 款式草图,<span class="prompt-token">参考图 2</span> = 款式图</div>
+        </div>
+      </div>
+      <div class="handle" style="left:230px;top:168px"></div>
+      <div class="handle" style="left:230px;top:358px"></div>
+      <div class="handle" style="left:324px;top:88px"></div>
+      <div class="handle" style="left:324px;top:330px"></div>
+      <div class="handle-label" style="left:332px;top:88px">图片输入(0–8)</div>
+      <div class="handle-label" style="left:332px;top:330px">图片输入(0–8)</div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <div class="frame-title"><span class="k">帧 B</span>选中「草图→效果图」→ 草图 = 1,同一款式图变为 2</div>
+    <div class="canvas">
+      <svg class="edges" viewBox="0 0 560 400" preserveAspectRatio="none">
+        <path class="edge-path" d="M 230 168 C 285 168, 285 92, 322 88" marker-end="url(#arrB)"/>
+        <path class="edge-path edge-selected" d="M 230 168 C 285 168, 285 322, 322 318" marker-end="url(#arrB)"/>
+        <path class="edge-path edge-selected" d="M 230 358 C 285 358, 285 346, 322 344" marker-end="url(#arrB)"/>
+      </svg>
+      <!-- 款式图(源)· 相对 B = 2 -->
+      <div class="node" style="left:14px;top:112px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot"><span class="badge-ordinal">2</span></div></div>
+      </div>
+      <!-- 草图(源)· 相对 B = 1 -->
+      <div class="node" style="left:14px;top:302px">
+        <div class="node-header"><span class="status-dot"></span>款式草图</div>
+        <div class="node-body"><div class="img-slot"><span class="badge-ordinal">1</span></div></div>
+      </div>
+      <div class="node" style="left:324px;top:26px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 面料换色</div>
+        <div class="node-body">
+          <div class="inner-box">参考图片 <b>1 / 8</b> · <span class="prompt-token">参考图 1</span> = 款式图</div>
+        </div>
+      </div>
+      <div class="node selected" style="left:324px;top:262px;width:222px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 草图→效果图</div>
+        <div class="node-body">
+          <div class="inner-box">参考图片 <b>2 / 8</b> · <span class="prompt-token">参考图 1</span> = 款式草图,<span class="prompt-token">参考图 2</span> = 款式图</div>
+        </div>
+      </div>
+      <div class="handle" style="left:230px;top:168px"></div>
+      <div class="handle" style="left:230px;top:358px"></div>
+      <div class="handle" style="left:324px;top:88px"></div>
+      <div class="handle" style="left:324px;top:330px"></div>
+      <div class="handle-label" style="left:332px;top:88px">图片输入(0–8)</div>
+      <div class="handle-label" style="left:332px;top:330px">图片输入(0–8)</div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li><span class="num">①</span>同一源图在两个目标里序号不同是<b>事实</b>,不是歧义 —— 徽标从不脱离「选中目标」这个语境单独出现。</li>
+  <li><span class="num">②</span>不连当前选中目标的源(帧 A 的草图)保持无标,画布上不会出现「不属于本次语境」的数字。</li>
+  <li><span class="num">③</span>目标内参考图列表文字(「参考图 1 = 款式草图」)与源图徽标同源同号,交叉印证。</li>
+</ul>
+
+<!-- ================= 图例 ================= -->
+<div class="scene-label"><span class="tag">图例</span><h2>徽标两态 + 默认态(文档说明用,非产品内元素)</h2></div>
+<div class="legend">
+  <span class="item"><span class="demo-badge">2</span>常态:图上半透明黑底 + 白描边(三主题不变形)</span>
+  <span class="item"><span class="demo-badge hot">2</span>确认高亮:点击「参考图 N」时联动(强调色 + 数字 + 缩略图描边)</span>
+  <span class="item"><span class="demo-none">—</span>默认态:未选中目标 = 不渲染徽标(不是隐藏数字,是元素不存在)</span>
+</div>
+
+<script>
+  // 仅文档演示用:主题切换,把三段 token 换成 src/index.css 的对应主题
+  const btns = document.querySelectorAll('.theme-switch button');
+  btns.forEach(b => b.addEventListener('click', () => {
+    document.documentElement.dataset.theme = b.dataset.theme;
+    btns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+</script>
+</body>
+</html>
