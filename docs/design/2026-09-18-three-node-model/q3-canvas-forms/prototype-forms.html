@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>R-35 Q3 · 画布形态对比(示意)</title>
+<style>
+  :root{
+    --canvas:#16181d;
+    --accent:#FFC940;
+    --edge:#FFC940;
+    --node-bg:#ffffff;
+    --node-inner:#f2f3f5;
+    --node-text:#1d1d1f;
+    --node-muted:#6b7075;
+    --node-border:#e4e6ea;
+    --handle-ring:rgba(255,201,64,.75);
+    --handle-glow:rgba(255,212,105,.8);
+    --font:"Inter","SF Pro Display","Helvetica Neue","PingFang SC","Noto Sans SC",sans-serif;
+    --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0e0f12;font-family:var(--font);padding:36px 44px;color:#e8eaee}
+  .doc-head{margin-bottom:22px}
+  .doc-head h1{font-size:22px;font-weight:700;letter-spacing:.02em}
+  .doc-head p{font-size:12.5px;color:#9ba1a9;margin-top:6px}
+  .panels{display:flex;gap:36px;align-items:flex-start}
+  .panel{flex:1}
+  .panel-title{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+  .panel-title .tag{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--accent);border:1px solid rgba(255,201,64,.4);border-radius:999px;padding:2px 10px}
+  .panel-title h2{font-size:17px;font-weight:700}
+  .panel-sub{font-size:12px;color:#9ba1a9;margin-bottom:14px}
+  .canvas{
+    position:relative;height:460px;border-radius:14px;overflow:hidden;
+    background:var(--canvas);
+    background-image:radial-gradient(circle,#262930 1px,transparent 1px);
+    background-size:20px 20px;
+    border:1px solid #2a2e35;
+  }
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .edge-path{stroke:var(--edge);stroke-width:1.8;fill:none}
+  .edge-dash{stroke-dasharray:5 5}
+
+  .node{
+    position:absolute;width:236px;background:var(--node-bg);color:var(--node-text);
+    border:1px solid var(--node-border);border-radius:10px;
+    box-shadow:0 10px 28px rgba(8,14,22,.2);
+    font-size:11px;
+  }
+  .node-header{
+    display:flex;align-items:center;gap:7px;padding:7px 10px;
+    border-bottom:1px solid var(--node-border);font-weight:600;font-size:11.5px;
+  }
+  .status-dot{width:8px;height:8px;border-radius:50%;background:#8e8e93;flex:none}
+  .node-body{padding:9px 10px;display:flex;flex-direction:column;gap:7px}
+  .inner-box{
+    background:var(--node-inner);border:1px solid var(--node-border);border-radius:6px;
+    padding:6px 8px;color:var(--node-muted);font-size:10px;line-height:1.5;
+  }
+  .img-slot{
+    height:74px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(135deg,#eceef1 0 8px,#e3e6ea 8px 16px);
+    border:1px solid var(--node-border);color:#9aa0a8;font-size:10px;
+  }
+  .inner-box b{color:var(--node-text);font-weight:600}
+
+  .handle{
+    position:absolute;width:18px;height:18px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffe9ac 0 10%,#ffd469 24%,#FFC940 56%,#8a6d00 100%);
+    border:3px solid #ffffff;
+    box-shadow:0 0 0 1px var(--handle-ring),0 3px 7px rgba(0,0,0,.42),
+      inset -2px -3px 4px rgba(138,109,0,.55),inset 2px 2px 3px rgba(255,233,172,.62);
+    transform:translate(-50%,-50%);
+    z-index:5;
+  }
+  .handle.small{width:13px;height:13px;border-width:2.5px}
+  .handle-label{
+    position:absolute;transform:translate(8px,-50%);
+    font-size:10px;color:#c9cdd4;white-space:nowrap;
+    background:rgba(22,24,29,.85);padding:1px 7px;border-radius:4px;border:1px solid #33373f;
+    pointer-events:none;
+  }
+
+  .badge{
+    display:inline-block;font-size:9.5px;padding:1px 7px;border-radius:999px;
+    background:rgba(255,201,64,.14);color:var(--accent);border:1px solid rgba(255,201,64,.35);
+    font-weight:600;
+  }
+  .notes{margin-top:14px;font-size:12px;color:#c9cdd4;line-height:1.7}
+  .notes li{margin-left:18px;margin-bottom:2px}
+  .num{color:var(--accent);font-family:var(--mono);font-weight:700;margin-right:4px}
+</style>
+</head>
+<body>
+<div class="doc-head">
+  <h1>R-35 Q3 · 同一任务、两种形态(示意,非真实截图)</h1>
+  <p>任务:「把款式图换成参考面料的颜色」· 曜黑·活力黄主题 · 节点卡/HANDLE/连线样式取自 src/index.css 现有 token</p>
+</div>
+
+<div class="panels">
+  <!-- ============ 形态 A ============ -->
+  <section class="panel">
+    <div class="panel-title"><span class="tag">形态 A</span><h2>抹平 · 统一连线</h2><span class="badge">推荐</span></div>
+    <div class="panel-sub">image 节点只有一个通用图片入口;「谁是面料」由选中的系统提示词声明</div>
+    <div class="canvas" id="canvas-a">
+      <svg class="edges" viewBox="0 0 640 460" preserveAspectRatio="none">
+        <defs>
+          <marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="none" stroke="var(--edge)" stroke-width="1.4"/>
+          </marker>
+        </defs>
+        <path class="edge-path" d="M 232 118 C 292 118, 292 199, 354 205" marker-end="url(#arr-a)"/>
+        <path class="edge-path" d="M 232 330 C 292 330, 292 239, 354 233" marker-end="url(#arr-a)"/>
+      </svg>
+      <!-- 款式图节点 -->
+      <div class="node" style="left:14px;top:64px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot">图片</div></div>
+      </div>
+      <!-- 面料参考图节点 -->
+      <div class="node" style="left:14px;top:276px">
+        <div class="node-header"><span class="status-dot"></span>面料参考图</div>
+        <div class="node-body"><div class="img-slot">图片</div></div>
+      </div>
+      <!-- image 节点 -->
+      <div class="node" style="left:360px;top:150px;width:264px">
+        <div class="node-header"><span class="status-dot"></span>图像生成 · 面料换色</div>
+        <div class="node-body">
+          <div class="inner-box">功能(悬浮窗选择):<b>面料换色</b><br>提示词声明:「参考图 2 = 面料」</div>
+          <div class="inner-box">参考图片 <b>2 / 8</b>(顺序语义)</div>
+        </div>
+      </div>
+      <!-- handles A -->
+      <div class="handle" style="left:250px;top:118px"></div>
+      <div class="handle" style="left:250px;top:330px"></div>
+      <div class="handle" style="left:360px;top:219px"></div>
+      <div class="handle-label" style="left:368px;top:219px">图片输入(0–8)</div>
+    </div>
+    <ul class="notes">
+      <li><span class="num">①</span>连线动作:拖线 → 落在唯一入口,松手即成。<b>1 步,无二次指认</b>。</li>
+      <li><span class="num">②</span>语义落在「功能选择」上:提示词正文声明第几张是面料。</li>
+      <li><span class="num">③</span>代价:用户需记住参考图顺序(现有顺序语义已如此)。</li>
+    </ul>
+  </section>
+
+  <!-- ============ 形态 B ============ -->
+  <section class="panel">
+    <div class="panel-title"><span class="tag">形态 B</span><h2>保留多 handle(现状)</h2></div>
+    <div class="panel-sub">image 节点带「款式」「面料」两个专用入口,连线时显式区分语义</div>
+    <div class="canvas" id="canvas-b">
+      <svg class="edges" viewBox="0 0 640 460" preserveAspectRatio="none">
+        <defs>
+          <marker id="arr-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="none" stroke="var(--edge)" stroke-width="1.4"/>
+          </marker>
+        </defs>
+        <path class="edge-path" d="M 232 118 C 286 118, 288 178, 346 180" marker-end="url(#arr-b)"/>
+        <path class="edge-path" d="M 232 330 C 286 330, 288 256, 346 254" marker-end="url(#arr-b)"/>
+      </svg>
+      <div class="node" style="left:14px;top:64px">
+        <div class="node-header"><span class="status-dot"></span>款式图</div>
+        <div class="node-body"><div class="img-slot">图片</div></div>
+      </div>
+      <div class="node" style="left:14px;top:276px">
+        <div class="node-header"><span class="status-dot"></span>面料参考图</div>
+        <div class="node-body"><div class="img-slot">图片</div></div>
+      </div>
+      <div class="node" style="left:350px;top:126px;width:250px">
+        <div class="node-header"><span class="status-dot"></span>面料/配色替换</div>
+        <div class="node-body">
+          <div class="inner-box">左侧输入口:<b>上=款式/补充参考,下=面料参考</b>;总计最多 8 图</div>
+          <div class="inner-box">配色:蓝灰 #5A7D9C · 米白 #E8E2D5</div>
+        </div>
+      </div>
+      <!-- handles B: 节点左缘 x=350,上 32% / 下 68% -->
+      <div class="handle" style="left:250px;top:118px"></div>
+      <div class="handle" style="left:250px;top:330px"></div>
+      <div class="handle" style="left:350px;top:180px"></div>
+      <div class="handle" style="left:350px;top:254px"></div>
+      <div class="handle-label" style="left:358px;top:180px">款式</div>
+      <div class="handle-label" style="left:358px;top:254px">面料</div>
+    </div>
+    <ul class="notes">
+      <li><span class="num">①</span>连线动作:拖线 → <b>必须判断落上口还是下口</b> → 松手。多 1 次指认。</li>
+      <li><span class="num">②</span>语义由 handle 位置承载,看图即知角色,不依赖提示词文字。</li>
+      <li><span class="num">③</span>代价:handle 语义写死在节点类型里,新功能又要新增专用口。</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

@@ -113,8 +113,8 @@ body{background:var(--board-bg);color:var(--board-ink);
 section{margin-top:80px}
 
 /* ---- 画布舞台 ---- */
-.stage{position:relative;height:1050px;border-radius:20px;overflow:hidden;
-  background:var(--gc-canvas);min-height:700px;box-shadow:var(--node-shadow)}
+.stage{position:relative;height:1400px;border-radius:20px;overflow:hidden;
+  background:var(--gc-canvas);min-height:1400px;box-shadow:var(--node-shadow)}
 .stage::before{content:"";position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(circle, var(--gc-border) 1px, transparent 1.3px) 0 0/24px 24px}
 .stagelabel{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--board-muted);opacity:.85}
@@ -391,72 +391,23 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
     <span class="stagelabel tr">1280 × AUTO</span>
     <span class="stagelabel bl">GRID 24</span>
     <span class="stagelabel br">REVIEW</span>
-    <svg class="ct-svg" viewBox="0 0 1140 1050" preserveAspectRatio="none">
+    <svg class="ct-svg" viewBox="0 0 1140 1400" preserveAspectRatio="none">
       <defs>
         <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--gc-accent)"/>
         </marker>
       </defs>
-      <path d="M 330 150 C 400 150, 410 330, 480 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
-      <path d="M 330 470 C 400 470, 410 344, 480 342" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
-      <path d="M 790 340 C 828 340, 830 330, 836 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 330 150 C 360 150, 378 330, 408 330" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 330 494 C 360 494, 378 344, 408 342" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 730 340 C 750 340, 756 180, 776 180" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
+      <path d="M 730 360 C 750 360, 756 520, 776 520" fill="none" stroke="var(--gc-accent)" stroke-width="1.8" marker-end="url(#ar4)"/>
     </svg>
 
     <!-- 连线语义标签 -->
-    <span class="edge-label" style="left:415px;top:252px">图片</span>
-    <span class="edge-label" style="left:415px;top:430px">图片</span>
-    <span class="edge-label" style="left:820px;top:336px">图片</span>
-
-    <div class="node" style="left:40px; top:700px;">
-      <div class="node-head">
-        <span class="dot running"></span>
-        <span class="title">迁移结果 · 生成中</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-shimmer"></div>
-          <div class="result-badge running">RUNNING</div>
-          <div class="result-progress"></div>
-        </div>
-        <div class="node-foot"><span class="hint">预计 12s · 排队 2</span><span class="hint">Kling v1.6</span></div>
-      </div>
-    </div>
-
-    <div class="node" style="left:796px; top:238px;">
-      <div class="node-head">
-        <span class="dot success"></span>
-        <span class="title">迁移结果</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span><span class="handle out"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-reveal"></div>
-          <div class="result-done-ring"></div>
-          <span>IMAGE · 结果槽位</span>
-        </div>
-        <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
-      </div>
-    </div>
-
-    <div class="node" style="left:796px; top:436px;">
-      <div class="node-head">
-        <span class="dot success"></span>
-        <span class="title">视频迁移结果</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span><span class="handle out"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-play"></div>
-          <div class="result-badge">VIDEO</div>
-          <span>VIDEO · 结果槽位</span>
-        </div>
-        <div class="node-foot"><span class="hint">00:08 · 24fps · 1080p</span><span class="hint">Kling v1.6</span></div>
-      </div>
-    </div>
+    <span class="edge-label" style="left:384px;top:240px">图片</span>
+    <span class="edge-label" style="left:384px;top:418px">图片</span>
+    <span class="edge-label" style="left:752px;top:260px">图片</span>
+    <span class="edge-label" style="left:752px;top:440px">视频</span>
 
     <div class="node" style="left:40px; top:96px;">
       <div class="node-head">
@@ -471,7 +422,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       </div>
     </div>
 
-    <div class="node" style="left:40px; top:416px;">
+    <div class="node" style="left:40px; top:440px;">
       <div class="node-head">
         <span class="dot idle"></span>
         <span class="title">图2 · 风格参考</span>
@@ -484,58 +435,7 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       </div>
     </div>
 
-    <div class="node" style="left:40px; top:700px;">
-      <div class="node-head">
-        <span class="dot running"></span>
-        <span class="title">迁移结果 · 生成中</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-shimmer"></div>
-          <div class="result-badge running">RUNNING</div>
-          <div class="result-progress"></div>
-        </div>
-        <div class="node-foot"><span class="hint">预计 12s · 排队 2</span><span class="hint">Kling v1.6</span></div>
-      </div>
-    </div>
-
-    <div class="node" style="left:796px; top:238px;">
-      <div class="node-head">
-        <span class="dot success"></span>
-        <span class="title">迁移结果</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span><span class="handle out"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-reveal"></div>
-          <div class="result-done-ring"></div>
-          <span>IMAGE · 结果槽位</span>
-        </div>
-        <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
-      </div>
-    </div>
-
-    <div class="node" style="left:796px; top:436px;">
-      <div class="node-head">
-        <span class="dot success"></span>
-        <span class="title">视频迁移结果</span>
-        <span class="kind">RESULT</span>
-        <span class="handle in"></span><span class="handle out"></span>
-      </div>
-      <div class="node-body">
-        <div class="thumb" style="position:relative;">
-          <div class="result-play"></div>
-          <div class="result-badge">VIDEO</div>
-          <span>VIDEO · 结果槽位</span>
-        </div>
-        <div class="node-foot"><span class="hint">00:08 · 24fps · 1080p</span><span class="hint">Kling v1.6</span></div>
-      </div>
-    </div>
-
-    <div class="node selected" style="left:480px; top:200px;">
+    <div class="node selected" style="left:408px; top:200px;">
       <div class="node-head">
         <span class="dot running"></span>
         <span class="title">图案风格迁移</span>
@@ -556,17 +456,57 @@ input[type=range]{accent-color:var(--gc-accent);width:160px}
       </div>
     </div>
 
-    <div class="node" style="left:796px; top:238px;">
+    <!-- 结果节点示例:生成中(shimmer) -->
+    <div class="node" style="left:40px; top:784px;">
       <div class="node-head">
-        <span class="dot idle"></span>
-        <span class="title">迁移结果</span>
+        <span class="dot running"></span>
+        <span class="title">迁移结果 · 生成中</span>
         <span class="kind">RESULT</span>
         <span class="handle in"></span>
       </div>
       <div class="node-body">
-        <div class="drop" style="height:110px;"><span class="glyph">◍</span>等待上游输出</div>
-        <button class="run" disabled>未验证不可运行</button>
-        <p class="warn-line">该流程尚未通过评估，暂不可付费运行。</p>
+        <div class="thumb" style="position:relative;">
+          <div class="result-shimmer"></div>
+          <div class="result-badge running">RUNNING</div>
+          <div class="result-progress"></div>
+        </div>
+        <div class="node-foot"><span class="hint">预计 12s · 排队 2</span><span class="hint">Kling v1.6</span></div>
+      </div>
+    </div>
+
+    <!-- 结果节点示例:生成完成(blur→clear + 边框呼吸) -->
+    <div class="node" style="left:776px; top:96px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-reveal"></div>
+          <div class="result-done-ring"></div>
+          <span>IMAGE · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">生成于 14:32 · 1536×2048</span><span class="hint">1 / 1</span></div>
+      </div>
+    </div>
+
+    <!-- 结果节点示例:视频结果 -->
+    <div class="node" style="left:776px; top:436px;">
+      <div class="node-head">
+        <span class="dot success"></span>
+        <span class="title">视频迁移结果</span>
+        <span class="kind">RESULT</span>
+        <span class="handle in"></span><span class="handle out"></span>
+      </div>
+      <div class="node-body">
+        <div class="thumb" style="position:relative;">
+          <div class="result-play"></div>
+          <div class="result-badge">VIDEO</div>
+          <span>VIDEO · 结果槽位</span>
+        </div>
+        <div class="node-foot"><span class="hint">00:08 · 24fps · 1080p</span><span class="hint">Kling v1.6</span></div>
       </div>
     </div>
   </div>
