@@ -1,7 +1,7 @@
 # R-40 · 悬浮窗口(功能设置)—— 交互与视觉规范
 
 - 日期:2026-09-18 · 作者:designer
-- 状态:**待用户评审**(原型 + 规范;按 AGENTS.md §2,实施前需用户确认)
+- 状态:**用户已确认(2026-09-18 晚)· ① 入口条按裁定 B 修订**——仅选中时显示,双击节点体/Enter 为主入口。三个开放点的裁定结果见 §9;键位语义查清见 §2.1.1(代码实证)
 - 裁定基线:plan.md v3.2(R4 悬浮窗口三项配置 / R5 参数自由 key-value / R6 只列已发布)+ R-39(撤销=运行拒绝+提示重选)+ Q1=B(text 节点可运行,采纳=显式动作)
 - 用户视角验收基线:`docs/requests/2026-09-18-user-task-map.md`(12 任务 / 拉线心智模型 / 14 项功能最小集)——对照结果见 §7
 - 纪律:本目录只含文档与原型,不改 `src/**`、不改 `contracts/**`
@@ -10,9 +10,10 @@
 
 | 文件 | 类型 | 真实性 |
 |---|---|---|
-| `prototype-window.html` | 示意原型(可复截,支持 `?theme=&scene=` 直出) | **示意**;画布/节点/handle/连线/状态色/三主题 token **1:1 取自 `src/index.css`**,悬浮窗口为本提案新设计 |
+| `prototype-window.html` | 示意原型(可复截,支持 `?theme=&scene=` 直出;场景含 S0a/S0b 入口条两帧) | **示意**;画布/节点/handle/连线/状态色/三主题 token **1:1 取自 `src/index.css`**,悬浮窗口为本提案新设计 |
 | `tokens.css` | 机读 token(**唯一事实源**) | `--iw-*` 全部数值只在此出现一次;本文引用不复述 |
-| `shots/s1-{obsidian,apple,eye}-{1024,1280,1440}.png` | 三主题 × 三档宽 · 主场景 | 示意原型实截 |
+| `shots/s0a|s0b-{obsidian,apple,eye}-{1024,1280,1440}.png` | 入口条默认态 / 选中态 · 三主题 × 三档宽(修订 B) | 示意原型实截 |
+| `shots/s1-{obsidian,apple,eye}-{1024,1280,1440}.png` | 三主题 × 三档宽 · 主场景(打开态) | 示意原型实截 |
 | `shots/s2|s3|s4-{obsidian,apple}-1280.png` | 撤销态 / 蒙版 / 采纳 · 双主题 | 示意原型实截 |
 | 本文 | 规范(人读版) | — |
 
@@ -30,15 +31,49 @@
 
 ## 2. 交互规范
 
-### 2.1 打开入口(三个,等效)
+### 2.1 打开入口(修订 B:仅选中时显示入口条,双击/Enter 为主)
 
 | 入口 | 触发 | 说明 |
 |---|---|---|
-| 节点卡「功能」入口条 | 单击 | 节点卡底部常态可见的胶囊条(图标 ⚙ + 当前功能名 / 未选时「选择功能」),是**主入口**;未选功能时它同时承担「这个节点还没配功能」的自解释 |
-| 双击节点体 | 双击 | 快捷路径 |
-| 键盘 | `Enter`(选中节点时) / `Esc` 关 | 焦点在节点上时 Enter 打开;窗口内 Esc 关闭并把焦点还给节点 |
+| **双击节点体** | 双击 | **主入口(指针路径)**。单击只选中;双击 = 选中 + 打开。不依赖入口条 |
+| **Enter** | 键盘 | **主入口(键盘路径)**。选中节点(或焦点在节点上)时按 Enter 打开。完整键盘流见 §2.1.2 |
+| 节点卡「功能」入口条 | 单击 | **仅选中态渲染的显式锚点**(次入口):选中节点时入口条出现(图标 ⚙ + 当前功能名 / 未选时「选择功能」),未选中时**不渲染**——节点卡默认干净。点击打开窗口 |
 
-**双击节点打开、单击节点只选中**(选中负责序号徽标语境,见 R-38)——打开窗口不改变 R-38 的徽标语境,两者互不干扰。
+- 入口条出现/收起动效 = `tokens.css` `--iw-entry-motion`(高度+透明度);`prefers-reduced-motion` 时零动效直接显示/隐藏。
+- 「双击节点打开、单击节点只选中」语义保持——打开窗口不改变 R-38 的徽标语境(选中才显示序号徽标),两者互不干扰。
+- 未选功能时,入口条文案「选择功能」在选中态承担「这张卡还没配功能」的自解释;该自解释不依赖常驻。
+
+#### 2.1.1 双击/Enter 既有语义查清(代码实证,2026-09-19)
+
+**双击(2026-09-19 实证,`@xyflow/react@12.3.6` 实测 + `src/` 全量检索):**
+
+| 双击目标 | 既有语义 | 出处 | 结论 |
+|---|---|---|---|
+| 节点标题 | **改名**(进入标题行内编辑) | `src/components/nodes/NodeFrame.tsx:136`(`onDoubleClick` → `setEditing(true)`,title 提示「双击改名」) | **保留,不冲突**。打开窗口的双击绑定在**节点体**(正文/缩略图区),不落在标题 |
+| 画布空白 | **缩放一档** | `zoomOnDoubleClick` 默认 `true` 且 `CanvasFlow.tsx` 未覆盖(`node_modules/@xyflow/react/dist/esm/index.js:1298` 默认参数;缩放处理器挂在 `.react-flow__renderer` 的 `dblclick.zoom`) | **保留,不冲突**。空白双击继续缩放 |
+| 节点体 | **无既有语义** | 全量检索 `onDoubleClick` 仅 3 处:ProjectTabs(tab 改名)、ImageViewer、NodeFrame 标题。节点体(正文/缩略图)无绑定 | **零冲突,直接赋予「打开窗口」** |
+
+一个实现细节必须写死:节点 DOM 位于 `.react-flow__renderer` 内部,双击节点事件会冒泡到 renderer 上的 `dblclick.zoom` 处理器。xyflow 的 `createFilter`(`@xyflow/system/dist/esm/index.js:2864-2868`)对被 `nopan` 类包裹的元素**拒绝**该处理器——而 NodeWrapper 对可拖节点恰好挂了 `nopan`(`react/dist/esm/index.js:2330` 附近 `{[noPanClassName]: isDraggable}`)。因此**双击可拖节点天然不触发缩放**;但只读模式 `nodesDraggable=false` 时节点无 `nopan` 类,双击节点会冒泡缩放——**实现时双击处理器必须 `event.stopPropagation()`**(改名双击在标题上已有缩放豁免同理)。这不是可选项,是规范的一部分。
+
+**Enter(选中/聚焦态):**
+
+| 状态 | 既有语义 | 出处 | 结论 |
+|---|---|---|---|
+| 画布选中节点,焦点不在输入框 | **无全局绑定**(全局快捷键只占 Ctrl/Meta 组合键,`src/App.tsx:145`) | 全量检索 `key === "Enter"`:仅 3 处输入场景(标题编辑 commit `NodeFrame.tsx:123`、ProjectTabs 改名、FabricRecolorNode 加色号)+ `useCoalescedTextEdit` 的 IME 防误触 | **零冲突**。Enter 可安全赋予「打开窗口」 |
+| 焦点在节点上(xyflow `nodesFocusable=true` 为 store 默认,`react/dist/esm/index.js:3320`;CanvasFlow 未覆盖) | **库内置:Enter/Space = 选中切换,Escape = 取消选中**(`elementSelectionKeys = ['Enter',' ','Escape']`,`@xyflow/system/dist/esm/index.js:28`) | NodeWrapper `onKeyDown`(react index.js:2282-2293) | **共存而非替换**:Enter 打开窗口**叠在**库内置「选中」之上——先选中(或已选中)再开窗,两者语义方向一致,不互斥。实现 = 在 `onNodeKeyDown`/全局 keydown 里判断「节点已选中 && 焦点不在文本输入」→ 打开窗口 + `preventDefault`(避免再触发一次内置 toggle) |
+| 标题编辑态 | **Enter = commit 改名**(`NodeFrame.tsx:123`,且 `!isComposing` 排除 IME) | — | **保留**。焦点在标题输入框内时 Enter 永远是 commit,不开窗 |
+| IME 组字态 | **Enter = 确认组字,禁止任何快捷语义**(仓库既有纪律,`useCoalescedTextEdit.ts:30-33`) | — | 开窗判定必须 `!isComposing` |
+
+#### 2.1.2 键盘可达路径(无常驻入口条时的完整键盘流)
+
+键盘用户打开窗口的两条等价路径,**不依赖入口条**:
+
+1. **Tab 流(库原生,零实现成本)**:xyflow `nodesFocusable=true`(store 默认,CanvasFlow 未覆盖)→ Tab 进入画布后可逐个聚焦节点(节点 `tabIndex=0`、`role="group"`,NodeWrapper react index.js:2349)→ 聚焦节点上按 **Enter** → 打开窗口(叠加在库内置「Enter=选中」上,§2.1.1 共存口径)。
+2. **选中流(主路径)**:框选/单击选中节点 → 按 **Enter** → 打开窗口。
+
+窗口打开后焦点进窗(§2.4);Esc 关闭还原焦点到节点(§2.4)。**全程键盘可达,不退步**:入口条从「常驻」改为「仅选中显示」不影响任何键盘路径——Enter 的可用性从未依赖入口条的存在。
+
+打开动效与焦点管理细则不变,见 §2.4。
 
 ### 2.2 锚定与几何
 
@@ -66,7 +101,7 @@
 | 属性编辑(功能/参数/模型/运行) | **迁入悬浮窗口**,InspectorPanel 不再渲染这些字段 |
 | InspectorPanel 保留 | 仅「生成记录」视图(`ResultRecordDetail`)与节点名称编辑(名称保留在面板,避免窗口里再放一个低频字段) |
 | `PromptPresetPicker` 四键查询 | **退役**。新窗口按「功能目录(只列已发布,R6)」选变体,绑定字段(`promptVariantId/contractHash/evaluationVersion`)不变,由目录选项携带 |
-| 迁移路径 | P2-c 单批次切换:节点组件加入口条 + 新 Popover 组件;InspectorPanel 删除属性编辑分支。**不做灰度并存**(两套配置入口 = 双倍认知负担) |
+| 迁移路径 | P2-c 单批次切换:节点组件加**仅选中态渲染的**入口条(修订 B)+ 双击/Enter 打开 + 新 Popover 组件;InspectorPanel 删除属性编辑分支。**不做灰度并存**(两套配置入口 = 双倍认知负担) |
 
 ### 2.6 各状态形态(窗口级)
 
@@ -154,7 +189,7 @@
 
 ## 4. 可访问性
 
-- **键盘可达**:打开(Enter)、关闭(Esc)、窗口内 Tab 循环、目录项方向键上下移动、运行按钮 Tab 可达。
+- **键盘可达**:打开(Enter,两条等价路径见 §2.1.2)、关闭(Esc)、窗口内 Tab 循环、目录项方向键上下移动、运行按钮 Tab 可达。Tab 聚焦节点为库原生(`nodesFocusable` 默认开)。
 - **焦点管理**:打开时焦点入窗口;关闭时焦点还原节点;窗口存在期间焦点不泄漏到画布(§2.4)。
 - **aria**:窗口 `role="dialog"` + `aria-label="{节点名} · 功能设置"`;撤销条 `role="alert"`;状态行 `aria-live="polite"`;warning 行与对应输入 `aria-describedby` 关联;徽标为文字非纯图标。
 - **不靠颜色区分**:状态 = 状态点 + 文字;选中 = 描边 + 字重;撤销 = 图标 + 文案 + 灰显 + 徽标(四重编码)。
@@ -164,6 +199,8 @@
 ## 5. 视觉规范(全部数值 → `tokens.css`)
 
 窗口 = 白卡浮层:`--iw-surface` 纯白(三主题同值)、`--iw-radius` 14px(比节点卡大 2px,标记浮层身份)、四层阴影比节点卡多一档「浮起」(`--iw-shadow`)。分区节奏:三区之间 `--iw-section-gap`,字段间 `--iw-field-gap`,横向内边 `--iw-pad-x`。
+
+**入口条(修订 B)**:仅选中态渲染的胶囊控件,几何与颜色见 `tokens.css` `--iw-entry-*`(底=`--gc-node-inner`、边=`--gc-border-strong` 比卡边框深一档保证白卡上可发现、文字=`--gc-node-text` 主文字色、箭头=accent);出现/收起动效 `--iw-entry-motion`。未选中时节点卡上**不渲染任何入口条 DOM**。
 
 **与既有语言的接缝**:头部状态点 = `--gc-dot-status` + `--gc-status-*`;运行按钮 = 既有 RunButton 的胶囊几何(accent 底 + `--gc-accent-cta-ink` 字);输入字段底 = `--gc-node-inner` 同值;warning/warn 徽标 = `--gc-warn-text` 浅底变体。
 
@@ -199,15 +236,15 @@
 
 | 文件 | 覆盖 |
 |---|---|
-| `shots/s1-obsidian-{1024,1280,1440}.png` | 曜黑 · 三档宽 · 选功能 + 参数 warning + 模型适用性 |
-| `shots/s1-apple-{1024,1280,1440}.png` | 简白 · 三档宽 · 白卡跨主题浮起验证 |
-| `shots/s1-eye-{1024,1280,1440}.png` | 护眼绿 · 三档宽 |
+| `shots/s0a-{obsidian,apple,eye}-{1024,1280,1440}.png` | **默认态:未选中 → 干净节点卡(无入口条)** · 修订 B 核心帧 |
+| `shots/s0b-{obsidian,apple,eye}-{1024,1280,1440}.png` | **选中态:入口条出现 · 窗口未开** · 修订 B 核心帧 |
+| `shots/s1-{obsidian,apple,eye}-{1024,1280,1440}.png` | 打开态:选功能 + 参数 warning + 模型适用性 |
 | `shots/s2-{obsidian,apple}-1280.png` | 功能被撤销态(撤销条 + 灰显变体 + 禁运行) |
 | `shots/s3-{obsidian,apple}-1280.png` | needsMask 蒙版入口条 |
 | `shots/s4-{obsidian,apple}-1280.png` | text 节点运行成功 + 采纳区 |
 
-## 9. 待用户确认的开放点
+## 9. 开放点裁定结果(用户已确认,2026-09-18 晚)
 
-1. **入口条在节点卡上的常驻形态**:原型按「节点卡底部胶囊条(⚙ + 功能名)」呈现;若认为节点卡应更干净,备选是「仅选中态显示入口条 + 双击/Enter 为主」。
-2. **InspectorPanel 取代节奏**:本规范按 P2-c 单批次切换(§2.5);若想先并存一个版本观察,需接受双入口并明确下线时间点。
-3. **窗口宽度 320px**:比现 Inspector(256px)宽;若画布密集场景嫌占空间,可降到 288px(参数编辑器 key 列会相应压缩)。
+1. **入口条在节点卡上的形态** → **裁定 B(本修订)**:「仅选中态显示入口条 + 双击/Enter 为主」。未选中 = 干净节点卡;选中时入口条出现(§2.1);双击节点体 / Enter 打开窗口,不依赖入口条(§2.1.1 键位语义查清、§2.1.2 键盘路径)。**已按 B 修订全文与原型。**
+2. **InspectorPanel 取代节奏** → **裁定 A:P2-c 单批次直接取代**(§2.5),不并存。
+3. **窗口宽度** → **裁定 A:320px 维持**(§2.2),不降 288px。

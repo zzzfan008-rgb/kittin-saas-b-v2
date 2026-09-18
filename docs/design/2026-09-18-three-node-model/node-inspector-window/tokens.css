@@ -66,10 +66,20 @@
        各 data-theme 段已有浅底变体)与 --gc-warn-text。窗口永远渲染在节点
        语境的白卡上,因此浅底变体永远是生效的那组。 ---- */
 
+  /* ---- 入口条(修订 B:仅选中态渲染) ---- */
+  --iw-entry-font: 12px;         /* 入口条字号(比 label 高 1px:它是控件不是标注) */
+  --iw-entry-h: 34px;            /* 入口条高 */
+  --iw-entry-radius: 999px;      /* 胶囊 */
+  --iw-entry-gap: 8px;           /* 图标/功能名/箭头间距 */
+  --iw-entry-margin: 0 14px 12px;/* 入口条在节点卡内的占位(左右内边 + 底距) */
+  /* 颜色不新造:底 = --gc-node-inner,边 = --gc-border-strong(比节点卡边框深一档,
+     保证白卡上可发现),文字 = --gc-node-text(主文字色,非 muted),箭头 = accent */
+
   /* ---- 动效 ---- */
   --iw-motion-enter: 160ms cubic-bezier(.32,.72,.35,1);  /* 打开:缩放 .96→1 + 8px 平移 */
   --iw-motion-exit: 120ms ease-in;
   --iw-motion-none: none;         /* prefers-reduced-motion 时替换为 none */
+  --iw-entry-motion: 120ms ease-out; /* 入口条随选中出现/收起(高度+透明度);reduced-motion 时用 --iw-motion-none */
 }
 
 /* ---- 三主题差异:窗口自身同形同值(白卡),仅「交互强调色」跟随主题 ---- */

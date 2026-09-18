@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="current">
 <head>
 <meta charset="UTF-8">
-<title>R-40 · 悬浮窗口(功能设置)原型(示意)</title>
+<title>R-40 · 悬浮窗口(功能设置)原型(示意·修订 B)</title>
 <style>
   /* ============ 主题 token —— 1:1 取自 src/index.css 三主题 ============ */
   :root{
@@ -86,7 +86,7 @@
   .thumb{border-radius:8px;background:repeating-linear-gradient(135deg,#d9dbe0 0 8px,#eceef1 8px 16px);height:120px;position:relative}
   .thumb .badge{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--gc-media-overlay);color:var(--gc-media-overlay-text);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
   .text-lines span{display:block;height:8px;border-radius:4px;background:var(--gc-node-inner);margin:6px 0}
-  .node .fn-entry{margin:0 14px 12px;display:flex;align-items:center;gap:8px;border:1px solid var(--gc-node-border);background:var(--gc-node-inner);border-radius:999px;padding:7px 12px;font-size:11.5px;color:var(--gc-node-muted);cursor:pointer}
+  .node .fn-entry{margin:var(--iw-entry-margin,0 14px 12px);display:flex;align-items:center;gap:var(--iw-entry-gap,8px);border:1px solid var(--gc-border-strong);background:var(--gc-node-inner);border-radius:var(--iw-entry-radius,999px);min-height:var(--iw-entry-h,34px);padding:6px 12px;font-size:var(--iw-entry-font,12px);font-weight:600;color:var(--gc-node-text);cursor:pointer}
   .node .fn-entry .chev{margin-left:auto;color:var(--gc-accent);font-weight:700}
   .handle{position:absolute;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff 0 9%,var(--gc-accent) 55%,color-mix(in srgb,var(--gc-accent) 60%,#000) 100%);border:3px solid var(--gc-canvas);box-shadow:0 0 0 1px color-mix(in srgb,var(--gc-accent) 70%,transparent),0 3px 7px rgba(0,0,0,.35);z-index:5}
   .handle.out{right:-9px;top:56px}
@@ -188,6 +188,7 @@
   .scene-caption{font-size:12px;color:var(--gc-text-muted);margin:22px 0 10px;line-height:1.7;max-width:960px}
   .scene-caption b{color:var(--gc-text)}
   .frame-tag{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--gc-accent);border:1px solid color-mix(in srgb,var(--gc-accent) 55%,transparent);border-radius:4px;padding:0 6px;margin-right:8px}
+  .hint{position:absolute;font-size:11px;color:var(--gc-text-muted);line-height:1.7;max-width:360px}
 
   .legend{margin-top:22px;border:1px solid var(--gc-border);border-radius:12px;background:var(--gc-panel);padding:14px 16px;font-size:11.5px;color:var(--gc-text-muted);line-height:1.9}
   .legend b{color:var(--gc-text)}
@@ -199,8 +200,8 @@
 
 <header class="doc-head">
   <div>
-    <h1>R-40 · 悬浮窗口(功能设置)— 示意原型</h1>
-    <p>Command/Inspect 面:钻取单个节点的属性编辑。节点卡/handle/连线/画布网格/三主题 token 1:1 取自 <span class="kbd" style="font-size:10px">src/index.css</span>;悬浮窗口视觉为本提案新设计(tokens.css 为唯一事实源)。四个场景覆盖验收要求:S1 功能选择+参数 warning、S2 撤销态、S3 蒙版入口、S4 text 节点运行+采纳。</p>
+    <h1>R-40 · 悬浮窗口(功能设置)— 示意原型(修订 B)</h1>
+    <p><b>修订 B(用户已确认 2026-09-18 晚):入口条仅选中时显示,双击节点体 / Enter 为主入口。</b>未选中 = 干净节点卡;选中节点才出现「⚙ 功能」入口条;双击节点体或按 Enter 打开窗口(不依赖入口条)。Command/Inspect 面:钻取单个节点的属性编辑。节点卡/handle/连线/画布网格/三主题 token 1:1 取自 <span class="kbd" style="font-size:10px">src/index.css</span>;悬浮窗口视觉为本提案新设计(tokens.css 为唯一事实源)。六个场景:S0a 默认态(未选中·干净卡)、S0b 选中态(入口条出现·窗口未开)、S1 功能选择+参数 warning、S2 撤销态、S3 蒙版入口、S4 text 节点运行+采纳。</p>
   </div>
   <div class="switchers">
     <div class="switch" id="themeSwitch" role="group" aria-label="主题切换">
@@ -209,6 +210,8 @@
       <button data-theme="eye" aria-pressed="false">护眼绿</button>
     </div>
     <div class="switch" id="sceneSwitch" role="group" aria-label="场景切换">
+      <button data-scene="s0a" aria-pressed="false">S0a 默认</button>
+      <button data-scene="s0b" aria-pressed="false">S0b 选中</button>
       <button data-scene="s1" aria-pressed="true">S1 选功能</button>
       <button data-scene="s2" aria-pressed="false">S2 撤销态</button>
       <button data-scene="s3" aria-pressed="false">S3 蒙版</button>
@@ -217,9 +220,58 @@
   </div>
 </header>
 
+<!-- ================= S0a: 默认态(未选中 · 干净节点卡,无入口条) ================= -->
+<div class="scene hidden" data-scene="s0a">
+  <p class="scene-caption"><span class="frame-tag">S0a</span><b>默认态:未选中 → 干净节点卡,不渲染入口条</b> — 画布平视时节点卡只有标题+缩略图+handle;「⚙ 功能」入口条不存在(修订 B:仅选中时显示)。双击画布空白 = 缩放一档(既有语义,保留);双击节点标题 = 改名(既有语义,保留)。</p>
+  <div class="canvas">
+    <svg class="edges"><path d="M 300 220 C 380 220 400 220 470 220"/><path d="M 300 400 C 380 400 400 220 470 220"/></svg>
+    <div class="node" style="left:16px;top:150px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">款式草图</span></div>
+      <div class="node-body"><div class="thumb"><span class="badge">1</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node" style="left:16px;top:330px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">面料特写</span></div>
+      <div class="node-body"><div class="thumb" style="height:80px"><span class="badge">2</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node" style="left:480px;top:140px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">效果图 A</span></div>
+      <div class="node-body"><div class="thumb" style="height:100px"></div></div>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+    <div class="hint" style="left:480px;top:342px">↖ 未选中:无入口条 · <span class="kbd">双击节点体</span> 或 <span class="kbd">Enter</span>(选中后)打开功能设置</div>
+  </div>
+</div>
+
+<!-- ================= S0b: 选中态(入口条出现 · 窗口未开) ================= -->
+<div class="scene hidden" data-scene="s0b">
+  <p class="scene-caption"><span class="frame-tag">S0b</span><b>选中态:节点被选中 → 「⚙ 功能」入口条出现(窗口未开)</b> — 单击选中(选中描边 + R-38 徽标语境),入口条随选中滑入(约 120ms);入口条 = 显式可视锚点,显示当前功能名(未选功能时「选择功能」);点击它 / 双击节点体 / 按 <span class="kbd">Enter</span> 均打开窗口。未配置功能时入口条同时承担「这张卡还没配功能」的自解释。</p>
+  <div class="canvas">
+    <svg class="edges"><path d="M 300 220 C 380 220 400 220 470 220"/><path d="M 300 400 C 380 400 400 220 470 220"/></svg>
+    <div class="node" style="left:16px;top:150px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">款式草图</span></div>
+      <div class="node-body"><div class="thumb"><span class="badge">1</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node" style="left:16px;top:330px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">面料特写</span></div>
+      <div class="node-body"><div class="thumb" style="height:80px"><span class="badge">2</span></div></div>
+      <span class="handle out"></span>
+    </div>
+    <div class="node selected" style="left:480px;top:140px">
+      <div class="node-head"><span class="dot" style="background:var(--gc-status-idle)"></span><span class="title">效果图 A</span></div>
+      <div class="node-body"><div class="thumb" style="height:100px"></div></div>
+      <button class="fn-entry">⚙ 草图转效果图<span class="chev">›</span></button>
+      <span class="handle in"></span><span class="handle out"></span>
+    </div>
+    <div class="hint" style="left:480px;top:396px">↖ 已选中:入口条出现 · 单击它 / <span class="kbd">双击节点体</span> / <span class="kbd">Enter</span> → 打开功能设置窗口</div>
+  </div>
+</div>
+
 <!-- ================= S1: image 节点选功能(含参数 warning) ================= -->
 <div class="scene" data-scene="s1">
-  <p class="scene-caption"><span class="frame-tag">S1</span><b>image 节点 · 已选功能「草图转效果图」+ 自定义参数 warning</b> — 窗口锚定节点右侧 12px;目录按功能族分组、只列已发布变体(R6);参数区显示「自定义参数(未评估)」徽标与行内 warning(不阻断,§R5);选中项 1.5px accent 描边。</p>
+  <p class="scene-caption"><span class="frame-tag">S1</span><b>image 节点 · 已选功能「草图转效果图」+ 自定义参数 warning</b> — 窗口默认锚定节点右侧 12px;右缘空间不足时翻转到节点左侧(§2.2,1024 档即翻转示例,1280/1440 保持右侧);目录按功能族分组、只列已发布变体(R6);参数区显示「自定义参数(未评估)」徽标与行内 warning(不阻断,§R5);选中项 1.5px accent 描边。</p>
   <div class="canvas">
     <svg class="edges"><path d="M 300 220 C 380 220 400 220 470 220"/><path d="M 300 400 C 380 400 400 220 470 220"/></svg>
     <div class="node" style="left:16px;top:150px">
@@ -291,7 +343,7 @@
       </div>
       <div class="iw-foot">
         <button class="run-btn">运 行</button>
-        <div class="run-status"><span class="dot" style="background:var(--gc-status-idle)"></span>已选「草图转效果图」· 参考图 2 张 · 参数有 1 条提示(不阻断)</div>
+        <div class="run-status"><span class="dot" style="background:var(--gc-status-idle)"></span>已选「草图转效果图」· 参考图 2 张 · 1 条参数提示(不阻断)</div>
       </div>
     </div>
   </div>
@@ -458,7 +510,7 @@
 </div>
 
 <div class="legend">
-  <b>图例与真实性标注</b> — 节点卡 / handle / 连线 / 画布圆点网格 / 三主题色 / 状态色 8 槽位 / 运行胶囊按钮:<b>1:1 取自 src/index.css 与 NodeFrame</b>(示意数据:文案、缩略图为斜纹占位)。悬浮窗口(白卡浮层、分区、目录卡片、参数行、徽标、撤销条、蒙版条、采纳区):<b>本提案新设计</b>,数值唯一事实源 = <span style="font-family:var(--mono)">tokens.css</span>。交互规则(打开/关闭/Esc/单例/锚定翻转)见 design.md §2。
+  <b>图例与真实性标注(修订 B)</b> — 节点卡 / handle / 连线 / 画布圆点网格 / 三主题色 / 状态色 8 槽位 / 运行胶囊按钮:<b>1:1 取自 src/index.css 与 NodeFrame</b>(示意数据:文案、缩略图为斜纹占位)。「⚙ 功能」入口条:<b>仅选中态渲染</b>(S0a 未选中无此条,S0b 选中出现)。悬浮窗口(白卡浮层、分区、目录卡片、参数行、徽标、撤销条、蒙版条、采纳区):<b>本提案新设计</b>,数值唯一事实源 = <span style="font-family:var(--mono)">tokens.css</span>。交互规则(打开/关闭/Esc/单例/锚定翻转/键位语义)见 design.md §2。
 </div>
 
 <script>
@@ -475,11 +527,36 @@
   });
   // 支持 ?theme= & ?scene= 便于脚本实截
   const q = new URLSearchParams(location.search);
-  if (q.get("theme")) root.dataset.theme = q.get("theme");
+  if (q.get("theme")) {
+    root.dataset.theme = q.get("theme");
+    // 同步切换器按下态,避免直出截图与实际主题不一致
+    for (const x of document.querySelectorAll("#themeSwitch button")) x.setAttribute("aria-pressed", String(x.dataset.theme === q.get("theme")));
+  }
   if (q.get("scene")) {
     for (const s of document.querySelectorAll(".scene")) s.classList.toggle("hidden", s.dataset.scene !== q.get("scene"));
     for (const x of document.querySelectorAll("#sceneSwitch button")) x.setAttribute("aria-pressed", String(x.dataset.scene === q.get("scene")));
   }
+
+  // 锚定翻转(design.md §2.2):窗口右缘将越出画布可视区(留 8px 边距)时,翻转到锚定节点左侧
+  function relayout() {
+    for (const cv of document.querySelectorAll(".scene:not(.hidden) .canvas")) {
+      const iw = cv.querySelector(".iw");
+      const node = cv.querySelector(".node.selected");
+      if (!iw || !node) continue;
+      const cvr = cv.getBoundingClientRect(), nr = node.getBoundingClientRect(), iwr = iw.getBoundingClientRect();
+      const rightPlace = nr.right - cvr.left + 12;
+      if (rightPlace + iwr.width > cvr.width - 8) {
+        iw.style.left = Math.max(8, nr.left - cvr.left - 12 - iwr.width) + "px";
+      } else {
+        iw.style.left = rightPlace + "px";
+      }
+      if (iwr.bottom > cvr.bottom - 8) {
+        iw.style.top = Math.max(8, cvr.height - iwr.height - 8) + "px";
+      }
+    }
+  }
+  window.addEventListener("resize", relayout);
+  relayout();
 </script>
 </body>
 </html>
