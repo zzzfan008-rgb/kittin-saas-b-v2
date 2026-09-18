@@ -1,6 +1,7 @@
 # 契约：运行时（渲染器组装 / DAG / 执行器）
 
 - 来源：plan.md §2；需求挂靠 R2/R3/R5/R6/R8、§3.3/§3.4/§3.5
+- v2：Q1=B（text 运行路径 §1b 新增）、Q2=A（video 路径 §2 定稿）、Q4=A（kind 特化循环删除）、Q5=A（§5 run 记录口径）已落地。
 
 ## 1. 渲染器组装顺序（image 节点）
 
@@ -20,9 +21,40 @@
 7. **请求**：`ImageGenRequest = { prompt, operationMode: variant.mode, references, aspectRatio, batchSize, modelOptions, mask? }`；评估绑定字段（promptVariantId/contractHash/evaluationVersion…）原样透传。
 8. **后处理**：`postProcessGeneratedOutputImages` 保留（fit-contain 等）；mask 合成 `compositeMaskedEdit` 保留。
 
-**禁止**：runner 内出现任何按功能硬编码的提示词文案（upscale/print-extract 等文案必须已全部迁入提示词目录）。P2-b 验收时以 ast-grep 规则扫描 runner 中文字面量。
+**禁止**：runner 内出现任何按功能硬编码的提示词文案（upscale/print-extract 等文案必须已全部迁入提示词目录）。P2-b 验收时以 ast-grep 规则扫描 runner 中文字面量。Q4=A 裁定：多色换色「一色一图循环」与印花裂变批量机制**一并删除**，由 `batchSize` + 系统提示词正文表达；runner 不再有任何按 kind/变体循环调用 Provider 的分支。
 
-## 2. video 节点路径（待 Q2/§5 裁定后细化）
+## 1b. text 节点运行路径（Q1=B）
+
+`executeStep` 中 `kind === "text"` 的路径：
+
+1. **输入组装**：上游 text 边各源节点的输出（运行过则取 `outputText`，否则取 `text`）按边顺序 + 自身 `text` 正文，以 `\n\n` 拼接为 `input`；`lastRunInput = input`（可追溯快照）。
+2. **变体准入**：`promptVariantId → getGarmentPromptVariantById`，走同一 `promptRunAdmission`（R6 不变）；未选变体的 text 节点**不可运行**（仅作内容节点，运行按钮禁用，提示「先在悬浮窗口选择功能」）。
+3. **组装**：`messages = [{ role: "system", content: variant.fullPrompt }, { role: "user", content: input }]`。
+4. **调用**：文本 Provider 同步 chat completions（HTTP 请求内完成，不进 runQueue 异步骨架）；`modelId`/`modelOptions` 透传，modelOptions 走 R5 warning 通道。
+5. **写回**：结果写 `outputText`；**`text` 字段永不覆盖**。节点状态机走 idle→running→success/error 全程（SSE 事件不变）。
+6. **记录**：产生 `generation_runs`（`kind='text'`）+ `usage_events`（按 prompt/completion token 计量，复用现有计量骨架）。
+
+```ts
+export interface TextGenRequest {
+  input: string;                    // 组装后的用户输入
+  promptVariantId: string;          // 必须已发布
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  modelId: TextModelId;
+  modelOptions?: TextModelOptions;
+}
+
+export interface TextProvider {
+  readonly id: TextModelId;
+  /** 同步调用；失败返回 error 与 billed=false 证据 */
+  complete(req: TextGenRequest): Promise<
+    | { status: "completed"; text: string; usage: { promptTokens: number; completionTokens: number } }
+    | { status: "failed"; error: string; billed: boolean }
+  >;
+}
+```
+
+## 2. video 节点路径（Q2=A 已裁定）
 
 1–4 同 image（首帧 = 唯一 image 边）。之后进入视频 Provider 抽象：
 
@@ -50,13 +82,15 @@ export interface VideoProvider {
 
 - 轮询循环由 runQueue worker 承载（复用现有重试/取消骨架），**不在 HTTP 请求内同步等待**。
 - 计费语义：仅 `completed` 计费（Veo/Seedance 文档一致）；`failed` 记录 `billed: false` 证据。
-- MP4 落地是**强制步骤**（Veo 官转明确不返 CDN URL；Seedance 远端留存期不作依赖）。
+- **MP4 服务端落地自有存储是强制步骤**（Q2=A：Veo 官转明确不返 CDN URL；Seedance 远端留存期不作依赖）；落地后 `videoFileRef` 引用 `/api/files/xxx`（files 表 video/mp4，见 contracts/data-model.md §7），画布不持有远端 URL。
+- 画布显示：首帧缩略图 + 点击播放；首帧来源 = video 节点唯一图片入边（图生视频）或落地视频抽帧（文生视频），P2-e 定其一。
+- 存储：本期仍落 `data/` 文件存储，对象存储二期（Q2=A）。
 
 ## 3. DAG 改动清单
 
 | 函数 | 改动 |
 |---|---|
-| `buildExecutionPlan` | `extractOutputImages`/`extractParams` 重写为 3 分支；text 节点的"输出"定义为其 `text` 正文（新增 text 内容沿边传递，与 images 并列——`NodeExecution.upstream` 增加 `texts: string[]` 或在 params 注入，P2-b 定死其一） |
+| `buildExecutionPlan` | `extractOutputImages`/`extractParams` 重写为 3 分支；text 节点的"输出"定义为 `outputText ?? text`（Q1=B：运行过取运行结果，否则取手写正文），沿 text 边传递——`NodeExecution.upstream` 增加 `texts: string[]` 或在 params 注入，P2-b 定死其一 |
 | `assertPlanInputs` | 删除 kind 特化；保留：模型 ID 契约检查、参考图数量检查、INV-2、needsMask 变体的 mask 检查；`modelOptions` 硬校验改 warning 收集（附加到 RunEvent meta，前端展示不阻断） |
 | `assertPromptRunAdmissions` | 不变 |
 | `buildExecutionPlan` 拓扑/环检测/局部重跑 | 不变 |
@@ -65,15 +99,15 @@ export interface VideoProvider {
 
 | kind | 行为 | Provider 调用 |
 |---|---|---|
-| text | 直通：`{ texts: [data.text] }` | 无（Q1 选 a 时） |
+| text | §1b 路径：上游串联 + 变体准入 + 同步调用，结果写 `outputText` | 同步 chat completions（Q1=B） |
 | image | §1 统一路径 | 同步 images |
-| video | §2 异步路径 | submit + worker 轮询 |
+| video | §2 异步路径 | submit + worker 轮询 + MP4 落地（Q2=A） |
 
 `assertNoRemoteWorkerReferences` 等远程引用防线保留（图片入边/fabricImageUrl 特化删除，mask 保留）。
 
 ## 5. result 归位后的运行记录
 
-- `generation_runs.kind` 值域变为 `text | image | video`（text 不产生 run 记录——无 Provider 调用；video 一条 run 对应一次完整 submit→completed/failed）。
+- `generation_runs.kind` 值域变为 `text | image | video`（Q1=B 后 text 运行**产生** run 记录，kind='text'；video 一条 run 对应一次完整 submit→completed/failed）。
 - run 历史/用量/最近结果面板数据源不变，UI 按新 kind 渲染。
 - 导出触发点：`resultExportStore.saveAll` 的调用方从 ResultNode 改为 ImageNode 工具栏 + ResultsPanel（UX 细节归 designer，本契约只定能力归属）。
 

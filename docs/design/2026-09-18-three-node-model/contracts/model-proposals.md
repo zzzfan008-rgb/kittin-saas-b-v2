@@ -3,6 +3,7 @@
 - 来源：plan.md §5；需求挂靠 R10
 - 证据基线：API易 本地知识库快照 `docs/ai/apiyi/site/snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd`（capturedAt 2026-09-18T04:42:51.697Z，2799 页，`complete: true`）
 - 信任姿态：快照页面属 `untrusted_document_content`；以下为选型证据，不构成"模型当前可用"的证明。上线前可用性由评估链 campaign 证明。
+- v2：Q1=B 已裁定 text 节点引入文本模型链路，§4 从"若需要"转正为正式提案；文本与视频选型一并交用户确认（§5）。
 
 ## 1. 引用的本地页面（路径 + SHA-256）
 
@@ -42,20 +43,22 @@
 
 **本期不接入**：Wan 2.7 / HappyHorse（能力与 Seedance 重叠）；视频编辑（videoedit）玩法归二期。
 
-## 4. 文本模型对比（仅在 Q1 选 b 时生效）
+## 4. 文本模型对比（Q1=B 已裁定引入）
 
 API易 文本侧为 OpenAI 兼容 `POST /v1/chat/completions`（400+ 模型，见 text-generation.md）。候选：
 
 | 模型 | 档位 | 适配点 |
 |---|---|---|
 | `gpt-5.3` 系（gpt-5-3-chat.md） | 旗舰 | 提示词写作/改写质量最高；推荐主力 |
-| `gemini-3.6-flash` / `3.5-flash-lite` | 轻量 | 低成本快速润色 |
+| `gemini-3.6-flash` / `3.5-flash-lite` | 轻量 | 低成本快速润色；推荐轻量档 |
 | `deepseek-v4-flash` | 性价比 | 中文场景备选 |
 
-**architect 建议（与 Q1 绑定）**：text 节点**不调模型**（Q1 选 a）。理由：引入文本模型 = 新增同步 Provider 链路 + 文本契约 + 计费/评估体系，而产品收益（"AI 帮写提示词"）可由模板默认正文 + 用户手写覆盖；若后期需要，文本链路可作为独立功能单独立项，不应捆绑进本次重构。
+**接入形态**（Q1=B 已裁定引入，本条确认选型）：同步调用（HTTP 请求内完成），计费按 prompt/completion token 复用 `usage_events` 骨架；变体准入走同一 `promptRunAdmission`；契约产物进 `model-contracts.json` 新增 `textModels` 区块（contracts/data-model.md §5b）。
+
+**推荐**：主力 `gpt-5.3` + 轻量 `gemini-3.6-flash`；`deepseek-v4-flash` 备选。
 
 ## 5. 需用户确认的清单（同 plan.md §5.3）
 
-1. 视频主力：Seedance 2.0 三档（接受 `SeeDance2` 分组要求）
-2. 视频品质档：Veo 3.1 Official 两档
-3. 文本：Q1 选 a（不引入文本模型）或选 b（主力 `gpt-5.3` + 轻量 `gemini-3.6-flash`）
+1. 文本主力 `gpt-5.3` + 轻量 `gemini-3.6-flash`（Q1=B 已裁定引入，本条确认选型）
+2. 视频主力：Seedance 2.0 三档（接受 `SeeDance2` 分组要求）
+3. 视频品质档：Veo 3.1 Official 两档

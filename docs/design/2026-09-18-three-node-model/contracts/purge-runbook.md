@@ -1,18 +1,19 @@
 # 契约：清理 / 不兼容执行手册（R7）
 
 - 来源：plan.md §4；需求挂靠 R7、§3.7
-- 性质：P2-f 执行手册的契约层。**执行前必须 Q5 裁定**。
+- 性质：P2-f 执行手册的契约层。范围已按 Q5=A 裁定定稿。
 
-## 1. 范围矩阵
+## 1. 范围矩阵（Q5=A 已裁定）
 
 | 对象 | 存储位置 | 处置 | 备注 |
 |---|---|---|---|
 | 用户项目（全部） | `projects` 表 | 物理删除 | 含 `lifecycle='saved'` 与 `'initial_draft'` |
 | 用户模板 | `data/templates/user/*.json` | 物理删除 | 目录保留 |
 | 内置模板 | `data/templates/builtin/*.json` | 重写为 v7 | 不在删除范围；随 P2-d 交付 |
-| 运行历史 | `generation_runs` / `generation_outputs` / `usage_events` | 【Q5-a】推荐删除 | 引用旧 kind/旧节点 ID，新 UI 无法呈现 |
+| 运行历史 | `generation_runs` / `generation_outputs` / `usage_events` | **物理删除**（Q5=A） | 引用旧 kind/旧节点 ID，新 UI 无法呈现；用量统计随重构清零重计 |
 | 生成文件 | `files` 中仅被已删对象引用的行 | 级联清理 | 走现有 purge 机制补扫 |
-| 素材库 | `assets` / `project_asset_refs` | 【Q5-b】推荐保留 assets；`project_asset_refs` 随 projects 级联删 | assets 是用户显式保存的素材 |
+| 素材库 | `assets` | **保留**（Q5=A） | 用户显式保存的素材 |
+| 素材引用 | `project_asset_refs` | 随 projects 级联删除 | 引用关系随主体 |
 | 评估证据 | `evaluation_*` 表、`docs/ai/evaluation/**` | 保留 | 审计资产 |
 | 账号/会话 | `users` / `sessions` / `revoked_sessions` | 不动 | — |
 
@@ -27,7 +28,7 @@
    - `projects`：逐行导出 `{id, owner_id, name, flow_json, updated_at}` 至 `data/migration-export-<UTC 时间戳>/projects/<owner_id>/<project_id>.json`。
    - 用户模板：整目录复制至 `<导出目录>/templates-user/`。
    - 校验：导出文件数 == 表行数；任一失败则**中止且不执行删除**。
-   - 【Q5-a 若裁定删除】同时导出 `generation_runs` 元数据（不含图片 blob）至 `runs.json`。
+   - 同时导出 `generation_runs` 元数据（不含图片 blob）至 `runs.json`（Q5=A 已确认删除，导出仅作证据）。
 3. **二次确认**
    - 交互式输入 `DELETE-ALL-PROJECTS`，随后 `YES`；脚本打印将删除的逐表行数。
 4. **删除**（单事务）

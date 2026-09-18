@@ -1,7 +1,8 @@
 # 契约：既有测试与 e2e 的同步清单（§3.2）
 
 - 来源：plan.md §7；需求挂靠 §3.2
-- 枚举方式：`grep -lE 'image-input|sketch-to-render|ai-modify|fabric-recolor|print-extract|print-mutate|mask-redraw|"result"' tests/ e2e/`（2026-09-18 实际执行结果）
+- 枚举方式：grep -lE 对旧 9 kind 在 tests/ e2e/ 的实际执行结果（2026-09-18）
+- v2：Q1=B 新增 text 运行路径测试条目（§1.A 尾部）；Q4=A 后 kind 特化循环相关断言删除并入 workflow-schema/dag 重写。
 
 ## 1. tests/（37 个文件）
 
@@ -26,6 +27,7 @@
 - `tests/result-export.test.ts` — 导出触发点归位
 - `tests/selection-consistency.test.ts` — 选择/查看器一致性夹具
 - `tests/schema-migrations.test.ts` — 旧迁移测试删除，改测"v6 及以下一律拒绝"
+- 【Q1=B 新增】`tests/text-run.test.ts`（新文件）— text 运行路径：输入串联组装（上游 outputText ?? text 取值）、变体准入（未选变体不可运行）、同步 Provider 调用 mock、`outputText` 写回且不覆盖 `text`、`generation_runs` kind='text' 记录与 token 计量事件
 
 ### B. 改断言（逻辑保留，硬校验 → warning）
 - `tests/provider-contract.test.ts` — `imageModelOptionsError` 硬失败断言改 warning 断言

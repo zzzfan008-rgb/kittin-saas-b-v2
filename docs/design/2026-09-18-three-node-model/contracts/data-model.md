@@ -2,6 +2,7 @@
 
 - 来源：plan.md §1；需求挂靠 R1/R2/R3/R4/R5/R8
 - 性质：字段级契约。P2 实现以本文为准；改动需回归本方案评审。
+- v2：Q1=B（text 可运行文本模型）、Q2=A（视频落地形态）、Q4=A（mask 保留、循环取消）、Q5=A（清理范围）已落地；Q3 双分支见 §6 附注。
 
 ## 1. NodeKind
 
@@ -32,8 +33,17 @@ export interface BaseNodeData {
 
 export interface TextNodeData extends BaseNodeData {
   kind: "text";
-  /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。 */
+  /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。
+   *  用户手写内容的所有权字段：运行路径（Q1=B）永不写本字段。 */
   text: string;
+  /** Q1=B：可运行文本模型。三项窗口配置与 image/video 同构（R4）。 */
+  promptVariantId?: string;              // 文本功能变体（如"提示词润色"），走同一 promptRunAdmission
+  modelId?: TextModelId;                 // 见 §5
+  modelOptions?: TextModelOptions;       // 自由 key-value（R5），契约提供 recommendedOptions
+  /** 最近一次文本运行的输出（展示态；「采纳」是显式 UI 动作，把 outputText 复制进 text） */
+  outputText?: string;
+  /** 最近一次运行的输入快照（上游串联 + 当时正文），用于可追溯展示 */
+  lastRunInput?: string;
 }
 
 export interface ImageNodeData extends BaseNodeData {
@@ -107,7 +117,7 @@ export interface ImageModelOptions {
 }
 ```
 
-## 5. 视频参数（待 Q2/Q5.2 裁定后定稿）
+## 5. 视频参数（Q2=A 已裁定）
 
 ```ts
 export type VideoModelId =
@@ -129,6 +139,24 @@ export interface VideoModelOptions {
 
 视频模型契约产物：新增 `docs/ai/apiyi/video-model-contracts.json`（与 image 的 model-contracts.json 同级、同评审流程），**不在本阶段生成**——P2-e 按 §5 知识库门禁走 `docs:apiyi:lookup` 后产出。
 
+## 5b. 文本参数（Q1=B 已裁定）
+
+```ts
+export type TextModelId =
+  | "gpt-5.3"                  // 主力（推荐，见 model-proposals.md §4）
+  | "gemini-3.6-flash"         // 轻量档（推荐）
+  | "deepseek-v4-flash";       // 备选
+// 最终清单以 R10 用户确认（plan.md §5.3）为准；类型与契约一致性断言沿用 imageModels.ts 顶部 throw 同款防线。
+
+export interface TextModelOptions {
+  temperature?: number;
+  maxTokens?: number;
+  [key: string]: string | number | boolean | undefined;   // R5 自由 key-value
+}
+```
+
+文本模型契约产物：清单进 `docs/ai/apiyi/model-contracts.json` 新增 `textModels` 区块（与 `recommendedOptions` 同属纯增量），走与图片契约相同的评审流程与 `docs:apiyi:lookup` 回执。
+
 ## 6. WorkflowTemplate / PersistedWorkflow
 
 - `PersistedWorkflow` 结构不变（nodes/edges/schemaVersion），`schemaVersion: 7`。
@@ -137,16 +165,19 @@ export interface VideoModelOptions {
 
 ```ts
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
-  text:  { kind: "text",  title: "文本",  inputs: { text: 0, image: 0 }, outputs: "text"  },
+  text:  { kind: "text",  title: "文本",  inputs: { text: 8, image: 0 }, outputs: "text"  },
   image: { kind: "image", title: "图片",  inputs: { text: 8, image: 8 }, outputs: "images" },
   video: { kind: "video", title: "视频",  inputs: { text: 8, image: 1 }, outputs: "video" },
 };
 ```
 
-（`inputs` 由单一数字改为按边类型计数；边类型由 sourceHandle/targetHandle 区分，见 contracts/graph-invariants.md §2。）
+（`inputs` 由单一数字改为按边类型计数；边类型由 sourceHandle/targetHandle 区分，见 contracts/graph-invariants.md §2。text 节点的 text 入边用于多段正文串联，Q1=B 新增；text 节点没有 image 入边。）
 
-## 7. files 表 video 扩展（待 Q2 裁定）
+## 7. files 表 video 扩展（Q2=A 已裁定）
 
 - `files.mime_type` 放行 `video/mp4`（及 Seedance 的 `video/quicktime` mov）。
+- **服务端拉 MP4 落地自有存储是强制步骤**（Veo 官转明确不返 CDN URL；Seedance 远端留存期不作依赖）；落地后画布引用 `/api/files/xxx`，不持有远端 URL。
 - 校验：`validateImageDataUrl` 不适用于视频；视频一律走 multipart 上传或服务端落地（Provider MP4 拉取后写 files），不接受 dataURL 入库存储。
+- 画布显示：首帧缩略图 + 点击播放（缩略图由服务端落地时抽帧生成或前端 `<video>` 首帧渲染，P2-e 定其一）。
+- 存储：本期仍落 `data/` 文件存储（与图片一致）；对象存储二期。
 - `width/height/byte_length` 语义沿用；新增可选元数据（时长/码率）存 `files` 扩展列或 `source_type='generation'` 的既有 JSON 旁路——P2-e 定。
