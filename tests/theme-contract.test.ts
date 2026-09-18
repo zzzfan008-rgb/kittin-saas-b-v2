@@ -111,8 +111,8 @@ assert.doesNotMatch(css, /@tailwind\s+(?:base|components|utilities)\s*;/);
 for (const [token, value] of [
   ["--color-ink", "#0a0a0a"],
   ["--color-paper", "#fafaf8"],
-  ["--color-gold", "#FFC940"],
-  ["--color-golddeep", "#8a6d00"],
+  ["--color-gold", "#B7F35A"],
+  ["--color-golddeep", "#4a7a17"],
 ] as const) {
   declaration(css, token, value);
 }

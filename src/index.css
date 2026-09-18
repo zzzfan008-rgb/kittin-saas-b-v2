@@ -9,9 +9,9 @@
   --color-ink: #0a0a0a;
   --color-paper: #fafaf8;
   /* gold/golddeep 为 Tailwind 品牌工具类槽位，运行时跟随当前主题 accent；
-     此处默认值仅作未加载主题时的回退（与曜黑 #FFC940 一致） */
-  --color-gold: #FFC940;
-  --color-golddeep: #8a6d00;
+     此处默认值仅作未加载主题时的回退（与曜黑 #B7F35A 一致） */
+  --color-gold: #B7F35A;
+  --color-golddeep: #4a7a17;
 }
 
 /*
@@ -316,7 +316,7 @@ body {
 /* ---- 节点语义主题：画布节点与节点库共用，和周边面板颜色解耦 ---- */
 :root,
 [data-theme="current"] {
-  /* 曜黑·活力黄（默认）：DESIGN.md 2026-09-18 定稿 */
+  /* 曜黑·荧光绿（默认）：DESIGN.md Rev.2 V4 定稿（可灵参考） */
   --gc-shell: #1a1c22;
   --gc-canvas: #16181d;
   --gc-panel: #21242a;
@@ -326,9 +326,9 @@ body {
   --gc-text-muted: #9ba1a9;
   --gc-border: #33373f;
   --gc-border-strong: #454a53;
-  --gc-accent: #FFC940;
+  --gc-accent: #B7F35A;
   --gc-accent-cta-ink: #131313;
-  --gc-accent-deep: #8a6d00;
+  --gc-accent-deep: #4a7a17;
   --gc-primary-foreground: #131313;
   --gc-node-main: #ffffff;
   --gc-node-header: #ffffff;
@@ -337,16 +337,16 @@ body {
   --gc-node-border: #e4e6ea;
   --gc-node-text: #1d1d1f;
   --gc-node-muted: #6b7075;
-  --gc-node-accent: #FFC940;
-  --gc-edge: #FFC940;
-  --gc-handle-highlight: #ffe9ac;
-  --gc-handle-mid: #ffd469;
-  --gc-handle-dark: #8a6d00;
-  --gc-handle-ring: rgba(255, 201, 64, 0.75);
-  --gc-handle-glow: rgba(255, 212, 105, 0.8);
+  --gc-node-accent: #B7F35A;
+  --gc-edge: #B7F35A;
+  --gc-handle-highlight: #dcffab;
+  --gc-handle-mid: #8ed94e;
+  --gc-handle-dark: #4a7a17;
+  --gc-handle-ring: rgba(183, 243, 90, 0.75);
+  --gc-handle-glow: rgba(142, 217, 78, 0.8);
   /* 节点类型标识色（WorkflowMini 微缩图用） */
   --gc-kind-image-input: #4a90d9;
-  --gc-kind-sketch-to-render: #FFC940;
+  --gc-kind-sketch-to-render: #B7F35A;
   --gc-kind-ai-modify: #9b72cf;
   --gc-kind-fabric-recolor: #d9707e;
   --gc-kind-upscale: #4fa37c;
@@ -355,10 +355,10 @@ body {
   --gc-kind-mask-redraw: #e05252;
   --gc-kind-result: #6e6e6e;
 }
-/* 曜黑章 gold 工具类跟随活力黄（与 white/eye 反查段同构，消除双金色并存） */
-[data-theme="current"] .text-gold { color: #FFC940 !important; }
-[data-theme="current"] .border-gold { border-color: #FFC940 !important; }
-[data-theme="current"] .bg-gold { background-color: #FFC940 !important; }
+/* 曜黑章 gold 工具类跟随荧光绿（与 white/eye 反查段同构，消除双金并存） */
+[data-theme="current"] .text-gold { color: #B7F35A !important; }
+[data-theme="current"] .border-gold { border-color: #B7F35A !important; }
+[data-theme="current"] .bg-gold { background-color: #B7F35A !important; }
 
 [data-theme="white"] {
   /* 简白·Apple：DESIGN.md 2026-09-18 定稿 */

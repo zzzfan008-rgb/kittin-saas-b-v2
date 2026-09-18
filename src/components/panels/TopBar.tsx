@@ -35,7 +35,7 @@ function themePreviewColors(theme: ThemeId) {
   if (theme === "eye") {
     return { shell: "#E9F1EA", panel: "#ffffff", line: "#c9dccc", accent: "#0B7A43" };
   }
-  return { shell: "#16181d", panel: "#21242a", line: "#454a53", accent: "#FFC940" };
+  return { shell: "#16181d", panel: "#21242a", line: "#454a53", accent: "#B7F35A" };
 }
 
 function ThemeMiniature({ theme }: { theme: ThemeId }) {

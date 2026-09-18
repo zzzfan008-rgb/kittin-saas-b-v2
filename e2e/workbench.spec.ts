@@ -410,7 +410,7 @@ test("results and project center follow desktop density for cards", async ({ pag
   const themes = [
     { label: "简白", id: "white" },
     { label: "护眼绿", id: "eye" },
-    { label: "曜黑·活力黄", id: "current" },
+    { label: "曜黑·荧光绿", id: "current" },
   ];
   for (const theme of themes) {
     const themeTrigger = page.getByRole("button", { name: /^切换主题，当前为/ });
@@ -982,7 +982,7 @@ test("theme picker reports state and restores focus", async ({ page }) => {
   const choices = [
     { label: "简白", id: "white" },
     { label: "护眼绿", id: "eye" },
-    { label: "曜黑·活力黄", id: "current" },
+    { label: "曜黑·荧光绿", id: "current" },
   ];
 
   for (const choice of choices) {
