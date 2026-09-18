@@ -211,6 +211,16 @@ a dependency change must update it in the same delivery batch.
 - The review path is GitHub Actions status checks on the exact head being merged,
   plus the user's explicit approval. Local `gate:codex` runs and external review
   services (CodeRabbit, etc.) remain optional advisory evidence, not required gates.
+- Deliver through GitHub. Push every delivery to `origin` so GitHub Actions runs on it;
+  a commit that exists only locally has no CI coverage. Pushing a delivery branch — and
+  opening a pull request for it — is expected, not a special request. Merging to `main`
+  is the step that still requires the user's explicit approval; pushing a branch does not.
+- Plans are reviewed before they are built. When a requirement arrives, refine it first
+  (scope, constraints, acceptance criteria, what is explicitly out of scope), then send
+  the refined plan to the relevant roles for review and optimization, and iterate on the
+  plan until it is settled. Only then does development start. A plan that has not been
+  reviewed and settled is not ready to implement — do not start coding to "see how it
+  goes" and fix the direction afterwards.
 - Merging a PR, tagging, publishing a release, and deploying each require explicit
   user authorization. Never merge automatically.
 - Keep `.env`, `.env.local`, PATs, provider keys, credentials, uploads, database
