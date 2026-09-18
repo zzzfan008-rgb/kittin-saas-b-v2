@@ -169,6 +169,14 @@ instruction, then verify drift-prone repository and release state live.
   targeting `main` runs the workflow, and merging to `main` requires its status
   checks to be green. A red or absent CI run blocks delivery; a skipped, cancelled,
   or degraded job must be reported as such and never claimed as passed.
+- `main` is protected: these five checks are required on the exact head, with the
+  branch required to be up to date before merging —
+  `static (lint / typecheck / web build)`, `unit (test:suite on PostgreSQL)`,
+  `e2e (playwright chromium, dev mode)`,
+  `production-smoke (build + playwright against production bundle)`,
+  `code-intelligence (ast-grep + dependency-cruiser)`.
+  Verify the checks with `gh run list` / `gh run view` before asking to merge;
+  merging with a red, missing, or stale check is a delivery violation.
 - `npm run gate:codex -- --base origin/main` (or `--commit SHA`; use `--uncommitted`
   for a pre-review of uncommitted work) remains available as an optional local
   pre-check and acceleration tool; its result is advisory evidence, not the sole
