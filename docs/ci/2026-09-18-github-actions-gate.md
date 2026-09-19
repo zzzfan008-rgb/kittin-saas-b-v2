@@ -12,8 +12,14 @@
 
 ## 2. 触发条件
 
-- `push`:所有分支。任何分支的推送都会触发完整 CI,让功能分支在合 main 前就看到完整信号。
-- `pull_request`(目标 `main`):PR 场景是分支保护状态检查的主要来源。
+- `push`:仅 `main`,且带 `paths-ignore: ['docs/**', '**.md']`。理由(2026-09-19 修订):
+  实测近 60 次 run 中 ≥21 次是 docs/design-only 提交,仍要各装一次 chromium 并跑
+  `e2e` + `production-smoke` 两个 playwright job(每次 ≈5min);而交付分支的 push 与它的 PR
+  是同一个 commit,等于把整套矩阵跑两遍(实测 3 个 commit × 2 run)。
+  交付分支的绿灯由 PR 事件给出,不再由 push 给出。
+- `pull_request`(目标 `main`):PR 场景是分支保护状态检查的唯一来源,**刻意不加 `paths-ignore`** ——
+  main 的保护要求这 5 个 check 出现在 PR 的精确 head 上,被 paths 过滤掉的 PR 会永远等不到
+  check 而无法合并(docs-only PR 仍跑全矩阵,这是保护正确性的代价)。
 - `concurrency` 按 `ci-${{ github.workflow }}-${{ github.ref }}` 分组并
   `cancel-in-progress: true`:同一分支/PR 的新 push 取代未跑完的旧 run,避免队列堆积。
 - `permissions: contents: read`:workflow 只需要读仓库,不申请任何写权限。
