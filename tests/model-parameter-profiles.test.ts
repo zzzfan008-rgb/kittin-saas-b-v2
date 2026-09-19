@@ -5,8 +5,12 @@ import {
   materializeModelParameterProfile,
 } from "../src/types/modelParameterProfiles";
 
-assert.equal(MODEL_PARAMETER_PROFILES.length, 25, "4 个普通模型 × 3 任务族 × 2 模式 + 1 蒙版轨");
-assert.equal(new Set(MODEL_PARAMETER_PROFILES.map((profile) => profile.profileId)).size, 25);
+const NEW_FAMILIES = ["upscale", "print-extract", "print-mutate", "fabric-recolor"] as const;
+const LEGACY_FAMILIES = ["fashion-lookbook", "commerce-hero", "design-sheet"] as const;
+const EXPECTED_PROFILE_COUNT = 41;
+
+assert.equal(MODEL_PARAMETER_PROFILES.length, 41, "4 个普通模型 × (3 族 × 2 模式 + 4 族 × 1 edit) + 1 蒙版 = 41");
+assert.equal(new Set(MODEL_PARAMETER_PROFILES.map((profile) => profile.profileId)).size, 41);
 
 const vip = getModelParameterProfile("gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1");
 assert.equal(vip?.modelId, "gpt-image-2.5-flare-vip");
@@ -46,6 +50,10 @@ for (const profile of MODEL_PARAMETER_PROFILES) {
     case "gpt-image-2-vip":
       assert.deepEqual(materialized.modelOptions, { size: profile.native.size });
       assert.deepEqual(materialized.ignoredNativeFields, profile.native.omittedFields);
+      if (profile.businessFrame.aspectRatio === "source") {
+        assert.equal(profile.native.size, "source-derived");
+        assert.equal(profile.native.derivedFromFirstReference, true);
+      }
       break;
     case "gemini-image":
       assert.deepEqual(materialized.modelOptions, {
@@ -55,14 +63,18 @@ for (const profile of MODEL_PARAMETER_PROFILES) {
       assert.deepEqual(materialized.ignoredNativeFields, []);
       break;
     case "flux-image":
-      assert.deepEqual(materialized.modelOptions, {
-        width: profile.native.width,
-        height: profile.native.height,
-        outputFormat: profile.native.outputFormat,
-      });
-      assert.equal(profile.native.width % profile.native.multipleOf, 0);
-      assert.equal(profile.native.height % profile.native.multipleOf, 0);
-      assert.ok(profile.native.width * profile.native.height <= profile.native.maxPixels);
+      if (profile.native.derivedFromFirstReference) {
+        assert.deepEqual(materialized.modelOptions, { outputFormat: profile.native.outputFormat });
+      } else {
+        assert.deepEqual(materialized.modelOptions, {
+          width: profile.native.width,
+          height: profile.native.height,
+          outputFormat: profile.native.outputFormat,
+        });
+        assert.equal(profile.native.width % profile.native.multipleOf, 0);
+        assert.equal(profile.native.height % profile.native.multipleOf, 0);
+        assert.ok(profile.native.width * profile.native.height <= profile.native.maxPixels);
+      }
       break;
     case "seedream-image":
       assert.deepEqual(materialized.modelOptions, { size: profile.native.size });
@@ -70,6 +82,25 @@ for (const profile of MODEL_PARAMETER_PROFILES) {
       assert.equal(Object.hasOwn(materialized.modelOptions, "aspectRatio"), false);
       break;
   }
+}
+
+for (const familyId of LEGACY_FAMILIES) {
+  assert.equal(MODEL_PARAMETER_PROFILES.filter((p) => p.familyId === familyId).length, 8, `${familyId} 仍为 4 模型 × 2 模式 = 8 条`);
+}
+for (const familyId of NEW_FAMILIES) {
+  assert.equal(MODEL_PARAMETER_PROFILES.filter((p) => p.familyId === familyId).length, 4, `${familyId} 仅 edit 模式 = 4 条`);
+  assert.ok(MODEL_PARAMETER_PROFILES.filter((p) => p.familyId === familyId).every((p) => p.mode === "edit"));
+}
+for (const familyId of NEW_FAMILIES) {
+  const expectedFrame = {
+    upscale: "source",
+    "fabric-recolor": "source",
+    "print-extract": "1:1",
+    "print-mutate": "1:1",
+  }[familyId];
+  assert.ok(MODEL_PARAMETER_PROFILES.filter((p) => p.familyId === familyId).every(
+    (p) => p.businessFrame.aspectRatio === expectedFrame && p.postprocess.finalAspectRatio === expectedFrame,
+  ));
 }
 
 console.log("五模型判别联合参数档案测试通过");
