@@ -1,0 +1,103 @@
+{
+  "themes": {
+    "current": {
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(220, 255, 171) 0px, rgb(220, 255, 171) 10%, rgb(142, 217, 78) 24%, rgb(183, 243, 90) 56%, rgb(74, 122, 23) 100%)",
+        "boxShadow": "rgba(183, 243, 90, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0.290196 0.478431 0.0901961 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.862745 1 0.670588 / 0.62) 2px 2px 3p"
+      },
+      "selection": {
+        "background": "rgba(201, 166, 107, 0.08)",
+        "border": "rgba(201, 166, 107, 0.4)",
+        "borderWidth": "1px"
+      },
+      "connection": {
+        "stroke": "rgb(201, 166, 107)",
+        "strokeWidth": "1.5px",
+        "d": "M280.0000701437855,351.2500544969994 C357.41395448581216,351"
+      }
+    },
+    "white": {
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(214, 236, 255) 0px, rgb(214, 236, 255) 10%, rgb(102, 178, 255) 24%, rgb(0, 113, 227) 56%, rgb(0, 74, 153) 100%)",
+        "boxShadow": "rgba(0, 113, 227, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0 0.290196 0.6 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.839216 0.92549 1 / 0.62) 2px 2px 3px 0px inset"
+      },
+      "selection": {
+        "background": "rgba(201, 166, 107, 0.08)",
+        "border": "rgba(201, 166, 107, 0.4)",
+        "borderWidth": "1px"
+      },
+      "connection": {
+        "stroke": "rgb(201, 166, 107)",
+        "strokeWidth": "1.5px",
+        "d": "M280.0000701437855,351.2500544969994 C357.41395448581216,351"
+      }
+    },
+    "eye": {
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(210, 236, 220) 0px, rgb(210, 236, 220) 10%, rgb(63, 164, 106) 24%, rgb(11, 122, 67) 56%, rgb(10, 92, 51) 100%)",
+        "boxShadow": "rgba(11, 122, 67, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0.0392157 0.360784 0.2 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.823529 0.92549 0.862745 / 0.62) 2px 2px 3p"
+      },
+      "selection": {
+        "background": "rgba(201, 166, 107, 0.08)",
+        "border": "rgba(201, 166, 107, 0.4)",
+        "borderWidth": "1px"
+      },
+      "connection": {
+        "stroke": "rgb(201, 166, 107)",
+        "strokeWidth": "1.5px",
+        "d": "M280.0000701437855,351.2500544969994 C357.41395448581216,351"
+      }
+    }
+  },
+  "b1": {
+    "button": {
+      "text": "生成效果图",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "disabled": false
+    }
+  },
+  "develop": {
+    "gridlines": {
+      "backgroundImage": "linear-gradient(rgba(201, 166, 107, 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, rgba(201, 166, 107, 0.13) 1px, rgba(0, 0, 0, 0) 1px)",
+      "color": "rgb(29, 29, 31)"
+    },
+    "scanline": {
+      "background": "linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(201, 166, 107), rgba(0, 0, 0, 0))",
+      "color": "rgb(29, 29, 31)"
+    },
+    "overlay": {
+      "className": "develop-gridlines",
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(29, 29, 31)"
+    },
+    "bodyText": "",
+    "hexHits": [
+      {
+        "tag": "DIV",
+        "cls": "develop-overlay nodrag h-28 w-full",
+        "value": "linear-gradient(rgba(201, 166, 107, 0.05), rgba(201, 166, 107, 0.14))"
+      },
+      {
+        "tag": "DIV",
+        "cls": "develop-gridlines",
+        "value": "linear-gradient(rgba(201, 166, 107, 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gra"
+      },
+      {
+        "tag": "DIV",
+        "cls": "develop-scanline",
+        "value": "linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(201, 166, 107), rgba(0, 0, 0, 0))"
+      },
+      {
+        "tag": "DIV",
+        "cls": "develop-scanline",
+        "value": "rgb(201, 166, 107) 0px 0px 12px 0px"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "develop-label",
+        "value": "rgba(201, 166, 107, 0.8)"
+      }
+    ]
+  }
+}

@@ -997,5 +997,77 @@
    1280,
    720
   ]
+ },
+ {
+  "file": "shots/interaction/b2-after-white-1280.png",
+  "bytes": 136896,
+  "md5": "b3990dba53fa28bd0e226a63cd2ffc4d",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b2-developing-white-1280.png",
+  "bytes": 143525,
+  "md5": "3aa67447c4f9fd38bf0e347906c6faa0",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-connection-current-1280.png",
+  "bytes": 126989,
+  "md5": "862b581b2caf009f1695a5e0174396a7",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-connection-eye-1280.png",
+  "bytes": 140941,
+  "md5": "54201b5201a688bd46befc83c060afff",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-connection-white-1280.png",
+  "bytes": 133338,
+  "md5": "21fc05434cd557aa5d80e44524ac19f2",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-selection-current-1280.png",
+  "bytes": 135374,
+  "md5": "615d23225cd2f79689caa7ade97f62b2",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-selection-eye-1280.png",
+  "bytes": 134316,
+  "md5": "15fa49063ab5d01b8d0ffbdc5cb4b7d9",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/interaction/b3-selection-white-1280.png",
+  "bytes": 135123,
+  "md5": "f6720b1bf6906b3d87ae33e30c9c5161",
+  "size": [
+   1280,
+   720
+  ]
  }
 ]
