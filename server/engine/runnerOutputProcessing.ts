@@ -1,27 +1,15 @@
 import type { NodeExecution } from "../../src/types/workflow";
-import {
-  fitGeneratedImageToAspect,
-  normalizeExactAspectRatio,
-  normalizeUpscaleSize,
-  upscaleImageToLongEdge,
-} from "../lib/imagePostProcessing";
 
-/** Apply business-side output guarantees only to nodes that expose size controls to users. */
+/**
+ * v7（R-53）：旧 kind 特化后处理（sketch-to-render/ai-modify 的画幅拟合、
+ * upscale 的长边放大）随旧 9 值 kind 一并退役。image 节点的画幅由 modelOptions.size
+ * 在 Provider 侧控制；本地 fit/upscale 不再按节点类型触发。
+ * 函数签名保留以兼容既有调用点（runner / generate 路由）。
+ */
 export async function postProcessGeneratedOutputImages(
-  kind: NodeExecution["kind"],
-  params: Record<string, unknown>,
+  _kind: NodeExecution["kind"],
+  _params: Record<string, unknown>,
   images: string[],
 ): Promise<string[]> {
-  if (kind !== "sketch-to-render" && kind !== "ai-modify" && kind !== "upscale") return images;
-  const aspectRatio = normalizeExactAspectRatio(params.aspectRatio);
-  const imageSize = normalizeUpscaleSize(params.imageSize);
-  const processed: string[] = [];
-  for (const image of images) {
-    processed.push(
-      kind === "upscale"
-        ? await upscaleImageToLongEdge(image, imageSize)
-        : await fitGeneratedImageToAspect(image, aspectRatio),
-    );
-  }
-  return processed;
+  return images;
 }

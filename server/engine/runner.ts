@@ -2,13 +2,16 @@
  * 执行步骤执行器：把单个 NodeExecution 逐步执行并调用 Provider。
  * 运行队列与事件持久化已迁移到 runQueue/（PostgreSQL 持久队列）；本文件只保留
  * executeStep 及其纯执行辅助函数（参考图解析、Provider 请求、后处理）。
+ *
+ * v7 三基础节点模型（R-53）：executeStep 收敛为 text / image / video 三分支。
+ * - text：同步 chat completions（Q1=B），结果写 outputText（runtime.md §1b）。
+ * - image：统一生成路径，operationMode 由提示词变体携带，蒙版由 needsMask 驱动。
+ * - video：异步任务路径（submit + poll），Provider 实现归 P2-e。
  */
 import { createHash } from "node:crypto";
 import {
-  NODE_SPECS,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
-  allowedOperationModesForNode,
   type AIProvider,
   type ImageGenRequest,
   type ImageOperationMode,
@@ -20,6 +23,7 @@ import {
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
 import { generateExactImages } from "../providers/exact";
+import { getTextProvider, type TextProvider } from "../providers/textProvider";
 import { normalizeImageRef } from "../lib/fileStore";
 import {
   isLocalImageReference,
@@ -30,21 +34,21 @@ import { REMOTE_IMAGE_REFERENCE_MESSAGE } from "../lib/imageReferenceAccess";
 import { normalizeUploadImageDataUrl } from "../lib/uploadImageNormalization";
 import { query } from "../lib/database";
 import {
-  normalizeExactAspectRatio,
-  normalizeUpscaleSize,
-} from "../lib/imagePostProcessing";
-import { buildRecolorPrompt } from "../../src/lib/colors";
-import {
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
+import { DEFAULT_TEXT_MODEL_ID, isTextModelId, type TextModelOptions } from "../../src/types/textModels";
+import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import { compositeMaskedEdit, prepareMaskForGeneration, resolveMaskFeatherRadius } from "../lib/maskProcessing";
 import { renderProviderPrompt, type ProviderPromptReference } from "../../src/lib/providerPromptRenderer";
 import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
 export { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
+
+/** text 节点正文与 outputText 的长度上限（runtime.md §1b / data-model.md §3）。 */
+export const MAX_TEXT_LENGTH = 20_000;
 
 export interface RunFailure {
   prompt?: string;
@@ -63,6 +67,8 @@ interface RunEventMeta {
   failures?: RunFailure[];
   startedAt?: number;
   finishedAt?: number;
+  /** R5 参数 warning（不阻断，前端展示）。 */
+  parameterWarnings?: string[];
 }
 
 export type RunEvent =
@@ -96,12 +102,19 @@ export interface StepResult {
   references?: ReferenceImageInput[];
   model?: string;
   prompts?: string[];
-  providerOutputSizes?: Array<string | null>;
+  providerOutputSizes?: Array<string | null> | undefined;
   failures?: RunFailure[];
   providerRequests: number;
+  /** text 节点的运行结果（展示态，不覆盖 data.text；runtime.md §1b）。 */
+  outputText?: string;
+  /** text 节点的输入快照（可追溯）。 */
+  lastRunInput?: string;
+  /** outputText 是否因超长被截断。 */
+  truncated?: boolean;
 }
 
 export type ProviderResolver = (id: string) => AIProvider;
+export type TextProviderResolver = (id: string) => TextProvider;
 
 export interface ExecuteStepOptions {
   runId?: string;
@@ -128,6 +141,8 @@ export interface ExecuteStepOptions {
     providerOutputSizes?: Array<string | null>;
     providerRequestId?: string;
   }) => Promise<string[]>;
+  /** text 节点 Provider 解析器（测试注入用）；缺省走 getTextProvider。 */
+  resolveTextProvider?: TextProviderResolver;
 }
 
 function fallbackReferenceSources(step: NodeExecution, inputImages: string[]): ReferenceImageSource[] {
@@ -186,10 +201,14 @@ function assertNoRemoteWorkerReferenceValues(values: readonly unknown[]): void {
 function assertNoRemoteWorkerReferences(step: NodeExecution, inputImages: readonly string[]): void {
   assertNoRemoteWorkerReferenceValues([
     ...inputImages,
-    step.kind === "image-input" ? step.params.imageUrl : undefined,
-    step.kind === "fabric-recolor" ? step.params.fabricImageUrl : undefined,
-    step.kind === "mask-redraw" ? step.params.mask : undefined,
+    step.kind === "image" && typeof step.params.mask === "string" ? step.params.mask : undefined,
   ]);
+}
+
+function inputTextsOf(step: NodeExecution): string[] {
+  return Array.isArray(step.params.inputTexts)
+    ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
+    : [];
 }
 
 export async function resolveReferenceInputs(
@@ -212,6 +231,175 @@ export async function resolveReferenceInputs(
   });
 }
 
+async function executeTextStep(
+  step: NodeExecution,
+  resolveTextProvider: TextProviderResolver,
+): Promise<StepResult> {
+  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
+  if (!promptVariantId) {
+    throw new Error("先在悬浮窗口选择功能");
+  }
+  const modelId = isTextModelId(step.params.modelId) ? step.params.modelId : DEFAULT_TEXT_MODEL_ID;
+  // runtime.md §1b 第 1 步：上游 text 正文（按边顺序，一律取已采纳 data.text）+ 自身正文。
+  const ownText = typeof step.params.text === "string" ? step.params.text : "";
+  const input = [...inputTextsOf(step), ownText].filter((text) => text.trim() !== "").join("\n\n");
+  if (!input.trim()) {
+    throw new Error("文本节点没有可发送的提示词");
+  }
+  const provider = resolveTextProvider(modelId);
+  const result = await provider.complete({
+    input,
+    promptVariantId,
+    modelId,
+    modelOptions: step.params.modelOptions as TextModelOptions | undefined,
+    ...(typeof step.params.contractHash === "string"
+      ? { contractHash: step.params.contractHash as `sha256:${string}` }
+      : {}),
+    ...(typeof step.params.evaluationVersion === "string"
+      ? { evaluationVersion: step.params.evaluationVersion }
+      : {}),
+  });
+  if (result.status === "failed") {
+    throw new Error(result.error);
+  }
+  const truncated = result.text.length > MAX_TEXT_LENGTH;
+  const outputText = truncated ? result.text.slice(0, MAX_TEXT_LENGTH) : result.text;
+  return {
+    images: [],
+    outputText,
+    lastRunInput: input,
+    truncated,
+    model: modelId,
+    providerRequests: 1,
+  };
+}
+
+async function executeImageStep(
+  step: NodeExecution,
+  inputImages: string[],
+  resolveProvider: ProviderResolver,
+  options: ExecuteStepOptions,
+): Promise<StepResult> {
+  const modelId = step.params.modelId;
+  if (!isImageModelId(modelId)) {
+    throw new Error(`Node ${step.nodeId} must select an explicit supported image model`);
+  }
+  if (!isModelAllowedForNode(modelId, step.kind)) {
+    throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
+  }
+  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
+  const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
+  if (!variant) {
+    throw new Error(`Node ${step.nodeId} 没有绑定当前版本的提示词变体`);
+  }
+  // operationMode 由提示词变体携带（runtime.md §1）；needsMask 由 mask-edit 模式驱动（P2-d 显式化 needsMask 字段）。
+  const operationMode: ImageOperationMode = variant.mode;
+  const needsMask = operationMode === "mask-edit";
+  // runtime.md §1 第 3 步：taskPrompt = variant.fullPrompt + "\n\n" + userPrompt（不再走 buildGarmentPrompt 包装）。
+  // userPrompt：DAG 路径取上游 text 正文；直接生成路径（无 text 上游）回退到 params.prompt。
+  const inputTexts = inputTextsOf(step);
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof step.params.prompt === "string" ? step.params.prompt : "");
+  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+
+  const inputReferenceSources = options.referenceSources !== undefined
+    ? options.referenceSources.map((reference) => ({ ...reference }))
+    : fallbackReferenceSources(step, inputImages);
+  assertReferenceSourcesMatchImages(inputReferenceSources, inputImages, step.nodeId);
+  const references = await resolveReferenceInputs(inputReferenceSources);
+  const promptReferences: ProviderPromptReference[] = references.map(() => ({}));
+  const referenceImages = references.map((reference) => reference.dataUrl);
+  const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
+  const maxUserReferences = needsMask
+    ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
+    : maxReferences;
+  if (referenceImages.length > maxUserReferences) {
+    throw new Error(`Node ${step.nodeId} accepts at most ${maxUserReferences} user reference images for ${modelId}`);
+  }
+
+  // 蒙版（needsMask 变体；maskSourceRef 必须等于第一条图片入边当前引用）。
+  const maskReference = needsMask ? step.params.mask : undefined;
+  if (needsMask && (typeof maskReference !== "string" || !maskReference)) {
+    throw new Error("局部修改必须先保存 PNG 蒙版");
+  }
+  if (needsMask && (typeof step.params.maskSourceRef !== "string" || step.params.maskSourceRef !== inputImages[0])) {
+    throw new Error("蒙版对应的原图已变化，请重新绘制蒙版");
+  }
+  const mask = typeof maskReference === "string" ? await normalizeImageRef(maskReference) : undefined;
+  const maskFeatherRadius = needsMask ? resolveMaskFeatherRadius(step.params.featherRadius) : undefined;
+  const preparedMask = needsMask
+    ? await prepareMaskForGeneration(referenceImages[0], mask!, { featherRadius: maskFeatherRadius })
+    : undefined;
+  const providerMask = preparedMask?.mask ?? mask;
+  const providerReferences = preparedMask
+    ? [
+        references[0],
+        ...references.slice(1),
+        {
+          dataUrl: preparedMask.guide,
+          order: references.length,
+          assetSha256: assetSha256(preparedMask.guide),
+          sourceNodeId: `${step.nodeId}:mask-guide`,
+        },
+      ]
+    : references;
+  const providerReferenceImages = providerReferences.map((reference) => reference.dataUrl);
+
+  const prompt = renderProviderPrompt({
+    nodeKind: "image",
+    modelId,
+    operationMode,
+    taskPrompt,
+    references: promptReferences,
+    needsMask,
+  });
+
+  const request: ImageGenRequest = {
+    prompt,
+    operationMode,
+    promptVariantId,
+    ...(typeof step.params.promptFamilyId === "string" ? { promptFamilyId: step.params.promptFamilyId } : {}),
+    ...(typeof step.params.parameterProfileId === "string" ? { parameterProfileId: step.params.parameterProfileId } : {}),
+    ...(typeof step.params.contractHash === "string"
+      ? { contractHash: step.params.contractHash as `sha256:${string}` }
+      : {}),
+    ...(typeof step.params.evaluationVersion === "string" ? { evaluationVersion: step.params.evaluationVersion } : {}),
+    ...(typeof step.params.postprocessVersion === "string" ? { postprocessVersion: step.params.postprocessVersion } : {}),
+    references: providerReferences.length ? providerReferences : undefined,
+    referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
+    aspectRatio: typeof step.params.aspectRatio === "string" ? step.params.aspectRatio : undefined,
+    batchSize: typeof step.params.batchSize === "number" ? step.params.batchSize : undefined,
+    modelOptions: step.params.modelOptions as ImageModelOptions | undefined,
+    ...(providerMask ? { mask: providerMask } : {}),
+  };
+
+  const requestedCount = Math.max(1, Math.min(8, Number(step.params.batchSize) || 1));
+  const provider = resolveProvider(modelId);
+  const result = await generateExactImages(
+    provider,
+    request,
+    requestedCount,
+    { ...options, nodeId: step.nodeId },
+  );
+  const businessImages = needsMask
+    ? await Promise.all(result.images.map((image) => (
+        compositeMaskedEdit(referenceImages[0], mask!, image, { featherRadius: maskFeatherRadius })
+      )))
+    : result.images;
+  const images = await postProcessGeneratedOutputImages("image", step.params, businessImages);
+  return {
+    images,
+    providerImages: result.providerImages,
+    references: providerReferences,
+    model: result.model,
+    prompts: images.map(() => prompt),
+    providerRequests: result.providerRequests,
+    providerOutputSizes: result.providerOutputSizes,
+    failures: result.failures.length ? result.failures.map((error) => ({ prompt, error })) : undefined,
+  };
+}
+
 export async function executeStep(
   step: NodeExecution,
   inputImages: string[],
@@ -226,263 +414,12 @@ export async function executeStep(
   // unresolved user input references and never changes output URL handling.
   assertNoRemoteWorkerReferences(step, inputImages);
   switch (step.kind) {
-    case "image-input": {
-      const imageUrl = step.params.imageUrl as string | undefined;
-      return { images: imageUrl ? [imageUrl] : [], providerRequests: 0 };
-    }
-    case "result": {
-      // 结果节点：汇总上游本次运行的真实产出
-      const providerImages = options.inputProviderImages?.length === inputImages.length
-        && options.inputProviderImages.every((image): image is string => typeof image === "string" && image.length > 0)
-        ? options.inputProviderImages
-        : undefined;
-      return { images: inputImages, providerImages, providerRequests: 0 };
-    }
-    case "sketch-to-render":
-    case "ai-modify":
-    case "fabric-recolor":
-    case "upscale":
-    case "print-extract":
-    case "print-mutate":
-    case "mask-redraw": {
-      if (
-        step.params.modelSelectionNeedsConfirmation === true
-        || (typeof step.params.retiredModelId === "string" && step.params.retiredModelId.trim())
-      ) {
-        throw new Error(`Node ${step.nodeId} uses a retired model and must be manually reconfigured before running`);
-      }
-      if (!isImageModelId(step.params.modelId)) {
-        throw new Error(`Node ${step.nodeId} must select an explicit supported image model`);
-      }
-      const modelId = step.params.modelId;
-      if (!isModelAllowedForNode(modelId, step.kind)) {
-        throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
-      }
-      const provider = resolveProvider(modelId);
-      const modelOptions = step.params.modelOptions as ImageModelOptions | undefined;
-      const allowedModes = allowedOperationModesForNode(step.kind);
-      const operationMode = step.params.operationMode as ImageOperationMode;
-      if (!allowedModes.includes(operationMode as never)) {
-        throw new Error(`Node ${step.nodeId} has an invalid fixed operationMode`);
-      }
-      if (step.params.operationModeNeedsConfirmation === true) {
-        throw new Error(`Node ${step.nodeId} operationMode must be confirmed before running`);
-      }
-      if (
-        step.kind === "mask-redraw" &&
-        (typeof step.params.maskSourceRef !== "string" || step.params.maskSourceRef !== inputImages[0])
-      ) {
-        throw new Error("蒙版对应的原图已变化，请重新绘制蒙版");
-      }
-      const inputReferenceSources = options.referenceSources !== undefined
-        ? options.referenceSources.map((reference) => ({ ...reference }))
-        : fallbackReferenceSources(step, inputImages);
-      assertReferenceSourcesMatchImages(inputReferenceSources, inputImages, step.nodeId);
-
-      // fabric-recolor 的面料参考图（可能不是边连入，而是节点参数）先并入
-      // canonical sources，再只从最终 references 派生兼容图片数组。
-      const fabricImageUrl = step.params.fabricImageUrl as string | undefined;
-      const referenceSources = step.kind === "fabric-recolor" && fabricImageUrl
-        ? [...inputReferenceSources, {
-          imageRef: fabricImageUrl,
-          order: inputReferenceSources.length,
-          sourceNodeId: step.nodeId,
-        }]
-        : inputReferenceSources;
-      const references = await resolveReferenceInputs(referenceSources);
-      const promptReferences: ProviderPromptReference[] = references.map(() => ({}));
-      const referenceImages = references.map((reference) => reference.dataUrl);
-      const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-      const maxUserReferences = step.kind === "mask-redraw"
-        ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
-        : maxReferences;
-      if (referenceImages.length > maxUserReferences) {
-        throw new Error(`Node ${step.nodeId} accepts at most ${maxUserReferences} user reference images for ${modelId}`);
-      }
-
-      const extra = ((step.params.prompt as string) ?? "").trim();
-
-      // 配色替换：每个颜色独立调用，保证一色一图；部分失败也保留成功结果。
-      if (step.kind === "fabric-recolor") {
-        const colors = Array.isArray(step.params.colors)
-          ? step.params.colors.filter((value): value is string => typeof value === "string")
-          : [];
-        if (colors.length > 0) {
-          const images: string[] = [];
-          const providerImages: string[] = [];
-          const prompts: string[] = [];
-          const providerOutputSizes: Array<string | null> = [];
-          const failures: RunFailure[] = [];
-          let model: string | undefined;
-          let providerRequests = 0;
-          let firstError: unknown;
-          for (const color of colors) {
-            const prompt = renderProviderPrompt({
-              nodeKind: step.kind,
-              modelId,
-              operationMode,
-              taskPrompt: buildRecolorPrompt([color]),
-              references: promptReferences,
-            });
-            try {
-              const result = await generateExactImages(
-                provider,
-                { prompt, operationMode: "edit", references, referenceImages, modelOptions },
-                1,
-                { ...options, nodeId: step.nodeId },
-              );
-              providerRequests += result.providerRequests;
-              model = result.model;
-              for (const [index, image] of result.images.entries()) {
-                images.push(image);
-                providerImages.push(result.providerImages[index]!);
-                prompts.push(prompt);
-                providerOutputSizes.push(result.providerOutputSizes?.[index] ?? null);
-              }
-            } catch (err) {
-              firstError ??= err;
-              if (err instanceof ProviderError && err.category === "outcome_unknown") throw err;
-              failures.push({
-                prompt,
-                error: err instanceof ProviderError
-                  ? publicProviderErrorMessage(err)
-                  : err instanceof Error ? err.message : String(err),
-              });
-              if (images.length > 0) break;
-              if (err instanceof ProviderError && (
-                err.status === 429 || err.status === 503 ||
-                ["gateway_authentication", "invalid_request", "model_unavailable"].includes(err.category)
-              )) throw err;
-            }
-          }
-          if (images.length === 0) {
-            throw firstError instanceof Error ? firstError : new Error(failures[0]?.error ?? "全部配色生成失败");
-          }
-          return {
-            images,
-            providerImages,
-            references,
-            prompts,
-            model,
-            providerRequests,
-            providerOutputSizes: providerOutputSizes.some((size) => size !== null)
-              ? providerOutputSizes
-              : undefined,
-            failures: failures.length ? failures : undefined,
-          };
-        }
-      }
-
-      // 印花裂变：分批出图（单次最多 4 张）
-      if (step.kind === "print-mutate") {
-        const count = Math.max(1, Math.min(8, Number(step.params.count) || 4));
-        const taskPrompt =
-          "基于这张印花图案生成风格一致的新变体：保持原有配色体系、艺术风格与笔触质感，重新编排元素的构图与组合方式，纯白背景，适合作为印花素材复用" +
-          (extra ? `。补充要求：${extra}` : "");
-        const prompt = renderProviderPrompt({
-          nodeKind: step.kind,
-          modelId,
-          operationMode,
-          taskPrompt,
-          references: promptReferences,
-        });
-        const result = await generateExactImages(
-          provider,
-          { prompt, operationMode: "edit", references, referenceImages, modelOptions },
-          count,
-          { ...options, nodeId: step.nodeId },
-        );
-        const failures = result.failures.map((error) => ({ prompt, error }));
-        return {
-          images: result.images,
-          providerImages: result.providerImages,
-          references,
-          prompts: result.images.map(() => prompt),
-          model: result.model,
-          providerRequests: result.providerRequests,
-          providerOutputSizes: result.providerOutputSizes,
-          failures: failures.length ? failures : undefined,
-        };
-      }
-
-      const taskPrompt =
-        step.kind === "upscale"
-          ? "将这张服装效果图放大为超高清版本，增强面料纹理、走线与边缘细节，保持原有构图、色彩和光影完全不变"
-          : step.kind === "print-extract"
-            ? "提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用" +
-              (extra ? `。补充要求：${extra}` : "")
-            : extra;
-      const prompt = renderProviderPrompt({
-        nodeKind: step.kind,
-        modelId,
-        operationMode,
-        taskPrompt,
-        references: promptReferences,
-      });
-      const maskReference = step.kind === "mask-redraw" ? step.params.mask : undefined;
-      if (step.kind === "mask-redraw" && (typeof maskReference !== "string" || !maskReference)) {
-        throw new Error("局部修改必须先保存 PNG 蒙版");
-      }
-      const mask = typeof maskReference === "string" ? await normalizeImageRef(maskReference) : undefined;
-      const maskFeatherRadius = step.kind === "mask-redraw"
-        ? resolveMaskFeatherRadius(step.params.featherRadius)
-        : undefined;
-      const preparedMask = step.kind === "mask-redraw"
-        ? await prepareMaskForGeneration(referenceImages[0], mask!, { featherRadius: maskFeatherRadius })
-        : undefined;
-      const providerMask = preparedMask?.mask ?? mask;
-      const providerReferences = preparedMask
-        ? [
-            references[0],
-            ...references.slice(1),
-            {
-              dataUrl: preparedMask.guide,
-              order: references.length,
-              assetSha256: assetSha256(preparedMask.guide),
-              sourceNodeId: `${step.nodeId}:mask-guide`,
-            },
-          ]
-        : references;
-      const providerReferenceImages = providerReferences.map((reference) => reference.dataUrl);
-      const request = {
-        prompt,
-        operationMode: operationMode as "generate" | "edit" | "mask-edit",
-        references: providerReferences.length ? providerReferences : undefined,
-        referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
-        aspectRatio: step.kind === "sketch-to-render" || step.kind === "ai-modify"
-          ? normalizeExactAspectRatio(step.params.aspectRatio)
-          : step.params.aspectRatio as string | undefined,
-        batchSize: step.params.batchSize as number | undefined,
-        imageSize: step.kind === "upscale" ? normalizeUpscaleSize(step.params.imageSize) : undefined,
-        modelOptions: preparedMask ? { ...modelOptions, size: preparedMask.size } : modelOptions,
-        mask: providerMask,
-      };
-      const requestedCount = step.kind === "sketch-to-render" || step.kind === "ai-modify"
-        ? Math.max(1, Math.min(8, Number(step.params.batchSize) || 1))
-        : 1;
-      const result = await generateExactImages(
-        provider,
-        request,
-        requestedCount,
-        { ...options, nodeId: step.nodeId },
-      );
-      const providerImages = step.kind === "mask-redraw"
-        ? await Promise.all(result.images.map((image) => (
-            compositeMaskedEdit(referenceImages[0], mask!, image, { featherRadius: maskFeatherRadius })
-          )))
-        : result.images;
-      const images = await postProcessGeneratedOutputImages(step.kind, step.params, providerImages);
-      return {
-        images,
-        providerImages: result.providerImages,
-        references: providerReferences,
-        model: result.model,
-        prompts: images.map(() => prompt),
-        providerRequests: result.providerRequests,
-        providerOutputSizes: result.providerOutputSizes,
-        failures: result.failures.length ? result.failures.map((error) => ({ prompt, error })) : undefined,
-      };
-    }
+    case "text":
+      return executeTextStep(step, options.resolveTextProvider ?? getTextProvider);
+    case "image":
+      return executeImageStep(step, inputImages, resolveProvider, options);
+    case "video":
+      throw new Error("视频节点执行链路尚未实现（P2-e）");
   }
 }
 
