@@ -1765,13 +1765,28 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       if (typeof input.promptVariantId !== "string" || !input.promptVariantId) delete data.promptVariantId;
       break;
     case "image": {
-      const selectedModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
+      const validModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
         ? input.modelId
         : undefined;
-      const modelId = selectedModelId ?? DEFAULT_GENERATION_MODEL_ID;
       const preferredAspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "3:4";
-      data.modelId = modelId;
-      data.modelOptions = normalizeImageModelOptions(modelId, input.modelOptions);
+      if (validModelId) {
+        data.modelId = validModelId;
+        data.modelOptions = normalizeImageModelOptions(validModelId, input.modelOptions);
+      } else if (typeof input.modelId === "string" && input.modelId.trim()) {
+        // R-61：非空但已退役/契约外的模型 ID 视为「用户曾选过、模型已失效」，
+        // 会话恢复替换为默认模型；旧 promptVariantId 等绑定保留，运行准入拦截
+        // （对应测试「退役 Grok 会话恢复替换为默认模型」）。
+        const fallbackId = DEFAULT_GENERATION_MODEL_ID;
+        data.modelId = fallbackId;
+        data.modelOptions = normalizeImageModelOptions(fallbackId, input.modelOptions);
+      } else {
+        // 节点从未选择模型（modelId 缺省/空串/脏值）：modelId 在 v7 是可选文档字段
+        // （contracts/data-model.md §3 ImageNodeData），会话恢复不得替用户补默认模型、
+        // 改写文档形状；未选模型不可运行，由 promptRunAdmission 提示选择
+        // （contracts/runtime.md §1/§1b）。
+        delete data.modelId;
+        delete data.modelOptions;
+      }
       data.aspectRatio = typeof input.aspectRatio === "string" && ["1:1", "3:4", "4:3", "9:16", "16:9"].includes(input.aspectRatio)
         ? input.aspectRatio
         : preferredAspectRatio;

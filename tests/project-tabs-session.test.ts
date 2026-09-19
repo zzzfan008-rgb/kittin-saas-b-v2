@@ -1132,6 +1132,8 @@ const boundaryResultNode = {
 useFlowStore.getState().openFlowTab({
   projectId: "pure-boundary-project",
   projectName: "纯文档边界项目",
+  // boundaryResultNode 是从未选择模型的 image 节点（v7 modelId 可选，见
+  // data-model.md §3）：会话恢复不得替它补默认模型（R-67 A2）。
   nodes: [unsafeDocumentNode, boundaryResultNode],
   edges: [unsafeDocumentEdge],
 });
@@ -1197,6 +1199,10 @@ assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "posi
 assert.equal(persistedBoundaryData.status, "idle");
 assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
+const persistedBoundaryResult = projectPayload.flow.nodes[1] as Record<string, unknown>;
+const persistedBoundaryResultData = persistedBoundaryResult.data as Record<string, unknown>;
+assert.equal("modelId" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelId");
+assert.equal("modelOptions" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelOptions");
 assert.deepEqual(
   Object.keys(projectPayload.flow.edges[0] as Record<string, unknown>).sort(),
   ["data", "id", "source", "sourceHandle", "target", "targetHandle"],
@@ -1255,9 +1261,9 @@ console.log("  ✓ saveState 即使不改变 revision/dirty 也会更新可恢�
 
 sessionWriteKeys.length = 0;
 const writesBeforeDebouncedChanges = sessionWrites;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身" });
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改" });
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改袖型" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身，只修改" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身，只修改袖型" });
 assert.equal(sessionWrites, writesBeforeDebouncedChanges, "连续文档修改在 debounce 前不得同步写盘");
 assert.equal(timeoutCallbacks.size, 1, "连续修改必须重置为同一个 debounce 任务");
 assert.equal(idleCallbacks.size, 0);
@@ -1276,7 +1282,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "保留衣身，只修改袖型",
 );
 console.log("  ✓ revision/topology 驱动持久化：瞬态零写入，连续修改 debounce 为单次分片写入");
@@ -1285,12 +1291,12 @@ sessionWriteKeys.length = 0;
 const revisionBeforeTextBurst = activeDocument().revision;
 const writesBeforeTextBurst = sessionWrites;
 let textToken = updateCoalescedTextEdit(
-  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "label" },
   "合并输入第一段",
 );
 assert.ok(textToken);
 textToken = updateCoalescedTextEdit(
-  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "label" },
   "合并输入最终内容",
   textToken,
 );
@@ -1311,13 +1317,13 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "合并输入最终内容",
 );
 console.log("  ✓ 连续文本输入实时可见，但每个 burst 只提交一次 revision/session 分片");
 
 sessionWriteKeys.length = 0;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "页面隐藏前的最后内容" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "页面隐藏前的最后内容" });
 assert.equal(timeoutCallbacks.size, 1);
 assert.equal(flushTabSessionPersistence(), true);
 assert.equal(timeoutCallbacks.size, 0, "生命周期同步 flush 必须取消尚未执行的 debounce");
@@ -1326,7 +1332,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "页面隐藏前的最后内容",
 );
 const writesAfterLifecycleFlush = sessionWrites;
@@ -1369,7 +1375,7 @@ useFlowStore.getState().switchTab(debouncedTabId);
 flushTabSessionPersistence();
 
 deferIdleWrites = true;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "拖拽前稳定编辑" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "拖拽前稳定编辑" });
 assert.equal(timeoutCallbacks.size, 1);
 const lifecycleDrag = beginHistoryTransaction("lifecycle-stable-rebase");
 assert.equal(timeoutCallbacks.size, 0, "开始实时事务前必须同步落盘已稳定的 debounce 编辑");
@@ -1377,7 +1383,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "拖拽前稳定编辑",
 );
 const writesAfterTransactionBaseline = sessionWrites;
@@ -1425,7 +1431,7 @@ console.log("  ✓ 实时事务前 flush 稳定编辑；事务期生命周期只
 
 failedSessionTabId = debouncedTabId;
 failSessionWrites = true;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "等待事务后重试" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "等待事务后重试" });
 assert.equal(sessionStorage.getItem(projectTabStorageKey(debouncedTabId)), null);
 assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
 const deferredRetryTransaction = beginHistoryTransaction("deferred-session-retry");
