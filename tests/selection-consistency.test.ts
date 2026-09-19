@@ -53,10 +53,10 @@ function test(name: string, run: () => void): void {
 function node(id: string, selected = false): FlowNode {
   return {
     id,
-    type: "image-input",
+    type: "image",
     position: { x: id === "a" ? 0 : 320, y: 0 },
     selected,
-    data: { kind: "image-input", label: id, status: "idle" },
+    data: { kind: "image", label: id, status: "idle" },
   };
 }
 
@@ -66,7 +66,7 @@ function result(id: string, status: "success" | "error" = "success"): RecentResu
     image: status === "success" ? `/api/files/${id}.png` : "",
     nodeId: `node-${id}`,
     nodeLabel: id,
-    kind: "ai-modify",
+    kind: "image",
     projectId: "selection-project",
     startedAt: Number(id.replace(/\D/g, "")) || 1,
     finishedAt: 2,

@@ -146,7 +146,7 @@ assert.equal(evaluatePromptRunAdmission({ ...input, modelId: "gpt-image-2.5-sunb
 // generate + 参考图的冲突由 reference 闸拦截。
 assert.equal(evaluatePromptRunAdmission({ ...input, operationMode: "generate" }).code, "generate-reference-conflict");
 // v7：operationModeNeedsConfirmation 字段族删除，该断言随字段一并移除。
-// v7：旧「sketch-to-render 节点 + generate + 参考图」冲突反例改为 image kind 表达。
+// v7：旧「草图渲染节点 + generate + 参考图」冲突反例改为 image kind 表达。
 assert.equal(evaluatePromptRunAdmission({
   ...input,
   operationMode: "generate",
@@ -242,7 +242,7 @@ const maskInput = promptRunAdmissionInputFromParams("image", {
   contractHash: maskVariant.contractHash,
   evaluationVersion: maskVariant.evaluationVersion,
   postprocessVersion: maskProfile.postprocess.version,
-  // v7：mask-redraw 的 batchSize 豁免随旧 kind 退役；蒙版 profile 物化值同样比对。
+  // v7：蒙版重绘节点的 batchSize 豁免随旧 kind 退役；蒙版 profile 物化值同样比对。
   aspectRatio: materializeModelParameterProfile(maskProfile).aspectRatio,
   batchSize: materializeModelParameterProfile(maskProfile).batchSize,
   modelOptions: {},

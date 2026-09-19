@@ -54,7 +54,7 @@ const queued: RecentResult = {
   image: "",
   nodeId: "node-1",
   nodeLabel: "文生图",
-  kind: "sketch-to-render",
+  kind: "image",
   projectId: "project-1",
   projectName: "秋冬款式",
   prompt: "极简黑色西装",
@@ -105,7 +105,7 @@ test("点击批量生成时立即按用户选择创建对应数量的排队卡",
 
 test("各批量节点正确计算用户选择的卡片数量", () => {
   const modify: AiModifyNodeData = {
-    kind: "ai-modify",
+    kind: "image",
     label: "AI 改款",
     status: "idle",
     prompt: "改款",
@@ -116,7 +116,7 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
   };
   assert.equal(requestedResultCount(modify), 4);
   assert.equal(requestedResultCount({
-    kind: "print-mutate",
+    kind: "image",
     label: "印花裂变",
     status: "idle",
     prompt: "变体",
@@ -124,7 +124,7 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
     outputImages: [],
   }), 8);
   assert.equal(requestedResultCount({
-    kind: "fabric-recolor",
+    kind: "image",
     label: "配色",
     status: "idle",
     colors: ["#111111", "#222222", "#333333"],
@@ -271,7 +271,7 @@ test("并发保存素材按最新状态追加且保持幂等", () => {
 
 test("异常错误事件即使夹带 images 也不会清空节点原有图片", () => {
   const data: AiModifyNodeData = {
-    kind: "ai-modify",
+    kind: "image",
     label: "保留上一版",
     status: "success",
     prompt: "改款",

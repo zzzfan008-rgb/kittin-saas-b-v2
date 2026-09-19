@@ -107,7 +107,7 @@ await database.query(`
     run_type, retry_policy, evaluation_case_id, evaluation_authorization_id,
     evaluation_campaign_id, evaluation_slot_id, billing_reconciliation_status
   ) VALUES (
-    $1, $2, 'review-node', '复核节点', 'sketch-to-render', '评估复核', 2,
+    $1, $2, 'review-node', '复核节点', 'image', '评估复核', 2,
     2, 1, 'succeeded', $3, $4, 'evaluation', 'no-retry', $5, $6, $7, $8, 'pending'
   )
 `, [runId, admin.id, startedAt, finishedAt, caseId, authorizationId, campaignId, slotId]);
@@ -158,7 +158,7 @@ await database.query(`
   ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8,
     $9, 'build-identity', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
-    'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
+    'image', 'generate', 'fashion-lookbook', 'fashion-lookbook',
     'fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1', 'prompt-v1', $10,
     'evaluation-v1', $11, $12, 'profile-v1', '1.0.0', 'fit-pad-v1',
     'reference-input-sha256-v1', 'garment-gold-v1', 'garment-rubric-v1',

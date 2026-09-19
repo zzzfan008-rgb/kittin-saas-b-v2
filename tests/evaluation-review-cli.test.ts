@@ -215,7 +215,7 @@ try {
   const variant = requireGarmentPromptVariant({
     familyId: "commerce-hero",
     modelId: "gpt-image-2.5-flare-vip",
-    nodeKind: "sketch-to-render",
+    nodeKind: "image",
     mode: "generate",
   });
   const baseRelease = createPromptEvaluationReleaseSnapshot(
@@ -233,7 +233,7 @@ try {
   const secondVariant = requireGarmentPromptVariant({
     familyId: "mask-local-edit",
     modelId: "gpt-image-2.5-sunburst",
-    nodeKind: "mask-redraw",
+    nodeKind: "image",
     mode: "mask-edit",
   });
   const secondRelease = createPromptEvaluationReleaseSnapshot(

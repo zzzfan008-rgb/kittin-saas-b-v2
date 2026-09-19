@@ -42,9 +42,9 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
     readOnly: false,
     nodes: [{
       id: "starter",
-      type: "image-input",
+      type: "image",
       position: { x: 0, y: 0 },
-      data: { kind: "image-input", label: "上传服装图", status: "idle" },
+      data: { kind: "image", label: "上传服装图", status: "idle" },
     }],
     edges: [],
     selectedNodeIds: [],
@@ -245,10 +245,10 @@ const maskLocal = tab({
   projectId: "mask-source-project",
   nodes: [{
     id: "mask-node",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "mask-redraw",
+      kind: "image",
       label: "局部重绘",
       status: "idle",
       modelId: "gpt-image-2.5-sunburst",
@@ -284,8 +284,8 @@ try {
   assert.equal(maskCopyPayload?.targetProjectId, "mask-target-project");
   assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
   assert.equal(copied.targetProjectId, "mask-target-project");
-  assert.equal(copied.flow.nodes[0].data.kind, "mask-redraw");
-  if (copied.flow.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+  assert.equal(copied.flow.nodes[0].data.kind, "image");
+  if (copied.flow.nodes[0].data.kind !== "image") throw new Error("unexpected node kind");
   assert.equal(copied.flow.nodes[0].data.mask, "/api/files/copied-mask.png");
 } finally {
   globalThis.fetch = originalFetch;
@@ -435,7 +435,7 @@ const conflictLocal = tab({
 useFlowStore.setState({ tabs: [conflictLocal], activeTabId: conflictLocal.id, viewer: null });
 const copiedBackupFlow = {
   ...persistedWorkflowForProjectTab(conflictLocal),
-  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "mask-redraw"
+  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "image"
     ? { ...node, data: { ...node.data, mask: "/api/files/backup-mask.png" } }
     : node),
 };
@@ -445,8 +445,8 @@ assert.equal(applyServerInitialDraftToTab(conflictLocal.id, draft({ id: "conflic
 const backup = useFlowStore.getState().tabs.find((candidate) => candidate.projectId === "backup-project");
 assert.ok(backup);
 assert.equal(projectTabLifecycle(backup), "local");
-assert.equal(backup.nodes[0].data.kind, "mask-redraw");
-if (backup.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected backup node kind");
+assert.equal(backup.nodes[0].data.kind, "image");
+if (backup.nodes[0].data.kind !== "image") throw new Error("unexpected backup node kind");
 assert.equal(backup.nodes[0].data.mask, "/api/files/backup-mask.png");
 console.log("  ✓ 采用云端冲突版本时，本机备份使用独立项目 ID 与复制后的蒙版");
 
@@ -513,8 +513,8 @@ function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
     },
   } as unknown as Pick<WorkflowTemplate, "flow">;
 }
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image-input"])), "upload");
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["sketch-to-render"])), "text");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
 assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
 for (const cover of [

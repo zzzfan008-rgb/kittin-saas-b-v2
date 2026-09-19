@@ -21,7 +21,7 @@ import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
 const boundaryVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 // This isolated serializer fixture needs to cross the client admission gate so
@@ -66,10 +66,10 @@ function memoryStorage(
 function storedSelectionNode(id: string, selected?: boolean) {
   return {
     id,
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image-input",
+      kind: "image",
       label: id,
       status: "idle",
     },
@@ -119,19 +119,19 @@ const storedSession = {
       nodes: [
         {
           id: "node-a",
-          type: "image-input",
+          type: "image",
           position: { x: 0, y: 0 },
           data: {
-            kind: "image-input",
+            kind: "image",
             label: "输入",
             status: "idle",
           },
         },
         {
           id: "node-b",
-          type: "result",
+          type: "image",
           position: { x: 300, y: 0 },
-          data: { kind: "result", label: "结果", status: "idle", images: [] },
+          data: { kind: "image", label: "结果", status: "idle", images: [] },
         },
       ],
       edges: [restoredEdge],
@@ -153,7 +153,7 @@ const storedRecentResults = [
     image: "/api/files/project-b.png",
     nodeId: "node-project-b",
     nodeLabel: "项目 B 的生成记录",
-    kind: "ai-modify",
+    kind: "image",
     projectId: "project-b",
     projectName: "项目 B",
     startedAt: 1_000,
@@ -165,7 +165,7 @@ const storedRecentResults = [
     image: "/api/files/legacy.png",
     nodeId: "node-legacy",
     nodeLabel: "旧版生成记录",
-    kind: "sketch-to-render",
+    kind: "image",
     startedAt: 3_000,
     finishedAt: 4_000,
     status: "success",
@@ -428,16 +428,16 @@ const migrated = normalizeTabSessionValue({
     nodes: [
       {
         id: "legacy-ai",
-        type: "ai-modify",
+        type: "image",
         position: { x: 10, y: 20 },
-        data: { kind: "ai-modify", label: "改款", status: "idle", prompt: "换领型" },
+        data: { kind: "image", label: "改款", status: "idle", prompt: "换领型" },
       },
       { id: "broken", type: "unknown", position: { x: 0, y: 0 }, data: {} },
       {
         id: "legacy-result",
-        type: "result",
+        type: "image",
         position: { x: 300, y: 20 },
-        data: { kind: "result", label: "结果", status: "idle" },
+        data: { kind: "image", label: "结果", status: "idle" },
       },
     ],
     edges: [
@@ -455,8 +455,8 @@ assert.equal(migrated.schemaVersion, TAB_SESSION_SCHEMA_VERSION);
 assert.deepEqual(migrated.tabs[0].nodes.map((node) => node.id), ["legacy-ai", "legacy-result"]);
 assert.deepEqual(migrated.tabs[0].edges.map((edge) => edge.id), ["valid-edge"]);
 const migratedAi = migrated.tabs[0].nodes[0].data;
-assert.equal(migratedAi.kind, "ai-modify");
-if (migratedAi.kind !== "ai-modify") throw new Error("unexpected node kind");
+assert.equal(migratedAi.kind, "image");
+if (migratedAi.kind !== "image") throw new Error("unexpected node kind");
 assert.equal(migratedAi.aspectRatio, "1:1");
 assert.equal(migratedAi.batchSize, 1);
 assert.deepEqual(migratedAi.outputImages, []);
@@ -486,10 +486,10 @@ const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
     projectName: "通用模型恢复",
     nodes: generalModelPairs.map((pair, index) => ({
       id: `model-pair-${index}`,
-      type: "ai-modify",
+      type: "image",
       position: { x: index * 80, y: 0 },
       data: {
-        kind: "ai-modify",
+        kind: "image",
         label: pair.modelId,
         status: "idle",
         prompt: "保留模型参数",
@@ -520,10 +520,10 @@ const retiredModelSession = normalizeTabSessionValue({
     projectName: "退役模型会话",
     nodes: [{
       id: "retired-model-node",
-      type: "ai-modify",
+      type: "image",
       position: { x: 0, y: 0 },
       data: {
-        kind: "ai-modify",
+        kind: "image",
         label: "历史 Grok 节点",
         status: "idle",
         prompt: "旧提示词",
@@ -533,7 +533,7 @@ const retiredModelSession = normalizeTabSessionValue({
         modelId: "grok-imagine-image",
         modelOptions: { aspectRatio: "4:3", resolution: "1k" },
         operationMode: "edit",
-        promptVariantId: "fashion-lookbook.grok-imagine-image.ai-modify.edit.v1",
+        promptVariantId: "fashion-lookbook.grok-imagine-image.edit.v1",
         parameterProfileId: "grok-imagine-image:fashion-lookbook:edit:v1",
       },
     }],
@@ -542,8 +542,8 @@ const retiredModelSession = normalizeTabSessionValue({
 });
 assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
-assert.equal(retiredModelData.kind, "ai-modify");
-if (retiredModelData.kind !== "ai-modify") throw new Error("unexpected retired node kind");
+assert.equal(retiredModelData.kind, "image");
+if (retiredModelData.kind !== "image") throw new Error("unexpected retired node kind");
 assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
 assert.equal(retiredModelData.retiredModelId, "grok-imagine-image");
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, true);
@@ -564,10 +564,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "运行恢复项目",
   nodes: [{
     id: "run-recovery-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "运行恢复节点",
       status: "queued",
       prompt: "换领型",
@@ -592,7 +592,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "run-recovery-node",
   nodeLabel: "运行恢复节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "run-recovery-project",
   projectName: "运行恢复项目",
   startedAt: 5_000,
@@ -609,7 +609,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "late-open-node",
   nodeLabel: "稍后打开节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "late-open-project",
   projectName: "稍后打开项目",
   startedAt: 6_000,
@@ -620,7 +620,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "late-open-node",
   nodeLabel: "稍后打开节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "late-open-project",
   projectName: "稍后打开项目",
   startedAt: 5_500,
@@ -631,10 +631,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "稍后打开项目",
   nodes: [{
     id: "late-open-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "稍后打开节点",
       status: "idle",
       prompt: "换袖型",
@@ -658,7 +658,7 @@ const overflowActiveRecords = Array.from({ length: 180 }, (_, index) => ({
   image: "",
   nodeId: `overflow-node-${index}`,
   nodeLabel: `活动节点 ${index}`,
-  kind: "ai-modify" as const,
+  kind: "image" as const,
   projectId: `overflow-project-${index}`,
   projectName: `活动项目 ${index}`,
   startedAt: 10_000 - index,
@@ -670,7 +670,7 @@ const overflowTerminalRecords = Array.from({ length: 160 }, (_, index) => ({
   image: `/api/files/overflow-${index}.png`,
   nodeId: `terminal-node-${index}`,
   nodeLabel: "终态输出",
-  kind: "ai-modify" as const,
+  kind: "image" as const,
   projectId: "terminal-project",
   projectName: "终态项目",
   startedAt: 20_000 - index,
@@ -682,10 +682,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "最旧活动项目",
   nodes: [{
     id: "overflow-node-179",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "最旧活动节点",
       status: "idle",
       prompt: "保持运行",
@@ -742,18 +742,18 @@ useFlowStore.getState().openFlowTab({
   projectName: "容量恢复项目",
   nodes: [{
     id: "quota-source",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image-input", label: "原图", status: "idle",
+      kind: "image", label: "原图", status: "idle",
       imageUrl: "/api/files/quota-source.png",
     },
   }, {
     id: "quota-mask",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 300, y: 0 },
     data: {
-      kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改色",
+      kind: "image", label: "局部重绘", status: "idle", prompt: "改色",
       modelId: "gpt-image-2.5-sunburst", modelOptions: {},
       operationMode: "mask-edit", operationModeNeedsConfirmation: false,
       outputImages: [],
@@ -886,9 +886,9 @@ useFlowStore.getState().loadFlow({
   projectName: "拖拽会话项目",
   nodes: [{
     id: "drag-session-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle" },
   }],
   edges: [],
 });
@@ -925,10 +925,10 @@ useFlowStore.getState().loadFlow({
   projectName: "无位移成功项目",
   nodes: [{
     id: "drag-session-no-move-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "无位移生成节点",
       status: "idle",
       prompt: "生成成功",
@@ -972,10 +972,10 @@ useFlowStore.getState().loadFlow({
   projectName: "净零位移成功项目",
   nodes: [{
     id: "drag-session-net-zero-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "净零位移生成节点",
       status: "idle",
       prompt: "生成成功",
@@ -1033,9 +1033,9 @@ useFlowStore.getState().loadFlow({
   projectName: "拖拽会话项目",
   nodes: [{
     id: "drag-session-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle" },
   }],
   edges: [],
 });
@@ -1045,9 +1045,9 @@ useFlowStore.getState().openFlowTab({
   projectName: "切换目标",
   nodes: [{
     id: "drag-session-target-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "目标节点", status: "idle" },
+    data: { kind: "image", label: "目标节点", status: "idle" },
   }],
   edges: [],
 });
@@ -1074,7 +1074,7 @@ console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切�
 
 const unsafeDocumentNode = {
   id: "pure-boundary-node",
-  type: "sketch-to-render",
+  type: "image",
   position: { x: 120, y: 48 },
   selected: true,
   dragging: true,
@@ -1083,7 +1083,7 @@ const unsafeDocumentNode = {
   height: 180,
   unknownNodeShell: "不得持久化",
   data: {
-    kind: "sketch-to-render",
+    kind: "image",
     label: "纯文档边界",
     status: "error",
     error: "旧运行错误不得持久化",
@@ -1114,10 +1114,10 @@ const unsafeDocumentEdge = {
 };
 const boundaryResultNode = {
   id: "pure-boundary-result",
-  type: "result",
+  type: "image",
   position: { x: 520, y: 48 },
   data: {
-    kind: "result",
+    kind: "image",
     label: "纯文档边界结果",
     status: "idle",
     images: [],
@@ -1339,10 +1339,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "后台持久化项目",
   nodes: [{
     id: "background-session-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "后台生成节点",
       status: "idle",
       prompt: "后台成功",
