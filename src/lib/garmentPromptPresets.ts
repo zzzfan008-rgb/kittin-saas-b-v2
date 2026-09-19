@@ -1,12 +1,42 @@
 import { imageModelContractHash, type ImageModelId } from "../types/imageModels";
+import { textModelContractHash, type TextModelId } from "../types/textModels";
+import { videoModelContractHash, type VideoModelId } from "../types/videoModels";
 import type { NodeKind } from "../types/workflow";
 
 /**
- * awesome-gpt-image-2 只为这三个任务族提供分类、标签和提示词编写方法。
+ * 服装提示词目录（schema v7 / P2-d）。
+ * 功能从节点结构退化为系统提示词变体（PromptVariant），供 text/image/video 节点选用。
  * 运行时文本是下方按模型与操作模式明确编写的独立变体，不读取社区模板作为回退。
+ *
+ * 契约锚点：docs/design/2026-09-18-three-node-model/contracts/prompt-variant-schema.md
+ * （§1 字段级 schema / §2 四键查询 / §3 迁移对照表 / §4 新增功能设置流程）。
+ * 变体的 fullPrompt 是功能文案的唯一来源；runner / colors.ts 不再持有任何功能文案。
+ */
+
+// ---------- 类型定义 ----------
+
+/**
+ * 目录族（取值域随目录重写一次性定版，contracts/prompt-variant-schema.md §1.1 / §3）：
+ * - 旧三任务族 `fashion-lookbook` / `commerce-hero` / `design-sheet`：generate = 文生图、edit = 多图编辑；
+ *   这两组文案同时就是旧 `sketch-to-render`（generate）与旧 `ai-modify`（edit）功能的迁移落点
+ *   （§3.1：迁移 = 把 v6 目录里那 24 个变体的 nodeKind 改为 "image"，fullPrompt 不动；因此两者
+ *   **不新建族**——新建会与三族文案重复并违反单一事实源）。
+ * - 六族迁移中真正新增的族：`upscale` / `print-extract` / `print-mutate` / `fabric-recolor`。
+ * - `mask-local-edit`（蒙版族，ID 不变 + needsMask=true）、文本族 `prompt-polish` / `prompt-generate`、
+ *   视频族 `video-animate`（P2-e）。
  */
 export type GarmentPromptPresetId = "fashion-lookbook" | "commerce-hero" | "design-sheet";
-export type GarmentPromptFamilyId = GarmentPromptPresetId | "mask-local-edit";
+export type PromptFamilyId =
+  | GarmentPromptPresetId
+  | "mask-local-edit"
+  | "upscale"
+  | "print-extract"
+  | "print-mutate"
+  | "fabric-recolor"
+  | "prompt-polish"
+  | "prompt-generate"
+  | "video-animate";
+
 export type PromptOperationMode = "generate" | "edit" | "mask-edit";
 export type PromptSupportStatus = "unsupported" | "unverified" | "experimental" | "verified" | "recommended";
 
@@ -21,10 +51,12 @@ export interface GarmentPromptPreset {
 
 export interface PromptVariant {
   variantId: string;
-  familyId: GarmentPromptFamilyId;
-  modelId: ImageModelId;
+  familyId: PromptFamilyId;
+  modelId: ImageModelId | TextModelId | VideoModelId;
   nodeKind: NodeKind;
   mode: PromptOperationMode;
+  /** Q4=A：声明该变体运行时是否需要蒙版输入。 */
+  needsMask: boolean;
   promptLocale: "zh-CN";
   fullPrompt: string;
   parameterProfileId: string;
@@ -35,8 +67,8 @@ export interface PromptVariant {
 }
 
 export interface PromptVariantQuery {
-  familyId: GarmentPromptFamilyId;
-  modelId: ImageModelId;
+  familyId: PromptFamilyId;
+  modelId: ImageModelId | TextModelId | VideoModelId;
   nodeKind: NodeKind;
   mode: PromptOperationMode;
 }
@@ -48,7 +80,7 @@ export interface PromptVariantAvailability {
 }
 
 const DEFAULT_INTENT = "【请填写服装品类、款式、颜色、面料和目标人群】";
-const EVALUATION_VERSION = "garment-eval-v2-pending";
+const EVALUATION_VERSION = "garment-eval-v3-pending";
 const UNVERIFIED_REASON = "该模型×任务族×操作模式尚未完成当前契约版本的真实评估，普通用户不可启用。";
 
 export const GARMENT_PROMPT_PRESETS: readonly GarmentPromptPreset[] = [
@@ -78,17 +110,19 @@ export const GARMENT_PROMPT_PRESETS: readonly GarmentPromptPreset[] = [
   },
 ] as const;
 
-const STANDARD_MODEL_IDS = [
+// ---------- 标准图片模型变体（lookbook / commerce-hero / design-sheet） ----------
+
+const STANDARD_IMAGE_MODEL_IDS = [
   "gpt-image-2.5-flare-vip",
   "gemini-3.1-flash-image",
   "flux-2-pro",
   "seedream-5-0-260128",
 ] as const;
-type StandardModelId = (typeof STANDARD_MODEL_IDS)[number];
+type StandardImageModelId = (typeof STANDARD_IMAGE_MODEL_IDS)[number];
 type StandardPromptSet = Record<GarmentPromptPresetId, Record<"generate" | "edit", string>>;
 
 /** 每个叶子都是完整可发送提示词；这里不存在跨模型 base prompt。 */
-const MODEL_PROMPTS: Record<StandardModelId, StandardPromptSet> = {
+const MODEL_PROMPTS: Record<StandardImageModelId, StandardPromptSet> = {
   "gpt-image-2.5-flare-vip": {
     "fashion-lookbook": {
       generate: `GPT Image 2 VIP 写实穿搭生成。创建单人全身 3:4 品牌 Lookbook：平视机位、中远景、约 50mm 视角，人物完整入镜、主体居中并留呼吸空间；动作自然，可有轻微行走或衣摆运动，但不得摆拍僵硬。
@@ -195,20 +229,18 @@ const MODEL_PROMPTS: Record<StandardModelId, StandardPromptSet> = {
   },
 };
 
-function makeStandardVariants(): PromptVariant[] {
+function makeStandardImageVariants(): PromptVariant[] {
   const variants: PromptVariant[] = [];
-  for (const modelId of STANDARD_MODEL_IDS) {
+  for (const modelId of STANDARD_IMAGE_MODEL_IDS) {
     for (const preset of GARMENT_PROMPT_PRESETS) {
       for (const mode of ["generate", "edit"] as const) {
         variants.push({
           variantId: `${preset.id}.${modelId}.${mode}.v1`,
           familyId: preset.id,
           modelId,
-          // v7：nodeKind 取值域收敛为三值（R-41 契约 prompt-variant-schema.md §1.1）。
-          // generate → image（文生图族）、edit → image（编辑族）；六族迁移与
-          // supportStatus 重置归 P2-d 目录重写。
           nodeKind: "image",
           mode,
+          needsMask: false,
           promptLocale: "zh-CN",
           fullPrompt: MODEL_PROMPTS[modelId][preset.id][mode],
           parameterProfileId: `${modelId}:${preset.id}:${mode}:v1`,
@@ -223,14 +255,71 @@ function makeStandardVariants(): PromptVariant[] {
   return variants;
 }
 
+// ---------- 六族功能变体（由旧 runner 硬编码 / 旧目录迁移而来） ----------
+//
+// 文案逐字迁移源头（P2-b 之前的实现，ad7aa1e 已把 runner 内文案删除）：
+// - upscale        ← server/engine/runner.ts 的 `step.kind === "upscale"` 分支字面量
+// - print-extract  ← server/engine/runner.ts 的 `step.kind === "print-extract"` 分支字面量
+// - print-mutate   ← server/engine/runner.ts 的 `step.kind === "print-mutate"` 分支字面量
+// - fabric-recolor ← src/lib/colors.ts:140 `buildRecolorPrompt`
+// 迁移只做两件事：去掉 v6 的 `。补充要求：${extra}` 拼接（补充要求改由 text 上游承载，§3.1 备注），
+// 以及删掉 fabric-recolor 的 `{colors}` 占位（§3.5：一色一图循环与占位拼接一并删除）。
+// 其余字符与旧实现完全一致，见 tests/prompt-presets.test.ts 的逐字对照断言。
+
+const SIX_FAMILY_MODEL_IDS = STANDARD_IMAGE_MODEL_IDS;
+type SixFamilyModelId = StandardImageModelId;
+
+/** 逐字迁移自 runner.ts 的 upscale 分支字面量（旧 taskPrompt 全文）。 */
+const UPSCALE_PROMPT = `将这张服装效果图放大为超高清版本，增强面料纹理、走线与边缘细节，保持原有构图、色彩和光影完全不变`;
+
+/** 逐字迁移自 runner.ts 的 print-extract 分支字面量（旧 taskPrompt 全文，含 extra 拼接已删）。 */
+const PRINT_EXTRACT_PROMPT = `提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用`;
+
+/** 逐字迁移自 runner.ts 的 print-mutate 分支字面量；v6 的 count 分批出图改由 batchSize 表达（§3.5）。 */
+const PRINT_MUTATE_PROMPT = `基于这张印花图案生成风格一致的新变体：保持原有配色体系、艺术风格与笔触质感，重新编排元素的构图与组合方式，纯白背景，适合作为印花素材复用`;
+
+/** 迁移自 src/lib/colors.ts `buildRecolorPrompt`；唯一改动 = `{colors}` 占位换成「用户指定的配色」。 */
+const FABRIC_RECOLOR_PROMPT = `保持服装的版型、款式细节、构图和光线完全不变，仅将面料配色替换为用户指定的配色。配色应用于面料主体，呈现真实面料质感与准确色彩，无文字无水印。`;
+
+function makeSixFamilyVariants(): PromptVariant[] {
+  const variants: PromptVariant[] = [];
+  const familyPrompts: Record<"upscale" | "print-extract" | "print-mutate" | "fabric-recolor", string> = {
+    upscale: UPSCALE_PROMPT,
+    "print-extract": PRINT_EXTRACT_PROMPT,
+    "print-mutate": PRINT_MUTATE_PROMPT,
+    "fabric-recolor": FABRIC_RECOLOR_PROMPT,
+  };
+  for (const modelId of SIX_FAMILY_MODEL_IDS) {
+    for (const familyId of Object.keys(familyPrompts) as Array<keyof typeof familyPrompts>) {
+      variants.push({
+        variantId: `${familyId}.${modelId}.edit.v1`,
+        familyId,
+        modelId,
+        nodeKind: "image",
+        mode: "edit",
+        needsMask: false,
+        promptLocale: "zh-CN",
+        fullPrompt: familyPrompts[familyId],
+        parameterProfileId: `${modelId}:${familyId}:edit:v1`,
+        supportStatus: "unverified",
+        contractHash: imageModelContractHash(modelId),
+        evaluationVersion: EVALUATION_VERSION,
+        statusReason: UNVERIFIED_REASON,
+      });
+    }
+  }
+  return variants;
+}
+
+// ---------- 蒙版族（ID 不变，needsMask 显式化） ----------
+
 const GPT_IMAGE_2_MASK_VARIANT: PromptVariant = {
   variantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
   familyId: "mask-local-edit",
   modelId: "gpt-image-2.5-sunburst",
-  // v7：蒙版族迁移 = nodeKind 改 "image"（ID 不变，R-41 契约 §3.2）；
-  // needsMask: true 显式化归 P2-d 目录重写（PromptVariant schema 扩展同批）。
   nodeKind: "image",
   mode: "mask-edit",
+  needsMask: true,
   promptLocale: "zh-CN",
   fullPrompt: `GPT Image 2 服装局部修改。仅编辑 Alpha PNG 蒙版标记的可编辑区域，执行指定的局部替换、改款或清除；先移除旧物件边缘、阴影和残影，再生成新结构。
 新内容与相邻服装的版型、面料、缝线、图案、光线、透视和褶皱自然融合，蒙版边界不出现光晕、硬边、重影或纹理断裂。
@@ -242,9 +331,99 @@ const GPT_IMAGE_2_MASK_VARIANT: PromptVariant = {
   statusReason: UNVERIFIED_REASON,
 };
 
+// ---------- 文本族变体（Q1=B） ----------
+
+const TEXT_MODEL_IDS = ["gpt-4o", "claude-sonnet-4-5", "gemini-3-pro-preview"] as const satisfies readonly TextModelId[];
+
+const PROMPT_POLISH_PROMPT = `你是一位服装视觉提示词编辑。请将用户输入的意图润色为一段结构化、可直接用于文生图模型的中文提示词。
+要求：
+1. 保留用户原意的核心服装品类、款式、颜色、面料、目标人群与场景。
+2. 补充合理的构图、光线、背景与质感描述，但不臆造用户未提及的关键元素。
+3. 使用中文输出，避免英文术语堆砌；句法简洁、可读性强。
+4. 不要生成任何解释、Markdown 标题或列表符号；只输出一段连续正文。`;
+
+const PROMPT_GENERATE_PROMPT = `你是一位服装视觉提示词作者。请从零生成一段可直接用于文生图模型的中文提示词，描述一套完整的服装视觉呈现。
+要求：
+1. 明确服装品类、款式、颜色、面料、目标人群与使用场景。
+2. 包含构图、光线、背景和质感描述。
+3. 使用中文输出，避免英文术语堆砌；句法简洁、可读性强。
+4. 不要生成任何解释、Markdown 标题或列表符号；只输出一段连续正文。`;
+
+function makeTextVariants(): PromptVariant[] {
+  const variants: PromptVariant[] = [];
+  for (const modelId of TEXT_MODEL_IDS) {
+    variants.push({
+      variantId: `prompt-polish.${modelId}.edit.v1`,
+      familyId: "prompt-polish",
+      modelId,
+      nodeKind: "text",
+      mode: "edit",
+      needsMask: false,
+      promptLocale: "zh-CN",
+      fullPrompt: PROMPT_POLISH_PROMPT,
+      parameterProfileId: `${modelId}:prompt-polish:edit:v1`,
+      supportStatus: "unverified",
+      contractHash: textModelContractHash(modelId),
+      evaluationVersion: EVALUATION_VERSION,
+      statusReason: UNVERIFIED_REASON,
+    });
+    variants.push({
+      variantId: `prompt-generate.${modelId}.generate.v1`,
+      familyId: "prompt-generate",
+      modelId,
+      nodeKind: "text",
+      mode: "generate",
+      needsMask: false,
+      promptLocale: "zh-CN",
+      fullPrompt: PROMPT_GENERATE_PROMPT,
+      parameterProfileId: `${modelId}:prompt-generate:generate:v1`,
+      supportStatus: "unverified",
+      contractHash: textModelContractHash(modelId),
+      evaluationVersion: EVALUATION_VERSION,
+      statusReason: UNVERIFIED_REASON,
+    });
+  }
+  return variants;
+}
+
+// ---------- 视频族变体（P2-e 落地） ----------
+
+const VIDEO_MODEL_IDS = ["doubao-seedance-2-5-260628"] as const satisfies readonly VideoModelId[];
+
+const VIDEO_ANIMATE_PROMPT = `Seedance 服装款式动效。基于用户提供的款式图/上身图与正文描述，生成一段稳定、自然的服装展示视频。
+优先保留服装的版型、颜色、图案、面料质感和穿着效果；动作自然、镜头稳定，不出现明显变形、闪烁或材质漂移。
+严格遵循用户在正文中指定的时长、分辨率、画幅与运动要求；无额外文字、Logo 或水印。`;
+
+function makeVideoVariants(): PromptVariant[] {
+  const variants: PromptVariant[] = [];
+  for (const modelId of VIDEO_MODEL_IDS) {
+    variants.push({
+      variantId: `video-animate.${modelId}.edit.v1`,
+      familyId: "video-animate",
+      modelId,
+      nodeKind: "video",
+      mode: "edit",
+      needsMask: false,
+      promptLocale: "zh-CN",
+      fullPrompt: VIDEO_ANIMATE_PROMPT,
+      parameterProfileId: `${modelId}:video-animate:edit:v1`,
+      supportStatus: "unverified",
+      contractHash: videoModelContractHash(modelId),
+      evaluationVersion: EVALUATION_VERSION,
+      statusReason: UNVERIFIED_REASON,
+    });
+  }
+  return variants;
+}
+
+// ---------- 目录聚合 ----------
+
 export const GARMENT_PROMPT_VARIANTS: readonly PromptVariant[] = [
-  ...makeStandardVariants(),
+  ...makeStandardImageVariants(),
+  ...makeSixFamilyVariants(),
   GPT_IMAGE_2_MASK_VARIANT,
+  ...makeTextVariants(),
+  ...makeVideoVariants(),
 ] as const;
 
 const variantById = new Map(GARMENT_PROMPT_VARIANTS.map((variant) => [variant.variantId, variant]));
