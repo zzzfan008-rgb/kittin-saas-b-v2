@@ -417,12 +417,16 @@ export function buildEvaluationCaseSnapshotFromRuntime(
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
   const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+  // needsMask 由 mask-edit 模式驱动，与 runner.ts executeImageStep 逐字对齐；
+  // 否则评估证据侧的渲染器输出会与 Provider 实际收到的蒙版包装提示词漂移。
+  const needsMask = operationMode === "mask-edit";
   const expectedResolvedPrompt = renderProviderPrompt({
     nodeKind: step.kind,
     modelId,
     operationMode: variant.mode,
     taskPrompt,
     references: providerPromptReferences,
+    needsMask,
   });
   if (input.request.prompt !== expectedResolvedPrompt) {
     throw new Error("actual ImageGenRequest prompt differs from the shared reviewed Provider renderer output");

@@ -392,7 +392,12 @@ async function executeImageStep(
     referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
     aspectRatio: typeof step.params.aspectRatio === "string" ? step.params.aspectRatio : undefined,
     batchSize: typeof step.params.batchSize === "number" ? step.params.batchSize : undefined,
-    modelOptions: step.params.modelOptions as ImageModelOptions | undefined,
+    // mask-edit 的源像素尺寸是运行时才能确定的动态参数（mask profile 的
+    // materialize 固定返回 modelOptions:{}），必须在边界处注入，否则 Provider
+    // 收不到 size、评估证据侧也会判定 native 参数漂移。
+    modelOptions: preparedMask
+      ? { ...(step.params.modelOptions ?? {}), size: preparedMask.size }
+      : step.params.modelOptions as ImageModelOptions | undefined,
     ...(providerMask ? { mask: providerMask } : {}),
   };
 
