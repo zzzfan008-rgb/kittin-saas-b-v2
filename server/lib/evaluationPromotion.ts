@@ -26,7 +26,7 @@ import {
   PROVIDER_PROMPT_RENDERER_HASH,
   PROVIDER_PROMPT_RENDERER_VERSION,
 } from "../../src/lib/providerPromptRenderer";
-import { getImageModelContract, IMAGE_MODEL_IDS } from "../../src/types/imageModels";
+import { getImageModelContract, IMAGE_MODEL_IDS, isImageModelId } from "../../src/types/imageModels";
 import { getModelParameterProfile } from "../../src/types/modelParameterProfiles";
 import type {
   EvaluationHardBlocker,
@@ -563,9 +563,9 @@ export function currentEvaluationPromotionTarget(
 ): { unit: PromptEvaluationUnit; versions: PromptEvaluationVersionVector } {
   const variant = getGarmentPromptVariantById(variantId);
   if (!variant) throw new Error(`prompt variant ${variantId} is not in the reviewed catalog`);
-  // v7：旧 image-input/result kind 已不存在；图片晋升只认 image/video 之外的 image。
-  if (variant.nodeKind !== "image") {
-    throw new Error("image evaluation promotion requires an image-kind prompt variant");
+  // v7：旧 image-input/result kind 已不存在；图片晋升只认 image kind，且 modelId 必须落在 image 契约清单。
+  if (variant.nodeKind !== "image" || !isImageModelId(variant.modelId)) {
+    throw new Error("image evaluation promotion requires an image-kind prompt variant with an image model");
   }
   const profile = getModelParameterProfile(variant.parameterProfileId);
   if (!profile) throw new Error(`parameter profile ${variant.parameterProfileId} is missing`);
