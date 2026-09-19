@@ -4,6 +4,7 @@
  * 文本运行是同步链路（HTTP 请求内完成），不进 runQueue 异步骨架。
  */
 import {
+  TEXT_MODEL_IDS,
   getTextModelContract,
   isTextModelId,
   type TextModelId,
@@ -136,17 +137,31 @@ export function createApiyiTextProvider(modelId: TextModelId): TextProvider {
   };
 }
 
-export const apiyiTextProviders = Object.fromEntries(
-  ([
-    "gpt-5.3-chat-latest",
-    "gemini-3.6-flash",
-    "deepseek-v4-flash-ga-260731",
-  ] as const).map((modelId) => [modelId, createApiyiTextProvider(modelId)]),
-) as Record<TextModelId, TextProvider>;
+/**
+ * 文本 Provider 注册表：从 TEXT_MODEL_IDS（权威清单，src/types/textModels.ts）逐项构建，
+ * 不再在 Provider 层硬编码模型 ID 列表，注册表与契约类型永不失联（R-55 集成修复）。
+ * 完备性守卫：每个 TextModelId 都必须在注册表中有 Provider；缺一即加载抛错，杜绝再犯。
+ */
+const textProviderRegistry = new Map<TextModelId, TextProvider>();
+for (const modelId of TEXT_MODEL_IDS) {
+  textProviderRegistry.set(modelId, createApiyiTextProvider(modelId));
+}
+for (const modelId of TEXT_MODEL_IDS) {
+  if (!textProviderRegistry.has(modelId)) {
+    throw new Error(`文本 Provider 注册表缺少模型: ${modelId}`);
+  }
+}
+
+export const apiyiTextProviders: ReadonlyMap<TextModelId, TextProvider> = textProviderRegistry;
 
 export function getTextProvider(modelId: string): TextProvider {
   if (!isTextModelId(modelId)) {
     throw new ProviderError(`Unknown text provider id: ${modelId}`, 400);
   }
-  return apiyiTextProviders[modelId];
+  const provider = apiyiTextProviders.get(modelId);
+  if (!provider) {
+    // isTextModelId 已收窄 + 注册表完备性守卫，此处理论上不可达；保留防御，杜绝再犯。
+    throw new ProviderError(`Text provider not registered: ${modelId}`, 500);
+  }
+  return provider;
 }
