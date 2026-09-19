@@ -17,7 +17,7 @@ import {
   type RecentResult,
   type RunEvent,
 } from "../src/store/flowStore";
-import type { AiModifyNodeData } from "../src/types/workflow";
+import type { ImageNodeData } from "../src/types/workflow";
 import { ImageGrid } from "../src/components/nodes/ImageGrid";
 import { RunButton } from "../src/components/nodes/NodeFrame";
 import { normalizeReferenceImageEvidence } from "../src/lib/referenceEvidence";
@@ -104,7 +104,7 @@ test("点击批量生成时立即按用户选择创建对应数量的排队卡",
 });
 
 test("各批量节点正确计算用户选择的卡片数量", () => {
-  const modify: AiModifyNodeData = {
+  const modify: ImageNodeData = {
     kind: "image",
     label: "AI 改款",
     status: "idle",
@@ -270,7 +270,7 @@ test("并发保存素材按最新状态追加且保持幂等", () => {
 });
 
 test("异常错误事件即使夹带 images 也不会清空节点原有图片", () => {
-  const data: AiModifyNodeData = {
+  const data: ImageNodeData = {
     kind: "image",
     label: "保留上一版",
     status: "success",
@@ -292,7 +292,7 @@ test("异常错误事件即使夹带 images 也不会清空节点原有图片", 
   const next = applyRunEventToNode(data, event);
   assert.equal(next.status, "error");
   assert.equal(next.error, "网关失败");
-  assert.deepEqual((next as AiModifyNodeData).outputImages, ["/api/files/previous.png"]);
+  assert.deepEqual((next as ImageNodeData).outputImages, ["/api/files/previous.png"]);
 });
 
 test("缺少 images 的成功事件被归一为空数组而不是 undefined", () => {

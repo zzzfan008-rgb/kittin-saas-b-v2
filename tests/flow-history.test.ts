@@ -139,7 +139,7 @@ await test("参考边重排和移除可逐步撤销并重做", () => {
       kind: "image" as const,
       label: "参考 A",
       status: "idle" as const,
-      imageUrl: "/api/files/history-a.png",
+      outputImages: ["/api/files/history-a.png"],
     },
   };
   const sourceB = {
