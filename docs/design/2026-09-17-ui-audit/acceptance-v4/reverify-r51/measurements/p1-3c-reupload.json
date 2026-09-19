@@ -1,0 +1,128 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "themes": {
+    "current": {
+      "wrapperTag": "DIV",
+      "before": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "boxShadow": "none",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "after": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgb(74, 122, 23)",
+        "borderLeftColor": "rgb(74, 122, 23)",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "changed": [
+        "borderTopColor",
+        "borderLeftColor",
+        "boxShadow"
+      ],
+      "focusVisible": false,
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-3c-reupload-current-1280.png",
+      "clip": {
+        "x": 344,
+        "y": 234,
+        "width": 84,
+        "height": 33
+      }
+    },
+    "white": {
+      "wrapperTag": "DIV",
+      "before": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "boxShadow": "none",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "after": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgb(0, 102, 204)",
+        "borderLeftColor": "rgb(0, 102, 204)",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "changed": [
+        "borderTopColor",
+        "borderLeftColor",
+        "boxShadow"
+      ],
+      "focusVisible": false,
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-3c-reupload-white-1280.png",
+      "clip": {
+        "x": 344,
+        "y": 234,
+        "width": 84,
+        "height": 33
+      }
+    },
+    "eye": {
+      "wrapperTag": "DIV",
+      "before": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "boxShadow": "none",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "after": {
+        "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:bord",
+        "borderTopColor": "rgb(11, 122, 67)",
+        "borderLeftColor": "rgb(11, 122, 67)",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "rect": {
+          "x": 354.1710510253906,
+          "y": 244.89474487304688,
+          "width": 63.631591796875,
+          "height": 12.828948974609375
+        }
+      },
+      "changed": [
+        "borderTopColor",
+        "borderLeftColor",
+        "boxShadow"
+      ],
+      "focusVisible": false,
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-3c-reupload-eye-1280.png",
+      "clip": {
+        "x": 344,
+        "y": 234,
+        "width": 84,
+        "height": 33
+      }
+    }
+  },
+  "errors": [],
+  "templateHits": 1,
+  "imageCount": 2
+}

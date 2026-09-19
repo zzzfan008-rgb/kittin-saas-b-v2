@@ -1,0 +1,19 @@
+current vars {"accent":"#B7F35A","accentDeep":"#4a7a17","edge":"#B7F35A","statusQueued":"#2dd4bf"} 
+   selection {"background":"color(srgb 0.717647 0.952941 0.352941 / 0.08)","border":"color(srgb 0.717647 0.952941 0.352941 / 0.4)","borderWidth":"1px"} 
+   connection {"stroke":"rgb(183, 243, 90)","strokeWidth":"1.5px","d":"M279.99993067117384,313.74988747337653 C360.63183346745507,3"} 
+   handle {"background":"radial-gradient(circle at 35% 30%, rgb(220, 255, 171) 0px, rgb(220, 255, 171) 10%, rgb(142, 217, 78) 24%, rgb(183, 243, 90) 56%, rgb(74, 122, 23) 100%)","boxShadow":"rgba(183, 243, 90,  
+   oldGoldHits 0 []
+white vars {"accent":"#0071e3","accentDeep":"#0066cc","edge":"#0071e3","statusQueued":"#9a6f00"} 
+   selection {"background":"color(srgb 0 0.443137 0.890196 / 0.08)","border":"color(srgb 0 0.443137 0.890196 / 0.4)","borderWidth":"1px"} 
+   connection {"stroke":"rgb(0, 113, 227)","strokeWidth":"1.5px","d":"M279.99993067117384,313.74988747337653 C360.63183346745507,3"} 
+   handle {"background":"radial-gradient(circle at 35% 30%, rgb(214, 236, 255) 0px, rgb(214, 236, 255) 10%, rgb(102, 178, 255) 24%, rgb(0, 113, 227) 56%, rgb(0, 74, 153) 100%)","boxShadow":"rgba(0, 113, 227, 0. 
+   oldGoldHits 0 []
+eye vars {"accent":"#0B7A43","accentDeep":"#0B7A43","edge":"#0B7A43","statusQueued":"#85660e"} 
+   selection {"background":"color(srgb 0.0431373 0.478431 0.262745 / 0.08)","border":"color(srgb 0.0431373 0.478431 0.262745 / 0.4)","borderWidth":"1px"} 
+   connection {"stroke":"rgb(11, 122, 67)","strokeWidth":"1.5px","d":"M279.99993067117384,313.74988747337653 C360.63183346745507,3"} 
+   handle {"background":"radial-gradient(circle at 35% 30%, rgb(210, 236, 220) 0px, rgb(210, 236, 220) 10%, rgb(63, 164, 106) 24%, rgb(11, 122, 67) 56%, rgb(10, 92, 51) 100%)","boxShadow":"rgba(11, 122, 67, 0.7 
+   oldGoldHits 0 []
+current develop {"overlay":{"backgroundImage":"linear-gradient(color(srgb 0.717647 0.952941 0.352941 / 0.05), color(srgb 0.717647 0.952941 0.352941 / 0.14))","color":"rgb(29, 29, 31)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"gridlines":{"backgroundImage":"linear-gradient(color(srgb 0.717647 0.952941 0.352941 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0.717647 0.952941 0.352941","color":"rgb(29, 29, 31)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"scanlin oldGoldHits: 0
+white develop {"overlay":{"backgroundImage":"linear-gradient(color(srgb 0 0.443137 0.890196 / 0.05), color(srgb 0 0.443137 0.890196 / 0.14))","color":"rgb(29, 29, 31)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"gridlines":{"backgroundImage":"linear-gradient(color(srgb 0 0.443137 0.890196 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0 0.443137 0.890196 / 0.13) 1px, ","color":"rgb(29, 29, 31)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"scanline":{"backgroun oldGoldHits: 0
+eye develop {"overlay":{"backgroundImage":"linear-gradient(color(srgb 0.0431373 0.478431 0.262745 / 0.05), color(srgb 0.0431373 0.478431 0.262745 / 0.14))","color":"rgb(18, 59, 43)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"gridlines":{"backgroundImage":"linear-gradient(color(srgb 0.0431373 0.478431 0.262745 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0.0431373 0.478431 0.2627","color":"rgb(18, 59, 43)","backgroundColor":"rgba(0, 0, 0, 0)","boxShadow":"none"},"scanl oldGoldHits: 0
+pageerrors: 0

@@ -1,0 +1,180 @@
+
+===== pattern / current =====
+ thumbSlot (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgb(228, 230, 234) focusTop=rgb(228, 230, 234) blurL=rgb(228, 230, 234) focusL=rgb(228, 230, 234) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(107, 112, 117) focus=none/3px/rgb(107, 112, 117)
+   scan(focus) cardBg=[221,239,193] ring=[[221,239,193],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[145,174,114]] inner=[242,243,245]
+   ringPx(focus)=[145,174,114] vs card=2.02:1 vs inner=2.22:1 ; blurRing=[255,255,255] vsCard=1.22:1 ; blur->focus delta=2.47:1
+ thumbSlotFallback (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgb(228, 230, 234) focusTop=rgb(228, 230, 234) blurL=rgb(228, 230, 234) focusL=rgb(228, 230, 234) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(107, 112, 117) focus=none/3px/rgb(107, 112, 117)
+   scan(focus) cardBg=[221,239,193] ring=[[221,239,193],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[145,174,114]] inner=[242,243,245]
+   ringPx(focus)=[145,174,114] vs card=2.02:1 vs inner=2.22:1 ; blurRing=[255,255,255] vsCard=1.22:1 ; blur->focus delta=2.47:1
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgb(228, 230, 234) focusTop=rgb(74, 122, 23) blurL=rgb(183, 243, 90) focusL=rgb(183, 243, 90) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[242,243,245]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.11:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgb(228, 230, 234) focusTop=rgb(74, 122, 23) blurL=rgb(228, 230, 234) focusL=rgb(74, 122, 23) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[193,210,176]] inner=[242,243,245]
+   ringPx(focus)=[193,210,176] vs card=1.6:1 vs inner=1.44:1 ; blurRing=[246,247,248] vsCard=1.07:1 ; blur->focus delta=1.49:1
+ assetPickerButton (BUTTON) changed=[]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border
+   blurTop=rgb(228, 230, 234) focusTop=rgb(228, 230, 234) blurL=rgb(228, 230, 234) focusL=rgb(228, 230, 234) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(155, 161, 169) focus=none/3px/rgb(155, 161, 169)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[249,250,251]] inner=[255,255,255]
+   ringPx(focus)=[249,250,251] vs card=1.05:1 vs inner=1.05:1 ; blurRing=[249,250,251] vsCard=1.05:1 ; blur->focus delta=1:1
+
+===== pattern / white =====
+ thumbSlot (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgba(0, 0, 0, 0.08) blurL=rgba(0, 0, 0, 0.08) focusL=rgba(0, 0, 0, 0.08) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(110, 110, 115) focus=none/3px/rgb(110, 110, 115)
+   scan(focus) cardBg=[177,211,246] ring=[[177,211,246],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[100,162,224]] inner=[245,245,247]
+   ringPx(focus)=[100,162,224] vs card=1.74:1 vs inner=2.48:1 ; blurRing=[255,255,255] vsCard=1.55:1 ; blur->focus delta=2.7:1
+ thumbSlotFallback (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgba(0, 0, 0, 0.08) blurL=rgba(0, 0, 0, 0.08) focusL=rgba(0, 0, 0, 0.08) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(110, 110, 115) focus=none/3px/rgb(110, 110, 115)
+   scan(focus) cardBg=[177,211,246] ring=[[177,211,246],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[100,162,224]] inner=[245,245,247]
+   ringPx(focus)=[100,162,224] vs card=1.74:1 vs inner=2.48:1 ; blurRing=[255,255,255] vsCard=1.55:1 ; blur->focus delta=2.7:1
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgb(0, 102, 204) blurL=rgb(0, 113, 227) focusL=rgb(0, 113, 227) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[245,245,247]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.09:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgb(0, 102, 204) blurL=rgba(0, 0, 0, 0.08) focusL=rgb(0, 102, 204) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[168,203,238]] inner=[245,245,247]
+   ringPx(focus)=[168,203,238] vs card=1.69:1 vs inner=1.55:1 ; blurRing=[250,250,250] vsCard=1.04:1 ; blur->focus delta=1.62:1
+ assetPickerButton (BUTTON) changed=[]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgba(0, 0, 0, 0.08) blurL=rgba(0, 0, 0, 0.08) focusL=rgba(0, 0, 0, 0.08) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(110, 110, 115) focus=none/3px/rgb(110, 110, 115)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[252,252,252]] inner=[255,255,255]
+   ringPx(focus)=[252,252,252] vs card=1.03:1 vs inner=1.03:1 ; blurRing=[252,252,252] vsCard=1.03:1 ; blur->focus delta=1:1
+
+===== pattern / eye =====
+ thumbSlot (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgb(226, 236, 228) focusTop=rgb(226, 236, 228) blurL=rgb(226, 236, 228) focusL=rgb(226, 236, 228) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(71, 104, 90) focus=none/3px/rgb(71, 104, 90)
+   scan(focus) cardBg=[180,213,196] ring=[[180,213,196],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[106,174,140]] inner=[240,246,241]
+   ringPx(focus)=[106,174,140] vs card=1.65:1 vs inner=2.38:1 ; blurRing=[255,255,255] vsCard=1.58:1 ; blur->focus delta=2.61:1
+ thumbSlotFallback (DIV>INPUT) changed=[boxShadow]
+   cls=nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounde
+   blurTop=rgb(226, 236, 228) focusTop=rgb(226, 236, 228) blurL=rgb(226, 236, 228) focusL=rgb(226, 236, 228) leftW=1px
+   blurShadow=none
+   focusShadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0
+   outline blur=none/3px/rgb(71, 104, 90) focus=none/3px/rgb(71, 104, 90)
+   scan(focus) cardBg=[180,213,196] ring=[[180,213,196],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[106,174,140]] inner=[240,246,241]
+   ringPx(focus)=[106,174,140] vs card=1.65:1 vs inner=2.38:1 ; blurRing=[255,255,255] vsCard=1.58:1 ; blur->focus delta=2.61:1
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgb(226, 236, 228) focusTop=rgb(11, 122, 67) blurL=rgb(11, 122, 67) focusL=rgb(11, 122, 67) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(18, 59, 43) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[240,246,241]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.1:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgb(226, 236, 228) focusTop=rgb(11, 122, 67) blurL=rgb(226, 236, 228) focusL=rgb(11, 122, 67) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(18, 59, 43) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[171,210,191]] inner=[240,246,241]
+   ringPx(focus)=[171,210,191] vs card=1.65:1 vs inner=1.51:1 ; blurRing=[245,249,246] vsCard=1.06:1 ; blur->focus delta=1.56:1
+ assetPickerButton (BUTTON) changed=[]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border
+   blurTop=rgb(226, 236, 228) focusTop=rgb(226, 236, 228) blurL=rgb(226, 236, 228) focusL=rgb(226, 236, 228) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(71, 104, 90) focus=none/3px/rgb(71, 104, 90)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[249,251,249]] inner=[255,255,255]
+   ringPx(focus)=[249,251,249] vs card=1.04:1 vs inner=1.04:1 ; blurRing=[249,251,249] vsCard=1.04:1 ; blur->focus delta=1:1
+
+===== text / current =====
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgb(228, 230, 234) focusTop=rgb(74, 122, 23) blurL=rgb(183, 243, 90) focusL=rgb(183, 243, 90) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[242,243,245]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.11:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgb(228, 230, 234) focusTop=rgb(74, 122, 23) blurL=rgb(228, 230, 234) focusL=rgb(74, 122, 23) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[242,243,245]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.11:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+
+===== text / white =====
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgb(0, 102, 204) blurL=rgb(0, 113, 227) focusL=rgb(0, 113, 227) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[245,245,247]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.09:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgba(0, 0, 0, 0.08) focusTop=rgb(0, 102, 204) blurL=rgba(0, 0, 0, 0.08) focusL=rgb(0, 102, 204) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(29, 29, 31) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[245,245,247]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.09:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+
+===== text / eye =====
+ promptChipTextarea (TEXTAREA) changed=[borderTopColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[v
+   blurTop=rgb(226, 236, 228) focusTop=rgb(11, 122, 67) blurL=rgb(11, 122, 67) focusL=rgb(11, 122, 67) leftW=3px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(18, 59, 43) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[240,246,241]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.1:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1
+ modelSelect (SELECT) changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor]
+   cls=nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(-
+   blurTop=rgb(226, 236, 228) focusTop=rgb(11, 122, 67) blurL=rgb(226, 236, 228) focusL=rgb(11, 122, 67) leftW=1px
+   blurShadow=none
+   focusShadow=none
+   outline blur=none/3px/rgb(18, 59, 43) focus=none/1px/rgb(0, 95, 204)
+   scan(focus) cardBg=[255,255,255] ring=[[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255],[255,255,255]] inner=[240,246,241]
+   ringPx(focus)=[255,255,255] vs card=1:1 vs inner=1.1:1 ; blurRing=[255,255,255] vsCard=1:1 ; blur->focus delta=1:1

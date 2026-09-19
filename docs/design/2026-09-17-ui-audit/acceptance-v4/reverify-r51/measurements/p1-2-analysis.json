@@ -1,0 +1,449 @@
+{
+  "sampled": {
+    "current": {
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-current-1280.png",
+      "buttonCenterPx": [
+        117,
+        427
+      ],
+      "dominantPixel": [
+        183,
+        243,
+        90
+      ],
+      "dominantShare": "275/369",
+      "top3": [
+        {
+          "px": [
+            183,
+            243,
+            90
+          ],
+          "n": 275
+        },
+        {
+          "px": [
+            77,
+            99,
+            44
+          ],
+          "n": 4
+        },
+        {
+          "px": [
+            42,
+            51,
+            29
+          ],
+          "n": 3
+        }
+      ],
+      "nodeBackgroundSample": [
+        236,
+        238,
+        240
+      ],
+      "contrastDominantVsNodeBg": 1.13
+    },
+    "white": {
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-white-1280.png",
+      "buttonCenterPx": [
+        117,
+        427
+      ],
+      "dominantPixel": [
+        0,
+        113,
+        227
+      ],
+      "dominantShare": "275/369",
+      "top3": [
+        {
+          "px": [
+            0,
+            113,
+            227
+          ],
+          "n": 275
+        },
+        {
+          "px": [
+            164,
+            204,
+            245
+          ],
+          "n": 4
+        },
+        {
+          "px": [
+            219,
+            235,
+            251
+          ],
+          "n": 3
+        }
+      ],
+      "nodeBackgroundSample": [
+        235,
+        235,
+        237
+      ],
+      "contrastDominantVsNodeBg": 3.94
+    },
+    "eye": {
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-eye-1280.png",
+      "buttonCenterPx": [
+        117,
+        427
+      ],
+      "dominantPixel": [
+        11,
+        122,
+        67
+      ],
+      "dominantShare": "276/369",
+      "top3": [
+        {
+          "px": [
+            11,
+            122,
+            67
+          ],
+          "n": 276
+        },
+        {
+          "px": [
+            167,
+            207,
+            188
+          ],
+          "n": 4
+        },
+        {
+          "px": [
+            220,
+            236,
+            228
+          ],
+          "n": 3
+        }
+      ],
+      "nodeBackgroundSample": [
+        234,
+        242,
+        236
+      ],
+      "contrastDominantVsNodeBg": 4.75
+    }
+  },
+  "declared": {
+    "current": {
+      "accent": "#B7F35A",
+      "declaredBg": "rgb(183, 243, 90)",
+      "declaredFg": "rgb(19, 19, 19)",
+      "disabled": false,
+      "opacity": "1",
+      "computedContrastBgVsFg": 14.14,
+      "sampledContrastVsFg": 14.14
+    },
+    "white": {
+      "accent": "#0071e3",
+      "declaredBg": "rgb(0, 113, 227)",
+      "declaredFg": "rgb(255, 255, 255)",
+      "disabled": false,
+      "opacity": "1",
+      "computedContrastBgVsFg": 4.7,
+      "sampledContrastVsFg": 4.7
+    },
+    "eye": {
+      "accent": "#0B7A43",
+      "declaredBg": "rgb(11, 122, 67)",
+      "declaredFg": "rgb(255, 255, 255)",
+      "disabled": false,
+      "opacity": "1",
+      "computedContrastBgVsFg": 5.41,
+      "sampledContrastVsFg": 5.41
+    }
+  },
+  "auditRows": {
+    "current": [
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "运行此节点",
+        "bg": "rgb(183, 243, 90)",
+        "color": "rgb(19, 19, 19)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          12,
+          475,
+          296,
+          28
+        ]
+      },
+      {
+        "goldClasses": "border-gold",
+        "testid": null,
+        "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+        "bg": "rgb(255, 255, 255)",
+        "color": "rgb(29, 29, 31)",
+        "borderTop": "rgb(183, 243, 90)",
+        "borderLeft": "rgb(183, 243, 90)",
+        "borderLeftWidth": "1px",
+        "opacity": "1",
+        "rect": [
+          364,
+          131,
+          217,
+          546
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "生成效果图",
+        "bg": "rgb(183, 243, 90)",
+        "color": "rgb(19, 19, 19)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          374,
+          539,
+          197,
+          22
+        ]
+      },
+      {
+        "goldClasses": "text-gold",
+        "testid": null,
+        "text": "未设置",
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(183, 243, 90)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          745,
+          282,
+          23,
+          12
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "保存全部到文件夹",
+        "bg": "rgb(183, 243, 90)",
+        "color": "rgb(19, 19, 19)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "0.4",
+        "rect": [
+          715,
+          318,
+          183,
+          19
+        ]
+      }
+    ],
+    "white": [
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "运行此节点",
+        "bg": "rgb(0, 113, 227)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          12,
+          475,
+          296,
+          28
+        ]
+      },
+      {
+        "goldClasses": "border-gold",
+        "testid": null,
+        "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+        "bg": "rgb(255, 255, 255)",
+        "color": "rgb(29, 29, 31)",
+        "borderTop": "rgb(0, 113, 227)",
+        "borderLeft": "rgb(0, 113, 227)",
+        "borderLeftWidth": "1px",
+        "opacity": "1",
+        "rect": [
+          364,
+          131,
+          217,
+          546
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "生成效果图",
+        "bg": "rgb(0, 113, 227)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          374,
+          539,
+          197,
+          22
+        ]
+      },
+      {
+        "goldClasses": "text-gold",
+        "testid": null,
+        "text": "未设置",
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(0, 113, 227)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          745,
+          282,
+          23,
+          12
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "保存全部到文件夹",
+        "bg": "rgb(0, 113, 227)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "0.4",
+        "rect": [
+          715,
+          318,
+          183,
+          19
+        ]
+      }
+    ],
+    "eye": [
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "运行此节点",
+        "bg": "rgb(11, 122, 67)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          12,
+          475,
+          296,
+          28
+        ]
+      },
+      {
+        "goldClasses": "border-gold",
+        "testid": null,
+        "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+        "bg": "rgb(255, 255, 255)",
+        "color": "rgb(18, 59, 43)",
+        "borderTop": "rgb(11, 122, 67)",
+        "borderLeft": "rgb(11, 122, 67)",
+        "borderLeftWidth": "1px",
+        "opacity": "1",
+        "rect": [
+          364,
+          131,
+          217,
+          546
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "生成效果图",
+        "bg": "rgb(11, 122, 67)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          374,
+          539,
+          197,
+          22
+        ]
+      },
+      {
+        "goldClasses": "text-gold",
+        "testid": null,
+        "text": "未设置",
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(11, 122, 67)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "1",
+        "rect": [
+          745,
+          282,
+          23,
+          12
+        ]
+      },
+      {
+        "goldClasses": "bg-gold",
+        "testid": null,
+        "text": "保存全部到文件夹",
+        "bg": "rgb(11, 122, 67)",
+        "color": "rgb(255, 255, 255)",
+        "borderTop": "oklch(0.928 0.006 264.531)",
+        "borderLeft": "oklch(0.928 0.006 264.531)",
+        "borderLeftWidth": "0px",
+        "opacity": "0.4",
+        "rect": [
+          715,
+          318,
+          183,
+          19
+        ]
+      }
+    ]
+  }
+}

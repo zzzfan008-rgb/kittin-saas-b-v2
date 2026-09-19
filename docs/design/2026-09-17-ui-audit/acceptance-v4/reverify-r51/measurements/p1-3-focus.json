@@ -1,0 +1,1284 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "pattern": {
+    "templateHits": 1,
+    "inventory": {
+      "nodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "textareas": 2,
+      "selects": 4,
+      "inputs": 2,
+      "slots": 2,
+      "goldEls": []
+    },
+    "themes": {
+      "current": {
+        "targets": [
+          {
+            "name": "thumbSlot",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(107, 112, 117)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(107, 112, 117)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(107, 112, 117)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(107, 112, 117)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlot-current-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlot-current-1280.png"
+          },
+          {
+            "name": "thumbSlotFallback",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(107, 112, 117)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(107, 112, 117)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(107, 112, 117)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(107, 112, 117)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlotFallback-current-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlotFallback-current-1280.png"
+          },
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-current-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 244,
+              "width": 145,
+              "height": 116
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-current-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(74, 122, 23)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-current-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 379,
+              "width": 79,
+              "height": 33
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-current-1280.png"
+          },
+          {
+            "name": "assetPickerButton",
+            "kind": "button focus",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(155, 161, 169)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(155, 161, 169)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(155, 161, 169)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(155, 161, 169)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "changed": [],
+            "tag": "BUTTON",
+            "focusableTag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-assetPickerButton-current-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 249,
+              "width": 145,
+              "height": 29
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-assetPickerButton-current-1280.png"
+          }
+        ]
+      },
+      "white": {
+        "targets": [
+          {
+            "name": "thumbSlot",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlot-white-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlot-white-1280.png"
+          },
+          {
+            "name": "thumbSlotFallback",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlotFallback-white-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlotFallback-white-1280.png"
+          },
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-white-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 244,
+              "width": 145,
+              "height": 116
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-white-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 102, 204)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-white-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 379,
+              "width": 79,
+              "height": 33
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-white-1280.png"
+          },
+          {
+            "name": "assetPickerButton",
+            "kind": "button focus",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(110, 110, 115)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(110, 110, 115)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "changed": [],
+            "tag": "BUTTON",
+            "focusableTag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-assetPickerButton-white-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 249,
+              "width": 145,
+              "height": 29
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-assetPickerButton-white-1280.png"
+          }
+        ]
+      },
+      "eye": {
+        "targets": [
+          {
+            "name": "thumbSlot",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlot-eye-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlot-eye-1280.png"
+          },
+          {
+            "name": "thumbSlotFallback",
+            "kind": "focus-within ring",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 154.25555419921875,
+                "width": 128.41110229492188,
+                "height": 96.30833435058594
+              }
+            },
+            "changed": [
+              "boxShadow"
+            ],
+            "tag": "DIV",
+            "focusableTag": "INPUT",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableCls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-thumbSlotFallback-eye-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 146,
+              "width": 145,
+              "height": 113
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-thumbSlotFallback-eye-1280.png"
+          },
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(18, 59, 43)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 252.3333282470703,
+                "width": 128.4111328125,
+                "height": 99.84721374511719
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-eye-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 244,
+              "width": 145,
+              "height": 116
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-eye-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(18, 59, 43)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 575.79443359375,
+                "y": 387.5694580078125,
+                "width": 62.183349609375,
+                "height": 16.683319091796875
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-eye-1280.png",
+            "clip": {
+              "x": 567,
+              "y": 379,
+              "width": 79,
+              "height": 33
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-eye-1280.png"
+          },
+          {
+            "name": "assetPickerButton",
+            "kind": "button focus",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(71, 104, 90)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(71, 104, 90)",
+              "rect": {
+                "x": 358.40557861328125,
+                "y": 257.64166259765625,
+                "width": 128.41110229492188,
+                "height": 12.638885498046875
+              }
+            },
+            "changed": [],
+            "tag": "BUTTON",
+            "focusableTag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focused": true,
+            "focusVisible": false,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-assetPickerButton-eye-1280.png",
+            "clip": {
+              "x": 350,
+              "y": 249,
+              "width": 145,
+              "height": 29
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-assetPickerButton-eye-1280.png"
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  "text": {
+    "templateHits": 1,
+    "inventory": {
+      "nodes": [
+        "rf__node-generate",
+        "rf__node-result"
+      ],
+      "textareas": 2,
+      "selects": 4,
+      "inputs": 0,
+      "slots": 0,
+      "goldEls": []
+    },
+    "themes": {
+      "current": {
+        "targets": [
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-current-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 180,
+              "width": 224,
+              "height": 178
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-current-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(74, 122, 23)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-current-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 399,
+              "width": 117,
+              "height": 44
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-current-1280.png"
+          }
+        ]
+      },
+      "white": {
+        "targets": [
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-white-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 180,
+              "width": 224,
+              "height": 178
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-white-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(29, 29, 31)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 102, 204)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "color": "rgb(29, 29, 31)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-white-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 399,
+              "width": 117,
+              "height": 44
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-white-1280.png"
+          }
+        ]
+      },
+      "eye": {
+        "targets": [
+          {
+            "name": "promptChipTextarea",
+            "kind": "chip / field-input",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(18, 59, 43)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 188.3013458251953,
+                "width": 207.9219970703125,
+                "height": 161.6716766357422
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "TEXTAREA",
+            "focusableTag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableCls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-promptChipTextarea-eye-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 180,
+              "width": 224,
+              "height": 178
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-promptChipTextarea-eye-1280.png"
+          },
+          {
+            "name": "modelSelect",
+            "kind": "field-input",
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(18, 59, 43)",
+              "outlineWidth": "3px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderTopWidth": "1px",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineColor": "rgb(0, 95, 204)",
+              "outlineWidth": "1px",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "color": "rgb(18, 59, 43)",
+              "rect": {
+                "x": 360.0419921875,
+                "y": 407.27435302734375,
+                "width": 100.6866455078125,
+                "height": 27.01348876953125
+              }
+            },
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "tag": "SELECT",
+            "focusableTag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableCls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focused": true,
+            "focusVisible": true,
+            "afterShot": "/tmp/gc-uiqa-r51/shots/p1-3-focus-modelSelect-eye-1280.png",
+            "clip": {
+              "x": 352,
+              "y": 399,
+              "width": 117,
+              "height": 44
+            },
+            "beforeShot": "/tmp/gc-uiqa-r51/shots/p1-3-blur-modelSelect-eye-1280.png"
+          }
+        ]
+      }
+    },
+    "errors": []
+  }
+}

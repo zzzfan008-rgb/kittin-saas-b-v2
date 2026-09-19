@@ -1,0 +1,181 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "themes": {
+    "current": {
+      "vars": {
+        "accent": "#B7F35A",
+        "accentDeep": "#4a7a17",
+        "edge": "#B7F35A",
+        "statusQueued": "#2dd4bf"
+      },
+      "selection": {
+        "background": "color(srgb 0.717647 0.952941 0.352941 / 0.08)",
+        "border": "color(srgb 0.717647 0.952941 0.352941 / 0.4)",
+        "borderWidth": "1px"
+      },
+      "selectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-current-1280.png",
+      "connection": {
+        "stroke": "rgb(183, 243, 90)",
+        "strokeWidth": "1.5px",
+        "d": "M279.99993067117384,313.74988747337653 C360.63183346745507,3"
+      },
+      "connectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-connection-current-1280.png",
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(220, 255, 171) 0px, rgb(220, 255, 171) 10%, rgb(142, 217, 78) 24%, rgb(183, 243, 90) 56%, rgb(74, 122, 23) 100%)",
+        "boxShadow": "rgba(183, 243, 90, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0.290196 0.478431 0.0901961 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.862745 1 0.67058",
+        "border": "rgb(255, 255, 255)"
+      },
+      "oldGoldHits": []
+    },
+    "white": {
+      "vars": {
+        "accent": "#0071e3",
+        "accentDeep": "#0066cc",
+        "edge": "#0071e3",
+        "statusQueued": "#9a6f00"
+      },
+      "selection": {
+        "background": "color(srgb 0 0.443137 0.890196 / 0.08)",
+        "border": "color(srgb 0 0.443137 0.890196 / 0.4)",
+        "borderWidth": "1px"
+      },
+      "selectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-white-1280.png",
+      "connection": {
+        "stroke": "rgb(0, 113, 227)",
+        "strokeWidth": "1.5px",
+        "d": "M279.99993067117384,313.74988747337653 C360.63183346745507,3"
+      },
+      "connectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-connection-white-1280.png",
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(214, 236, 255) 0px, rgb(214, 236, 255) 10%, rgb(102, 178, 255) 24%, rgb(0, 113, 227) 56%, rgb(0, 74, 153) 100%)",
+        "boxShadow": "rgba(0, 113, 227, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0 0.290196 0.6 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.839216 0.92549 1 / 0.62) 2px 2",
+        "border": "rgb(255, 255, 255)"
+      },
+      "oldGoldHits": []
+    },
+    "eye": {
+      "vars": {
+        "accent": "#0B7A43",
+        "accentDeep": "#0B7A43",
+        "edge": "#0B7A43",
+        "statusQueued": "#85660e"
+      },
+      "selection": {
+        "background": "color(srgb 0.0431373 0.478431 0.262745 / 0.08)",
+        "border": "color(srgb 0.0431373 0.478431 0.262745 / 0.4)",
+        "borderWidth": "1px"
+      },
+      "selectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-eye-1280.png",
+      "connection": {
+        "stroke": "rgb(11, 122, 67)",
+        "strokeWidth": "1.5px",
+        "d": "M279.99993067117384,313.74988747337653 C360.63183346745507,3"
+      },
+      "connectionShot": "/tmp/gc-uiqa-r51/shots/p1-4-connection-eye-1280.png",
+      "handle": {
+        "background": "radial-gradient(circle at 35% 30%, rgb(210, 236, 220) 0px, rgb(210, 236, 220) 10%, rgb(63, 164, 106) 24%, rgb(11, 122, 67) 56%, rgb(10, 92, 51) 100%)",
+        "boxShadow": "rgba(11, 122, 67, 0.75) 0px 0px 0px 1px, rgba(0, 0, 0, 0.42) 0px 3px 7px 0px, color(srgb 0.0392157 0.360784 0.2 / 0.55) -2px -3px 4px 0px inset, color(srgb 0.823529 0.92549 0.86274",
+        "border": "rgb(255, 255, 255)"
+      },
+      "oldGoldHits": []
+    }
+  },
+  "develop": {
+    "current": {
+      "overlay": {
+        "backgroundImage": "linear-gradient(color(srgb 0.717647 0.952941 0.352941 / 0.05), color(srgb 0.717647 0.952941 0.352941 / 0.14))",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "gridlines": {
+        "backgroundImage": "linear-gradient(color(srgb 0.717647 0.952941 0.352941 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0.717647 0.952941 0.352941",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "scanline": {
+        "backgroundImage": "linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(183, 243, 90), rgba(0, 0, 0, 0))",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "rgb(183, 243, 90) 0px 0px 12px 0px"
+      },
+      "label": {
+        "backgroundImage": "none",
+        "color": "rgb(74, 122, 23)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "overlayClass": "develop-overlay nodrag h-28 w-full",
+      "text": "显影中",
+      "oldGoldHits": [],
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-4-developing-current-1280.png"
+    },
+    "white": {
+      "overlay": {
+        "backgroundImage": "linear-gradient(color(srgb 0 0.443137 0.890196 / 0.05), color(srgb 0 0.443137 0.890196 / 0.14))",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "gridlines": {
+        "backgroundImage": "linear-gradient(color(srgb 0 0.443137 0.890196 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0 0.443137 0.890196 / 0.13) 1px, ",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "scanline": {
+        "backgroundImage": "linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(0, 113, 227), rgba(0, 0, 0, 0))",
+        "color": "rgb(29, 29, 31)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "rgb(0, 113, 227) 0px 0px 12px 0px"
+      },
+      "label": {
+        "backgroundImage": "none",
+        "color": "rgb(0, 102, 204)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "overlayClass": "develop-overlay nodrag h-28 w-full",
+      "text": "显影中",
+      "oldGoldHits": [],
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-4-developing-white-1280.png"
+    },
+    "eye": {
+      "overlay": {
+        "backgroundImage": "linear-gradient(color(srgb 0.0431373 0.478431 0.262745 / 0.05), color(srgb 0.0431373 0.478431 0.262745 / 0.14))",
+        "color": "rgb(18, 59, 43)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "gridlines": {
+        "backgroundImage": "linear-gradient(color(srgb 0.0431373 0.478431 0.262745 / 0.13) 1px, rgba(0, 0, 0, 0) 1px), linear-gradient(90deg, color(srgb 0.0431373 0.478431 0.2627",
+        "color": "rgb(18, 59, 43)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "scanline": {
+        "backgroundImage": "linear-gradient(90deg, rgba(0, 0, 0, 0), rgb(11, 122, 67), rgba(0, 0, 0, 0))",
+        "color": "rgb(18, 59, 43)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "rgb(11, 122, 67) 0px 0px 12px 0px"
+      },
+      "label": {
+        "backgroundImage": "none",
+        "color": "rgb(11, 122, 67)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none"
+      },
+      "overlayClass": "develop-overlay nodrag h-28 w-full",
+      "text": "显影中",
+      "oldGoldHits": [],
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-4-developing-eye-1280.png"
+    }
+  },
+  "handle": {},
+  "notes": [
+    "template hits: 1",
+    "variant install: ok"
+  ],
+  "errors": []
+}

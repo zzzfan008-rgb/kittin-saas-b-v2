@@ -1,0 +1,733 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "phases": {
+    "pattern": {
+      "vars": {
+        "current": {
+          "dataTheme": "current",
+          "accent": "#B7F35A",
+          "accentDeep": "#4a7a17",
+          "nodeAccent": "#B7F35A",
+          "nodeInner": "#f2f3f5",
+          "nodeBorder": "#e4e6ea",
+          "nodeText": "#1d1d1f",
+          "colorGold": "#B7F35A"
+        },
+        "white": {
+          "dataTheme": "white",
+          "accent": "#0071e3",
+          "accentDeep": "#0066cc",
+          "nodeAccent": "#0071e3",
+          "nodeInner": "#f5f5f7",
+          "nodeBorder": "rgba(0, 0, 0, 0.08)",
+          "nodeText": "#1d1d1f",
+          "colorGold": "#B7F35A"
+        },
+        "eye": {
+          "dataTheme": "eye",
+          "accent": "#0B7A43",
+          "accentDeep": "#0B7A43",
+          "nodeAccent": "#0B7A43",
+          "nodeInner": "#f0f6f1",
+          "nodeBorder": "#e2ece4",
+          "nodeText": "#123B2B",
+          "colorGold": "#B7F35A"
+        }
+      },
+      "targets": {
+        "current": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "tag": "INPUT",
+            "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focusableTag": "INPUT",
+            "focusableType": "file",
+            "focusablePlaceholder": null,
+            "focusableAria": "重新上传图片",
+            "focusableOpacity": "0",
+            "focusableSize": [
+              65,
+              12
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgb(242, 243, 245)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-reupload-current.png",
+            "clip": {
+              "x": 337,
+              "y": 169,
+              "width": 81,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border",
+                "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0"
+              }
+            ]
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "block w-full cursor-zoom-in",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "1",
+            "focusableSize": [
+              134,
+              13
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-assetPicker-current.png",
+            "clip": {
+              "x": 337,
+              "y": 148,
+              "width": 150,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        },
+        "white": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "tag": "INPUT",
+            "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focusableTag": "INPUT",
+            "focusableType": "file",
+            "focusablePlaceholder": null,
+            "focusableAria": "重新上传图片",
+            "focusableOpacity": "0",
+            "focusableSize": [
+              65,
+              12
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgb(245, 245, 247)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-reupload-white.png",
+            "clip": {
+              "x": 337,
+              "y": 169,
+              "width": 81,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border",
+                "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0"
+              }
+            ]
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "block w-full cursor-zoom-in",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "1",
+            "focusableSize": [
+              134,
+              13
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-assetPicker-white.png",
+            "clip": {
+              "x": 337,
+              "y": 148,
+              "width": 150,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        },
+        "eye": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "tag": "INPUT",
+            "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "focusableTag": "INPUT",
+            "focusableType": "file",
+            "focusablePlaceholder": null,
+            "focusableAria": "重新上传图片",
+            "focusableOpacity": "0",
+            "focusableSize": [
+              65,
+              12
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)",
+              "backgroundColor": "rgb(240, 246, 241)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 177.05825805664062,
+                "width": 64.67184448242188,
+                "height": 12.192230224609375
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-reupload-eye.png",
+            "clip": {
+              "x": 337,
+              "y": 169,
+              "width": 81,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border",
+                "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0"
+              }
+            ]
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "block w-full cursor-zoom-in",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "1",
+            "focusableSize": [
+              134,
+              13
+            ],
+            "nodeOwner": "rf__node-pattern",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)",
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "rect": {
+                "x": 345.2660217285156,
+                "y": 156.91455078125,
+                "width": 133.58444213867188,
+                "height": 12.722335815429688
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-pattern-assetPicker-eye.png",
+            "clip": {
+              "x": 337,
+              "y": 148,
+              "width": 150,
+              "height": 29
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        }
+      },
+      "identity": {
+        "hasHexInput": 0,
+        "inputs": [
+          {
+            "type": "file",
+            "placeholder": null,
+            "aria": "重新上传图片",
+            "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "size": [
+              63,
+              12
+            ],
+            "visibility": "visible",
+            "opacity": "0",
+            "display": "block",
+            "node": "rf__node-pattern"
+          },
+          {
+            "type": "file",
+            "placeholder": null,
+            "aria": "上传图片",
+            "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+            "size": [
+              129,
+              97
+            ],
+            "visibility": "visible",
+            "opacity": "0",
+            "display": "block",
+            "node": "rf__node-style"
+          }
+        ],
+        "assetButtons": [
+          {
+            "text": "素材库",
+            "cls": "flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/6",
+            "node": "rf__node-pattern"
+          },
+          {
+            "text": "从素材库选择",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border",
+            "node": "rf__node-style"
+          }
+        ],
+        "uploaded": 4
+      },
+      "errors": []
+    },
+    "text": {
+      "vars": {
+        "current": {
+          "dataTheme": "current",
+          "accent": "#B7F35A",
+          "accentDeep": "#4a7a17",
+          "nodeAccent": "#B7F35A",
+          "nodeInner": "#f2f3f5",
+          "nodeBorder": "#e4e6ea",
+          "nodeText": "#1d1d1f",
+          "colorGold": "#B7F35A"
+        },
+        "white": {
+          "dataTheme": "white",
+          "accent": "#0071e3",
+          "accentDeep": "#0066cc",
+          "nodeAccent": "#0071e3",
+          "nodeInner": "#f5f5f7",
+          "nodeBorder": "rgba(0, 0, 0, 0.08)",
+          "nodeText": "#1d1d1f",
+          "colorGold": "#B7F35A"
+        },
+        "eye": {
+          "dataTheme": "eye",
+          "accent": "#0B7A43",
+          "accentDeep": "#0B7A43",
+          "nodeAccent": "#0B7A43",
+          "nodeInner": "#f0f6f1",
+          "nodeBorder": "#e2ece4",
+          "nodeText": "#123B2B",
+          "colorGold": "#B7F35A"
+        }
+      },
+      "targets": {
+        "current": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "missing": true
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-[var(--gc-accent-cta-ink)]",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "0.4",
+            "focusableSize": [
+              187,
+              21
+            ],
+            "nodeOwner": "rf__node-generate",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(19, 19, 19)",
+              "backgroundColor": "rgb(183, 243, 90)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(19, 19, 19)",
+              "backgroundColor": "rgb(183, 243, 90)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-text-assetPicker-current.png",
+            "clip": {
+              "x": 380,
+              "y": 509,
+              "width": 203,
+              "height": 37
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        },
+        "white": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "missing": true
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-[var(--gc-accent-cta-ink)]",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "0.4",
+            "focusableSize": [
+              187,
+              21
+            ],
+            "nodeOwner": "rf__node-generate",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(255, 255, 255)",
+              "backgroundColor": "rgb(0, 113, 227)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(255, 255, 255)",
+              "backgroundColor": "rgb(0, 113, 227)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-text-assetPicker-white.png",
+            "clip": {
+              "x": 380,
+              "y": 509,
+              "width": 203,
+              "height": 37
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        },
+        "eye": {
+          "slot": {
+            "missing": true
+          },
+          "reupload": {
+            "missing": true
+          },
+          "assetPicker": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-[var(--gc-accent-cta-ink)]",
+            "focusableTag": "BUTTON",
+            "focusableType": "button",
+            "focusablePlaceholder": null,
+            "focusableAria": null,
+            "focusableOpacity": "0.4",
+            "focusableSize": [
+              187,
+              21
+            ],
+            "nodeOwner": "rf__node-generate",
+            "focusVisible": false,
+            "before": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(255, 255, 255)",
+              "backgroundColor": "rgb(11, 122, 67)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "after": {
+              "borderTopColor": "oklch(0.928 0.006 264.531)",
+              "borderLeftColor": "oklch(0.928 0.006 264.531)",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(255, 255, 255)",
+              "backgroundColor": "rgb(11, 122, 67)",
+              "rect": {
+                "x": 388.3396301269531,
+                "y": 517.688720703125,
+                "width": 186.90567016601562,
+                "height": 20.603759765625
+              }
+            },
+            "changed": [],
+            "shot": "/tmp/gc-uiqa-r51/shots/p1-3b-focus-text-assetPicker-eye.png",
+            "clip": {
+              "x": 380,
+              "y": 509,
+              "width": 203,
+              "height": 37
+            },
+            "ancestorRing": [
+              {
+                "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4",
+                "boxShadow": "rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"
+              }
+            ]
+          },
+          "hexInput": {
+            "missing": true
+          }
+        }
+      },
+      "identity": {
+        "hasHexInput": 0,
+        "inputs": [
+          {
+            "type": "checkbox",
+            "placeholder": null,
+            "aria": null,
+            "cls": "nodrag",
+            "size": [
+              10,
+              10
+            ],
+            "visibility": "visible",
+            "opacity": "1",
+            "display": "block",
+            "node": "rf__node-result"
+          }
+        ],
+        "assetButtons": []
+      },
+      "errors": []
+    }
+  }
+}

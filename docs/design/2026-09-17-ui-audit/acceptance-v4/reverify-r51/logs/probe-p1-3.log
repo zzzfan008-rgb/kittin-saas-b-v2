@@ -1,0 +1,28 @@
+[pattern/current] vars undefined targets 5
+   thumbSlot: changed=[boxShadow] borderL rgb(228, 230, 234)->rgb(228, 230, 234) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   thumbSlotFallback: changed=[boxShadow] borderL rgb(228, 230, 234)->rgb(228, 230, 234) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(183, 243, 90)->rgb(183, 243, 90) shadow none rect {"x":575.79443359375,"y":252.3333282470703,"width":128.4111328125,"height":99.84721374511719}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgb(228, 230, 234)->rgb(74, 122, 23) shadow none rect {"x":575.79443359375,"y":387.5694580078125,"width":62.183349609375,"height":16.683319091796875}
+   assetPickerButton: changed=[] borderL rgb(228, 230, 234)->rgb(228, 230, 234) shadow none rect {"x":358.40557861328125,"y":257.64166259765625,"width":128.41110229492188,"height":12.638885498046875}
+[pattern/white] vars undefined targets 5
+   thumbSlot: changed=[boxShadow] borderL rgba(0, 0, 0, 0.08)->rgba(0, 0, 0, 0.08) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   thumbSlotFallback: changed=[boxShadow] borderL rgba(0, 0, 0, 0.08)->rgba(0, 0, 0, 0.08) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(0, 113, 227)->rgb(0, 113, 227) shadow none rect {"x":575.79443359375,"y":252.3333282470703,"width":128.4111328125,"height":99.84721374511719}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgba(0, 0, 0, 0.08)->rgb(0, 102, 204) shadow none rect {"x":575.79443359375,"y":387.5694580078125,"width":62.183349609375,"height":16.683319091796875}
+   assetPickerButton: changed=[] borderL rgba(0, 0, 0, 0.08)->rgba(0, 0, 0, 0.08) shadow none rect {"x":358.40557861328125,"y":257.64166259765625,"width":128.41110229492188,"height":12.638885498046875}
+[pattern/eye] vars undefined targets 5
+   thumbSlot: changed=[boxShadow] borderL rgb(226, 236, 228)->rgb(226, 236, 228) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   thumbSlotFallback: changed=[boxShadow] borderL rgb(226, 236, 228)->rgb(226, 236, 228) shadow rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rg rect {"x":358.40557861328125,"y":154.25555419921875,"width":128.41110229492188,"height":96.30833435058594}
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(11, 122, 67)->rgb(11, 122, 67) shadow none rect {"x":575.79443359375,"y":252.3333282470703,"width":128.4111328125,"height":99.84721374511719}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgb(226, 236, 228)->rgb(11, 122, 67) shadow none rect {"x":575.79443359375,"y":387.5694580078125,"width":62.183349609375,"height":16.683319091796875}
+   assetPickerButton: changed=[] borderL rgb(226, 236, 228)->rgb(226, 236, 228) shadow none rect {"x":358.40557861328125,"y":257.64166259765625,"width":128.41110229492188,"height":12.638885498046875}
+[text/current] vars undefined targets 2
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(183, 243, 90)->rgb(183, 243, 90) shadow none rect {"x":360.0419921875,"y":188.3013458251953,"width":207.9219970703125,"height":161.6716766357422}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgb(228, 230, 234)->rgb(74, 122, 23) shadow none rect {"x":360.0419921875,"y":407.27435302734375,"width":100.6866455078125,"height":27.01348876953125}
+[text/white] vars undefined targets 2
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(0, 113, 227)->rgb(0, 113, 227) shadow none rect {"x":360.0419921875,"y":188.3013458251953,"width":207.9219970703125,"height":161.6716766357422}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgba(0, 0, 0, 0.08)->rgb(0, 102, 204) shadow none rect {"x":360.0419921875,"y":407.27435302734375,"width":100.6866455078125,"height":27.01348876953125}
+[text/eye] vars undefined targets 2
+   promptChipTextarea: changed=[borderTopColor|outlineWidth|outlineColor] borderL rgb(11, 122, 67)->rgb(11, 122, 67) shadow none rect {"x":360.0419921875,"y":188.3013458251953,"width":207.9219970703125,"height":161.6716766357422}
+   modelSelect: changed=[borderTopColor|borderLeftColor|outlineWidth|outlineColor] borderL rgb(226, 236, 228)->rgb(11, 122, 67) shadow none rect {"x":360.0419921875,"y":407.27435302734375,"width":100.6866455078125,"height":27.01348876953125}
+pageerrors: {"pattern":0,"text":0}
