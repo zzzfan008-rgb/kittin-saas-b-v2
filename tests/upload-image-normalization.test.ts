@@ -353,22 +353,38 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     }
 
     const maskFlow = (mask: string, maskNodeId = "mask-node") => ({
-      schemaVersion: 2,
+      schemaVersion: 7,
       nodes: [{
-        id: "source-node",
-        type: "image",
+        id: "prompt-node",
+        type: "text",
         position: { x: 0, y: 0 },
-        data: { kind: "image", label: "原图", status: "idle", imageUrl: body.url },
+        data: { kind: "text", label: "提示词", status: "idle", text: "改成银色" },
       }, {
-        id: maskNodeId,
+        id: "source-node",
         type: "image",
         position: { x: 300, y: 0 },
         data: {
-          kind: "image", label: "局部重绘", status: "idle", prompt: "改成银色",
-          modelId: "gpt-image-2.5-sunburst", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
+          kind: "image", label: "原图", status: "idle",
+          aspectRatio: "3:4", batchSize: 1,
+          outputImages: [body.url],
+        },
+      }, {
+        id: maskNodeId,
+        type: "image",
+        position: { x: 600, y: 0 },
+        data: {
+          kind: "image", label: "局部重绘", status: "idle",
+          modelId: "gpt-image-2.5-sunburst", modelOptions: {},
+          aspectRatio: "3:4", batchSize: 1,
+          outputImages: [],
+          mask, maskSourceRef: body.url,
         },
       }],
-      edges: [{ id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId }],
+      edges: [
+        { id: "prompt-source", source: "prompt-node", target: "source-node", targetHandle: "prompt" },
+        { id: "prompt-mask", source: "prompt-node", target: maskNodeId, targetHandle: "prompt" },
+        { id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId },
+      ],
     });
     const saveMaskProject = async (
       mask: string,

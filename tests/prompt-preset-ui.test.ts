@@ -2,29 +2,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const inspectorSource = fs.readFileSync(
-  new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
-  "utf8",
-);
-const maskNodeSource = fs.readFileSync(
-  new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+  new URL("../src/components/nodes/NodeInspectorWindowPortal.tsx", import.meta.url),
   "utf8",
 );
 
-assert.match(inspectorSource, /const contextKey = JSON\.stringify\(\{/);
-assert.match(inspectorSource, /pending\?\.contextKey === contextKey \? pending : null/);
-assert.match(inspectorSource, /pending && pending\.contextKey !== contextKey/);
-assert.match(inspectorSource, /提示词变体/);
-assert.match(inspectorSource, /参数档案/);
-assert.match(inspectorSource, /提示词预览/);
+// 提示词变体选择已从「侧栏预设确认」收敛为悬浮窗口内的直接绑定：选中即写
+// promptVariantId，不再有 pending 确认态；撤销/下线由 variantRevoked 拦截运行。
+assert.match(inspectorSource, /selectedVariant = data\.promptVariantId/);
+assert.match(inspectorSource, /variantRevoked/);
+assert.match(inspectorSource, /promptVariantId: variant\.variantId/);
+assert.match(inspectorSource, /role="dialog"/);
 assert.match(inspectorSource, /aria-live="polite"/);
-assert.match(inspectorSource, /aria-describedby=\{reason \? reasonId : undefined\}/);
+assert.match(inspectorSource, /!selectedVariant \|\| variantRevoked/);
+assert.match(inspectorSource, /imageModelOptionsWarnings\(/);
+assert.match(inspectorSource, /textModelOptionsWarnings\(/);
 
-assert.match(maskNodeSource, /!presetAvailability\.enabled \|\| running \|\| readOnly/);
-assert.match(maskNodeSource, /setPresetPending\(false\)/);
-assert.match(maskNodeSource, /aria-describedby=\{!presetAvailability\.enabled/);
-assert.match(maskNodeSource, /提示词变体/);
-assert.match(maskNodeSource, /参数档案/);
-assert.match(maskNodeSource, /提示词预览/);
-assert.match(maskNodeSource, /aria-live="polite"/);
-
-console.log("提示词预设确认 UI 契约测试通过");
+console.log("提示词变体选择 UI 契约测试通过");

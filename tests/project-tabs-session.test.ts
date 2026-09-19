@@ -72,6 +72,9 @@ function storedSelectionNode(id: string, selected?: boolean) {
       kind: "image",
       label: id,
       status: "idle",
+      aspectRatio: "3:4",
+      batchSize: 1,
+      outputImages: [] as string[],
     },
     ...(selected === undefined ? {} : { selected }),
   };
@@ -355,7 +358,7 @@ const transientDraggingIsDiscarded = normalizeTabSessionValue({
   activeTabId: "dragging-session-tab",
   tabs: [storedSelectionTab(
     "dragging-session-tab",
-    [{ ...storedSelectionNode("dragging-node"), dragging: true }],
+    [{ ...storedSelectionNode("dragging-node"), dragging: true } as ReturnType<typeof storedSelectionNode>],
   )],
 });
 assert.ok(transientDraggingIsDiscarded);
@@ -746,7 +749,8 @@ useFlowStore.getState().openFlowTab({
     position: { x: 0, y: 0 },
     data: {
       kind: "image", label: "原图", status: "idle",
-      imageUrl: "/api/files/quota-source.png",
+      aspectRatio: "3:4", batchSize: 1,
+      outputImages: ["/api/files/quota-source.png"],
     },
   }, {
     id: "quota-mask",
@@ -755,7 +759,7 @@ useFlowStore.getState().openFlowTab({
     data: {
       kind: "image", label: "局部重绘", status: "idle", prompt: "改色",
       modelId: "gpt-image-2.5-sunburst", modelOptions: {},
-      operationMode: "mask-edit", operationModeNeedsConfirmation: false,
+      aspectRatio: "3:4", batchSize: 1,
       outputImages: [],
       mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
@@ -888,7 +892,7 @@ useFlowStore.getState().loadFlow({
     id: "drag-session-node",
     type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -1035,7 +1039,7 @@ useFlowStore.getState().loadFlow({
     id: "drag-session-node",
     type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -1047,7 +1051,7 @@ useFlowStore.getState().openFlowTab({
     id: "drag-session-target-node",
     type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image", label: "目标节点", status: "idle" },
+    data: { kind: "image", label: "目标节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -1120,7 +1124,9 @@ const boundaryResultNode = {
     kind: "image",
     label: "纯文档边界结果",
     status: "idle",
-    images: [],
+    aspectRatio: "3:4",
+    batchSize: 1,
+    outputImages: [],
   },
 } as import("../src/store/flowStore").FlowNode;
 useFlowStore.getState().openFlowTab({
