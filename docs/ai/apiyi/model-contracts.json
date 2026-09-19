@@ -809,17 +809,17 @@
   ],
   "textModels": [
     {
-      "id": "gpt-5.3-chat-latest",
+      "id": "gpt-4o",
       "contractHashScope": "sha256-canonical-text-model-envelope-v1",
-      "contractHash": "sha256:c31c2cacc70a4565be8c76c97e481578f7e840dfe050b99f3838a1f76199e0f3",
-      "label": "GPT-5.3 Chat（主力）",
+      "contractHash": "sha256:827409deddb8889b115718fe2b9b3244115f60a5ca337924807136e90b354a9f",
+      "label": "GPT-4o（默认/主力）",
       "channel": "official",
       "endpoint": {
         "path": "/v1/chat/completions",
         "contentType": "application/json"
       },
       "contextWindow": {
-        "inputTokens": 400000,
+        "inputTokens": 128000,
         "maxOutputTokens": 16384
       },
       "timeoutMs": 60000,
@@ -847,37 +847,38 @@
       },
       "knowledgeSources": [
         {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gpt-5-3-chat.md",
-          "sha256": "6a0010791b51b630c8624d99de3ca232834a1ad9e9dc7d7ffed386491c1a8b47"
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
         },
         {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-reference/chat/chat-completions.md",
-          "sha256": "ae5685e713e982547ce42b9d5156019fb9f2f81756325c8b0723dd6f95856491"
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/model-info.md",
+          "sha256": "cbae72a3a2117b8d8c7c4dcea8a9eb35f800084191a0dde1fe56abb7993f816e"
         }
       ]
     },
     {
-      "id": "gemini-3.6-flash",
+      "id": "claude-sonnet-4-5",
       "contractHashScope": "sha256-canonical-text-model-envelope-v1",
-      "contractHash": "sha256:b62b31764cda5a24a6863a7edbd96e1fbdae31d7fb341dd8cb3fa28d0ceafc91",
-      "label": "Gemini 3.6 Flash（轻量档）",
+      "contractHash": "sha256:025b33f93a0e37af373b8e5c5a1ab0f42ae77861f2f490c85b29e1adf969a56e",
+      "label": "Claude Sonnet 4.5（备选）",
       "channel": "official",
       "endpoint": {
         "path": "/v1/chat/completions",
         "contentType": "application/json"
       },
       "contextWindow": {
-        "inputTokens": 1048576,
-        "maxOutputTokens": 65536
+        "inputTokens": 200000,
+        "maxOutputTokens": 64000
       },
       "timeoutMs": 60000,
       "recommendedOptions": {
-        "reasoning_effort": {
-          "default": "low",
+        "temperature": {
+          "default": 0.7,
           "examples": [
-            "low",
-            "medium",
-            "high"
+            0,
+            0.5,
+            0.7,
+            1
           ]
         },
         "maxTokens": {
@@ -886,22 +887,31 @@
             1024,
             2048,
             4096,
-            8192
+            8192,
+            16384
           ]
         }
       },
       "knowledgeSources": [
         {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gemini-3-6-flash/overview.md",
-          "sha256": "3f8a7dbcbfb48b0b9d04f9fc5d8c4f6bda81bf7268b33419911af3e873cc9774"
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/model-info.md",
+          "sha256": "cbae72a3a2117b8d8c7c4dcea8a9eb35f800084191a0dde1fe56abb7993f816e"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/scenarios/chat/chathub.md",
+          "sha256": "9da7ec41696442a10207f936443bffdc9dabd9e8300c6ed0452b4bcaeccb9a3b"
         }
       ]
     },
     {
-      "id": "deepseek-v4-flash-ga-260731",
+      "id": "gemini-3-pro-preview",
       "contractHashScope": "sha256-canonical-text-model-envelope-v1",
-      "contractHash": "sha256:b396f6ed0eaa91353ba235b5ca1328f763f3c681bb354b85a35218455aad9a02",
-      "label": "DeepSeek V4 Flash GA（备选）",
+      "contractHash": "sha256:dd4790174f12037c7555eba392acb21550a3e96546bb24a0cca123562c08ea3e",
+      "label": "Gemini 3 Pro Preview（备选）",
       "channel": "official",
       "endpoint": {
         "path": "/v1/chat/completions",
@@ -909,28 +919,44 @@
       },
       "contextWindow": {
         "inputTokens": 1000000,
-        "maxOutputTokens": 393216
+        "maxOutputTokens": 65536
       },
       "timeoutMs": 60000,
       "recommendedOptions": {
+        "temperature": {
+          "default": 0.7,
+          "examples": [
+            0,
+            0.5,
+            0.7,
+            1,
+            1.5
+          ]
+        },
         "maxTokens": {
           "default": 4096,
           "examples": [
             1024,
             2048,
             4096,
-            8192
+            8192,
+            16384,
+            65536
           ]
         }
       },
-      "thinking": {
-        "default": "disabled",
-        "notes": "overview.md：默认思考量偏大；简单任务显式 thinking disabled"
-      },
       "knowledgeSources": [
         {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/deepseek-v4-flash/overview.md",
-          "sha256": "830e3975a70241f32f32ca90c99631d37828f3ff8b8569bbfc6db63efe547bfb"
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/news/gemini-3-pro-preview-launch.md",
+          "sha256": "d1e30e09c27a7a98cd2cb62a5a728f4340e9caf79f3686cf71f5cef809564eb8"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gemini/native.md",
+          "sha256": "e181e988193d1871ae901f2cecdb5d24ccfbab1acbb19c843a716077affe3b11"
         }
       ]
     }

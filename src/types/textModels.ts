@@ -11,26 +11,27 @@ import contracts from "../../docs/ai/apiyi/model-contracts.json";
 
 /**
  * 网关模型 ID 以 API易 本地知识库页面实际模型名为准
- * （快照 2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd）：
- * - "gpt-5.3 系" → 页面模型名为 `gpt-5.3-chat-latest`
- *   （pages/api-capabilities/gpt-5-3-chat.md:39，SHA-256 6a001079…1a8b47）
- * - gemini-3.6-flash → 与页面一致（stable，无重定向别名）
- *   （pages/api-capabilities/gemini-3-6-flash/overview.md，SHA-256 3f8a7dbc…cc9774）
- * - deepseek-v4-flash 正式版 → 页面模型名为 `deepseek-v4-flash-ga-260731`
- *   （pages/api-capabilities/deepseek-v4-flash/overview.md:44，SHA-256 830e3975…47bfb）
- * 方案文档 model-proposals.md §4 中的 “gpt-5.3 / deepseek-v4-flash” 是系名（档位称呼），
- * 不是可调用的网关 ID；此处落地的是网关 ID。
+ * （快照 2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd；R10 最终裁定 2026-09-19 实名定版）：
+ * - gpt-4o → 计费目录登记实名 `"n": "gpt-4o"`
+ *   （pages/models.md，SHA-256 33100d3f…9f00ed）
+ * - claude-sonnet-4-5 → 横线形式见 chathub 场景页示例；计费目录登记
+ *   claude-sonnet-4-5-20250929 / -thinking 变体（pages/models.md 同上）。
+ *   实际可调性由 P2-b Provider 联调与评估链 campaign 证明
+ *   （pages/scenarios/chat/chathub.md，SHA-256 9da7ec41…9a3b）
+ * - gemini-3-pro-preview → 上线记录 + text-generation 示例 + native 计费表
+ *   （pages/news/gemini-3-pro-preview-launch.md，SHA-256 d1e30e09…4eb8）
+ * R10 裁定细节见 docs/design/2026-09-18-three-node-model/contracts/model-proposals.md §6。
  */
 export const TEXT_MODEL_IDS = [
-  "gpt-5.3-chat-latest",
-  "gemini-3.6-flash",
-  "deepseek-v4-flash-ga-260731",
+  "gpt-4o",
+  "claude-sonnet-4-5",
+  "gemini-3-pro-preview",
 ] as const;
 
 export type TextModelId = (typeof TEXT_MODEL_IDS)[number];
 
-/** 主力模型（model-proposals.md §4 推荐：gpt-5.3 系主力 + gemini-3.6-flash 轻量档）。 */
-export const DEFAULT_TEXT_MODEL_ID: TextModelId = "gpt-5.3-chat-latest";
+/** 主力模型（R10 最终裁定 2026-09-19：gpt-4o 默认/主力）。 */
+export const DEFAULT_TEXT_MODEL_ID: TextModelId = "gpt-4o";
 
 /** R5：自由 key-value；契约区块提供 recommendedOptions 元数据，UI 负责默认填充。 */
 export interface TextModelOptions {
