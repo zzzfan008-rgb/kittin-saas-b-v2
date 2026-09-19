@@ -124,7 +124,7 @@ function ResultSaveControls({ images }: { images: string[] }) {
         type="button"
         disabled={busy || !directoryName || images.length === 0}
         onClick={() => void onSaveAll()}
-        className="nodrag w-full rounded-md bg-gold py-1 text-[11px] font-medium text-ink disabled:opacity-40"
+        className="nodrag w-full rounded-md bg-gold py-1 text-[11px] font-medium text-[var(--gc-accent-cta-ink)] disabled:opacity-40"
       >
         保存全部到文件夹
       </button>

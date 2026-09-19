@@ -171,7 +171,7 @@ export function ResultsPanel({
                       />
                     </button>
                     {compareIds.includes(r.id) && (
-                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[11px] font-bold text-ink">
+                      <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[11px] font-bold text-[var(--gc-accent-cta-ink)]">
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}

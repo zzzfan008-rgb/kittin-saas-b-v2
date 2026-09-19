@@ -112,14 +112,7 @@ body {
 .react-flow__handle {
   width: 18px;
   height: 18px;
-  background:
-    radial-gradient(circle at 35% 30%, #fff4d6 0 9%, #e5c78f 18%, #c9a66b 52%, #806135 100%);
-  border: 3px solid #141414;
-  box-shadow:
-    0 0 0 1px rgba(201, 166, 107, 0.7),
-    0 3px 7px rgba(0, 0, 0, 0.55),
-    inset -2px -3px 4px rgba(67, 45, 17, 0.42),
-    inset 2px 2px 3px rgba(255, 242, 211, 0.55);
+  /* 颜色声明收敛到下方 --gc-handle-* 变量段，消除首帧闪旧金与双源维护 */
   cursor: crosshair;
   transition:
     scale 140ms ease,
@@ -131,28 +124,17 @@ body {
 .react-flow__handle.connectingfrom {
   scale: 1.22;
   filter: brightness(1.12);
-  box-shadow:
-    0 0 0 2px rgba(229, 199, 143, 0.7),
-    0 0 14px rgba(201, 166, 107, 0.72),
-    0 4px 8px rgba(0, 0, 0, 0.5),
-    inset -2px -3px 4px rgba(67, 45, 17, 0.35),
-    inset 2px 2px 3px rgba(255, 248, 226, 0.7);
 }
 .react-flow__handle.connectingto {
   scale: 1.3;
   filter: brightness(1.18);
-  box-shadow:
-    0 0 0 3px rgba(229, 199, 143, 0.38),
-    0 0 18px rgba(229, 199, 143, 0.85),
-    inset -2px -3px 4px rgba(67, 45, 17, 0.3),
-    inset 2px 2px 3px rgba(255, 250, 232, 0.8);
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #c9a66b;
+  stroke: var(--gc-accent);
 }
 .react-flow__connection-path {
-  stroke: #c9a66b;
+  stroke: var(--gc-edge);
   stroke-width: 1.5;
 }
 
@@ -163,8 +145,8 @@ body {
 }
 
 .react-flow__selection {
-  background: rgba(201, 166, 107, 0.08);
-  border: 1px solid rgba(201, 166, 107, 0.4);
+  background: color-mix(in srgb, var(--gc-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gc-accent) 40%, transparent);
 }
 
 /* ---- 生成中动画：方案 E 暗房显影 ---- */
@@ -200,15 +182,19 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid #262626;
-  background: linear-gradient(180deg, rgba(201, 166, 107, 0.05), rgba(201, 166, 107, 0.14));
+  border: 1px solid var(--gc-node-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--gc-accent) 5%, transparent),
+    color-mix(in srgb, var(--gc-accent) 14%, transparent)
+  );
 }
 .develop-overlay .develop-gridlines {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(201, 166, 107, 0.13) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(201, 166, 107, 0.13) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--gc-accent) 13%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--gc-accent) 13%, transparent) 1px, transparent 1px);
   background-size: 16px 16px;
   animation: develop-gridfade 2s ease-in-out infinite;
 }
@@ -217,8 +203,8 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #c9a66b, transparent);
-  box-shadow: 0 0 12px #c9a66b;
+  background: linear-gradient(90deg, transparent, var(--gc-accent), transparent);
+  box-shadow: 0 0 12px var(--gc-accent);
   animation: develop-scan 1.6s ease-in-out infinite;
 }
 .develop-overlay .develop-label {
@@ -228,7 +214,7 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: rgba(201, 166, 107, 0.8);
+  color: var(--gc-accent-deep);
   letter-spacing: 0.2em;
 }
 
@@ -293,17 +279,10 @@ body {
 [data-theme="white"] .text-neutral-500 { color: #6e6e73 !important; }
 [data-theme="white"] .text-neutral-600 { color: #86868b !important; }
 [data-theme="white"] .text-gold { color: #0071e3 !important; }
+[data-theme="white"] .bg-gold { background-color: #0071e3 !important; }
 [data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #98989d !important; }
 [data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
 [data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
-[data-theme="white"] .react-flow__handle {
-  border-color: #ffffff;
-  box-shadow:
-    0 0 0 1px rgba(0, 113, 227, 0.62),
-    0 3px 7px rgba(29, 29, 31, 0.2),
-    inset -2px -3px 4px rgba(0, 74, 153, 0.28),
-    inset 2px 2px 3px rgba(255, 255, 255, 0.75);
-}
 [data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
 [data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
 
@@ -320,16 +299,9 @@ body {
 [data-theme="eye"] .text-neutral-500 { color: #557a68 !important; }
 [data-theme="eye"] .text-neutral-600 { color: #6d8d7c !important; }
 [data-theme="eye"] .text-gold { color: #0B7A43 !important; }
+[data-theme="eye"] .bg-gold { background-color: #0B7A43 !important; }
 [data-theme="eye"] .placeholder\:text-neutral-600::placeholder { color: #85a291 !important; }
 [data-theme="eye"] .react-flow__minimap { border-color: #c9dccc !important; }
-[data-theme="eye"] .react-flow__handle {
-  border-color: #ffffff;
-  box-shadow:
-    0 0 0 1px rgba(11, 122, 67, 0.62),
-    0 3px 7px rgba(18, 59, 43, 0.22),
-    inset -2px -3px 4px rgba(18, 59, 43, 0.28),
-    inset 2px 2px 3px rgba(255, 255, 255, 0.7);
-}
 [data-theme="eye"] ::-webkit-scrollbar-thumb { background: #a8c2ac; }
 [data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #8fb096; }
 
@@ -395,8 +367,8 @@ body {
   --gc-accent-cta-ink: #ffffff;
   --gc-accent-deep: #0066cc;
   --gc-primary-foreground: #ffffff;
-  /* 浅底状态色覆盖（DESIGN.md st-*-light） */
-  --gc-status-queued: #c79002;
+  /* 浅底状态色覆盖（DESIGN.md st-*-light 系；B5 加深至 WCAG 1.4.11 ≥3:1） */
+  --gc-status-queued: #9a6f00;
   --gc-status-running: #3b82f6;
   --gc-status-retry: #ea8a00;
   --gc-status-success: #1d7a3e;
@@ -435,8 +407,8 @@ body {
   --gc-accent-cta-ink: #ffffff;
   --gc-accent-deep: #0B7A43;
   --gc-primary-foreground: #ffffff;
-  /* 浅底状态色覆盖（DESIGN.md st-*-light 系） */
-  --gc-status-queued: #a1801a;
+  /* 浅底状态色覆盖（DESIGN.md st-*-light 系；B5 加深至 WCAG 1.4.11 ≥3:1） */
+  --gc-status-queued: #85660e;
   --gc-status-running: #2f6db5;
   --gc-status-retry: #c07a10;
   --gc-status-success: #1d7a3e;

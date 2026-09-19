@@ -179,7 +179,7 @@ export function ImageViewer() {
         {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[var(--gc-border)] p-3 text-[10px] text-[var(--gc-text-muted)]"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
         <div className="mt-5 flex flex-wrap gap-2">
-          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-ink">下载图片</a>
+          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
           <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
           {record && (
             <button

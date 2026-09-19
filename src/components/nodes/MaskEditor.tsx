@@ -378,7 +378,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
           type="button"
           onClick={() => void save()}
           disabled={!ready || saving}
-          className="ml-auto rounded-md bg-gold px-4 py-2 text-xs font-medium text-ink disabled:opacity-40"
+          className="ml-auto rounded-md bg-gold px-4 py-2 text-xs font-medium text-[var(--gc-accent-cta-ink)] disabled:opacity-40"
         >
           {saving ? "保存中…" : "保存蒙版"}
         </button>
@@ -398,7 +398,7 @@ function ToolbarButton({ label, onClick, disabled = false }: { label: string; on
 
 function ModeButton({ active, label, onClick, disabled = false }: { active: boolean; label: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`rounded-sm px-3 py-1.5 text-[11px] disabled:opacity-40 ${active ? "bg-gold text-ink" : "text-neutral-400 hover:text-neutral-200"}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`rounded-sm px-3 py-1.5 text-[11px] disabled:opacity-40 ${active ? "bg-gold text-[var(--gc-accent-cta-ink)]" : "text-neutral-400 hover:text-neutral-200"}`}>
       {label}
     </button>
   );

@@ -185,7 +185,7 @@ export function RunButton({
         disabled={active || disabled || Boolean(disabledReason) || newGenerationBlocked}
         title={newGenerationBlocked ? safetyBlockReason ?? undefined : disabledReason}
         className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
-          active ? "btn-running-breathe text-[var(--gc-warn-text)]" : "bg-gold text-ink disabled:opacity-40"
+          active ? "btn-running-breathe text-[var(--gc-warn-text)]" : "bg-gold text-[var(--gc-accent-cta-ink)] disabled:opacity-40"
         }`}
         style={active ? { backgroundColor: "var(--gc-panel-hover)" } : undefined}
       >
