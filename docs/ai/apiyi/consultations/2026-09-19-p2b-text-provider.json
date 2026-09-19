@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-19T08:45:36.507Z",
+  "baseCommit": "8d561fd64fe929834aa2d2db3a399d3fb20e9641",
+  "changeFingerprintSha256": "77b025f21b120ec5ab43a34ba1624879fc57b7733e35d0d0384bf737e70a351a",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "text node sync chat completions Q1B request response contract",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/engine/runner.ts",
+    "server/lib/workflowSchema.ts",
+    "server/providers/textProvider.ts",
+    "server/routes/generate.ts",
+    "server/routes/runPlan.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/text-generation.md",
+      "title": "Text Generation (Chat Completions)",
+      "sha256": "e7e36800c87de711d0ca1e47ac3b3555a936d650c41d6dd06844b6a14e118553"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/chat-completions.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/chat-completions.md",
+      "title": "Chat-Style API Reference",
+      "sha256": "516bf873c5e7214d8945876a09cb93770bed3aa15ad8cdde3ef0134dd5f00377"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-reference/chat/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-reference/chat/chat-completions.md",
+      "pageLocalPath": "pages/en/api-reference/chat/chat-completions.md",
+      "title": "Chat Completions",
+      "sha256": "41496c681aead0226a649d3183b08d6d6c08b13a2f9933a818f0ca9a87361ac3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "title": "Chat API Reference",
+      "sha256": "9aa76aefde31a342dac902534ffb6fd5b3cd0fc802d2c723d765d12cf4b932c2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/ko/api-capabilities/text-generation.md",
+      "title": "텍스트 생성 (Chat Completions)",
+      "sha256": "ac2f2c669c37be8f487ac8c56276ab5be4c178ca227de5a25291d2a54e94fc31"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/ru/api-capabilities/text-generation.md",
+      "title": "Генерация текста (Chat Completions)",
+      "sha256": "e5651f94fc84d8c59c281b89414e73080ba6d49840970e9ba7c74420ee160b58"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions Compatible Mode",
+      "sha256": "d2325c6660d0d2140d432a2bf0996ebc30d859a96c76a0f328c6a23d2de5d8d6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-reference/chat/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-reference/chat/chat-completions.md",
+      "pageLocalPath": "pages/api-reference/chat/chat-completions.md",
+      "title": "Chat Completions",
+      "sha256": "ae5685e713e982547ce42b9d5156019fb9f2f81756325c8b0723dd6f95856491"
+    }
+  ],
+  "decisionSummary": "text provider uses POST /v1/chat/completions OpenAI-compatible with messages and model options; response reads choices[0].message.content and usage tokens; dag/runner refactor to three-branch without changing reviewed image model contracts",
+  "unresolvedChoices": []
+}

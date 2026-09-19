@@ -301,9 +301,38 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
     if (!nodeIds.has(edge.source)) fail("flow.edges", `edge ${edge.id} source not found: ${edge.source}`);
     if (!nodeIds.has(edge.target)) fail("flow.edges", `edge ${edge.id} target not found: ${edge.target}`);
   }
+  const nodeKindById = new Map(nodes.map((node) => [node.id, node.type]));
+  // 边类型校验（graph-invariants.md §2）：targetHandle 区分 text 边 / image 边；
+  // 未知 handle（含旧 fabric / garment）一律拒绝。
+  for (const edge of edges) {
+    const sourceKind = nodeKindById.get(edge.source)!;
+    const targetKind = nodeKindById.get(edge.target)!;
+    const handle = edge.targetHandle ?? "";
+    if (handle === "prompt") {
+      if (sourceKind !== "text") {
+        fail("flow.edges", `edge ${edge.id} 的 prompt 入边只能来自 text 节点`);
+      }
+    } else if (handle === "reference" || handle === "") {
+      if (targetKind === "text") {
+        fail("flow.edges", `edge ${edge.id} 不能指向 text 节点（text 节点没有图片入边）`);
+      }
+      if (sourceKind !== "image") {
+        fail("flow.edges", `edge ${edge.id} 的 reference 入边只能来自 image 节点`);
+      }
+    } else {
+      fail("flow.edges", `edge ${edge.id} 使用了未知的 targetHandle: ${String(handle)}`);
+    }
+  }
+  // INV-1（graph-invariants.md §1）：每个 image/video 节点必须有 ≥1 条 text→该节点的入边。
   for (const node of nodes) {
-    // v7：入边限位按边类型计数（text/image 分开，graph-invariants.md §2）。
-    // 完整的 handle 类型检查与 INV-1 图级规则归 P2-b；此处先按总入边粗限位。
+    if (node.type === "text") continue;
+    const hasTextUpstream = edges.some((edge) => edge.target === node.id && edge.targetHandle === "prompt");
+    if (!hasTextUpstream) {
+      fail("flow.nodes", `「${node.data.label}」需要至少一个上游文本节点提供提示词`);
+    }
+  }
+  // 入边限位（graph-invariants.md §2）：text 边 / image 边分开计数。
+  for (const node of nodes) {
     const spec = NODE_SPECS[node.type];
     const incoming = edges.filter((edge) => edge.target === node.id);
     const textIncoming = incoming.filter((edge) => edge.targetHandle === "prompt").length;

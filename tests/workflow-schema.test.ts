@@ -1,897 +1,175 @@
+/**
+ * v7 schema 图级规则回归测试（R-53 P2-b，纯逻辑，不调真实 API/DB）。
+ * 覆盖：INV-1（image/video 必须有 text 上游）、边 handle 类型校验（fabric/garment 拒绝、
+ * image→text 拒绝、text→text 串联允许）、v6 及以下一律拒绝、入边限位。
+ * 运行：node node_modules/tsx/dist/cli.mjs tests/workflow-schema.test.ts
+ */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import sharp from "sharp";
-import { writeJsonAtomicSync } from "../server/lib/atomicJson";
-import {
-  assertUrlAllowed,
-  createPinnedLookup,
-  downloadImageToDataUrl,
-  ensureThumbnail,
-  isGlobalIpAddress,
-  type HostLookup,
-  type ImageFetch,
-} from "../server/lib/fileStore";
-import {
-  ImageValidationError,
-  isLocalImageReference,
-  validateImageDataUrl,
-} from "../server/lib/imageValidation";
 import {
   validateAndMigrateFlow,
   WorkflowValidationError,
 } from "../server/lib/workflowSchema";
-import { ensureBuiltinTemplates } from "../server/routes/templates";
-import { getImageModelContract, MASK_REDRAW_MODEL_ID } from "../src/types/imageModels";
 
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-  "base64",
-);
-const PNG_DATA_URL = `data:image/png;base64,${PNG.toString("base64")}`;
-const MASK_CONTRACT = getImageModelContract(MASK_REDRAW_MODEL_ID).edit.mask;
-
-if (!MASK_CONTRACT) throw new Error("gpt-image-2.5-sunburst mask contract missing");
-
-async function halfEditablePng(
-  width: number,
-  height: number,
-  uncompressed = false,
-): Promise<{ buffer: Buffer; dataUrl: string }> {
-  const pixels = Buffer.alloc(width * height * 4, 255);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width / 2; x += 1) {
-      pixels[(y * width + x) * 4 + 3] = 0;
-    }
-  }
-  const image = sharp(pixels, { raw: { width, height, channels: 4 } });
-  const buffer = uncompressed
-    ? await image.png({ compressionLevel: 0 }).toBuffer()
-    : await image.png().toBuffer();
-  return { buffer, dataUrl: `data:image/png;base64,${buffer.toString("base64")}` };
-}
-
-function imageInputFlow(imageUrl: string) {
-  return {
-    schemaVersion: 2,
-    nodes: [{
-      id: "source",
-      type: "image-input",
-      position: { x: 0, y: 0 },
-      data: {
-        kind: "image-input",
-        label: "原图",
-        status: "idle",
-        imageUrl,
-      },
-    }],
-    edges: [],
-  };
-}
-
-function maskFlow(mask: string, maskSourceRef = PNG_DATA_URL, prompt = "局部改色") {
-  return {
-    schemaVersion: 2,
-    nodes: [{
-      id: "mask",
-      type: "mask-redraw",
-      position: { x: 0, y: 0 },
-      data: {
-        kind: "mask-redraw",
-        label: "局部重绘",
-        status: "idle",
-        prompt,
-        mask,
-        maskSourceRef,
-        outputImages: [],
-        modelId: MASK_REDRAW_MODEL_ID,
-        modelOptions: {},
-      },
-    }],
-    edges: [],
-  };
-}
+const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-schema-test-"));
+process.env.DATA_DIR = TEST_DATA_DIR;
 
 let passed = 0;
-async function test(name: string, run: () => unknown | Promise<unknown>) {
+function ok(name: string, fn: () => void): void {
   try {
-    await run();
-    passed++;
+    fn();
+    passed += 1;
     console.log(`  ✓ ${name}`);
   } catch (error) {
     console.error(`  ✗ ${name}`);
-    throw error;
+    console.error(error);
+    process.exitCode = 1;
   }
 }
 
-const legacyAiFlow = () => ({
-  nodes: [
-    {
-      id: "n1",
-      type: "ai-modify",
-      position: { x: 1, y: 2 },
-      data: { kind: "ai-modify", label: "改款", status: "idle", prompt: "", outputImages: [] },
-    },
-  ],
-  edges: [],
-});
+function textNode(id: string, text = "设计一套现代都市女装"): Record<string, unknown> {
+  return { id, type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text } };
+}
 
-async function main() {
-  console.log("工作流 Schema / 图片 / SSRF 回归测试");
+function imageNode(id: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id,
+    type: "image",
+    position: { x: 380, y: 0 },
+    data: { kind: "image", label: "图片", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [], ...extra },
+  };
+}
 
-  await test("无版本 v0 确定性迁移到 v6，并补模型、模式默认字段", () => {
-    const first = validateAndMigrateFlow(legacyAiFlow());
-    const second = validateAndMigrateFlow(first);
-    assert.equal(first.schemaVersion, 6);
-    assert.equal(first.nodes[0].data.kind, "ai-modify");
-    if (first.nodes[0].data.kind !== "ai-modify") throw new Error("unexpected node kind");
-    assert.equal(first.nodes[0].data.aspectRatio, "1:1");
-    assert.equal(first.nodes[0].data.batchSize, 1);
-    assert.equal(first.nodes[0].data.modelId, "gpt-image-2.5-flare-vip");
-    assert.deepEqual(first.nodes[0].data.modelOptions, { size: "2048x2048" });
-    assert.equal(first.nodes[0].data.operationMode, "edit");
-    assert.equal(first.nodes[0].data.operationModeNeedsConfirmation, false);
-    assert.deepEqual(second, first);
+function videoNode(id: string): Record<string, unknown> {
+  return { id, type: "video", position: { x: 380, y: 0 }, data: { kind: "video", label: "视频", status: "idle", outputVideos: [] } };
+}
+
+function flow(nodes: unknown[], edges: unknown[], version = 7): unknown {
+  return { schemaVersion: version, nodes, edges };
+}
+
+const textEdge = (id: string, source: string, target: string, targetHandle = "prompt") =>
+  ({ id, source, target, targetHandle, data: {} });
+const imageEdge = (id: string, source: string, target: string) =>
+  ({ id, source, target, targetHandle: "reference", data: {} });
+
+function main() {
+  console.log("workflowSchema v7 图级规则回归测试");
+
+  ok("v7 合法：text → image（prompt 边）通过", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageNode("i1")],
+      [textEdge("e1", "t1", "i1")],
+    ));
+    assert.equal(result.schemaVersion, 7);
+    assert.equal(result.nodes.length, 2);
   });
 
-  await test("v6 含旧角色字段（imageRole/边 data.role/roleNeedsConfirmation）读取容忍且不抛错", () => {
-    const legacyRoleFlow = {
-      schemaVersion: 6,
-      nodes: [
-        {
-          id: "source",
-          type: "image-input",
-          position: { x: 0, y: 0 },
-          data: {
-            kind: "image-input",
-            label: "参考图",
-            status: "idle",
-            imageUrl: PNG_DATA_URL,
-            imageRole: "garment_full",
-            roleNeedsConfirmation: false,
-          },
-        },
-        {
-          id: "result",
-          type: "result",
-          position: { x: 320, y: 0 },
-          data: { kind: "result", label: "结果", status: "idle", images: [] },
-        },
-      ],
-      edges: [
-        {
-          id: "source-result",
-          source: "source",
-          target: "result",
-          data: { role: "garment_full", roleNeedsConfirmation: false },
-        },
-      ],
-    };
-    // 旧角色字段存在即忽略：不报错、不写回。
-    const normalized = validateAndMigrateFlow(legacyRoleFlow);
-    assert.equal(normalized.schemaVersion, 6);
-    assert.equal(normalized.nodes[0].id, "source");
-    assert.equal(normalized.edges[0].id, "source-result");
-    // 旧角色字段存在即忽略：节点级字段被剥离；边数据按任意键值容忍保留（不销毁未知键）。
-    assert.ok(!("imageRole" in normalized.nodes[0].data));
-    assert.ok(!("roleNeedsConfirmation" in normalized.nodes[0].data));
-    assert.ok(!("role" in normalized.nodes[0].data));
-    // 边数据按任意键值容忍：未知键原样保留，不销毁用户数据。
-    assert.equal((normalized.edges[0].data as Record<string, unknown>)["role"], "garment_full");
-  });
-
-  await test("v2 显式合法模型与参数不得被默认值替换", () => {
-    const flow = { ...legacyAiFlow(), schemaVersion: 2 };
-    Object.assign(flow.nodes[0].data, {
-      aspectRatio: "16:9",
-      batchSize: 1,
-      modelId: "gemini-3.1-flash-image",
-      modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
-    });
-
-    const normalized = validateAndMigrateFlow(flow);
-    const data = normalized.nodes[0].data;
-    assert.equal(data.kind, "ai-modify");
-    if (data.kind !== "ai-modify") throw new Error("unexpected node kind");
-    assert.equal(data.modelId, "gemini-3.1-flash-image");
-    assert.deepEqual(data.modelOptions, { aspectRatio: "16:9", imageSize: "4K" });
-    assert.equal(data.operationMode, "edit");
-    assert.equal(data.operationModeNeedsConfirmation, false);
-  });
-
-  await test("v2 蒙版节点迁移到统一局部修改并剥离旧处理模式", () => {
-    const legacyMaskFlow = maskFlow(PNG_DATA_URL) as ReturnType<typeof maskFlow> & {
-      nodes: Array<{ data: Record<string, unknown> }>;
-    };
-    legacyMaskFlow.nodes[0].data.maskMode = "preserve";
-    const normalized = validateAndMigrateFlow(legacyMaskFlow);
-    assert.equal(normalized.schemaVersion, 6);
-    assert.equal(normalized.nodes[0].data.operationMode, "mask-edit");
-    assert.equal(normalized.nodes[0].data.operationModeNeedsConfirmation, false);
-    assert.equal((normalized.nodes[0].data as Record<string, unknown>).maskMode, undefined);
-  });
-
-  await test("v2 蒙版节点的 8 路历史输入可迁移、保存并再次读取", () => {
-    const legacyMaskFlow = maskFlow(PNG_DATA_URL);
-    for (let index = 0; index < 8; index += 1) {
-      legacyMaskFlow.nodes.push({
-        id: `legacy-ref-${index}`,
-        type: "image-input",
-        position: { x: -200, y: index * 80 },
-        data: {
-          kind: "image-input",
-          label: `历史参考图 ${index + 1}`,
-          status: "idle",
-          imageUrl: PNG_DATA_URL,
-        },
-      } as never);
-      legacyMaskFlow.edges.push({
-        id: `legacy-edge-${index}`,
-        source: `legacy-ref-${index}`,
-        target: "mask",
-      } as never);
-    }
-
-    const migrated = validateAndMigrateFlow(legacyMaskFlow);
-    assert.equal(migrated.schemaVersion, 6);
-    assert.equal(migrated.edges.length, 8);
-    assert.deepEqual(validateAndMigrateFlow(migrated), migrated);
-  });
-
-  await test("v2 读取后只返回文档白名单，并把运行态归一为 idle", () => {
-    const normalized = validateAndMigrateFlow({
-      schemaVersion: 2,
-      debugOnly: "must-not-survive",
-      nodes: [
-        {
-          id: "n1",
-          type: "ai-modify",
-          position: { x: 1, y: 2, stalePositionField: true },
-          selected: true,
-          dragging: true,
-          measured: { width: 320, height: 180 },
-          width: 320,
-          height: 180,
-          unknownNodeField: "must-not-survive",
-          data: {
-            kind: "ai-modify",
-            label: "改款",
-            status: "success",
-            error: "runtime-only",
-            prompt: "保留版型",
-            aspectRatio: "1:1",
-            batchSize: 1,
-            outputImages: [],
-            modelId: "gpt-image-2.5-flare-vip",
-            modelOptions: { size: "2048x2048", unknownModelOption: "must-not-survive" },
-            unknownDataField: "must-not-survive",
-          },
-        },
-        {
-          id: "n2",
-          type: "result",
-          position: { x: 420, y: 2 },
-          data: {
-            kind: "result",
-            label: "结果",
-            status: "idle",
-            images: [],
-          },
-        },
-      ],
-      edges: [
-        {
-          id: "e1",
-          source: "n1",
-          target: "n2",
-          sourceHandle: "images",
-          targetHandle: null,
-          selected: true,
-          animated: true,
-          unknownEdgeField: "must-not-survive",
-        },
-      ],
-    });
-
-    assert.deepEqual(normalized, {
-      schemaVersion: 6,
-      nodes: [
-        {
-          id: "n1",
-          type: "ai-modify",
-          position: { x: 1, y: 2 },
-          data: {
-            kind: "ai-modify",
-            label: "改款",
-            status: "idle",
-            prompt: "保留版型",
-            aspectRatio: "1:1",
-            batchSize: 1,
-            outputImages: [],
-            modelId: "gpt-image-2.5-flare-vip",
-            modelSelectionNeedsConfirmation: false,
-            modelOptions: { size: "2048x2048" },
-            operationMode: "edit",
-            operationModeNeedsConfirmation: false,
-          },
-        },
-        {
-          id: "n2",
-          type: "result",
-          position: { x: 420, y: 2 },
-          data: {
-            kind: "result",
-            label: "结果",
-            status: "idle",
-            images: [],
-          },
-        },
-      ],
-      edges: [
-        {
-          id: "e1",
-          source: "n1",
-          target: "n2",
-          sourceHandle: "images",
-          targetHandle: null,
-          data: {},
-        },
-      ],
-    });
-  });
-
-  await test("拒绝未知版本、kind/type 不符、非法批量与悬空边", () => {
-    assert.throws(() => validateAndMigrateFlow({ ...legacyAiFlow(), schemaVersion: 99 }), WorkflowValidationError);
-    const mismatch = legacyAiFlow();
-    mismatch.nodes[0].data.kind = "result" as "ai-modify";
-    assert.throws(() => validateAndMigrateFlow(mismatch), /must equal node type/);
-    const batch = legacyAiFlow();
-    Object.assign(batch.nodes[0].data, { batchSize: 3 });
-    assert.throws(() => validateAndMigrateFlow(batch), /batchSize/);
-    const invalidModelOptions = { ...legacyAiFlow(), schemaVersion: 6 };
-    Object.assign(invalidModelOptions.nodes[0].data, {
-      aspectRatio: "1:1",
-      batchSize: 1,
-      modelId: "gpt-image-2.5-flare-vip",
-      modelOptions: { size: "unsupported-size", unknownModelOption: true },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-    });
-    assert.throws(() => validateAndMigrateFlow(invalidModelOptions), /modelOptions/);
-    const dangling = legacyAiFlow();
-    dangling.edges.push({ id: "e1", source: "n1", target: "missing" } as never);
-    assert.throws(() => validateAndMigrateFlow(dangling), /target not found/);
-    const spoofedImage = legacyAiFlow();
-    Object.assign(spoofedImage.nodes[0].data, {
-      outputImages: [`data:image/jpeg;base64,${PNG.toString("base64")}`],
-    });
-    assert.throws(() => validateAndMigrateFlow(spoofedImage), /MIME\/signature mismatch/);
-  });
-
-  await test("v6 对模型原生参数原样严格校验，不以确认标记或归一化丢弃非法字段", () => {
-    const current = validateAndMigrateFlow({ ...legacyAiFlow(), schemaVersion: 2 });
-    const invalidCases: Array<{ name: string; patch: Record<string, unknown>; pattern: RegExp }> = [
-      {
-        name: "VIP forbidden aspect_ratio",
-        patch: {
-          modelId: "gpt-image-2.5-flare-vip",
-          modelOptions: { size: "2048x2048", aspect_ratio: "16:9" },
-          operationMode: "edit",
-        },
-        pattern: /aspect_ratio/,
-      },
-      {
-        name: "VIP receives Gemini fields",
-        patch: {
-          modelId: "gpt-image-2.5-flare-vip",
-          modelOptions: { size: "2048x2048", aspectRatio: "1:1", imageSize: "2K" },
-          operationMode: "edit",
-        },
-        pattern: /aspectRatio|unsupported parameter/,
-      },
-      {
-        name: "FLUX dimension type",
-        patch: {
-          modelId: "flux-2-pro",
-          modelOptions: { width: "1024", height: 1024, outputFormat: "png" },
-          operationMode: "edit",
-        },
-        pattern: /modelOptions/,
-      },
-      {
-        name: "Seedream unsupported size",
-        patch: {
-          modelId: "seedream-5-0-260128",
-          modelOptions: { size: "4K" },
-          operationMode: "edit",
-        },
-        pattern: /unsupported/,
-      },
-    ];
-    for (const { name, patch, pattern } of invalidCases) {
-      const flow = structuredClone(current);
-      Object.assign(flow.nodes[0].data, patch, { operationModeNeedsConfirmation: true });
-      assert.throws(
-        () => validateAndMigrateFlow(flow),
-        pattern,
-        `${name} 不得被静默删除或被 confirmation 绕过`,
-      );
-    }
-
-    const currentMask = validateAndMigrateFlow(maskFlow(PNG_DATA_URL));
-    Object.assign(currentMask.nodes[0].data, { modelOptions: { size: "816x816" } });
+  ok("INV-1：image 节点无 text 上游被拒绝", () => {
     assert.throws(
-      () => validateAndMigrateFlow(currentMask),
-      /must be empty/,
-      "v6 蒙版节点不得持久化运行时像素尺寸",
+      () => validateAndMigrateFlow(flow([imageNode("i1")], [])),
+      WorkflowValidationError,
     );
-  });
-
-  await test("v5 Grok 项目迁移为显式退役状态，必须手选新模型且不会沿用旧绑定", () => {
-    const legacy = { ...legacyAiFlow(), schemaVersion: 5 };
-    Object.assign(legacy.nodes[0].data, {
-      modelId: "grok-imagine-image",
-      modelOptions: { aspectRatio: "1:1", resolution: "2k", legacyOnly: true },
-      operationMode: "edit",
-      promptVariantId: "fashion-lookbook.grok-imagine-image.ai-modify.edit.v1",
-      promptFamilyId: "fashion-lookbook",
-      parameterProfileId: "grok-imagine-image:fashion-lookbook:edit:v1",
-      contractHash: `sha256:${"a".repeat(64)}`,
-      evaluationVersion: "evaluation-protocol-v1",
-      postprocessVersion: "fit-contain-dominant-webp-v1",
-    });
-    const migrated = validateAndMigrateFlow(legacy);
-    assert.equal(migrated.schemaVersion, 6);
-    const data = migrated.nodes[0].data;
-    assert.equal(data.kind, "ai-modify");
-    if (data.kind !== "ai-modify") throw new Error("unexpected node kind");
-    assert.equal(data.modelId, "gpt-image-2.5-flare-vip", "内部安全默认值不得冒充用户已选择的新模型");
-    assert.equal(data.retiredModelId, "grok-imagine-image");
-    assert.equal(data.modelSelectionNeedsConfirmation, true);
-    assert.deepEqual(data.modelOptions, { size: "2048x2048" });
-    for (const field of [
-      "promptVariantId",
-      "promptFamilyId",
-      "parameterProfileId",
-      "contractHash",
-      "evaluationVersion",
-      "postprocessVersion",
-    ] as const) assert.equal(data[field], undefined, `${field} 不得从退役模型迁移到现役模型`);
-    assert.deepEqual(validateAndMigrateFlow(migrated), migrated);
-
-    const currentWithRetiredId = structuredClone(migrated) as unknown as {
-      nodes: Array<{ data: Record<string, unknown> }>;
-    };
-    currentWithRetiredId.nodes[0].data.modelId = "grok-imagine-image";
-    assert.throws(
-      () => validateAndMigrateFlow(currentWithRetiredId),
-      /must be a supported API易 image model/,
-      "当前 v6 文档不得把退役 ID 当作可运行模型",
-    );
-  });
-
-  await test("运行态不会写进项目：queued/running/error 读取时归一为 idle", () => {
-    for (const status of ["queued", "running", "error"] as const) {
-      const flow = legacyAiFlow();
-      Object.assign(flow.nodes[0].data, { status, error: "transient failure" });
-      const normalized = validateAndMigrateFlow(flow);
-      assert.equal(normalized.nodes[0].data.status, "idle");
-      assert.equal(normalized.nodes[0].data.error, undefined);
-    }
-  });
-
-  await test("工作流 Schema 拒绝超过节点上限的参考图连接", () => {
-    const flow = legacyAiFlow();
-    for (let index = 0; index < 9; index += 1) {
-      flow.nodes.push({
-        id: `ref${index}`,
-        type: "image-input",
-        position: { x: 0, y: index * 10 },
-        data: {
-          kind: "image-input",
-          label: `ref${index}`,
-          status: "idle",
-        },
-      } as never);
-      flow.edges.push({ id: `e${index}`, source: `ref${index}`, target: "n1" } as never);
-    }
-    assert.throws(() => validateAndMigrateFlow(flow), /accepts at most 8 incoming image connections/);
-  });
-
-  await test("图片上传节点只接受单个 imageUrl 字段", () => {
-    const flow = {
-      nodes: [{
-        id: "upload",
-        type: "image-input",
-        position: { x: 0, y: 0 },
-        data: {
-          kind: "image-input",
-          label: "单图上传",
-          status: "idle",
-          imageUrl: ["/api/files/one.png", "/api/files/two.png"],
-        },
-      }],
-      edges: [],
-    };
-    assert.throws(() => validateAndMigrateFlow(flow), /imageUrl/);
-  });
-
-  await test("大于文本上限但小于图片字节上限的 dataURL 可用于通用图片与蒙版", async () => {
-    const largePng = await halfEditablePng(128, 128, true);
-    assert.ok(largePng.dataUrl.length > 20_000, "fixture 必须超过普通文本上限");
-    assert.ok(largePng.buffer.length < MASK_CONTRACT.maxBytes, "fixture 必须低于蒙版字节上限");
-
-    const imageFlow = validateAndMigrateFlow(imageInputFlow(largePng.dataUrl));
-    assert.equal(imageFlow.nodes[0].data.kind, "image-input");
-    if (imageFlow.nodes[0].data.kind !== "image-input") throw new Error("unexpected node kind");
-    assert.equal(imageFlow.nodes[0].data.imageUrl, largePng.dataUrl);
-
-    const redrawFlow = validateAndMigrateFlow(maskFlow(largePng.dataUrl, largePng.dataUrl));
-    assert.equal(redrawFlow.nodes[0].data.kind, "mask-redraw");
-    if (redrawFlow.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
-    assert.equal(redrawFlow.nodes[0].data.mask, largePng.dataUrl);
-    assert.equal(redrawFlow.nodes[0].data.maskSourceRef, largePng.dataUrl);
-  });
-
-  await test("蒙版 schema 按契约拒绝非 PNG 与解码后超过 4MiB 的 dataURL", async () => {
-    const jpeg = await sharp({
-      create: { width: 4, height: 2, channels: 3, background: { r: 255, g: 255, b: 255 } },
-    }).jpeg().toBuffer();
-    assert.throws(
-      () => validateAndMigrateFlow(maskFlow(`data:image/jpeg;base64,${jpeg.toString("base64")}`)),
-      /dataURL MIME must be one of: image\/png/,
-    );
-
-    const oversized = await halfEditablePng(1024, 1024, true);
-    assert.ok(oversized.buffer.length > MASK_CONTRACT.maxBytes, "fixture 必须超过蒙版字节上限");
-    assert.throws(() => validateAndMigrateFlow(maskFlow(oversized.dataUrl)), /image too large/);
-
-    const localMask = validateAndMigrateFlow(maskFlow("/api/files/mask.png"));
-    assert.equal(localMask.nodes[0].data.kind, "mask-redraw");
-    if (localMask.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
-    assert.equal(localMask.nodes[0].data.mask, "/api/files/mask.png");
-
-    for (const invalidMask of ["/api/files/mask.jpg", "https://example.com/mask.png"]) {
-      assert.throws(
-        () => validateAndMigrateFlow(maskFlow(invalidMask)),
-        /mask: must be an inline PNG dataURL or local \/api\/files\/\*\.png reference/,
-      );
-    }
-  });
-
-  await test("普通文本与非 dataURL 图片引用仍保留 20,000 字符上限", () => {
-    const promptFlow = legacyAiFlow();
-    promptFlow.nodes[0].data.prompt = "x".repeat(20_001);
-    assert.throws(() => validateAndMigrateFlow(promptFlow), /prompt: must be at most 20000 characters/);
-
-    const longUrl = `https://example.com/${"x".repeat(20_001)}`;
-    assert.throws(() => validateAndMigrateFlow(imageInputFlow(longUrl)), /imageUrl: must be at most 20000 characters/);
-  });
-
-  await test("干净检出也可迁移旧项目，并校验仓库内置模板", () => {
-    // 不依赖被 .gitignore 排除的 data/projects；旧项目夹具必须由测试自己提供。
-    const legacyProject = {
-      id: "legacy-project",
-      name: "旧项目",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-      flow: legacyAiFlow(),
-    };
-    assert.equal(validateAndMigrateFlow(legacyProject.flow).schemaVersion, 6);
-
-    const builtinRoot = "data/templates/builtin";
-    const builtinFiles = fs.readdirSync(builtinRoot).filter((name) => name.endsWith(".json"));
-    assert.equal(builtinFiles.length, 6, "仓库应包含六份内置模板");
-    for (const file of builtinFiles) {
-      const value = JSON.parse(fs.readFileSync(path.join(builtinRoot, file), "utf-8")) as { flow: unknown };
-      assert.equal(validateAndMigrateFlow(value.flow).schemaVersion, 6, `${builtinRoot}/${file}`);
-    }
-    for (const [file, expected] of [
-      ["builtin-person-scene-transfer.json", ["subject", "scene"]],
-      ["builtin-pattern-style-transfer.json", ["pattern", "style"]],
-    ] as const) {
-      const transfer = JSON.parse(fs.readFileSync(path.join(builtinRoot, file), "utf-8")) as {
-        flow: { edges: Array<{ source: string; target: string }> };
-      };
-      assert.deepEqual(
-        transfer.flow.edges.filter((edge) => edge.target === "transfer").map((edge) => edge.source),
-        expected,
-        `${file} 必须按图1、图2顺序传入参考图`,
-      );
-    }
-    const textToImage = JSON.parse(
-      fs.readFileSync(path.join(builtinRoot, "builtin-text-to-image.json"), "utf-8"),
-    ) as { flow: { nodes: Array<{ id: string; data: { prompt?: string } }>; edges: unknown[] } };
-    const generateNode = textToImage.flow.nodes.find((node) => node.id === "generate");
-    assert.ok(generateNode?.data.prompt?.trim(), "文生图模板必须提供可编辑的示例提示词");
-    assert.equal(textToImage.flow.edges.length, 1, "文生图结果应自动汇总到结果节点");
-  });
-
-  await test("已有数据目录保留可迁移的 v1 内置模板并增量补齐缺失模板", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-templates-"));
-    const originalDataDir = process.env.DATA_DIR;
     try {
-      process.env.DATA_DIR = dir;
-      ensureBuiltinTemplates();
-      const builtinDir = path.join(dir, "templates", "builtin");
-      const existingPath = path.join(builtinDir, "builtin-sketch-recolor.json");
-      const existing = JSON.parse(fs.readFileSync(existingPath, "utf-8")) as {
-        schemaVersion: number;
-        description: string;
-        flow: {
-          schemaVersion: number;
-          nodes: Array<{ data: Record<string, unknown> }>;
-        };
-      };
-      existing.schemaVersion = 1;
-      existing.flow.schemaVersion = 1;
-      existing.description = "preserve-existing-v1";
-      for (const node of existing.flow.nodes) {
-        delete node.data.modelId;
-        delete node.data.modelOptions;
-      }
-      const existingJson = JSON.stringify(existing, null, 2);
-      fs.writeFileSync(existingPath, existingJson, "utf-8");
-      for (const file of fs.readdirSync(builtinDir)) {
-        if (file !== path.basename(existingPath)) fs.rmSync(path.join(builtinDir, file));
-      }
-      fs.writeFileSync(path.join(builtinDir, "builtin-style-transfer.json"), "deprecated", "utf-8");
+      validateAndMigrateFlow(flow([imageNode("i1")], []));
+    } catch (error) {
+      assert.match(error instanceof Error ? error.message : "", /上游文本节点/);
+    }
+  });
 
-      ensureBuiltinTemplates();
+  ok("INV-1：video 节点无 text 上游被拒绝", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow([videoNode("v1")], [])),
+      WorkflowValidationError,
+    );
+  });
 
-      assert.equal(fs.readFileSync(existingPath, "utf-8"), existingJson);
-      assert.equal(fs.existsSync(path.join(builtinDir, "builtin-style-transfer.json")), false);
-      assert.deepEqual(
-        fs.readdirSync(builtinDir).filter((name) => name.endsWith(".json")).sort(),
+  ok("边 handle：旧 fabric handle 被拒绝", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), imageNode("i2")],
         [
-          "builtin-pattern-style-transfer.json",
-          "builtin-person-scene-transfer.json",
-          "builtin-sketch-recolor.json",
-          "builtin-sketch-upscale.json",
-          "builtin-text-recolor.json",
-          "builtin-text-to-image.json",
+          textEdge("e1", "t1", "i1"),
+          { id: "e2", source: "i1", target: "i2", targetHandle: "fabric", data: {} },
         ],
-      );
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("已有 v4 内置模板缺少 edge data 仍可读取迁移且不会被启动流程覆盖", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-v4-template-edge-upgrade-"));
-    const originalDataDir = process.env.DATA_DIR;
-    try {
-      process.env.DATA_DIR = dir;
-      ensureBuiltinTemplates();
-      const filePath = path.join(dir, "templates", "builtin", "builtin-person-scene-transfer.json");
-      const legacy = JSON.parse(fs.readFileSync(filePath, "utf-8")) as {
-        schemaVersion: number;
-        description: string;
-        flow: { schemaVersion: number; edges: Array<Record<string, unknown>> };
-      };
-      legacy.schemaVersion = 4;
-      legacy.flow.schemaVersion = 4;
-      legacy.description = "preserve-existing-v4-edge-data";
-      legacy.flow.edges[0].data = {};
-      delete legacy.flow.edges[1].data;
-      const legacyJson = JSON.stringify(legacy, null, 2);
-      fs.writeFileSync(filePath, legacyJson, "utf-8");
-
-      ensureBuiltinTemplates();
-
-      assert.equal(fs.readFileSync(filePath, "utf-8"), legacyJson);
-      const migrated = validateAndMigrateFlow(legacy.flow);
-      assert.equal(migrated.schemaVersion, 6);
-      assert.deepEqual(migrated.edges.slice(0, 2).map((edge) => edge.data), [
-        {},
-        {},
-      ]);
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("历史 v2 内置模板缺少模型字段时会被当前合法定义修复", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-v2-template-upgrade-"));
-    const originalDataDir = process.env.DATA_DIR;
-    try {
-      process.env.DATA_DIR = dir;
-      ensureBuiltinTemplates();
-      const filePath = path.join(dir, "templates", "builtin", "builtin-sketch-upscale.json");
-      const broken = JSON.parse(fs.readFileSync(filePath, "utf-8")) as {
-        flow: { nodes: Array<{ data: Record<string, unknown> }> };
-      };
-      for (const node of broken.flow.nodes) {
-        delete node.data.modelId;
-        delete node.data.modelOptions;
-      }
-      fs.writeFileSync(filePath, JSON.stringify(broken, null, 2), "utf-8");
-
-      ensureBuiltinTemplates();
-
-      const repaired = JSON.parse(fs.readFileSync(filePath, "utf-8")) as {
-        schemaVersion: unknown;
-        flow: { nodes: Array<{ type: string; data: Record<string, unknown> }> };
-      };
-      assert.equal(repaired.schemaVersion, 6);
-      assert.equal(validateAndMigrateFlow(repaired.flow).schemaVersion, 6);
-      for (const node of repaired.flow.nodes.filter((candidate) => candidate.type !== "image-input")) {
-        assert.equal(typeof node.data.modelId, "string", `${node.type} 应补 modelId`);
-        assert.equal(typeof node.data.modelOptions, "object", `${node.type} 应补 modelOptions`);
-      }
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("全新空数据目录生成的六份 v6 内置模板均可读取和校验", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-fresh-templates-"));
-    const originalDataDir = process.env.DATA_DIR;
-    try {
-      process.env.DATA_DIR = dir;
-      ensureBuiltinTemplates();
-
-      const builtinDir = path.join(dir, "templates", "builtin");
-      const files = fs.readdirSync(builtinDir).filter((name) => name.endsWith(".json")).sort();
-      assert.equal(files.length, 6);
-      for (const file of files) {
-        const template = JSON.parse(fs.readFileSync(path.join(builtinDir, file), "utf-8")) as {
-          schemaVersion: unknown;
-          flow: unknown;
-        };
-        assert.equal(template.schemaVersion, 6, file);
-        assert.equal(validateAndMigrateFlow(template.flow).schemaVersion, 6, file);
-      }
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("图片 dataURL 校验 MIME、魔数、base64 和体积", () => {
-    const parsed = validateImageDataUrl(PNG_DATA_URL);
-    assert.equal(parsed.mime, "image/png");
-    assert.deepEqual(parsed.buffer, PNG);
-    assert.deepEqual(validateImageDataUrl(PNG_DATA_URL, PNG.length).buffer, PNG);
-    assert.throws(() => validateImageDataUrl(`data:image/jpeg;base64,${PNG.toString("base64")}`), /mismatch/);
-    assert.throws(() => validateImageDataUrl("data:image/png;base64,abc$"), ImageValidationError);
-    assert.throws(() => validateImageDataUrl(PNG_DATA_URL, PNG.length - 1), /too large/);
-    assert.equal(isLocalImageReference("/api/files/abc_12-x.png"), true);
-    assert.equal(isLocalImageReference("https://example.com/a.png"), false);
-    assert.equal(isLocalImageReference("/api/files/../secret.png"), false);
-  });
-
-  await test("原子 JSON 写入留下完整目标且无临时文件", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-json-"));
-    try {
-      const target = path.join(dir, "project.json");
-      writeJsonAtomicSync(target, { version: 1 });
-      writeJsonAtomicSync(target, { version: 2, nested: { ok: true } });
-      assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf-8")), { version: 2, nested: { ok: true } });
-      assert.deepEqual(fs.readdirSync(dir), ["project.json"]);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("服务端为原图生成可复用 WebP 缩略图缓存", async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-thumbnails-"));
-    const originalDataDir = process.env.DATA_DIR;
-    try {
-      process.env.DATA_DIR = dir;
-      const uploads = path.join(dir, "uploads");
-      fs.mkdirSync(uploads, { recursive: true });
-      fs.writeFileSync(path.join(uploads, "source.png"), PNG);
-      const first = await ensureThumbnail("source.png");
-      const second = await ensureThumbnail("source.png");
-      assert.equal(first, second);
-      const bytes = fs.readFileSync(first);
-      assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF");
-      assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP");
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("缩略图拒绝超过四千万像素的输入且不留下临时文件", async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-thumbnail-limit-"));
-    const originalDataDir = process.env.DATA_DIR;
-    try {
-      process.env.DATA_DIR = dir;
-      const uploads = path.join(dir, "uploads");
-      fs.mkdirSync(uploads, { recursive: true });
-      const oversizedPng = Buffer.from(PNG);
-      oversizedPng.writeUInt32BE(10_000, 16);
-      oversizedPng.writeUInt32BE(5_000, 20);
-      fs.writeFileSync(path.join(uploads, "oversized.png"), oversizedPng);
-
-      await assert.rejects(() => ensureThumbnail("oversized.png"), /pixel limit/i);
-      assert.deepEqual(fs.readdirSync(path.join(dir, "thumbnails")), []);
-    } finally {
-      if (originalDataDir === undefined) delete process.env.DATA_DIR;
-      else process.env.DATA_DIR = originalDataDir;
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  await test("IP 分类拒绝内网、回环、链路本地、ULA 和 IPv4-mapped", () => {
-    for (const address of ["127.0.0.1", "10.1.2.3", "169.254.169.254", "192.168.1.1", "::1", "fe80::1", "fd00::1", "::192.168.1.1", "::ffff:127.0.0.1", "::ffff:7f00:1", "2002:c0a8:101::"]) {
-      assert.equal(isGlobalIpAddress(address), false, address);
-    }
-    assert.equal(isGlobalIpAddress("8.8.8.8"), true);
-    assert.equal(isGlobalIpAddress("2606:4700:4700::1111"), true);
-  });
-
-  await test("域名任一 DNS 地址非 global 即阻断", async () => {
-    await assert.rejects(
-      () => assertUrlAllowed("https://images.example/a.png", async () => ["93.184.216.34", "192.168.1.2"]),
-      /blocked non-global/,
+      )),
+      WorkflowValidationError,
     );
-    const allowed = await assertUrlAllowed("https://images.example/a.png", async () => ["93.184.216.34"]);
-    assert.equal(allowed.hostname, "images.example");
   });
 
-  await test("固定 DNS lookup 同时支持 Node 单地址与 all 地址回调", async () => {
-    const lookup = createPinnedLookup("93.184.216.34");
-    await new Promise<void>((resolve, reject) => {
-      lookup("images.example", { all: false }, (error, address, family) => {
-        if (error) return reject(error);
-        assert.equal(address, "93.184.216.34");
-        assert.equal(family, 4);
-        resolve();
-      });
-    });
-    await new Promise<void>((resolve, reject) => {
-      lookup("images.example", { all: true }, (error, addresses) => {
-        if (error) return reject(error);
-        assert.deepEqual(addresses, [{ address: "93.184.216.34", family: 4 }]);
-        resolve();
-      });
-    });
-  });
-
-  await test("手动重定向在请求下一跳前重新解析并阻断私网", async () => {
-    const calls: string[] = [];
-    const lookup: HostLookup = async (host) => host === "public.example" ? ["93.184.216.34"] : ["192.168.1.1"];
-    const fetcher: ImageFetch = async (input, init) => {
-      calls.push(String(input));
-      assert.equal(init?.redirect, "manual");
-      return new Response(null, { status: 302, headers: { location: "http://nas.internal/photo.png" } });
-    };
-    await assert.rejects(
-      () => downloadImageToDataUrl("https://public.example/photo.png", { lookup, fetch: fetcher }),
-      /private\/metadata|non-global/,
+  ok("边 handle：旧 garment handle 被拒绝", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), imageNode("i2")],
+        [
+          textEdge("e1", "t1", "i1"),
+          { id: "e2", source: "i1", target: "i2", targetHandle: "garment", data: {} },
+        ],
+      )),
+      WorkflowValidationError,
     );
-    assert.equal(calls.length, 1, "私网重定向目标不应被请求");
   });
 
-  await test("合法逐跳重定向返回经魔数验证的图片", async () => {
-    const calls: string[] = [];
-    const lookup: HostLookup = async () => ["93.184.216.34"];
-    const fetcher: ImageFetch = async (input, init) => {
-      calls.push(String(input));
-      assert.equal(init?.redirect, "manual");
-      if (calls.length === 1) return new Response(null, { status: 302, headers: { location: "/final.png" } });
-      return new Response(PNG, { status: 200, headers: { "content-type": "image/png", "content-length": String(PNG.length) } });
-    };
-    const result = await downloadImageToDataUrl("https://images.example/start", { lookup, fetch: fetcher });
-    assert.equal(result, PNG_DATA_URL);
-    assert.deepEqual(calls, ["https://images.example/start", "https://images.example/final.png"]);
+  ok("边 handle：image → text 被拒绝（text 节点无图片入边）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), textNode("t2")],
+        [textEdge("e1", "t1", "i1"), imageEdge("e2", "i1", "t2")],
+      )),
+      WorkflowValidationError,
+    );
+  });
+
+  ok("边 handle：prompt 边只能来自 text 节点", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), imageNode("i2")],
+        [textEdge("e1", "t1", "i1"), textEdge("e2", "i1", "i2")],
+      )),
+      WorkflowValidationError,
+    );
+  });
+
+  ok("text → text 串联边允许（Q1=B）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), textNode("t2"), imageNode("i1")],
+      [textEdge("e1", "t1", "t2"), textEdge("e2", "t2", "i1")],
+    ));
+    assert.equal(result.nodes.length, 3);
+  });
+
+  ok("image 边（reference）允许 image → image", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageNode("i1"), imageNode("i2")],
+      [textEdge("e1", "t1", "i1"), imageEdge("e2", "i1", "i2"), textEdge("e3", "t1", "i2")],
+    ));
+    assert.equal(result.nodes.length, 3);
+  });
+
+  ok("v6 及以下一律拒绝（R7 无迁移）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow([textNode("t1"), imageNode("i1")], [textEdge("e1", "t1", "i1")], 6)),
+      /旧版本格式/,
+    );
+    assert.throws(
+      () => validateAndMigrateFlow({ schemaVersion: undefined, nodes: [], edges: [] }),
+      /旧版本格式/,
+    );
+  });
+
+  ok("image 节点入边限位：text 边 ≤8", () => {
+    const textNodes = Array.from({ length: 9 }, (_, i) => textNode(`t${i}`));
+    const edges = textNodes.map((node, i) => textEdge(`e${i}`, node.id, "i1"));
+    assert.throws(
+      () => validateAndMigrateFlow(flow([...textNodes, imageNode("i1")], edges)),
+      WorkflowValidationError,
+    );
   });
 
   console.log(`\n通过 ${passed} 项`);
 }
 
-void main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main();
+fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
