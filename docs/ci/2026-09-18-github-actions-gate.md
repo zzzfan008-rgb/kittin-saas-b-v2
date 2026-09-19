@@ -207,3 +207,20 @@ playwright 配置额外硬校验(见 `playwright.config.ts` / `playwright.produc
   语法与结构经人工对照 GitHub Actions 文档与现有项目脚本核对。
 - `gh workflow list` / `gh api` 校验需要在 push 后进行(推送需用户授权,不在本批)。
 - 本规格与 `.github/workflows/ci.yml` 同批交付;任何后续改动必须同步更新本文件。
+
+## 12. 分支保护状态(2026-09-19 核验)
+
+`gh api repos/zzzfan008-rgb/kittin-saas-b-v2/branches/main/protection` 实测:
+
+| 项 | 值 | 含义 |
+| --- | --- | --- |
+| `required_status_checks.strict` | `true` | 合并前分支必须与 `main` 保持最新 |
+| required checks | 上面 5 个 job | 必须出现在 PR 的**精确 head** 上 |
+| `required_pull_request_reviews` | `required_approving_review_count: 0` | **合并必须走 PR**;不要求人工批准(本仓库只有一名人类维护者,要求 ≥1 会导致无人可批) |
+| `enforce_admins` | `false` | 管理员仍可绕过保护直接推 `main`(安全阀) |
+| `allow_force_pushes` / `allow_deletions` | `false` | 禁止强推与删分支 |
+
+**含义的变化**:此前的保护只要求 5 个 check、不要求走 PR,因此直推 `main` 时 CI 是「事后验证」;
+现在非管理员直推会被拒,交付路径收敛为「分支 → PR → 5 个 check 绿 → 合并」。
+若要让门禁对管理员同样强制,把 `enforce_admins` 置 `true` 即可——这是需要用户显式决定的开关,
+本文件只记录当前状态。
