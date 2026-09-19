@@ -508,13 +508,20 @@ const templatePresentationSource = readFileSync(
 function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
   return {
     flow: {
-      nodes: kinds.map((kind, index) => ({ id: `node-${index}`, data: { kind } })),
+      nodes: kinds.map((kind, index) => ({
+        id: `node-${index}`,
+        data: kind === "image"
+          ? { kind, outputImages: [] }
+          : kind === "text"
+            ? { kind, text: "示例文本" }
+            : { kind },
+      })),
       edges: [],
     },
   } as unknown as Pick<WorkflowTemplate, "flow">;
 }
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "text");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["text"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
 assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
 for (const cover of [
