@@ -210,7 +210,32 @@ a dependency change must update it in the same delivery batch.
   authorize merging to `main`, tagging, releasing, or deploying.
 - The review path is GitHub Actions status checks on the exact head being merged,
   plus the user's explicit approval. Local `gate:codex` runs and external review
-  services (CodeRabbit, etc.) remain optional advisory evidence, not required gates.
+  services remain optional advisory evidence, not required gates.
+
+### Review sources and the feedback loop
+
+Every check that decides a delivery runs on **GitHub Actions**. Local runs (tsc, focused
+tests, ast-grep, depcruise, build, playwright e2e) are self-checks only — they are never
+delivery evidence.
+
+| Source | Nature | When |
+|---|---|---|
+| GitHub Actions (static / unit / e2e / production-smoke / code-intelligence) | **required gate** | on every PR; on `main` pushes |
+| **CodeRabbit** (`.coderabbit.yaml`; free for this public repo) | **advisory feedback source** | automatically on every PR push, drafts included (incremental) |
+| `reviewer` agent | domain review (advisory) | delivery gate |
+| `ui-qa` agent | visual / accessibility acceptance | after delivery |
+| `architect` agent | release gate | before merge / release |
+| the user | **final merge authorization** | at merge time |
+
+Loop: CodeRabbit findings are collected by the orchestrator and routed by responsibility
+(contracts / plans → `architect`; `server/**` → `backend`; `src/**` → `frontend`;
+`docs/design/**` → `designer`; `e2e/**` and acceptance → `ui-qa`). The owning agent fixes
+them and reports back; the bot re-reviews incrementally; the orchestrator verifies. The
+orchestrator never fixes review findings itself.
+
+Priority: a red GitHub Actions check **blocks**; CodeRabbit comments are **suggestions**
+(triaged, then routed); when the two disagree, GitHub Actions and the settled contracts win.
+
 - Deliver through GitHub. Push every delivery to `origin` so GitHub Actions runs on it;
   a commit that exists only locally has no CI coverage. Pushing a delivery branch — and
   opening a pull request for it — is expected, not a special request. Merging to `main`
