@@ -563,8 +563,9 @@ export function currentEvaluationPromotionTarget(
 ): { unit: PromptEvaluationUnit; versions: PromptEvaluationVersionVector } {
   const variant = getGarmentPromptVariantById(variantId);
   if (!variant) throw new Error(`prompt variant ${variantId} is not in the reviewed catalog`);
-  if (variant.nodeKind === "image-input" || variant.nodeKind === "result") {
-    throw new Error("evaluation promotion requires a Provider-backed prompt variant");
+  // v7：旧 image-input/result kind 已不存在；图片晋升只认 image/video 之外的 image。
+  if (variant.nodeKind !== "image") {
+    throw new Error("image evaluation promotion requires an image-kind prompt variant");
   }
   const profile = getModelParameterProfile(variant.parameterProfileId);
   if (!profile) throw new Error(`parameter profile ${variant.parameterProfileId} is missing`);

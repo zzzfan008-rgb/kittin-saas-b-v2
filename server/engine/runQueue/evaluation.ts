@@ -117,7 +117,8 @@ export function planWithPersistedEvaluationPolicy(
   };
   const steps = plan.steps.map((step) => {
     const { evaluationPolicy: _untrustedPolicy, ...params } = step.params;
-    if (!NODE_SPECS[step.kind].providerId) return { ...step, params };
+    // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+    if (step.kind !== "image") return { ...step, params };
     providerStepCount += 1;
     return {
       ...step,

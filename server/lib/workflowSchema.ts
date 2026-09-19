@@ -1,6 +1,5 @@
 import {
   WORKFLOW_SCHEMA_VERSION,
-  MAX_REFERENCE_IMAGES,
   NODE_SPECS,
   type NodeKind,
   type PersistedWorkflow,
@@ -8,9 +7,6 @@ import {
   type PersistedWorkflowNode,
   type WorkflowNodeData,
   BATCH_SIZES,
-  IMAGE_OPERATION_MODE_VALUES,
-  allowedOperationModesForNode,
-  defaultOperationModeForNode,
 } from "../../src/types/workflow";
 import {
   createDocumentSnapshot,
@@ -18,45 +14,15 @@ import {
 } from "../../src/lib/documentSnapshot";
 import { isLocalImageReference, validateImageDataUrl } from "./imageValidation";
 import {
-  DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
-  defaultImageModelOptions,
   getImageModelContract,
-  imageModelOptionsErrorForOperation,
-  isImageModelId,
-  isModelAllowedForNode,
-  normalizeImageModelOptionsForOperation,
 } from "../../src/types/imageModels";
 
-function retiredModelIdForMigration(
-  kind: NodeKind,
-  raw: Record<string, unknown>,
-): string | undefined {
-  if (typeof raw.retiredModelId === "string" && raw.retiredModelId.trim()) {
-    return raw.retiredModelId;
-  }
-  if (
-    kind !== "mask-redraw"
-    && typeof raw.modelId === "string"
-    && raw.modelId.trim()
-    && (!isImageModelId(raw.modelId) || !isModelAllowedForNode(raw.modelId, kind))
-  ) {
-    return raw.modelId;
-  }
-  return undefined;
-}
-
-const NODE_KINDS: readonly NodeKind[] = [
-  "image-input",
-  "sketch-to-render",
-  "ai-modify",
-  "fabric-recolor",
-  "upscale",
-  "print-extract",
-  "print-mutate",
-  "mask-redraw",
-  "result",
-];
+// v7：旧 9 值 kind 的迁移 helper（retiredModelIdForMigration /
+// migratedModelFields / migratedOperationFields / migrateNodeData /
+// validateModelSelection）随 R7 无迁移裁定整体退役删除。
+// 旧 validateData 的九分支由下方 validateDataV7 取代（三值 kind）。
+const NODE_KINDS: readonly NodeKind[] = ["text", "image", "video"];
 const STATUSES = [
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
@@ -176,151 +142,47 @@ function imageReferenceArray(value: unknown, path: string, max = MAX_IMAGE_REFS)
   return value.map((item, index) => imageReference(item, `${path}[${index}]`));
 }
 
-function migratedModelFields(
-  kind: NodeKind,
-  raw: Record<string, unknown>,
-  preferredAspectRatio = "1:1",
-): Record<string, unknown> {
-  const requested = isImageModelId(raw.modelId) && isModelAllowedForNode(raw.modelId, kind)
-    ? raw.modelId
-    : kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
-  const retiredModelId = retiredModelIdForMigration(kind, raw);
-  const allowedModes = allowedOperationModesForNode(kind);
-  const operationMode = allowedModes.includes(raw.operationMode as never)
-    ? raw.operationMode as "generate" | "edit" | "mask-edit"
-    : defaultOperationModeForNode(kind)!;
-  return {
-    modelId: requested,
-    ...(retiredModelId ? {
-      retiredModelId,
-      modelSelectionNeedsConfirmation: true,
-      promptVariantId: undefined,
-      promptFamilyId: undefined,
-      parameterProfileId: undefined,
-      contractHash: undefined,
-      evaluationVersion: undefined,
-      postprocessVersion: undefined,
-    } : {
-      modelSelectionNeedsConfirmation: raw.modelSelectionNeedsConfirmation === true,
-    }),
-    modelOptions: kind === "mask-redraw"
-      ? {}
-      : normalizeImageModelOptionsForOperation(
-          requested,
-          raw.modelOptions,
-          preferredAspectRatio,
-          operationMode,
-        ),
-  };
-}
+// v7：旧 9 值 kind 的迁移 helper（retiredModelIdForMigration 已无引用，
+// migratedModelFields / migratedOperationFields / migrateNodeData /
+// validateModelSelection）随 R7 无迁移裁定整体退役删除。
+// 旧 validateData 的九分支由下方 validateDataV7 取代（三值 kind）。
 
-function migratedOperationFields(
-  kind: NodeKind,
-  raw: Record<string, unknown>,
-): Record<string, unknown> {
-  const allowed = allowedOperationModesForNode(kind);
-  if (allowed.length === 0) return {};
-  const hasExplicitMode = IMAGE_OPERATION_MODE_VALUES.includes(raw.operationMode as never)
-    && allowed.includes(raw.operationMode as never);
-  const operationMode = hasExplicitMode ? raw.operationMode : defaultOperationModeForNode(kind);
-  return {
-    operationMode,
-    // Only the historically ambiguous dual-mode node requires a user decision.
-    operationModeNeedsConfirmation: hasExplicitMode
-      ? raw.operationModeNeedsConfirmation === true
-      : kind === "sketch-to-render",
-  };
-}
-
-function migrateNodeData(kind: NodeKind, raw: Record<string, unknown>): Record<string, unknown> {
-  // v0/v1 文件保留现有值，只补后来新增且运行时依赖的确定性默认字段。
-  switch (kind) {
-    case "image-input":
-      return { ...raw };
-    case "sketch-to-render":
-      return {
-        prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
-        ...raw,
-        ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "3:4"),
-        ...migratedOperationFields(kind, raw),
-      };
-    case "ai-modify":
-      return {
-        prompt: "", aspectRatio: "1:1", batchSize: 1, outputImages: [],
-        ...raw,
-        ...migratedModelFields(kind, raw, typeof raw.aspectRatio === "string" ? raw.aspectRatio : "1:1"),
-        ...migratedOperationFields(kind, raw),
-      };
-    case "fabric-recolor":
-      return {
-        colors: [], prompt: "", outputImages: [], ...raw,
-        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
-      };
-    case "upscale":
-      return {
-        imageSize: "2K", outputImages: [], ...raw,
-        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
-      };
-    case "print-extract":
-      return {
-        prompt: "", outputImages: [], savedAsAssets: [], ...raw,
-        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
-      };
-    case "print-mutate":
-      return {
-        prompt: "", count: 4, outputImages: [], ...raw,
-        ...migratedModelFields(kind, raw), ...migratedOperationFields(kind, raw),
-      };
-    case "mask-redraw": {
-      const { maskMode: _legacyMaskMode, ...migratedMaskData } = raw;
-      return {
-        prompt: "", outputImages: [], ...migratedMaskData,
-        modelId: MASK_REDRAW_MODEL_ID,
-        modelOptions: defaultImageModelOptions(MASK_REDRAW_MODEL_ID),
-        ...migratedOperationFields(kind, raw),
-      };
+function validateModelOptionsShape(rawValue: unknown, path: string): void {
+  // R5：自由 key-value；仅校验形状（对象 + 标量值），取值 warning 归运行侧。
+  if (rawValue === undefined) return;
+  if (typeof rawValue !== "object" || rawValue === null || Array.isArray(rawValue)) {
+    fail(`${path}.modelOptions`, "must be an object");
+  }
+  for (const [key, value] of Object.entries(rawValue as Record<string, unknown>)) {
+    if (
+      value !== undefined
+      && typeof value !== "string"
+      && typeof value !== "number"
+      && typeof value !== "boolean"
+    ) {
+      fail(`${path}.modelOptions.${key}`, "must be a string, number, or boolean");
     }
-    case "result":
-      return { images: [], ...raw };
   }
 }
 
-function validateModelSelection(kind: NodeKind, raw: Record<string, unknown>, path: string): void {
-  if (!NODE_SPECS[kind].providerId) return;
-  if (!isImageModelId(raw.modelId)) fail(`${path}.modelId`, "must be a supported API易 image model");
-  if (!isModelAllowedForNode(raw.modelId, kind)) {
-    fail(`${path}.modelId`, `${raw.modelId} is not allowed for ${kind}`);
-  }
-  const allowedModes = allowedOperationModesForNode(kind);
-  if (!allowedModes.includes(raw.operationMode as never)) {
-    fail(`${path}.operationMode`, `must be one of: ${allowedModes.join(", ")}`);
-  }
-  if (raw.operationModeNeedsConfirmation !== undefined && typeof raw.operationModeNeedsConfirmation !== "boolean") {
-    fail(`${path}.operationModeNeedsConfirmation`, "must be a boolean when present");
-  }
-  if (raw.modelSelectionNeedsConfirmation !== undefined && typeof raw.modelSelectionNeedsConfirmation !== "boolean") {
-    fail(`${path}.modelSelectionNeedsConfirmation`, "must be a boolean when present");
-  }
-  const retiredModelId = optionalString(raw.retiredModelId, `${path}.retiredModelId`);
-  if (retiredModelId !== undefined && !retiredModelId.trim()) {
-    fail(`${path}.retiredModelId`, "must not be empty");
-  }
-  if (retiredModelId !== undefined && raw.modelSelectionNeedsConfirmation !== true) {
-    fail(`${path}.modelSelectionNeedsConfirmation`, "must be true while retiredModelId is present");
-  }
-  if (
-    retiredModelId !== undefined
-    && [
-      "promptVariantId",
-      "promptFamilyId",
-      "parameterProfileId",
-      "contractHash",
-      "evaluationVersion",
-      "postprocessVersion",
-    ].some((field) => raw[field] !== undefined)
-  ) {
-    fail(path, "retired models must not retain prompt, parameter, contract, evaluation, or postprocess bindings");
-  }
+/**
+ * v7 三值 kind 的节点数据校验（R-48 P2-a 首版；契约 data-model.md §3）。
+ * 字段级深校验（蒙版引用校验、评估绑定哈希格式、maskSourceRef 联动）与
+ * INV-1 图级规则在 P2-b 补全；本版先立结构骨架：kind/label/status/error +
+ * 各 kind 的必填形状。
+ */
+function validateDataV7(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
+  const input = record(rawValue, path);
+  // 运行中与失败状态不能跨保存/模板持久化；成功结果本身可以保留。
+  const runtimeStatus = input.status;
+  const raw =
+    runtimeStatus !== "idle" && runtimeStatus !== "success"
+      ? { ...input, status: "idle", error: undefined }
+      : input;
+  if (raw.kind !== kind) fail(`${path}.kind`, `must equal node type ${kind}`);
+  stringValue(raw.label, `${path}.label`, { nonEmpty: true });
+  oneOf(raw.status, STATUSES, `${path}.status`);
+  optionalString(raw.error, `${path}.error`);
   for (const field of [
     "promptVariantId",
     "promptFamilyId",
@@ -334,94 +196,43 @@ function validateModelSelection(kind: NodeKind, raw: Record<string, unknown>, pa
   if (contractHash !== undefined && !/^sha256:[a-f0-9]{64}$/.test(contractHash)) {
     fail(`${path}.contractHash`, "must be a sha256: prefixed lowercase SHA-256");
   }
-  const inputOptions = raw.modelOptions;
-  const optionsError = imageModelOptionsErrorForOperation(
-    raw.modelId,
-    inputOptions,
-    raw.operationMode as "generate" | "edit" | "mask-edit",
-  );
-  if (optionsError) fail(`${path}.modelOptions`, optionsError);
-  if (
-    kind === "mask-redraw"
-    && typeof inputOptions === "object"
-    && inputOptions !== null
-    && !Array.isArray(inputOptions)
-    && Object.keys(inputOptions as Record<string, unknown>).length > 0
-  ) {
-    fail(`${path}.modelOptions`, "must be empty; mask output size is derived from the source image at runtime");
+  validateModelOptionsShape(raw.modelOptions, path);
+  if (raw.featherRadius !== undefined) {
+    const radius = finiteNumber(raw.featherRadius, `${path}.featherRadius`);
+    if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
   }
-}
-
-function validateData(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
-  const input = record(rawValue, path);
-  // 运行中与失败状态不能跨保存/模板持久化；成功结果本身可以保留。
-  const runtimeStatus = input.status;
-  const raw =
-    runtimeStatus !== "idle" && runtimeStatus !== "success"
-      ? { ...input, status: "idle", error: undefined }
-      : input;
-  if (raw.kind !== kind) fail(`${path}.kind`, `must equal node type ${kind}`);
-  stringValue(raw.label, `${path}.label`, { nonEmpty: true });
-  oneOf(raw.status, STATUSES, `${path}.status`);
-  optionalString(raw.error, `${path}.error`);
-  validateModelSelection(kind, raw, path);
 
   switch (kind) {
-    case "image-input":
-      optionalImageReference(raw.imageUrl, `${path}.imageUrl`);
+    case "text":
+      stringValue(raw.text, `${path}.text`);
+      optionalString(raw.outputText, `${path}.outputText`);
+      optionalString(raw.lastRunInput, `${path}.lastRunInput`);
       break;
-    case "sketch-to-render":
-    case "ai-modify":
-      stringValue(raw.prompt, `${path}.prompt`);
+    case "image":
       oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
       oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
       imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      break;
-    case "fabric-recolor": {
-      const colors = stringArray(raw.colors, `${path}.colors`, 8);
-      for (let i = 0; i < colors.length; i++) {
-        if (!/^#[0-9a-fA-F]{6}$/.test(colors[i])) fail(`${path}.colors[${i}]`, "must be #RRGGBB");
-      }
-      stringValue(raw.prompt, `${path}.prompt`);
-      optionalImageReference(raw.fabricImageUrl, `${path}.fabricImageUrl`);
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      break;
-    }
-    case "upscale":
-      oneOf(raw.imageSize, IMAGE_SIZES, `${path}.imageSize`);
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      break;
-    case "print-extract":
-      stringValue(raw.prompt, `${path}.prompt`);
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      imageReferenceArray(raw.savedAsAssets, `${path}.savedAsAssets`);
-      break;
-    case "print-mutate":
-      stringValue(raw.prompt, `${path}.prompt`);
-      if (!Number.isInteger(raw.count) || (raw.count as number) < 1 || (raw.count as number) > 8) {
-        fail(`${path}.count`, "must be an integer from 1 to 8");
-      }
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      break;
-    case "mask-redraw":
-      stringValue(raw.prompt, `${path}.prompt`);
       optionalMaskReference(raw.mask, `${path}.mask`);
       optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
       break;
-    case "result":
-      imageReferenceArray(raw.images, `${path}.images`);
-      optionalString(raw.note, `${path}.note`);
+    case "video":
+      // 视频引用校验（/api/files/*.mp4）归 P2-e；此处先做形状校验。
+      if (raw.outputVideos !== undefined && !Array.isArray(raw.outputVideos)) {
+        fail(`${path}.outputVideos`, "must be an array");
+      }
+      if (Array.isArray(raw.outputVideos)) {
+        (raw.outputVideos as unknown[]).forEach((item, index) => {
+          if (typeof item !== "string" || !item.trim()) {
+            fail(`${path}.outputVideos[${index}]`, "must be a non-empty string");
+          }
+        });
+      }
       break;
-  }
-  if (kind === "mask-redraw" && Object.hasOwn(raw, "maskMode")) {
-    const { maskMode: _legacyMaskMode, ...normalized } = raw;
-    return normalized as unknown as WorkflowNodeData;
   }
   return raw as unknown as WorkflowNodeData;
 }
 
-function validateNode(value: unknown, index: number, migrateLegacy: boolean): PersistedWorkflowNode {
+function validateNode(value: unknown, index: number): PersistedWorkflowNode {
   const path = `flow.nodes[${index}]`;
   const raw = record(value, path);
   const id = stringValue(raw.id, `${path}.id`, { nonEmpty: true });
@@ -431,11 +242,7 @@ function validateNode(value: unknown, index: number, migrateLegacy: boolean): Pe
   finiteNumber(position.x, `${path}.position.x`);
   finiteNumber(position.y, `${path}.position.y`);
   const initialData = record(raw.data, `${path}.data`);
-  const data = validateData(
-    type,
-    migrateLegacy ? migrateNodeData(type, initialData) : initialData,
-    `${path}.data`,
-  );
+  const data = validateDataV7(type, initialData, `${path}.data`);
   return { ...raw, id, type, position: { ...position, x: position.x as number, y: position.y as number }, data } as PersistedWorkflowNode;
 }
 
@@ -457,18 +264,20 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   return { ...raw, id, source, target, data } as PersistedWorkflowEdge;
 }
 
-/** Validate untrusted JSON and migrate legacy unversioned/v0-v5 formats to v6. */
+/**
+ * Validate untrusted JSON. Schema v7（三基础节点模型）：
+ * v6 及以下（含无版本）一律 WorkflowValidationError，不做迁移（R7；契约 data-model.md §2）。
+ * 节点级 v7 数据校验与 INV-1 图级规则的重写归 P2-b。
+ */
 export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   const raw = record(value, "flow");
   const version = raw.schemaVersion;
-  const migrateLegacy = version === undefined
-    || version === 0
-    || version === 1
-    || version === 2
-    || version === 3
-    || version === 4
-    || version === 5;
-  if (!migrateLegacy && version !== WORKFLOW_SCHEMA_VERSION) {
+  const versionNumber = typeof version === "number" ? version : undefined;
+  if (versionNumber === undefined || versionNumber < WORKFLOW_SCHEMA_VERSION) {
+    // 拒绝文案固定（契约 data-model.md §2）；无版本按 v0 呈现。
+    fail("flow.schemaVersion", `该项目为旧版本格式（v${versionNumber ?? 0}），已在三节点重构中清理，请新建项目`);
+  }
+  if (versionNumber !== WORKFLOW_SCHEMA_VERSION) {
     fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
   }
   if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
@@ -478,7 +287,7 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   }
   if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
 
-  const nodes = raw.nodes.map((node, index) => validateNode(node, index, migrateLegacy));
+  const nodes = raw.nodes.map((node, index) => validateNode(node, index));
   const edges = raw.edges.map((edge, index) => validateEdge(edge, index));
   const nodeIds = new Set<string>();
   for (const node of nodes) {
@@ -493,20 +302,17 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
     if (!nodeIds.has(edge.target)) fail("flow.edges", `edge ${edge.id} target not found: ${edge.target}`);
   }
   for (const node of nodes) {
-    const incomingCount = edges.filter((edge) => edge.target === node.id).length;
-    // v2 曾允许蒙版节点保存 8 路输入。持久化层继续容忍这类历史文档，
-    // 但新建连线和运行前检查仍按 7 张用户参考图限制，提示用户移除一张后再运行。
-    const persistedInputLimit = node.type === "mask-redraw"
-      ? MAX_REFERENCE_IMAGES
-      : NODE_SPECS[node.type].inputs;
-    if (incomingCount > persistedInputLimit) {
+    // v7：入边限位按边类型计数（text/image 分开，graph-invariants.md §2）。
+    // 完整的 handle 类型检查与 INV-1 图级规则归 P2-b；此处先按总入边粗限位。
+    const spec = NODE_SPECS[node.type];
+    const incoming = edges.filter((edge) => edge.target === node.id);
+    const textIncoming = incoming.filter((edge) => edge.targetHandle === "prompt").length;
+    const imageIncoming = incoming.length - textIncoming;
+    if (textIncoming > spec.inputs.text || imageIncoming > spec.inputs.image) {
       fail(
         "flow.edges",
-        `node ${node.id} accepts at most ${persistedInputLimit} incoming image connections`,
+        `node ${node.id} accepts at most ${spec.inputs.text} text and ${spec.inputs.image} image incoming connections`,
       );
-    }
-    if (NODE_SPECS[node.type].providerId && incomingCount > MAX_REFERENCE_IMAGES) {
-      fail("flow.edges", `node ${node.id} accepts at most ${MAX_REFERENCE_IMAGES} reference images`);
     }
   }
   return documentSnapshotToPersistedWorkflow(createDocumentSnapshot({

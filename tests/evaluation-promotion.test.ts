@@ -35,7 +35,7 @@ const CREATED_AT = "2026-09-03T00:00:00.000Z";
 const variant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 const target = currentEvaluationPromotionTarget(variant.variantId, []);

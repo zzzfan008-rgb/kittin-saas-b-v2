@@ -92,12 +92,13 @@ export function attachEvaluationRunPolicy(
   plan: ExecutionPlan,
   policy: EvaluationRunPolicy,
 ): ExecutionPlan {
-  const providerSteps = plan.steps.filter((step) => NODE_SPECS[step.kind].providerId);
+  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+  const providerSteps = plan.steps.filter((step) => step.kind === "image");
   if (providerSteps.length !== 1) {
     throw new EvaluationRunPolicyError("每个真实评估 case 必须且只能包含一个付费节点", 400);
   }
   return {
-    steps: plan.steps.map((step) => NODE_SPECS[step.kind].providerId
+    steps: plan.steps.map((step) => step.kind === "image"
       ? { ...step, params: { ...step.params, evaluationPolicy: policy } }
       : step),
   };

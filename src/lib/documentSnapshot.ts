@@ -1,20 +1,24 @@
+import type { ImageModelOptions } from "../types/imageModels";
 import {
-  MASK_REDRAW_MODEL_ID,
-  imageModelOptionsErrorForOperation,
-  isImageModelId,
-  isModelAllowedForNode,
-  type GenerationImageModelId,
-  type ImageModelOptions,
-} from "../types/imageModels";
-import {
-  allowedOperationModesForNode,
   WORKFLOW_SCHEMA_VERSION,
-  type BatchSize,
   type NodeKind,
   type PersistedWorkflow,
   type ReferenceEdgeData,
   type WorkflowNodeData,
 } from "../types/workflow";
+
+/**
+ * DocumentSnapshot（schema v7，R-48 P2-a）。
+ *
+ * 状态注记：本文件在 P2-a 提交点上**只做了类型层重写以保持 v7 类型闭环**
+ * （旧 9 值 DocumentNodeData → 三值），未做行为重设计：
+ * - 三值 kind 的逐字段文档校验（TextNodeData/ImageNodeData/VideoNodeData 的
+ *   深校验）归 P2-b（workflowSchema v7 节点级校验同批）；
+ * - INV-1（text 上游不变量）的 snapshot 侧联防归 P2-b；
+ * - 「快照构造即收敛旧字段」的语义迁移（retiredModelId/operationMode 族删除后的
+ *   文档形状）在 P2-b 与 workflowSchema 一起定稿。
+ * 契约依据：docs/design/2026-09-18-three-node-model/contracts/data-model.md §3/§6。
+ */
 
 interface PromptBindingDocumentFields {
   promptVariantId?: string;
@@ -25,83 +29,38 @@ interface PromptBindingDocumentFields {
   postprocessVersion?: string;
 }
 
-interface GenerationModelDocumentFields extends PromptBindingDocumentFields {
-  modelId: GenerationImageModelId;
-  retiredModelId?: string;
-  modelSelectionNeedsConfirmation: boolean;
-  modelOptions: ImageModelOptions;
-  operationMode: "generate" | "edit";
-  operationModeNeedsConfirmation: boolean;
-}
-
 export type DocumentNodeData =
   | {
-      kind: "image-input";
+      kind: "text";
       label: string;
-      imageUrl?: string;
+      text: string;
+      promptVariantId?: string;
+      modelId?: string;
+      modelOptions?: ImageModelOptions;
+      outputText?: string;
+      lastRunInput?: string;
     }
   | ({
-      kind: "sketch-to-render";
+      kind: "image";
       label: string;
-      prompt: string;
       aspectRatio: string;
-      batchSize: BatchSize;
+      batchSize: number;
       outputImages: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "ai-modify";
-      label: string;
-      prompt: string;
-      aspectRatio: string;
-      batchSize: BatchSize;
-      outputImages: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "fabric-recolor";
-      label: string;
-      colors: string[];
-      prompt: string;
-      fabricImageUrl?: string;
-      outputImages: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "upscale";
-      label: string;
-      imageSize: "2K" | "4K";
-      outputImages: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "print-extract";
-      label: string;
-      prompt: string;
-      outputImages: string[];
-      savedAsAssets: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "print-mutate";
-      label: string;
-      prompt: string;
-      count: number;
-      outputImages: string[];
-    } & GenerationModelDocumentFields)
-  | ({
-      kind: "mask-redraw";
-      label: string;
-      prompt: string;
       mask?: string;
       maskSourceRef?: string;
       featherRadius?: number;
-      outputImages: string[];
-      modelId: typeof MASK_REDRAW_MODEL_ID;
-      modelOptions: ImageModelOptions;
-      operationMode: "mask-edit";
-      operationModeNeedsConfirmation: false;
+      modelId?: string;
+      modelOptions?: ImageModelOptions;
     } & PromptBindingDocumentFields)
   | {
-      kind: "result";
+      kind: "video";
       label: string;
-      images: string[];
-      note?: string;
+      promptVariantId?: string;
+      contractHash?: `sha256:${string}`;
+      evaluationVersion?: string;
+      modelId?: string;
+      modelOptions?: ImageModelOptions;
+      outputVideos: string[];
     };
 
 export interface DocumentNode {
@@ -147,7 +106,6 @@ function optionalString<K extends string>(key: K, value: string | undefined): Pa
 }
 
 function promptBindingFields(data: WorkflowNodeData): Partial<PromptBindingDocumentFields> {
-  if (!("modelId" in data)) return {};
   const stringField = (key: string): string | undefined => (
     typeof data[key] === "string" ? data[key] as string : undefined
   );
@@ -165,184 +123,55 @@ function promptBindingFields(data: WorkflowNodeData): Partial<PromptBindingDocum
   };
 }
 
-function generationModelFields(
-  kind: Exclude<NodeKind, "image-input" | "mask-redraw" | "result">,
-  modelIdValue: unknown,
-  modelOptionsValue: unknown,
-  operationModeValue: unknown,
-  operationModeNeedsConfirmation: boolean,
-  retiredModelIdValue: unknown,
-  modelSelectionNeedsConfirmation: boolean,
-): GenerationModelDocumentFields {
-  if (!isImageModelId(modelIdValue) || !isModelAllowedForNode(modelIdValue, kind)) {
-    throw new TypeError(`${kind}.modelId must be an explicitly supported model`);
+function cloneModelOptions(value: unknown): ImageModelOptions | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const result: ImageModelOptions = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") {
+      result[key] = entry;
+    }
   }
-  const modelId = modelIdValue as GenerationImageModelId;
-  const allowedOperationModes = allowedOperationModesForNode(kind);
-  const hasValidOperationMode = typeof operationModeValue === "string"
-    && allowedOperationModes.includes(operationModeValue as "generate" | "edit" | "mask-edit");
-  if (!hasValidOperationMode) {
-    throw new TypeError(`${kind}.operationMode must be one of: ${allowedOperationModes.join(", ")}`);
-  }
-  const operationMode = operationModeValue as "generate" | "edit";
-  const retiredModelId = typeof retiredModelIdValue === "string" && retiredModelIdValue.trim()
-    ? retiredModelIdValue
-    : undefined;
-  if (retiredModelId && !modelSelectionNeedsConfirmation) {
-    throw new TypeError(`${kind}.modelSelectionNeedsConfirmation must be true while retiredModelId is present`);
-  }
-  const optionsError = imageModelOptionsErrorForOperation(
-    modelId,
-    modelOptionsValue,
-    operationMode,
-  );
-  if (optionsError) throw new TypeError(`${kind}.modelOptions ${optionsError}`);
-  return {
-    modelId,
-    ...(retiredModelId ? { retiredModelId } : {}),
-    modelSelectionNeedsConfirmation,
-    modelOptions: { ...(modelOptionsValue as ImageModelOptions) },
-    operationMode,
-    operationModeNeedsConfirmation,
-  };
+  return result;
 }
 
 function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
   switch (data.kind) {
-    case "image-input":
+    case "text":
       return {
         kind: data.kind,
         label: data.label,
-        ...optionalString("imageUrl", data.imageUrl),
+        text: data.text,
+        ...optionalString("promptVariantId", data.promptVariantId),
+        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+        ...(data.modelOptions !== undefined ? { modelOptions: cloneModelOptions(data.modelOptions) } : {}),
+        ...optionalString("outputText", data.outputText),
+        ...optionalString("lastRunInput", data.lastRunInput),
       };
-    case "sketch-to-render":
+    case "image":
       return {
         kind: data.kind,
         label: data.label,
-        prompt: data.prompt,
         aspectRatio: data.aspectRatio,
         batchSize: data.batchSize,
         outputImages: [...data.outputImages],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "ai-modify":
-      return {
-        kind: data.kind,
-        label: data.label,
-        prompt: data.prompt,
-        aspectRatio: data.aspectRatio,
-        batchSize: data.batchSize,
-        outputImages: [...data.outputImages],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "fabric-recolor":
-      return {
-        kind: data.kind,
-        label: data.label,
-        colors: [...data.colors],
-        prompt: data.prompt,
-        ...optionalString("fabricImageUrl", data.fabricImageUrl),
-        outputImages: [...data.outputImages],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "upscale":
-      return {
-        kind: data.kind,
-        label: data.label,
-        imageSize: data.imageSize,
-        outputImages: [...data.outputImages],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "print-extract":
-      return {
-        kind: data.kind,
-        label: data.label,
-        prompt: data.prompt,
-        outputImages: [...data.outputImages],
-        savedAsAssets: [...data.savedAsAssets],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "print-mutate":
-      return {
-        kind: data.kind,
-        label: data.label,
-        prompt: data.prompt,
-        count: data.count,
-        outputImages: [...data.outputImages],
-        ...generationModelFields(
-          data.kind, data.modelId, data.modelOptions,
-          data.operationMode, data.operationModeNeedsConfirmation === true,
-          data.retiredModelId, data.modelSelectionNeedsConfirmation === true,
-        ),
-        ...promptBindingFields(data),
-      };
-    case "mask-redraw":
-      if (data.modelId !== MASK_REDRAW_MODEL_ID) {
-        throw new TypeError(`mask-redraw.modelId must equal ${MASK_REDRAW_MODEL_ID}`);
-      }
-      if (data.operationMode !== "mask-edit") {
-        throw new TypeError("mask-redraw.operationMode must equal mask-edit");
-      }
-      if (
-        imageModelOptionsErrorForOperation(
-          MASK_REDRAW_MODEL_ID,
-          data.modelOptions,
-          "mask-edit",
-        )
-        || Object.keys(data.modelOptions).length > 0
-      ) {
-        throw new TypeError(
-          "mask-redraw.modelOptions must be empty; output size is derived from the source image at runtime",
-        );
-      }
-      return {
-        kind: data.kind,
-        label: data.label,
-        prompt: data.prompt,
         ...optionalString("mask", data.mask),
         ...optionalString("maskSourceRef", data.maskSourceRef),
         ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
           ? { featherRadius: Math.max(0, Math.min(64, Math.round(data.featherRadius))) }
           : {}),
-        outputImages: [...data.outputImages],
-        modelId: MASK_REDRAW_MODEL_ID,
-        // 蒙版输出尺寸由服务端按原图逐次计算，不能写入项目文档形成陈旧参数。
-        modelOptions: {},
-        operationMode: "mask-edit",
-        operationModeNeedsConfirmation: false,
+        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+        ...(data.modelOptions !== undefined ? { modelOptions: cloneModelOptions(data.modelOptions) } : {}),
         ...promptBindingFields(data),
       };
-    case "result":
+    case "video":
       return {
         kind: data.kind,
         label: data.label,
-        images: [...data.images],
-        ...optionalString("note", data.note),
+        ...optionalString("promptVariantId", data.promptVariantId),
+        ...promptBindingFields(data),
+        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+        ...(data.modelOptions !== undefined ? { modelOptions: cloneModelOptions(data.modelOptions) } : {}),
+        outputVideos: [...data.outputVideos],
       };
   }
 }

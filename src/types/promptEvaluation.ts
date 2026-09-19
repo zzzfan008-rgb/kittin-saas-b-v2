@@ -1,7 +1,8 @@
 import type { ImageModelId } from "./imageModels";
 import type { NodeKind } from "./workflow";
 
-export type EvaluationNodeKind = Exclude<NodeKind, "image-input" | "result">;
+// v7：三值 kind 下不再有排除项（旧 image-input/result 已随 NodeKind 收敛消失）。
+export type EvaluationNodeKind = NodeKind;
 
 export type EvaluationOperationMode = "generate" | "edit" | "mask-edit";
 

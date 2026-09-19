@@ -1,39 +1,21 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
-  V1_UNSUPPORTED_NODE_KINDS,
   nodeProductPolicy,
   templateProductPolicy,
 } from "../src/lib/nodeProductPolicy";
 import type { NodeKind, WorkflowTemplate } from "../src/types/workflow";
 
-const supportedKinds: NodeKind[] = [
-  "image-input",
-  "sketch-to-render",
-  "ai-modify",
-  "mask-redraw",
-  "result",
-];
+/**
+ * v7（R-48 P2-a）：旧 9 值 kind 收敛为三值后，「首版产品政策不支持四族旧 kind」
+ * 的收窄清单失效——nodeProductPolicy 恒 supported、templateProductPolicy 恒可启动。
+ * 旧断言（V1_UNSUPPORTED_NODE_KINDS 清单、blockedNodeKinds、源码内「暂不支持」
+ * 文案扫描）随旧 kind 一并退役；本测试改为钉住「三值 kind 全支持」这一新语义。
+ * UI 源码文案扫描断言随旧节点组件退役删除（P2-c 重写节点组件）。
+ */
 
-assert.deepEqual(V1_UNSUPPORTED_NODE_KINDS, [
-  "fabric-recolor",
-  "upscale",
-  "print-extract",
-  "print-mutate",
-]);
+const allKinds: NodeKind[] = ["text", "image", "video"];
 
-for (const kind of V1_UNSUPPORTED_NODE_KINDS) {
-  const policy = nodeProductPolicy(kind);
-  assert.equal(policy.status, "unsupported", kind);
-  assert.equal(policy.canCreate, false, kind);
-  assert.equal(policy.paidRunAllowed, false, kind);
-  assert.match(policy.reason ?? "", /逐模型独立提示词/);
-  assert.match(policy.reason ?? "", /历史项目仍可读取、查看和编辑/);
-}
-
-for (const kind of supportedKinds) {
+for (const kind of allKinds) {
   const policy = nodeProductPolicy(kind);
   assert.equal(policy.status, "supported", kind);
   assert.equal(policy.canCreate, true, kind);
@@ -44,7 +26,7 @@ function template(kind: NodeKind, builtIn: boolean): Pick<WorkflowTemplate, "bui
   return {
     builtIn,
     flow: {
-      schemaVersion: 6,
+      schemaVersion: 7,
       nodes: [{
         id: "node",
         type: kind,
@@ -56,49 +38,14 @@ function template(kind: NodeKind, builtIn: boolean): Pick<WorkflowTemplate, "bui
   } as unknown as Pick<WorkflowTemplate, "builtIn" | "flow">;
 }
 
-const blockedBuiltin = templateProductPolicy(template("upscale", true));
-assert.equal(blockedBuiltin.status, "unsupported");
-assert.equal(blockedBuiltin.launchAllowed, false);
-assert.deepEqual(blockedBuiltin.blockedNodeKinds, ["upscale"]);
-assert.match(blockedBuiltin.reason ?? "", /高清放大/);
-
-const supportedBuiltin = templateProductPolicy(template("ai-modify", true));
-assert.equal(supportedBuiltin.status, "supported");
-assert.equal(supportedBuiltin.launchAllowed, true);
-
-const historicalUserTemplate = templateProductPolicy(template("print-extract", false));
-assert.equal(historicalUserTemplate.launchAllowed, true);
-assert.deepEqual(historicalUserTemplate.blockedNodeKinds, ["print-extract"]);
-
-const testRoot = path.dirname(fileURLToPath(import.meta.url));
-for (const relativePath of [
-  "../src/components/TaskLauncher.tsx",
-  "../src/components/panels/TemplatesDock.tsx",
-  "../src/components/panels/ProjectCenter.tsx",
-]) {
-  const source = fs.readFileSync(path.resolve(testRoot, relativePath), "utf-8");
-  assert.match(source, /templateProductPolicy/);
-  assert.match(source, /暂不支持/);
+for (const kind of allKinds) {
+  const builtin = templateProductPolicy(template(kind, true));
+  assert.equal(builtin.status, "supported", kind);
+  assert.equal(builtin.launchAllowed, true, kind);
+  assert.deepEqual(builtin.blockedNodeKinds, []);
+  const userTemplate = templateProductPolicy(template(kind, false));
+  assert.equal(userTemplate.launchAllowed, true, kind);
+  assert.deepEqual(userTemplate.blockedNodeKinds, []);
 }
 
-for (const relativePath of [
-  "../src/components/nodes/FabricRecolorNode.tsx",
-  "../src/components/nodes/UpscaleNode.tsx",
-  "../src/components/nodes/PrintExtractNode.tsx",
-  "../src/components/nodes/PrintMutateNode.tsx",
-]) {
-  const source = fs.readFileSync(path.resolve(testRoot, relativePath), "utf-8");
-  assert.match(source, /NodeProductPolicyNotice/);
-  assert.match(source, /disabledLabel="首版暂不支持"/);
-}
-
-for (const relativePath of [
-  "../src/components/panels/NodeLibraryPanel.tsx",
-  "../src/components/panels/InspectorPanel.tsx",
-]) {
-  const source = fs.readFileSync(path.resolve(testRoot, relativePath), "utf-8");
-  assert.match(source, /nodeProductPolicy/);
-  assert.match(source, /暂不支持/);
-}
-
-console.log("节点首版产品政策测试通过");
+console.log("v7 节点产品政策（三值全支持）测试通过");

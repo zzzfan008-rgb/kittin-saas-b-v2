@@ -57,7 +57,7 @@
     {
       "id": "gpt-image-2.5-sunburst",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:c143bba099efdd135195e26d5af141e0b7304bf61414551fd3931d9d4fc98001",
+      "contractHash": "sha256:7d8f66ec92ec53ac60a68a8ebd5d805aead90dd8b0013877bb2b785b6c30c94d",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -151,12 +151,13 @@
           "b64_json"
         ],
         "maxImages": 1
-      }
+      },
+      "recommendedOptions": {}
     },
     {
       "id": "gpt-image-2.5-all",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:3fc8ddff6557099e3e7ea16647da0a4b76add30acfe2c0c7bce89362c8484b4a",
+      "contractHash": "sha256:87cdbc16dcf2e1f5f62ec2c3e7e86bdc58c5f6c44a560db95105ffbac0800054",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -208,12 +209,13 @@
           "url"
         ],
         "maxImages": 1
-      }
+      },
+      "recommendedOptions": {}
     },
     {
       "id": "gpt-image-2.5-sunburst-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:2b577588de58adff5800643a00a080b4ff0f73c4e080e8e2c5ab05a8bebd400a",
+      "contractHash": "sha256:1da7f49f417ab5b97197022be0464c4305a185265aa911e38336def91c895618",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -304,12 +306,25 @@
           "url"
         ],
         "maxImages": 1
+      },
+      "recommendedOptions": {
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
       }
     },
     {
       "id": "gpt-image-2.5-flare-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+      "contractHash": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -400,12 +415,25 @@
           "url"
         ],
         "maxImages": 1
+      },
+      "recommendedOptions": {
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
       }
     },
     {
       "id": "gemini-3-pro-image-preview",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:03916d7adc0842ad26d7f572826f094f93cd94f5989c22aa0988fc1a81998397",
+      "contractHash": "sha256:c0ffeb30211869e4d1ef6c9e5b62a3b85aad54450369f7d4573a1ebd050c4704",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -465,12 +493,25 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
       }
     },
     {
       "id": "gemini-3.1-flash-lite-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:a645c5bfafac02beecab4095e53e1f4938322758c9b52f5566fc1362f46b5677",
+      "contractHash": "sha256:b24cd590b4fb401f54abeb0d22b87422292bf43f2bcff5d04b2653c06064d5fa",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -532,12 +573,20 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "1K"
+        }
       }
     },
     {
       "id": "gemini-3.1-flash-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+      "contractHash": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -602,12 +651,26 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "512",
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
       }
     },
     {
       "id": "flux-2-pro",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+      "contractHash": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -663,12 +726,21 @@
         ],
         "maxImages": 1,
         "urlTtlSeconds": 600
+      },
+      "recommendedOptions": {
+        "outputFormat": {
+          "default": "png",
+          "examples": [
+            "jpeg",
+            "png"
+          ]
+        }
       }
     },
     {
       "id": "seedream-5-0-260128",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+      "contractHash": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -723,7 +795,144 @@
           "b64_json"
         ],
         "recordActualSize": true
+      },
+      "recommendedOptions": {
+        "size": {
+          "default": "2K",
+          "examples": [
+            "2K",
+            "3K"
+          ]
+        }
       }
+    }
+  ],
+  "textModels": [
+    {
+      "id": "gpt-5.3-chat-latest",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:c31c2cacc70a4565be8c76c97e481578f7e840dfe050b99f3838a1f76199e0f3",
+      "label": "GPT-5.3 Chat（主力）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 400000,
+        "maxOutputTokens": 16384
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "temperature": {
+          "default": 0.7,
+          "examples": [
+            0,
+            0.5,
+            0.7,
+            1,
+            1.5
+          ]
+        },
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192,
+            16384
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gpt-5-3-chat.md",
+          "sha256": "6a0010791b51b630c8624d99de3ca232834a1ad9e9dc7d7ffed386491c1a8b47"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-reference/chat/chat-completions.md",
+          "sha256": "ae5685e713e982547ce42b9d5156019fb9f2f81756325c8b0723dd6f95856491"
+        }
+      ]
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:b62b31764cda5a24a6863a7edbd96e1fbdae31d7fb341dd8cb3fa28d0ceafc91",
+      "label": "Gemini 3.6 Flash（轻量档）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 1048576,
+        "maxOutputTokens": 65536
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "reasoning_effort": {
+          "default": "low",
+          "examples": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gemini-3-6-flash/overview.md",
+          "sha256": "3f8a7dbcbfb48b0b9d04f9fc5d8c4f6bda81bf7268b33419911af3e873cc9774"
+        }
+      ]
+    },
+    {
+      "id": "deepseek-v4-flash-ga-260731",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:b396f6ed0eaa91353ba235b5ca1328f763f3c681bb354b85a35218455aad9a02",
+      "label": "DeepSeek V4 Flash GA（备选）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 1000000,
+        "maxOutputTokens": 393216
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192
+          ]
+        }
+      },
+      "thinking": {
+        "default": "disabled",
+        "notes": "overview.md：默认思考量偏大；简单任务显式 thinking disabled"
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/deepseek-v4-flash/overview.md",
+          "sha256": "830e3975a70241f32f32ca90c99631d37828f3ff8b8569bbfc6db63efe547bfb"
+        }
+      ]
     }
   ]
 }

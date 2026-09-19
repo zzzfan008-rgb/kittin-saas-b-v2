@@ -43,7 +43,7 @@ function plan(overrides: Record<string, unknown> = {}): ExecutionPlan {
   return {
     steps: [{
       nodeId: `evaluation-node-${++sequence}`,
-      kind: "sketch-to-render",
+      kind: "image",
       inputImages: [],
       inputReferences: [],
       params: {

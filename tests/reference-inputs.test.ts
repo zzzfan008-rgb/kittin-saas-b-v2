@@ -101,7 +101,7 @@ assert.match(
 // ---- 顺序语义回归（方案 §6.3）：references 数组顺序变化 → 渲染提示词图号同步变化 ----
 {
   const promptA = renderProviderPrompt({
-    nodeKind: "ai-modify",
+    nodeKind: "image",
     modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
@@ -117,7 +117,7 @@ assert.match(
 
 {
   const promptB = renderProviderPrompt({
-    nodeKind: "ai-modify",
+    nodeKind: "image",
     modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
@@ -134,7 +134,7 @@ assert.match(
 // ---- 提示词实例对照（方案 §5.2）：改后不再逐图写角色/职责/禁止影响 ----
 {
   const rendered = renderProviderPrompt({
-    nodeKind: "ai-modify",
+    nodeKind: "image",
     modelId: "gpt-image-2.5-flare-vip",
     operationMode: "edit",
     taskPrompt: "换装",
@@ -150,9 +150,10 @@ assert.match(
   assert.ok(!rendered.includes("garment_full"), "改后提示词不得包含角色 ID");
 }
 
-// ---- mask-redraw 渲染 ----
+// ---- 蒙版渲染（v7：needsMask 声明驱动，不再按 nodeKind 判定） ----
 const renderedMaskPrompt = renderProviderPrompt({
-  nodeKind: "mask-redraw",
+  nodeKind: "image",
+  needsMask: true,
   modelId: "gpt-image-2.5-sunburst",
   operationMode: "mask-edit",
   taskPrompt: "将袖口改成银色拉链",
@@ -208,20 +209,20 @@ for (const [modelId, operationMode] of [
   ["seedream-5-0-260128", "generate"],
   ["seedream-5-0-260128", "edit"],
 ] as const satisfies readonly [ImageModelId, ImageOperationMode][]) {
-  const nodeKind = operationMode === "mask-edit"
-    ? "mask-redraw"
-    : operationMode === "generate" ? "sketch-to-render" : "ai-modify";
+  // v7：needsMask 声明驱动蒙版错误文案；kind 统一为三值。
+  const needsMask = operationMode === "mask-edit";
   assert.throws(
     () => renderProviderPrompt({
-      nodeKind,
+      nodeKind: "image",
+      needsMask,
       modelId,
       operationMode,
       taskPrompt: " \n ",
       references: [],
     }),
-    operationMode === "mask-edit"
+    needsMask
       ? /局部修改必须填写修改说明/
-      : new RegExp(`节点 ${nodeKind} 没有可发送的提示词`),
+      : /节点 image 没有可发送的提示词/,
     `${modelId}/${operationMode} 不得从空任务提示词静默回退到跨模型默认文案`,
   );
 }

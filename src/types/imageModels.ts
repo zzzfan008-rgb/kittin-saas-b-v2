@@ -1,5 +1,4 @@
 import contracts from "../../docs/ai/apiyi/model-contracts.json";
-import type { ImageOperationMode } from "./imageOperations";
 
 export const IMAGE_MODEL_IDS = [
   "gpt-image-2.5-sunburst",
@@ -16,14 +15,20 @@ export const IMAGE_MODEL_IDS = [
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number];
 export type GenerationImageModelId = Exclude<ImageModelId, "gpt-image-2.5-sunburst">;
 
+/**
+ * R5（schema v7）：模型参数放开为自由 key-value。契约仅提供推荐值元数据
+ * （model-contracts.json 每模型的 recommendedOptions 块），校验从硬失败降级为
+ * warning 语义（见 imageModelOptionsWarnings）。字段级契约：
+ * docs/design/2026-09-18-three-node-model/contracts/data-model.md §4
+ */
 export interface ImageModelOptions {
-  size?: string;
-  aspectRatio?: string;
-  imageSize?: string;
-  width?: number;
-  height?: number;
-  outputFormat?: "jpeg" | "png" | "webp";
-  quality?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+/** recommendedOptions 条目结构（契约 data-model.md §4）。 */
+export interface RecommendedOptionSpec {
+  default?: string | number | boolean;
+  examples?: Array<string | number | boolean>;
 }
 
 export interface ReviewedModelCatalogBaseline {
@@ -68,6 +73,7 @@ export interface ImageModelContract {
   qualityValues?: string[];
   outputFormats?: string[];
   resolutions?: string[];
+  recommendedOptions?: Record<string, RecommendedOptionSpec>;
   outputCounts?: { min: number; max: number };
   dimensions?: {
     multipleOf: number;
@@ -159,12 +165,6 @@ export function imageModelLabel(id: ImageModelId): string {
   return getImageModelContract(id).label;
 }
 
-export function isModelAllowedForNode(modelId: ImageModelId, nodeKind: string): boolean {
-  return nodeKind === "mask-redraw"
-    ? modelId === MASK_REDRAW_MODEL_ID
-    : modelId !== MASK_REDRAW_MODEL_ID;
-}
-
 const VIP_SIZE_BY_RATIO: Record<string, string> = {
   "1:1": "2048x2048",
   "2:3": "1360x2048",
@@ -191,45 +191,22 @@ const FLUX_DIMENSIONS_BY_RATIO: Record<string, { width: number; height: number }
   "21:9": { width: 2016, height: 864 },
 };
 
+/**
+ * 默认参数（R5）：数据源从硬编码 switch 改为读 model-contracts.json 每模型的
+ * `recommendedOptions` 块；缺省返回 {}（契约 data-model.md §4）。
+ * 画幅联动（原 VIP_SIZE_BY_RATIO / FLUX_DIMENSIONS_BY_RATIO 等 size↔ratio 推导）
+ * 由 imageModelOptionsForAspectRatio 继续承载（联动填充职责保留）。
+ */
 export function defaultImageModelOptions(
   modelId: ImageModelId,
-  preferredAspectRatio = "1:1",
+  _preferredAspectRatio = "1:1",
 ): ImageModelOptions {
-  switch (modelId) {
-    case "gpt-image-2.5-sunburst":
-    case "gpt-image-2.5-all":
-      return {};
-    case "gpt-image-2.5-sunburst-vip":
-    case "gpt-image-2.5-flare-vip":
-      return { size: VIP_SIZE_BY_RATIO[preferredAspectRatio] ?? VIP_SIZE_BY_RATIO["1:1"] };
-    case "gemini-3-pro-image-preview": {
-      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
-      return {
-        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
-        imageSize: "2K",
-      };
-    }
-    case "gemini-3.1-flash-lite-image": {
-      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
-      return {
-        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
-        imageSize: "1K",
-      };
-    }
-    case "gemini-3.1-flash-image": {
-      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
-      return {
-        aspectRatio: allowed.includes(preferredAspectRatio) ? preferredAspectRatio : "1:1",
-        imageSize: "2K",
-      };
-    }
-    case "flux-2-pro": {
-      const dimensions = FLUX_DIMENSIONS_BY_RATIO[preferredAspectRatio] ?? FLUX_DIMENSIONS_BY_RATIO["1:1"];
-      return { ...dimensions, outputFormat: "png" };
-    }
-    case "seedream-5-0-260128":
-      return { size: "2K" };
+  const recommended = getImageModelContract(modelId).recommendedOptions ?? {};
+  const defaults: ImageModelOptions = {};
+  for (const [key, spec] of Object.entries(recommended)) {
+    if (spec.default !== undefined) defaults[key] = spec.default;
   }
+  return defaults;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -238,95 +215,34 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {};
 }
 
+/**
+ * R5（schema v7）：normalize 系列的「丢弃非法值」语义删除，改为「保留用户值」。
+ * 运行侧的 warning 接线归 P2-b/P2-c；此处仅保留容忍读取（非法输入退化为空对象），
+ * 供既有联动填充函数（imageModelOptionsForAspectRatio）过渡期继续编译。
+ */
 export function normalizeImageModelOptions(
-  modelId: ImageModelId,
+  _modelId: ImageModelId,
   value: unknown,
-  preferredAspectRatio = "1:1",
 ): ImageModelOptions {
   const raw = objectValue(value);
-  const defaults = defaultImageModelOptions(modelId, preferredAspectRatio);
-  switch (modelId) {
-    case "gpt-image-2.5-sunburst": {
-      const dimensions = getImageModelContract(modelId).dimensions!;
-      const match = typeof raw.size === "string" ? /^(\d+)x(\d+)$/.exec(raw.size) : null;
-      const width = Number(match?.[1]);
-      const height = Number(match?.[2]);
-      const aspectRatio = Math.max(width / height, height / width);
-      const valid = Number.isInteger(width) && Number.isInteger(height)
-        && width > 0 && height > 0
-        && width % dimensions.multipleOf === 0 && height % dimensions.multipleOf === 0
-        && width <= (dimensions.maxSide ?? Number.POSITIVE_INFINITY)
-        && height <= (dimensions.maxSide ?? Number.POSITIVE_INFINITY)
-        && width * height >= (dimensions.minPixels ?? 0)
-        && width * height <= dimensions.maxPixels
-        && aspectRatio <= (dimensions.maxAspectRatio ?? Number.POSITIVE_INFINITY);
-      const result: ImageModelOptions = {};
-      if (valid) result.size = raw.size as string;
-      const qualityValues = getImageModelContract(modelId).qualityValues ?? [];
-      if (typeof raw.quality === "string" && qualityValues.includes(raw.quality)) result.quality = raw.quality;
-      return result;
-    }
-    case "gpt-image-2.5-all":
-      return {};
-    case "gpt-image-2.5-sunburst-vip":
-    case "gpt-image-2.5-flare-vip": {
-      const sizes = getImageModelContract(modelId).sizes ?? [];
-      const result: ImageModelOptions = {
-        size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size,
-      };
-      const qualityValues = getImageModelContract(modelId).qualityValues ?? [];
-      if (typeof raw.quality === "string" && qualityValues.includes(raw.quality)) result.quality = raw.quality;
-      return result;
-    }
-    case "gemini-3-pro-image-preview":
-    case "gemini-3.1-flash-lite-image": {
-      const contract = getImageModelContract(modelId);
-      return {
-        aspectRatio: typeof raw.aspectRatio === "string" && contract.aspectRatios?.includes(raw.aspectRatio)
-          ? raw.aspectRatio
-          : defaults.aspectRatio,
-        imageSize: typeof raw.imageSize === "string" && contract.imageSizes?.includes(raw.imageSize)
-          ? raw.imageSize
-          : defaults.imageSize,
-      };
-    }
-    case "gemini-3.1-flash-image": {
-      const contract = getImageModelContract(modelId);
-      return {
-        aspectRatio: typeof raw.aspectRatio === "string" && contract.aspectRatios?.includes(raw.aspectRatio)
-          ? raw.aspectRatio
-          : defaults.aspectRatio,
-        imageSize: typeof raw.imageSize === "string" && contract.imageSizes?.includes(raw.imageSize)
-          ? raw.imageSize
-          : defaults.imageSize,
-      };
-    }
-    case "flux-2-pro": {
-      const dimensions = getImageModelContract(modelId).dimensions!;
-      const width = Number(raw.width);
-      const height = Number(raw.height);
-      const validDimensions = Number.isInteger(width) && Number.isInteger(height)
-        && width >= dimensions.minSide && height >= dimensions.minSide
-        && width % dimensions.multipleOf === 0 && height % dimensions.multipleOf === 0
-        && width * height <= dimensions.maxPixels;
-      const outputFormat = raw.outputFormat === "jpeg" || raw.outputFormat === "png"
-        ? raw.outputFormat
-        : defaults.outputFormat;
-      return validDimensions ? { width, height, outputFormat } : defaults;
-    }
-    case "seedream-5-0-260128": {
-      const sizes = getImageModelContract(modelId).sizes ?? [];
-      return { size: typeof raw.size === "string" && sizes.includes(raw.size) ? raw.size : defaults.size };
+  const result: ImageModelOptions = {};
+  for (const [key, entry] of Object.entries(raw)) {
+    if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") {
+      result[key] = entry;
     }
   }
+  return result;
 }
 
+/**
+ * 画幅联动填充（R5：职责保留）。用户已有值优先，缺省项按画幅推导补齐。
+ */
 export function imageModelOptionsForAspectRatio(
   modelId: ImageModelId,
   current: ImageModelOptions | undefined,
   aspectRatio: string,
 ): ImageModelOptions {
-  const normalized = normalizeImageModelOptions(modelId, current, aspectRatio);
+  const normalized = { ...normalizeImageModelOptions(modelId, current) };
   switch (modelId) {
     case "gpt-image-2.5-sunburst":
     case "gpt-image-2.5-all":
@@ -362,47 +278,57 @@ export function imageModelAspectRatioPatch(
 
 export function imageModelOptionsError(modelId: ImageModelId, value: unknown): string | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "must be an object";
-  const raw = value as Record<string, unknown>;
-  const normalized = normalizeImageModelOptions(modelId, raw);
-  const allowedKeys: Record<ImageModelId, readonly string[]> = {
-    "gpt-image-2.5-sunburst": ["size", "quality"],
-    "gpt-image-2.5-all": [],
-    "gpt-image-2.5-sunburst-vip": ["size", "quality"],
-    "gpt-image-2.5-flare-vip": ["size", "quality"],
-    "gemini-3-pro-image-preview": ["aspectRatio", "imageSize"],
-    "gemini-3.1-flash-lite-image": ["aspectRatio", "imageSize"],
-    "gemini-3.1-flash-image": ["aspectRatio", "imageSize"],
-    "flux-2-pro": ["width", "height", "outputFormat"],
-    "seedream-5-0-260128": ["size"],
-  };
-  const unknown = Object.keys(raw).find((key) => !allowedKeys[modelId].includes(key));
-  if (unknown) return `contains unsupported parameter ${unknown}`;
-  const normalizedEntries = Object.entries(normalized);
-  if (Object.keys(raw).length !== normalizedEntries.length) {
-    return "contains an unsupported or incomplete model option";
-  }
-  if (normalizedEntries.some(([key, expected]) => raw[key] !== expected)) {
-    return "contains an unsupported or incomplete model option";
-  }
   return undefined;
 }
 
-/** Mode-aware validation for parameters whose gateway meaning changes between generate and edit. */
-export function imageModelOptionsErrorForOperation(
-  modelId: ImageModelId,
-  value: unknown,
-  _operationMode: ImageOperationMode,
-): string | undefined {
-  return imageModelOptionsError(modelId, value);
+/**
+ * R5（schema v7）：模型参数校验从硬失败降级为 warning。永不返回错误；
+ * 调用方不得据此拒绝保存/运行（契约 data-model.md §4）。
+ * - 未知 key → warning「参数 {key} 不在模型 {id} 的已知参数中」
+ * - 值不在契约推荐集合 → warning「{key}={v} 不在推荐取值 {examples} 中」
+ */
+export function imageModelOptionsWarnings(modelId: ImageModelId, value: unknown): string[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+  const recommended = getImageModelContract(modelId).recommendedOptions ?? {};
+  const known = new Set(Object.keys(recommended));
+  // 既有清单字段（sizes/aspectRatios/imageSizes/qualityValues/outputFormats/dimensions）
+  // 降级为“已知取值参考”，同样视为已知参数。
+  const contract = getImageModelContract(modelId);
+  if (contract.sizes) for (const key of ["size"]) known.add(key);
+  if (contract.aspectRatios) for (const key of ["aspectRatio"]) known.add(key);
+  if (contract.imageSizes) for (const key of ["imageSize"]) known.add(key);
+  if (contract.qualityValues) for (const key of ["quality"]) known.add(key);
+  if (contract.outputFormats) for (const key of ["outputFormat"]) known.add(key);
+  if (contract.dimensions) for (const key of ["width", "height"]) known.add(key);
+  const warnings: string[] = [];
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (raw === undefined) continue;
+    if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") continue;
+    if (!known.has(key)) {
+      warnings.push(`参数 ${key} 不在模型 ${modelId} 的已知参数中`);
+      continue;
+    }
+    const spec = recommended[key];
+    if (spec?.examples && spec.examples.length > 0 && !spec.examples.includes(raw)) {
+      warnings.push(`${key}=${String(raw)} 不在推荐取值 ${spec.examples.map((item) => String(item)).join("、")} 中`);
+    }
+  }
+  return warnings;
 }
 
-export function normalizeImageModelOptionsForOperation(
-  modelId: ImageModelId,
-  value: unknown,
-  preferredAspectRatio: string,
-  _operationMode: ImageOperationMode,
-): ImageModelOptions {
-  return normalizeImageModelOptions(modelId, value, preferredAspectRatio);
+/**
+ * R5 / mode 归属反转（schema v7）：操作模式由提示词变体携带（variant.mode），
+ * 节点不再自描述 operationMode，mode 感知包装层随之删除。
+ * 运行侧的参数 warning 接线（原 4 处调用点）归 P2-b/P2-c。
+ */
+
+/**
+ * 模型×节点类型闸（契约 data-model.md §3 保留检查第 1 条的前半）：
+ * 图片模型只允许用于 image 节点。`gpt-image-2.5-sunburst` 仅蒙版变体可用的
+ * 限制改由变体声明（needsMask）驱动，在运行准入层执行（P2-b，见 runtime.md）。
+ */
+export function isModelAllowedForNode(modelId: ImageModelId, nodeKind: string): boolean {
+  return nodeKind === "image";
 }
 
 export function modelMaxReferenceImages(modelId: ImageModelId): number {

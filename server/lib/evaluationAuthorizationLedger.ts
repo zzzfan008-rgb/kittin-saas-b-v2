@@ -103,7 +103,8 @@ function databaseSafeInteger(value: number | string, field: string): number {
 }
 
 function providerStep(plan: ExecutionPlan): NodeExecution {
-  const providerSteps = plan.steps.filter((step) => NODE_SPECS[step.kind].providerId);
+  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+  const providerSteps = plan.steps.filter((step) => step.kind === "image");
   if (providerSteps.length !== 1) {
     throw new EvaluationRunPolicyError("每个真实评估 case 必须且只能包含一个付费节点", 400);
   }
@@ -111,14 +112,9 @@ function providerStep(plan: ExecutionPlan): NodeExecution {
 }
 
 function maximumProviderRequestsForStep(step: NodeExecution): number {
-  if (step.kind === "sketch-to-render" || step.kind === "ai-modify") {
+  // v7：一色一图 / count 分批机制删除（Q4=A）；张数一律由 batchSize 表达。
+  if (step.kind === "image") {
     return Math.max(1, Math.min(8, Math.floor(Number(step.params.batchSize) || 1)));
-  }
-  if (step.kind === "fabric-recolor") {
-    return Math.max(1, Math.min(8, Array.isArray(step.params.colors) ? step.params.colors.length : 1));
-  }
-  if (step.kind === "print-mutate") {
-    return Math.max(1, Math.min(8, Math.floor(Number(step.params.count) || 1)));
   }
   return 1;
 }

@@ -25,27 +25,25 @@ export type TemplateLaunchMode = "default" | "upload" | "text";
 export function inferTemplateLaunchMode(
   template: Pick<WorkflowTemplate, "flow">,
 ): TemplateLaunchMode {
-  if (template.flow.nodes.some((node) => node.data.kind === "image-input")) {
-    return "upload";
-  }
-  if (template.flow.nodes.some((node) => node.data.kind === "sketch-to-render")) {
-    return "text";
-  }
+  // v7（契约 template-format.md §3）：含空 outputImages 且无图片入边的 image
+  // 节点 → upload；否则含非空 text → text；否则 default。
+  const hasUploadSlot = template.flow.nodes.some(
+    (node) => node.data.kind === "image"
+      && node.data.outputImages.length === 0
+      && !template.flow.edges.some((edge) => edge.target === node.id && edge.targetHandle !== "prompt"),
+  );
+  if (hasUploadSlot) return "upload";
+  const hasText = template.flow.nodes.some(
+    (node) => node.data.kind === "text" && node.data.text.trim().length > 0,
+  );
+  if (hasText) return "text";
   return "default";
 }
 
 function isMissingParameter(data: WorkflowNodeData): boolean {
-  if (data.kind === "image-input") return !data.imageUrl;
-  if (
-    data.kind === "sketch-to-render" ||
-    data.kind === "ai-modify" ||
-    data.kind === "print-extract" ||
-    data.kind === "print-mutate" ||
-    data.kind === "mask-redraw"
-  ) return !data.prompt.trim();
-  if (data.kind === "fabric-recolor") {
-    return data.colors.length === 0 && !data.prompt.trim() && !data.fabricImageUrl;
-  }
+  // v7：text 节点缺正文 / image 节点既无输出也无参考输入时视为待补参数。
+  if (data.kind === "text") return !data.text.trim();
+  if (data.kind === "image") return data.outputImages.length === 0;
   return false;
 }
 
@@ -54,13 +52,12 @@ export function templateLandingNodeId(
   mode: TemplateLaunchMode,
 ): string | undefined {
   if (mode === "upload") {
-    return nodes.find((node) => node.data.kind === "image-input" && !node.data.imageUrl)?.id;
+    return nodes.find((node) => node.data.kind === "image" && node.data.outputImages.length === 0)?.id;
   }
   if (mode === "text") {
-    return nodes.find((node) => node.data.kind === "sketch-to-render")?.id;
+    return nodes.find((node) => node.data.kind === "text")?.id;
   }
-  return nodes.find((node) => isMissingParameter(node.data))?.id ??
-    nodes.find((node) => node.data.kind !== "result")?.id;
+  return nodes.find((node) => isMissingParameter(node.data))?.id ?? nodes[0]?.id;
 }
 
 function cloneNodes(nodes: WorkflowTemplate["flow"]["nodes"]): FlowNode[] {

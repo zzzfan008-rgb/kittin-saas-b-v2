@@ -54,6 +54,7 @@ const TEST_FILES = [
   "tests/generation-safety.test.ts",
   "tests/workbench-shell.test.ts",
   "tests/apiyi-docs.test.ts",
+  "tests/r48-version-gate.test.ts",
   "tests/model-parameter-profiles.test.ts",
   "tests/node-prompt-parameter-matrix.test.ts",
   "tests/prompt-evaluation.test.ts",

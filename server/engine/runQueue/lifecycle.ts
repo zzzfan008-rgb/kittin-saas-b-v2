@@ -156,7 +156,8 @@ export async function completeJobSuccess(
   finishedAt: number,
 ): Promise<void> {
   const imageUrls = persistedImages.map((image) => image.url);
-  const isProviderStep = Boolean(NODE_SPECS[job.step.kind].providerId);
+  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+  const isProviderStep = job.step.kind === "image";
   if (providerImageUrls.length > 0 && providerImageUrls.length !== imageUrls.length) {
     throw new Error("Provider originals and business outputs must have identical cardinality");
   }
