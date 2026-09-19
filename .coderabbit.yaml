@@ -1,0 +1,51 @@
+# CodeRabbit 配置 —— 本仓库为公开仓库，适用 Open Source 免费档。
+#
+# 定位（用户 2026-09-19 裁定）：审核的**反馈来源之一（advisory）**，
+# 不是必需批准 —— bot 不可用/超时不会卡住合并。硬门禁仍是 GitHub Actions 的 5 个 check。
+#
+# 关键：本团队 PR 全程 draft → 必须开 drafts: true，否则一个都不会被审。
+language: "zh-CN"
+
+reviews:
+  profile: "chill"            # 平衡档；先别 assertive（噪音大）
+  request_changes_workflow: false
+  auto_review:
+    enabled: true
+    drafts: true              # 我们全程 draft PR
+    auto_incremental_review: true   # 每次 push 增量复审
+    base_branches: [".*"]     # 覆盖 refactor/* 等交付分支
+    ignore_title_keywords: ["WIP"]
+  path_filters:
+    - "!node_modules/**"
+    - "!dist/**"
+    - "!dist-server/**"
+    - "!data/**"
+    - "!**/*.png"
+    - "!**/*.jpg"
+  path_instructions:
+    - path: "server/**"
+      instructions: "关注异步/队列/迁移的失败路径、幂等性与错误传播；忽略与本改动无关的既有告警。"
+    - path: "src/**"
+      instructions: "关注可访问性、主题 token 一致性（不得硬编码颜色）、状态管理竞态与事件监听清理。"
+    - path: "docs/design/**"
+      instructions: "只检查与代码/契约的一致性（数值、命名、引用路径），不评审设计审美。"
+    - path: "docs/**"
+      instructions: "检查引用路径与契约一致性；不评论文风。"
+  pre_merge_checks:
+    title:
+      mode: "warning"
+    description:
+      mode: "off"             # 我们的 PR 描述本来就长
+    docstrings:
+      mode: "off"             # 不强制 docstring 覆盖率
+
+tools:
+  eslint:
+    enabled: true
+  ast-grep:
+    enabled: true
+  gitleaks:
+    enabled: true             # 密钥扫描（防 .env 类问题再犯）
+
+chat:
+  auto_reply: true
