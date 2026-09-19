@@ -6,6 +6,7 @@
 - 结论：**P1-1 不通过（未修复）、P1-2 通过、P1-3 通过（声明值 ≥3:1；渲染像素在画布缩放下未达 3:1，见 P3-1）、P1-4 通过（DOM 计算样式层零残留；另发现 canvas 2D 层旧金残留，见 P2-2）**
 - 新发现：P2 ×2、P3 ×4（其中 P2-1、P3-3 为承接 R-46 的未闭合项，本轮给出 a624571 上的实测/源码证据）
 - 产出：本目录（`shots/` 75 张、`measurements/` 13 份 JSON、`scripts/` 可复现脚本、`logs/` 运行日志）；**未覆盖 `acceptance-v4/` 首轮数据**（首轮 README/shots/measurements 保持原状）
+- **裁决补记（2026-09-19，R-56）**：P1-1 已经用户裁定为首轮 README 给出的选项②——**登录页品牌固定（恒曜黑 · 荧光绿），有意为之，不是缺陷** ✓。裁决全文见 [`../../DESIGN-Rev2.1-2026-09-19-login-brand-fixed.md`](../../DESIGN-Rev2.1-2026-09-19-login-brand-fixed.md)。本报告全部量测事实（`data-theme=null` / `#B7F35A` / 卡底 / md5 / 机理定位）原样有效，仅「不通过」的缺陷定性被该裁决翻转；**未来审计不要再重复上报此条**。
 
 ---
 
@@ -47,6 +48,8 @@ orchestrator 在复验期间给出校准：正确基线是 `main` @ `a624571`（
 ## 3. 逐条复验
 
 ### 3.1 P1-1 登录页 white/eye 换肤 —— **不通过**（未修复）
+
+> **裁决补记（2026-09-19，R-56）**：本条已裁定为首轮 README 给出的选项②——登录页**品牌固定（恒曜黑 · 荧光绿），有意为之** ✓，不是缺陷。量测事实不变，定性翻转，详见 [`../../DESIGN-Rev2.1-2026-09-19-login-brand-fixed.md`](../../DESIGN-Rev2.1-2026-09-19-login-brand-fixed.md) §1/§3。
 
 机器量测（`measurements/p1-1-login-theme.json`、`measurements/p1-1-diff` 见 `scripts/analyze-p1-1-diff.mjs` 输出）：
 
