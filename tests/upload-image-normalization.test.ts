@@ -7,6 +7,7 @@ import path from "node:path";
 import express, { type Request } from "express";
 import sharp from "sharp";
 import type { AIProvider, NodeExecution } from "../src/types/workflow";
+import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-upload-normalization-"));
@@ -504,14 +505,28 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
 
     const blankFlow = {
-      schemaVersion: 2,
+      schemaVersion: 7,
       nodes: [{
+        id: "starter-prompt",
+        type: "text",
+        position: { x: 0, y: 0 },
+        data: { kind: "text", label: "提示词", status: "idle", text: "" },
+      }, {
         id: "starter",
         type: "image",
-        position: { x: 0, y: 0 },
-        data: { kind: "image", label: "上传服装图", status: "idle" },
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "image", label: "上传服装图", status: "idle",
+          aspectRatio: "3:4", batchSize: 1, outputImages: [],
+        },
       }],
-      edges: [],
+      edges: [{
+        id: "starter-prompt-edge",
+        source: "starter-prompt",
+        target: "starter",
+        targetHandle: "prompt",
+        data: {},
+      }],
     };
     const initialTargetId = "mask-sync-draft";
     const targetBootstrap = await fetch(`${server.baseUrl}/api/projects/initial-draft/bootstrap`, {
@@ -718,6 +733,12 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
       return { images: [prepared], model: "normalization-gate-test" };
     },
   };
+  const normalizationVariant = requireGarmentPromptVariant({
+    familyId: "commerce-hero",
+    modelId: "flux-2-pro",
+    nodeKind: "image",
+    mode: "edit",
+  });
   const step: NodeExecution = {
     nodeId: "normalization-gate",
     kind: "image",
@@ -727,6 +748,7 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
       operationMode: "edit",
       modelId: "flux-2-pro",
       modelOptions: { width: 1024, height: 1024, outputFormat: "png" },
+      promptVariantId: normalizationVariant.variantId,
     },
   };
   await executeStep(step, step.inputImages, () => provider);
@@ -754,9 +776,9 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
 });
 
 await test("前端未拿到 normalized:true 时不会把图片写入节点", () => {
-  const source = fs.readFileSync(new URL("../src/components/nodes/ImageInputNode.tsx", import.meta.url), "utf8");
+  const source = fs.readFileSync(new URL("../src/components/nodes/ImageNode.tsx", import.meta.url), "utf8");
   assert.match(source, /data\.normalized !== true[\s\S]*服务端未完成素材标准化/);
-  assert.match(source, /const upload = await uploadFile\(file\)[\s\S]*imageUrl: upload\.url/);
+  assert.match(source, /const upload = await uploadFile\(file\)[\s\S]*outputImages: \[upload\.url\]/);
 });
 
 await closeDatabaseForTests();

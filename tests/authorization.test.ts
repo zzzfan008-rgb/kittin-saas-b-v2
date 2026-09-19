@@ -104,81 +104,101 @@ async function test(name: string, fn: () => void | Promise<void>) {
   console.log(`  ✓ ${name}`);
 }
 
+function promptTextNode(text: string) {
+  return {
+    id: "prompt",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text },
+  };
+}
+
+function promptEdge(id: string, target: string) {
+  return { id, source: "prompt", target, targetHandle: "prompt", data: {} };
+}
+
 function flow(images: string[] = []) {
   return {
-    schemaVersion: 1,
-    nodes: images.map((imageUrl, index) => ({
-      id: `image_${index}`,
-      type: "image",
-      position: { x: index * 100, y: 0 },
-      data: {
-        kind: "image",
-        label: `图片 ${index + 1}`,
-        status: "idle",
-        imageUrl,
-      },
-    })),
-    edges: [],
+    schemaVersion: 7,
+    nodes: [
+      promptTextNode("授权测试"),
+      ...images.map((imageUrl, index) => ({
+        id: `image_${index}`,
+        type: "image",
+        position: { x: (index + 1) * 100, y: 0 },
+        data: {
+          kind: "image",
+          label: `图片 ${index + 1}`,
+          status: "idle",
+          aspectRatio: "1:1",
+          batchSize: 1,
+          outputImages: [imageUrl],
+        },
+      })),
+    ],
+    edges: images.map((_, index) => promptEdge(`prompt-image-${index}`, `image_${index}`)),
   };
 }
 
 function generationFlow(prompt: string) {
   return {
-    schemaVersion: 4,
-    nodes: [{
-      id: "generate",
-      type: "image",
-      position: { x: 0, y: 0 },
-      data: {
-        kind: "image",
-        label: "生成效果图",
-        status: "idle",
-        modelId: "gemini-3.1-flash-image",
-        modelOptions: generationParameters.modelOptions,
-        operationMode: "generate",
-        prompt: buildGarmentPrompt(generationVariant.variantId, prompt),
-        promptVariantId: generationVariant.variantId,
-        promptFamilyId: generationVariant.familyId,
-        parameterProfileId: generationVariant.parameterProfileId,
-        contractHash: generationVariant.contractHash,
-        evaluationVersion: generationVariant.evaluationVersion,
-        postprocessVersion: generationProfile.postprocess.version,
-        aspectRatio: generationParameters.aspectRatio,
-        batchSize: 1,
-        outputImages: [],
+    schemaVersion: 7,
+    nodes: [
+      promptTextNode(prompt),
+      {
+        id: "generate",
+        type: "image",
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "image",
+          label: "生成效果图",
+          status: "idle",
+          modelId: "gemini-3.1-flash-image",
+          modelOptions: generationParameters.modelOptions,
+          promptVariantId: generationVariant.variantId,
+          promptFamilyId: generationVariant.familyId,
+          parameterProfileId: generationVariant.parameterProfileId,
+          contractHash: generationVariant.contractHash,
+          evaluationVersion: generationVariant.evaluationVersion,
+          postprocessVersion: generationProfile.postprocess.version,
+          aspectRatio: generationParameters.aspectRatio,
+          batchSize: 1,
+          outputImages: [],
+        },
       },
-    }],
-    edges: [],
+    ],
+    edges: [promptEdge("prompt-generate", "generate")],
   };
 }
 
 function editFlow(imageUrl: string) {
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     nodes: [
+      promptTextNode("改成短袖"),
       {
         id: "source",
         type: "image",
-        position: { x: 0, y: 0 },
+        position: { x: 320, y: 0 },
         data: {
           kind: "image",
           label: "原图",
           status: "idle",
-          imageUrl,
+          aspectRatio: "1:1",
+          batchSize: 1,
+          outputImages: [imageUrl],
         },
       },
       {
         id: "edit",
         type: "image",
-        position: { x: 320, y: 0 },
+        position: { x: 640, y: 0 },
         data: {
           kind: "image",
           label: "改款",
           status: "idle",
           modelId: "gpt-image-2.5-flare-vip",
           modelOptions: editParameters.modelOptions,
-          operationMode: "edit",
-          prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
           promptVariantId: editVariant.variantId,
           promptFamilyId: editVariant.familyId,
           parameterProfileId: editVariant.parameterProfileId,
@@ -191,12 +211,11 @@ function editFlow(imageUrl: string) {
         },
       },
     ],
-    edges: [{
-      id: "source-edit",
-      source: "source",
-      target: "edit",
-      data: {},
-    }],
+    edges: [
+      promptEdge("prompt-source", "source"),
+      promptEdge("prompt-edit", "edit"),
+      { id: "source-edit", source: "source", target: "edit", data: {} },
+    ],
   };
 }
 
@@ -204,34 +223,42 @@ function independentEditFlow(firstImageUrl: string, secondImageUrl: string) {
   const first = editFlow(firstImageUrl);
   const second = editFlow(secondImageUrl);
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     nodes: [
-      { ...first.nodes[0], id: "source-a" },
-      { ...first.nodes[1], id: "edit-a" },
-      { ...second.nodes[0], id: "source-b" },
-      { ...second.nodes[1], id: "edit-b" },
+      first.nodes[0],
+      { ...first.nodes[1], id: "source-a" },
+      { ...first.nodes[2], id: "edit-a" },
+      { ...second.nodes[1], id: "source-b" },
+      { ...second.nodes[2], id: "edit-b" },
     ],
     edges: [
-      { ...first.edges[0], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
-      { ...second.edges[0], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
+      { ...first.edges[0], id: "prompt-source-a", target: "source-a" },
+      { ...first.edges[1], id: "prompt-edit-a", target: "edit-a" },
+      { ...first.edges[2], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
+      { ...second.edges[0], id: "prompt-source-b", target: "source-b" },
+      { ...second.edges[1], id: "prompt-edit-b", target: "edit-b" },
+      { ...second.edges[2], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
     ],
   };
 }
 
 function branchedEditFlow(imageUrl: string) {
   const base = editFlow(imageUrl);
-  const firstEdit = { ...base.nodes[1], id: "edit-a" };
+  const firstEdit = { ...base.nodes[2], id: "edit-a" };
   const secondEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-b",
-    position: { x: 320, y: 240 },
+    position: { x: 640, y: 240 },
   };
   return {
-    schemaVersion: 6,
-    nodes: [base.nodes[0], firstEdit, secondEdit],
+    schemaVersion: 7,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
     edges: [
-      { ...base.edges[0], id: "source-edit-a", target: "edit-a" },
-      { ...base.edges[0], id: "source-edit-b", target: "edit-b" },
+      { ...base.edges[0], id: "prompt-source", target: "source" },
+      { ...base.edges[1], id: "prompt-edit-a", target: "edit-a" },
+      { ...base.edges[2], id: "source-edit-a", source: "source", target: "edit-a" },
+      { ...base.edges[1], id: "prompt-edit-b", target: "edit-b" },
+      { ...base.edges[2], id: "source-edit-b", source: "source", target: "edit-b" },
     ],
   };
 }
@@ -239,27 +266,25 @@ function branchedEditFlow(imageUrl: string) {
 function chainedEditFlow(sourceImageUrl: string, savedFirstOutput: string) {
   const base = editFlow(sourceImageUrl);
   const firstEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-first",
-    data: { ...base.nodes[1].data, outputImages: [savedFirstOutput] },
+    data: { ...base.nodes[2].data, outputImages: [savedFirstOutput] },
   };
   const secondEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-second",
-    position: { x: 640, y: 0 },
-    data: { ...base.nodes[1].data, outputImages: [] },
+    position: { x: 960, y: 0 },
+    data: { ...base.nodes[2].data, outputImages: [] },
   };
   return {
-    schemaVersion: 6,
-    nodes: [base.nodes[0], firstEdit, secondEdit],
+    schemaVersion: 7,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
     edges: [
-      { ...base.edges[0], id: "source-edit-first", target: "edit-first" },
-      {
-        ...base.edges[0],
-        id: "edit-first-edit-second",
-        source: "edit-first",
-        target: "edit-second",
-      },
+      { ...base.edges[0], id: "prompt-source", target: "source" },
+      { ...base.edges[1], id: "prompt-edit-first", target: "edit-first" },
+      { ...base.edges[2], id: "source-edit-first", source: "source", target: "edit-first" },
+      { ...base.edges[1], id: "prompt-edit-second", target: "edit-second" },
+      { ...base.edges[2], id: "edit-first-edit-second", source: "edit-first", target: "edit-second" },
     ],
   };
 }
@@ -559,7 +584,11 @@ await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式�
   const plan = buildExecutionPlan([{
     id: "result",
     type: "image",
-    data: { kind: "image", label: "结果", status: "idle", images: [] },
+    data: {
+      kind: "image", label: "结果", status: "idle",
+      modelId: "gpt-image-2.5-flare-vip",
+      aspectRatio: "3:4", batchSize: 1, outputImages: [],
+    },
   }], []);
   const run = await enqueueGenerationRun(plan, users.owner.id, {
     userId: users.owner.id,
@@ -984,8 +1013,8 @@ await test("同 ID 项目不能被其他账号覆盖", async () => {
 
 await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归一化后落库", async () => {
   const invalidFlow = editFlow(PNG_DATA_URL);
-  invalidFlow.nodes[1].data.modelOptions = {
-    ...invalidFlow.nodes[1].data.modelOptions,
+  invalidFlow.nodes[2].data.modelOptions = {
+    ...invalidFlow.nodes[2].data.modelOptions,
     aspect_ratio: "16:9",
   } as never;
   const response = await request("/projects", "owner", {
@@ -1075,8 +1104,8 @@ await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且�
   assert.equal(save.status, 200, await save.text());
 
   const invalidSubmittedFlow = structuredClone(savedFlow);
-  invalidSubmittedFlow.nodes[0].data.modelId = "gpt-image-2.5-flare-vip" as never;
-  invalidSubmittedFlow.nodes[0].data.modelOptions = {
+  invalidSubmittedFlow.nodes[1].data.modelId = "gpt-image-2.5-flare-vip" as never;
+  invalidSubmittedFlow.nodes[1].data.modelOptions = {
     size: "2048x2048",
     aspect_ratio: "16:9",
   } as never;
@@ -1123,9 +1152,9 @@ await test("运行只接受当前已保存画布，且项目名称以服务端�
   assert.equal(forged.status, 409, await forged.text());
 
   const queuedClientFlow = structuredClone(savedFlow);
-  queuedClientFlow.nodes[0].position = { x: 999, y: 999 };
-  queuedClientFlow.nodes[0].data.label = "客户端瞬态标签";
-  queuedClientFlow.nodes[0].data.status = "queued";
+  queuedClientFlow.nodes[1].position = { x: 999, y: 999 };
+  queuedClientFlow.nodes[1].data.label = "客户端瞬态标签";
+  queuedClientFlow.nodes[1].data.status = "queued";
   const accepted = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({

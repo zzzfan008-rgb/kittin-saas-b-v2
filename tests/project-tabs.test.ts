@@ -606,34 +606,25 @@ await test("专用面料/角色句柄在新连线时被拒绝，不再写入角�
 });
 
 await test("快捷建图复用输入上限与只读门禁", () => {
-  const source = imageNode("full-source", "已有上游");
   const target: FlowNode = {
     id: "full-target",
     type: "image",
     position: { x: 380, y: 0 },
-    data: {
-      kind: "image",
-      label: "高清放大",
-      status: "idle",
-      imageSize: "2K",
-      outputImages: [],
-      modelId: "gpt-image-2.5-flare-vip",
-      modelOptions: { size: "auto" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-    },
+    data: { kind: "image", label: "图片", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   };
+  // 图片节点 reference 入边上限为 8：8 个上游已满，第 9 个快捷建图被拒绝。
+  const upstreams = Array.from({ length: 8 }, (_, index) => imageNode(`upstream-${index}`, `上游 ${index + 1}`));
   useFlowStore.getState().openFlowTab({
     projectId: "quick-connect-full",
     projectName: "输入已满",
-    nodes: [source, target],
-    edges: [{ id: "already-connected", source: source.id, target: target.id }],
+    nodes: [...upstreams, target],
+    edges: upstreams.map((node, index) => ({ id: `upstream-${index}-edge`, source: node.id, target: target.id })),
   });
   assert.equal(
     useFlowStore.getState().addConnectedNode(target.id, "image", "upstream"),
     null,
   );
-  assert.equal(activeDocument().nodes.length, 2);
+  assert.equal(activeDocument().nodes.length, 9);
 
   useFlowStore.getState().openFlowTab({
     projectId: "quick-connect-readonly",
