@@ -292,17 +292,99 @@ export interface Asset {
 // PATCH  /api/assets/:id       { name? } 重命名
 // DELETE /api/assets/:id       删除素材（不删底层图片文件，允许多素材共图）
 
+// ---------- 图不变量与参考图序号（graph-invariants.md）----------
+/**
+ * 图不变量的纯函数实现，前端唯一事实源。
+ * 三处实现（画布 / schema / 运行前置）共享同一条不变量：
+ *   ∀ n ∈ {image, video}: ∃ ≥1 条 text→n 的边（INV-1，targetHandle === "prompt"）。
+ * 边类型判定见 graph-invariants.md §2：text 边 targetHandle="prompt"；
+ * image 边 targetHandle 缺省或 "reference"；source kind 由节点表提供。
+ */
+
+export type GraphNodeLike = { id: string; data: { kind: NodeKind } };
+export type GraphEdgeLike = {
+  target: string;
+  source: string;
+  targetHandle?: string | null;
+};
+
+export function isPromptEdge(edge: GraphEdgeLike): boolean {
+  return edge.targetHandle === "prompt";
+}
+
+export function isReferenceEdge(edge: GraphEdgeLike): boolean {
+  return edge.targetHandle !== "prompt";
+}
+
+/** INV-1：每个 image/video 节点必须存在 ≥1 条来自 text 节点的 text 边。 */
+export function missingTextUpstreamNodeIds(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): string[] {
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  const result: string[] = [];
+  for (const node of nodes) {
+    if (node.data.kind !== "image" && node.data.kind !== "video") continue;
+    const hasTextUpstream = edges.some(
+      (edge) => edge.target === node.id && isPromptEdge(edge) && kindById.get(edge.source) === "text",
+    );
+    if (!hasTextUpstream) result.push(node.id);
+  }
+  return result;
+}
+
+/**
+ * R-39 参考图序号（graph-invariants.md §2b）：(选中目标, 源图) 的二元派生视图。
+ * 永不持久化——不写入节点 data、不进 DocumentSnapshot、不进 flow_json。
+ * 只有 image 边参与编号；text 边不编号。无选中目标时返回空 Map（不渲染徽标）。
+ * 选择器必须以 selectedTargetId 为输入现算，禁止缓存跨目标的映射。
+ */
+export function selectReferenceOrdinals(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+  selectedTargetId: string | null,
+): ReadonlyMap<string, number> {
+  const ordinals = new Map<string, number>();
+  if (!selectedTargetId) return ordinals;
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  let nextOrdinal = 1;
+  for (const edge of edges) {
+    if (edge.target !== selectedTargetId || !isReferenceEdge(edge)) continue;
+    // 只给 image 源节点编号（video 源不产参考图；text 源不会出现在 reference 边上）
+    if (kindById.get(edge.source) !== "image") continue;
+    if (!ordinals.has(edge.source)) {
+      ordinals.set(edge.source, nextOrdinal);
+      nextOrdinal += 1;
+    }
+  }
+  return ordinals;
+}
+
 // ---------- 节点注册表（前端渲染 + 引擎共用）----------
 export interface NodeSpec {
   kind: NodeKind;
   title: string;
+  /** 节点库/快捷建图展示用一句话描述；文案单一事实源在此，不在组件里散落。 */
+  description: string;
   /** 按边类型的入边数上限（graph-invariants.md §2：text 边 / image 边）；0 = 不接受该类型入边。 */
   inputs: { text: number; image: number };
   outputs: "text" | "images" | "video";
 }
 
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
-  text:  { kind: "text",  title: "文本", inputs: { text: 8, image: 0 }, outputs: "text"  },
-  image: { kind: "image", title: "图片", inputs: { text: 8, image: 8 }, outputs: "images" },
-  video: { kind: "video", title: "视频", inputs: { text: 8, image: 1 }, outputs: "video" },
+  text:  {
+    kind: "text", title: "文本",
+    description: "写提示词正文；可串联多段，也可运行文本功能润色生成",
+    inputs: { text: 8, image: 0 }, outputs: "text",
+  },
+  image: {
+    kind: "image", title: "图片",
+    description: "上传图片或选功能生成；既是输入参考图，也承载产出",
+    inputs: { text: 8, image: 8 }, outputs: "images",
+  },
+  video: {
+    kind: "video", title: "视频",
+    description: "文字 + 首帧图片生成上身动效视频",
+    inputs: { text: 8, image: 1 }, outputs: "video",
+  },
 };

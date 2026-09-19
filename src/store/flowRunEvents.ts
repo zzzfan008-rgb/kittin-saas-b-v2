@@ -124,7 +124,9 @@ export function applyRunEventToNode(
   if (event.status === "success") {
     return {
       ...data,
-      ...(data.kind !== "image-input" && data.kind !== "result" ? { outputImages: event.images } : {}),
+      // v7：只有 image 节点产出图片数组；text 节点的 outputText / video 节点的
+      // outputVideos 由各自运行路径写回（SSE images 通道只覆盖 image 节点）。
+      ...(data.kind === "image" ? { outputImages: event.images } : {}),
       status: "success",
       error: event.error,
     } as WorkflowNodeData;
@@ -138,16 +140,10 @@ export function applyRunEventToNode(
 
 export function requestedResultCount(data: WorkflowNodeData): number {
   switch (data.kind) {
-    case "sketch-to-render":
-    case "ai-modify":
+    case "image":
       return Math.max(1, Math.min(8, Number(data.batchSize) || 1));
-    case "print-mutate":
-      return Math.max(1, Math.min(8, Number(data.count) || 1));
-    case "fabric-recolor":
-      return Math.max(1, Math.min(8, data.colors.length || 1));
-    case "mask-redraw":
-      return 1;
-    default:
+    case "text":
+    case "video":
       return 1;
   }
 }

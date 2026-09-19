@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { maskRedrawReadiness } from "../src/lib/maskRedraw";
+import { maskRedrawReadiness } from "./lib/maskRedraw";
 import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
 import { imageModelAspectRatioPatch } from "../src/types/imageModels";
 import type { Edge } from "@xyflow/react";

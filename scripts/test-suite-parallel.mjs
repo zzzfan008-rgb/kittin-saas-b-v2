@@ -90,7 +90,6 @@ const TEST_FILES = [
   "tests/provider-retry.test.ts",
   "tests/exact-generation.test.ts",
   "tests/upload-image-normalization.test.ts",
-  "tests/image-input-node.test.ts",
   "tests/mask-upload.test.ts",
   "tests/static-frontend.test.ts",
   "tests/sqlite-postgres-migration.test.ts",

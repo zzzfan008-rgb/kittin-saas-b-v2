@@ -51,7 +51,8 @@ function projectMaskRefs(flow: PersistedWorkflow): Array<{
   nodeId: string;
 }> {
   return flow.nodes.flatMap((node) => {
-    if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return [];
+    // v7：蒙版是 image 节点能力（Q4=A），仅所选变体声明 needsMask 时存在 mask 字段。
+    if (node.data.kind !== "image" || typeof node.data.mask !== "string") return [];
     const match = /^\/api\/files\/([^/?#]+\.png)$/.exec(node.data.mask);
     return match ? [{ sourceUrl: node.data.mask, fileId: match[1], nodeId: node.id }] : [];
   });
@@ -117,7 +118,7 @@ export async function copyProjectScopedMasks(input: {
     flow: {
       ...input.flow,
       nodes: input.flow.nodes.map((node) => {
-        if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return node;
+        if (node.data.kind !== "image" || typeof node.data.mask !== "string") return node;
         const mask = replacements.get(node.data.mask);
         return mask ? { ...node, data: { ...node.data, mask } } : node;
       }),
@@ -248,5 +249,6 @@ export function isServerInitialDraftPristine(draft: ServerInitialDraftSnapshot):
   if (!/^未修改项目名称\d{8}000000$/.test(draft.name) || draft.flow.edges.length !== 0) return false;
   if (draft.flow.nodes.length !== 1) return false;
   const node = draft.flow.nodes[0];
-  return node.data.kind === "image-input" && node.data.status === "idle" && !node.data.imageUrl;
+  // v7：空白起始节点是尚未上传图片的 image 节点（R8 输入输出同体）。
+  return node.data.kind === "image" && node.data.status === "idle" && node.data.outputImages.length === 0;
 }

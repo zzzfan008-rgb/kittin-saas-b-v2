@@ -1,72 +1,109 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 7,
   "id": "builtin-sketch-upscale",
   "name": "草图→效果图→高清放大",
   "description": "上传草图渲染效果图，再放大至 2K/4K 精修细节",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 1,
+    "schemaVersion": 7,
     "nodes": [
       {
-        "id": "n1",
-        "type": "image-input",
+        "id": "sketch",
+        "type": "image",
         "position": {
           "x": 0,
           "y": 0
         },
         "data": {
-          "kind": "image-input",
-          "label": "图片上传",
+          "kind": "image",
+          "label": "草图上传",
           "status": "idle",
-          "imageRole": "sketch"
+          "aspectRatio": "3:4",
+          "batchSize": 1,
+          "outputImages": [],
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "quality": "high"
+          }
         }
       },
       {
-        "id": "n2",
-        "type": "sketch-to-render",
+        "id": "render",
+        "type": "image",
         "position": {
           "x": 380,
           "y": 0
         },
         "data": {
-          "kind": "sketch-to-render",
-          "label": "草图→效果图",
+          "kind": "image",
+          "label": "草图渲染",
           "status": "idle",
-          "prompt": "",
           "aspectRatio": "3:4",
           "batchSize": 1,
-          "outputImages": []
+          "outputImages": [],
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "quality": "high"
+          }
         }
       },
       {
-        "id": "n3",
-        "type": "upscale",
+        "id": "upscale-note",
+        "type": "text",
+        "position": {
+          "x": 380,
+          "y": 220
+        },
+        "data": {
+          "kind": "text",
+          "label": "放大说明",
+          "status": "idle",
+          "text": "保持原有构图、色彩和光影完全不变。"
+        }
+      },
+      {
+        "id": "upscale",
+        "type": "image",
         "position": {
           "x": 760,
           "y": 0
         },
         "data": {
-          "kind": "upscale",
+          "kind": "image",
           "label": "高清放大",
           "status": "idle",
-          "imageSize": "2K",
-          "outputImages": []
+          "aspectRatio": "3:4",
+          "batchSize": 1,
+          "outputImages": [],
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "quality": "high"
+          }
         }
       }
     ],
     "edges": [
       {
-        "id": "e1",
-        "source": "n1",
-        "target": "n2"
+        "id": "sketch-to-render",
+        "source": "sketch",
+        "target": "render",
+        "data": {}
       },
       {
-        "id": "e2",
-        "source": "n2",
-        "target": "n3"
+        "id": "render-to-upscale",
+        "source": "render",
+        "target": "upscale",
+        "data": {}
+      },
+      {
+        "id": "upscale-note-to-upscale",
+        "source": "upscale-note",
+        "target": "upscale",
+        "targetHandle": "prompt",
+        "sourceHandle": "prompt",
+        "data": {}
       }
     ]
-  },
-  "thumbnail": "/api/files/7qICbTj5uMWr.jpg"
+  }
 }
