@@ -482,24 +482,23 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("非法模型原生参数在付费调用前拒绝", async () => {
-      assert.match(imageModelOptionsError("flux-2-pro", { width: 513, height: 512, outputFormat: "png" }) ?? "", /unsupported/);
-      assert.match(imageModelOptionsError("seedream-5-0-260128", { size: "4K" }) ?? "", /unsupported/);
+    await test("模型原生参数校验降级为 warning：仅形状校验，取值不再阻断付费调用", async () => {
+      assert.equal(imageModelOptionsError("flux-2-pro", null), "must be an object");
+      assert.equal(imageModelOptionsError("flux-2-pro", [1, 2, 3]), "must be an object");
+      assert.equal(imageModelOptionsError("flux-2-pro", { width: 513, height: 512, outputFormat: "png" }), undefined);
+      assert.equal(imageModelOptionsError("seedream-5-0-260128", { size: "4K" }), undefined);
       let calls = 0;
       const restoreFetch = installFetchMock(() => {
         calls += 1;
-        return Response.json(pngPayload(white));
+        return Response.json({ data: [{ url: "https://cdn.example/generated.png" }] });
       });
       try {
-        await assert.rejects(
-          () => apiyiProviders["flux-2-pro"].generate({
-            prompt: "非法尺寸",
-            operationMode: "generate",
-            modelOptions: { width: 513, height: 512, outputFormat: "png" },
-          }),
-          /模型参数无效/,
-        );
-        assert.equal(calls, 0);
+        await apiyiProviders["flux-2-pro"].generate({
+          prompt: "非法尺寸",
+          operationMode: "generate",
+          modelOptions: { width: 513, height: 512, outputFormat: "png" },
+        });
+        assert.equal(calls, 1);
       } finally {
         restoreFetch();
       }

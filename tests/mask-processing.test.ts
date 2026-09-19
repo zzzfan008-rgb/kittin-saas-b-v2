@@ -296,17 +296,15 @@ await test("统一局部修改完整保留延展区内的低对比纹理，不�
 });
 
 await test("节点只展示统一局部修改说明，不再暴露技术处理模式", () => {
-  const sourceCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/MaskRedrawNode.tsx"), "utf8");
+  const imageNodeCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/ImageNode.tsx"), "utf8");
+  const maskEditorCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/MaskEditor.tsx"), "utf8");
   const processingCode = fs.readFileSync(path.join(REPO_ROOT, "server/lib/maskProcessing.ts"), "utf8");
-  assert.doesNotMatch(
-    sourceCode,
-    /useFlowStore\(selectActiveDocumentTarget\)/,
-    "返回新对象的文档目标 selector 不能直接用于渲染期订阅",
-  );
-  assert.match(sourceCode, /添加、替换或调整/);
-  assert.match(sourceCode, /涂抹区不是裁切框/);
-  assert.match(sourceCode, /整幅服装自动延展并融合/);
-  assert.doesNotMatch(sourceCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
+  assert.match(maskEditorCode, /红色是修改中心，不是裁切框/);
+  assert.match(maskEditorCode, /新内容可在金色融合区内完整延展/);
+  assert.match(imageNodeCode, /蒙版（该功能要求）/);
+  assert.match(imageNodeCode, /该功能需要先涂蒙版/);
+  assert.doesNotMatch(imageNodeCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
+  assert.doesNotMatch(maskEditorCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
   assert.doesNotMatch(processingCode, /preserveGeneratedLayer|opaqueGeneratedLayer|MaskCompositeMode/);
 });
 

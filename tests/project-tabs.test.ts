@@ -562,7 +562,7 @@ await test("新连线不再写入角色数据（edge data 为空对象）", () =
   ]);
 });
 
-await test("专用面料节点句柄在新连线时不再写入角色数据", () => {
+await test("专用面料/角色句柄在新连线时被拒绝，不再写入角色数据", () => {
   const source = imageNode("dedicated-handle-source", "参考来源");
   const targetId = "dedicated-handle-target";
   const target = {
@@ -602,10 +602,7 @@ await test("专用面料节点句柄在新连线时不再写入角色数据", ()
     targetHandle: "garment",
   });
 
-  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
-    {},
-    {},
-  ]);
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), []);
 });
 
 await test("快捷建图复用输入上限与只读门禁", () => {
