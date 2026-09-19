@@ -28,7 +28,7 @@ const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport
 const storageGenerateVariant = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 promotePromptVariantForTest(storageGenerateVariant);
@@ -207,9 +207,9 @@ await test("账号数据转移会化解重复付费请求号而不触发唯一�
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
       client_request_id, request_fingerprint
     ) VALUES
-      ('transfer-source-run', $1, 'source-node', '源任务', 'ai-modify', 1, 'failed', 1,
+      ('transfer-source-run', $1, 'source-node', '源任务', 'image', 1, 'failed', 1,
        'shared-transfer-request', 'source-fingerprint'),
-      ('transfer-target-run', $2, 'target-node', '目标任务', 'ai-modify', 1, 'failed', 2,
+      ('transfer-target-run', $2, 'target-node', '目标任务', 'image', 1, 'failed', 2,
        'shared-transfer-request', 'target-fingerprint')
   `, [sourceId, targetId]);
   const transferRecord = {
@@ -290,11 +290,11 @@ await test("账号转移不会合并出超过安全恢复上限的活动任务",
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
     )
     SELECT 'transfer-capacity-source-' || index, $1, 'source-node-' || index,
-      '源活动任务', 'ai-modify', 1, 'queued', index, '{"steps":[]}'
+      '源活动任务', 'image', 1, 'queued', index, '{"steps":[]}'
     FROM generate_series(1, 91) AS index
     UNION ALL
     SELECT 'transfer-capacity-target-' || index, $2, 'target-node-' || index,
-      '目标活动任务', 'ai-modify', 1, 'running', 1000 + index, '{"steps":[]}'
+      '目标活动任务', 'image', 1, 'running', 1000 + index, '{"steps":[]}'
     FROM generate_series(1, 90) AS index
   `, [sourceId, targetId]);
 
@@ -344,7 +344,7 @@ await test("仍有活动生成任务的账号不能直接删除", async () => {
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
-    ) VALUES ($1, $2, 'active-node', '活动任务', 'ai-modify', 1, 'queued', 1, '{"steps":[]}')
+    ) VALUES ($1, $2, 'active-node', '活动任务', 'image', 1, 'queued', 1, '{"steps":[]}')
   `, [runId, userId]);
 
   const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
@@ -393,7 +393,7 @@ await test("升级遗留且没有执行计划的 queued 记录不会永久阻止
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at
-    ) VALUES ($1, $2, 'legacy-node', '旧队列任务', 'ai-modify', 1, 'queued', 1)
+    ) VALUES ($1, $2, 'legacy-node', '旧队列任务', 'image', 1, 'queued', 1)
   `, [runId, userId]);
 
   const adminSession = await createSession(String(admin.id), { markExistingAsReplaced: false });
@@ -441,7 +441,7 @@ await test("账号转移等待 Worker 行锁时不会触发表锁升级死锁", 
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
-    ) VALUES ($1, $2, 'worker-node', 'Worker 任务', 'ai-modify', 1, 'queued', 1, '{"steps":[]}')
+    ) VALUES ($1, $2, 'worker-node', 'Worker 任务', 'image', 1, 'queued', 1, '{"steps":[]}')
   `, [runId, sourceId]);
 
   const worker = await db().connect();
@@ -533,7 +533,7 @@ await test("删除账号时全部业务数据进入 15 天回收期并在到期�
     INSERT INTO generation_runs (
       id, owner_id, project_id, node_id, node_label, kind, requested_count,
       successful_count, provider_requests, status, started_at, finished_at
-    ) VALUES ('retention-run', $1, 'retention-project', 'node', '节点', 'ai-modify', 1, 1, 1, 'success', 1, 2)
+    ) VALUES ('retention-run', $1, 'retention-project', 'node', '节点', 'image', 1, 1, 1, 'success', 1, 2)
   `, [userId]);
   await query(`
     INSERT INTO usage_events (
@@ -709,7 +709,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     {
       steps: [{
         nodeId: successNodeId,
-        kind: "sketch-to-render",
+        kind: "image",
         inputImages: [],
         params: boundStorageGenerateParams("生成成功效果图"),
       }],
@@ -719,7 +719,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
       userId: String(admin.id),
       nodeId: successNodeId,
       nodeLabel: "AI 改款",
-      kind: "sketch-to-render",
+      kind: "image",
       requestedCount: 1,
     },
   );
@@ -740,7 +740,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     {
       steps: [{
         nodeId: failureNodeId,
-        kind: "sketch-to-render",
+        kind: "image",
         inputImages: [],
         params: boundStorageGenerateParams("生成失败效果图"),
       }],
@@ -750,7 +750,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
       userId: String(admin.id),
       nodeId: failureNodeId,
       nodeLabel: "AI 改款",
-      kind: "sketch-to-render",
+      kind: "image",
       requestedCount: 1,
     },
   );

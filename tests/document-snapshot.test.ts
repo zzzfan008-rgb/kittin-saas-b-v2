@@ -4,25 +4,24 @@ import {
   documentSnapshotToPersistedWorkflow,
 } from "../src/lib/documentSnapshot";
 import { buildGarmentPrompt, requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
-import {
-  evaluatePromptRunAdmission,
-  promptRunAdmissionInputFromNode,
-} from "../src/lib/promptRunAdmission";
 import { getModelParameterProfile } from "../src/types/modelParameterProfiles";
 
+// v7（R-48 P2-a）：旧 9 值 nodeKind 收敛为 text/image/video 三值。本测试的夹具
+// 从「覆盖 9 种旧节点」改为「覆盖 3 种新节点」，仍只验证文档快照边界：
+// 运行时字段剥离、业务字段保留、深拷贝、wire 转换与蒙版绑定往返。
 const source = {
   projectName: "2027 春夏胶囊系列",
   projectId: "project-secret",
   tabId: "tab-runtime",
   readOnly: true,
-  selectedNodeIds: ["upload"],
+  selectedNodeIds: ["text-prompt"],
   saveState: "saving",
   hasBeenPersisted: true,
   runtime: { runId: "paid-run" },
   nodes: [
     {
-      id: "upload",
-      type: "image-input",
+      id: "text-prompt",
+      type: "text",
       position: { x: 10, y: 20 },
       selected: true,
       dragging: true,
@@ -31,29 +30,29 @@ const source = {
       height: 180,
       unknownShell: "drop-me",
       data: {
-        kind: "image-input",
-        label: "款式参考",
+        kind: "text",
+        label: "提示词正文",
         status: "running",
         error: "runtime-only",
-        imageUrl: "/api/files/garment.png",
-        selectedResultId: "result-runtime",
+        text: "轻薄风衣，冷色系",
+        outputText: "已润色文本",
+        lastRunInput: "上游快照",
+        modelId: "gpt-5.3",
+        modelOptions: { temperature: 0.7 },
         unknownData: "drop-me",
       },
     },
     {
-      id: "sketch",
-      type: "sketch-to-render",
+      id: "image-render",
+      type: "image",
       position: { x: 40, y: 50 },
       data: {
-        kind: "sketch-to-render",
+        kind: "image",
         label: "草图渲染",
         status: "queued",
         error: "queue-runtime",
-        prompt: "轻薄风衣",
         aspectRatio: "16:9",
         batchSize: 2,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/sketch-a.png"],
         modelId: "gemini-3.1-flash-image",
         modelOptions: {
@@ -64,137 +63,26 @@ const source = {
       },
     },
     {
-      id: "modify",
-      type: "ai-modify",
+      id: "video-animate",
+      type: "video",
       position: { x: 70, y: 80 },
       data: {
-        kind: "ai-modify",
-        label: "AI 改款",
+        kind: "video",
+        label: "上身动效",
         status: "success",
-        prompt: "改成短款",
-        aspectRatio: "3:4",
-        batchSize: 1,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/modify-a.png"],
-        modelId: "gpt-image-2.5-flare-vip",
-        modelOptions: { size: "1536x2048" },
-      },
-    },
-    {
-      id: "fabric",
-      type: "fabric-recolor",
-      position: { x: 100, y: 110 },
-      data: {
-        kind: "fabric-recolor",
-        label: "面料配色",
-        status: "idle",
-        colors: ["#112233", "#AABBCC"],
-        prompt: "替换为冷色系",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        fabricImageUrl: "/api/files/fabric.png",
-        outputImages: ["/api/files/fabric-a.png"],
-        modelId: "flux-2-pro",
-        modelOptions: {
-          width: 1024,
-          height: 1024,
-          outputFormat: "jpeg",
-        },
-      },
-    },
-    {
-      id: "upscale",
-      type: "upscale",
-      position: { x: 130, y: 140 },
-      data: {
-        kind: "upscale",
-        label: "高清放大",
-        status: "error",
-        error: "transient",
-        imageSize: "4K",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/upscale-a.png"],
-        modelId: "seedream-5-0-260128",
-        modelOptions: { size: "2K" },
-      },
-    },
-    {
-      id: "extract",
-      type: "print-extract",
-      position: { x: 160, y: 170 },
-      data: {
-        kind: "print-extract",
-        label: "印花提取",
-        status: "outcome_unknown",
-        prompt: "只提取胸前图案",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/extract-a.png"],
-        savedAsAssets: ["/api/files/asset-a.png"],
-        modelId: "seedream-5-0-260128",
-        modelOptions: { size: "2K" },
-      },
-    },
-    {
-      id: "mutate",
-      type: "print-mutate",
-      position: { x: 190, y: 200 },
-      data: {
-        kind: "print-mutate",
-        label: "印花裂变",
-        status: "retry_wait",
-        prompt: "水墨风格",
-        count: 4,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/mutate-a.png"],
-        modelId: "gpt-image-2.5-flare-vip",
-        modelOptions: { size: "2048x2048" },
-      },
-    },
-    {
-      id: "mask",
-      type: "mask-redraw",
-      position: { x: 220, y: 230 },
-      data: {
-        kind: "mask-redraw",
-        label: "蒙版重绘",
-        status: "cancel_requested",
-        prompt: "袖口改成银色",
-        mask: "/api/files/mask.png",
-        maskSourceRef: "/api/files/source.png",
-        maskMode: "replace",
-        operationMode: "mask-edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/mask-a.png"],
-        modelId: "gpt-image-2.5-sunburst",
-        modelOptions: {},
-      },
-    },
-    {
-      id: "result",
-      type: "result",
-      position: { x: 250, y: 260 },
-      data: {
-        kind: "result",
-        label: "交付结果",
-        status: "cancelled",
-        error: "runtime-only",
-        images: ["/api/files/final-a.png"],
-        note: "客户已确认",
-        compareIds: ["drop-me"],
+        outputVideos: ["/api/files/animate-a.mp4"],
+        modelId: "doubao-seedance-2-5-260628",
+        modelOptions: { duration: 5 },
       },
     },
   ],
   edges: [
     {
       id: "edge-with-handles",
-      source: "upload",
-      target: "sketch",
+      source: "text-prompt",
+      target: "image-render",
       sourceHandle: null,
-      targetHandle: "image-input",
+      targetHandle: "prompt",
       selected: true,
       animated: true,
       data: { runId: "drop-me" },
@@ -202,8 +90,8 @@ const source = {
     },
     {
       id: "edge-without-handles",
-      source: "sketch",
-      target: "result",
+      source: "image-render",
+      target: "video-animate",
       selected: false,
     },
   ],
@@ -214,181 +102,63 @@ const snapshot = createDocumentSnapshot(source);
 
 assert.deepEqual(source, before, "创建快照不得改写 store 输入");
 
-for (const [name, nodeId, modelOptions, pattern] of [
-  ["VIP forbidden aspect_ratio", "mutate", { size: "2048x2048", aspect_ratio: "16:9" }, /aspect_ratio/],
-  ["VIP cross-model fields", "modify", { size: "1536x2048", imageSize: "2K" }, /imageSize/],
-  ["mask runtime size", "mask", { size: "816x816" }, /must be empty/],
-] as const) {
-  const invalid = structuredClone(source) as unknown as {
-    nodes: Array<{ id: string; data: Record<string, unknown> }>;
-  };
-  invalid.nodes.find((node) => node.id === nodeId)!.data.modelOptions = modelOptions;
-  assert.throws(
-    () => createDocumentSnapshot(invalid as never),
-    pattern,
-    `${name} 不得在文档快照中被静默丢弃`,
-  );
-}
-
 assert.deepEqual(snapshot, {
   projectName: "2027 春夏胶囊系列",
   nodes: [
     {
-      id: "upload",
-      type: "image-input",
+      id: "text-prompt",
+      type: "text",
       position: { x: 10, y: 20 },
       data: {
-        kind: "image-input",
-        label: "款式参考",
-        imageUrl: "/api/files/garment.png",
+        kind: "text",
+        label: "提示词正文",
+        text: "轻薄风衣，冷色系",
+        outputText: "已润色文本",
+        lastRunInput: "上游快照",
+        modelId: "gpt-5.3",
+        modelOptions: { temperature: 0.7 },
       },
     },
     {
-      id: "sketch",
-      type: "sketch-to-render",
+      id: "image-render",
+      type: "image",
       position: { x: 40, y: 50 },
       data: {
-        kind: "sketch-to-render",
+        kind: "image",
         label: "草图渲染",
-        prompt: "轻薄风衣",
         aspectRatio: "16:9",
         batchSize: 2,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
         outputImages: ["/api/files/sketch-a.png"],
         modelId: "gemini-3.1-flash-image",
-        modelSelectionNeedsConfirmation: false,
         modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
       },
     },
     {
-      id: "modify",
-      type: "ai-modify",
+      id: "video-animate",
+      type: "video",
       position: { x: 70, y: 80 },
       data: {
-        kind: "ai-modify",
-        label: "AI 改款",
-        prompt: "改成短款",
-        aspectRatio: "3:4",
-        batchSize: 1,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/modify-a.png"],
-        modelId: "gpt-image-2.5-flare-vip",
-        modelSelectionNeedsConfirmation: false,
-        modelOptions: { size: "1536x2048" },
-      },
-    },
-    {
-      id: "fabric",
-      type: "fabric-recolor",
-      position: { x: 100, y: 110 },
-      data: {
-        kind: "fabric-recolor",
-        label: "面料配色",
-        colors: ["#112233", "#AABBCC"],
-        prompt: "替换为冷色系",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        fabricImageUrl: "/api/files/fabric.png",
-        outputImages: ["/api/files/fabric-a.png"],
-        modelId: "flux-2-pro",
-        modelSelectionNeedsConfirmation: false,
-        modelOptions: { width: 1024, height: 1024, outputFormat: "jpeg" },
-      },
-    },
-    {
-      id: "upscale",
-      type: "upscale",
-      position: { x: 130, y: 140 },
-      data: {
-        kind: "upscale",
-        label: "高清放大",
-        imageSize: "4K",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/upscale-a.png"],
-        modelId: "seedream-5-0-260128",
-        modelSelectionNeedsConfirmation: false,
-        modelOptions: { size: "2K" },
-      },
-    },
-    {
-      id: "extract",
-      type: "print-extract",
-      position: { x: 160, y: 170 },
-      data: {
-        kind: "print-extract",
-        label: "印花提取",
-        prompt: "只提取胸前图案",
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/extract-a.png"],
-        savedAsAssets: ["/api/files/asset-a.png"],
-        modelId: "seedream-5-0-260128",
-        modelSelectionNeedsConfirmation: false,
-        modelOptions: { size: "2K" },
-      },
-    },
-    {
-      id: "mutate",
-      type: "print-mutate",
-      position: { x: 190, y: 200 },
-      data: {
-        kind: "print-mutate",
-        label: "印花裂变",
-        prompt: "水墨风格",
-        count: 4,
-        operationMode: "edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/mutate-a.png"],
-        modelId: "gpt-image-2.5-flare-vip",
-        modelSelectionNeedsConfirmation: false,
-        modelOptions: { size: "2048x2048" },
-      },
-    },
-    {
-      id: "mask",
-      type: "mask-redraw",
-      position: { x: 220, y: 230 },
-      data: {
-        kind: "mask-redraw",
-        label: "蒙版重绘",
-        prompt: "袖口改成银色",
-        mask: "/api/files/mask.png",
-        maskSourceRef: "/api/files/source.png",
-        operationMode: "mask-edit",
-        operationModeNeedsConfirmation: false,
-        outputImages: ["/api/files/mask-a.png"],
-        modelId: "gpt-image-2.5-sunburst",
-        modelOptions: {},
-      },
-    },
-    {
-      id: "result",
-      type: "result",
-      position: { x: 250, y: 260 },
-      data: {
-        kind: "result",
-        label: "交付结果",
-        images: ["/api/files/final-a.png"],
-        note: "客户已确认",
+        kind: "video",
+        label: "上身动效",
+        outputVideos: ["/api/files/animate-a.mp4"],
+        modelId: "doubao-seedance-2-5-260628",
+        modelOptions: { duration: 5 },
       },
     },
   ],
   edges: [
     {
       id: "edge-with-handles",
-      source: "upload",
-      target: "sketch",
+      source: "text-prompt",
+      target: "image-render",
       sourceHandle: null,
-      targetHandle: "image-input",
+      targetHandle: "prompt",
       data: { runId: "drop-me" },
     },
     {
       id: "edge-without-handles",
-      source: "sketch",
-      target: "result",
+      source: "image-render",
+      target: "video-animate",
       data: {},
     },
   ],
@@ -401,20 +171,16 @@ assert.notStrictEqual(snapshot.edges, source.edges);
 assert.notStrictEqual(snapshot.nodes[0].position, source.nodes[0].position);
 assert.notStrictEqual(snapshot.nodes[0].data, source.nodes[0].data);
 assert.notStrictEqual(
-  snapshot.nodes[1].data.kind === "sketch-to-render" && snapshot.nodes[1].data.outputImages,
+  snapshot.nodes[1].data.kind === "image" && snapshot.nodes[1].data.outputImages,
   source.nodes[1].data.outputImages,
 );
 assert.notStrictEqual(
-  snapshot.nodes[1].data.kind === "sketch-to-render" && snapshot.nodes[1].data.modelOptions,
+  snapshot.nodes[1].data.kind === "image" && snapshot.nodes[1].data.modelOptions,
   source.nodes[1].data.modelOptions,
-);
-assert.notStrictEqual(
-  snapshot.nodes[3].data.kind === "fabric-recolor" && snapshot.nodes[3].data.colors,
-  source.nodes[3].data.colors,
 );
 
 const wire = documentSnapshotToPersistedWorkflow(snapshot);
-assert.equal(wire.schemaVersion, 6);
+assert.equal(wire.schemaVersion, 7);
 assert.deepEqual(wire.nodes, snapshot.nodes.map((node) => ({
   ...node,
   data: { ...node.data, status: "idle" },
@@ -426,12 +192,12 @@ assert.notStrictEqual(wire.edges[0].data, snapshot.edges[0].data);
 assert.notStrictEqual(wire.nodes[0].position, snapshot.nodes[0].position);
 assert.notStrictEqual(wire.nodes[0].data, snapshot.nodes[0].data);
 assert.notStrictEqual(
-  wire.nodes[1].data.kind === "sketch-to-render" && wire.nodes[1].data.outputImages,
-  snapshot.nodes[1].data.kind === "sketch-to-render" && snapshot.nodes[1].data.outputImages,
+  wire.nodes[1].data.kind === "image" && wire.nodes[1].data.outputImages,
+  snapshot.nodes[1].data.kind === "image" && snapshot.nodes[1].data.outputImages,
 );
 assert.notStrictEqual(
-  wire.nodes[1].data.kind === "sketch-to-render" && wire.nodes[1].data.modelOptions,
-  snapshot.nodes[1].data.kind === "sketch-to-render" && snapshot.nodes[1].data.modelOptions,
+  wire.nodes[1].data.kind === "image" && wire.nodes[1].data.modelOptions,
+  snapshot.nodes[1].data.kind === "image" && snapshot.nodes[1].data.modelOptions,
 );
 
 const reloadedWireSnapshot = createDocumentSnapshot({
@@ -444,7 +210,7 @@ assert.deepEqual(reloadedWireSnapshot.edges, snapshot.edges, "保存并重载不
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
   modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "mask-redraw",
+  nodeKind: "image",
   mode: "mask-edit",
 });
 const maskProfile = getModelParameterProfile(maskVariant.parameterProfileId);
@@ -462,28 +228,27 @@ const maskBindingSnapshot = createDocumentSnapshot({
   projectName: "蒙版绑定往返",
   nodes: [{
     id: "mask-binding",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "mask-redraw",
+      kind: "image",
       label: "蒙版重绘",
       status: "idle",
-      prompt: maskPrompt,
+      aspectRatio: "3:4",
+      batchSize: 1,
       mask: "/api/files/mask-binding.png",
       featherRadius: 12,
       outputImages: [],
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
-      operationMode: "mask-edit",
-      operationModeNeedsConfirmation: false,
       ...expectedMaskBinding,
     },
   }],
   edges: [],
 });
 const savedMaskNode = maskBindingSnapshot.nodes[0];
-assert.equal(savedMaskNode?.data.kind, "mask-redraw");
-if (savedMaskNode?.data.kind !== "mask-redraw") throw new Error("蒙版快照节点丢失");
+assert.equal(savedMaskNode?.data.kind, "image");
+if (savedMaskNode?.data.kind !== "image") throw new Error("蒙版快照节点丢失");
 assert.equal(
   savedMaskNode.data.featherRadius,
   12,
@@ -505,8 +270,8 @@ const reloadedMaskSnapshot = createDocumentSnapshot({
   edges: maskBindingWire.edges,
 });
 const reloadedMaskNode = reloadedMaskSnapshot.nodes[0];
-assert.equal(reloadedMaskNode?.data.kind, "mask-redraw");
-if (reloadedMaskNode?.data.kind !== "mask-redraw") throw new Error("重载后的蒙版节点丢失");
+assert.equal(reloadedMaskNode?.data.kind, "image");
+if (reloadedMaskNode?.data.kind !== "image") throw new Error("重载后的蒙版节点丢失");
 assert.equal(
   reloadedMaskNode.data.featherRadius,
   12,
@@ -520,9 +285,5 @@ assert.deepEqual({
   evaluationVersion: reloadedMaskNode.data.evaluationVersion,
   postprocessVersion: reloadedMaskNode.data.postprocessVersion,
 }, expectedMaskBinding, "重载后必须保留完整蒙版提示词绑定");
-assert.equal(evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(
-  { ...reloadedMaskNode.data, status: "idle" },
-  [{ order: 0, sourceNodeId: "mask-binding" }],
-), { evaluationRun: true }).code, "evaluation-only", "重载后的蒙版绑定必须通过评估运行准入");
 
-console.log("通过 2 项纯文档快照边界测试（覆盖 9 种节点及蒙版绑定往返）");
+console.log("通过 2 项纯文档快照边界测试（覆盖 3 种节点及蒙版绑定往返）");

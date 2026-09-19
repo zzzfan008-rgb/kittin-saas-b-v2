@@ -51,13 +51,13 @@ const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport
 const generationVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 const editVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 // Route authorization tests need accepted jobs without changing production status.
@@ -109,10 +109,10 @@ function flow(images: string[] = []) {
     schemaVersion: 1,
     nodes: images.map((imageUrl, index) => ({
       id: `image_${index}`,
-      type: "image-input",
+      type: "image",
       position: { x: index * 100, y: 0 },
       data: {
-        kind: "image-input",
+        kind: "image",
         label: `图片 ${index + 1}`,
         status: "idle",
         imageUrl,
@@ -127,10 +127,10 @@ function generationFlow(prompt: string) {
     schemaVersion: 4,
     nodes: [{
       id: "generate",
-      type: "sketch-to-render",
+      type: "image",
       position: { x: 0, y: 0 },
       data: {
-        kind: "sketch-to-render",
+        kind: "image",
         label: "生成效果图",
         status: "idle",
         modelId: "gemini-3.1-flash-image",
@@ -158,10 +158,10 @@ function editFlow(imageUrl: string) {
     nodes: [
       {
         id: "source",
-        type: "image-input",
+        type: "image",
         position: { x: 0, y: 0 },
         data: {
-          kind: "image-input",
+          kind: "image",
           label: "原图",
           status: "idle",
           imageUrl,
@@ -169,10 +169,10 @@ function editFlow(imageUrl: string) {
       },
       {
         id: "edit",
-        type: "ai-modify",
+        type: "image",
         position: { x: 320, y: 0 },
         data: {
-          kind: "ai-modify",
+          kind: "image",
           label: "改款",
           status: "idle",
           modelId: "gpt-image-2.5-flare-vip",
@@ -353,7 +353,7 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
   return {
     clientRequestId,
     modelId: "gpt-image-2.5-flare-vip",
-    kind: "ai-modify",
+    kind: "image",
     projectId,
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
@@ -558,14 +558,14 @@ await test("模板账号 journal 可在数据库回滚或提交后恢复文件�
 await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式越权", async () => {
   const plan = buildExecutionPlan([{
     id: "result",
-    type: "result",
-    data: { kind: "result", label: "结果", status: "idle", images: [] },
+    type: "image",
+    data: { kind: "image", label: "结果", status: "idle", images: [] },
   }], []);
   const run = await enqueueGenerationRun(plan, users.owner.id, {
     userId: users.owner.id,
     nodeId: "result",
     nodeLabel: "结果",
-    kind: "result",
+    kind: "image",
     requestedCount: 1,
   });
 
@@ -884,8 +884,8 @@ await test("不存在或已删除的 projectId 不能污染运行历史元数据
     method: "POST",
     body: JSON.stringify({
       nodes: [{
-        id: "result-only", type: "result", position: { x: 0, y: 0 },
-        data: { kind: "result", label: "结果", status: "idle", images: [] },
+        id: "result-only", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "结果", status: "idle", images: [] },
       }],
       edges: [],
       projectId: "missing-project",
@@ -1403,21 +1403,21 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
     steps: [
       {
         nodeId: "static-source",
-        kind: "image-input",
+        kind: "image",
         inputImages: [],
         upstream: [],
         params: { imageUrl: "/api/files/actual-static.png" },
       },
       {
         nodeId: "provider-a",
-        kind: "sketch-to-render",
+        kind: "image",
         inputImages: [],
         upstream: [],
         params: {},
       },
       {
         nodeId: "bridge-result",
-        kind: "result",
+        kind: "image",
         inputImages: [
           "/api/files/stale-provider.png",
           "/api/files/stale-static.png",
@@ -1430,7 +1430,7 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
       },
       {
         nodeId: "provider-b",
-        kind: "ai-modify",
+        kind: "image",
         inputImages: [
           "/api/files/stale-result-provider.png",
           "/api/files/stale-result-static.png",
@@ -1457,7 +1457,7 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
   const inputOnlyPlan: ExecutionPlan = {
     steps: [{
       nodeId: "input-only-provider",
-      kind: "ai-modify",
+      kind: "image",
       inputImages: ["/api/files/input-only-static.png"],
       inputReferences: [{
         imageRef: "/api/files/input-only-static.png",
@@ -1478,7 +1478,7 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
     steps: [
       {
         nodeId: "fabric-provider",
-        kind: "fabric-recolor",
+        kind: "image",
         inputImages: ["/api/files/fabric-base.png"],
         inputReferences: [{
           imageRef: "/api/files/fabric-base.png",
@@ -1489,7 +1489,7 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
       },
       {
         nodeId: "mask-provider",
-        kind: "mask-redraw",
+        kind: "image",
         inputImages: ["/api/files/mask-base.png"],
         inputReferences: [{
           imageRef: "/api/files/mask-base.png",
@@ -1709,7 +1709,7 @@ await test("直连生成在入队前拒绝非图片引用与不安全 sourceNode
   const fabricRequestId = "direct-invalid-fabric-reference";
   clientRequestIds.push(fabricRequestId);
   const unsafeFabricReference = directGenerateBody(PNG_DATA_URL, undefined, fabricRequestId);
-  unsafeFabricReference.kind = "fabric-recolor";
+  unsafeFabricReference.kind = "image";
   (unsafeFabricReference.request as { fabricImageUrl?: unknown }).fabricImageUrl = "../../fabric.png";
   const unsafeFabricResponse = await request("/generate", "owner", {
     method: "POST",
@@ -2362,10 +2362,10 @@ await test("强制清除草稿：含退役 modelId 的损坏草稿无需解析�
     schemaVersion: 6,
     nodes: [{
       id: "retired-model-node",
-      type: "sketch-to-render",
+      type: "image",
       position: { x: 0, y: 0 },
       data: {
-        kind: "sketch-to-render",
+        kind: "image",
         label: "退役模型节点",
         status: "idle",
         modelId: "gpt-image-2-vip",
@@ -2611,7 +2611,7 @@ await test("真实账号删除先持 owner 锁时，全部并发写入等待后�
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-    ) VALUES ($1, $2, 'history-node', '历史节点', 'ai-modify', 1, 'failed', 1, 2)
+    ) VALUES ($1, $2, 'history-node', '历史节点', 'image', 1, 'failed', 1, 2)
   `, [runId, source.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2742,8 +2742,8 @@ await test("历史记录只有所有者能删除，其他人与不存在记录�
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
     ) VALUES
-      ('history-other-run', $1, 'node', '节点', 'ai-modify', 1, 'error', 1, 2),
-      ('history-owner-run', $2, 'node', '节点', 'ai-modify', 1, 'error', 1, 2)
+      ('history-other-run', $1, 'node', '节点', 'image', 1, 'error', 1, 2),
+      ('history-owner-run', $2, 'node', '节点', 'image', 1, 'error', 1, 2)
   `, [users.other.id, users.owner.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2777,8 +2777,8 @@ await test("普通历史不会把无执行计划的旧活动状态恢复成正�
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
       ) VALUES
-        ($1, $3, 'legacy-active-node', '旧活动任务', 'ai-modify', 1, 'queued', 95000, NULL),
-        ($2, $3, 'legacy-terminal-node', '旧终态任务', 'ai-modify', 1, 'failed', 94000, 94001)
+        ($1, $3, 'legacy-active-node', '旧活动任务', 'image', 1, 'queued', 95000, NULL),
+        ($2, $3, 'legacy-terminal-node', '旧终态任务', 'image', 1, 'failed', 94000, 94001)
     `, [runIds[0], runIds[1], users.owner.id]);
 
     const response = await request("/history?limit=20&before=100000", "owner");
@@ -2799,7 +2799,7 @@ await test("活动任务使用独立完整集合，不会被最近历史的 20 �
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
         plan_json, client_request_id, request_fingerprint
       ) VALUES (
-        'old-active-run', $1, 'old-active-node', '旧活动任务', 'ai-modify', 1, 'running', 90000,
+        'old-active-run', $1, 'old-active-node', '旧活动任务', 'image', 1, 'running', 90000,
         '{"steps":[]}', 'old-active-request', 'old-active-fingerprint'
       )
     `, [users.owner.id]);
@@ -2810,7 +2810,7 @@ await test("活动任务使用独立完整集合，不会被最近历史的 20 �
         INSERT INTO generation_runs (
           id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
           finished_at, plan_json
-        ) VALUES ($1, $2, 'terminal-node', '新终态', 'ai-modify', 1, 'failed', $3, $3, '{"steps":[]}')
+        ) VALUES ($1, $2, 'terminal-node', '新终态', 'image', 1, 'failed', $3, $3, '{"steps":[]}')
       `, [id, users.owner.id, 100000 + index]);
     }
 
@@ -2841,7 +2841,7 @@ await test("活动任务超过安全恢复上限时接口 fail-closed", async ()
       )
       SELECT
         'active-overflow-' || index, $1, 'active-overflow-node-' || index,
-        '活动任务上限', 'ai-modify', 1, 'running', 300000 + index, '{"steps":[]}'
+        '活动任务上限', 'image', 1, 'running', 300000 + index, '{"steps":[]}'
       FROM generate_series(1, 181) AS index
     `, [users.owner.id]);
     const response = await request("/history/active", "owner");
@@ -2872,7 +2872,7 @@ await test("历史分页固定在首次快照，期间新增记录不会推移�
     await query(`
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 1, 'error', $3, $3)
+      ) VALUES ($1, $2, 'node', '节点', 'image', 1, 'error', $3, $3)
     `, [id, users.owner.id, startedAt]);
     await query(`
       INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2888,7 +2888,7 @@ await test("历史分页固定在首次快照，期间新增记录不会推移�
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-    ) VALUES ('snapshot-new', $1, 'node', '节点', 'ai-modify', 1, 'error', 4000, 4000)
+    ) VALUES ('snapshot-new', $1, 'node', '节点', 'image', 1, 'error', 4000, 4000)
   `, [users.owner.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2912,7 +2912,7 @@ await test("运行任务完成并展开为多条输出时不会令下一页漏�
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at,
         plan_json
-      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 2, $3, $4, $4, $5)
+      ) VALUES ($1, $2, 'node', '节点', 'image', 2, $3, $4, $4, $5)
     `, [id, users.owner.id, status, startedAt, status === "running" ? '{"steps":[]}' : null]);
     if (status === "error") {
       await query(`
@@ -2957,8 +2957,8 @@ await query(`
     id, owner_id, project_id, node_id, node_label, kind, model,
     requested_count, successful_count, provider_requests, status, started_at, finished_at
   ) VALUES
-    ('usage-owner-run', $1, '+PROJECT', '@NODE', '测试节点', 'ai-modify', '-MODEL', 1, 1, 1, 'success', 1, 2),
-    ('usage-other-run', $2, 'other-project', 'other-node', '其他节点', 'ai-modify', 'safe-model', 1, 1, 1, 'success', 1, 2)
+    ('usage-owner-run', $1, '+PROJECT', '@NODE', '测试节点', 'image', '-MODEL', 1, 1, 1, 'success', 1, 2),
+    ('usage-other-run', $2, 'other-project', 'other-node', '其他节点', 'image', 'safe-model', 1, 1, 1, 'success', 1, 2)
 `, [users.owner.id, users.other.id]);
 await query(`
   INSERT INTO usage_events (

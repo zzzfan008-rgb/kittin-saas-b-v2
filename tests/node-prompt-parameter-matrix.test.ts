@@ -28,13 +28,13 @@ assert.equal(actual.scope.supportedEntryCount, 9);
 assert.equal(actual.scope.unsupportedEntryCount, 54);
 assert.deepEqual(actual.scope.modelIds, IMAGE_MODEL_IDS);
 assert.deepEqual(actual.scope.nodeKinds, [
-  "sketch-to-render",
-  "ai-modify",
-  "mask-redraw",
-  "fabric-recolor",
-  "upscale",
-  "print-extract",
-  "print-mutate",
+  "image",
+  "image",
+  "image",
+  "image",
+  "image",
+  "image",
+  "image",
 ]);
 assert.equal(actual.scope.noProviderCallsPerformed, true);
 assert.equal(actual.scope.imageGenerationOrEditCalls, 0);
@@ -110,7 +110,7 @@ for (const entry of supported) {
   }
 }
 
-const maskEntry = actual.entries.find((entry) => entry.nodeKind === "mask-redraw" && entry.modelId === "gpt-image-2.5-sunburst");
+const maskEntry = actual.entries.find((entry) => entry.nodeKind === "image" && entry.modelId === "gpt-image-2.5-sunburst");
 assert.ok(maskEntry);
 assert.equal(maskEntry.supportStatus, "unverified");
 assert.deepEqual(maskEntry.promptVariantIds, ["mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1"]);
@@ -162,12 +162,12 @@ for (const entry of unsupported) {
 }
 
 for (const entry of actual.entries.filter((candidate) => candidate.modelId === "gpt-image-2.5-sunburst")) {
-  if (entry.nodeKind === "mask-redraw") continue;
+  if (entry.nodeKind === "image") continue;
   assert.equal(entry.supportStatus, "unsupported");
   assert.match(entry.failClosedReason ?? "", /仅允许 mask-redraw/);
 }
 
-for (const entry of actual.entries.filter((candidate) => candidate.nodeKind === "mask-redraw" && candidate.modelId !== "gpt-image-2.5-sunburst")) {
+for (const entry of actual.entries.filter((candidate) => candidate.nodeKind === "image" && candidate.modelId !== "gpt-image-2.5-sunburst")) {
   assert.equal(entry.supportStatus, "unsupported");
   assert.match(entry.failClosedReason ?? "", /只支持 GPT Image 2/);
 }

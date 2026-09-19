@@ -290,7 +290,7 @@ function buildExternalRelease(): {
   const variant = requireGarmentPromptVariant({
     familyId: "commerce-hero",
     modelId: "gpt-image-2.5-flare-vip",
-    nodeKind: "sketch-to-render",
+    nodeKind: "image",
     mode: "generate",
   });
   const target = currentEvaluationPromotionTarget(variant.variantId, []);

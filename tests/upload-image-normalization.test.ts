@@ -356,15 +356,15 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       schemaVersion: 2,
       nodes: [{
         id: "source-node",
-        type: "image-input",
+        type: "image",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "原图", status: "idle", imageUrl: body.url },
+        data: { kind: "image", label: "原图", status: "idle", imageUrl: body.url },
       }, {
         id: maskNodeId,
-        type: "mask-redraw",
+        type: "image",
         position: { x: 300, y: 0 },
         data: {
-          kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改成银色",
+          kind: "image", label: "局部重绘", status: "idle", prompt: "改成银色",
           modelId: "gpt-image-2.5-sunburst", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
         },
       }],
@@ -491,9 +491,9 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       schemaVersion: 2,
       nodes: [{
         id: "starter",
-        type: "image-input",
+        type: "image",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "上传服装图", status: "idle" },
+        data: { kind: "image", label: "上传服装图", status: "idle" },
       }],
       edges: [],
     };
@@ -630,7 +630,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       INSERT INTO generation_runs (
         id, owner_id, project_id, node_id, node_label, kind,
         requested_count, status, started_at, plan_json, run_type, updated_at
-      ) VALUES ($1, $2, 'mask-project', 'mask-node', '局部重绘', 'mask-redraw',
+      ) VALUES ($1, $2, 'mask-project', 'mask-node', '局部重绘', 'image',
         1, 'queued', $3, $4, 'workflow', $3)
     `, [
       "active-mask-retention-run", admin.id, Date.now(),
@@ -704,7 +704,7 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
   };
   const step: NodeExecution = {
     nodeId: "normalization-gate",
-    kind: "print-extract",
+    kind: "image",
     inputImages: [`/api/files/${legacyId}`],
     params: {
       prompt: "提取主图案",

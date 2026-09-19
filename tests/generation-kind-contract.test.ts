@@ -57,9 +57,10 @@ assert.equal(
   false,
   "fabric-replace 不是产品或生成节点 kind；它被加入目录时必须同时补齐提示词、参数档案与评估矩阵",
 );
-assert.ok(
-  comparedKinds.has("fabric-recolor"),
-  "fabricImageUrl 的授权守卫必须绑定到 fabric-recolor，缺失说明守卫被误删",
+assert.equal(
+  knownKinds.has("fabric-recolor"),
+  false,
+  "fabric-recolor 已迁移为 image 节点（六族迁移，R-41），不得再作为合法 kind",
 );
 assert.equal(
   comparedKinds.has("fabric-replace"),

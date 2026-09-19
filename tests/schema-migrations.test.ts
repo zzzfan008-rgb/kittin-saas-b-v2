@@ -681,7 +681,7 @@ await query(`
     run_type, retry_policy, evaluation_case_id, evaluation_authorization_id,
     evaluation_campaign_id, evaluation_slot_id, billing_reconciliation_status
   ) VALUES (
-    $1, $2, 'legacy-node', 'Legacy identity node', 'sketch-to-render',
+    $1, $2, 'legacy-node', 'Legacy identity node', 'image',
     'legacy identity evidence', 1, 0, 0, 'queued', $3, $3,
     'evaluation', 'no-retry', $4, $5, $6, $7, 'not-required'
   )
@@ -740,7 +740,7 @@ await query(`
   ) VALUES (
     $1, $2, $3, $4, 'legacy-sample', $5, $6, $7,
     $8, 'deployment-env', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
-    'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
+    'image', 'generate', 'fashion-lookbook', 'fashion-lookbook',
     'legacy-variant', 'legacy-prompt-v1', $9, 'legacy-evaluation-v1', $10,
     $11, 'legacy-profile', '1.0.0', 'fit-pad-v1',
     'reference-input-sha256-v1', 'legacy-golden-v1', 'legacy-rubric-v1',

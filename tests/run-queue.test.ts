@@ -53,7 +53,7 @@ await database.initializeDatabase();
 const queueVariant = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 // Queue tests exercise already-reviewed production jobs unless a test explicitly
@@ -65,7 +65,7 @@ const queueParameters = materializeModelParameterProfile(queueProfile);
 const runtimeEditVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 promotePromptVariantForTest(runtimeEditVariant);
@@ -75,7 +75,7 @@ const runtimeEditParameters = materializeModelParameterProfile(runtimeEditProfil
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
   modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "mask-redraw",
+  nodeKind: "image",
   mode: "mask-edit",
 });
 // This isolated queue/route fixture needs an accepted run to inspect persistence.
@@ -142,7 +142,7 @@ function boundQueueParams(
 function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecution {
   return {
     nodeId,
-    kind: "sketch-to-render",
+    kind: "image",
     inputImages: [],
     upstream,
     params: boundQueueParams("生成服装效果图"),
@@ -152,7 +152,7 @@ function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecuti
 function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
   return {
     nodeId,
-    kind: "ai-modify",
+    kind: "image",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -181,7 +181,7 @@ function runtimeEditContext(nodeId: string): GenerationRecordContext {
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "ai-modify",
+    kind: "image",
     prompt: "保持服装结构并优化商业棚拍光线",
     requestedCount: 1,
   };
@@ -192,7 +192,7 @@ function context(nodeId: string): GenerationRecordContext {
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "sketch-to-render",
+    kind: "image",
     prompt: "生成服装效果图",
     requestedCount: 1,
   };
@@ -508,7 +508,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
   const nodeId = `worker-remote-mask-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "mask-redraw",
+    kind: "image",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -538,7 +538,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "mask-redraw",
+      kind: "image",
       prompt: "仅修改蒙版区域的拉链颜色",
       requestedCount: 1,
     },
@@ -651,7 +651,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
   const nodeId = `worker-mask-guide-order-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "mask-redraw",
+    kind: "image",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -681,7 +681,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "mask-redraw",
+      kind: "image",
       prompt: "仅修改蒙版区域的拉链颜色",
       requestedCount: 1,
     },
@@ -884,7 +884,7 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
   const nodeId = `evaluation-mask-runtime-profile-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "mask-redraw",
+    kind: "image",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -925,7 +925,7 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "mask-redraw",
+      kind: "image",
       prompt: "仅将蒙版区域改为银色拉链",
       requestedCount: 1,
     },
@@ -1077,7 +1077,7 @@ await test("没有执行计划的历史 queued 行不占活动任务容量", asy
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at
       )
       SELECT $1 || index, $2, 'legacy-node-' || index, '历史任务',
-        'ai-modify', 1, 'queued', index
+        'image', 1, 'queued', index
       FROM generate_series(1, 180) AS index
     `, [prefix, owner.id]);
     const run = await queue.enqueueGenerationRun(
@@ -1103,7 +1103,7 @@ await test("179 条活动任务下两个不同请求并发入队时只接受一�
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, plan_json
       )
       SELECT $1 || index, $2, 'capacity-node-' || index, '容量任务',
-        'ai-modify', 1, 'queued', index, '{"steps":[]}'
+        'image', 1, 'queued', index, '{"steps":[]}'
       FROM generate_series(1, 179) AS index
     `, [prefix, owner.id]);
     const outcomes = await Promise.allSettled(["a", "b"].map((suffix) => {
@@ -1579,7 +1579,7 @@ await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前�
   const plan: ExecutionPlan = {
     steps: [{
       nodeId,
-      kind: "sketch-to-render",
+      kind: "image",
       inputImages: [],
       params: boundQueueParams("生成两张服装效果图", { batchSize: 2 }),
     }],
@@ -1588,7 +1588,7 @@ await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前�
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "sketch-to-render",
+    kind: "image",
     prompt: "生成两张服装效果图",
     requestedCount: 2,
   });
@@ -1618,7 +1618,7 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
   const targetNodeId = `mapping-result-${testId}`;
   const generationStep = (nodeId: string, prompt: string): NodeExecution => ({
     nodeId,
-    kind: "sketch-to-render",
+    kind: "image",
     inputImages: [],
     params: boundQueueParams(prompt),
   });
@@ -1628,7 +1628,7 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
       generationStep(secondNodeId, "第二组效果图"),
       {
         nodeId: targetNodeId,
-        kind: "result",
+        kind: "image",
         inputImages: [],
         upstream: [
           { nodeId: firstNodeId, images: [] },
@@ -1646,7 +1646,7 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
     userId: owner.id,
     nodeId: targetNodeId,
     nodeLabel: targetNodeId,
-    kind: "result",
+    kind: "image",
     requestedCount: 2,
   });
   for (let jobIndex = 0; jobIndex < 3; jobIndex += 1) {
@@ -2042,7 +2042,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       body: JSON.stringify({
         clientRequestId: "direct-mask-request",
         modelId: "gpt-image-2.5-sunburst",
-        kind: "mask-redraw",
+        kind: "image",
         nodeId: "direct-mask-test",
         request: {
           prompt: buildGarmentPrompt(maskVariant.variantId, "只修改左侧衣袖"),
@@ -2072,7 +2072,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     );
     assert.ok(stored);
     const queuedStep = JSON.parse(stored.step_json) as NodeExecution;
-    assert.equal(queuedStep.kind, "mask-redraw");
+    assert.equal(queuedStep.kind, "image");
     assert.deepEqual(queuedStep.inputImages, [PNG_DATA_URL]);
     assert.equal(queuedStep.params.maskSourceRef, PNG_DATA_URL);
     assert.equal(queuedStep.params.maskMode, undefined);
@@ -2090,7 +2090,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       body: JSON.stringify({
         clientRequestId: "direct-mask-over-limit",
         modelId: "gpt-image-2.5-sunburst",
-        kind: "mask-redraw",
+        kind: "image",
         nodeId: "direct-mask-over-limit",
         request: {
           prompt: buildGarmentPrompt(maskVariant.variantId, "局部修改"),

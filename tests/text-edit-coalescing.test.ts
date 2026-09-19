@@ -29,10 +29,10 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
 function aiNode(id = "coalesced-text-node"): FlowNode {
   return {
     id,
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "连续文本节点",
       status: "idle",
       prompt: "初始提示词",
@@ -59,7 +59,7 @@ function activeTarget(): DocumentTarget {
 
 function prompt(): string {
   const data = activeDocument().nodes[0].data;
-  return data.kind === "ai-modify" ? data.prompt : "";
+  return data.kind === "image" ? data.prompt : "";
 }
 
 function resetDocument(id = "coalesced-text-node") {
