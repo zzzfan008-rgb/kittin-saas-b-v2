@@ -58,7 +58,7 @@
     "perBaseUnitFullLifecycle": 133,
     "initialPilotConnectivity": 9,
     "initialPilotFullLifecycle": 1197,
-    "allBaseUnitsFullLifecycle": 3325
+    "allBaseUnitsFullLifecycle": 5453
   },
   "representativeProbePilot": {
     "status": "awaiting-separate-paid-authorization",
@@ -114,7 +114,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:b16500d3e8aef8729d7cb817e3c019a20f0174b4de64d444c1c753578692cf92"
+      "releaseVectorSha256": "sha256:fc63b3befcfd8fc378bd9cd9ddd88da2b04d6a922a20bc59ac23ac59dc57e1d8"
     },
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
@@ -145,7 +145,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:6db58a27dd4fbeb464e3ec9a2e9d1bdf7aa5090b213f41463ee2a622ace0df1d"
+      "releaseVectorSha256": "sha256:906e31f0c7944efe013b08c345c7f917f4a8ce8ce64bcd88d4a05523290bb1c5"
     },
     {
       "unitId": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
@@ -176,7 +176,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:efe395f95f5ef527ecb4ee02e5c8964759ba0611d39c5dbc452a54b0358930be"
+      "releaseVectorSha256": "sha256:bcc53968de39b135be576a2e8e9c0375d28a1aa260161434a57ee65bf70a289c"
     },
     {
       "unitId": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
@@ -207,7 +207,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:961c006af0fdaad2396ad3d4adb398194614564007e050ed6f8fca412c71202e"
+      "releaseVectorSha256": "sha256:4ca7aeceba9cf48f7dbfd43af366094df82038bd2330a10e75685913c850c644"
     },
     {
       "unitId": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
@@ -238,7 +238,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:bef2d159ed97fc7dfe3431f00b71aaeb4bf7f26aa847c314db3044daedf905ed"
+      "releaseVectorSha256": "sha256:c8785339edf81ba53317509d90dcc1baa8b5e3e78af8292886d20eabdd538e1c"
     },
     {
       "unitId": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
@@ -269,7 +269,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:64606545a119720a92e587c5e6ef0e40a542f3cc8add55d4004f594d28feffa3"
+      "releaseVectorSha256": "sha256:868ef28c3c8b8c754f63eb8db194c57125b03fbddcd205ce5e13415410b84ef2"
     },
     {
       "unitId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
@@ -300,7 +300,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:4673e6e64575aca830250589808d3932e80ebbc074596f0ed87d6641f33f5ff5"
+      "releaseVectorSha256": "sha256:e334029b32f55eb920f83cabebb57efe4e0c71cc9eb2d79e47c21f421ab626bd"
     },
     {
       "unitId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
@@ -331,7 +331,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:fb7cde9607c643da41a04f25f541bbeaf8bdee41afb9af30942ec6aa72fec669"
+      "releaseVectorSha256": "sha256:779e681a255494c956654ce7bc8127ff0b4cb3b3009f24ffccf527d3962bd386"
     },
     {
       "unitId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
@@ -362,7 +362,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:94c54d153e1966bd5a41783132f39f1ad44956c8210a03c81295f798d17c9d23"
+      "releaseVectorSha256": "sha256:e327ec625068df3b9377dd3e6c4ce9e05d392f8ef2245233b7a9a08bf2248937"
     },
     {
       "unitId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
@@ -393,7 +393,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:4869c2c76a0b7ff4bd4bfc0c4218b3c99053e71dae2cb0f21369870e3bae3ef9"
+      "releaseVectorSha256": "sha256:41eabffce60a8ec5b1652af9f0709f75e2d5746e2a2632fe3d5b73c5a0ff0cb6"
     },
     {
       "unitId": "design-sheet.gemini-3.1-flash-image.generate.v1",
@@ -424,7 +424,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:4211d629673e6282639c4cb6e7f11895a4c06e58e2dc5f313d344a43914d5e87"
+      "releaseVectorSha256": "sha256:4861ad4d1e5490cbbb43e20824282957f70611f16b23a306f1c50829d981137d"
     },
     {
       "unitId": "design-sheet.gemini-3.1-flash-image.edit.v1",
@@ -455,7 +455,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:2d53ff0829dc8d5ebe9304a9db0e67295e243df0d9e79997999d16002cdeaba4"
+      "releaseVectorSha256": "sha256:718b0d707280d0ed81d90a1b3dcc1a7eacd65b6f502361f9943b3c09f27ee5c7"
     },
     {
       "unitId": "fashion-lookbook.flux-2-pro.generate.v1",
@@ -486,7 +486,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:f8bcd9255f71ce8e680d7f045242efcdc7c2f8e799fb6365940c5620308931a8"
+      "releaseVectorSha256": "sha256:41df874f54eea347d73be537e08181dcd99d13dfea5bcc13d96074170b8b55f4"
     },
     {
       "unitId": "fashion-lookbook.flux-2-pro.edit.v1",
@@ -517,7 +517,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:cf343337d3e48879276807e102853e034b11131869cbd4dc824ca9eb905e7aca"
+      "releaseVectorSha256": "sha256:9f9806d28ef334d1972767c00e029071aa30f5767f92ab196ff4a00d5cc2ce81"
     },
     {
       "unitId": "commerce-hero.flux-2-pro.generate.v1",
@@ -548,7 +548,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:58fd0b31cde8e5f6d30de27d6b9cbd3c0fcbb00b9f580d7e99b17d7d13fb8fab"
+      "releaseVectorSha256": "sha256:d6f43ef302e4358b553afccd4a933d51488a84892d5ca3c241d292e2709c5703"
     },
     {
       "unitId": "commerce-hero.flux-2-pro.edit.v1",
@@ -579,7 +579,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:6a013914bdcc2a744acf41621c3f441e40c350ec7cf474a191e4b1c28ab52626"
+      "releaseVectorSha256": "sha256:14861ce3d9dcbd099c4eb6565d009b5e908f490110270a21b64b9e99c7d27c18"
     },
     {
       "unitId": "design-sheet.flux-2-pro.generate.v1",
@@ -610,7 +610,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:5bb29ded8fb5ce33ac519e8cf662de0ae3f7378fe33e50b217795c079d0aff09"
+      "releaseVectorSha256": "sha256:74b8a350f5a2366905d5fd44a077f07d4f672158545c74c170aeca9feb77f802"
     },
     {
       "unitId": "design-sheet.flux-2-pro.edit.v1",
@@ -641,7 +641,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:25f890c1d4b264d9967fe11fc4b1a48b28784da93f8bbd814cea38b38f3966f4"
+      "releaseVectorSha256": "sha256:432e307feccefeb318e8206012737a5944e2d954e7c5bd1fdca7d93f2aaba0a3"
     },
     {
       "unitId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
@@ -672,7 +672,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:3a5d43ba7fafcfb37bf25fd3e8bc04412bb523bc9e90bb22dd433ff2d75e9464"
+      "releaseVectorSha256": "sha256:e3c3555ac05785fb038035a4a62af19723170f4d57463e79bb76d280c6a0f201"
     },
     {
       "unitId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
@@ -703,7 +703,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:01285ce97bfaeb8d2820fcd242ec0c997a57549d880670a2544cff93d8759db9"
+      "releaseVectorSha256": "sha256:26c38fb29f5cb67b602c45742950b45d22c3b52d4146d7c1b24b44442480fb52"
     },
     {
       "unitId": "commerce-hero.seedream-5-0-260128.generate.v1",
@@ -734,7 +734,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:65a7f25d022c1fd10728b6eb8f60fe695c538c5bf0d32ccfc79a3b7db86feb2a"
+      "releaseVectorSha256": "sha256:f068d9cf26eb7a955bce308c663b56d64e67f82d153a035b811443b4c6067bef"
     },
     {
       "unitId": "commerce-hero.seedream-5-0-260128.edit.v1",
@@ -765,7 +765,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:12dee8eb5795950cd4ca0aba531c4703154b982914d3c84bc8d3ec9612a4855e"
+      "releaseVectorSha256": "sha256:de84fd9a77e958b1bdcf7e15cc2ab58e392ca3ce27e4d06b158d9f6d5eabaf44"
     },
     {
       "unitId": "design-sheet.seedream-5-0-260128.generate.v1",
@@ -796,7 +796,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:5e1aa7998e4ffa754678284e26c54887559a4e1df7f693d6f7d6ac8c2bac1d96"
+      "releaseVectorSha256": "sha256:f6a61e1f501fcfde5d2ba59d7b85ffed809d12247af8f1d24b4cfda0e9317d0b"
     },
     {
       "unitId": "design-sheet.seedream-5-0-260128.edit.v1",
@@ -827,7 +827,503 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:2a8786f237fb91a46f135582cb181ce09da3a8c0030d2c9322ef54dc83b47a02"
+      "releaseVectorSha256": "sha256:49e90bba05b00cb2b7dda06ec8855a3840d36e07ced454679ad1dc64825e27d8"
+    },
+    {
+      "unitId": "upscale.gpt-image-2.5-flare-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "upscale",
+        "promptVariantId": "upscale.gpt-image-2.5-flare-vip.edit.v1",
+        "presetId": "upscale",
+        "presetVersion": "upscale.gpt-image-2.5-flare-vip.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gpt-image-2.5-flare-vip",
+        "operationMode": "edit",
+        "parameterProfileId": "gpt-image-2.5-flare-vip:upscale:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "upscale.gpt-image-2.5-flare-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
+        "resolvedModelVersion": "gpt-image-2.5-flare-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:ea30326296d88e8876bc6fc3a55dac8bc64ff6c5f10701b3bb2e362cc3b12a8a"
+    },
+    {
+      "unitId": "print-extract.gpt-image-2.5-flare-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-extract",
+        "promptVariantId": "print-extract.gpt-image-2.5-flare-vip.edit.v1",
+        "presetId": "print-extract",
+        "presetVersion": "print-extract.gpt-image-2.5-flare-vip.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gpt-image-2.5-flare-vip",
+        "operationMode": "edit",
+        "parameterProfileId": "gpt-image-2.5-flare-vip:print-extract:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-extract.gpt-image-2.5-flare-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
+        "resolvedModelVersion": "gpt-image-2.5-flare-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:d2a90937765b433f98586c39537d3952e1219bc743376e59d424653fd7f91549"
+    },
+    {
+      "unitId": "print-mutate.gpt-image-2.5-flare-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-mutate",
+        "promptVariantId": "print-mutate.gpt-image-2.5-flare-vip.edit.v1",
+        "presetId": "print-mutate",
+        "presetVersion": "print-mutate.gpt-image-2.5-flare-vip.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gpt-image-2.5-flare-vip",
+        "operationMode": "edit",
+        "parameterProfileId": "gpt-image-2.5-flare-vip:print-mutate:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-mutate.gpt-image-2.5-flare-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
+        "resolvedModelVersion": "gpt-image-2.5-flare-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:adf34e5c6e1de09438447d2c8ee2479a19bba1985d65f6935271628255af7794"
+    },
+    {
+      "unitId": "fabric-recolor.gpt-image-2.5-flare-vip.edit.v1",
+      "unit": {
+        "taskFamilyId": "fabric-recolor",
+        "promptVariantId": "fabric-recolor.gpt-image-2.5-flare-vip.edit.v1",
+        "presetId": "fabric-recolor",
+        "presetVersion": "fabric-recolor.gpt-image-2.5-flare-vip.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gpt-image-2.5-flare-vip",
+        "operationMode": "edit",
+        "parameterProfileId": "gpt-image-2.5-flare-vip:fabric-recolor:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fabric-recolor.gpt-image-2.5-flare-vip.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
+        "resolvedModelVersion": "gpt-image-2.5-flare-vip",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:5686636cc6d51502cdfaad4ee05eb6d667bfb1c9419da693657faa4fbeca51e1"
+    },
+    {
+      "unitId": "upscale.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "upscale",
+        "promptVariantId": "upscale.gemini-3.1-flash-image.edit.v1",
+        "presetId": "upscale",
+        "presetVersion": "upscale.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "parameterProfileId": "gemini-3.1-flash-image:upscale:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "upscale.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:069b0d68f1d73677efba58269e336b3ac08659d1fbb391baeeeb14ebdf52923a"
+    },
+    {
+      "unitId": "print-extract.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-extract",
+        "promptVariantId": "print-extract.gemini-3.1-flash-image.edit.v1",
+        "presetId": "print-extract",
+        "presetVersion": "print-extract.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "parameterProfileId": "gemini-3.1-flash-image:print-extract:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-extract.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:8522957ba3a65b72830cb019981187bffd2c8fb990f3cd5cb3466f85bb8488c8"
+    },
+    {
+      "unitId": "print-mutate.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-mutate",
+        "promptVariantId": "print-mutate.gemini-3.1-flash-image.edit.v1",
+        "presetId": "print-mutate",
+        "presetVersion": "print-mutate.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "parameterProfileId": "gemini-3.1-flash-image:print-mutate:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-mutate.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:12b464e740cd09d464261d53366e1c3de95dce9bdc6f5252a5194d9794c01e65"
+    },
+    {
+      "unitId": "fabric-recolor.gemini-3.1-flash-image.edit.v1",
+      "unit": {
+        "taskFamilyId": "fabric-recolor",
+        "promptVariantId": "fabric-recolor.gemini-3.1-flash-image.edit.v1",
+        "presetId": "fabric-recolor",
+        "presetVersion": "fabric-recolor.gemini-3.1-flash-image.edit.v1",
+        "nodeKind": "image",
+        "modelId": "gemini-3.1-flash-image",
+        "operationMode": "edit",
+        "parameterProfileId": "gemini-3.1-flash-image:fabric-recolor:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fabric-recolor.gemini-3.1-flash-image.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
+        "resolvedModelVersion": "gemini-3.1-flash-image",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:1326d25185710697b4e6178b6d27b61d2d530ad0e6628b975a5a64fc67a54f05"
+    },
+    {
+      "unitId": "upscale.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "upscale",
+        "promptVariantId": "upscale.flux-2-pro.edit.v1",
+        "presetId": "upscale",
+        "presetVersion": "upscale.flux-2-pro.edit.v1",
+        "nodeKind": "image",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "parameterProfileId": "flux-2-pro:upscale:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "upscale.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:0b71f46e86f554d38f96d4862d9bb36bb26d6e5caa8c604267b0289f93d0e714"
+    },
+    {
+      "unitId": "print-extract.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-extract",
+        "promptVariantId": "print-extract.flux-2-pro.edit.v1",
+        "presetId": "print-extract",
+        "presetVersion": "print-extract.flux-2-pro.edit.v1",
+        "nodeKind": "image",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "parameterProfileId": "flux-2-pro:print-extract:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-extract.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:5c6ce6b9363da15ee2a7790e90278f68a25391a39c3475a01200069b4c10963f"
+    },
+    {
+      "unitId": "print-mutate.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-mutate",
+        "promptVariantId": "print-mutate.flux-2-pro.edit.v1",
+        "presetId": "print-mutate",
+        "presetVersion": "print-mutate.flux-2-pro.edit.v1",
+        "nodeKind": "image",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "parameterProfileId": "flux-2-pro:print-mutate:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-mutate.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:4cb5d9b1e20c922cd7ca3b429c6d427d47b8a081901f1e2b9dd0140edf82fef9"
+    },
+    {
+      "unitId": "fabric-recolor.flux-2-pro.edit.v1",
+      "unit": {
+        "taskFamilyId": "fabric-recolor",
+        "promptVariantId": "fabric-recolor.flux-2-pro.edit.v1",
+        "presetId": "fabric-recolor",
+        "presetVersion": "fabric-recolor.flux-2-pro.edit.v1",
+        "nodeKind": "image",
+        "modelId": "flux-2-pro",
+        "operationMode": "edit",
+        "parameterProfileId": "flux-2-pro:fabric-recolor:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fabric-recolor.flux-2-pro.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
+        "resolvedModelVersion": "flux-2-pro",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:b6433d505e2e43345e84e6d42e21da7d5bd9b0b5487b3874be6887760c79164c"
+    },
+    {
+      "unitId": "upscale.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "upscale",
+        "promptVariantId": "upscale.seedream-5-0-260128.edit.v1",
+        "presetId": "upscale",
+        "presetVersion": "upscale.seedream-5-0-260128.edit.v1",
+        "nodeKind": "image",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "parameterProfileId": "seedream-5-0-260128:upscale:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "upscale.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:ce214e0a947989a5f6012803f95a1d9fa21a341892e41cedd25e66971d9c0ce6"
+    },
+    {
+      "unitId": "print-extract.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-extract",
+        "promptVariantId": "print-extract.seedream-5-0-260128.edit.v1",
+        "presetId": "print-extract",
+        "presetVersion": "print-extract.seedream-5-0-260128.edit.v1",
+        "nodeKind": "image",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "parameterProfileId": "seedream-5-0-260128:print-extract:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-extract.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:3b631d678222f0054dc123a4e15d7b8193b2bbed0e33082a31e6e46a7e985793"
+    },
+    {
+      "unitId": "print-mutate.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "print-mutate",
+        "promptVariantId": "print-mutate.seedream-5-0-260128.edit.v1",
+        "presetId": "print-mutate",
+        "presetVersion": "print-mutate.seedream-5-0-260128.edit.v1",
+        "nodeKind": "image",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "parameterProfileId": "seedream-5-0-260128:print-mutate:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "print-mutate.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "1:1",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:549772b3d820aaa474dac43d4de558a31007d4e1cbebe775d78c131492b324f0"
+    },
+    {
+      "unitId": "fabric-recolor.seedream-5-0-260128.edit.v1",
+      "unit": {
+        "taskFamilyId": "fabric-recolor",
+        "promptVariantId": "fabric-recolor.seedream-5-0-260128.edit.v1",
+        "presetId": "fabric-recolor",
+        "presetVersion": "fabric-recolor.seedream-5-0-260128.edit.v1",
+        "nodeKind": "image",
+        "modelId": "seedream-5-0-260128",
+        "operationMode": "edit",
+        "parameterProfileId": "seedream-5-0-260128:fabric-recolor:edit:v1",
+        "parameterProfileVersion": "1.0.0"
+      },
+      "versions": {
+        "presetVersion": "fabric-recolor.seedream-5-0-260128.edit.v1",
+        "parameterProfileVersion": "1.0.0",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
+        "resolvedModelVersion": "seedream-5-0-260128",
+        "providerPromptRendererVersion": "provider-prompt-renderer-v4",
+        "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
+        "inputNormalizationVersion": "reference-input-sha256-v1",
+        "postprocessingVersion": "fit-contain-dominant-webp-v1",
+        "goldenSetVersion": "garment-gold-v1",
+        "scoringRubricVersion": "garment-rubric-v1"
+      },
+      "businessFrame": {
+        "aspectRatio": "source",
+        "requestedOutputs": 1
+      },
+      "releaseVectorSha256": "sha256:2b4355d3661c24aa8580210cc06ffd28618b54073da429b2bc389cfa8bd21e00"
     },
     {
       "unitId": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
@@ -858,7 +1354,7 @@
         "aspectRatio": "source",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:7077223d0f63d6ca6c33ad1fc6e0146957c49e320ad3bbd5cc8cf23cbde37da7"
+      "releaseVectorSha256": "sha256:51f105f53776de0b54c35f7563a532fc40ff062e1c285d073bdd79be8136e307"
     }
   ]
 }

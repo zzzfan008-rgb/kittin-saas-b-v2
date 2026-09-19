@@ -18,11 +18,11 @@
 
 ## 节点、提示词与 Provider 参数离线复核
 
-`node-prompt-parameter-matrix-v1.json` 是当前节点能力、逐模型提示词、判别联合参数档案和 API易请求形状的可重算离线证据。`npm run evaluation:node-matrix:check` 会从生产代码重新生成预期结构并与物化文件精确比较；测试还逐一核对提示词是否包含主体与任务、构图、风格与材质、文字限制、画幅输出和负面约束。
+`node-prompt-parameter-matrix-v1.json` 是当前功能族 × 模型能力、逐模型提示词、判别联合参数档案和 API易请求形状的可重算离线证据。`npm run evaluation:node-matrix:check` 会从生产代码重新生成预期结构并与物化文件精确比较；测试还逐一核对提示词的审查维度（checklist 只登记测试真实断言过的维度，不虚报）。
 
-- 矩阵固定覆盖 7 类节点 × 5 个现役模型，共 35 个组合。
-- 其中 9 个产品允许组合仍为 `unverified`：四个普通模型分别对应 `sketch-to-render` 与 `ai-modify`，以及 `gpt-image-2` 对应 `mask-redraw`。`unverified` 不是可运行状态，当前发布清单为空时仍会被浏览器、路由和 Worker 拒绝。
-- 其余 26 个组合为 `unsupported`，没有提示词、参数档案或 Provider 请求形状。`fabric-recolor`、`upscale`、`print-extract`、`print-mutate` 全部保持产品级 fail-closed；`gpt-image-2` 也不扩展到普通生成或普通编辑节点。
+- 三节点重构后（R-68，2026-09-20）矩阵主轴为 **familyId × modelId（域内模型全集）**，mode 由变体携带（模式归属反转），nodeKind 为派生属性。网格 = image 域 8 族 × 9 模型（72 条目）+ text 域 2 族 × 3 模型（6 条目）+ video 域 1 族 × 1 模型（1 条目），共 79 个组合。
+- 其中 36 个产品允许组合仍为 `unverified`：image 域 29 个（三任务族 × 四普通模型、四功能族 × 四普通模型、`gpt-image-2.5-sunburst` × `mask-local-edit`）、text 域 6 个、video 域 1 个。`unverified` 不是可运行状态，当前发布清单为空时仍会被浏览器、路由和 Worker 拒绝。
+- 其余 43 个组合为 `unsupported`，没有提示词、参数档案或 Provider 请求形状。`gpt-image-2.5-sunburst` 不扩展到 `mask-local-edit` 之外的任何功能族；`mask-local-edit` 也不扩展到其他模型。text / video 变体声明的 `parameterProfileId` 在矩阵中保留，但物化参数档案为空——参数档案 store 当前仅覆盖 image 域，该缺口显式登记而非虚构。
 - awesome-gpt-image-2 只提供提示词分类与六段式编写依据。生产提示词按模型、任务族和模式独立保存，不读取社区模板作为运行时回退。
 - API易参数复核绑定当前本地契约与 Provider 构造器。Seedream 固定使用 `response_format=b64_json`、`watermark=false`、`sequential_image_generation=disabled`，禁止 `n` 和 `aspect_ratio`，并保留 Provider 实际输出尺寸。
 - 该矩阵生成与检查不读取 API Key，不发送 Provider 请求；`noProviderCallsPerformed=true` 且 `imageGenerationOrEditCalls=0` 是证据范围声明，不是外部端点可用性证明。
@@ -39,17 +39,17 @@
 - `sampleId` 标识黄金集或实验集中的原始样本，`caseId` 标识该样本的一次具体运行。两者都必填；获准重跑时保留 `sampleId`，但必须使用新的 `caseId` 和新授权。
 - `providerContractVersion`、实际解析模型版本、Provider 提示词 renderer 版本/hash、输入归一化、后处理、黄金集或评分规则任一变化，已验证状态自动降为 `unverified`，重新跑完整评估。
 
-## 方案 A：25 个基础单元与 9 个首批探针
+## 方案 A：41 个基础单元与 9 个首批探针
 
-`evaluation-manifest-v1.json` 是当前零费用准备清单。它将 25 个现役提示词变体逐一物化为完整 `PromptEvaluationUnit`，并绑定当前版本向量、业务画幅及不含代码 SHA 的 release-vector SHA-256。`npm run evaluation:manifest:check` 会从当前提示词目录、参数档案、评估计划和生产权威构造器重新计算全部内容；任一字段漂移都会失败，不能静默沿用旧清单。
+`evaluation-manifest-v1.json` 是当前零费用准备清单。它将 41 个现役图片域提示词变体（R-62：text / video 域变体无评分规则与证据契约，排除出本清单）逐一物化为完整 `PromptEvaluationUnit`，并绑定当前版本向量、业务画幅及不含代码 SHA 的 release-vector SHA-256。`npm run evaluation:manifest:check` 会从当前提示词目录、参数档案、评估计划和生产权威构造器重新计算全部内容；任一字段漂移都会失败，不能静默沿用旧清单。
 
-方案 A 的 9 个首批 `model × mode` 探针采用最低参考图复杂度：四个普通模型各选 `commerce-hero` 的 generate 与 edit，GPT Image 2 使用唯一的 `mask-local-edit`。普通 generate 为 1:1、零参考图；普通 edit 只使用一张 `garment_full`；蒙版输入顺序固定为 `garment_full → generic 系统引导图 → mask`。这 9 个单位只代表自身，未入选的 16 个基础单位继续保持 `unverified`，不得借用探针证据。
+方案 A 的 9 个首批 `model × mode` 探针采用最低参考图复杂度：四个普通模型各选 `commerce-hero` 的 generate 与 edit，GPT Image 2 使用唯一的 `mask-local-edit`。普通 generate 为 1:1、零参考图；普通 edit 只使用一张 `garment_full`；蒙版输入顺序固定为 `garment_full → generic 系统引导图 → mask`。这 9 个单位只代表自身，未入选的 32 个基础单位继续保持 `unverified`，不得借用探针证据。
 
 当前固定、不复用的请求上限为：
 
 - 单位完整生命周期规划上限：`1 + 8 + 24 + 50 × 2 = 133` 次。
 - 9 个首批连通性探针：最多 `9` 次；若未来让这 9 个单位全部走完各阶段，则最多 `1,197` 次。
-- 25 个基础单位全部走完各阶段：最多 `3,325` 次。
+- 41 个基础单位全部走完各阶段：最多 `5,453` 次。
 
 这些数字不包含补样，也是预算规划而非当前可执行授权。当前 `automaticRetries = 0`、`supplementalSamplesPerStage = 0`；任何无效结果、超时、断连或 `outcome_unknown` 都会停止后续调用，核对账单后另行决定是否建立新 case 和新授权。清单本身授权的付费调用数恒为 0，也尚未绑定干净 exact-SHA。真实探针前必须封存具体 Campaign/Slot：提供样本与素材哈希、当前单价和币种、campaign 硬预算、case ID 和逐 case 一次性管理员授权；账本会拒绝遗漏、重复或超额槽位。推荐阶段的 100 次候选/基线配对预算在基础提示词语义和双侧证据契约获批前不得授权或执行。
 
