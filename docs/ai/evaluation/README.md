@@ -185,3 +185,37 @@ docker compose -f compose.yaml -f compose.evaluation-release.yaml config --quiet
 ```
 
 宿主预检绑定外置目录、固定 registry 位置、registry 原始字节哈希、闭包哈希以及构建/运行代码 SHA，并只接受恰好 40 或 64 位的小写十六进制代码 SHA。预检输出中的 `ok: true` 仅说明 `hostMountOnly: true`；它会同时返回 `campaignStatus: ready` 表示账本实现已存在，但 `campaignReady: false` 明确表示宿主挂载预检本身没有加载某个具体 campaign 的完整 case/证据闭包，不能解读为发布、构建或运行时已获准。生产运行时再次重算闭包并与环境变量、前端 manifest、服务端 manifest 和服务端内嵌最小 registry 投影核对。所有这些步骤都是零 Provider 调用；真实探针与质量样本仍需独立付费授权。
+
+## 提示词目录治理：新增、修订、撤销与回滚
+
+本节是三基础节点模型（schema v7）下「功能」的治理流程正文，契约来源为 `docs/design/2026-09-18-three-node-model/contracts/prompt-variant-schema.md` §4（设置流程）与 §1.1，运行语义边界见 `contracts/runtime.md` §5c / §5d。
+
+目录的唯一定义位置是 `src/lib/garmentPromptPresets.ts`：一个「功能」就是一个 `PromptVariant`，节点的 `promptVariantId` 只是引用。node 不复制正文，因此目录修订/撤销只改目录与 registry，不改用户文档。
+
+### 新增一个功能（从提出到普通用户可选）
+
+1. **提 PR（任何开发者）**：在 `garmentPromptPresets.ts` 追加变体条目，逐字段填齐 `PromptVariant` 全部字段。新功能通常意味着在 `PromptFamilyId` 联合中追加一个新 `familyId`。`fullPrompt` 是功能文案的唯一来源（runner 内不得再出现功能文案）；`needsMask` 必须显式写 `true`/`false`（不留 `undefined`）；新增变体的 `supportStatus` 只能填 `unverified`，`statusReason` 用 `UNVERIFIED_REASON`；`contractHash` 取对应模型域的 `imageModelContractHash` / `textModelContractHash` / `videoModelContractHash`，`parameterProfileId` 按 `{modelId}:{familyId}:{mode}:v{n}` 命名。
+2. **类型层不得私改**：需要新 `mode` 取值或新 `nodeKind` 值时必须停步——它们是类型层变更，须回到方案评审，不属于「新增一个功能」。
+3. **评审与合入（PR + 门禁）**：走既有 PR 评审、`npm run check`、`npm run build`、ast-grep/dependency-cruiser 扫描与 CI 五个必需检查。目录加载断言（`variantById` / `variantByQuery` 唯一性 throw，防同一四键组合出现两份文案）由 `tests/prompt-presets.test.ts` 覆盖，冲突即红。
+4. **合入后状态 = `unverified`**：普通用户不可见不可选（运行准入 fail-closed；只有 `verified` / `recommended` 可普通运行）。上线不依赖评估完成，评估节奏由 orchestrator 排期。
+5. **评估 campaign**：按本文上方 campaign 流程封存 Campaign/Slot 总账，逐阶段（`contract` → `provider-probe` → `internal-experiment` → `formal-validation`）跑真实评估并保留 receipt 链。付费前必须有真实数据库账本、逐 case 一次性授权与精确 slot 绑定。
+6. **release registry 发布（可选时才可选）**：评估通过后走 `evaluation:review gate` → `promote` → registry 登记，`supportStatus` 经发布动作升为 `verified` / `recommended`，普通用户才可选。registry 为空时任何变体都不会被激活。
+
+### 修订纪律：正文修订必改 ID
+
+变体 ID（`{familyId}.{modelId}.{mode}.v{n}`）是稳定键，**版本推进 = 新变体 ID + 旧 ID 走撤销流程**，不存在「同 ID 内容原地变更」。现行 registry schema 按 `variantId` 唯一键拒绝重复（`duplicate release key`），因此同 ID 多 release（`evaluationVersion` 递增）**默认不启动**；如需该路径，必须先扩展 registry schema（`schemaVersion: 2`，同 ID 取最新 `generatedAt`）并走方案评审。
+
+### 变体撤销与存量节点语义
+
+- 撤销 = 目录侧删除/停用该变体 + registry 中该变体标记撤销。存量节点**运行时拒绝**（`promptRunAdmission` fail-closed，节点错误文案「所选功能已被撤销，请重新选择」）。
+- **不做自动回退**：节点 `promptVariantId` 保留不动，等待用户手动改选；不自动改写用户文档。
+- 旧 ID 未撤销的并行期，存量节点继续可用；旧 ID 撤销后按上一条处理。
+- `contractHash` 绑定的是 registry 中该变体 ID 的发布记录：ID 不变则 hash 不变；ID 被撤销后准入已拒绝，不会带着过期 hash 进入运行。
+
+### R5 之后「已评估」的口径弱化（审计影响）
+
+`modelOptions` 硬校验放开后，`contractHash` / `evaluationVersion` 仍随请求透传，但语义弱化为：**「该变体已评估」只覆盖 registry 登记的推荐参数面**——用户自定义的 `modelOptions` 组合不在既有评估证据覆盖范围内。这是 R5 裁定的直接后果，不是缺陷。审计与计费对账时不得把 `contractHash` 当作参数合规证据（悬浮窗口侧以「已评估参数 / 自定义参数（未评估）」标记提示用户，纯信息展示、不阻断）。
+
+### 回滚
+
+目录 PR `revert` + registry 中该变体标记撤销；与代码发布解耦，不需要回滚代码。存量引用节点按「变体撤销」处理（运行 fail-closed，不自动回退用户文档）。任何回归审计都会同时作用于浏览器提示与服务端权威准入（静态关闭规则 `PROMPT_RUNTIME_SHUTDOWN_RULES`，见上文「四级静态关闭」）。
