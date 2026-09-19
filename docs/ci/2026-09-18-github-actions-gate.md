@@ -12,8 +12,14 @@
 
 ## 2. 触发条件
 
-- `push`:所有分支。任何分支的推送都会触发完整 CI,让功能分支在合 main 前就看到完整信号。
-- `pull_request`(目标 `main`):PR 场景是分支保护状态检查的主要来源。
+- `push`:仅 `main`,且带 `paths-ignore: ['docs/**', '**.md']`。理由(2026-09-19 修订):
+  实测近 60 次 run 中 ≥21 次是 docs/design-only 提交,仍要各装一次 chromium 并跑
+  `e2e` + `production-smoke` 两个 playwright job(每次 ≈5min);而交付分支的 push 与它的 PR
+  是同一个 commit,等于把整套矩阵跑两遍(实测 3 个 commit × 2 run)。
+  交付分支的绿灯由 PR 事件给出,不再由 push 给出。
+- `pull_request`(目标 `main`):PR 场景是分支保护状态检查的唯一来源,**刻意不加 `paths-ignore`** ——
+  main 的保护要求这 5 个 check 出现在 PR 的精确 head 上,被 paths 过滤掉的 PR 会永远等不到
+  check 而无法合并(docs-only PR 仍跑全矩阵,这是保护正确性的代价)。
 - `concurrency` 按 `ci-${{ github.workflow }}-${{ github.ref }}` 分组并
   `cancel-in-progress: true`:同一分支/PR 的新 push 取代未跑完的旧 run,避免队列堆积。
 - `permissions: contents: read`:workflow 只需要读仓库,不申请任何写权限。
@@ -201,3 +207,20 @@ playwright 配置额外硬校验(见 `playwright.config.ts` / `playwright.produc
   语法与结构经人工对照 GitHub Actions 文档与现有项目脚本核对。
 - `gh workflow list` / `gh api` 校验需要在 push 后进行(推送需用户授权,不在本批)。
 - 本规格与 `.github/workflows/ci.yml` 同批交付;任何后续改动必须同步更新本文件。
+
+## 12. 分支保护状态(2026-09-19 核验)
+
+`gh api repos/zzzfan008-rgb/kittin-saas-b-v2/branches/main/protection` 实测:
+
+| 项 | 值 | 含义 |
+| --- | --- | --- |
+| `required_status_checks.strict` | `true` | 合并前分支必须与 `main` 保持最新 |
+| required checks | 上面 5 个 job | 必须出现在 PR 的**精确 head** 上 |
+| `required_pull_request_reviews` | `required_approving_review_count: 0` | **合并必须走 PR**;不要求人工批准(本仓库只有一名人类维护者,要求 ≥1 会导致无人可批) |
+| `enforce_admins` | `false` | 管理员仍可绕过保护直接推 `main`(安全阀) |
+| `allow_force_pushes` / `allow_deletions` | `false` | 禁止强推与删分支 |
+
+**含义的变化**:此前的保护只要求 5 个 check、不要求走 PR,因此直推 `main` 时 CI 是「事后验证」;
+现在非管理员直推会被拒,交付路径收敛为「分支 → PR → 5 个 check 绿 → 合并」。
+若要让门禁对管理员同样强制,把 `enforce_admins` 置 `true` 即可——这是需要用户显式决定的开关,
+本文件只记录当前状态。

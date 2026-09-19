@@ -1,11 +1,21 @@
 name: ci
 
+# 触发策略(2026-09-19 修订,依据实测):
+# - push 只跟 main:交付分支的绿灯由它的 PR 事件给出,同一 commit 不再被 push+PR 各跑一遍完整矩阵
+#   (实测 3 个 commit × 2 run)。main 上的 run 是「合并后复核」。
+# - main 的 docs/design-only 提交跳过全部 job:近 60 次 run 里 ≥21 次是这类提交,却仍要各装一次
+#   chromium 并跑 e2e + production-smoke(每次 ≈5min)。它的 PR run 已在精确 head 上跑过全矩阵。
+# - PR 事件刻意**不加** paths-ignore:main 的保护要求这 5 个 check 出现在 PR 的精确 head 上,
+#   被 paths 过滤掉的 PR 会永远等不到 check 而无法合并。
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   pull_request:
     branches: [main]
 
-# 同一分支的新 push 取代未跑完的旧 run，避免队列堆积；PR 同理（按 ref 分组）。
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
