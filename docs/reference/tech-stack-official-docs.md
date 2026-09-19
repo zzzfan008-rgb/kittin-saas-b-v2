@@ -133,6 +133,7 @@ aliases `@/components`、`@/components/ui`、`@/lib/utils`。
 | OpenAI API 参考 | vendorCapability | https://developers.openai.com/api/reference/overview | 200(旧 `platform.openai.com/docs/api-reference` 已 302 到此) |
 | BFL FLUX.2 提示词指南 | vendorCapability | https://docs.bfl.ai/guides/prompting_guide_flux2 | 200 |
 | BytePlus Seedream(ModelArk) | vendorCapability | https://docs.byteplus.com/api/docs/ModelArk/1824121 | 200 |
+| Seedance 2.5(火山引擎视频,经 API易) | vendorCapability | 本地知识库 `docs/ai/apiyi/video-model-contracts.json`(页面 `api-capabilities/seedance2/overview.md` + `video-generation.md`);官方上游 https://www.volcengine.com/docs/6791 | 200(本地快照) |
 | Google Gemini 图像生成 | vendorCapability | https://ai.google.dev/gemini-api/docs/image-generation | **本环境不可达**(302 → Google 登录回路,见下) |
 | Google Cloud Vertex AI 图像生成(替代来源) | vendorCapability | https://cloud.google.com/vertex-ai/generative-ai/docs/image/generate-images | 200 |
 
@@ -145,6 +146,7 @@ Vertex AI 文档作为可达的一手替代(注意二者是不同产品线,不�
 - `docs/ai/apiyi/` —— 全站不可变快照 + 已审查契约。入口:`docs/ai/apiyi/README.md`
 - 上游 canonical/镜像 URL、抓取时间与 SHA-256:`docs/ai/apiyi/sources.json`
 - 机器可读契约:`docs/ai/apiyi/model-contracts.json`(实现与测试只读这一份,不读原始网页)
+- 视频模型契约:`docs/ai/apiyi/video-model-contracts.json`(Seedance 2.5 异步任务端点,契约哈希重算见 `scripts/video-model-contract-hash.mjs`)
 - 修改模型/参数/提示词/参考图语义前必须走 `npm run docs:apiyi:kb:check` → `docs:apiyi:search` → `docs:apiyi:lookup`
 - `docs/ai/gpt-image-2-lmu.md` 描述的是灵眸网关,**已被取代,不得用于 API易实现**
 

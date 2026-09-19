@@ -14,7 +14,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { migrateLegacyData } = await import("../server/lib/legacyMigration");
 
-console.log("PostgreSQL 20 编号迁移回归测试");
+console.log("PostgreSQL 21 编号迁移回归测试");
 await initializeDatabase();
 
 const versions = await query<{ version: number; name: string }>(
@@ -41,6 +41,7 @@ assert.deepEqual(versions, [
   { version: 18, name: "evaluation_code_identity_binding" },
   { version: 19, name: "immutable_evaluation_campaign_ledger" },
   { version: 20, name: "provider_request_id_evidence" },
+  { version: 21, name: "video_step_output_metadata" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 

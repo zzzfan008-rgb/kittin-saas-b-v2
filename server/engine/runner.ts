@@ -24,6 +24,7 @@ import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
 import { generateExactImages } from "../providers/exact";
 import { getTextProvider, type TextProvider } from "../providers/textProvider";
+import { getVideoProvider, type VideoGenRequest, type VideoProvider } from "../providers/videoProvider";
 import { normalizeImageRef } from "../lib/fileStore";
 import {
   isLocalImageReference,
@@ -40,6 +41,7 @@ import {
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { DEFAULT_TEXT_MODEL_ID, isTextModelId, type TextModelOptions } from "../../src/types/textModels";
+import { DEFAULT_VIDEO_MODEL_ID, isVideoModelId, type VideoModelOptions } from "../../src/types/videoModels";
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import { compositeMaskedEdit, prepareMaskForGeneration, resolveMaskFeatherRadius } from "../lib/maskProcessing";
 import { renderProviderPrompt, type ProviderPromptReference } from "../../src/lib/providerPromptRenderer";
@@ -49,6 +51,11 @@ export { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
 
 /** text 节点正文与 outputText 的长度上限（runtime.md §1b / data-model.md §3）。 */
 export const MAX_TEXT_LENGTH = 20_000;
+
+/** 视频异步轮询节奏（runtime.md §2；seedance2/overview.md 建议 10–20s 一次、预算 15 分钟）。 */
+export const VIDEO_POLL_INITIAL_DELAY_MS = 20_000;
+export const VIDEO_POLL_INTERVAL_MS = 20_000;
+export const VIDEO_POLL_TIMEOUT_MS = 15 * 60_000;
 
 export interface RunFailure {
   prompt?: string;
@@ -83,6 +90,8 @@ export type RunEvent =
       nodeId: string;
       status: "success";
       images: string[];
+      /** video 节点产出的 MP4 引用（files 表 video/mp4）；image 节点缺省。 */
+      videos?: string[];
     })
   | (Omit<RunEventMeta, "error"> & {
       type: "node-status";
@@ -111,10 +120,15 @@ export interface StepResult {
   lastRunInput?: string;
   /** outputText 是否因超长被截断。 */
   truncated?: boolean;
+  /** video 节点产出的 MP4 引用（/api/files/xxx，已服务端落地）。 */
+  videos?: string[];
+  /** video 实际产出时长（秒，来自 Provider 查询响应）。 */
+  videoDurationSec?: number;
 }
 
 export type ProviderResolver = (id: string) => AIProvider;
 export type TextProviderResolver = (id: string) => TextProvider;
+export type VideoProviderResolver = (id: string) => VideoProvider;
 
 export interface ExecuteStepOptions {
   runId?: string;
@@ -143,6 +157,14 @@ export interface ExecuteStepOptions {
   }) => Promise<string[]>;
   /** text 节点 Provider 解析器（测试注入用）；缺省走 getTextProvider。 */
   resolveTextProvider?: TextProviderResolver;
+  /** video 节点 Provider 解析器（测试注入用）；缺省走 getVideoProvider。 */
+  resolveVideoProvider?: VideoProviderResolver;
+  /** video 异步任务提交成功后的回调（持久化 taskId 并标记 attempt_started，幂等护栏）。 */
+  onVideoTaskSubmitted?: (taskId: string) => void | Promise<void>;
+  /** 测试注入：轮询节奏覆盖（生产走 VIDEO_POLL_* 常量）。 */
+  videoPollInitialDelayMs?: number;
+  videoPollIntervalMs?: number;
+  videoPollTimeoutMs?: number;
 }
 
 function fallbackReferenceSources(step: NodeExecution, inputImages: string[]): ReferenceImageSource[] {
@@ -400,6 +422,80 @@ async function executeImageStep(
   };
 }
 
+async function executeVideoStep(
+  step: NodeExecution,
+  inputImages: string[],
+  resolveVideoProvider: VideoProviderResolver,
+  options: ExecuteStepOptions,
+): Promise<StepResult> {
+  const modelId = isVideoModelId(step.params.modelId) ? step.params.modelId : DEFAULT_VIDEO_MODEL_ID;
+  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
+  const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
+  if (!variant) {
+    throw new Error(`Node ${step.nodeId} 没有绑定当前版本的提示词变体`);
+  }
+  // runtime.md §2：1–4 同 image——taskPrompt = variant.fullPrompt + "\n\n" + userPrompt。
+  const inputTexts = inputTextsOf(step);
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof step.params.prompt === "string" ? step.params.prompt : "");
+  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+  if (!taskPrompt) {
+    throw new Error("视频节点没有可发送的提示词");
+  }
+
+  // 首帧 = 唯一 image 边（0..1）。
+  let firstFrame: ReferenceImageInput | undefined;
+  if (inputImages.length > 0) {
+    const source: ReferenceImageSource = step.inputReferences?.[0] ?? { imageRef: inputImages[0], order: 0 };
+    if (source.imageRef !== inputImages[0]) {
+      throw new Error(`Node ${step.nodeId} 首帧引用快照与 inputImages 不一致`);
+    }
+    firstFrame = (await resolveReferenceInputs([{ ...source, order: 0 }]))[0];
+  }
+
+  const provider = resolveVideoProvider(modelId);
+  const request: VideoGenRequest = {
+    prompt: taskPrompt,
+    promptVariantId,
+    ...(firstFrame ? { firstFrame } : {}),
+    modelOptions: step.params.modelOptions as VideoModelOptions | undefined,
+    ...(typeof step.params.contractHash === "string"
+      ? { contractHash: step.params.contractHash as `sha256:${string}` }
+      : {}),
+  };
+
+  const { taskId } = await provider.submit(request);
+  await options.onVideoTaskSubmitted?.(taskId);
+
+  const initialDelayMs = options.videoPollInitialDelayMs ?? VIDEO_POLL_INITIAL_DELAY_MS;
+  const intervalMs = options.videoPollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
+  const timeoutMs = options.videoPollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  if (initialDelayMs > 0) await sleep(initialDelayMs);
+  for (;;) {
+    if (Date.now() >= deadline) {
+      throw new Error("视频生成超时，请稍后重试");
+    }
+    const result = await provider.poll(taskId);
+    if (result.status === "completed") {
+      return {
+        images: [],
+        videos: [result.videoFileRef],
+        ...(result.durationSec !== undefined ? { videoDurationSec: result.durationSec } : {}),
+        model: modelId,
+        providerRequests: 1,
+      };
+    }
+    if (result.status === "failed") {
+      throw new Error(result.error);
+    }
+    await sleep(intervalMs);
+  }
+}
+
 export async function executeStep(
   step: NodeExecution,
   inputImages: string[],
@@ -419,7 +515,7 @@ export async function executeStep(
     case "image":
       return executeImageStep(step, inputImages, resolveProvider, options);
     case "video":
-      throw new Error("视频节点执行链路尚未实现（P2-e）");
+      return executeVideoStep(step, inputImages, options.resolveVideoProvider ?? getVideoProvider, options);
   }
 }
 
