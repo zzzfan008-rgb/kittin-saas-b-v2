@@ -407,20 +407,29 @@ export function buildEvaluationCaseSnapshotFromRuntime(
     reference.sourceNodeId !== `${step.nodeId}:mask-guide`
   ));
   const providerPromptReferences: ProviderPromptReference[] = promptReferences.map(() => ({}));
+  // runtime.md §1 第 1–3 步：userPrompt 取上游 text 正文（params.inputTexts），直接生成
+  // 路径回退 params.prompt；taskPrompt = variant.fullPrompt + "\n\n" + userPrompt。
+  // 必须与 runner.ts executeImageStep 保持逐字一致，否则评估证据侧会与渲染器输出漂移。
+  const inputTexts = Array.isArray(step.params.inputTexts)
+    ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
+    : [];
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof step.params.prompt === "string" ? step.params.prompt : "");
+  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
   const expectedResolvedPrompt = renderProviderPrompt({
     nodeKind: step.kind,
     modelId,
     operationMode: variant.mode,
-    taskPrompt: typeof step.params.prompt === "string" ? step.params.prompt : "",
+    taskPrompt,
     references: providerPromptReferences,
   });
   if (input.request.prompt !== expectedResolvedPrompt) {
     throw new Error("actual ImageGenRequest prompt differs from the shared reviewed Provider renderer output");
   }
-  if (
-    !expectedResolvedPrompt.includes(`提示词变体：${variant.variantId}`)
-    || !expectedResolvedPrompt.includes(variant.fullPrompt)
-  ) {
+  // v7：buildGarmentPrompt 的「提示词变体：…」包装已按 runtime.md §1 第 3 步移除，
+  // 变体绑定由 taskPrompt 前置 fullPrompt 表达，故只校验 fullPrompt 完整内联。
+  if (!expectedResolvedPrompt.includes(variant.fullPrompt)) {
     throw new Error("actual ImageGenRequest prompt is not bound to the complete reviewed prompt variant");
   }
 
