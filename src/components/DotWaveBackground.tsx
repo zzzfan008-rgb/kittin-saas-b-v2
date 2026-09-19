@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useViewport } from "@xyflow/react";
+import { useTheme } from "@/lib/theme";
 
 /**
  * 画布点阵背景 · 波浪呼吸动效
- * 金色圆点沿对角线方向做正弦波呼吸（大小 + 透明度起伏），
+ * accent 圆点沿对角线方向做正弦波呼吸（大小 + 透明度起伏），
  * 跟随画布平移/缩放，视觉上是附着在画布上的。
  */
 export function DotWaveBackground() {
@@ -14,6 +15,29 @@ export function DotWaveBackground() {
   useEffect(() => {
     vpRef.current = viewport;
   }, [viewport]);
+
+  // R-51 P2-1：点阵颜色随主题 accent。canvas 2D 无法引用 CSS 变量，
+  // 在主题变化时读取 --gc-accent 计算值缓存为 RGB，绘制循环直接使用；
+  // 解析失败时保持三主题默认（current #B7F35A）。
+  const theme = useTheme()[0];
+  const accentRef = useRef<[number, number, number]>([183, 243, 90]);
+  useEffect(() => {
+    const cssVar = getComputedStyle(document.documentElement)
+      .getPropertyValue("--gc-accent")
+      .trim();
+    const m = /^#([0-9a-f]{6})$/i.exec(cssVar);
+    if (m) {
+      const n = Number.parseInt(m[1], 16);
+      accentRef.current = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+  }, [theme]);
+
+  // R-51 P3-1：把画布缩放写入 .react-flow 根的 CSS 变量，供节点内焦点环
+  // 做宽度补偿（fitView 缩放下 2px 声明环被压到亚像素，补偿后渲染宽度恒定）。
+  useEffect(() => {
+    const rf = canvasRef.current?.closest<HTMLElement>(".react-flow");
+    rf?.style.setProperty("--rf-zoom", String(viewport.zoom || 1));
+  }, [viewport.zoom]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,7 +91,9 @@ export function DotWaveBackground() {
           const r = (0.7 + s * 1.0) * sizeScale;
           ctx.beginPath();
           ctx.arc(cx, cy, r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(201, 166, 107, ${(0.08 + s * 0.2).toFixed(3)})`;
+          // R-51 P2-1：点阵颜色 = 当前主题 accent（旧值硬编码旧金 rgba(201,166,107,…)）
+          const [ar, ag, ab] = accentRef.current;
+          ctx.fillStyle = `rgba(${ar}, ${ag}, ${ab}, ${(0.08 + s * 0.2).toFixed(3)})`;
           ctx.fill();
         }
       }

@@ -180,7 +180,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
           <button
             type="button"
             onClick={openAssetPicker}
-            className="nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+            className="nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--gc-accent-deep)]"
           >
             从素材库选择
           </button>
@@ -194,7 +194,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
             <button
               type="button"
               onClick={openAssetPicker}
-              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--gc-accent-deep)]"
             >
               素材库
             </button>
