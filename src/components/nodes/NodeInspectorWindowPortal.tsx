@@ -232,7 +232,7 @@ function InspectorDialog({
       evaluationVersion: variant.evaluationVersion,
       error: undefined,
     };
-    if (data.kind === "image") {
+    if (data.kind === "image" && isImageModelId(variant.modelId)) {
       patch.modelId = variant.modelId;
       patch.modelOptions = defaultImageModelOptions(variant.modelId, (data as ImageNodeData).aspectRatio);
     } else if (data.kind === "text") {
