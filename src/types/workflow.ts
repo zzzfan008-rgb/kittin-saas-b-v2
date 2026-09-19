@@ -1,27 +1,23 @@
 /**
  * 工作流核心类型契约 —— 团队共用，改动需通知全员
- * 无限画布 + 节点 DAG + 节点级图片模型选择。
+ * 三基础节点模型（schema v7）：text / image / video。
+ * 字段级契约唯一来源：docs/design/2026-09-18-three-node-model/contracts/data-model.md
  */
 import type { GenerationImageModelId, ImageModelOptions } from "./imageModels";
-import {
-  IMAGE_OPERATION_MODE_VALUES,
-  type ImageOperationMode,
-} from "./imageOperations";
+import type { TextModelId, TextModelOptions } from "./textModels";
+import type { VideoModelId, VideoModelOptions } from "./videoModels";
+import type { ImageOperationMode } from "./imageOperations";
 
 export { IMAGE_OPERATION_MODE_VALUES } from "./imageOperations";
 export type { ImageOperationMode } from "./imageOperations";
 
 // ---------- 节点类型 ----------
-export type NodeKind =
-  | "image-input"        // 图片上传（草图/款式图/面料参考）
-  | "sketch-to-render"   // 草图→效果图（节点内选择 API易模型）
-  | "ai-modify"          // AI 改款/变体（gpt-image-2）
-  | "fabric-recolor"     // 面料/配色替换（gpt-image-2）
-  | "upscale"            // 高清放大（节点内选择 API易模型，业务侧 2K/4K）
-  | "print-extract"      // 印花提取（gpt-image-2，抠出印花平铺展开）
-  | "print-mutate"       // 印花裂变（gpt-image-2，1~8 张风格一致变体）
-  | "mask-redraw"        // GPT Image 2 局部修改
-  | "result";            // 结果展示/管理
+/**
+ * 三基础节点（R1）。旧 9 值（image-input / sketch-to-render / ai-modify /
+ * fabric-recolor / upscale / print-extract / print-mutate / mask-redraw /
+ * result）在类型层删除，不留别名、不留运行时映射（R7 无迁移路径）。
+ */
+export type NodeKind = "text" | "image" | "video";
 
 // ---------- 节点执行状态机 ----------
 export type NodeRunStatus =
@@ -43,34 +39,6 @@ export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 export const MASK_PIPELINE_VERSION = 3;
 export const BATCH_SIZES = [1, 2, 4, 8] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
-
-// ---------- 显式生成模式 ----------
-/**
- * 模式是节点契约，不得在运行时根据是否带参考图临时推断。
- * sketch-to-render 同时承担文生图与草图编辑，必须由用户明确选择；其余节点语义固定。
- */
-export function allowedOperationModesForNode(kind: NodeKind): readonly ImageOperationMode[] {
-  switch (kind) {
-    case "sketch-to-render":
-      return ["generate", "edit"];
-    case "ai-modify":
-    case "fabric-recolor":
-    case "upscale":
-    case "print-extract":
-    case "print-mutate":
-      return ["edit"];
-    case "mask-redraw":
-      return ["mask-edit"];
-    case "image-input":
-    case "result":
-      return [];
-  }
-}
-
-export function defaultOperationModeForNode(kind: NodeKind): ImageOperationMode | undefined {
-  if (kind === "sketch-to-render") return "generate";
-  return allowedOperationModesForNode(kind)[0];
-}
 
 // ---------- 参考图可追溯输入 ----------
 /** 边数据按任意键值容忍读取；历史数据中的角色字段一律忽略。 */
@@ -102,26 +70,63 @@ export interface BaseNodeData {
   [key: string]: unknown;
 }
 
-export interface ModelSelectableNodeData {
-  /** v0/v1 读取期间可缺省；v2/v3 服务端校验后一定存在。 */
-  modelId?: GenerationImageModelId;
-  /** 历史项目中的退役/未知模型原值；仅用于提示用户手动重选，绝不发送给 Provider。 */
-  retiredModelId?: string;
-  /** 只要历史模型尚未由用户重选，运行时必须失败关闭。 */
-  modelSelectionNeedsConfirmation?: boolean;
-  modelOptions?: ImageModelOptions;
-  /** 持久化、可审计的模式；运行时不得根据输入数量改写。 */
-  operationMode: Exclude<ImageOperationMode, "mask-edit">;
-  /** 旧版含糊节点只有在用户确认模式后才能执行。 */
-  operationModeNeedsConfirmation?: boolean;
-  /** 仅在用户确认应用一个精确变体时写入；模型/契约变化后由评估门禁判为未验证。 */
+export interface TextNodeData extends BaseNodeData {
+  kind: "text";
+  /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。
+   *  用户手写内容的所有权字段：运行路径（Q1=B）永不写本字段。 */
+  text: string;
+  /** Q1=B：可运行文本模型。三项窗口配置与 image/video 同构（R4）。 */
+  promptVariantId?: string;              // 文本功能变体（如"提示词润色"），走同一 promptRunAdmission
+  modelId?: TextModelId;                 // 见 textModels 契约
+  modelOptions?: TextModelOptions;       // 自由 key-value（R5），契约提供 recommendedOptions
+  /** 最近一次文本运行的输出（展示态；「采纳」是显式 UI 动作，把 outputText 复制进 text）。
+   *  长度上限同 text（MAX_TEXT_LENGTH = 20_000），Provider 返回超长时截断写回并标记
+   *  truncated（见 contracts/runtime.md §1b 超长处置）。
+   *  随文档持久化：进 DocumentSnapshot 与 flow_json，刷新/重开不丢失未采纳提案。 */
+  outputText?: string;
+  /** 最近一次运行的输入快照（上游串联 + 当时正文），用于可追溯展示；不受 20_000 限制 */
+  lastRunInput?: string;
+}
+
+export interface ImageNodeData extends BaseNodeData {
+  kind: "image";
   promptVariantId?: string;
   promptFamilyId?: string;
   parameterProfileId?: string;
   contractHash?: `sha256:${string}`;
   evaluationVersion?: string;
   postprocessVersion?: string;
+  modelId?: GenerationImageModelId;
+  /** R5：自由 key-value；契约提供 recommendedOptions 元数据，UI 负责默认填充。 */
+  modelOptions?: ImageModelOptions;
+  aspectRatio: string;            // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
+  batchSize: BatchSize;           // 1 | 2 | 4 | 8，沿用
+  /** 蒙版能力：仅当 promptVariantId 对应变体声明 needsMask=true 时启用 */
+  mask?: string;                  // PNG dataURL 或 /api/files/*.png（校验沿用现有 optionalMaskReference）
+  maskSourceRef?: string;         // 必须等于第一条图片入边的当前引用，否则运行拒绝（沿用现有语义）
+  featherRadius?: number;         // 0–64
+  /** R8：输入与输出同体。上传图 = 用户直接写入 outputImages；生成结果 = 运行时写回。 */
+  outputImages: string[];
 }
+
+export interface VideoNodeData extends BaseNodeData {
+  kind: "video";
+  promptVariantId?: string;
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  modelId?: VideoModelId;
+  modelOptions?: VideoModelOptions;  // 见 videoModels（契约 data-model.md §5）
+  /** 输出视频引用（/api/files/xxx，files 表 video/mp4）。
+   *  语义：当前产物数组，非历史——一次 run 覆盖写（当前 Provider 一次任务产出一个 MP4，
+   *  长度恒 0 或 1；保留数组形状只为与未来多产物 Provider 对齐，不做多余 UI 分支）。
+   *  历史产物由 generation_runs/generation_outputs 与最近结果面板承载（与 image 同构）。 */
+  outputVideos: string[];
+}
+
+export type WorkflowNodeData =
+  | TextNodeData
+  | ImageNodeData
+  | VideoNodeData;
 
 export function isNodeRunActive(status: NodeRunStatus): boolean {
   return status === "queued" || status === "running" || status === "retry_wait" || status === "cancel_requested";
@@ -131,110 +136,12 @@ export function isNodeRunTerminal(status: NodeRunStatus): boolean {
   return status === "success" || status === "error" || status === "outcome_unknown" || status === "cancelled";
 }
 
-export interface ImageInputNodeData extends BaseNodeData {
-  kind: "image-input";
-  /** dataURL 或 /api/files/xxx 路径 */
-  imageUrl?: string;
-}
-
-export interface SketchToRenderNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "sketch-to-render";
-  prompt: string;
-  aspectRatio: string;       // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
-  batchSize: BatchSize;
-  outputImages: string[];    // 生成结果
-}
-
-export interface AiModifyNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "ai-modify";
-  prompt: string;
-  aspectRatio: string;
-  batchSize: BatchSize;            // 改款指令，如"改成娃娃领、袖长改短"
-  outputImages: string[];
-}
-
-export interface FabricRecolorNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "fabric-recolor";
-  /** 选中的配色（hex 数组，最多 8 个，一色出一张图），prompt 由它自动组装 */
-  colors: string[];
-  prompt: string;            // 由 colors 自动组装的替换指令
-  fabricImageUrl?: string;   // 面料参考图（可来自上游 fabric 节点）
-  outputImages: string[];
-}
-
-export interface UpscaleNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "upscale";
-  /** 最终输出长边：2K=2048px，4K=4096px。 */
-  imageSize: "2K" | "4K";
-  outputImages: string[];
-}
-
-export interface PrintExtractNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "print-extract";
-  /** 补充说明（可选），如"只要胸前那朵花" */
-  prompt: string;
-  /** 提取出的印花图（平铺展开、纯色背景） */
-  outputImages: string[];
-  /** 已存为素材的图片 URL（防止重复保存） */
-  savedAsAssets: string[];
-}
-
-export interface PrintMutateNodeData extends BaseNodeData, ModelSelectableNodeData {
-  kind: "print-mutate";
-  /** 裂变方向补充说明（可选），如"改成水墨风格" */
-  prompt: string;
-  /** 裂变数量（1~8） */
-  count: number;
-  outputImages: string[];
-}
-
-export interface MaskRedrawNodeData extends BaseNodeData, Pick<ModelSelectableNodeData,
-  | "promptVariantId"
-  | "promptFamilyId"
-  | "parameterProfileId"
-  | "contractHash"
-  | "evaluationVersion"
-  | "postprocessVersion"
-> {
-  kind: "mask-redraw";
-  operationMode: "mask-edit";
-  operationModeNeedsConfirmation?: false;
-  modelId: "gpt-image-2.5-sunburst";
-  modelOptions: ImageModelOptions;
-  prompt: string;
-  mask?: string;
-  maskSourceRef?: string;
-  /**
-   * 用户可调羽化宽度（px，0–64）。undefined/非数值 = 服务端自适应羽化（现有行为）；
-   * 0 = 硬边（不羽化）；1–64 = 按像素羽化。仅 mask-redraw 使用。
-   */
-  featherRadius?: number;
-  outputImages: string[];
-}
-
-export interface ResultNodeData extends BaseNodeData {
-  kind: "result";
-  images: string[];
-  note?: string;
-}
-
-export type WorkflowNodeData =
-  | ImageInputNodeData
-  | SketchToRenderNodeData
-  | AiModifyNodeData
-  | FabricRecolorNodeData
-  | UpscaleNodeData
-  | PrintExtractNodeData
-  | PrintMutateNodeData
-  | MaskRedrawNodeData
-  | ResultNodeData;
-
 // ---------- 持久化工作流（项目 / 模板共用）----------
 /**
- * 版本 6 为退役模型保留只读哨兵并要求手动重选。读取 v0-v5 时服务端会保守迁移；
- * 新版本不得静默降级读取。
+ * 版本 7 为三基础节点模型（R7：v6 及以下一律拒绝，不做迁移）。
+ * 拒绝文案见 contracts/data-model.md §2。
  */
-export const WORKFLOW_SCHEMA_VERSION = 6 as const;
+export const WORKFLOW_SCHEMA_VERSION = 7 as const;
 export type WorkflowSchemaVersion = typeof WORKFLOW_SCHEMA_VERSION;
 
 export interface PersistedWorkflowNode {
@@ -272,23 +179,24 @@ export interface ImageGenRequest {
   contractHash?: `sha256:${string}`;
   evaluationVersion?: string;
   postprocessVersion?: string;
-  /** 显式调用模式；Provider 路由不得根据参考图数组临时推断。 */
+  /** 调用模式；v7 起由选中的提示词变体携带（variant.mode），节点不再自描述。 */
   operationMode: ImageOperationMode;
   /**
    * 新的可追溯参考图契约。Provider 按 order 转换为各自协议；
    * 不得根据数组位置静默推断人物或服装语义。
    */
   references?: ReferenceImageInput[];
-  /** 参考图（dataURL 数组，按连线顺序，最多 8 张） */
-  /** @deprecated 仅供旧客户端与迁移期读取；新代码应同时生成 references。 */
+  /**
+   * @deprecated 旧客户端与迁移期的冗余数组（v7 前的 legacy 通道）。
+   * 与 references 同时存在时必须逐项一致（referenceInputs.ts 校验）。
+   * P2-b 服务端重写时随旧 runner 一起清理；P2-a 仅保留类型以维持编译。
+   */
   referenceImages?: string[];
   aspectRatio?: string;
   batchSize?: number;
-  /** 业务输出档位：保持比例，2K/4K 分别将最终图片长边处理为 2048/4096 像素。 */
-  imageSize?: string;
-  /** 模型原生参数；由本地知识库契约严格校验。 */
+  /** 模型原生参数；R5 起为自由 key-value，仅产生 warning（契约 §4）。 */
   modelOptions?: ImageModelOptions;
-  /** 局部编辑蒙版（dataURL），P0 可选 */
+  /** 局部编辑蒙版（dataURL），仅 needsMask=true 的变体 */
   mask?: string;
 }
 
@@ -388,82 +296,13 @@ export interface Asset {
 export interface NodeSpec {
   kind: NodeKind;
   title: string;
-  description: string;
-  providerId?: string;     // AI 节点对应的 provider
-  inputs: number;          // 接受的图片输入数（0 = 无输入）
-  outputs: "images" | "none";
+  /** 按边类型的入边数上限（graph-invariants.md §2：text 边 / image 边）；0 = 不接受该类型入边。 */
+  inputs: { text: number; image: number };
+  outputs: "text" | "images" | "video";
 }
 
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
-  "image-input": {
-    kind: "image-input",
-    title: "图片上传",
-    description: "上传草图 / 款式图 / 面料参考",
-    inputs: 0,
-    outputs: "images",
-  },
-  "sketch-to-render": {
-    kind: "sketch-to-render",
-    title: "草图→效果图",
-    description: "选择模型，将线稿渲染为服装效果图",
-    providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  "ai-modify": {
-    kind: "ai-modify",
-    title: "AI 改款",
-    description: "选择模型修改领型、袖型、长度与细节",
-    providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  "fabric-recolor": {
-    kind: "fabric-recolor",
-    title: "面料/配色替换",
-    description: "选择模型替换面料纹理与配色",
-    providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  upscale: {
-    kind: "upscale",
-    title: "高清放大",
-    description: "AI 放大至 2K/4K，精修细节",
-    providerId: "apiyi",
-    inputs: 1,
-    outputs: "images",
-  },
-  "print-extract": {
-    kind: "print-extract",
-    title: "印花提取",
-    description: "选择模型从服装上提取印花并平铺展开",
-    providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  "print-mutate": {
-    kind: "print-mutate",
-    title: "印花裂变",
-    description: "选择模型生成 1~8 张风格一致的印花变体",
-    providerId: "apiyi",
-    inputs: MAX_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  "mask-redraw": {
-    kind: "mask-redraw",
-    title: "局部修改",
-    description: "涂抹需要修改的区域并描述要添加、替换或调整的内容",
-    providerId: "apiyi",
-    // GPT Image 2 最多接收 8 张图，其中最后一张由服务端保留给区域引导图。
-    inputs: MAX_MASK_USER_REFERENCE_IMAGES,
-    outputs: "images",
-  },
-  result: {
-    kind: "result",
-    title: "结果",
-    description: "汇总展示与导出",
-    inputs: 4,
-    outputs: "none",
-  },
+  text:  { kind: "text",  title: "文本", inputs: { text: 8, image: 0 }, outputs: "text"  },
+  image: { kind: "image", title: "图片", inputs: { text: 8, image: 8 }, outputs: "images" },
+  video: { kind: "video", title: "视频", inputs: { text: 8, image: 1 }, outputs: "video" },
 };

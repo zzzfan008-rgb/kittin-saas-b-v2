@@ -3,7 +3,7 @@ import { appendRunEvent } from "./events";
 import { persistedEvaluationPolicy, assertEvaluationRuntimeReferenceBinding } from "./evaluation";
 import { evaluateClaimedJobPromptAdmission, runtimeUserReferenceInputs } from "./promptAdmission";
 import { inputImagesForStep, persistStepImages, captureProviderOriginals, compensatePersistedImages, assertJobOwnedForCompletion } from "./persist";
-import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted } from "./claim";
+import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted, markVideoTaskSubmitted } from "./claim";
 import { completeJobSuccess, terminateRun } from "./lifecycle";
 import os from "node:os";
 import { nanoid } from "nanoid";
@@ -24,6 +24,7 @@ import {
   startEvaluationProviderRequestEvidence,
 } from "../../lib/evaluationEvidenceStore";
 import { getProvider } from "../../providers";
+import { getVideoProvider } from "../../providers/videoProvider";
 import {
   ProviderError,
   publicProviderErrorMessage,
@@ -172,6 +173,10 @@ export async function processNextGenerationJob(
         runId: job.runId,
         referenceSources: input.references,
         inputProviderImages: input.providerImages,
+        resolveVideoProvider: options.resolveVideoProvider ?? getVideoProvider,
+        onVideoTaskSubmitted: async (taskId) => {
+          await markVideoTaskSubmitted(job, workerId, taskId, options.now?.() ?? Date.now(), leaseMs);
+        },
         beforeProviderCall: async (providerRequest, request) => {
           const runtimeUserReferences = runtimeUserReferenceInputs(job, request);
           const admission = evaluateClaimedJobPromptAdmission(
@@ -249,6 +254,7 @@ export async function processNextGenerationJob(
         providerImageUrls,
         capturedProviderReceipts,
         input.images,
+        result.videos ?? [],
         options.now?.() ?? Date.now(),
       );
     } catch (error) {

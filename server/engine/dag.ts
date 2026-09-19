@@ -2,6 +2,9 @@
  * DAG 工作流执行计划构建。
  * 输入 React Flow 的 nodes/edges JSON，Kahn 拓扑排序输出 ExecutionPlan。
  * 支持环检测与两种局部重跑：只跑选中节点，或选中节点及其下游。
+ *
+ * v7 三基础节点模型（R-48/R-53）：extractOutputImages / extractParams 收敛为
+ * text/image/video 三分支；text 正文沿 text 边传播（runtime.md §0/§1/§1b）。
  */
 import type {
   ExecutionPlan,
@@ -10,15 +13,11 @@ import type {
   WorkflowNodeData,
 } from "../../src/types/workflow";
 import {
-  MASK_PIPELINE_VERSION,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
-  allowedOperationModesForNode,
 } from "../../src/types/workflow";
 import {
-  MASK_REDRAW_MODEL_ID,
-  imageModelOptionsErrorForOperation,
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
@@ -28,6 +27,7 @@ import {
   promptRunAdmissionInputFromParams,
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
+import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -68,13 +68,16 @@ export class PromptRunAdmissionError extends DagError {
  * Release/evaluation admission is separate from graph-shape validation so
  * legacy migration tests can inspect a plan without authorising a paid run.
  * Both paid enqueue routes must call this immediately before enqueueing.
+ *
+ * v7：仅 image 节点走异步 runQueue 的付费准入；text 节点走同步链路（§1b），
+ * video 节点归 P2-e。准入继续按 promptVariantId 工作，语义不变。
  */
 export function assertPromptRunAdmissions(
   plan: ExecutionPlan,
   options: { evaluationRun?: boolean } = {},
 ): void {
   for (const step of plan.steps) {
-    if (!NODE_SPECS[step.kind].providerId) continue;
+    if (step.kind !== "image") continue;
     const references = (step.inputReferences ?? []).map((reference, order) => ({
       order,
       sourceNodeId: reference.sourceNodeId,
@@ -89,101 +92,48 @@ export function assertPromptRunAdmissions(
   }
 }
 
-/** 运行前验证会产生费用的节点具备真实图片输入。 */
-export function assertPlanInputs(plan: ExecutionPlan, edges: FlowEdge[]): void {
-  const executingNodeIds = new Set(plan.steps.map((step) => step.nodeId));
+/** 运行前验证会产生费用的节点具备真实输入（runtime.md §3）。 */
+export function assertPlanInputs(plan: ExecutionPlan, _edges: FlowEdge[]): void {
   for (const step of plan.steps) {
-    const spec = NODE_SPECS[step.kind];
-    if (!spec.providerId) continue;
-    if (
-      step.params.modelSelectionNeedsConfirmation === true
-      || (typeof step.params.retiredModelId === "string" && step.params.retiredModelId.trim())
-    ) {
-      throw new DagError(
-        `Node ${step.nodeId} uses a retired model and must be manually reconfigured before running`,
-      );
-    }
-    if (!isImageModelId(step.params.modelId)) {
+    // text 节点走同步链路（无参考图/模型 ID 约束由同步路由负责）；video 归 P2-e。
+    if (step.kind !== "image") continue;
+
+    const modelId = step.params.modelId;
+    if (!isImageModelId(modelId)) {
       throw new DagError(`Node ${step.nodeId} must select an explicit supported image model`);
     }
-    const modelId = step.params.modelId;
     if (!isModelAllowedForNode(modelId, step.kind)) {
       throw new DagError(`Model ${modelId} is not allowed for node ${step.nodeId}`);
     }
-    const operationMode = step.params.operationMode;
-    const allowedModes = allowedOperationModesForNode(step.kind);
-    if (!allowedModes.includes(operationMode as never)) {
-      throw new DagError(
-        `Node ${step.nodeId} operationMode must be one of: ${allowedModes.join(", ")}`,
-      );
+
+    // INV-2（graph-invariants.md §1）：至少一条上游 text 节点正文非空。
+    const inputTexts = Array.isArray(step.params.inputTexts)
+      ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
+      : [];
+    if (!inputTexts.some((text) => text.trim() !== "")) {
+      throw new DagError(`Node ${step.nodeId} 的上游文本节点还没有填写提示词`);
     }
-    if (step.params.operationModeNeedsConfirmation === true) {
-      throw new DagError(`Node ${step.nodeId} operationMode must be confirmed before running`);
-    }
-    const optionsError = imageModelOptionsErrorForOperation(
-      modelId,
-      step.params.modelOptions,
-      operationMode as "generate" | "edit" | "mask-edit",
-    );
-    if (optionsError) {
-      throw new DagError(`Node ${step.nodeId} modelOptions ${optionsError}`);
-    }
-    if (
-      step.kind === "mask-redraw"
-      && Object.keys(step.params.modelOptions as Record<string, unknown>).length > 0
-    ) {
-      throw new DagError(
-        `Node ${step.nodeId} modelOptions must be empty; mask size is derived at runtime`,
-      );
-    }
-    const usableImages = (step.upstream ?? []).flatMap((upstream) =>
-      executingNodeIds.has(upstream.nodeId) ? ["__runtime_output__"] : upstream.images,
-    );
+
+    // 参考图数量（保留检查第 2 条）。
     const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-    const maxUserReferences = step.kind === "mask-redraw"
+    const needsMask = step.params.operationMode === "mask-edit";
+    const maxUserReferences = needsMask
       ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
       : maxReferences;
-    if (usableImages.length > maxUserReferences) {
-      const qualifier = step.kind === "mask-redraw" ? " user" : "";
+    if (step.inputImages.length > maxUserReferences) {
       throw new DagError(
-        `Node ${step.nodeId} accepts at most ${maxUserReferences}${qualifier} reference images for ${modelId}`,
+        `Node ${step.nodeId} accepts at most ${maxUserReferences} reference images for ${modelId}`,
       );
     }
-    if (operationMode === "generate") {
-      if (usableImages.length > 0) {
-        throw new DagError(`Node ${step.nodeId} is generate mode and cannot accept reference images`);
-      }
-      const prompt = typeof step.params.prompt === "string" ? step.params.prompt.trim() : "";
-      if (!prompt) throw new DagError(`Node ${step.nodeId} requires a prompt in generate mode`);
-      continue;
-    }
-    if (step.kind === "fabric-recolor") {
-      const garmentEdges = edges.filter(
-        (edge) => edge.target === step.nodeId && edge.targetHandle !== "fabric",
-      );
-      const garmentIds = new Set(garmentEdges.map((edge) => edge.source));
-      const garmentImages = (step.upstream ?? [])
-        .filter((upstream) => garmentIds.has(upstream.nodeId))
-        .flatMap((upstream) =>
-          executingNodeIds.has(upstream.nodeId) ? ["__runtime_output__"] : upstream.images,
-        );
-      if (garmentImages.length === 0) {
-        throw new DagError(`Node ${step.nodeId} requires a garment image`);
-      }
-      continue;
-    }
-    if (step.kind === "mask-redraw") {
-      if (usableImages.length === 0) throw new DagError(`Node ${step.nodeId} requires an upstream image`);
+
+    // needsMask 变体的蒙版检查（Q4=A：由变体声明驱动；过渡期按 mask-edit 模式判定）。
+    if (needsMask) {
       if (typeof step.params.mask !== "string" || !step.params.mask) {
         throw new DagError(`Node ${step.nodeId} requires a saved PNG mask`);
       }
-      if (typeof step.params.maskSourceRef !== "string" || step.params.maskSourceRef !== usableImages[0]) {
+      if (typeof step.params.maskSourceRef !== "string" || step.params.maskSourceRef !== step.inputImages[0]) {
         throw new DagError(`Node ${step.nodeId} mask does not match its current source image`);
       }
-      continue;
-    }
-    if (usableImages.length === 0) {
-      throw new DagError(`Node ${step.nodeId} requires an upstream image`);
     }
   }
 }
@@ -261,8 +211,9 @@ export function buildExecutionPlan(
     const node = nodeMap.get(id)!;
     const data = node.data;
 
-    // 上游按 edges 数组顺序（result 节点多输入时保持连接顺序）
+    // 上游按 edges 数组顺序；text 节点正文沿 text 边传播（runtime.md §0）。
     const upstream: NodeExecution["upstream"] = [];
+    const inputTexts: string[] = [];
     for (const e of edges) {
       if (e.target !== id) continue;
       const srcData = nodeMap.get(e.source)!.data;
@@ -270,6 +221,7 @@ export function buildExecutionPlan(
         nodeId: e.source,
         images: extractOutputImages(srcData),
       });
+      if (srcData.kind === "text") inputTexts.push(srcData.text);
     }
 
     const inputImages = upstream.flatMap((source) => source.images);
@@ -287,135 +239,71 @@ export function buildExecutionPlan(
       inputImages,
       inputReferences,
       upstream,
-      params: extractParams(data),
+      params: { ...extractParams(data), inputTexts },
     };
   });
 
   return { steps };
 }
 
-/** 从节点 data 提取该节点当前已知的输出图片 */
+/** 从节点 data 提取该节点当前已知的输出图片（v7 三值 kind）。 */
 function extractOutputImages(data: WorkflowNodeData): string[] {
   switch (data.kind) {
-    case "image-input":
-      return data.imageUrl ? [data.imageUrl] : [];
-    case "sketch-to-render":
-    case "ai-modify":
-    case "fabric-recolor":
-    case "upscale":
-    case "print-extract":
-    case "print-mutate":
-    case "mask-redraw":
-      return data.outputImages ?? [];
-    case "result":
-      return data.images ?? [];
+    case "image":
+      return data.outputImages;
+    case "text":
+    case "video":
+      return [];
   }
 }
 
-/** 提取节点执行参数（prompt / aspectRatio / batchSize / fabricImageUrl 等） */
+/** 提取节点执行参数（v7 三值 kind；operationMode 由提示词变体携带）。 */
 function extractParams(data: WorkflowNodeData): Record<string, unknown> {
-  const modelFields = (_preferredAspectRatio = "1:1") => {
-    if (!NODE_SPECS[data.kind].providerId) return {};
-    if (
-      !("modelId" in data)
-      || !isImageModelId(data.modelId)
-      || !isModelAllowedForNode(data.modelId, data.kind)
-    ) {
-      throw new DagError(`Node data for ${data.kind} must select an explicit supported image model`);
-    }
-    const modelId = data.modelId;
-    const operationMode = "operationMode" in data ? data.operationMode : undefined;
-    const allowedModes = allowedOperationModesForNode(data.kind);
-    if (!allowedModes.includes(operationMode as never)) {
-      throw new DagError(`Node data for ${data.kind} has an invalid operationMode`);
-    }
-    const modelOptions = "modelOptions" in data ? data.modelOptions : undefined;
-    const optionsError = imageModelOptionsErrorForOperation(
-      modelId,
-      modelOptions,
-      operationMode as "generate" | "edit" | "mask-edit",
-    );
-    if (optionsError) {
-      throw new DagError(`Node data for ${data.kind} modelOptions ${optionsError}`);
-    }
-    return {
-      modelId,
-      operationMode,
-      operationModeNeedsConfirmation: "operationModeNeedsConfirmation" in data
-        ? data.operationModeNeedsConfirmation === true
-        : false,
-      modelSelectionNeedsConfirmation: "modelSelectionNeedsConfirmation" in data
-        ? data.modelSelectionNeedsConfirmation === true
-        : false,
-      ...(typeof data.retiredModelId === "string" && data.retiredModelId.trim()
-        ? { retiredModelId: data.retiredModelId }
-        : {}),
-      modelOptions: { ...(modelOptions as Record<string, unknown>) },
-      ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
-      ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
-      ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),
-      ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
-      ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
-      ...(typeof data.postprocessVersion === "string" ? { postprocessVersion: data.postprocessVersion } : {}),
-    };
-  };
   switch (data.kind) {
-    case "image-input":
-      return { imageUrl: data.imageUrl };
-    case "sketch-to-render":
+    case "text":
       return {
-        prompt: data.prompt, aspectRatio: data.aspectRatio, batchSize: data.batchSize,
-        ...modelFields(data.aspectRatio),
+        text: data.text,
+        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
+        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+        ...(data.modelOptions ? { modelOptions: { ...data.modelOptions } } : {}),
       };
-    case "ai-modify":
-      return {
-        prompt: data.prompt, aspectRatio: data.aspectRatio, batchSize: data.batchSize,
-        ...modelFields(data.aspectRatio),
-      };
-    case "fabric-recolor":
-      return {
-        prompt: data.prompt,
-        colors: data.colors,
-        fabricImageUrl: data.fabricImageUrl,
-        ...modelFields(),
-      };
-    case "upscale":
-      return { imageSize: data.imageSize, ...modelFields() };
-    case "print-extract":
-      return { prompt: data.prompt, ...modelFields() };
-    case "print-mutate":
-      return { prompt: data.prompt, count: data.count, ...modelFields() };
-    case "mask-redraw":
-      if (
-        data.modelId !== MASK_REDRAW_MODEL_ID
-        || data.operationMode !== "mask-edit"
-        || imageModelOptionsErrorForOperation(
-          MASK_REDRAW_MODEL_ID,
-          data.modelOptions,
-          "mask-edit",
-        )
-        || Object.keys(data.modelOptions).length > 0
-      ) {
-        throw new DagError(
-          `Node data for mask-redraw requires ${MASK_REDRAW_MODEL_ID}, mask-edit, and empty modelOptions`,
-        );
+    case "image": {
+      const modelId = data.modelId;
+      if (!isImageModelId(modelId)) {
+        throw new DagError("Node data for image must select an explicit supported image model");
       }
+      // operationMode 由提示词变体携带（mode 归属反转，runtime.md §1）；此处从变体
+      // 解析落入 params，供准入（binding-mismatch 校验 operationMode === variant.mode）
+      // 与运行链路共用。未选变体则缺省，由准入的 missing-binding 拒绝。
+      const operationMode = typeof data.promptVariantId === "string"
+        ? getGarmentPromptVariantById(data.promptVariantId)?.mode
+        : undefined;
       return {
-        prompt: data.prompt, mask: data.mask, maskSourceRef: data.maskSourceRef,
-        maskPipelineVersion: MASK_PIPELINE_VERSION,
-        operationMode: "mask-edit", operationModeNeedsConfirmation: false,
-        modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
-        ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
-          ? { featherRadius: data.featherRadius }
-          : {}),
+        modelId,
+        ...(operationMode ? { operationMode } : {}),
+        aspectRatio: data.aspectRatio,
+        batchSize: data.batchSize,
+        modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
         ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
         ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),
         ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
         ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
         ...(typeof data.postprocessVersion === "string" ? { postprocessVersion: data.postprocessVersion } : {}),
+        ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
+        ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
+        ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+          ? { featherRadius: data.featherRadius }
+          : {}),
       };
-    case "result":
-      return { note: data.note };
+    }
+    case "video":
+      return {
+        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
+        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+        ...(data.modelOptions ? { modelOptions: { ...data.modelOptions } } : {}),
+        ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
+        ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+      };
   }
 }

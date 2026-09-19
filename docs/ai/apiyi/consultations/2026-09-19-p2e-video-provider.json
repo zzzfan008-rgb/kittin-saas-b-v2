@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-19T09:14:23.495Z",
+  "baseCommit": "1c8b365fd7119e95e8f32f88fe7e55d6a16386e6",
+  "changeFingerprintSha256": "58b182dbff575fafd81787c251a97b9395e2e312fabb9da51dcb07c414400c05",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "Seedance 2.5 video generation doubao-seedance-2-5-260628",
+  "affectedPaths": [
+    "docs/ai/apiyi/video-model-contracts.json",
+    "server/config.ts",
+    "server/engine/runner.ts",
+    "server/providers/textProvider.ts",
+    "server/providers/videoProvider.ts",
+    "src/types/videoModels.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 Video Generation API Reference",
+      "sha256": "2934974934a5c05ad3dd5821e896d8ca5c659ee6f27c3ce43ca002348701fd5d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 Video Generation",
+      "sha256": "f5d50e6f744c4d06555163a34c2730a8530230e0905bdc8c40755cd4b4c1efcc"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/ja/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 動画生成 API リファレンス",
+      "sha256": "5deb1a64d4e4c67e1c1929c1fb9e7afaff81ef00cc414c383fd146712b779d3d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/ko/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 동영상 생성 API 레퍼런스",
+      "sha256": "6167f119bd307b7458a09ac901e7bc6aaf602d453f03d4674f80d758cbb9d4ee"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/ru/api-capabilities/seedance2/video-generation.md",
+      "title": "Справочник API генерации видео Seedance 2.0 / 2.5",
+      "sha256": "75f49336a2c0cf357fa1f4dd480044ea048f7b2820c1c55769c7b809e7d7e01b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 视频生成 API 参考",
+      "sha256": "971f78c3d6af915f86065d4ec63628f499672742d41b665128c880ff21455c3a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 影片生成 API 參考",
+      "sha256": "d036cbcce921f564b31a007998f908fb563d81f3dca98628d7b1ae8564a92d8e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/seedance2-reference-vs-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/faq/seedance2-reference-vs-edit.md",
+      "pageLocalPath": "pages/en/faq/seedance2-reference-vs-edit.md",
+      "title": "Seedance 2.5: Reference-to-Video vs. Video Editing",
+      "sha256": "e269db44a52aa05ede6a3c3c1527bf4ab507785c7b8c25bda1290f0b4bf2ab65"
+    }
+  ],
+  "decisionSummary": "P2-e video provider: only doubao-seedance-2-5-260628, async submit+poll+MP4 land to own storage, dedicated token APIYI_VIDEO_API_KEY; also fix textProvider stale model IDs to R10 adjudicated set.",
+  "unresolvedChoices": []
+}

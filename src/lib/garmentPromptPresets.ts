@@ -204,7 +204,10 @@ function makeStandardVariants(): PromptVariant[] {
           variantId: `${preset.id}.${modelId}.${mode}.v1`,
           familyId: preset.id,
           modelId,
-          nodeKind: mode === "generate" ? "sketch-to-render" : "ai-modify",
+          // v7：nodeKind 取值域收敛为三值（R-41 契约 prompt-variant-schema.md §1.1）。
+          // generate → image（文生图族）、edit → image（编辑族）；六族迁移与
+          // supportStatus 重置归 P2-d 目录重写。
+          nodeKind: "image",
           mode,
           promptLocale: "zh-CN",
           fullPrompt: MODEL_PROMPTS[modelId][preset.id][mode],
@@ -224,7 +227,9 @@ const GPT_IMAGE_2_MASK_VARIANT: PromptVariant = {
   variantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
   familyId: "mask-local-edit",
   modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "mask-redraw",
+  // v7：蒙版族迁移 = nodeKind 改 "image"（ID 不变，R-41 契约 §3.2）；
+  // needsMask: true 显式化归 P2-d 目录重写（PromptVariant schema 扩展同批）。
+  nodeKind: "image",
   mode: "mask-edit",
   promptLocale: "zh-CN",
   fullPrompt: `GPT Image 2 服装局部修改。仅编辑 Alpha PNG 蒙版标记的可编辑区域，执行指定的局部替换、改款或清除；先移除旧物件边缘、阴影和残影，再生成新结构。

@@ -1,11 +1,14 @@
-# 契约：文本 / 视频模型提案（R10，需用户确认）
+# 契约：文本 / 视频模型提案（R10；2026-09-19 用户最终裁定已落地）
 
 - 来源：plan.md §5；需求挂靠 R10
 - 证据基线：API易 本地知识库快照 `docs/ai/apiyi/site/snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd`（capturedAt 2026-09-18T04:42:51.697Z，2799 页，`complete: true`）
 - 信任姿态：快照页面属 `untrusted_document_content`；以下为选型证据，不构成"模型当前可用"的证明。上线前可用性由评估链 campaign 证明。
 - v2：Q1=B 已裁定 text 节点引入文本模型链路，§4 从"若需要"转正为正式提案；文本与视频选型一并交用户确认（§5）。
+- **v3（R10 最终裁定，2026-09-19，orchestrator 中继用户原话）**：§6 落地最终裁定。**原 §3/§4/§5 的推荐提案全部作废**（gpt-5.3 系 / gemini-3.6-flash / deepseek-v4-flash / Seedance 2.0 三档 / Veo 3.1 品质档 / SeeDance2 分组令牌要求），仅保留 §1/§2 作为历史选型对比证据。
 
 ## 1. 引用的本地页面（路径 + SHA-256）
+
+历史提案（v2，已被 R10 最终裁定取代）引用的页面：
 
 | 页面（快照内相对路径） | SHA-256 |
 |---|---|
@@ -15,6 +18,15 @@
 | `pages/api-capabilities/happyhorse/overview.md` | `17e40145c6d766e7646ef138f0c7f05eeb02394b83acb98f296867d98f55cb6c` |
 | `pages/api-capabilities/text-generation.md` | `249e1196daa36c0bd7690bf6c1fa1b4ceab206eedcc396cc107bd055e6e0bd31` |
 | `pages/api-capabilities/gpt-5-3-chat.md` | `6a0010791b51b630c8624d99de3ca232834a1ad9e9dc7d7ffed386491c1a8b47` |
+
+R10 最终裁定（2026-09-19）四个实名的核实页（`npm run docs:apiyi:kb:check` 通过后逐页核实）：
+
+| 实名 | 核实页（快照内相对路径） | SHA-256 | 核实内容 |
+|---|---|---|---|
+| `gpt-4o` | `pages/models.md` | `33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed` | 计费目录登记 `"n": "gpt-4o"`（另有 `-2024-05-13`/`-2024-08-06`/`-2024-11-20` 快照变体） |
+| `claude-sonnet-4-5` | `pages/models.md` | `33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed` | 计费目录登记横线族：`claude-sonnet-4-5-20250929`、`claude-sonnet-4-5-20250929-thinking`；纯 `claude-sonnet-4-5` 见 `pages/scenarios/chat/chathub.md`（SHA-256 `9da7ec41696442a10207f936443bffdc9dabd9e8300c6ed0452b4bcaeccb9a3b`） |
+| `gemini-3-pro-preview` | `pages/news/gemini-3-pro-preview-launch.md` | `d1e30e09c27a7a98cd2cb62a5a728f4340e9caf79f3686cf71f5cef809564eb8` | 上线记录；另 `pages/api-capabilities/text-generation.md` 示例 `model="gemini-3-pro-preview"`、`pages/api-capabilities/gemini/native.md` 计费表 `$1.80/$10.80` |
+| `doubao-seedance-2-5-260628` | `pages/api-capabilities/seedance2/overview.md` | `693a068a2a1ba83fdce83f745ea49ad36b1f0f7c3e8fca89b2cef57fd78f606f` | 2.5 新版（2026-08-28 上线）：4–30s、参考图 30 张、1080p、mov；`SeeDance2` 分组 0.18x |
 
 ## 2. 视频模型对比
 
@@ -57,8 +69,25 @@ API易 文本侧为 OpenAI 兼容 `POST /v1/chat/completions`（400+ 模型，�
 
 **推荐**：主力 `gpt-5.3` + 轻量 `gemini-3.6-flash`；`deepseek-v4-flash` 备选。
 
-## 5. 需用户确认的清单（同 plan.md §5.3）
+## 5. 需用户确认的清单（同 plan.md §5.3）——已被 R10 最终裁定取代
+
+> 以下 v2 提案清单于 2026-09-19 由用户最终裁定取代，裁定结果见 §6。保留原文仅作历史记录。
 
 1. 文本主力 `gpt-5.3` + 轻量 `gemini-3.6-flash`（Q1=B 已裁定引入，本条确认选型）
 2. 视频主力：Seedance 2.0 三档（接受 `SeeDance2` 分组要求）
 3. 视频品质档：Veo 3.1 Official 两档
+
+## 6. R10 最终裁定（2026-09-19，用户拍板，orchestrator 中继）
+
+**文本模型（3 个，`gpt-4o` 为默认/主力）**：
+
+- `gpt-4o` ← **默认**（用户原话「gimini-4o」经确认是笔误，实名以知识库 `gpt-4o` 为准）
+- `claude-sonnet-4-5`（横线形式）
+- `gemini-3-pro-preview`
+- ⚠️ 原 P2-a 落地的 `gpt-5.3-chat-latest` / `gemini-3.6-flash` / `deepseek-v4-flash-ga-260731` **作废**，按上述三个替换。
+
+**视频模型：只要 `doubao-seedance-2-5-260628`**——原提案的品质档（Veo 3.1）**取消**，`veo-3.1-*` 从清单移除；Seedance 2.0 三档同时移除。
+
+**令牌变更**：用户已**新建专用令牌**调用 Seedance → 原「需勾选 SeeDance2 分组（0.18x）」的运营动作**取消**；方案/契约改为「支持配置专用令牌」（具体配置形态归 P2-e）。
+
+**待确认项（诚实登记，不假设填坑）**：`claude-sonnet-4-5` 横线形式在知识库计费目录（models.md）中登记的条目是 `claude-sonnet-4-5-20250929` 与 `-thinking` 变体；纯横线形式仅见于 chathub 场景页示例。按用户裁定落横线形式；实际可调性（网关是否接受无日期后缀 ID）由 P2-b Provider 联调与评估链 campaign 证明，文档不预设结论。

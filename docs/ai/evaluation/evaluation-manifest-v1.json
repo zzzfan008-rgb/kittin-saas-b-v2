@@ -92,7 +92,7 @@
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "generate",
         "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:generate:v1",
@@ -101,7 +101,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -114,7 +114,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:f014358748a85e577ab1c0c89bb483f52992339625159a167853da10783a338d"
+      "releaseVectorSha256": "sha256:b16500d3e8aef8729d7cb817e3c019a20f0174b4de64d444c1c753578692cf92"
     },
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
@@ -123,7 +123,7 @@
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "edit",
         "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1",
@@ -132,7 +132,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -145,7 +145,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:05d28ebac58455cfb9bcb2546230e754af826596292c45e0c649cb6570fc6c9e"
+      "releaseVectorSha256": "sha256:6db58a27dd4fbeb464e3ec9a2e9d1bdf7aa5090b213f41463ee2a622ace0df1d"
     },
     {
       "unitId": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
@@ -154,7 +154,7 @@
         "promptVariantId": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "generate",
         "parameterProfileId": "gpt-image-2.5-flare-vip:commerce-hero:generate:v1",
@@ -163,7 +163,7 @@
       "versions": {
         "presetVersion": "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -176,7 +176,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:373bf2664305badd948b7710f4cce51b18ddb22f401af259e96903f881163656"
+      "releaseVectorSha256": "sha256:efe395f95f5ef527ecb4ee02e5c8964759ba0611d39c5dbc452a54b0358930be"
     },
     {
       "unitId": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
@@ -185,7 +185,7 @@
         "promptVariantId": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "edit",
         "parameterProfileId": "gpt-image-2.5-flare-vip:commerce-hero:edit:v1",
@@ -194,7 +194,7 @@
       "versions": {
         "presetVersion": "commerce-hero.gpt-image-2.5-flare-vip.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -207,7 +207,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:06d112487aa4a2d633f6a948f4b5806a70172867009639e70aaa1502e97a1bb9"
+      "releaseVectorSha256": "sha256:961c006af0fdaad2396ad3d4adb398194614564007e050ed6f8fca412c71202e"
     },
     {
       "unitId": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
@@ -216,7 +216,7 @@
         "promptVariantId": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "generate",
         "parameterProfileId": "gpt-image-2.5-flare-vip:design-sheet:generate:v1",
@@ -225,7 +225,7 @@
       "versions": {
         "presetVersion": "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -238,7 +238,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:a10d4f0202f3978106b4f81af89825e5530e9b05eca41850dd8cb557d3c24451"
+      "releaseVectorSha256": "sha256:bef2d159ed97fc7dfe3431f00b71aaeb4bf7f26aa847c314db3044daedf905ed"
     },
     {
       "unitId": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
@@ -247,7 +247,7 @@
         "promptVariantId": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "edit",
         "parameterProfileId": "gpt-image-2.5-flare-vip:design-sheet:edit:v1",
@@ -256,7 +256,7 @@
       "versions": {
         "presetVersion": "design-sheet.gpt-image-2.5-flare-vip.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+        "providerContractVersion": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
         "resolvedModelVersion": "gpt-image-2.5-flare-vip",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -269,7 +269,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:0557047886eb2573bb72c179583749c265942ee2eeded65d387c5a7e3e0f569f"
+      "releaseVectorSha256": "sha256:64606545a119720a92e587c5e6ef0e40a542f3cc8add55d4004f594d28feffa3"
     },
     {
       "unitId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
@@ -278,7 +278,7 @@
         "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "generate",
         "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:generate:v1",
@@ -287,7 +287,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -300,7 +300,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:735dd74b2b081fb300ce37828f12830d4a5eaa5ee6a23b5de3c6f87dab9b3845"
+      "releaseVectorSha256": "sha256:4673e6e64575aca830250589808d3932e80ebbc074596f0ed87d6641f33f5ff5"
     },
     {
       "unitId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
@@ -309,7 +309,7 @@
         "promptVariantId": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "edit",
         "parameterProfileId": "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
@@ -318,7 +318,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -331,7 +331,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:ff51c726d127aeda9ed7ff44278e9da91399775c7c35284fbbef64b4575d9e3d"
+      "releaseVectorSha256": "sha256:fb7cde9607c643da41a04f25f541bbeaf8bdee41afb9af30942ec6aa72fec669"
     },
     {
       "unitId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
@@ -340,7 +340,7 @@
         "promptVariantId": "commerce-hero.gemini-3.1-flash-image.generate.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.gemini-3.1-flash-image.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "generate",
         "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:generate:v1",
@@ -349,7 +349,7 @@
       "versions": {
         "presetVersion": "commerce-hero.gemini-3.1-flash-image.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -362,7 +362,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:2b2c636bef290d77c655cb9d4eeef37415f7f9f7970f5b0d88a9cc02a152dbab"
+      "releaseVectorSha256": "sha256:94c54d153e1966bd5a41783132f39f1ad44956c8210a03c81295f798d17c9d23"
     },
     {
       "unitId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
@@ -371,7 +371,7 @@
         "promptVariantId": "commerce-hero.gemini-3.1-flash-image.edit.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.gemini-3.1-flash-image.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "edit",
         "parameterProfileId": "gemini-3.1-flash-image:commerce-hero:edit:v1",
@@ -380,7 +380,7 @@
       "versions": {
         "presetVersion": "commerce-hero.gemini-3.1-flash-image.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -393,7 +393,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:5428fed9b8b612da7224ebf63f389755554ae83dcf98ddadb44fa92164ba6f00"
+      "releaseVectorSha256": "sha256:4869c2c76a0b7ff4bd4bfc0c4218b3c99053e71dae2cb0f21369870e3bae3ef9"
     },
     {
       "unitId": "design-sheet.gemini-3.1-flash-image.generate.v1",
@@ -402,7 +402,7 @@
         "promptVariantId": "design-sheet.gemini-3.1-flash-image.generate.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.gemini-3.1-flash-image.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "generate",
         "parameterProfileId": "gemini-3.1-flash-image:design-sheet:generate:v1",
@@ -411,7 +411,7 @@
       "versions": {
         "presetVersion": "design-sheet.gemini-3.1-flash-image.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -424,7 +424,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:457853d53c80c3330ea9bbc025526ea9c8ac65253b168c40de868178ef20de79"
+      "releaseVectorSha256": "sha256:4211d629673e6282639c4cb6e7f11895a4c06e58e2dc5f313d344a43914d5e87"
     },
     {
       "unitId": "design-sheet.gemini-3.1-flash-image.edit.v1",
@@ -433,7 +433,7 @@
         "promptVariantId": "design-sheet.gemini-3.1-flash-image.edit.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.gemini-3.1-flash-image.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "gemini-3.1-flash-image",
         "operationMode": "edit",
         "parameterProfileId": "gemini-3.1-flash-image:design-sheet:edit:v1",
@@ -442,7 +442,7 @@
       "versions": {
         "presetVersion": "design-sheet.gemini-3.1-flash-image.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+        "providerContractVersion": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
         "resolvedModelVersion": "gemini-3.1-flash-image",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -455,7 +455,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:205cef4cdbbd8ee8471b92f3396a80df5dc8d25b12280f1e6d263e918141404d"
+      "releaseVectorSha256": "sha256:2d53ff0829dc8d5ebe9304a9db0e67295e243df0d9e79997999d16002cdeaba4"
     },
     {
       "unitId": "fashion-lookbook.flux-2-pro.generate.v1",
@@ -464,7 +464,7 @@
         "promptVariantId": "fashion-lookbook.flux-2-pro.generate.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.flux-2-pro.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "generate",
         "parameterProfileId": "flux-2-pro:fashion-lookbook:generate:v1",
@@ -473,7 +473,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.flux-2-pro.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -486,7 +486,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:886358e02281893f89d6cfb9dab416f4d2cc9202273a8472eaa98bf6ee4dcd11"
+      "releaseVectorSha256": "sha256:f8bcd9255f71ce8e680d7f045242efcdc7c2f8e799fb6365940c5620308931a8"
     },
     {
       "unitId": "fashion-lookbook.flux-2-pro.edit.v1",
@@ -495,7 +495,7 @@
         "promptVariantId": "fashion-lookbook.flux-2-pro.edit.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.flux-2-pro.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "edit",
         "parameterProfileId": "flux-2-pro:fashion-lookbook:edit:v1",
@@ -504,7 +504,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.flux-2-pro.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -517,7 +517,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:c0eadd5950d7661a1fe20c29f91e8a81aa92bb3d30d0152501575f39413c42f0"
+      "releaseVectorSha256": "sha256:cf343337d3e48879276807e102853e034b11131869cbd4dc824ca9eb905e7aca"
     },
     {
       "unitId": "commerce-hero.flux-2-pro.generate.v1",
@@ -526,7 +526,7 @@
         "promptVariantId": "commerce-hero.flux-2-pro.generate.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.flux-2-pro.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "generate",
         "parameterProfileId": "flux-2-pro:commerce-hero:generate:v1",
@@ -535,7 +535,7 @@
       "versions": {
         "presetVersion": "commerce-hero.flux-2-pro.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -548,7 +548,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:e749f64471d26e68eb2afb82c5f8d059d5bc466b2d462d88a0fe7f272f9c2149"
+      "releaseVectorSha256": "sha256:58fd0b31cde8e5f6d30de27d6b9cbd3c0fcbb00b9f580d7e99b17d7d13fb8fab"
     },
     {
       "unitId": "commerce-hero.flux-2-pro.edit.v1",
@@ -557,7 +557,7 @@
         "promptVariantId": "commerce-hero.flux-2-pro.edit.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.flux-2-pro.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "edit",
         "parameterProfileId": "flux-2-pro:commerce-hero:edit:v1",
@@ -566,7 +566,7 @@
       "versions": {
         "presetVersion": "commerce-hero.flux-2-pro.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -579,7 +579,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:de27b2a856c2baa06abcd5430591b29eff527d565b36b650ab0d71bbd83b2a02"
+      "releaseVectorSha256": "sha256:6a013914bdcc2a744acf41621c3f441e40c350ec7cf474a191e4b1c28ab52626"
     },
     {
       "unitId": "design-sheet.flux-2-pro.generate.v1",
@@ -588,7 +588,7 @@
         "promptVariantId": "design-sheet.flux-2-pro.generate.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.flux-2-pro.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "generate",
         "parameterProfileId": "flux-2-pro:design-sheet:generate:v1",
@@ -597,7 +597,7 @@
       "versions": {
         "presetVersion": "design-sheet.flux-2-pro.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -610,7 +610,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:19367bca487a3ad2a6554ebf4d9f870e465b5b41ec668454cc46aa36f11e3693"
+      "releaseVectorSha256": "sha256:5bb29ded8fb5ce33ac519e8cf662de0ae3f7378fe33e50b217795c079d0aff09"
     },
     {
       "unitId": "design-sheet.flux-2-pro.edit.v1",
@@ -619,7 +619,7 @@
         "promptVariantId": "design-sheet.flux-2-pro.edit.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.flux-2-pro.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "flux-2-pro",
         "operationMode": "edit",
         "parameterProfileId": "flux-2-pro:design-sheet:edit:v1",
@@ -628,7 +628,7 @@
       "versions": {
         "presetVersion": "design-sheet.flux-2-pro.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+        "providerContractVersion": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
         "resolvedModelVersion": "flux-2-pro",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -641,7 +641,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:4c87848c19833ddb88851726f6d1f1748e507124bce67f50de86ed834eb76f18"
+      "releaseVectorSha256": "sha256:25f890c1d4b264d9967fe11fc4b1a48b28784da93f8bbd814cea38b38f3966f4"
     },
     {
       "unitId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
@@ -650,7 +650,7 @@
         "promptVariantId": "fashion-lookbook.seedream-5-0-260128.generate.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.seedream-5-0-260128.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "generate",
         "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:generate:v1",
@@ -659,7 +659,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.seedream-5-0-260128.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -672,7 +672,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:51c0f3fdbb5bfca9c5a67c1390ba0365622c6734d6ffd483aee77548c9ee13c7"
+      "releaseVectorSha256": "sha256:3a5d43ba7fafcfb37bf25fd3e8bc04412bb523bc9e90bb22dd433ff2d75e9464"
     },
     {
       "unitId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
@@ -681,7 +681,7 @@
         "promptVariantId": "fashion-lookbook.seedream-5-0-260128.edit.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.seedream-5-0-260128.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "edit",
         "parameterProfileId": "seedream-5-0-260128:fashion-lookbook:edit:v1",
@@ -690,7 +690,7 @@
       "versions": {
         "presetVersion": "fashion-lookbook.seedream-5-0-260128.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -703,7 +703,7 @@
         "aspectRatio": "3:4",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:b8b7ae099653e256854b1551ebe3e75f3b053121b65348698e5328a3e41fc605"
+      "releaseVectorSha256": "sha256:01285ce97bfaeb8d2820fcd242ec0c997a57549d880670a2544cff93d8759db9"
     },
     {
       "unitId": "commerce-hero.seedream-5-0-260128.generate.v1",
@@ -712,7 +712,7 @@
         "promptVariantId": "commerce-hero.seedream-5-0-260128.generate.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.seedream-5-0-260128.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "generate",
         "parameterProfileId": "seedream-5-0-260128:commerce-hero:generate:v1",
@@ -721,7 +721,7 @@
       "versions": {
         "presetVersion": "commerce-hero.seedream-5-0-260128.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -734,7 +734,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:d93161930c9a3fc9cae59ab89c74f94f923359c13dc7c30c50acdf7c85696b88"
+      "releaseVectorSha256": "sha256:65a7f25d022c1fd10728b6eb8f60fe695c538c5bf0d32ccfc79a3b7db86feb2a"
     },
     {
       "unitId": "commerce-hero.seedream-5-0-260128.edit.v1",
@@ -743,7 +743,7 @@
         "promptVariantId": "commerce-hero.seedream-5-0-260128.edit.v1",
         "presetId": "commerce-hero",
         "presetVersion": "commerce-hero.seedream-5-0-260128.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "edit",
         "parameterProfileId": "seedream-5-0-260128:commerce-hero:edit:v1",
@@ -752,7 +752,7 @@
       "versions": {
         "presetVersion": "commerce-hero.seedream-5-0-260128.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -765,7 +765,7 @@
         "aspectRatio": "1:1",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:813d17507ec4e1c657bd207a723be1ea35213ab8d926d5e46cd2ba75c6c9f192"
+      "releaseVectorSha256": "sha256:12dee8eb5795950cd4ca0aba531c4703154b982914d3c84bc8d3ec9612a4855e"
     },
     {
       "unitId": "design-sheet.seedream-5-0-260128.generate.v1",
@@ -774,7 +774,7 @@
         "promptVariantId": "design-sheet.seedream-5-0-260128.generate.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.seedream-5-0-260128.generate.v1",
-        "nodeKind": "sketch-to-render",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "generate",
         "parameterProfileId": "seedream-5-0-260128:design-sheet:generate:v1",
@@ -783,7 +783,7 @@
       "versions": {
         "presetVersion": "design-sheet.seedream-5-0-260128.generate.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -796,7 +796,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:fb77394227d46dad39c9e72ed03db292d73f10bab83a6e73af1ce8eaf93e438e"
+      "releaseVectorSha256": "sha256:5e1aa7998e4ffa754678284e26c54887559a4e1df7f693d6f7d6ac8c2bac1d96"
     },
     {
       "unitId": "design-sheet.seedream-5-0-260128.edit.v1",
@@ -805,7 +805,7 @@
         "promptVariantId": "design-sheet.seedream-5-0-260128.edit.v1",
         "presetId": "design-sheet",
         "presetVersion": "design-sheet.seedream-5-0-260128.edit.v1",
-        "nodeKind": "ai-modify",
+        "nodeKind": "image",
         "modelId": "seedream-5-0-260128",
         "operationMode": "edit",
         "parameterProfileId": "seedream-5-0-260128:design-sheet:edit:v1",
@@ -814,7 +814,7 @@
       "versions": {
         "presetVersion": "design-sheet.seedream-5-0-260128.edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+        "providerContractVersion": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
         "resolvedModelVersion": "seedream-5-0-260128",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -827,7 +827,7 @@
         "aspectRatio": "4:3",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:ebf4d2f64b722ee1d3442aa61604045c68c4c575b85332bc1396297eecbd2f4e"
+      "releaseVectorSha256": "sha256:2a8786f237fb91a46f135582cb181ce09da3a8c0030d2c9322ef54dc83b47a02"
     },
     {
       "unitId": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
@@ -836,7 +836,7 @@
         "promptVariantId": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
         "presetId": "mask-local-edit",
         "presetVersion": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
-        "nodeKind": "mask-redraw",
+        "nodeKind": "image",
         "modelId": "gpt-image-2.5-sunburst",
         "operationMode": "mask-edit",
         "parameterProfileId": "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
@@ -845,7 +845,7 @@
       "versions": {
         "presetVersion": "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
         "parameterProfileVersion": "1.0.0",
-        "providerContractVersion": "sha256:c143bba099efdd135195e26d5af141e0b7304bf61414551fd3931d9d4fc98001",
+        "providerContractVersion": "sha256:7d8f66ec92ec53ac60a68a8ebd5d805aead90dd8b0013877bb2b785b6c30c94d",
         "resolvedModelVersion": "gpt-image-2.5-sunburst",
         "providerPromptRendererVersion": "provider-prompt-renderer-v4",
         "providerPromptRendererHash": "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca",
@@ -858,7 +858,7 @@
         "aspectRatio": "source",
         "requestedOutputs": 1
       },
-      "releaseVectorSha256": "sha256:f7dfa03d0886413e0ccb3996a043857750a739a2913fa7ff409a37005992b661"
+      "releaseVectorSha256": "sha256:7077223d0f63d6ca6c33ad1fc6e0146957c49e320ad3bbd5cc8cf23cbde37da7"
     }
   ]
 }

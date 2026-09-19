@@ -1,5 +1,4 @@
 import {
-  appendSavedAsset,
   selectActiveDocumentTarget,
   selectDocumentForTab,
   useFlowStore,
@@ -39,10 +38,10 @@ export async function savePrintOutputAsAsset(
   const targetStillMatches = document?.projectId === target.projectId &&
     document.documentEpoch === target.documentEpoch;
   const latest = document?.nodes.find((node) => node.id === input.nodeId)?.data;
-  if (!targetStillMatches || !latest || latest.kind !== "print-extract") {
+  // v7：print-extract 旧 kind 退役；savedAsAssets 字段随六族迁移删除（R-41 §3.5）。
+  // 保存印花素材的入口改由 ResultsPanel / image 节点工具栏承载（P2-c UI 归位）；
+  // 此处只校验节点仍在当前文档，不再回写旧字段。
+  if (!targetStillMatches || !latest) {
     throw new Error("原节点所在项目已关闭，素材已保存但节点未回写");
   }
-  state.updateNodeDataInTab(target, input.nodeId, {
-    savedAsAssets: appendSavedAsset(latest.savedAsAssets, input.url),
-  });
 }

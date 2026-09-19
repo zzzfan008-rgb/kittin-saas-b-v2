@@ -29,7 +29,6 @@ import {
 } from "../../src/types/imageModels";
 import {
   NODE_SPECS,
-  allowedOperationModesForNode,
   type ExecutionPlan,
   type ImageGenRequest,
   type NodeExecution,
@@ -269,7 +268,9 @@ export interface EvaluationCaseEvidenceRecord {
 }
 
 function requireExactProviderStep(plan: ExecutionPlan, step: NodeExecution): NodeExecution {
-  const providerSteps = plan.steps.filter((candidate) => NODE_SPECS[candidate.kind].providerId);
+  // v7：providerId 从 NodeSpec 删除；Provider-backed 判定改为 kind === "image"
+  //（评估快照的图片评估只认 image step；text/video 评估链归后续阶段）。
+  const providerSteps = plan.steps.filter((candidate) => candidate.kind === "image");
   if (providerSteps.length !== 1) {
     throw new Error("an evaluation runtime snapshot requires exactly one Provider-backed step");
   }
@@ -424,11 +425,8 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   }
 
   const materialized = materializeModelParameterProfile(profile);
-  const requestedImageCount = step.kind === "fabric-recolor"
-    ? (Array.isArray(step.params.colors) ? step.params.colors.length : 1)
-    : step.kind === "print-mutate"
-      ? Number(step.params.count)
-      : Number(step.params.batchSize ?? 1);
+  // v7：一色一图 / count 分批机制删除（Q4=A）；张数一律由 batchSize 表达。
+  const requestedImageCount = Number(step.params.batchSize ?? 1);
   if (
     !Number.isSafeInteger(requestedImageCount)
     || requestedImageCount !== materialized.batchSize
@@ -447,9 +445,8 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   if (actualAspectRatio !== materialized.aspectRatio) {
     throw new Error("actual ImageGenRequest aspect ratio drifted from the evaluated parameter profile");
   }
-  if (input.request.imageSize !== undefined) {
-    throw new Error("evaluated garment prompt variants do not use the generic imageSize field");
-  }
+  // v7：ImageGenRequest.imageSize 字段已删除（upscale 档位语义随旧 kind 退役），
+  // 对应检查移除；native 参数仍按 profile 比对。
   const actualModelOptions = input.request.modelOptions ?? {};
   if (profile.native.kind === "gpt-image-2-mask") {
     const keys = Object.keys(actualModelOptions);
@@ -461,8 +458,9 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   }
 
   const references = evaluationReferenceInputs(input.request, step);
-  if (variant.nodeKind === "image-input" || variant.nodeKind === "result") {
-    throw new Error("evaluation prompt variants must target a Provider-backed node kind");
+  // v7：旧 image-input/result kind 已不存在，Provider 目标检查简化为 text 排除。
+  if (variant.nodeKind === "text") {
+    throw new Error("image evaluation prompt variants must target an image node kind");
   }
   const unit: PromptEvaluationUnit = {
     taskFamilyId: variant.familyId,
@@ -577,15 +575,17 @@ export function buildEvaluationCaseSnapshot(
   if (!Object.prototype.hasOwnProperty.call(NODE_SPECS, input.unit.nodeKind)) {
     throw new TypeError("unit.nodeKind is invalid");
   }
-  if (!NODE_SPECS[input.unit.nodeKind].providerId) {
-    throw new Error("evaluation case must target a Provider-backed node");
+  if (!NODE_SPECS[input.unit.nodeKind]) {
+    throw new Error("evaluation case must target a known node kind");
+  }
+  if (input.unit.nodeKind !== "image") {
+    throw new Error("image evaluation cases must target the image node kind");
   }
   if (!isModelAllowedForNode(input.unit.modelId, input.unit.nodeKind)) {
     throw new Error("unit model is not allowed for its node kind");
   }
-  if (!allowedOperationModesForNode(input.unit.nodeKind).includes(input.unit.operationMode)) {
-    throw new Error("unit operation mode is not allowed for its node kind");
-  }
+  // v7：mode×kind 硬闸删除（mode 由变体携带）；评估单元的 mode 合法性
+  // 由其绑定的变体验证（binding 校验在 promptRunAdmission 层）。
   assertString(input.contractHash, "contractHash", { max: 71, pattern: CONTRACT_HASH_PATTERN });
   if (input.contractHash !== imageModelContractHash(input.unit.modelId)) {
     throw new Error("contractHash does not match the current reviewed model contract");

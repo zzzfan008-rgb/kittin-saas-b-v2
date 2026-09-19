@@ -6,6 +6,7 @@ import {
   getGarmentPromptVariant,
   listGarmentPromptVariants,
   requireGarmentPromptVariant,
+  type GarmentPromptFamilyId,
 } from "../src/lib/garmentPromptPresets";
 import { getRuntimePromptVariantAvailability } from "../src/lib/promptEvaluationRelease";
 import {
@@ -36,7 +37,8 @@ for (const modelId of [...new Set(GARMENT_PROMPT_VARIANTS.map((variant) => varia
 const gptImage2Variants = listGarmentPromptVariants({ modelId: "gpt-image-2.5-sunburst" });
 assert.equal(gptImage2Variants.length, 1);
 assert.equal(gptImage2Variants[0]?.mode, "mask-edit");
-assert.equal(gptImage2Variants[0]?.nodeKind, "mask-redraw");
+// v7：蒙版族迁移 = nodeKind 改 "image"（ID 不变，R-41 契约 §3.2）。
+assert.equal(gptImage2Variants[0]?.nodeKind, "image");
 assert.equal(gptImage2Variants[0]?.familyId, "mask-local-edit");
 
 for (const variant of GARMENT_PROMPT_VARIANTS) {
@@ -64,7 +66,7 @@ for (const modelId of [...new Set(GARMENT_PROMPT_VARIANTS.map((variant) => varia
 const geminiEdit = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 assert.match(geminiEdit.fullPrompt, /逐图建立序号/);
@@ -74,7 +76,7 @@ assert.match(geminiEdit.fullPrompt, /styling_only/);
 const fluxGenerate = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "flux-2-pro",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 assert.match(fluxGenerate.fullPrompt, /优先级：1\./);
@@ -82,7 +84,7 @@ assert.match(fluxGenerate.fullPrompt, /优先级：1\./);
 const seedreamEdit = requireGarmentPromptVariant({
   familyId: "design-sheet",
   modelId: "seedream-5-0-260128",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 assert.match(seedreamEdit.fullPrompt, /按输入顺序/);
@@ -91,7 +93,7 @@ assert.match(seedreamEdit.fullPrompt, /未说明的细节不变/);
 const vipEdit = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 assert.match(vipEdit.fullPrompt, /图1、图2/);
@@ -101,18 +103,20 @@ assert.match(maskVariant.fullPrompt, /Alpha PNG/);
 assert.match(maskVariant.fullPrompt, /蒙版之外.*受保护/);
 assert.match(maskVariant.fullPrompt, /自然融合.*蒙版边界/);
 
+// v7：旧「nodeKind 不同但四键其余相同 → miss」的反例随 nodeKind 收敛失效
+//（image 现在是合法命中）。改为用目录外 familyId（cast 绕过联合类型）验证绝不回退语义。
 const exactMiss = getGarmentPromptVariant({
-  familyId: "fashion-lookbook",
+  familyId: "nonexistent-family" as GarmentPromptFamilyId,
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "generate",
 });
-assert.equal(exactMiss, undefined, "节点/模式不匹配时不得回退到其他变体");
+assert.equal(exactMiss, undefined, "familyId 不匹配时不得回退到其他变体");
 
 const unavailable = getRuntimePromptVariantAvailability({
   familyId: "fashion-lookbook",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 assert.equal(unavailable.enabled, false);
@@ -121,7 +125,7 @@ assert.match(unavailable.reason, /尚未完成.*真实评估/);
 const unsupported = getRuntimePromptVariantAvailability({
   familyId: "fashion-lookbook",
   modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 assert.equal(unsupported.enabled, false);

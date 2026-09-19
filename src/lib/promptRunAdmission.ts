@@ -33,7 +33,6 @@ import type {
 import {
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
-  allowedOperationModesForNode,
 } from "../types/workflow";
 
 export interface PromptRunReferenceSnapshot {
@@ -70,9 +69,10 @@ export interface PromptRunGraphEdge {
 }
 
 function promptRunNodeOutputCount(data: WorkflowNodeData): number {
-  if (data.kind === "image-input") return data.imageUrl ? 1 : 0;
-  if (data.kind === "result") return 0;
-  return data.outputImages.length;
+  // v7 三值 kind：image 节点 outputImages 承载输出（R8 输入输出同体）；
+  // text 节点输出为正文（不产参考图）；video 节点输出视频（不产参考图）。
+  if (data.kind === "image") return data.outputImages.length;
+  return 0;
 }
 
 /**
@@ -272,21 +272,13 @@ export function evaluatePromptRunCompatibility(
       reason: `模型 ${input.modelId} 不支持节点 ${input.nodeKind} 的当前产品策略。`,
     };
   }
-  if (
-    !isImageOperationMode(input.operationMode)
-    || !allowedOperationModesForNode(input.nodeKind).includes(input.operationMode)
-  ) {
+  // v7：operationMode 由提示词变体携带（mode 归属反转），节点不再自描述；
+  // 该检查的变体驱动重写归 P2-b（promptRunAdmission 与 needsMask 联动）。
+  if (!isImageOperationMode(input.operationMode)) {
     return {
       allowed: false,
       code: "operation-mode-incompatible",
-      reason: `节点 ${input.nodeKind} 不支持当前 operationMode；必须显式选择该节点允许的模式。`,
-    };
-  }
-  if (input.operationModeNeedsConfirmation === true) {
-    return {
-      allowed: false,
-      code: "operation-mode-incompatible",
-      reason: "该旧项目节点的 operationMode 尚未由用户确认；请明确选择生成或编辑模式。",
+      reason: `operationMode ${String(input.operationMode)} 不是受支持的调用模式。`,
     };
   }
   const contract = getImageModelContract(input.modelId);
@@ -316,9 +308,9 @@ export function evaluatePromptRunCompatibility(
     };
   }
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(input.modelId));
-  const maxUserReferences = input.nodeKind === "mask-redraw"
-    ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
-    : maxReferences;
+  // v7：mask-redraw 特例随旧 kind 退役；蒙版参考图限位改由变体 needsMask 声明
+  // 驱动（runtime.md §1 第 5 步），P2-b 接线。当前统一按普通 image 节点限位。
+  const maxUserReferences = maxReferences;
   if (references.length > maxUserReferences) {
     return {
       allowed: false,
@@ -397,7 +389,7 @@ export function evaluatePromptRunAdmission(
   }
   const materialized = materializeModelParameterProfile(profile);
   const aspectMatches = materialized.aspectRatio === "source" || input.aspectRatio === materialized.aspectRatio;
-  const batchMatches = input.nodeKind === "mask-redraw" || input.batchSize === materialized.batchSize;
+  const batchMatches = input.batchSize === materialized.batchSize;
   if (
     !aspectMatches
     || !batchMatches

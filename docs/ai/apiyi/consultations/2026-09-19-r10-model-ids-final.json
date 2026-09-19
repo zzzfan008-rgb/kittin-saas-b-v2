@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-19T08:29:05.049Z",
+  "baseCommit": "bec11637abb7f2adc4bc39c616e732a84c68fa06",
+  "changeFingerprintSha256": "106f91d56aebffde60f24575998532f3fafe8a1ca7498540d99cd7e7cef1a9e0",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "R10 最终裁定:文本模型实名 gpt-4o claude-sonnet-4-5 gemini-3-pro-preview;视频模型 doubao-seedance-2-5-260628;veo-3.1 不接入",
+  "affectedPaths": [
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/design/2026-09-18-three-node-model/contracts/data-model.md",
+    "docs/design/2026-09-18-three-node-model/contracts/model-proposals.md",
+    "docs/design/2026-09-18-three-node-model/node-inspector-window/design.md",
+    "docs/design/2026-09-18-three-node-model/plan.md",
+    "src/types/textModels.ts",
+    "src/types/videoModels.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/api-capabilities/text-generation.md",
+      "title": "文本生成（对话补全）",
+      "sha256": "249e1196daa36c0bd7690bf6c1fa1b4ceab206eedcc396cc107bd055e6e0bd31"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/text-generation.md",
+      "title": "Text Generation (Chat Completions)",
+      "sha256": "e7e36800c87de711d0ca1e47ac3b3555a936d650c41d6dd06844b6a14e118553"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/ja/api-capabilities/text-generation.md",
+      "title": "テキスト生成（チャット補完）",
+      "sha256": "11392d9ed568db2ee1dca1564015762a241c2c4636732413f4a9e89ab5fff324"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/ko/api-capabilities/text-generation.md",
+      "title": "텍스트 생성 (Chat Completions)",
+      "sha256": "ac2f2c669c37be8f487ac8c56276ab5be4c178ca227de5a25291d2a54e94fc31"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/ru/api-capabilities/text-generation.md",
+      "title": "Генерация текста (Chat Completions)",
+      "sha256": "e5651f94fc84d8c59c281b89414e73080ba6d49840970e9ba7c74420ee160b58"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/text-generation.md",
+      "title": "文本生成（對話補全）",
+      "sha256": "cc849a82a4735a1f50633d13c99eb416bbb3af2bfd894ecbe6e161b15d53168e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/models",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/models.md",
+      "pageLocalPath": "pages/en/models.md",
+      "title": "Model Pricing Directory",
+      "sha256": "32baf8f4a49584c8c7f45a83750522be618896ad2679c8214fdb26bdbe9daa1a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/models",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/models.md",
+      "pageLocalPath": "pages/ja/models.md",
+      "title": "モデル料金一覧",
+      "sha256": "c69c58e6a24a2b9833ce772bfeef61c3423d5228c3c9218af41a970f259869a2"
+    }
+  ],
+  "decisionSummary": "R10 最终裁定(2026-09-19 用户拍板,orchestrator 中继):文本三实名 gpt-4o(默认)/claude-sonnet-4-5(横线形式,用户已明确;计费目录登记 -20250929/-thinking 变体属同族,可调性由 P2-b 联调与评估链 campaign 证明)/gemini-3-pro-preview;视频仅 doubao-seedance-2-5-260628;Veo 3.1 不接入,veo-3.1-* 移除;Seedance 令牌改专用令牌(SeeDance2 分组动作取消)。落地:data-model.md v4 §5/§5b、model-proposals.md §6、textModels/videoModels.ts、model-contracts.json textModels 区块(contractHash 以 sha256-canonical-text-model-envelope-v1 scope 重算,脚本 scripts/text-model-contract-hash.mjs verify 可机检)、plan.md §6 R10 条目",
+  "unresolvedChoices": []
+}

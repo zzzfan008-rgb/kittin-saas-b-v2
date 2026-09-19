@@ -20,7 +20,8 @@ export function evaluateClaimedJobPromptAdmission(
   job: ClaimedJob,
   runtimeUserReferences?: readonly PromptRunReferenceSnapshot[],
 ): { allowed: boolean; reason: string } {
-  if (!NODE_SPECS[job.step.kind].providerId) {
+  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+  if (job.step.kind !== "image") {
     return { allowed: true, reason: "非付费节点不调用 Provider。" };
   }
   const hasEvaluationPolicy = (
@@ -130,7 +131,9 @@ export function runtimeUserReferenceInputs(
 
   const maskGuideSourceNodeId = `${job.step.nodeId}:mask-guide`;
   let userReferences = references;
-  if (job.step.kind === "mask-redraw" && request.operationMode === "mask-edit") {
+  // v7：蒙版引导图检查改由 needsMask 语义驱动（变体声明）；P2-b 重写时
+  // 从 variant.needsMask 读取。过渡期按 mask-edit 模式判定（等价旧行为）。
+  if (request.operationMode === "mask-edit") {
     const guideIndexes = references.flatMap((reference, index) => (
       reference.sourceNodeId === maskGuideSourceNodeId ? [index] : []
     ));

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-19T08:57:40.470Z",
+  "baseCommit": "ad7aa1ed4089a7d3ab04b94adab76386fcd00e6a",
+  "changeFingerprintSha256": "79164d0eb3b17a4d02036e5e2bbdd038f2641997a608018e1e051eee272c3d95",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "text generation chat completions model id request response contract",
+  "affectedPaths": [
+    "server/providers/textProvider.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/text-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/text-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/text-generation.md",
+      "title": "Text Generation (Chat Completions)",
+      "sha256": "e7e36800c87de711d0ca1e47ac3b3555a936d650c41d6dd06844b6a14e118553"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/chat-completions.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/chat-completions.md",
+      "title": "Chat-Style API Reference",
+      "sha256": "516bf873c5e7214d8945876a09cb93770bed3aa15ad8cdde3ef0134dd5f00377"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/native",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/openai/native.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/native.md",
+      "title": "OpenAI Responses API Native Guide",
+      "sha256": "8dfa3a3b431eb95ca5a72220c2e00a81e8635c4f7d85caf682ef2b1f0c1df7a4"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/chat-completions.md",
+      "title": "Chat API Reference",
+      "sha256": "9aa76aefde31a342dac902534ffb6fd5b3cd0fc802d2c723d765d12cf4b932c2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 Video Generation API Reference",
+      "sha256": "2934974934a5c05ad3dd5821e896d8ca5c659ee6f27c3ce43ca002348701fd5d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-6-astra/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-6-astra/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-6-astra/overview.md",
+      "title": "GPT-6 Astra Text Generation",
+      "sha256": "2533fcda4257db3d90dcf814013521b30c73bddaddbd8c8466bf52d24336eb40"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-5-3-chat",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-5-3-chat.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-5-3-chat.md",
+      "title": "GPT-5.3 Chat Text Generation",
+      "sha256": "fec663d7070a06770b9fc83f55c639fade8b14449a5a050063d5eb94643bfa36"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok/overview.md",
+      "title": "Grok Model Series Guide",
+      "sha256": "77eef44fa7e221e1c165fd1be859f7aecb31d9fad34cead630deb656e6c86864"
+    }
+  ],
+  "decisionSummary": "Mechanical integration fix (R-55): textProvider registry now derives from TEXT_MODEL_IDS (authoritative list in src/types/textModels.ts) instead of hardcoding model IDs, with a completeness guard so every TextModelId resolves to a provider. No model ID, prompt, parameter, reference-image, billing, or evaluation semantics change; the text node still uses the reviewed OpenAI-compatible POST /v1/chat/completions contract.",
+  "unresolvedChoices": []
+}

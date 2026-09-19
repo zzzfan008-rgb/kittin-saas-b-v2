@@ -83,6 +83,12 @@ export interface ProviderPromptRenderInput {
   taskPrompt: string;
   /** User references only. The mask guide is appended after prompt rendering. */
   references: readonly ProviderPromptReference[];
+  /**
+   * v7（Q4=A）：蒙版包装改由变体声明驱动（variant.needsMask），不再按
+   * nodeKind === "mask-redraw" 判定。P2-b 在调用侧把 needsMask 传入；
+   * 过渡期默认 false，等价于「未声明 needsMask 的变体不做蒙版包装」。
+   */
+  needsMask?: boolean;
 }
 
 export function providerPromptRendererHashMaterial(): string {
@@ -146,11 +152,12 @@ function providerPromptReferenceListIntro(
 export function renderProviderPrompt(input: ProviderPromptRenderInput): string {
   const rawTaskPrompt = input.taskPrompt.trim();
   if (!rawTaskPrompt) {
-    if (input.nodeKind === "mask-redraw") throw new Error("局部修改必须填写修改说明");
+    if (input.needsMask) throw new Error("局部修改必须填写修改说明");
     throw new Error(`节点 ${input.nodeKind} 没有可发送的提示词`);
   }
   let taskPrompt = rawTaskPrompt;
-  if (input.nodeKind === "mask-redraw") {
+  // v7（Q4=A）：蒙版包装由 needsMask 声明驱动（见 ProviderPromptRenderInput 注释）。
+  if (input.needsMask) {
     taskPrompt = interpolate(PROVIDER_PROMPT_RENDERER_CONTRACT.maskPromptTemplate, {
       TARGET: rawTaskPrompt,
       MASK_REFERENCE_ROLES: maskReferenceRolePrompt(input.references.length),

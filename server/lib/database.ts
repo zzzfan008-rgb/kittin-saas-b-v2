@@ -1315,6 +1315,20 @@ async function migrate(): Promise<void> {
       );
     }
 
+    // 视频链路（P2-e）：video 节点的产物引用与 Seedance 任务 ID 审计证据。
+    if (!applied.has(21)) {
+      await client.query(`
+        ALTER TABLE generation_run_steps
+          ADD COLUMN IF NOT EXISTS output_videos_json TEXT NOT NULL DEFAULT '[]';
+        ALTER TABLE generation_run_steps
+          ADD COLUMN IF NOT EXISTS provider_task_id TEXT;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (21, $1, $2)",
+        ["video_step_output_metadata", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

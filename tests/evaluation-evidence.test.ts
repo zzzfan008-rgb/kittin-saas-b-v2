@@ -29,7 +29,7 @@ const unit: PromptEvaluationUnit = {
   promptVariantId: "fashion-lookbook.gemini-3.1-flash-image.ai-modify.edit.v1",
   presetId: "fashion-lookbook-gemini",
   presetVersion: "1.0.0",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   modelId: "gemini-3.1-flash-image",
   operationMode: "edit",
   parameterProfileId: "gemini-3.1-flash-image:fashion-lookbook:edit:v1",

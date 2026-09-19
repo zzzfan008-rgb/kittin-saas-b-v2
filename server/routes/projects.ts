@@ -123,7 +123,8 @@ async function syncAssetRefs(
 
 function projectMaskFileRefs(flow: PersistedWorkflow): ProjectMaskFileRef[] {
   return flow.nodes.flatMap((node) => {
-    if (node.data.kind !== "mask-redraw" || typeof node.data.mask !== "string") return [];
+    // v7：蒙版是 image 节点能力（needsMask 变体），mask 字段内嵌在 ImageNodeData。
+    if (node.data.kind !== "image" || typeof node.data.mask !== "string") return [];
     if (!isLocalImageReference(node.data.mask)) return [];
     return [{
       fileId: node.data.mask.slice("/api/files/".length),
