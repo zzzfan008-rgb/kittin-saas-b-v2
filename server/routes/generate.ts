@@ -7,9 +7,7 @@ import {
   MASK_PIPELINE_VERSION,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
-  NODE_SPECS,
   IMAGE_OPERATION_MODE_VALUES,
-  allowedOperationModesForNode,
   type ImageGenRequest,
   type NodeKind,
   type ReferenceImageSource,
@@ -36,7 +34,6 @@ import {
   type ImageReferenceAccessEvidence,
 } from "../lib/imageReferenceAccess";
 import {
-  imageModelOptionsErrorForOperation,
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
@@ -104,8 +101,8 @@ function directMaskReferenceError(value: string): string | undefined {
 }
 
 function isDirectGenerateKind(value: unknown): value is DirectGenerateKind {
-  if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(NODE_SPECS, value)) return false;
-  return Boolean(NODE_SPECS[value as NodeKind].providerId);
+  // v7：直连生成只接受 image（唯一有图片 Provider 契约的 kind）。
+  return value === "image";
 }
 
 /** Validate the node contract before starting or recording a direct generation. */
@@ -131,31 +128,13 @@ export function validateDirectGenerateRequest(
   if (!isDirectGenerateKind(kind)) {
     return { ok: false, error: "kind must identify a supported AI node" };
   }
-  const allowedModes = allowedOperationModesForNode(kind);
-  if (!allowedModes.includes(request.operationMode)) {
-    return { ok: false, error: `${kind} operationMode must be one of: ${allowedModes.join(", ")}` };
-  }
-  if (kind === "sketch-to-render" || kind === "ai-modify") {
-    if (
-      typeof request.aspectRatio !== "string"
-      || !Object.prototype.hasOwnProperty.call(EXACT_ASPECT_DIMENSIONS, request.aspectRatio)
-    ) {
-      return {
-        ok: false,
-        error: `request.aspectRatio must be one of ${Object.keys(EXACT_ASPECT_DIMENSIONS).join(", ")}`,
-      };
-    }
-  }
-  if (kind === "upscale" && request.imageSize !== "2K" && request.imageSize !== "4K") {
-    return { ok: false, error: "request.imageSize must be 2K or 4K" };
-  }
   if (
-    kind === "mask-redraw"
-    && referenceImages.length > MAX_MASK_USER_REFERENCE_IMAGES
+    typeof request.aspectRatio !== "string"
+    || !Object.prototype.hasOwnProperty.call(EXACT_ASPECT_DIMENSIONS, request.aspectRatio)
   ) {
     return {
       ok: false,
-      error: `request.referenceImages must contain at most ${MAX_MASK_USER_REFERENCE_IMAGES} user images for mask-redraw`,
+      error: `request.aspectRatio must be one of ${Object.keys(EXACT_ASPECT_DIMENSIONS).join(", ")}`,
     };
   }
   return { ok: true, kind };
@@ -227,27 +206,11 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
       return;
     }
   }
-  if (resolvedKind === "mask-redraw" && typeof request.mask === "string") {
+  // v7：直连生成只可能是 image kind；蒙版（mask-edit 模式）仍需引用校验。
+  if (request.operationMode === "mask-edit" && typeof request.mask === "string") {
     const maskError = directMaskReferenceError(request.mask);
     if (maskError) {
       res.status(400).json({ error: `request.mask ${maskError}` });
-      return;
-    }
-  }
-  const fabricImageUrl = (request as ImageGenRequest & { fabricImageUrl?: unknown }).fabricImageUrl;
-  // 仅 fabric-recolor 会携带 fabricImageUrl。删除原先 `|| resolvedKind === "fabric-replace"`
-  // 是行为等价的死代码清理，不是收窄校验，理由有三层：
-  //   1. validateDirectGenerateRequest 已用 isDirectGenerateKind 在此前拒绝未知 kind，
-  //      而它要求 kind 必须是运行时 NODE_SPECS 的键，所以 resolvedKind 到这里只可能是
-  //      受支持的节点 kind；
-  //   2. NODE_SPECS 中并不存在 fabric-replace（TypeScript 也以 TS2367 证明该比较与类型
-  //      联合无交集、恒为 false）；
-  //   3. 该比较因此不可达，fabric-replace 请求在更早的守卫处即被 400 拒绝。
-  // 回归不变量见 tests/generation-kind-contract.test.ts。
-  if (resolvedKind === "fabric-recolor" && fabricImageUrl !== undefined) {
-    const fabricReferenceError = directImageReferenceError(fabricImageUrl);
-    if (fabricReferenceError) {
-      res.status(400).json({ error: `request.fabricImageUrl ${fabricReferenceError}` });
       return;
     }
   }
@@ -261,20 +224,16 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     : submittedReferenceImages;
   const maskSourceRef = requestReferenceImages[0];
   if (
-    resolvedKind === "mask-redraw" &&
+    request.operationMode === "mask-edit" &&
     (typeof maskSourceRef !== "string" || !maskSourceRef.trim() || typeof request.mask !== "string" || !request.mask.trim())
   ) {
-    res.status(400).json({ error: "mask-redraw requires a source image and PNG mask" });
+    res.status(400).json({ error: "mask-edit requires a source image and PNG mask" });
     return;
   }
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
-  const maxUserReferences = resolvedKind === "mask-redraw"
-    ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
-    : maxReferences;
-  if (requestReferenceImages.length > maxUserReferences) {
-    const qualifier = resolvedKind === "mask-redraw" ? " user" : "";
+  if (requestReferenceImages.length > maxReferences) {
     res.status(400).json({
-      error: `referenceImages must contain at most ${maxUserReferences}${qualifier} images for ${modelId}`,
+      error: `referenceImages must contain at most ${maxReferences} images for ${modelId}`,
     });
     return;
   }
@@ -283,11 +242,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     return;
   }
   const modelOptions = request.modelOptions;
-  const optionsError = imageModelOptionsErrorForOperation(modelId, modelOptions, request.operationMode);
-  if (optionsError) {
-    res.status(400).json({ error: `request.modelOptions ${optionsError}` });
-    return;
-  }
+  // v7（R5）：modelOptions 只做形状校验，取值 warning 不再阻断（imageModelOptionsWarnings）。
   if (projectId !== undefined && (typeof projectId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(projectId))) {
     res.status(400).json({ error: "projectId must contain only letters, digits, underscore or hyphen" });
     return;
@@ -324,16 +279,8 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   // append one-by-one so their indexes stay unambiguous even if node policies
   // later allow more than one auxiliary image at a time.
   const accessReferences: ImageReferenceAccessEvidence[] = [...inputReferences];
-  // 同上：fabric-replace 不是受支持的节点 kind（不在 NODE_SPECS 中，且 TS2367 证明比较
-  // 恒为 false），未知 kind 已在 validateDirectGenerateRequest 处被拒绝。
-  if (resolvedKind === "fabric-recolor" && typeof fabricImageUrl === "string") {
-    accessReferences.push({
-      imageRef: fabricImageUrl,
-      order: accessReferences.length,
-      sourceNodeId: "direct-fabric",
-    });
-  }
-  if (resolvedKind === "mask-redraw" && typeof request.mask === "string") {
+  // v7：fabricImageUrl 特化随 fabric-recolor 旧 kind 退役；蒙版仍作为辅助输入登记。
+  if (request.operationMode === "mask-edit" && typeof request.mask === "string") {
     accessReferences.push({
       imageRef: request.mask,
       order: accessReferences.length,
@@ -349,7 +296,9 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
       params: {
         ...resolvedRequest,
         modelId,
-        ...(resolvedKind === "mask-redraw" ? { maskSourceRef, maskPipelineVersion: MASK_PIPELINE_VERSION } : {}),
+        ...(request.operationMode === "mask-edit"
+          ? { maskSourceRef, maskPipelineVersion: MASK_PIPELINE_VERSION }
+          : {}),
       },
     }],
   };

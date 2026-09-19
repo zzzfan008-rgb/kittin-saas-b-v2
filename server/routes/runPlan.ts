@@ -8,7 +8,6 @@
 import { Router, type Request, type Response } from "express";
 import { isDeepStrictEqual } from "node:util";
 import {
-  NODE_SPECS,
   WORKFLOW_SCHEMA_VERSION,
   type ExecutionPlan,
   type NodeExecution,
@@ -122,33 +121,9 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
   const staticOutputsByNode = new Map<string, Array<{ imageRef: string; order: number }>>();
   const references: ImageReferenceAccessEvidence[] = [];
   for (const step of plan.steps) {
-    if (!NODE_SPECS[step.kind].providerId) {
-      if (step.kind === "image-input") {
-        staticOutputsByNode.set(
-          step.nodeId,
-          typeof step.params.imageUrl === "string"
-            ? [{ imageRef: step.params.imageUrl, order: 0 }]
-            : [],
-        );
-      } else if (step.kind === "result") {
-        let offset = 0;
-        const outputs: Array<{ imageRef: string; order: number }> = [];
-        for (const upstream of step.upstream ?? []) {
-          const upstreamOutputs = executingNodeIds.has(upstream.nodeId)
-            ? staticOutputsByNode.get(upstream.nodeId) ?? []
-            : upstream.images.map((imageRef, order) => ({ imageRef, order }));
-          outputs.push(...upstreamOutputs.map((output) => ({
-            imageRef: output.imageRef,
-            order: offset + output.order,
-          })));
-          // Preserve planned slots occupied by dynamic outputs so a surviving
-          // static reference keeps its request-relative order.
-          offset += upstream.images.length;
-        }
-        staticOutputsByNode.set(step.nodeId, outputs);
-      } else {
-        staticOutputsByNode.set(step.nodeId, []);
-      }
+    if (step.kind === "text") {
+      // v7：text 节点不产图片；其上游 text 边也不产生图片引用。
+      staticOutputsByNode.set(step.nodeId, []);
       continue;
     }
 
@@ -175,19 +150,8 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
     references.push(...actualStaticInputs);
 
     const plannedInputCount = plannedStepReferences(step).length;
-    // 仅 fabric-recolor 会携带 fabricImageUrl：删除原先 `|| step.kind === "fabric-replace"`
-    // 是行为等价的死代码清理。fabric-replace 不是受支持的节点 kind（不在运行时 NODE_SPECS
-    // 中，TypeScript 亦以 TS2367 证明该比较恒为 false），上游校验会拒绝未知 kind；
-    // 回归不变量见 tests/generation-kind-contract.test.ts。
-    if (step.kind === "fabric-recolor" && typeof step.params.fabricImageUrl === "string") {
-      references.push({
-        imageRef: step.params.fabricImageUrl,
-        order: plannedInputCount,
-        sourceNodeId: step.nodeId,
-        targetNodeId: step.nodeId,
-      });
-    }
-    if (step.kind === "mask-redraw" && typeof step.params.mask === "string") {
+    // v7：fabricImageUrl 特化随 fabric-recolor 旧 kind 退役；蒙版仍作为辅助输入登记。
+    if (step.params.operationMode === "mask-edit" && typeof step.params.mask === "string") {
       references.push({
         imageRef: step.params.mask,
         order: plannedInputCount,

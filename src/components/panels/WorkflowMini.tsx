@@ -1,16 +1,10 @@
 import type { NodeKind } from "@/types/workflow";
 
-/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色，值定义在 tokens.css §5 --gc-kind-*） */
+/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色，值定义在 index.css §5 --gc-kind-*） */
 const KIND_COLOR: Record<NodeKind, string> = {
-  "image-input": "var(--gc-kind-image-input)",
-  "sketch-to-render": "var(--gc-kind-sketch-to-render)",
-  "ai-modify": "var(--gc-kind-ai-modify)",
-  "fabric-recolor": "var(--gc-kind-fabric-recolor)",
-  upscale: "var(--gc-kind-upscale)",
-  "print-extract": "var(--gc-kind-print-extract)",
-  "print-mutate": "var(--gc-kind-print-mutate)",
-  "mask-redraw": "var(--gc-kind-mask-redraw)",
-  result: "var(--gc-kind-result)",
+  text: "var(--gc-kind-text)",
+  image: "var(--gc-kind-image)",
+  video: "var(--gc-kind-video)",
 };
 
 interface MiniNode {
@@ -100,7 +94,7 @@ export function WorkflowMini({
             width={blockW}
             height={blockH}
             rx={1.6}
-            fill={KIND_COLOR[kind] ?? "var(--gc-kind-result)"}
+            fill={KIND_COLOR[kind] ?? "var(--gc-border-strong)"}
             opacity={0.9}
           />
         );

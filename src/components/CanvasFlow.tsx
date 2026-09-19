@@ -4,14 +4,18 @@ import {
   MiniMap,
   useNodesInitialized,
   useReactFlow,
+  type Connection,
+  type FinalConnectionState,
   type NodeChange,
 } from "@xyflow/react";
 import {
   beginHistoryTransaction,
+  documentConnectionRejection,
   endHistoryTransaction,
   selectActiveEdges,
   selectActiveNodes,
   selectActiveReadOnly,
+  selectActiveSelectedNodeIds,
   useFlowStore,
   type FlowNode,
   type HistoryTransactionToken,
@@ -19,6 +23,9 @@ import {
 import { DotWaveBackground } from "./DotWaveBackground";
 import { PulseEdge } from "./edges/PulseEdge";
 import { nodeTypes } from "./nodes";
+import { NodeInspectorWindowPortal } from "./nodes/NodeInspectorWindowPortal";
+import { ReferenceOrdinalsProvider } from "./nodes/ReferenceOrdinals";
+import { useNodeInspector } from "./nodes/NodeInspectorWindow";
 import { useTheme, type ThemeId } from "@/lib/theme";
 import type { NodeKind } from "@/types/workflow";
 import {
@@ -193,6 +200,10 @@ export function CanvasFlow() {
   const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
   const activeTabId = useFlowStore((s) => s.activeTabId);
   const readOnly = useFlowStore(selectActiveReadOnly);
+  const openInspector = useNodeInspector((s) => s.open);
+  const inspectorAnchor = useNodeInspector((s) => s.anchorNodeId);
+  // 连线被拒的明确反馈（R3：连错线要有反馈，不是静默失败）。
+  const [connectionRejection, setConnectionRejection] = useState<string | null>(null);
   const { fitView, getViewport, screenToFlowPosition, setViewport } = useReactFlow();
   const nodesInitialized = useNodesInitialized();
   const [landingVersion, setLandingVersion] = useState(0);
@@ -290,10 +301,93 @@ export function CanvasFlow() {
       e.preventDefault();
       const kind = e.dataTransfer.getData(DND_MIME) as NodeKind | "";
       if (!kind || readOnly) return;
-      addNode(kind, screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      addNode(kind, position);
+      // R3 画布层：新建 image/video 节点时若无可用 text 节点，自动在其左侧
+      // 生成一个空 text 节点并预连线（graph-invariants.md §3 画布行）。
+      if (kind === "image" || kind === "video") {
+        const state = useFlowStore.getState();
+        const document = state.tabs.find((tab) => tab.id === state.activeTabId);
+        const hasText = document?.nodes.some((node) => node.data.kind === "text");
+        if (document && !hasText) {
+          const textId = state.addNode("text", { x: position.x - 380, y: position.y });
+          if (textId) {
+            const nodeId = state.tabs
+              .find((tab) => tab.id === state.activeTabId)?.nodes.at(-1)?.id;
+            const newImageNodeId = nodeId && nodeId !== textId ? nodeId : null;
+            if (newImageNodeId) {
+              // 直接补一条 prompt 边（同一撤销语义由两次提交分别承载；连线在用户
+              // 拖动或保存时生效——addConnectedNode 的原子路径由快捷建图使用）。
+              useFlowStore.getState().onConnect({
+                source: textId,
+                target: newImageNodeId,
+                sourceHandle: "prompt",
+                targetHandle: "prompt",
+              });
+            }
+          }
+        }
+      }
     },
     [addNode, screenToFlowPosition, readOnly],
   );
+
+  // 连线结束时的拒绝反馈（onConnectEnd；React Flow 12.3.6 提供 FinalConnectionState）。
+  const handleConnectEnd = useCallback(
+    (_event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      const state = useFlowStore.getState();
+      const document = state.tabs.find((tab) => tab.id === state.activeTabId);
+      if (!document) return;
+      const candidate: Connection | null = connectionState.fromHandle && connectionState.toHandle
+        ? {
+            source: connectionState.fromNode?.id ?? "",
+            target: connectionState.toNode?.id ?? "",
+            sourceHandle: connectionState.fromHandle.id ?? null,
+            targetHandle: connectionState.toHandle.id ?? null,
+          }
+        : null;
+      if (!candidate || !candidate.source || !candidate.target) return;
+      const reason = documentConnectionRejection(document, candidate);
+      if (reason) {
+        setConnectionRejection(reason);
+        window.setTimeout(() => setConnectionRejection(null), 3500);
+      }
+    },
+    [],
+  );
+
+  // R-40 §2.1.2：选中节点 + Enter 打开功能设置（叠加在库内置「Enter=选中」之上；
+  // 焦点在文本输入内不触发；IME 组字态不触发）。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      if (typeof event.isComposing === "boolean" ? event.isComposing : false) return;
+      const active = globalThis.document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) return;
+      const state = useFlowStore.getState();
+      const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+      if (!activeTab || activeTab.readOnly) return;
+      const selectedId = activeTab.selectedNodeIds.at(-1);
+      if (!selectedId) return;
+      const selected = activeTab.nodes.find((node) => node.id === selectedId);
+      if (!selected) return;
+      event.preventDefault();
+      openInspector(selectedId);
+    };
+    globalThis.document.addEventListener("keydown", onKeyDown);
+    return () => globalThis.document.removeEventListener("keydown", onKeyDown);
+  }, [openInspector]);
+
+  // 点击画布空白处关闭悬浮窗口（R-40 §2.3）；切页/换选中不跟随切换。
+  const handlePaneClick = useCallback(() => {
+    setSelectedNodeIds([]);
+    if (inspectorAnchor) useNodeInspector.getState().close();
+  }, [setSelectedNodeIds, inspectorAnchor]);
+
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
@@ -305,55 +399,68 @@ export function CanvasFlow() {
 
   return (
     <div ref={canvasContainerRef} className="min-h-0 flex-1">
-      <ReactFlow
-        aria-label="工作流画布"
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        isValidConnection={isValidConnection}
-        onDrop={onDrop}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-        }}
-        onNodeDragStart={(event) => {
-          if (readOnly) return;
-          beginDragHistoryTransaction(dragTransactionRef, event.timeStamp);
-        }}
-        onNodeDragStop={(event) => {
-          finishDragHistoryTransaction(dragTransactionRef, event.timeStamp);
-        }}
-        onPaneClick={() => setSelectedNodeIds([])}
-        deleteKeyCode={readOnly ? null : ["Delete", "Backspace"]}
-        nodesDraggable={!readOnly}
-        nodesConnectable={!readOnly}
-        selectionOnDrag
-        multiSelectionKeyCode={multiSelectionKeyCode}
-        panOnDrag={[1, 2]}
-        autoPanOnNodeDrag={false}
-        defaultViewport={{ x: 100, y: 200, zoom: 1 }}
-        proOptions={{ hideAttribution: true }}
-        edgeTypes={edgeTypes}
-        defaultEdgeOptions={{ type: "pulse" }}
-      >
-        <DotWaveBackground />
-        <MiniMap
-          position="bottom-right"
-          bgColor={minimap.bg}
-          nodeColor={minimap.node}
-          maskColor={minimap.mask}
-          style={{
-            width: compactMinimap ? 128 : 200,
-            height: compactMinimap ? 96 : 150,
+      <ReferenceOrdinalsProvider>
+        <ReactFlow
+          aria-label="工作流画布"
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onConnectEnd={handleConnectEnd}
+          isValidConnection={isValidConnection}
+          onDrop={onDrop}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
           }}
-          pannable
-          zoomable
-        />
-        <CanvasZoomControls />
-      </ReactFlow>
+          onNodeDragStart={(event) => {
+            if (readOnly) return;
+            beginDragHistoryTransaction(dragTransactionRef, event.timeStamp);
+          }}
+          onNodeDragStop={(event) => {
+            finishDragHistoryTransaction(dragTransactionRef, event.timeStamp);
+          }}
+          onPaneClick={handlePaneClick}
+          deleteKeyCode={readOnly ? null : ["Delete", "Backspace"]}
+          nodesDraggable={!readOnly}
+          nodesConnectable={!readOnly}
+          selectionOnDrag
+          multiSelectionKeyCode={multiSelectionKeyCode}
+          panOnDrag={[1, 2]}
+          autoPanOnNodeDrag={false}
+          defaultViewport={{ x: 100, y: 200, zoom: 1 }}
+          proOptions={{ hideAttribution: true }}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={{ type: "pulse" }}
+        >
+          <DotWaveBackground />
+          <MiniMap
+            position="bottom-right"
+            bgColor={minimap.bg}
+            nodeColor={minimap.node}
+            maskColor={minimap.mask}
+            style={{
+              width: compactMinimap ? 128 : 200,
+              height: compactMinimap ? 96 : 150,
+            }}
+            pannable
+            zoomable
+          />
+          <CanvasZoomControls />
+        </ReactFlow>
+        {/* 连线被拒的明确反馈（role=alert，不靠颜色单通道） */}
+        {connectionRejection && (
+          <div
+            role="alert"
+            className="pointer-events-none absolute bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-full border border-[var(--gc-border-strong)] bg-[var(--gc-panel)] px-4 py-2 text-[12px] text-[var(--gc-text)] shadow-lg"
+          >
+            {connectionRejection}
+          </div>
+        )}
+        <NodeInspectorWindowPortal />
+      </ReferenceOrdinalsProvider>
     </div>
   );
 }

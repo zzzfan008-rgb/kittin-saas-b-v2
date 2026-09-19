@@ -12,16 +12,12 @@ export async function postProcessGeneratedOutputImages(
   params: Record<string, unknown>,
   images: string[],
 ): Promise<string[]> {
-  if (kind !== "sketch-to-render" && kind !== "ai-modify" && kind !== "upscale") return images;
+  // v7：只有 image 节点有业务画幅（aspectRatio）；text/video 直接透传。
+  if (kind !== "image") return images;
   const aspectRatio = normalizeExactAspectRatio(params.aspectRatio);
-  const imageSize = normalizeUpscaleSize(params.imageSize);
   const processed: string[] = [];
   for (const image of images) {
-    processed.push(
-      kind === "upscale"
-        ? await upscaleImageToLongEdge(image, imageSize)
-        : await fitGeneratedImageToAspect(image, aspectRatio),
-    );
+    processed.push(await fitGeneratedImageToAspect(image, aspectRatio));
   }
   return processed;
 }
