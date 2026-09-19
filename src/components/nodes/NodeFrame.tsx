@@ -127,7 +127,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
                 setEditing(false);
               }
             }}
-            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-text)] focus:outline-hidden"
+            className="nodrag min-w-0 flex-1 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
           />
         ) : (
           <span
@@ -232,8 +232,11 @@ export function Developing() {
 }
 
 export const inputClass =
-  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";
+  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden";
 
-/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义） */
+/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义）。
+ *  R-50 P1-3：亮 accent（--gc-node-accent）在白卡上仅 1.19–1.31:1，焦点边框改用
+ *  行动色深档 --gc-accent-deep（三主题 on #ffffff 实测 5.14 / 5.57 / 5.41:1 ≥3:1）；
+ *  静息左条保留亮 accent 作为 chip 身份标识，focus 时维持全亮。 */
 export const promptChipClass =
-  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden";
+  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:border-l-[var(--gc-node-accent)] focus:outline-hidden";
