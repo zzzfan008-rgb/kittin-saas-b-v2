@@ -44,7 +44,7 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
       id: "starter",
       type: "image",
       position: { x: 0, y: 0 },
-      data: { kind: "image", label: "上传服装图", status: "idle" },
+      data: { kind: "image", label: "上传服装图", status: "idle", outputImages: [] },
     }],
     edges: [],
     selectedNodeIds: [],
@@ -508,13 +508,20 @@ const templatePresentationSource = readFileSync(
 function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
   return {
     flow: {
-      nodes: kinds.map((kind, index) => ({ id: `node-${index}`, data: { kind } })),
+      nodes: kinds.map((kind, index) => ({
+        id: `node-${index}`,
+        data: kind === "image"
+          ? { kind, outputImages: [] }
+          : kind === "text"
+            ? { kind, text: "示例文本" }
+            : { kind },
+      })),
       edges: [],
     },
   } as unknown as Pick<WorkflowTemplate, "flow">;
 }
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "text");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["text"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
 assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
 for (const cover of [

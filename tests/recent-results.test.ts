@@ -120,14 +120,14 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
     label: "印花裂变",
     status: "idle",
     prompt: "变体",
-    count: 8,
+    batchSize: 8,
     outputImages: [],
   }), 8);
   assert.equal(requestedResultCount({
     kind: "image",
     label: "配色",
     status: "idle",
-    colors: ["#111111", "#222222", "#333333"],
+    batchSize: 3,
     prompt: "",
     outputImages: [],
   }), 3);

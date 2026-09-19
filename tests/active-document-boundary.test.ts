@@ -246,7 +246,7 @@ const printSource = selectDocumentForTab(postSaveState, printSourceTabId);
 const destination = selectDocumentForTab(postSaveState, destinationTabId);
 const savedPrint = printSource?.nodes.find((node) => node.id === "selector-print-node")?.data;
 assert.equal(savedPrint?.kind, "image");
-assert.deepEqual(savedPrint?.kind === "image" ? savedPrint.savedAsAssets : [], [printUrl]);
+assert.deepEqual(savedPrint?.kind === "image" ? savedPrint.outputImages : [], [printUrl]);
 assert.equal(destination?.nodes.some((node) => node.id === "selector-print-node"), false);
 assert.equal(postSaveState.activeTabId, destinationTabId);
 console.log("  ✓ 异步素材保存在切页后仍定向回写发起命令的原页签");

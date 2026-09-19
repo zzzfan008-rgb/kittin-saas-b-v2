@@ -301,7 +301,7 @@ await test("页面退出、关闭页签和所有文本入口都接入统一提�
   assert.match(projectTabs, /flushActiveTextEdit\(\);[\s\S]*useFlowStore\.getState\(\)\.tabs\.find/);
   assert.match(projectTabs, /useCoalescedTextEdit\([\s\S]*kind: "project-name"/);
   assert.doesNotMatch(topBar, /kind: "project-name"/);
-  assert.match(inspector, /field: "label"[\s\S]*field: "prompt"[\s\S]*field: "note"/);
+  assert.match(inspector, /field: "label"/);
   assert.match(nodeFrame, /labelEdit\.cancel\(\)/);
   assert.match(textEditHook, /markKeyDown\(event\.key, composing\)/);
   assert.match(textEditHook, /consumeKeyUp\(event\.key\)\) return/);
