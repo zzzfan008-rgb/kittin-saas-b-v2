@@ -48,16 +48,17 @@ export async function finalizeSuccessfulRun(
 ): Promise<void> {
   const target = run.target_step_id
       ? (await client.query<{
-        output_images_json: string; prompts_json: string; provider_output_sizes_json: string;
+        output_images_json: string; output_videos_json: string; prompts_json: string; provider_output_sizes_json: string;
         provider_images_json: string; reference_inputs_json: string;
         failures_json: string; model: string | null;
       }>(`
-        SELECT output_images_json, prompts_json, provider_output_sizes_json,
+        SELECT output_images_json, output_videos_json, prompts_json, provider_output_sizes_json,
           provider_images_json, reference_inputs_json, failures_json, model
         FROM generation_run_steps WHERE id = $1
       `, [run.target_step_id])).rows[0]
     : undefined;
   const images = parseJson<string[]>(target?.output_images_json ?? "[]", []);
+  const videos = parseJson<string[]>(target?.output_videos_json ?? "[]", []);
   const prompts = parseJson<string[]>(target?.prompts_json ?? "[]", []);
   const providerOutputSizes = parseJson<Array<string | null>>(target?.provider_output_sizes_json ?? "[]", []);
   const providerImages = parseJson<string[]>(target?.provider_images_json ?? "[]", []);
@@ -78,6 +79,12 @@ export async function finalizeSuccessfulRun(
       providerOutputSizes[index] ?? null, finishedAt + index,
     ]);
   }
+  for (const [index, video] of videos.entries()) {
+    await client.query(`
+      INSERT INTO generation_outputs (id, run_id, image, prompt, status, error, created_at)
+      VALUES ($1, $2, $3, NULL, 'success', NULL, $4)
+    `, [nanoid(12), run.id, video, finishedAt + images.length + index]);
+  }
   for (const [index, failure] of failures.entries()) {
     await client.query(`
       INSERT INTO generation_outputs (id, run_id, image, prompt, status, error, created_at)
@@ -87,6 +94,7 @@ export async function finalizeSuccessfulRun(
   const warning = cancellationWarning ?? (failures.length ? `${failures.length} 个生成任务失败` : null);
   const model = target?.model ?? aggregate?.model ?? null;
   const providerRequests = aggregate?.provider_requests ?? 0;
+  const outputCount = images.length + videos.length;
   if (providerImages.length > 0 && providerImages.length !== images.length) {
     throw new Error("Target Provider evidence cardinality does not match business outputs");
   }
@@ -101,8 +109,8 @@ export async function finalizeSuccessfulRun(
         ELSE billing_reconciliation_status
       END
     WHERE id = $6
-  `, [images.length, providerRequests, model, warning, finishedAt, run.id]);
-  if (images.length > 0) {
+  `, [outputCount, providerRequests, model, warning, finishedAt, run.id]);
+  if (outputCount > 0) {
     await client.query(`
       INSERT INTO usage_events (
         id, owner_id, run_id, project_id, node_id, model, successful_count,
@@ -113,7 +121,7 @@ export async function finalizeSuccessfulRun(
         provider_requests = excluded.provider_requests, duration_ms = excluded.duration_ms,
         created_at = excluded.created_at
     `, [
-      nanoid(12), run.owner_id, run.id, run.project_id, run.node_id, model, images.length,
+      nanoid(12), run.owner_id, run.id, run.project_id, run.node_id, model, outputCount,
       providerRequests, Math.max(0, finishedAt - run.started_at), new Date(finishedAt).toISOString(),
     ]);
   }
@@ -153,11 +161,16 @@ export async function completeJobSuccess(
   providerImageUrls: string[],
   persistedProviderImages: PersistedImageReceipt[],
   runtimeReferenceImages: string[],
+  videos: string[],
   finishedAt: number,
 ): Promise<void> {
   const imageUrls = persistedImages.map((image) => image.url);
-  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
+  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。video 无 image 证据链。
   const isProviderStep = job.step.kind === "image";
+  const videoUrls = videos.filter((video) => video.startsWith("/api/files/"));
+  if (videoUrls.length !== videos.length) {
+    throw new Error("video outputs must be local /api/files references");
+  }
   if (providerImageUrls.length > 0 && providerImageUrls.length !== imageUrls.length) {
     throw new Error("Provider originals and business outputs must have identical cardinality");
   }
@@ -191,12 +204,14 @@ export async function completeJobSuccess(
     `, [finishedAt, job.id]);
     await client.query(`
       UPDATE generation_run_steps SET status = 'succeeded', model = $1, output_images_json = $2,
-        provider_images_json = $3, reference_inputs_json = $4,
-        prompts_json = $5, provider_output_sizes_json = $6, failures_json = $7,
-        error = $8, finished_at = $9
-      WHERE id = $10
+        output_videos_json = $3,
+        provider_images_json = $4, reference_inputs_json = $5,
+        prompts_json = $6, provider_output_sizes_json = $7, failures_json = $8,
+        error = $9, finished_at = $10
+      WHERE id = $11
     `, [
-      result.model ?? null, JSON.stringify(imageUrls), JSON.stringify(providerImageUrls),
+      result.model ?? null, JSON.stringify(imageUrls), JSON.stringify(videoUrls),
+      JSON.stringify(providerImageUrls),
       JSON.stringify(referenceEvidence), JSON.stringify(result.prompts ?? []),
       JSON.stringify(result.providerOutputSizes ?? []), JSON.stringify(result.failures ?? []),
       cancellationWarning ?? null, finishedAt, job.stepId,
@@ -221,6 +236,13 @@ export async function completeJobSuccess(
         VALUES ($1, $2, 'provider-original', $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING
       `, [image.id, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
     }
+    for (const video of videoUrls) {
+      const videoId = video.slice("/api/files/".length);
+      await client.query(`
+        INSERT INTO files (id, owner_id, source_type, project_id, node_id, run_id, mime_type, created_at)
+        VALUES ($1, $2, 'generation', $3, $4, $5, 'video/mp4', $6) ON CONFLICT (id) DO NOTHING
+      `, [videoId, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
+    }
     await completeEvaluationCaseEvidence(client, {
       runId: job.runId,
       policy: evaluationPolicy,
@@ -233,6 +255,7 @@ export async function completeJobSuccess(
       nodeId: job.nodeId,
       status: "success",
       images: imageUrls,
+      ...(videoUrls.length > 0 ? { videos: videoUrls } : {}),
       model: result.model,
       prompts: result.prompts,
       providerOutputSizes: result.providerOutputSizes,

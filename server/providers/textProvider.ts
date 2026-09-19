@@ -6,6 +6,7 @@
 import {
   getTextModelContract,
   isTextModelId,
+  TEXT_MODEL_IDS,
   type TextModelId,
   type TextModelOptions,
 } from "../../src/types/textModels";
@@ -137,11 +138,7 @@ export function createApiyiTextProvider(modelId: TextModelId): TextProvider {
 }
 
 export const apiyiTextProviders = Object.fromEntries(
-  ([
-    "gpt-5.3-chat-latest",
-    "gemini-3.6-flash",
-    "deepseek-v4-flash-ga-260731",
-  ] as const).map((modelId) => [modelId, createApiyiTextProvider(modelId)]),
+  TEXT_MODEL_IDS.map((modelId) => [modelId, createApiyiTextProvider(modelId)]),
 ) as Record<TextModelId, TextProvider>;
 
 export function getTextProvider(modelId: string): TextProvider {

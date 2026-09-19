@@ -42,6 +42,23 @@ const EXT_MIME: Record<string, string> = {
   gif: "image/gif",
 };
 
+// ---------- 视频文件（Q2=A：files 表放行 video/mp4 与 Seedance 的 video/quicktime） ----------
+const VIDEO_MIME_EXT: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+};
+
+const VIDEO_EXT_MIME: Record<string, string> = {
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+};
+
+/** 视频下载单文件安全上限（5–50MB 常态；512MB 兜底防 OOM，与 D3「保留不设限」无关）。 */
+const MAX_VIDEO_BYTES = 512 * 1024 * 1024;
+/** 视频直链下载超时（24 小时过期签名直链；大文件放宽到 5 分钟）。 */
+const VIDEO_DOWNLOAD_TIMEOUT_MS = 300_000;
+const MAX_VIDEO_REDIRECTS = 5;
+
 export function uploadsDir(): string {
   const dir = path.join(config.dataDir(), "uploads");
   fs.mkdirSync(dir, { recursive: true });
@@ -256,11 +273,20 @@ export async function verifyStoredImageFile(ref: string): Promise<void> {
 
 export function mimeOfFile(id: string): string {
   const ext = path.extname(id).slice(1).toLowerCase();
-  return EXT_MIME[ext] ?? "image/png";
+  return EXT_MIME[ext] ?? VIDEO_EXT_MIME[ext] ?? "image/png";
 }
 
 export function isSupportedImageFile(id: string): boolean {
   return Object.prototype.hasOwnProperty.call(EXT_MIME, path.extname(id).slice(1).toLowerCase());
+}
+
+export function isSupportedVideoFile(id: string): boolean {
+  return Object.prototype.hasOwnProperty.call(VIDEO_EXT_MIME, path.extname(id).slice(1).toLowerCase());
+}
+
+/** 图片或视频（files 路由 GET 统一入口）。 */
+export function isSupportedStoredFile(id: string): boolean {
+  return isSupportedImageFile(id) || isSupportedVideoFile(id);
 }
 
 // ---------- 图片来源归一化（Provider URL 结果 / 链式编辑输入统一为 dataURL）----------
@@ -589,5 +615,132 @@ export async function persistImageRefWithReceipt(
   for (;;) {
     const id = `${base}-${contentDigest}-${nanoid(6)}.${ext}`;
     if (createStoredImage(id, buffer)) return { id, url: `/api/files/${id}`, created: true };
+  }
+}
+
+// ---------- 视频 MP4 落地（Q2=A：Provider 轮询成功后拉回自有存储，不持有远端 URL） ----------
+
+/** 视频字节原子落盘（独占创建 + fsync），返回 { id, url }。 */
+export function saveVideoBuffer(buffer: Buffer, mime: string): { id: string; url: string } {
+  const ext = VIDEO_MIME_EXT[mime];
+  if (!ext) throw new Error(`unsupported video mime for storage: ${mime}`);
+  if (buffer.byteLength === 0 || buffer.byteLength > MAX_VIDEO_BYTES) {
+    throw new Error(`video payload size invalid: ${buffer.byteLength}`);
+  }
+  const id = `${nanoid(12)}.${ext}`;
+  const filePath = path.join(uploadsDir(), id);
+  const fd = fs.openSync(filePath, "wx", 0o600);
+  try {
+    fs.writeFileSync(fd, buffer);
+    fs.fsyncSync(fd);
+  } catch (error) {
+    try { fs.unlinkSync(filePath); } catch { /* best-effort cleanup */ }
+    throw error;
+  } finally {
+    fs.closeSync(fd);
+  }
+  return { id, url: `/api/files/${id}` };
+}
+
+/** 删除仅由失败 run 产生的视频文件。 */
+export function deleteStoredVideo(id: string): void {
+  if (!isSupportedVideoFile(id) || path.basename(id) !== id) return;
+  try { fs.rmSync(path.join(uploadsDir(), id), { force: true }); } catch { /* best-effort cleanup */ }
+}
+
+interface VideoResponse {
+  ok: boolean;
+  status: number;
+  headers: { get(name: string): string | null };
+  stream: import("node:http").IncomingMessage;
+}
+
+/**
+ * 下载 Seedance 直链 MP4 → Buffer。直链是 24 小时过期的签名 URL，必须立即转存；
+ * 下载时不得带 Authorization 头（seedance2/video-generation.md）。重定向目标逐跳过 SSRF 检查。
+ */
+export async function downloadVideoToBuffer(
+  raw: string,
+  dependencies?: { lookup?: HostLookup },
+): Promise<Buffer> {
+  const lookup = dependencies?.lookup ?? defaultHostLookup;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), VIDEO_DOWNLOAD_TIMEOUT_MS);
+  try {
+    let url = await assertUrlAllowed(raw, lookup);
+    let response: VideoResponse | undefined;
+    for (let redirects = 0; redirects <= MAX_VIDEO_REDIRECTS; redirects += 1) {
+      const addresses = isIP(url.hostname) ? [url.hostname] : await lookup(url.hostname);
+      const blocked = addresses.find((address) => !isGlobalIpAddress(address));
+      if (addresses.length === 0 || blocked) {
+        throw new Error(`blocked non-global address for ${url.hostname}: ${blocked ?? "no addresses"}`);
+      }
+      response = await new Promise<VideoResponse>((resolve, reject) => {
+        const client = url.protocol === "https:" ? https : http;
+        const request = client.request(
+          url,
+          {
+            method: "GET",
+            headers: { accept: "video/*", host: url.host },
+            signal: ctrl.signal,
+            lookup: createPinnedLookup(addresses[0]),
+            ...(url.protocol === "https:" ? { servername: url.hostname } : {}),
+          },
+          (res) => {
+            resolve({
+              ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
+              status: res.statusCode ?? 0,
+              headers: { get: (name) => {
+                const value = res.headers[name.toLowerCase()];
+                return Array.isArray(value) ? value.join(", ") : value ?? null;
+              } },
+              stream: res,
+            });
+          },
+        );
+        request.once("error", reject);
+        request.end();
+      });
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+      if (redirects === MAX_VIDEO_REDIRECTS) throw new Error(`too many video redirects (limit ${MAX_VIDEO_REDIRECTS})`);
+      const location = response.headers.get("location");
+      if (!location) throw new Error(`video redirect missing Location header: HTTP ${response.status}`);
+      response.stream.destroy();
+      url = await assertUrlAllowed(new URL(location, url), lookup);
+    }
+    if (!response) throw new Error("video download did not produce a response");
+    if (!response.ok) throw new Error(`video download failed: HTTP ${response.status}`);
+    const mime = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!mime.startsWith("video/")) {
+      throw new Error(`not a video response: ${mime || "unknown content-type"}`);
+    }
+    const contentLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_VIDEO_BYTES) {
+      response.stream.destroy();
+      throw new Error(`video too large: ${contentLength} bytes (limit ${MAX_VIDEO_BYTES})`);
+    }
+    const chunks: Buffer[] = [];
+    let total = 0;
+    const body = await new Promise<Buffer>((resolve, reject) => {
+      let settled = false;
+      response!.stream.on("data", (chunk: Buffer | string) => {
+        if (settled) return;
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        total += buffer.byteLength;
+        if (total > MAX_VIDEO_BYTES) {
+          settled = true;
+          response!.stream.destroy(new Error(`video too large: more than ${MAX_VIDEO_BYTES} bytes`));
+          reject(new Error(`video too large: more than ${MAX_VIDEO_BYTES} bytes`));
+          return;
+        }
+        chunks.push(buffer);
+      });
+      response!.stream.once("error", (error) => { if (!settled) reject(error); });
+      response!.stream.once("end", () => { if (!settled) resolve(Buffer.concat(chunks, total)); });
+    });
+    if (body.byteLength === 0) throw new Error("empty video response");
+    return body;
+  } finally {
+    clearTimeout(timer);
   }
 }

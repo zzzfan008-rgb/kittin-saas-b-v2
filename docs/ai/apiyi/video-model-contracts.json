@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "contractLayer": "productPolicy",
+  "contractId": "apiyi-video-contracts-v1",
+  "reviewedOn": "2026-09-19",
+  "generatedFrom": {
+    "knowledgeFile": "video-model-contracts.json",
+    "productMustRemainGatewaySubset": true
+  },
+  "baseUrl": "https://api.apiyi.com",
+  "runtime": {
+    "upstreamMode": "async-task",
+    "submitEndpoint": "/seedance/api/v3/contents/generations/tasks",
+    "pollEndpointTemplate": "/seedance/api/v3/contents/generations/tasks/{id}",
+    "successStatus": "succeeded",
+    "pendingStatuses": [
+      "queued",
+      "running"
+    ],
+    "terminalStatuses": [
+      "succeeded",
+      "failed",
+      "expired"
+    ],
+    "pollInitialDelayMs": 20000,
+    "pollIntervalMs": 20000,
+    "pollTimeoutMs": 900000,
+    "videoUrlExpirySeconds": 86400,
+    "downloadTimeoutMs": 300000
+  },
+  "models": [
+    {
+      "contractHashScope": "sha256-canonical-video-model-envelope-v1",
+      "contractHash": "sha256:b8c28766fa3af4c6823b2a61f79ab237850a8dcf523f5c0d53d79e167f99cde7",
+      "id": "doubao-seedance-2-5-260628",
+      "label": "Seedance 2.5（字节）",
+      "channel": "official",
+      "vendor": "bytedance",
+      "timeoutMs": 60000,
+      "endpoint": {
+        "submitPath": "/seedance/api/v3/contents/generations/tasks",
+        "pollPathTemplate": "/seedance/api/v3/contents/generations/tasks/{id}",
+        "contentType": "application/json"
+      },
+      "recommendedOptions": {
+        "resolution": {
+          "default": "720p",
+          "examples": [
+            "480p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "aspectRatio": {
+          "default": "adaptive",
+          "examples": [
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16",
+            "21:9",
+            "adaptive"
+          ]
+        },
+        "seconds": {
+          "default": "5",
+          "examples": [
+            "4",
+            "5",
+            "10",
+            "30",
+            "-1"
+          ]
+        },
+        "seed": {
+          "examples": [
+            -1
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/overview.md",
+          "sha256": "693a068a2a1ba83fdce83f745ea49ad36b1f0f7c3e8fca89b2cef57fd78f606f"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/video-generation.md",
+          "sha256": "971f78c3d6af915f86065d4ec63628f499672742d41b665128c880ff21455c3a"
+        }
+      ]
+    }
+  ]
+}
