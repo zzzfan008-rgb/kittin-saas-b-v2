@@ -161,7 +161,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
               setDragOver(false);
               void handleFile(e.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 ${
+            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
               dragOver
                 ? "border-gold bg-gold/8 text-gold"
                 : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
@@ -187,7 +187,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
         )}
         {data.imageUrl && (
           <div className="nodrag flex gap-1.5">
-            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-text)] focus-within:border-gold focus-within:ring-2 focus-within:ring-gold/60">
+            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-node-text)] focus-within:border-(--gc-accent-deep) focus-within:ring-2 focus-within:ring-(--gc-accent-deep)">
               {fileInput}
               <span className="pointer-events-none">重新上传</span>
             </div>

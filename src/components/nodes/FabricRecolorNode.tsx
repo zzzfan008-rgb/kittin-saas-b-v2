@@ -201,7 +201,7 @@ export function FabricRecolorNode({
                 onChange={(e) => setHexInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
                 placeholder="#RRGGBB"
-                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 font-mono text-[10px] text-[var(--gc-text)] outline-hidden focus:border-gold/60"
+                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 font-mono text-[10px] text-[var(--gc-node-text)] outline-hidden focus:border-[var(--gc-accent-deep)]"
               />
               <button
                 type="button"

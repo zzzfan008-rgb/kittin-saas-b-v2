@@ -508,8 +508,10 @@ body {
 [data-theme] .gc-node-card textarea,
 [data-theme] .gc-node-card select {
   background-color: var(--gc-node-inner) !important;
-  border-color: var(--gc-node-border) !important;
   color: var(--gc-node-text) !important;
+  /* border-color 反查已删除（R-50 P1-3）：该 !important 曾整体吃掉节点内
+     输入控件的 focus 边框与 V4 chip 的左 3px accent 引用条；控件自带
+     var(--gc-node-border) 静息边框，无需反查兜底。 */
 }
 
 [data-theme] .gc-node-card input::placeholder,

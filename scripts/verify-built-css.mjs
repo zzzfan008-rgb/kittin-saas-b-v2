@@ -26,7 +26,9 @@ requirePattern("品牌主色工具类 bg-gold", /\.bg-gold(?:[,{:]|\s*\{)/);
 requirePattern("品牌文字工具类 text-gold", /\.text-gold(?:[,{:]|\s*\{)/);
 requirePattern("响应式工具类", /\.(?:sm|md|lg)\\:/);
 requirePattern("图片上传焦点 ring 宽度", /\.focus-within\\:ring-2(?:[,{:]|\s*\{)/);
-requirePattern("图片上传焦点 ring 颜色", /\.focus-within\\:ring-gold\\\/60(?:[,{:]|\s*\{)/);
+// R-50 P1-3：ring-gold/60 在白节点卡上仅 1.19:1（WCAG 2.4.11 不达标），
+// 焦点环颜色改接行动色深档 --gc-accent-deep（三主题 5.14/5.57/5.41:1）。
+requirePattern("图片上传焦点 ring 颜色", /\.focus-within\\:ring-\\\(--gc-accent-deep\\\)(?:[,{:]|\s*\{)/);
 requirePattern("shadcn 弹层背景工具类", /\.bg-popover(?:[,{:]|\s*\{)/);
 requirePattern("shadcn 弹层文字工具类", /\.text-popover-foreground(?:[,{:]|\s*\{)/);
 requirePattern("画布节点主题样式", /\.gc-node-card/);
