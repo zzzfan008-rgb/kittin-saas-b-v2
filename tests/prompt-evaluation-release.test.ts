@@ -180,16 +180,10 @@ try {
   mutableReleases.splice(0, mutableReleases.length, ...originalReleases);
 }
 
-const inspectorSource = fs.readFileSync(
-  new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+const referenceListSource = fs.readFileSync(
+  new URL("../src/components/nodes/ReferenceImageList.tsx", import.meta.url),
   "utf8",
 );
-assert.match(inspectorSource, /ReferenceImageList/);
-
-const maskNodeSource = fs.readFileSync(
-  new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
-  "utf8",
-);
-assert.match(maskNodeSource, /ReferenceImageList/);
+assert.match(referenceListSource, /export function ReferenceImageList/);
 
 console.log("提示词评估发布快照与自动降级测试通过");

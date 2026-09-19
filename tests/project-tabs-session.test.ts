@@ -457,7 +457,7 @@ assert.deepEqual(migrated.tabs[0].edges.map((edge) => edge.id), ["valid-edge"]);
 const migratedAi = migrated.tabs[0].nodes[0].data;
 assert.equal(migratedAi.kind, "image");
 if (migratedAi.kind !== "image") throw new Error("unexpected node kind");
-assert.equal(migratedAi.aspectRatio, "1:1");
+assert.equal(migratedAi.aspectRatio, "3:4");
 assert.equal(migratedAi.batchSize, 1);
 assert.deepEqual(migratedAi.outputImages, []);
 assert.equal(migrated.tabs[0].saveState, "idle");

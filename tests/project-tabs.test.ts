@@ -396,7 +396,7 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   assert.equal(added?.data.kind, "image");
   assert.equal(added?.data.label, "金色面料");
   assert.equal(added?.data.status, "success");
-  assert.equal(added?.data.kind === "image" ? added.data.imageUrl : undefined, "/api/files/gold-fabric.png");
+  assert.deepEqual(added?.data.kind === "image" ? added.data.outputImages : [], ["/api/files/gold-fabric.png"]);
 
   useFlowStore.getState().undo();
   assert.equal(activeDocument().nodes.length, 1);
