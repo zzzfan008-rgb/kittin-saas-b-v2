@@ -1,7 +1,9 @@
 # Garment Canvas 设计规范（人读版）· Rev.1
 
-日期：2026-09-18 · 状态：**已实施 + 评审修复完毕**
-机读唯一事实源：[`DESIGN.md`](./DESIGN.md)（Google DESIGN.md 格式，lint 0 error；导出 [`theme.css`](./theme.css) / [`tailwind.theme.json`](./tailwind.theme.json) / [`tokens.json`](./tokens.json)）——本文件只引用 token 名，不复述数值。
+> **🔒 锁定指针（R-47，2026-09-19）**：本文已被冻结快照 [`DESIGN-Rev2-locked-2026-09-19.md`](./DESIGN-Rev2-locked-2026-09-19.md) 取代为现行有效版本——该快照与代码 head `e13de4c` 逐条对齐后冻结（含 9 项规范修订与 4+1 项代码问题报告）。**后续修订以新版本另立文件，本文不再原地修改**；引用数值请以锁定版及其 front matter（机读源）为准。本文下方内容仅作历史存档，其中曜黑行动色仍为旧「活力黄」、Rev.2 CTA 深绿例外已被作废。
+
+日期：2026-09-18 · 状态：**已锁定存档**（现行版见上方指针）
+机读唯一事实源：[`DESIGN-Rev2-locked-2026-09-19.md`](./DESIGN-Rev2-locked-2026-09-19.md) front matter（原 `DESIGN.md` 已丢失，见锁定版 §10；其旧导出 `theme.css` / `tailwind.theme.json` / `tokens.json` 停留在旧黄时代值，重新导出前不得引用）——本文件只引用 token 名，不复述数值。
 视觉证据：[`shots/`](./shots/)（prototype-v3 迭代 + acceptance 验收 + fix-white-* 修复复验）· 问题清单 [`audit-report.md`](./audit-report.md) · 评审清单 [`review-checklist.md`](./review-checklist.md)。
 
 ---
