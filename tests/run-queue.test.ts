@@ -526,6 +526,8 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       operationMode: maskVariant.mode,
       modelId: maskVariant.modelId,
       modelOptions: maskParameters.modelOptions,
+      aspectRatio: maskParameters.aspectRatio,
+      batchSize: maskParameters.batchSize,
       mask: "https://references.example.invalid/mask.png",
       maskSourceRef: PNG_DATA_URL,
       maskPipelineVersion: 3,
@@ -555,7 +557,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
   assert.equal(blocked?.status, "failed");
   assert.equal(blocked?.provider_requests, 0);
   assert.equal(blocked?.successful_count, 0);
-  assert.match(blocked?.error ?? "", /执行前提示词准入阻断/);
+  assert.match(blocked?.error ?? "", /远程参考图不能直接用于生成，请先上传或导入后再试/);
 });
 
 await test("Worker 在普通与评估 Provider 边界拒绝与实际内容不符的 reference hash", async () => {
@@ -669,6 +671,8 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
       operationMode: maskVariant.mode,
       modelId: maskVariant.modelId,
       modelOptions: maskParameters.modelOptions,
+      aspectRatio: maskParameters.aspectRatio,
+      batchSize: maskParameters.batchSize,
       mask: PNG_DATA_URL,
       maskSourceRef: PNG_DATA_URL,
       maskPipelineVersion: 3,
@@ -902,6 +906,8 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
       operationMode: maskVariant.mode,
       modelId: maskVariant.modelId,
       modelOptions: maskParameters.modelOptions,
+      aspectRatio: maskParameters.aspectRatio,
+      batchSize: maskParameters.batchSize,
       mask: PNG_DATA_URL,
       maskSourceRef: PNG_DATA_URL,
       maskPipelineVersion: 3,
