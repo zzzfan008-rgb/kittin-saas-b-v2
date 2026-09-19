@@ -1,0 +1,1001 @@
+[
+ {
+  "file": "shots/canvas/00-after-reveal.png",
+  "bytes": 235373,
+  "md5": "59797040f663db4b19cb7e92fdca2af8",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/00-setup-after-run.png",
+  "bytes": 126303,
+  "md5": "9727061958fe4da33d5fa69a8cd27413",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-current-1024.png",
+  "bytes": 141417,
+  "md5": "fcb787b94614dc4578be67620362c9f0",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-current-1280.png",
+  "bytes": 147556,
+  "md5": "e8b0ba274d9c890d980e3f9254ddc709",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-current-1440.png",
+  "bytes": 241080,
+  "md5": "2582326a98e9c8f90a16440f67d003ad",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-eye-1024.png",
+  "bytes": 148586,
+  "md5": "b758ffacf458d17b87f1eb9d6d5842fc",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-eye-1280.png",
+  "bytes": 199594,
+  "md5": "aa6bb1d872fadd16ae77437d499918d6",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-eye-1440.png",
+  "bytes": 252949,
+  "md5": "aa72fb6e15b691429a19044af68c6fcc",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-nodock-current-1280.png",
+  "bytes": 150893,
+  "md5": "c29981963cab5ddc9e9a5913c738559f",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-nodock-eye-1280.png",
+  "bytes": 157627,
+  "md5": "6531781c1efb8925f45bc7cc7ae2c512",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-nodock-white-1280.png",
+  "bytes": 147097,
+  "md5": "8988dccad2c22a684c3948465bfd704e",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-white-1024.png",
+  "bytes": 142763,
+  "md5": "d844ad1d3eb60fce65966cfd59512a83",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-white-1280.png",
+  "bytes": 192664,
+  "md5": "170816d9121c12bb3e2d79481d26b7fe",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-pattern-white-1440.png",
+  "bytes": 243728,
+  "md5": "8b1653bea35ed35dd2a9eafe3d27a897",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-current-1024.png",
+  "bytes": 119829,
+  "md5": "bbd50c1adf599f55f336c07b42b9f9f9",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-current-1280.png",
+  "bytes": 120728,
+  "md5": "7fd007953bf41bbed42f906c4203402f",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-current-1440.png",
+  "bytes": 209307,
+  "md5": "780f475e9ffe106b4109a69e7b4f7b88",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-eye-1024.png",
+  "bytes": 125013,
+  "md5": "d6c325af6197441d612a7e40c227d9de",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-eye-1280.png",
+  "bytes": 185582,
+  "md5": "0ab215d4a8e09d03581e2c8f19bb9400",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-eye-1440.png",
+  "bytes": 217925,
+  "md5": "5463d73d9c19faaf39ad79a97b2440bd",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-white-1024.png",
+  "bytes": 121276,
+  "md5": "d8cfe6506a138b61bca26ad2233fc1c7",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-white-1280.png",
+  "bytes": 179368,
+  "md5": "012a90ef12923f315f7e754a8a66bd52",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/canvas/canvas-text-white-1440.png",
+  "bytes": 212246,
+  "md5": "896e22c9964fd3e2482670eeee48052a",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/cta/cta-current-1280.png",
+  "bytes": 122504,
+  "md5": "559146b8a74371b112d2432ecdcf4c7e",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/cta/cta-enabled-current-1280.png",
+  "bytes": 42752,
+  "md5": "de9d69b078244bcfec8f6fdbde970cf4",
+  "size": [
+   229,
+   558
+  ]
+ },
+ {
+  "file": "shots/cta/cta-enabled-eye-1280.png",
+  "bytes": 43486,
+  "md5": "750f1f451d32018e5dcee9aef02214df",
+  "size": [
+   229,
+   558
+  ]
+ },
+ {
+  "file": "shots/cta/cta-enabled-white-1280.png",
+  "bytes": 42602,
+  "md5": "024dc0c5157d94916c710288f20552ba",
+  "size": [
+   229,
+   558
+  ]
+ },
+ {
+  "file": "shots/cta/cta-eye-1280.png",
+  "bytes": 122763,
+  "md5": "40bf43f4825f52384327a43d0a909d1b",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/cta/cta-white-1280.png",
+  "bytes": 116763,
+  "md5": "36f0f37cfb01731b0ca269171082b41e",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-promptChipTextarea-current-1280.png",
+  "bytes": 38095,
+  "md5": "7615049ce2f02d35adc8f6d26c4f07f9",
+  "size": [
+   270,
+   214
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-promptChipTextarea-eye-1280.png",
+  "bytes": 38214,
+  "md5": "a72e40002fed5f23a00d52f1616c9adc",
+  "size": [
+   270,
+   214
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-promptChipTextarea-white-1280.png",
+  "bytes": 37176,
+  "md5": "48e76957dddbb76e2cd9ae8ed3c01ce2",
+  "size": [
+   270,
+   214
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-thumbSlot-current-1280.png",
+  "bytes": 4276,
+  "md5": "b426f71ff92595de55abeb1066bca426",
+  "size": [
+   270,
+   207
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-thumbSlot-eye-1280.png",
+  "bytes": 4427,
+  "md5": "3ab492d02bbb8430fa4acbf04e933af6",
+  "size": [
+   270,
+   207
+  ]
+ },
+ {
+  "file": "shots/focus-ring/focus-thumbSlot-white-1280.png",
+  "bytes": 4280,
+  "md5": "32ce0105603f4b1197978aa00691fee6",
+  "size": [
+   270,
+   207
+  ]
+ },
+ {
+  "file": "shots/login/login-1024-full.png",
+  "bytes": 201071,
+  "md5": "43769032e84b4235dd38e174461a89f0",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/login/login-after-logout-eye-1280.png",
+  "bytes": 233409,
+  "md5": "22c54dfaa13983b5881e1e0538580d3d",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/login/login-after-logout-white-1280.png",
+  "bytes": 233409,
+  "md5": "22c54dfaa13983b5881e1e0538580d3d",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/login/login-current-1024.png",
+  "bytes": 201071,
+  "md5": "43769032e84b4235dd38e174461a89f0",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/login/login-current-1280.png",
+  "bytes": 233408,
+  "md5": "11a0dd16930a31aa019ac440f0d7f988",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/login/login-current-1440.png",
+  "bytes": 302452,
+  "md5": "abf1315ce4977d512e43cd85f354c7c1",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/login/login-eye-1024.png",
+  "bytes": 201071,
+  "md5": "43769032e84b4235dd38e174461a89f0",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/login/login-eye-1280.png",
+  "bytes": 233408,
+  "md5": "11a0dd16930a31aa019ac440f0d7f988",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/login/login-eye-1440.png",
+  "bytes": 302452,
+  "md5": "abf1315ce4977d512e43cd85f354c7c1",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/login/login-focus-account-1280.png",
+  "bytes": 3548,
+  "md5": "c324ed47cf5f6ed999d47f42c041ce04",
+  "size": [
+   352,
+   68
+  ]
+ },
+ {
+  "file": "shots/login/login-white-1024.png",
+  "bytes": 201071,
+  "md5": "43769032e84b4235dd38e174461a89f0",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/login/login-white-1280.png",
+  "bytes": 233408,
+  "md5": "11a0dd16930a31aa019ac440f0d7f988",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/login/login-white-1440.png",
+  "bytes": 302452,
+  "md5": "abf1315ce4977d512e43cd85f354c7c1",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-current-1024.png",
+  "bytes": 74553,
+  "md5": "d6e57eb45748b182656fd0d41efd3c76",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-current-1280.png",
+  "bytes": 82955,
+  "md5": "367fca50ec65ec8308031d103b3ab901",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-current-1440.png",
+  "bytes": 101421,
+  "md5": "969508e9902725d13fc69ba68925434e",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-eye-1024.png",
+  "bytes": 79072,
+  "md5": "b5ce57baa5660de499601df5aad7388f",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-eye-1280.png",
+  "bytes": 86352,
+  "md5": "a78d6b58e2c927e5b519919a3ada28a5",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-eye-1440.png",
+  "bytes": 100264,
+  "md5": "106b0bbc6874e3cb14e0247555dd2179",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-white-1024.png",
+  "bytes": 65411,
+  "md5": "38b9fea19cd04662b7337eb560aee33b",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-white-1280.png",
+  "bytes": 70273,
+  "md5": "0930348cca7add27bb5ea75d8ce53f2d",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-asset-library-white-1440.png",
+  "bytes": 80699,
+  "md5": "d7bdd4e3885d60cecdc72525c0e45559",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-current-1024.png",
+  "bytes": 114211,
+  "md5": "8691812138dec80e651476bd4faff649",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-current-1280.png",
+  "bytes": 135283,
+  "md5": "636ebca7e859446dcb38ef02656ef0c2",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-current-1440.png",
+  "bytes": 166595,
+  "md5": "195ca6917e7f69f398fc327fc26f6d37",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-eye-1024.png",
+  "bytes": 125471,
+  "md5": "b372e2a2214cd4511e3e9381dfc7ab0e",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-eye-1280.png",
+  "bytes": 144779,
+  "md5": "2287ef7e43f8fe31b2ec8f21a3791395",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-eye-1440.png",
+  "bytes": 174663,
+  "md5": "fa5ded39411eb3020534a65d91ac5e93",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-node-current-1280.png",
+  "bytes": 139303,
+  "md5": "d5e9d256d9d194409ece6d2377617536",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-node-eye-1280.png",
+  "bytes": 139255,
+  "md5": "3650403e2f577a7a6d0614c65c885abf",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-node-white-1280.png",
+  "bytes": 136155,
+  "md5": "107a21817fb63f9babfc471f8d10cb3b",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-white-1024.png",
+  "bytes": 118134,
+  "md5": "f7cd3c58ad7fcd470f915004d3a800a2",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-white-1280.png",
+  "bytes": 137239,
+  "md5": "a0eb0e0c9241ff9a3fe28a6e3678b62a",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-inspector-white-1440.png",
+  "bytes": 168902,
+  "md5": "8c3bc5a3d463980fbaae44053eb96ef6",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-current-1024.png",
+  "bytes": 184639,
+  "md5": "a9e500bb1313d3d02a5bb647b35cc9c3",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-current-1280.png",
+  "bytes": 193792,
+  "md5": "73c32dff472f7d19c4d403c4627caba6",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-current-1440.png",
+  "bytes": 229556,
+  "md5": "72a57ed1ba7393ac530826a6c28b676b",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-eye-1024.png",
+  "bytes": 192251,
+  "md5": "1e9a8846e6c9c2aeead39b59ab1ef74b",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-eye-1280.png",
+  "bytes": 199223,
+  "md5": "10ac5b5dd019eb5b90261f93b999a21a",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-eye-1440.png",
+  "bytes": 235699,
+  "md5": "8d19b1451982e66bca1fb691a8023f96",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-white-1024.png",
+  "bytes": 185345,
+  "md5": "01da7650f3318abd97f6f17cedfd2bb3",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-white-1280.png",
+  "bytes": 193853,
+  "md5": "c630cab9136138cf0fda27a3ad9ecc34",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-library-white-1440.png",
+  "bytes": 227018,
+  "md5": "dceb72c23468e226c54d9590467df67c",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-current-1024.png",
+  "bytes": 128374,
+  "md5": "9551524ef4c792e307fb1ac49fc8d2eb",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-current-1280.png",
+  "bytes": 141596,
+  "md5": "3634f5102add67316bc6d26dfe7b9e0b",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-current-1440.png",
+  "bytes": 162943,
+  "md5": "fdbd52f360fcd157967101ce3a975757",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-eye-1024.png",
+  "bytes": 128796,
+  "md5": "9204a94855e4ff9119fe757f983c7c75",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-eye-1280.png",
+  "bytes": 143795,
+  "md5": "7edbd9984b896bc724adab02e8e7e3be",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-eye-1440.png",
+  "bytes": 178694,
+  "md5": "0d076fba0282a4e309bb105f453c7a8e",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-white-1024.png",
+  "bytes": 125892,
+  "md5": "68586d849bf84da8e3eb0b410517dc58",
+  "size": [
+   1024,
+   768
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-white-1280.png",
+  "bytes": 139207,
+  "md5": "227fda05c08fba4386528ffc8d1e9b9c",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/panel-results-white-1440.png",
+  "bytes": 168796,
+  "md5": "ed0c1fcff829f38945f81b5ee46fa021",
+  "size": [
+   1440,
+   900
+  ]
+ },
+ {
+  "file": "shots/misc/pattern-canvas-filled-current-1280.png",
+  "bytes": 146581,
+  "md5": "b2baffc9098bbb746b3161e3c0a2e50c",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-current-1024.png",
+  "bytes": 33591,
+  "md5": "a65833e4bdfa6d7ce7cbdd8a591c0e22",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-current-1280.png",
+  "bytes": 33591,
+  "md5": "a65833e4bdfa6d7ce7cbdd8a591c0e22",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-current-1440.png",
+  "bytes": 33591,
+  "md5": "a65833e4bdfa6d7ce7cbdd8a591c0e22",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-eye-1024.png",
+  "bytes": 33607,
+  "md5": "94bbf691e40023145a3e16696fd195c6",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-eye-1280.png",
+  "bytes": 33607,
+  "md5": "94bbf691e40023145a3e16696fd195c6",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-eye-1440.png",
+  "bytes": 33607,
+  "md5": "94bbf691e40023145a3e16696fd195c6",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-white-1024.png",
+  "bytes": 32822,
+  "md5": "da6c62fb9c358cc6048439607c656c8c",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-white-1280.png",
+  "bytes": 32822,
+  "md5": "da6c62fb9c358cc6048439607c656c8c",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/misc/ring-chip-white-1440.png",
+  "bytes": 32822,
+  "md5": "da6c62fb9c358cc6048439607c656c8c",
+  "size": [
+   278,
+   222
+  ]
+ },
+ {
+  "file": "shots/focus-ring/ring-slot-current-1280.png",
+  "bytes": 4437,
+  "md5": "30f8df4378926a3dc1cb3ffdc7957d49",
+  "size": [
+   274,
+   211
+  ]
+ },
+ {
+  "file": "shots/focus-ring/ring-slot-eye-1280.png",
+  "bytes": 4605,
+  "md5": "41f910a8ae1bfa76ce31b8f0f19969bb",
+  "size": [
+   274,
+   211
+  ]
+ },
+ {
+  "file": "shots/focus-ring/ring-slot-white-1280.png",
+  "bytes": 4446,
+  "md5": "1725b68fcdacf0ae8504129925a81a68",
+  "size": [
+   274,
+   211
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-empty-current-1280.png",
+  "bytes": 5092,
+  "md5": "4acd7b72ebd3ced894f1e0fcf17046c7",
+  "size": [
+   270,
+   186
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-empty-eye-1280.png",
+  "bytes": 5202,
+  "md5": "a3538d247f60a37875e3144a537095ea",
+  "size": [
+   270,
+   186
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-empty-white-1280.png",
+  "bytes": 4982,
+  "md5": "945ce55802a580e4b00ded1639da1ee1",
+  "size": [
+   270,
+   186
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-filled-current-1280.png",
+  "bytes": 6828,
+  "md5": "94d1052a45e268778229835c679080ac",
+  "size": [
+   268,
+   176
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-filled-eye-1280.png",
+  "bytes": 7033,
+  "md5": "af6b48d7bc3d4d98494e8598b6716fde",
+  "size": [
+   268,
+   176
+  ]
+ },
+ {
+  "file": "shots/focus-ring/slot-filled-white-1280.png",
+  "bytes": 6953,
+  "md5": "a42e8777e4fff50e0aa9607eed95dde3",
+  "size": [
+   268,
+   176
+  ]
+ },
+ {
+  "file": "shots/misc/theme-applied-eye-1280.png",
+  "bytes": 154275,
+  "md5": "7b5fcc96cc86b119f1be0939a50ed419",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/misc/theme-applied-white-1280.png",
+  "bytes": 147781,
+  "md5": "06b866e631f403af71b3ecaa0c5cd309",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/theme-menu-current-1280.png",
+  "bytes": 142156,
+  "md5": "91c37d9c02a37cfd24cf4e65ac58586e",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/theme-menu-eye-1280.png",
+  "bytes": 208701,
+  "md5": "fbd919c089346567bec2b4a822db2182",
+  "size": [
+   1280,
+   720
+  ]
+ },
+ {
+  "file": "shots/panels/theme-menu-white-1280.png",
+  "bytes": 202281,
+  "md5": "3fe5b151338df8711ce85f6c023408ab",
+  "size": [
+   1280,
+   720
+  ]
+ }
+]

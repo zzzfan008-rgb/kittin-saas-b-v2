@@ -1,0 +1,101 @@
+{
+  "current": {
+    "accent": "#B7F35A",
+    "runButton": {
+      "text": "未验证不可运行",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "0.4",
+      "rect": [
+        388,
+        518,
+        187,
+        21
+      ]
+    },
+    "node": [
+      379,
+      131,
+      206,
+      546
+    ],
+    "folderButton": {
+      "bg": "rgb(183, 243, 90)",
+      "opacity": "0.4",
+      "rect": [
+        711,
+        308,
+        174,
+        18
+      ],
+      "disabled": true
+    },
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-node-current-1280.png"
+  },
+  "white": {
+    "accent": "#0071e3",
+    "runButton": {
+      "text": "未验证不可运行",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "0.4",
+      "rect": [
+        388,
+        518,
+        187,
+        21
+      ]
+    },
+    "node": [
+      379,
+      131,
+      206,
+      546
+    ],
+    "folderButton": {
+      "bg": "rgb(183, 243, 90)",
+      "opacity": "0.4",
+      "rect": [
+        711,
+        308,
+        174,
+        18
+      ],
+      "disabled": true
+    },
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-node-white-1280.png"
+  },
+  "eye": {
+    "accent": "#0B7A43",
+    "runButton": {
+      "text": "未验证不可运行",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "0.4",
+      "rect": [
+        388,
+        518,
+        187,
+        21
+      ]
+    },
+    "node": [
+      379,
+      131,
+      206,
+      546
+    ],
+    "folderButton": {
+      "bg": "rgb(183, 243, 90)",
+      "opacity": "0.4",
+      "rect": [
+        711,
+        308,
+        174,
+        18
+      ],
+      "disabled": true
+    },
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-node-eye-1280.png"
+  }
+}

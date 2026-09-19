@@ -1,0 +1,1238 @@
+{
+  "panels": [
+    {
+      "width": 1024,
+      "theme": "current",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              728,
+              413,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              132,
+              330,
+              836,
+              1010
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              779
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1024,
+      "theme": "white",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              728,
+              413,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              132,
+              330,
+              836,
+              1010
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1024,
+      "theme": "eye",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              728,
+              413,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              132,
+              330,
+              836,
+              1010
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              289,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              421,
+              664,
+              553,
+              777
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1280,
+      "theme": "current",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              260,
+              306,
+              1220,
+              938
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              640,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              640,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1280,
+      "theme": "white",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              260,
+              306,
+              1220,
+              938
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "circle",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              660,
+              736,
+              665,
+              741
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              640,
+              681,
+              755
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1280,
+      "theme": "eye",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              260,
+              306,
+              1220,
+              938
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              265,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              637,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              549,
+              640,
+              681,
+              753
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1440,
+      "theme": "current",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              771,
+              430,
+              1049,
+              1289
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1440,
+      "theme": "white",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              771,
+              430,
+              1049,
+              1289
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    },
+    {
+      "width": 1440,
+      "theme": "eye",
+      "dockInspector": {
+        "width": 320,
+        "open": [
+          "属性 / 结果"
+        ]
+      },
+      "inspectorText": "属性 结果 / 记录 属性 点击画布节点查看属性",
+      "overflowWithDockOpen": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 1,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案重新上传素材库图2 · 风格参考IMAGE · 槽位点击 / ",
+            "rect": [
+              340,
+              396,
+              1460,
+              1208
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              770,
+              396,
+              1050,
+              1290
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              771,
+              430,
+              1049,
+              1289
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "resultsText": "属性 结果 / 记录 最近生成 0 条 运行 AI 节点后，生成结果与运行记录会汇总在这里 生成记录 选择上方结果查看完整运行记录",
+      "dockLibrary": {
+        "width": 320,
+        "open": [
+          "节点库"
+        ]
+      },
+      "libraryText": "节点库 图片上传 上传草图 / 款式图 / 面料参考 草图→效果图 选择模型，将线稿渲染为服装效果图 AI 改款 选择模型修改领型、袖型、长度与细节 面料/配色替换 暂不支持 选择模型替换面料纹理与配色 首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。历史项目仍可读取、查看和编辑，但不能发起付费运行。 高清放大 暂不支持 AI 放大至 2K/4K，精",
+      "dockClosed": {
+        "width": 0,
+        "open": []
+      },
+      "assetText": null
+    }
+  ],
+  "errors": []
+}

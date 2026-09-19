@@ -1,0 +1,76 @@
+{
+  "loginAfterLogout": [
+    {
+      "theme": "white",
+      "beforeLogout": {
+        "attr": "white",
+        "accent": "#0071e3",
+        "shell": "#f5f5f7",
+        "canvas": "#f5f5f7",
+        "panel": "#ffffff",
+        "nodeInner": "#f5f5f7",
+        "text": "#1d1d1f",
+        "colorGold": "#B7F35A"
+      },
+      "afterLogout": {
+        "url": "http://127.0.0.1:5411/",
+        "dataThemeAttr": null,
+        "localStorageTheme": "white",
+        "accentToken": "#B7F35A",
+        "shellToken": "#1a1c22",
+        "cardBg": "rgb(33, 36, 42)",
+        "cardColor": "rgb(232, 234, 238)",
+        "bodyBg": "rgb(10, 10, 10)",
+        "cardPresent": true
+      },
+      "afterReload": {
+        "dataThemeAttr": null,
+        "localStorageTheme": "white",
+        "cardBg": "rgb(33, 36, 42)"
+      }
+    },
+    {
+      "theme": "eye",
+      "beforeLogout": {
+        "attr": "eye",
+        "accent": "#0B7A43",
+        "shell": "#EDF4EE",
+        "canvas": "#E9F1EA",
+        "panel": "#ffffff",
+        "nodeInner": "#f0f6f1",
+        "text": "#123B2B",
+        "colorGold": "#B7F35A"
+      },
+      "afterLogout": {
+        "url": "http://127.0.0.1:5411/",
+        "dataThemeAttr": null,
+        "localStorageTheme": "eye",
+        "accentToken": "#B7F35A",
+        "shellToken": "#1a1c22",
+        "cardBg": "rgb(33, 36, 42)",
+        "cardColor": "rgb(232, 234, 238)",
+        "bodyBg": "rgb(10, 10, 10)",
+        "cardPresent": true
+      },
+      "afterReload": {
+        "dataThemeAttr": null,
+        "localStorageTheme": "eye",
+        "cardBg": "rgb(33, 36, 42)"
+      }
+    }
+  ],
+  "runButton": {
+    "cards": 1,
+    "state": {
+      "found": true,
+      "text": "未验证不可运行",
+      "disabled": true,
+      "focused": false,
+      "boxShadow": "none",
+      "outline": "rgb(10, 10, 10) none 3px",
+      "borderTopColor": "oklch(0.928 0.006 264.531)",
+      "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+    }
+  },
+  "pageErrors": []
+}

@@ -1,0 +1,74 @@
+{
+  "current": {
+    "accent": "#B7F35A",
+    "runButton": {
+      "text": "生成效果图",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "1",
+      "disabled": false,
+      "rect": [
+        374,
+        539,
+        197,
+        22
+      ]
+    },
+    "node": [
+      364,
+      131,
+      217,
+      546
+    ],
+    "images": 1,
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-enabled-current-1280.png"
+  },
+  "white": {
+    "accent": "#0071e3",
+    "runButton": {
+      "text": "生成效果图",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "1",
+      "disabled": false,
+      "rect": [
+        374,
+        539,
+        197,
+        22
+      ]
+    },
+    "node": [
+      364,
+      131,
+      217,
+      546
+    ],
+    "images": 1,
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-enabled-white-1280.png"
+  },
+  "eye": {
+    "accent": "#0B7A43",
+    "runButton": {
+      "text": "生成效果图",
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(10, 10, 10)",
+      "opacity": "1",
+      "disabled": false,
+      "rect": [
+        374,
+        539,
+        197,
+        22
+      ]
+    },
+    "node": [
+      364,
+      131,
+      217,
+      546
+    ],
+    "images": 1,
+    "screenshot": "/tmp/gc-uiqa-v4/shots/cta-enabled-eye-1280.png"
+  }
+}

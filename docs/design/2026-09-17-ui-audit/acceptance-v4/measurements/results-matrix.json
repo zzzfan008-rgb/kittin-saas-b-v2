@@ -1,0 +1,4088 @@
+{
+  "matrix": [
+    {
+      "viewport": 1024,
+      "theme": "current",
+      "tokens": {
+        "attr": "current",
+        "accent": "#B7F35A",
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "nodeInner": "#f2f3f5",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 113,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              531,
+              322,
+              809,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 113,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              101,
+              322,
+              379,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            100,
+            288,
+            380,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            530,
+            288,
+            810,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 155
+    },
+    {
+      "viewport": 1024,
+      "theme": "white",
+      "tokens": {
+        "attr": "white",
+        "accent": "#0071e3",
+        "shell": "#f5f5f7",
+        "canvas": "#f5f5f7",
+        "panel": "#ffffff",
+        "nodeInner": "#f5f5f7",
+        "text": "#1d1d1f",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 113,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              531,
+              322,
+              809,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 113,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              101,
+              322,
+              379,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            100,
+            288,
+            380,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            530,
+            288,
+            810,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 155
+    },
+    {
+      "viewport": 1024,
+      "theme": "eye",
+      "tokens": {
+        "attr": "eye",
+        "accent": "#0B7A43",
+        "shell": "#EDF4EE",
+        "canvas": "#E9F1EA",
+        "panel": "#ffffff",
+        "nodeInner": "#f0f6f1",
+        "text": "#123B2B",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 113,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              530,
+              288,
+              810,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              531,
+              322,
+              809,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 113,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "docScrollWidth": 1024,
+        "docScrollHeight": 768,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              728,
+              93,
+              740
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1124,
+              968
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              101,
+              322,
+              379,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            100,
+            288,
+            380,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            530,
+            288,
+            810,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 155
+    },
+    {
+      "viewport": 1280,
+      "theme": "current",
+      "tokens": {
+        "attr": "current",
+        "accent": "#B7F35A",
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "nodeInner": "#f2f3f5",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 113,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              680,
+              93,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              100,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              389,
+              262,
+              521,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              389,
+              262,
+              521,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              389,
+              262,
+              521,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              389,
+              622,
+              521,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              389,
+              622,
+              521,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "assetOverlay": null,
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 113,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 2,
+        "offendersOutside": [
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              81,
+              680,
+              93,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              -1,
+              87,
+              0,
+              88
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              100,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              100,
+              288,
+              380,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              101,
+              322,
+              379,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            100,
+            288,
+            380,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            530,
+            288,
+            810,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "themeMenu": {
+        "rect": [
+          512,
+          48,
+          256,
+          233
+        ],
+        "items": [
+          {
+            "name": "曜黑·荧光绿提亮黑画布 + 荧光绿圆珠",
+            "checked": "true"
+          },
+          {
+            "name": "简白Apple 白画布 + 蓝色圆珠",
+            "checked": "false"
+          },
+          {
+            "name": "护眼绿薄荷绿画布 + 翡翠圆珠",
+            "checked": "false"
+          }
+        ]
+      },
+      "inspectorText": "",
+      "resultsText": "",
+      "dockWidthAfterPanels": 320,
+      "auditNodes": 216
+    },
+    {
+      "viewport": 1280,
+      "theme": "white",
+      "tokens": {
+        "attr": "white",
+        "accent": "#0071e3",
+        "shell": "#f5f5f7",
+        "canvas": "#f5f5f7",
+        "panel": "#ffffff",
+        "nodeInner": "#f5f5f7",
+        "text": "#1d1d1f",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 433,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 10,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "group/card flex flex-col overflow-hidden text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "cls": "group/button inline-flex shrink-0 justify-center border border-transparent bg-clip-padding text-sm font-medium transition-all outline-none focus-visible:border-",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              297,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              47,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "text-[11px] leading-relaxed text-[var(--gc-node-muted)]",
+            "text": "汇总展示与导出",
+            "rect": [
+              23,
+              733,
+              100,
+              751
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              622,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              622,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "assetOverlay": null,
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 433,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 10,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "group/card flex flex-col overflow-hidden text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "cls": "group/button inline-flex shrink-0 justify-center border border-transparent bg-clip-padding text-sm font-medium transition-all outline-none focus-visible:border-",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              297,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              47,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "text-[11px] leading-relaxed text-[var(--gc-node-muted)]",
+            "text": "汇总展示与导出",
+            "rect": [
+              23,
+              733,
+              100,
+              751
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              421,
+              322,
+              699,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            420,
+            288,
+            700,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            850,
+            288,
+            1130,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "themeMenu": {
+        "rect": [
+          512,
+          48,
+          256,
+          233
+        ],
+        "items": [
+          {
+            "name": "曜黑·荧光绿提亮黑画布 + 荧光绿圆珠",
+            "checked": "false"
+          },
+          {
+            "name": "简白Apple 白画布 + 蓝色圆珠",
+            "checked": "true"
+          },
+          {
+            "name": "护眼绿薄荷绿画布 + 翡翠圆珠",
+            "checked": "false"
+          }
+        ]
+      },
+      "inspectorText": "",
+      "resultsText": "",
+      "dockWidthAfterPanels": 320,
+      "auditNodes": 216
+    },
+    {
+      "viewport": 1280,
+      "theme": "eye",
+      "tokens": {
+        "attr": "eye",
+        "accent": "#0B7A43",
+        "shell": "#EDF4EE",
+        "canvas": "#E9F1EA",
+        "panel": "#ffffff",
+        "nodeInner": "#f0f6f1",
+        "text": "#123B2B",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 433,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 10,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "group/card flex flex-col overflow-hidden text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "cls": "group/button inline-flex shrink-0 justify-center border border-transparent bg-clip-padding text-sm font-medium transition-all outline-none focus-visible:border-",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              297,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              47,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "text-[11px] leading-relaxed text-[var(--gc-node-muted)]",
+            "text": "汇总展示与导出",
+            "rect": [
+              23,
+              733,
+              100,
+              751
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-pattern-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              262,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "g",
+            "testid": "rf__edge-style-to-transfer",
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              622,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "path",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              709,
+              622,
+              841,
+              743
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "assetOverlay": null,
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 433,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1280,
+          720
+        ],
+        "docScrollWidth": 1280,
+        "docScrollHeight": 720,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 10,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "group/card flex flex-col overflow-hidden text-sm text-card-foreground [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "cls": "group/button inline-flex shrink-0 justify-center border border-transparent bg-clip-padding text-sm font-medium transition-all outline-none focus-visible:border-",
+            "text": "结果汇总展示与导出",
+            "rect": [
+              12,
+              702,
+              308,
+              762
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              297,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "",
+            "text": "结果",
+            "rect": [
+              23,
+              713,
+              47,
+              729
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "text-[11px] leading-relaxed text-[var(--gc-node-muted)]",
+            "text": "汇总展示与导出",
+            "rect": [
+              23,
+              733,
+              100,
+              751
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              680,
+              413,
+              692
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1380,
+              920
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              421,
+              322,
+              699,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            420,
+            288,
+            700,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            850,
+            288,
+            1130,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "themeMenu": {
+        "rect": [
+          512,
+          48,
+          256,
+          233
+        ],
+        "items": [
+          {
+            "name": "曜黑·荧光绿提亮黑画布 + 荧光绿圆珠",
+            "checked": "false"
+          },
+          {
+            "name": "简白Apple 白画布 + 蓝色圆珠",
+            "checked": "false"
+          },
+          {
+            "name": "护眼绿薄荷绿画布 + 翡翠圆珠",
+            "checked": "true"
+          }
+        ]
+      },
+      "inspectorText": "",
+      "resultsText": "",
+      "dockWidthAfterPanels": 320,
+      "auditNodes": 216
+    },
+    {
+      "viewport": 1440,
+      "theme": "current",
+      "tokens": {
+        "attr": "current",
+        "accent": "#B7F35A",
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "nodeInner": "#f2f3f5",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 433,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              851,
+              322,
+              1129,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 433,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(242, 243, 245)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              421,
+              322,
+              699,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            420,
+            288,
+            700,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            850,
+            288,
+            1130,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 216
+    },
+    {
+      "viewport": 1440,
+      "theme": "white",
+      "tokens": {
+        "attr": "white",
+        "accent": "#0071e3",
+        "shell": "#f5f5f7",
+        "canvas": "#f5f5f7",
+        "panel": "#ffffff",
+        "nodeInner": "#f5f5f7",
+        "text": "#1d1d1f",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 433,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              851,
+              322,
+              1129,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 433,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(245, 245, 247)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              421,
+              322,
+              699,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            420,
+            288,
+            700,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            850,
+            288,
+            1130,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 216
+    },
+    {
+      "viewport": 1440,
+      "theme": "eye",
+      "tokens": {
+        "attr": "eye",
+        "accent": "#0B7A43",
+        "shell": "#EDF4EE",
+        "canvas": "#E9F1EA",
+        "panel": "#ffffff",
+        "nodeInner": "#f0f6f1",
+        "text": "#123B2B",
+        "colorGold": "#B7F35A"
+      },
+      "pageErrors": [],
+      "patternNodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "ringEmptySlot": {
+        "selector": ".gc-node-card .aspect-\\[4\\/3\\]",
+        "tag": "DIV",
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]",
+        "rect": {
+          "x": 433,
+          "y": 164,
+          "width": 254,
+          "height": 190.5
+        },
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "focused": "INPUT:nodrag nopan absolute inset-0 z-10 h-full w-full cursor-poin",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "patternOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "图1 · 原始图案IMAGE · 槽位点击 / 拖拽 / Ctrl+V从素材库选",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-transfer",
+            "cls": "react-flow__node react-flow__node-ai-modify nopan selectable draggable",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-[var(--gc-node-border)]",
+            "text": "图案风格迁移编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于",
+            "rect": [
+              850,
+              288,
+              1130,
+              1198
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "编辑指令严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工",
+            "rect": [
+              851,
+              322,
+              1129,
+              1197
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "chipRing": {
+        "selector": ".gc-node-card textarea",
+        "tag": "TEXTAREA",
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none",
+        "rect": {
+          "x": 433,
+          "y": 358,
+          "width": 254,
+          "height": 197.5
+        },
+        "boxShadow": "none",
+        "borderColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "focused": "TEXTAREA:nodrag w-full rounded-[10px] border border-[var(--gc-node-bo",
+        "focusWithin": true,
+        "bg": "rgb(240, 246, 241)",
+        "activeElementIsInside": true
+      },
+      "libraryButton": null,
+      "textOverflow": {
+        "viewport": [
+          1440,
+          900
+        ],
+        "docScrollWidth": 1440,
+        "docScrollHeight": 900,
+        "horizontalOverflow": false,
+        "verticalOverflow": false,
+        "offenderCountOutside": 5,
+        "offendersOutside": [
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「面料/配色替换」节点：该节点尚无逐模型独立提示词、参数档案",
+            "rect": [
+              22,
+              375,
+              23,
+              376
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「高清放大」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              448,
+              23,
+              449
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花提取」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              520,
+              23,
+              521
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "cls": "sr-only",
+            "text": "首版产品政策暂不支持「印花裂变」节点：该节点尚无逐模型独立提示词、参数档案和真实",
+            "rect": [
+              22,
+              593,
+              23,
+              594
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          },
+          {
+            "tag": "INPUT",
+            "testid": null,
+            "cls": "",
+            "text": "",
+            "rect": [
+              401,
+              860,
+              413,
+              872
+            ],
+            "kind": "clipped",
+            "inFlowCanvas": false
+          }
+        ],
+        "offendersInside": [
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__viewport xyflow__viewport react-flow__container",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__edgelabel-renderer",
+            "text": "",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "react-flow__nodes",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              1540,
+              1100
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": "rf__node-generate",
+            "cls": "react-flow__node react-flow__node-sketch-to-render nopan selected selectable draggable",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors border-gold",
+            "text": "文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景",
+            "rect": [
+              420,
+              288,
+              700,
+              991
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "cls": "gc-node-body space-y-3 p-3",
+            "text": "渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景\n提示",
+            "rect": [
+              421,
+              322,
+              699,
+              990
+            ],
+            "kind": "overflow",
+            "inFlowCanvas": true
+          }
+        ]
+      },
+      "textNodeGeometry": [
+        {
+          "testid": "rf__node-generate",
+          "rect": [
+            420,
+            288,
+            700,
+            991
+          ]
+        },
+        {
+          "testid": "rf__node-result",
+          "rect": [
+            850,
+            288,
+            1130,
+            701
+          ]
+        }
+      ],
+      "resultImages": 2,
+      "auditNodes": 216
+    }
+  ],
+  "extras": {
+    "initialTabs": [
+      "未修改项目名称20260919000000 · 双击重命名"
+    ],
+    "tabsAfterPattern": [
+      "未修改项目名称20260919000000 · 双击重命名"
+    ],
+    "variantInjection": "ok:gpt-image-2.5-flare-vip",
+    "tabsAfterText": [
+      "未修改项目名称20260919000000 · 双击重命名",
+      "未命名设计项目 · 双击重命名",
+      "文生图（服装设计） - 副本 · 双击重命名"
+    ],
+    "patternTab": "未修改项目名称20260919000000 · 双击重命名",
+    "textTab": "文生图（服装设计） - 副本 · 双击重命名",
+    "bindVariant": {
+      "steps": [
+        {
+          "label": "select node",
+          "count": 1,
+          "clicked": true
+        },
+        {
+          "label": "open inspector rail",
+          "count": 1,
+          "clicked": true
+        },
+        {
+          "label": "属性 tab",
+          "count": 1,
+          "clicked": true
+        },
+        {
+          "label": "preset trigger",
+          "count": 1,
+          "clicked": true
+        },
+        {
+          "label": "preset",
+          "count": 1,
+          "clicked": true
+        },
+        {
+          "label": "confirm",
+          "count": 1,
+          "clicked": true
+        }
+      ],
+      "panelDump": {
+        "found": true,
+        "selectedNodes": 1,
+        "selectedNodeIds": [
+          "generate"
+        ],
+        "chain": [
+          {
+            "tag": "DIV",
+            "cls": "group/tabs-list w-fit items-center justify-center rounded-lg text-mute",
+            "display": "grid",
+            "w": 190,
+            "h": 32,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "DIV",
+            "cls": "group/tabs data-horizontal:flex-col gc-panel flex h-full min-h-0 w-ful",
+            "display": "flex",
+            "w": 320,
+            "h": 632,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "SECTION",
+            "cls": "absolute inset-0 flex min-h-0 transition-[opacity,visibility] duration",
+            "display": "flex",
+            "w": 320,
+            "h": 632,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "DIV",
+            "cls": "relative h-full min-h-0 w-80 shrink-0",
+            "display": "block",
+            "w": 320,
+            "h": 632,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "ASIDE",
+            "cls": "gc-panel relative z-30 flex shrink-0 overflow-hidden bg-[var(--gc-pane",
+            "display": "flex",
+            "w": 320,
+            "h": 632,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "DIV",
+            "cls": "relative flex min-h-0 min-w-0 flex-1 overflow-hidden",
+            "display": "flex",
+            "w": 1280,
+            "h": 632,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "DIV",
+            "cls": "gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-",
+            "display": "flex",
+            "w": 1280,
+            "h": 720,
+            "hidden": false,
+            "dataState": null
+          },
+          {
+            "tag": "DIV",
+            "cls": "",
+            "display": "block",
+            "w": 1280,
+            "h": 720,
+            "hidden": false,
+            "dataState": null
+          }
+        ],
+        "tabPanels": [
+          {
+            "hidden": false,
+            "display": "block",
+            "w": 320,
+            "text": "属性 草图→效果图 空闲 节点名称 操作模式（固定写入任务） 文生图（不接受参考图） 参考图编辑（至少 1 张） 提示词可连接最多 8 张参考图，按连线顺序传入 服装提示词预设 画幅比例 1:1 3:"
+          },
+          {
+            "hidden": true,
+            "display": "none",
+            "w": 0,
+            "text": "最近生成0 条运行 AI 节点后，生成结果与运行记录会汇总在这里生成记录选择上方结果查看完整运行记录"
+          }
+        ],
+        "presetTrigger": {
+          "w": 77,
+          "h": 16,
+          "display": "block",
+          "visibility": "visible"
+        }
+      },
+      "presetCount": 1,
+      "presetDisabled": false,
+      "presetVisible": true,
+      "presetReasons": [
+        "该模型×任务族×操作模式尚未完成当前契约版本的真实评估，普通用户不可启用。",
+        "该模型×任务族×操作模式尚未完成当前契约版本的真实评估，普通用户不可启用。"
+      ]
+    },
+    "dockAfterBind": 0,
+    "runButtons": [
+      "生成效果图"
+    ],
+    "textNodeDump": [
+      {
+        "testid": "rf__node-generate",
+        "header": "文生图",
+        "buttons": [
+          {
+            "t": "生成效果图",
+            "disabled": false,
+            "title": ""
+          }
+        ],
+        "hasTextarea": true
+      },
+      {
+        "testid": "rf__node-result",
+        "header": "生成结果",
+        "buttons": [],
+        "hasTextarea": true
+      }
+    ],
+    "afterRunStatus": "null | 文生图渲染提示词主题与任务：uiqa 验收：极简黑白通勤女装，写实摄影，浅灰背景 提示词变体：commerce-hero.gpt-image-2.5-flare-vip.generate.v1 GPT Image 2 VIP 服装电商主图生成。仅展示一件指定服装，正面或指定角度完整居中，占 1:1 画面约 75%，保留",
+    "runCount": 1,
+    "imagesRendered": 2,
+    "animNoPreference": {
+      "mode": "no-preference",
+      "runTriggered": true,
+      "totalEvents": 10,
+      "revealEvents": [
+        {
+          "phase": "start",
+          "name": "gc-result-reveal",
+          "target": "DIV.nodrag group overflow-hidden rounded-md border border-[var(-"
+        },
+        {
+          "phase": "start",
+          "name": "gc-result-reveal",
+          "target": "DIV.nodrag group overflow-hidden rounded-md border border-[var(-"
+        },
+        {
+          "phase": "end",
+          "name": "gc-result-reveal"
+        },
+        {
+          "phase": "end",
+          "name": "gc-result-reveal"
+        }
+      ],
+      "animationEvents": [
+        {
+          "phase": "start",
+          "name": "develop-breathe",
+          "target": "BUTTON.nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium tra"
+        },
+        {
+          "phase": "start",
+          "name": "pulse",
+          "target": "SPAN.mr-2 size-2 shrink-0 rounded-full animate-pulse bg-blue-400"
+        },
+        {
+          "phase": "start",
+          "name": "develop-gridfade",
+          "target": "DIV.develop-gridlines"
+        },
+        {
+          "phase": "start",
+          "name": "develop-scan",
+          "target": "DIV.develop-scanline"
+        },
+        {
+          "phase": "start",
+          "name": "develop-breathe",
+          "target": "BUTTON.nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium tra"
+        },
+        {
+          "phase": "start",
+          "name": "gc-result-reveal",
+          "target": "DIV.nodrag group overflow-hidden rounded-md border border-[var(-"
+        },
+        {
+          "phase": "start",
+          "name": "gc-result-reveal",
+          "target": "DIV.nodrag group overflow-hidden rounded-md border border-[var(-"
+        },
+        {
+          "phase": "end",
+          "name": "gc-result-reveal"
+        },
+        {
+          "phase": "end",
+          "name": "gc-result-reveal"
+        }
+      ],
+      "transitions": 1
+    },
+    "animReduce": {
+      "mode": "reduce",
+      "runTriggered": true,
+      "totalEvents": 20,
+      "revealEvents": [],
+      "animationEvents": [],
+      "transitions": 20
+    }
+  }
+}

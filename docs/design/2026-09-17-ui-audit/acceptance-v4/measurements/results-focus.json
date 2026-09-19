@@ -1,0 +1,845 @@
+{
+  "errors": [],
+  "deltas": [
+    {
+      "theme": "current",
+      "target": "thumbSlot",
+      "tokens": "#B7F35A",
+      "before": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "focusableTag": "INPUT",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "current",
+      "target": "assetPickerButton",
+      "tokens": "#B7F35A",
+      "before": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(155, 161, 169) none 3px",
+        "outlineColor": "rgb(155, 161, 169)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(155, 161, 169) none 3px",
+        "outlineColor": "rgb(155, 161, 169)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "focusableTag": "BUTTON",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "current",
+      "target": "promptChipTextarea",
+      "tokens": "#B7F35A",
+      "before": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(29, 29, 31) none 3px",
+        "outlineColor": "rgb(29, 29, 31)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "focusableTag": "TEXTAREA",
+      "focused": true,
+      "focusVisible": true
+    },
+    {
+      "theme": "current",
+      "target": "runButton",
+      "tokens": "#B7F35A",
+      "before": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "after": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "focusableTag": "BUTTON",
+      "focused": false,
+      "focusVisible": false
+    },
+    {
+      "theme": "current",
+      "target": "modelSelect",
+      "tokens": "#B7F35A",
+      "before": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(29, 29, 31) none 3px",
+        "outlineColor": "rgb(29, 29, 31)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "focusableTag": "SELECT",
+      "focused": true,
+      "focusVisible": true
+    },
+    {
+      "theme": "white",
+      "target": "thumbSlot",
+      "tokens": "#0071e3",
+      "before": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "focusableTag": "INPUT",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "white",
+      "target": "assetPickerButton",
+      "tokens": "#0071e3",
+      "before": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "focusableTag": "BUTTON",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "white",
+      "target": "promptChipTextarea",
+      "tokens": "#0071e3",
+      "before": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(29, 29, 31) none 3px",
+        "outlineColor": "rgb(29, 29, 31)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "focusableTag": "TEXTAREA",
+      "focused": true,
+      "focusVisible": true
+    },
+    {
+      "theme": "white",
+      "target": "runButton",
+      "tokens": "#0071e3",
+      "before": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "after": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "focusableTag": "BUTTON",
+      "focused": false,
+      "focusVisible": false
+    },
+    {
+      "theme": "white",
+      "target": "modelSelect",
+      "tokens": "#0071e3",
+      "before": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(29, 29, 31) none 3px",
+        "outlineColor": "rgb(29, 29, 31)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "focusableTag": "SELECT",
+      "focused": true,
+      "focusVisible": true
+    },
+    {
+      "theme": "eye",
+      "target": "thumbSlot",
+      "tokens": "#0B7A43",
+      "before": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      },
+      "focusableTag": "INPUT",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "eye",
+      "target": "assetPickerButton",
+      "tokens": "#0B7A43",
+      "before": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "x": 113,
+          "y": 386.5,
+          "width": 254,
+          "height": 25
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold"
+      },
+      "focusableTag": "BUTTON",
+      "focused": true,
+      "focusVisible": false
+    },
+    {
+      "theme": "eye",
+      "target": "promptChipTextarea",
+      "tokens": "#0B7A43",
+      "before": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(18, 59, 43) none 3px",
+        "outlineColor": "rgb(18, 59, 43)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      },
+      "focusableTag": "TEXTAREA",
+      "focused": true,
+      "focusVisible": true
+    },
+    {
+      "theme": "eye",
+      "target": "runButton",
+      "tokens": "#0B7A43",
+      "before": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "after": {
+        "borderTopColor": "oklch(0.928 0.006 264.531)",
+        "borderLeftColor": "oklch(0.928 0.006 264.531)",
+        "borderTopWidth": "0px",
+        "borderLeftWidth": "0px",
+        "boxShadow": "none",
+        "outline": "rgb(10, 10, 10) none 3px",
+        "outlineColor": "rgb(10, 10, 10)",
+        "backgroundColor": "rgb(183, 243, 90)",
+        "rect": {
+          "x": 543,
+          "y": 1092.125,
+          "width": 254,
+          "height": 28
+        },
+        "cls": "nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed bg-gold text-ink disabled:opacity-40"
+      },
+      "focusableTag": "BUTTON",
+      "focused": false,
+      "focusVisible": false
+    },
+    {
+      "theme": "eye",
+      "target": "modelSelect",
+      "tokens": "#0B7A43",
+      "before": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(18, 59, 43) none 3px",
+        "outlineColor": "rgb(18, 59, 43)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 543,
+          "y": 643.5,
+          "width": 123,
+          "height": 33
+        },
+        "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden"
+      },
+      "focusableTag": "SELECT",
+      "focused": true,
+      "focusVisible": true
+    }
+  ],
+  "clips": [
+    {
+      "theme": "current",
+      "target": "thumbSlot",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-thumbSlot-current-1280.png",
+      "clip": {
+        "x": 105,
+        "y": 174,
+        "width": 270,
+        "height": 207
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(107, 112, 117) none 3px",
+        "outlineColor": "rgb(107, 112, 117)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      }
+    },
+    {
+      "theme": "current",
+      "target": "promptChipTextarea",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-promptChipTextarea-current-1280.png",
+      "clip": {
+        "x": 535,
+        "y": 368,
+        "width": 270,
+        "height": 214
+      },
+      "after": {
+        "borderTopColor": "rgb(228, 230, 234)",
+        "borderLeftColor": "rgb(228, 230, 234)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(242, 243, 245)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      }
+    },
+    {
+      "theme": "white",
+      "target": "thumbSlot",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-thumbSlot-white-1280.png",
+      "clip": {
+        "x": 105,
+        "y": 174,
+        "width": 270,
+        "height": 207
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(110, 110, 115) none 3px",
+        "outlineColor": "rgb(110, 110, 115)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      }
+    },
+    {
+      "theme": "white",
+      "target": "promptChipTextarea",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-promptChipTextarea-white-1280.png",
+      "clip": {
+        "x": 535,
+        "y": 368,
+        "width": 270,
+        "height": 214
+      },
+      "after": {
+        "borderTopColor": "rgba(0, 0, 0, 0.08)",
+        "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(245, 245, 247)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      }
+    },
+    {
+      "theme": "eye",
+      "target": "thumbSlot",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-thumbSlot-eye-1280.png",
+      "clip": {
+        "x": 105,
+        "y": 174,
+        "width": 270,
+        "height": 207
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "1px",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.894045 -0.117545 0.150251 / 0.6) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "outline": "rgb(71, 104, 90) none 3px",
+        "outlineColor": "rgb(71, 104, 90)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 113,
+          "y": 182,
+          "width": 254,
+          "height": 190.5
+        },
+        "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+      }
+    },
+    {
+      "theme": "eye",
+      "target": "promptChipTextarea",
+      "path": "/tmp/gc-uiqa-v4/shots/focus-promptChipTextarea-eye-1280.png",
+      "clip": {
+        "x": 535,
+        "y": 368,
+        "width": 270,
+        "height": 214
+      },
+      "after": {
+        "borderTopColor": "rgb(226, 236, 228)",
+        "borderLeftColor": "rgb(226, 236, 228)",
+        "borderTopWidth": "1px",
+        "borderLeftWidth": "3px",
+        "boxShadow": "none",
+        "outline": "rgb(0, 95, 204) none 1px",
+        "outlineColor": "rgb(0, 95, 204)",
+        "backgroundColor": "rgb(240, 246, 241)",
+        "rect": {
+          "x": 543,
+          "y": 376,
+          "width": 254,
+          "height": 197.5
+        },
+        "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden resize-none"
+      }
+    }
+  ],
+  "uploadedImageVisible": 2,
+  "filledSlotDelta": {
+    "before": {
+      "borderTopColor": "oklch(0.928 0.006 264.531)",
+      "borderLeftColor": "oklch(0.928 0.006 264.531)",
+      "borderTopWidth": "0px",
+      "borderLeftWidth": "0px",
+      "boxShadow": "none",
+      "outline": "rgb(29, 29, 31) none 3px",
+      "outlineColor": "rgb(29, 29, 31)",
+      "backgroundColor": "rgb(242, 243, 245)",
+      "rect": {
+        "x": 114,
+        "y": 183,
+        "width": 252,
+        "height": 160
+      },
+      "cls": "max-h-40 w-full object-contain bg-[var(--gc-node-inner)]"
+    },
+    "after": {
+      "borderTopColor": "oklch(0.928 0.006 264.531)",
+      "borderLeftColor": "oklch(0.928 0.006 264.531)",
+      "borderTopWidth": "0px",
+      "borderLeftWidth": "0px",
+      "boxShadow": "none",
+      "outline": "rgb(29, 29, 31) none 3px",
+      "outlineColor": "rgb(29, 29, 31)",
+      "backgroundColor": "rgb(242, 243, 245)",
+      "rect": {
+        "x": 114,
+        "y": 183,
+        "width": 252,
+        "height": 160
+      },
+      "cls": "max-h-40 w-full object-contain bg-[var(--gc-node-inner)]"
+    },
+    "focusableTag": "IMG",
+    "focused": false,
+    "focusVisible": false
+  }
+}
