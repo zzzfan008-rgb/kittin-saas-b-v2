@@ -44,7 +44,7 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
       id: "starter",
       type: "image",
       position: { x: 0, y: 0 },
-      data: { kind: "image", label: "上传服装图", status: "idle" },
+      data: { kind: "image", label: "上传服装图", status: "idle", outputImages: [] },
     }],
     edges: [],
     selectedNodeIds: [],
