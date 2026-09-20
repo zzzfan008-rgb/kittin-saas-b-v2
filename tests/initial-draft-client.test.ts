@@ -40,12 +40,8 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
     projectId: "project-local",
     projectName: "未命名设计项目",
     readOnly: false,
-    nodes: [{
-      id: "starter",
-      type: "image",
-      position: { x: 0, y: 0 },
-      data: { kind: "image", label: "上传服装图", status: "idle", outputImages: [] },
-    }],
+    // 方案 C：空白项目从空画布开始（nodes=[]&&edges=[]）。
+    nodes: [],
     edges: [],
     selectedNodeIds: [],
     selectedNodeId: null,
@@ -493,10 +489,6 @@ assert.match(initialDraftWorkspaceSource, /clearProjectTabSessionStorage/);
 assert.match(initialDraftWorkspaceSource, /setClearDraftDialogOpen\(true\)/);
 console.log("  ✓ 错误态阻断页提供清除草稿自救按钮，经 AlertDialog 二次确认后清理本地并重建");
 
-const taskLauncherSource = readFileSync(
-  new URL("../src/components/TaskLauncher.tsx", import.meta.url),
-  "utf8",
-);
 const templateLaunchSource = readFileSync(
   new URL("../src/lib/templateLaunch.ts", import.meta.url),
   "utf8",
@@ -523,7 +515,6 @@ function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["text"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
-assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
 for (const cover of [
   "pattern-style-transfer",
   "person-scene-transfer",
@@ -536,8 +527,7 @@ for (const cover of [
   assert.ok(existsSync(new URL(`../public/assets/project-center/templates/${cover}.webp`, import.meta.url)));
 }
 assert.doesNotMatch(templatePresentationSource, /project-center\/templates\/[^\n]+\.png/);
-assert.match(taskLauncherSource, /launchStarterTemplate/);
 assert.match(templateLaunchSource, /projectTabLifecycle\(active\) !== "initial_draft"/);
 assert.match(templateLaunchSource, /commitDocumentMutation\(/);
 assert.match(templateLaunchSource, /projectId: active\.projectId/);
-console.log("  ✓ 首次任务复用唯一初始草稿 ID，并按模板类型落地到上传或文本输入");
+console.log("  ✓ 模板落地模式（upload/text/default）与内置封面资源保持有效");

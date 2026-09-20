@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import {
+  ensureTextUpstreamForNode,
   selectActiveDocumentTarget,
   selectDocumentForTab,
   selectNodeInputImages,
@@ -97,6 +98,10 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         if (requestId !== uploadRequestRef.current) return;
         // R8：上传图直写 outputImages（覆盖式——上传位语义）。
         updateNodeDataInTab(target, id, { outputImages: [upload.url], status: "success", error: undefined });
+        // 方案 C auto-text 兜底：上传后 image 节点必须有 text 上游（INV-1）。
+        const tab = selectDocumentForTab(useFlowStore.getState(), target.tabId);
+        const node = tab?.nodes.find((candidate) => candidate.id === id);
+        ensureTextUpstreamForNode("image", node?.position ?? { x: 0, y: 0 }, id);
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
         const message = err instanceof Error ? err.message : String(err);

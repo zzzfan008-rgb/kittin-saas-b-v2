@@ -797,6 +797,38 @@ export function addExistingNodes(nodes: FlowNode[]): string[] {
   return changed ? addedIds : [];
 }
 
+/**
+ * 方案 C auto-text 共享兜底（必做项，R-75 §3.6）：保证每个 image/video 节点
+ * 都有 ≥1 条 text→该节点的 prompt 入边（server INV-1 / graph-invariants.md §1）。
+ * 若当前文档已有 text 节点则复用它，否则在目标节点左侧补一个空 text 节点；
+ * 两种情况都补上 prompt 边。幂等：目标已有 prompt 入边时不重复连线。
+ */
+export function ensureTextUpstreamForNode(
+  kind: "image" | "video",
+  position: { x: number; y: number },
+  targetNodeId: string,
+): void {
+  const state = useFlowStore.getState();
+  const tab = selectActiveDocument(state);
+  if (tab.readOnly) return;
+  const target = tab.nodes.find((node) => node.id === targetNodeId);
+  if (!target || target.data.kind !== kind) return;
+  if (tab.edges.some((edge) => edge.target === targetNodeId && edge.targetHandle === "prompt")) {
+    return;
+  }
+  let textId = tab.nodes.find((node) => node.data.kind === "text")?.id;
+  if (!textId) {
+    textId = state.addNode("text", { x: position.x - 380, y: position.y }) ?? undefined;
+  }
+  if (!textId || textId === targetNodeId) return;
+  state.onConnect({
+    source: textId,
+    target: targetNodeId,
+    sourceHandle: "prompt",
+    targetHandle: "prompt",
+  });
+}
+
 /** 开始一组实时可见、但只在结束时写入一次历史与 revision 的文档事务。 */
 export function beginHistoryTransaction(
   label = "document-transaction",
@@ -1127,16 +1159,6 @@ function selectionIdsAfterNodeChanges(
   return nextIds;
 }
 
-function makeStarterNode(): FlowNode {
-  // v7：空白项目从一张图片节点开始（上传位）。
-  return {
-    id: nanoid(8),
-    type: "image",
-    position: { x: 0, y: 0 },
-    data: defaultNodeData("image"),
-  };
-}
-
 /**
  * Canonical active-document boundary. A valid store always has exactly one tab
  * matching activeTabId; fail fast if an invariant violation reaches a caller.
@@ -1231,7 +1253,7 @@ export function selectHasDirtyTabs(state: FlowState): boolean {
   return state.tabs.some((tab) => tab.dirty);
 }
 
-/** 只有从未编辑、未保存的初始空白项目才显示任务启动器。 */
+/** 只有从未编辑、未保存的空白项目（nodes=[] && edges=[]）才显示空状态。 */
 export function isPristineProjectTab(tab: ProjectTab): boolean {
   const lifecycle = projectTabLifecycle(tab);
   if (
@@ -1244,14 +1266,10 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
     (lifecycle === "initial_draft"
       ? !/^\u672a\u4fee\u6539\u9879\u76ee\u540d\u79f0\d{8}000000$/.test(tab.projectName)
       : tab.projectName !== DEFAULT_PROJECT_NAME) ||
-    tab.edges.length !== 0 ||
-    tab.nodes.length !== 1
+    tab.nodes.length !== 0 ||
+    tab.edges.length !== 0
   ) return false;
-  const node = tab.nodes[0];
-  // v7：空白起始节点是尚未上传图片的 image 节点（R8 输入输出同体）。
-  return node.data.kind === "image" &&
-    node.data.status === "idle" &&
-    node.data.outputImages.length === 0;
+  return true;
 }
 
 export function projectTabLifecycle(tab: ProjectTab): ProjectLifecycle {
@@ -1267,10 +1285,6 @@ export function projectTabHasLocalDraftChanges(tab: ProjectTab): boolean {
     return tab.revision > (tab.draftSyncedRevision ?? 0);
   }
   return !isPristineProjectTab(tab);
-}
-
-export function selectActiveProjectIsPristine(state: FlowState): boolean {
-  return isPristineProjectTab(selectActiveDocument(state));
 }
 
 /**
@@ -1613,7 +1627,7 @@ function newTab(opts?: {
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
   const persisted = opts?.persisted === true && !markDirty;
-  const selection = normalizeNodeSelection(opts?.nodes ?? [makeStarterNode()], []);
+  const selection = normalizeNodeSelection(opts?.nodes ?? [], []);
   return {
     id: nanoid(10),
     projectId: opts?.projectId ?? nanoid(10),
@@ -2889,6 +2903,16 @@ export const useFlowStore = create<FlowState>()(
       setProjectName: (name) => {
         const tab = selectActiveDocument(get());
         if (tab.readOnly || name === tab.projectName) return;
+        // 方案 C 裁定 2：未落库空 tab（lifecycle=local 且 nodes=[]&&edges=[]）的重命名
+        // 只改本地瞬态字段，不 bump revision、不置 dirty、不写 history，也不触发落库同步。
+        if (
+          projectTabLifecycle(tab) === "local" &&
+          tab.nodes.length === 0 &&
+          tab.edges.length === 0
+        ) {
+          patchTab(set, tab.id, { projectName: name });
+          return;
+        }
         commitDocumentMutationWithSet(set, { projectName: name });
       },
       setSelectedNodeIds: (ids) => {
@@ -3075,8 +3099,30 @@ export const useFlowStore = create<FlowState>()(
             outputImages: [asset.image],
           } as WorkflowNodeData,
         };
-        const selection = normalizeNodeSelection([...tab.nodes, node], [id]);
-        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
+        // 方案 C auto-text 兜底：素材 image 节点必须与 text 上游原子加入（INV-1），
+        // 一次撤销完整移除（与历史单步语义一致）。
+        const existingText = tab.nodes.find((candidate) => candidate.data.kind === "text");
+        const textNode: FlowNode | null = existingText
+          ? null
+          : {
+            id: nanoid(8),
+            type: "text",
+            position: { x: position.x - 380, y: position.y },
+            data: defaultNodeData("text"),
+          };
+        const textId = existingText?.id ?? textNode!.id;
+        const nextNodes = textNode ? [...tab.nodes, node, textNode] : [...tab.nodes, node];
+        const connection: Connection = {
+          source: textId,
+          target: id,
+          sourceHandle: "prompt",
+          targetHandle: "prompt",
+        };
+        const nextEdges = isDocumentConnectionValid({ nodes: nextNodes, edges: tab.edges }, connection)
+          ? addEdge(connectionWithReferenceData(nextNodes, connection), tab.edges)
+          : tab.edges;
+        const selection = normalizeNodeSelection(nextNodes, [id]);
+        commitDocumentMutationWithSet(set, { ...selection, edges: nextEdges, selectedResultId: null });
         return id;
       },
 
