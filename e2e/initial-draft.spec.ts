@@ -68,11 +68,28 @@ test("the empty first screen stays local and only persists after the first subst
   await expect(page.getByRole("region", { name: "开始第一个创作任务" })).toHaveCount(0);
   const nodes = page.locator(".react-flow__node");
   await expect(nodes).toHaveCount(0);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
   // 空态不落库：既没有 bootstrap 请求，也没有服务端草稿记录。
   expect(bootstrapRequests).toEqual([]);
   expect(await readDraft()).toBeNull();
 
-  // 首次实质变更（CTA 一键建图片节点 + auto-text 兜底补文本节点与 prompt 边）才落库。
+  // 仅重命名（blur 提交，非 Enter 保存）：改名只走瞬态本地路径，不触发 bootstrap、不落库。
+  const transientName = `E2E 瞬态改名 ${Date.now()}`;
+  const localTabName = page.getByTitle(/双击重命名/).first();
+  await localTabName.dblclick();
+  const nameBox = page.getByRole("textbox", { name: "项目名称" });
+  await expect(nameBox).toBeVisible();
+  await nameBox.fill(transientName);
+  await nameBox.blur();
+  await expect(nameBox).toBeHidden();
+  await expect(page.getByTitle(`${transientName} · 双击重命名`)).toBeVisible();
+  // 等待超过 initial_draft 同步防抖窗口（700ms），确认空改名没有迟到的落库请求。
+  await page.waitForTimeout(1200);
+  expect(bootstrapRequests).toEqual([]);
+  expect(await readDraft()).toBeNull();
+
+  // 首次实质变更（CTA 一键建图片节点 + auto-text 兜底补文本节点与 prompt 边）才落库；
+  // 之前的瞬态改名随 bootstrap 的 name 字段一并持久化。
   await cta.getByRole("button", { name: "上传图片开始" }).click();
   await expect(nodes).toHaveCount(2);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
@@ -84,6 +101,7 @@ test("the empty first screen stays local and only persists after the first subst
   expect(bootstrapped.flow.schemaVersion).toBe(WORKFLOW_SCHEMA_VERSION);
   expect(bootstrapped.flow.nodes).toHaveLength(2);
   expect(bootstrapped.flow.edges).toHaveLength(1);
+  expect(bootstrapped.name).toBe(transientName);
 
   // v7 上传：图片直写 image 节点输出，且不破坏 text→image 的 prompt 边（INV-1）。
   const uploadImage = await sharp({
@@ -121,12 +139,16 @@ test("the empty first screen stays local and only persists after the first subst
   await expect(projectName).toBeHidden();
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   await expect.poll(() => draftSyncRequests, { timeout: 5_000 }).toBeGreaterThan(0);
-  await expect(page.getByText("正在同步未保存项目…")).toHaveCount(0);
+  // PUT 仍在途（路由里刻意延迟 900ms）：同步状态由 sr-only 的「正在同步未保存项目」
+  // 暴露（InitialDraftSyncNotice），这里正反两面都断言，避免恒真/恒假 needle：
+  // 在途时必须存在，收敛后必须消失；视觉位移由下面的 boundingBox 断言负责。
+  await expect(page.getByText("正在同步未保存项目")).toHaveCount(1);
   const canvasDuringSync = await canvas.boundingBox();
   if (!canvasDuringSync) throw new Error("Initial draft canvas disappeared during sync");
   expect(Math.abs(canvasDuringSync.y - canvasBeforeSync.y)).toBeLessThan(1);
   expect(Math.abs(canvasDuringSync.height - canvasBeforeSync.height)).toBeLessThan(1);
   await expect.poll(async () => (await readDraft())?.name).toBe(editedName);
+  await expect(page.getByText("正在同步未保存项目")).toHaveCount(0);
   const synchronized = await readDraft();
   expect(synchronized?.id).toBe(bootstrapped.id);
 
@@ -154,6 +176,24 @@ test("the empty first screen stays local and only persists after the first subst
   const afterRelogin = await readDraft();
   expect(afterRelogin?.id).toBe(bootstrapped.id);
   expect(afterRelogin?.name).toBe(editedName);
+});
+
+/**
+ * 本文件的用例内部会「退出登录 → 重新登录」，而账号是单设备会话：重登会吊销 storageState
+ * 里 setup 写入的 token。常规运行时每个 e2e 隔离进程都从 npm run test:e2e 的全新库起步，
+ * 收尾后内存态无所谓；但 CI 下 retries=1，失败重试会带着失效 token 起步（实测重试时在
+ * force-clear 处得到 SESSION_REPLACED/401）。因此在 CI 中回写重登后的有效会话。
+ * 这里刻意不用 --repeat-each 兼容同一进程内的二次执行：setup 依赖的「空库」前提只有
+ * 外层 runner 重置数据库才能满足，那不是本文件该承担的状态。
+ */
+test.afterEach(async ({ page }) => {
+  if (!process.env.CI) return;
+  const authStatePath = process.env.E2E_AUTH_STATE_PATH;
+  const accountId = process.env.E2E_ACCOUNT_ID;
+  const password = process.env.E2E_PASSWORD;
+  if (!authStatePath || !accountId || !password) return;
+  const login = await page.request.post("/api/auth/login", { data: { accountId, password } });
+  if (login.ok()) await page.context().storageState({ path: authStatePath });
 });
 
 test("relogin opens the latest saved project instead of bootstrapping a blank page", async ({ page }) => {
