@@ -4,6 +4,7 @@ import {
   evaluatePromptRunAdmission,
   evaluatePromptRunCompatibility,
   promptRunAdmissionInputFromParams,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
   synthesizeVariantTaskPrompt,
   type PromptRunAdmissionInput,
@@ -104,6 +105,30 @@ assert.deepEqual(promptRunReferenceSnapshotsFromGraph(graphNodes, [
   { order: 1, sourceNodeId: "multi-output" },
   { order: 2, sourceNodeId: "identity" },
 ], "旧 Provider 边同样按连线顺序逐图片展开");
+
+// v7（P2-b）：浏览器镜像闸按 dag 的 edges 顺序收集上游 text 正文（与
+// server/engine/dag.ts buildExecutionPlan 同源同语义），跳过非 text 来源、
+// 只取指向目标节点的边。若此处与服务端收集不一致，UI 会在 prompt-drift 误拦。
+const inputTextsGraphNodes: PromptRunGraphNode[] = [
+  { id: "t1", data: { kind: "text", label: "提示词1", status: "idle", text: "第一段正文" } },
+  { id: "img-a", data: { kind: "image", label: "上游图", status: "success", aspectRatio: "1:1", batchSize: 1, outputImages: ["a"] } },
+  { id: "t2", data: { kind: "text", label: "提示词2", status: "idle", text: "第二段正文" } },
+];
+assert.deepEqual(
+  promptRunInputTextsFromGraph(inputTextsGraphNodes, [
+    { source: "t1", target: "target" },
+    { source: "img-a", target: "target" },
+    { source: "t2", target: "target" },
+    { source: "t2", target: "other-node" },
+  ], "target"),
+  ["第一段正文", "第二段正文"],
+  "必须按 edges 顺序收集上游 text 正文，跳过非 text 来源与指向其他节点的边",
+);
+assert.deepEqual(
+  promptRunInputTextsFromGraph(inputTextsGraphNodes, [], "target"),
+  [],
+  "目标节点无上游入边时正文为空（随后由 prompt-drift 拒绝）",
+);
 
 const input = promptRunAdmissionInputFromParams("image", params, references);
 assert.equal(evaluatePromptRunAdmission(input).code, "support-status-blocked");

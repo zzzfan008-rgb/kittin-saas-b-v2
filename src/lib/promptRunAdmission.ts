@@ -435,7 +435,7 @@ export function evaluatePromptRunCompatibility(
     return {
       allowed: false,
       code: "reference-limit-exceeded",
-      reason: `模型 ${input.modelId} 在 ${input.operationMode} 模式最多接受 ${maxUserReferences} 张用户参考图；系统不会静默裁剪。`,
+      reason: `模型 ${input.modelId} 在 ${operationMode} 模式最多接受 ${maxUserReferences} 张用户参考图；系统不会静默裁剪。`,
     };
   }
   const referenceIssues = referenceInputIssues(references);
