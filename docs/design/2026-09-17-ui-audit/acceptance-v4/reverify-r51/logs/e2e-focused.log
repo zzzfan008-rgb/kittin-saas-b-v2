@@ -1,0 +1,33 @@
+e2e target db: postgresql://garment_canvas:***@127.0.0.1:5432/garment_canvas_test
+
+> garment-canvas@0.1.1 test:e2e
+> node scripts/e2e-with-postgres.mjs --project=login --project=setup --project=desktop-1280
+
+E2E: 隔离测试库已重置为干净状态
+
+> garment-canvas@0.1.1 test:e2e:run
+> playwright test --project=login --project=setup --project=desktop-1280
+
+[WebServer] [garment-canvas] server listening on http://localhost:64093 (full)
+[WebServer] 4:46:12 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+[WebServer] 
+[WebServer]   VITE v6.4.3  ready in 162 ms
+[WebServer] 
+[WebServer]   ➜  Local:   http://127.0.0.1:64094/
+
+Running 12 tests using 1 worker
+
+  ✓   1 [setup] › e2e/auth.setup.ts:12:1 › create an authenticated desktop session (2.5s)
+  ✓   2 [login] › e2e/login.spec.ts:3:1 › login form exposes its validation and errors (1.4s)
+  ✓   3 [login] › e2e/login.spec.ts:25:1 › login V4 split layout: brand pane + token card at desktop widths (3.0s)
+  ✓   4 [desktop-1280] › e2e/workbench.spec.ts:235:1 › unverified prompt variants stay disabled with an explicit runtime reason (2.8s)
+  ✓   5 [desktop-1280] › e2e/workbench.spec.ts:259:1 › project center separates built-in and user templates and keeps template actions reachable (3.0s)
+  ✓   6 [desktop-1280] › e2e/workbench.spec.ts:302:1 › project center keeps projects usable when template loading fails (2.1s)
+  ✓   7 [desktop-1280] › e2e/workbench.spec.ts:319:1 › results and project center follow desktop density for cards (6.5s)
+  ✓   8 [desktop-1280] › e2e/workbench.spec.ts:478:1 › adding a local edit node keeps the canvas mounted and exposes one clear workflow (1.4s)
+  ✓   9 [desktop-1280] › e2e/workbench.spec.ts:499:1 › node drag is one undo transaction and selection stays canonical (2.1s)
+  ✓  10 [desktop-1280] › e2e/workbench.spec.ts:622:1 › dragging a node near the canvas edge never auto-pans the viewport (1.9s)
+  ✓  11 [desktop-1280] › e2e/workbench.spec.ts:659:1 › left dock and horizontal zoom controls preserve canvas identity, geometry, focus, and results (5.3s)
+  ✓  12 [desktop-1280] › e2e/workbench.spec.ts:981:1 › theme picker reports state and restores focus (1.7s)
+
+  12 passed (36.2s)

@@ -1,0 +1,439 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "themes": {
+    "current": {
+      "withLib": {
+        "accent": "#B7F35A",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(183, 243, 90)",
+            "borderLeft": "rgb(183, 243, 90)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "withCtx": {
+        "accent": "#B7F35A",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(183, 243, 90)",
+            "borderLeft": "rgb(183, 243, 90)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "hoverInfo": {
+        "accent": "#B7F35A",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(183, 243, 90)",
+            "borderLeft": "rgb(183, 243, 90)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "chipCount": 18
+    },
+    "white": {
+      "withLib": {
+        "accent": "#0071e3",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(0, 113, 227)",
+            "borderLeft": "rgb(0, 113, 227)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "withCtx": {
+        "accent": "#0071e3",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(0, 113, 227)",
+            "borderLeft": "rgb(0, 113, 227)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "hoverInfo": {
+        "accent": "#0071e3",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTop": "rgb(0, 113, 227)",
+            "borderLeft": "rgb(0, 113, 227)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "chipCount": 18
+    },
+    "eye": {
+      "withLib": {
+        "accent": "#0B7A43",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(18, 59, 43)",
+            "borderTop": "rgb(11, 122, 67)",
+            "borderLeft": "rgb(11, 122, 67)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "withCtx": {
+        "accent": "#0B7A43",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(18, 59, 43)",
+            "borderTop": "rgb(11, 122, 67)",
+            "borderLeft": "rgb(11, 122, 67)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "hoverInfo": {
+        "accent": "#0B7A43",
+        "colorGold": "#B7F35A",
+        "dockWidth": 320,
+        "rows": [
+          {
+            "goldClasses": [
+              "border-gold"
+            ],
+            "tag": "DIV",
+            "text": "文生图渲染提示词设计一套现代都市女装：廓",
+            "bg": "rgb(255, 255, 255)",
+            "color": "rgb(18, 59, 43)",
+            "borderTop": "rgb(11, 122, 67)",
+            "borderLeft": "rgb(11, 122, 67)",
+            "borderLeftWidth": "1px",
+            "rect": [
+              509,
+              131,
+              229,
+              546
+            ],
+            "opacity": "1",
+            "visible": true
+          },
+          {
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "tag": "BUTTON",
+            "text": "未验证不可运行",
+            "bg": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTop": "oklch(0.928 0.006 264.531)",
+            "borderLeft": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "rect": [
+              520,
+              561,
+              208,
+              23
+            ],
+            "opacity": "0.4",
+            "visible": true
+          }
+        ]
+      },
+      "chipCount": 18
+    }
+  },
+  "errors": [],
+  "templateHits": 1
+}

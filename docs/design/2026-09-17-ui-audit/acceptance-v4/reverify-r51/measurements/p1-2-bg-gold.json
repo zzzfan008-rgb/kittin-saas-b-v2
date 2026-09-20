@@ -1,0 +1,454 @@
+{
+  "url": "http://127.0.0.1:5411",
+  "flow": {
+    "templateHits": 1,
+    "variant": "ok",
+    "presetPanel": 1,
+    "runButtonBefore": {
+      "disabled": false,
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(19, 19, 19)"
+    },
+    "runButtonAfter": {
+      "text": "生成效果图",
+      "disabled": false,
+      "bg": "rgb(183, 243, 90)",
+      "color": "rgb(19, 19, 19)",
+      "opacity": "1"
+    }
+  },
+  "themes": {
+    "current": {
+      "accent": "#B7F35A",
+      "dataTheme": "current",
+      "button": {
+        "text": "生成效果图",
+        "disabled": false,
+        "opacity": "1",
+        "bg": "rgb(183, 243, 90)",
+        "color": "rgb(19, 19, 19)",
+        "rect": {
+          "x": 374.3783874511719,
+          "y": 539.140869140625,
+          "width": 197.27450561523438,
+          "height": 21.74676513671875
+        }
+      },
+      "nodeRect": {
+        "x": 364.2816467285156,
+        "y": 131,
+        "width": 217.46798706054688,
+        "height": 545.6116943359375
+      },
+      "resultImages": 1,
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-current-1280.png",
+      "goldAudit": {
+        "accent": "#B7F35A",
+        "dataTheme": "current",
+        "rows": [
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "运行此节点",
+            "backgroundColor": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              12,
+              475,
+              296,
+              28
+            ]
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "goldClasses": [
+              "border-gold"
+            ],
+            "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+            "backgroundColor": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTopColor": "rgb(183, 243, 90)",
+            "borderLeftColor": "rgb(183, 243, 90)",
+            "borderLeftWidth": "1px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              364,
+              131,
+              217,
+              546
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "生成效果图",
+            "backgroundColor": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              374,
+              539,
+              197,
+              22
+            ]
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "goldClasses": [
+              "text-gold"
+            ],
+            "text": "未设置",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(183, 243, 90)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              745,
+              282,
+              23,
+              12
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "保存全部到文件夹",
+            "backgroundColor": "rgb(183, 243, 90)",
+            "color": "rgb(19, 19, 19)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "0.4",
+            "disabled": true,
+            "rect": [
+              715,
+              318,
+              183,
+              19
+            ]
+          }
+        ]
+      }
+    },
+    "white": {
+      "accent": "#0071e3",
+      "dataTheme": "white",
+      "button": {
+        "text": "生成效果图",
+        "disabled": false,
+        "opacity": "1",
+        "bg": "rgb(0, 113, 227)",
+        "color": "rgb(255, 255, 255)",
+        "rect": {
+          "x": 374.3783874511719,
+          "y": 539.140869140625,
+          "width": 197.27450561523438,
+          "height": 21.74676513671875
+        }
+      },
+      "nodeRect": {
+        "x": 364.2816467285156,
+        "y": 131,
+        "width": 217.46798706054688,
+        "height": 545.6116943359375
+      },
+      "resultImages": 1,
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-white-1280.png",
+      "goldAudit": {
+        "accent": "#0071e3",
+        "dataTheme": "white",
+        "rows": [
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "运行此节点",
+            "backgroundColor": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              12,
+              475,
+              296,
+              28
+            ]
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "goldClasses": [
+              "border-gold"
+            ],
+            "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+            "backgroundColor": "rgb(255, 255, 255)",
+            "color": "rgb(29, 29, 31)",
+            "borderTopColor": "rgb(0, 113, 227)",
+            "borderLeftColor": "rgb(0, 113, 227)",
+            "borderLeftWidth": "1px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              364,
+              131,
+              217,
+              546
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "生成效果图",
+            "backgroundColor": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              374,
+              539,
+              197,
+              22
+            ]
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "goldClasses": [
+              "text-gold"
+            ],
+            "text": "未设置",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(0, 113, 227)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              745,
+              282,
+              23,
+              12
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "保存全部到文件夹",
+            "backgroundColor": "rgb(0, 113, 227)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "0.4",
+            "disabled": true,
+            "rect": [
+              715,
+              318,
+              183,
+              19
+            ]
+          }
+        ]
+      }
+    },
+    "eye": {
+      "accent": "#0B7A43",
+      "dataTheme": "eye",
+      "button": {
+        "text": "生成效果图",
+        "disabled": false,
+        "opacity": "1",
+        "bg": "rgb(11, 122, 67)",
+        "color": "rgb(255, 255, 255)",
+        "rect": {
+          "x": 374.3783874511719,
+          "y": 539.140869140625,
+          "width": 197.27450561523438,
+          "height": 21.74676513671875
+        }
+      },
+      "nodeRect": {
+        "x": 364.2816467285156,
+        "y": 131,
+        "width": 217.46798706054688,
+        "height": 545.6116943359375
+      },
+      "resultImages": 1,
+      "clip": {
+        "x": 356,
+        "y": 123,
+        "width": 234,
+        "height": 562
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-2-cta-eye-1280.png",
+      "goldAudit": {
+        "accent": "#0B7A43",
+        "dataTheme": "eye",
+        "rows": [
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "运行此节点",
+            "backgroundColor": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              12,
+              475,
+              296,
+              28
+            ]
+          },
+          {
+            "tag": "DIV",
+            "testid": null,
+            "goldClasses": [
+              "border-gold"
+            ],
+            "text": "文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的",
+            "backgroundColor": "rgb(255, 255, 255)",
+            "color": "rgb(18, 59, 43)",
+            "borderTopColor": "rgb(11, 122, 67)",
+            "borderLeftColor": "rgb(11, 122, 67)",
+            "borderLeftWidth": "1px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              364,
+              131,
+              217,
+              546
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "生成效果图",
+            "backgroundColor": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": false,
+            "rect": [
+              374,
+              539,
+              197,
+              22
+            ]
+          },
+          {
+            "tag": "SPAN",
+            "testid": null,
+            "goldClasses": [
+              "text-gold"
+            ],
+            "text": "未设置",
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(11, 122, 67)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "1",
+            "disabled": null,
+            "rect": [
+              745,
+              282,
+              23,
+              12
+            ]
+          },
+          {
+            "tag": "BUTTON",
+            "testid": null,
+            "goldClasses": [
+              "bg-gold"
+            ],
+            "text": "保存全部到文件夹",
+            "backgroundColor": "rgb(11, 122, 67)",
+            "color": "rgb(255, 255, 255)",
+            "borderTopColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftColor": "oklch(0.928 0.006 264.531)",
+            "borderLeftWidth": "0px",
+            "opacity": "0.4",
+            "disabled": true,
+            "rect": [
+              715,
+              318,
+              183,
+              19
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "shots": [
+    "/tmp/gc-uiqa-r51/shots/p1-2-cta-current-1280.png",
+    "/tmp/gc-uiqa-r51/shots/p1-2-cta-white-1280.png",
+    "/tmp/gc-uiqa-r51/shots/p1-2-cta-eye-1280.png"
+  ],
+  "errors": []
+}

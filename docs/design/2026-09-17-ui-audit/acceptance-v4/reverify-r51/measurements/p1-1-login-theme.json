@@ -1,0 +1,197 @@
+{
+  "target": "http://127.0.0.1:5411",
+  "themes": {
+    "current": {
+      "dataTheme": null,
+      "localStorageTheme": "current",
+      "tokens": {
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "accent": "#B7F35A",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "body": {
+        "backgroundColor": "rgb(10, 10, 10)",
+        "color": "rgb(229, 229, 229)"
+      },
+      "card": {
+        "rect": [
+          840,
+          139,
+          400,
+          442
+        ],
+        "backgroundColor": "rgb(33, 36, 42)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "none",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, colo"
+      },
+      "brandAside": {
+        "rect": [
+          0,
+          0,
+          800,
+          720
+        ],
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "radial-gradient(80% 60% at 20% 80%, color(srgb 0.717647 0.952941 0.352941 / 0.06), rgba(0, 0, 0, 0)), linear-gradient(16",
+        "boxShadow": "none"
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-1-login-current-1280.png",
+      "md5": "b472e9779d9444cf09665c6cd092e32d",
+      "errors": []
+    },
+    "white": {
+      "dataTheme": null,
+      "localStorageTheme": "white",
+      "tokens": {
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "accent": "#B7F35A",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "body": {
+        "backgroundColor": "rgb(10, 10, 10)",
+        "color": "rgb(229, 229, 229)"
+      },
+      "card": {
+        "rect": [
+          840,
+          139,
+          400,
+          442
+        ],
+        "backgroundColor": "rgb(33, 36, 42)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "none",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, colo"
+      },
+      "brandAside": {
+        "rect": [
+          0,
+          0,
+          800,
+          720
+        ],
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "radial-gradient(80% 60% at 20% 80%, color(srgb 0.717647 0.952941 0.352941 / 0.06), rgba(0, 0, 0, 0)), linear-gradient(16",
+        "boxShadow": "none"
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-1-login-white-1280.png",
+      "md5": "933a9e3f351670ae93853513826f4b40",
+      "errors": []
+    },
+    "eye": {
+      "dataTheme": null,
+      "localStorageTheme": "eye",
+      "tokens": {
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "accent": "#B7F35A",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "body": {
+        "backgroundColor": "rgb(10, 10, 10)",
+        "color": "rgb(229, 229, 229)"
+      },
+      "card": {
+        "rect": [
+          840,
+          139,
+          400,
+          442
+        ],
+        "backgroundColor": "rgb(33, 36, 42)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "none",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, colo"
+      },
+      "brandAside": {
+        "rect": [
+          0,
+          0,
+          800,
+          720
+        ],
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "radial-gradient(80% 60% at 20% 80%, color(srgb 0.717647 0.952941 0.352941 / 0.06), rgba(0, 0, 0, 0)), linear-gradient(16",
+        "boxShadow": "none"
+      },
+      "shot": "/tmp/gc-uiqa-r51/shots/p1-1-login-eye-1280.png",
+      "md5": "b472e9779d9444cf09665c6cd092e32d",
+      "errors": []
+    }
+  },
+  "md5": {
+    "current": "b472e9779d9444cf09665c6cd092e32d",
+    "white": "933a9e3f351670ae93853513826f4b40",
+    "eye": "b472e9779d9444cf09665c6cd092e32d"
+  },
+  "logout": {
+    "beforeLogout": {
+      "dataTheme": "white",
+      "localStorageTheme": "white"
+    },
+    "afterLogout": {
+      "dataTheme": null,
+      "localStorageTheme": "white",
+      "tokens": {
+        "shell": "#1a1c22",
+        "canvas": "#16181d",
+        "panel": "#21242a",
+        "accent": "#B7F35A",
+        "text": "#e8eaee",
+        "colorGold": "#B7F35A"
+      },
+      "body": {
+        "backgroundColor": "rgb(10, 10, 10)",
+        "color": "rgb(229, 229, 229)"
+      },
+      "card": {
+        "rect": [
+          840,
+          139,
+          400,
+          442
+        ],
+        "backgroundColor": "rgb(33, 36, 42)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "none",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, colo"
+      },
+      "brandAside": {
+        "rect": [
+          0,
+          0,
+          800,
+          720
+        ],
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(232, 234, 238)",
+        "borderColor": "oklch(0.928 0.006 264.531)",
+        "backgroundImage": "radial-gradient(80% 60% at 20% 80%, color(srgb 0.717647 0.952941 0.352941 / 0.06), rgba(0, 0, 0, 0)), linear-gradient(16",
+        "boxShadow": "none"
+      }
+    },
+    "shot": "/tmp/gc-uiqa-r51/shots/p1-1-login-after-logout-white-1280.png",
+    "md5": "b472e9779d9444cf09665c6cd092e32d",
+    "errors": []
+  },
+  "md5Equal": false
+}

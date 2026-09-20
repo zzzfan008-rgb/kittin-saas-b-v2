@@ -1,0 +1,101 @@
+### pattern
+identity: {
+ "hasHexInput": 0,
+ "inputs": [
+  {
+   "type": "file",
+   "placeholder": null,
+   "aria": "重新上传图片",
+   "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+   "size": [
+    63,
+    12
+   ],
+   "visibility": "visible",
+   "opacity": "0",
+   "display": "block",
+   "node": "rf__node-pattern"
+  },
+  {
+   "type": "file",
+   "placeholder": null,
+   "aria": "上传图片",
+   "cls": "nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0",
+   "size": [
+    129,
+    97
+   ],
+   "visibility": "visible",
+   "opacity": "0",
+   "display": "block",
+   "node": "rf__node-style"
+  }
+ ],
+ "assetButtons": [
+  {
+   "text": "素材库",
+   "cls": "flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/6",
+   "node": "rf__node-pattern"
+  },
+  {
+   "text": "从素材库选择",
+   "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border",
+   "node": "rf__node-style"
+  }
+ ],
+ "uploaded": 4
+}
+  current/slot: MISSING
+  current/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-pattern size=[134,13] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  current/hexInput: MISSING
+  white/slot: MISSING
+  white/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-pattern size=[134,13] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  white/hexInput: MISSING
+  eye/slot: MISSING
+  eye/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-pattern size=[134,13] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  eye/hexInput: MISSING
+### text
+identity: {
+ "hasHexInput": 0,
+ "inputs": [
+  {
+   "type": "checkbox",
+   "placeholder": null,
+   "aria": null,
+   "cls": "nodrag",
+   "size": [
+    10,
+    10
+   ],
+   "visibility": "visible",
+   "opacity": "1",
+   "display": "block",
+   "node": "rf__node-result"
+  }
+ ],
+ "assetButtons": []
+}
+  current/slot: MISSING
+  current/reupload: MISSING
+  current/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-generate size=[187,21] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  current/hexInput: MISSING
+  white/slot: MISSING
+  white/reupload: MISSING
+  white/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-generate size=[187,21] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  white/hexInput: MISSING
+  eye/slot: MISSING
+  eye/reupload: MISSING
+  eye/assetPicker tag=BUTTON focusable=BUTTON/button owner=rf__node-generate size=[187,21] changed=[]
+      afterShadow=none
+      ancestorRing=[{"cls":"gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/4","boxShadow":"rgba(8, 14, 22, 0.2) 0px 10px 28px 0px"}]
+  eye/hexInput: MISSING

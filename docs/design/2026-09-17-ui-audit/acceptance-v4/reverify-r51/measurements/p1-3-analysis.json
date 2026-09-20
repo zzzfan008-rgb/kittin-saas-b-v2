@@ -1,0 +1,7369 @@
+{
+  "pattern": {
+    "inventory": {
+      "nodes": [
+        "rf__node-pattern",
+        "rf__node-style",
+        "rf__node-transfer",
+        "rf__node-result"
+      ],
+      "textareas": 2,
+      "selects": 4,
+      "inputs": 2,
+      "slots": 2,
+      "goldEls": []
+    },
+    "themes": {
+      "current": {
+        "targets": {
+          "thumbSlot": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(107, 112, 117)"
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(107, 112, 117)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    221,
+                    239,
+                    193
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    145,
+                    174,
+                    114
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    178,
+                    195,
+                    163
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                221,
+                239,
+                193
+              ],
+              "ringPx": [
+                [
+                  221,
+                  239,
+                  193
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  145,
+                  174,
+                  114
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    221,
+                    239,
+                    193
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                221,
+                239,
+                193
+              ],
+              "ringPx": [
+                [
+                  221,
+                  239,
+                  193
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              145,
+              174,
+              114
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 2.02,
+            "contrastFocusRingVsInner": 2.22,
+            "contrastBlurRingVsCard": 1.22,
+            "contrastChanged": 2.47
+          },
+          "thumbSlotFallback": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(107, 112, 117)"
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(107, 112, 117)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    221,
+                    239,
+                    193
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    145,
+                    174,
+                    114
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    178,
+                    195,
+                    163
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                221,
+                239,
+                193
+              ],
+              "ringPx": [
+                [
+                  221,
+                  239,
+                  193
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  145,
+                  174,
+                  114
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    221,
+                    239,
+                    193
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    241,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                221,
+                239,
+                193
+              ],
+              "ringPx": [
+                [
+                  221,
+                  239,
+                  193
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              145,
+              174,
+              114
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 2.02,
+            "contrastFocusRingVsInner": 2.22,
+            "contrastBlurRingVsCard": 1.22,
+            "contrastChanged": 2.47
+          },
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    181,
+                    200,
+                    162
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    242,
+                    243,
+                    246
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.11,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(74, 122, 23)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    193,
+                    210,
+                    176
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    161,
+                    186,
+                    140
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  193,
+                  210,
+                  176
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    246,
+                    247,
+                    248
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    235,
+                    237,
+                    240
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  246,
+                  247,
+                  248
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              193,
+              210,
+              176
+            ],
+            "blurRingPx": [
+              246,
+              247,
+              248
+            ],
+            "contrastFocusRingVsCard": 1.6,
+            "contrastFocusRingVsInner": 1.44,
+            "contrastBlurRingVsCard": 1.07,
+            "contrastChanged": 1.49
+          },
+          "assetPickerButton": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableTag": "BUTTON",
+            "focusVisible": false,
+            "changed": [],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(155, 161, 169)"
+            },
+            "after": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(155, 161, 169)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    249,
+                    250,
+                    251
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    246,
+                    247,
+                    248
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  249,
+                  250,
+                  251
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    249,
+                    250,
+                    251
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    246,
+                    247,
+                    248
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  249,
+                  250,
+                  251
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "focusRingPx": [
+              249,
+              250,
+              251
+            ],
+            "blurRingPx": [
+              249,
+              250,
+              251
+            ],
+            "contrastFocusRingVsCard": 1.05,
+            "contrastFocusRingVsInner": 1.05,
+            "contrastBlurRingVsCard": 1.05,
+            "contrastChanged": 1
+          }
+        }
+      },
+      "white": {
+        "targets": {
+          "thumbSlot": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    177,
+                    211,
+                    246
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    100,
+                    162,
+                    224
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    95,
+                    153,
+                    212
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                177,
+                211,
+                246
+              ],
+              "ringPx": [
+                [
+                  177,
+                  211,
+                  246
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  100,
+                  162,
+                  224
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    177,
+                    211,
+                    246
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    241,
+                    241
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                177,
+                211,
+                246
+              ],
+              "ringPx": [
+                [
+                  177,
+                  211,
+                  246
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              100,
+              162,
+              224
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1.74,
+            "contrastFocusRingVsInner": 2.48,
+            "contrastBlurRingVsCard": 1.55,
+            "contrastChanged": 2.7
+          },
+          "thumbSlotFallback": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    177,
+                    211,
+                    246
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    100,
+                    162,
+                    224
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    95,
+                    153,
+                    212
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                177,
+                211,
+                246
+              ],
+              "ringPx": [
+                [
+                  177,
+                  211,
+                  246
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  100,
+                  162,
+                  224
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    177,
+                    211,
+                    246
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    241,
+                    241
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                177,
+                211,
+                246
+              ],
+              "ringPx": [
+                [
+                  177,
+                  211,
+                  246
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              100,
+              162,
+              224
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1.74,
+            "contrastFocusRingVsInner": 2.48,
+            "contrastBlurRingVsCard": 1.55,
+            "contrastChanged": 2.7
+          },
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    153,
+                    193,
+                    234
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    242,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.09,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 102, 204)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    168,
+                    203,
+                    238
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    129,
+                    177,
+                    226
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  168,
+                  203,
+                  238
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    250,
+                    250,
+                    250
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    235,
+                    235,
+                    237
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  250,
+                  250,
+                  250
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              168,
+              203,
+              238
+            ],
+            "blurRingPx": [
+              250,
+              250,
+              250
+            ],
+            "contrastFocusRingVsCard": 1.69,
+            "contrastFocusRingVsInner": 1.55,
+            "contrastBlurRingVsCard": 1.04,
+            "contrastChanged": 1.62
+          },
+          "assetPickerButton": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableTag": "BUTTON",
+            "focusVisible": false,
+            "changed": [],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "after": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(110, 110, 115)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    252,
+                    252,
+                    252
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    249,
+                    249,
+                    249
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  252,
+                  252,
+                  252
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    252,
+                    252,
+                    252
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    249,
+                    249,
+                    249
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  252,
+                  252,
+                  252
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "focusRingPx": [
+              252,
+              252,
+              252
+            ],
+            "blurRingPx": [
+              252,
+              252,
+              252
+            ],
+            "contrastFocusRingVsCard": 1.03,
+            "contrastFocusRingVsInner": 1.03,
+            "contrastBlurRingVsCard": 1.03,
+            "contrastChanged": 1
+          }
+        }
+      },
+      "eye": {
+        "targets": {
+          "thumbSlot": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    180,
+                    213,
+                    196
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    106,
+                    174,
+                    140
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    155,
+                    198,
+                    175
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                180,
+                213,
+                196
+              ],
+              "ringPx": [
+                [
+                  180,
+                  213,
+                  196
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  106,
+                  174,
+                  140
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    180,
+                    213,
+                    196
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                180,
+                213,
+                196
+              ],
+              "ringPx": [
+                [
+                  180,
+                  213,
+                  196
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              106,
+              174,
+              140
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1.65,
+            "contrastFocusRingVsInner": 2.38,
+            "contrastBlurRingVsCard": 1.58,
+            "contrastChanged": 2.61
+          },
+          "thumbSlotFallback": {
+            "tag": "DIV",
+            "cls": "nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-wi",
+            "focusableTag": "INPUT",
+            "focusVisible": false,
+            "changed": [
+              "boxShadow"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    180,
+                    213,
+                    196
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    106,
+                    174,
+                    140
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    155,
+                    198,
+                    175
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                180,
+                213,
+                196
+              ],
+              "ringPx": [
+                [
+                  180,
+                  213,
+                  196
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  106,
+                  174,
+                  140
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                113
+              ],
+              "clip": {
+                "x": 350,
+                "y": 146,
+                "width": 145,
+                "height": 113
+              },
+              "rectInClip": [
+                8,
+                8,
+                137,
+                105
+              ],
+              "rowY": 57,
+              "samples": [
+                {
+                  "x": 2,
+                  "off": -6,
+                  "px": [
+                    180,
+                    213,
+                    196
+                  ]
+                },
+                {
+                  "x": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "x": 8,
+                  "off": 0,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 9,
+                  "off": 1,
+                  "px": [
+                    239,
+                    244,
+                    240
+                  ]
+                },
+                {
+                  "x": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "x": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                180,
+                213,
+                196
+              ],
+              "ringPx": [
+                [
+                  180,
+                  213,
+                  196
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              106,
+              174,
+              140
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1.65,
+            "contrastFocusRingVsInner": 2.38,
+            "contrastBlurRingVsCard": 1.58,
+            "contrastChanged": 2.61
+          },
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)"
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    70,
+                    154,
+                    113
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 567,
+                "y": 244,
+                "width": 145,
+                "height": 116
+              },
+              "rectInClip": [
+                9,
+                8,
+                137,
+                108
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    247,
+                    242
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.1,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)"
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    171,
+                    210,
+                    191
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    131,
+                    187,
+                    159
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  171,
+                  210,
+                  191
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 567,
+                "y": 379,
+                "width": 79,
+                "height": 33
+              },
+              "rectInClip": [
+                9,
+                9,
+                71,
+                25
+              ],
+              "colX": 40,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    245,
+                    249,
+                    246
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    233,
+                    241,
+                    235
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  245,
+                  249,
+                  246
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              171,
+              210,
+              191
+            ],
+            "blurRingPx": [
+              245,
+              249,
+              246
+            ],
+            "contrastFocusRingVsCard": 1.65,
+            "contrastFocusRingVsInner": 1.51,
+            "contrastBlurRingVsCard": 1.06,
+            "contrastChanged": 1.56
+          },
+          "assetPickerButton": {
+            "tag": "BUTTON",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold",
+            "focusableTag": "BUTTON",
+            "focusVisible": false,
+            "changed": [],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "after": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(71, 104, 90)"
+            },
+            "focusScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    249,
+                    251,
+                    249
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    245,
+                    249,
+                    246
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  249,
+                  251,
+                  249
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "blurScan": {
+              "size": [
+                145,
+                29
+              ],
+              "clip": {
+                "x": 350,
+                "y": 249,
+                "width": 145,
+                "height": 29
+              },
+              "rectInClip": [
+                8,
+                9,
+                137,
+                21
+              ],
+              "colX": 73,
+              "samples": [
+                {
+                  "y": 3,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": -1,
+                  "px": [
+                    249,
+                    251,
+                    249
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 0,
+                  "px": [
+                    245,
+                    249,
+                    246
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 12,
+                  "off": 3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  249,
+                  251,
+                  249
+                ]
+              ],
+              "innerPx": [
+                255,
+                255,
+                255
+              ]
+            },
+            "focusRingPx": [
+              249,
+              251,
+              249
+            ],
+            "blurRingPx": [
+              249,
+              251,
+              249
+            ],
+            "contrastFocusRingVsCard": 1.04,
+            "contrastFocusRingVsInner": 1.04,
+            "contrastBlurRingVsCard": 1.04,
+            "contrastChanged": 1
+          }
+        }
+      }
+    }
+  },
+  "text": {
+    "inventory": {
+      "nodes": [
+        "rf__node-generate",
+        "rf__node-result"
+      ],
+      "textareas": 2,
+      "selects": 4,
+      "inputs": 0,
+      "slots": 0,
+      "goldEls": []
+    },
+    "themes": {
+      "current": {
+        "targets": {
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(183, 243, 90)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    181,
+                    200,
+                    162
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    242,
+                    243,
+                    246
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.11,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(228, 230, 234)",
+              "borderLeftColor": "rgb(228, 230, 234)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(74, 122, 23)",
+              "borderLeftColor": "rgb(74, 122, 23)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    193,
+                    210,
+                    176
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    161,
+                    186,
+                    140
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    246,
+                    247,
+                    248
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    235,
+                    237,
+                    240
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    242,
+                    243,
+                    245
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                242,
+                243,
+                245
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.11,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          }
+        }
+      },
+      "white": {
+        "targets": {
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 113, 227)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    153,
+                    193,
+                    234
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    242,
+                    242,
+                    243
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.09,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftColor": "rgba(0, 0, 0, 0.08)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(29, 29, 31)"
+            },
+            "after": {
+              "borderTopColor": "rgb(0, 102, 204)",
+              "borderLeftColor": "rgb(0, 102, 204)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    168,
+                    203,
+                    238
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    129,
+                    177,
+                    226
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    250,
+                    250,
+                    250
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    235,
+                    235,
+                    237
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    245,
+                    245,
+                    247
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                245,
+                245,
+                247
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.09,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          }
+        }
+      },
+      "eye": {
+        "targets": {
+          "promptChipTextarea": {
+            "tag": "TEXTAREA",
+            "cls": "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-tex",
+            "focusableTag": "TEXTAREA",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)"
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "3px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    70,
+                    154,
+                    113
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                224,
+                178
+              ],
+              "clip": {
+                "x": 352,
+                "y": 180,
+                "width": 224,
+                "height": 178
+              },
+              "rectInClip": [
+                8,
+                8,
+                216,
+                170
+              ],
+              "colX": 112,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    241,
+                    247,
+                    242
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.1,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          },
+          "modelSelect": {
+            "tag": "SELECT",
+            "cls": "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-a",
+            "focusableTag": "SELECT",
+            "focusVisible": true,
+            "changed": [
+              "borderTopColor",
+              "borderLeftColor",
+              "outlineWidth",
+              "outlineColor"
+            ],
+            "before": {
+              "borderTopColor": "rgb(226, 236, 228)",
+              "borderLeftColor": "rgb(226, 236, 228)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "3px",
+              "outlineColor": "rgb(18, 59, 43)"
+            },
+            "after": {
+              "borderTopColor": "rgb(11, 122, 67)",
+              "borderLeftColor": "rgb(11, 122, 67)",
+              "borderLeftWidth": "1px",
+              "boxShadow": "none",
+              "outlineStyle": "none",
+              "outlineWidth": "1px",
+              "outlineColor": "rgb(0, 95, 204)"
+            },
+            "focusScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    171,
+                    210,
+                    191
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    131,
+                    187,
+                    159
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "blurScan": {
+              "size": [
+                117,
+                44
+              ],
+              "clip": {
+                "x": 352,
+                "y": 399,
+                "width": 117,
+                "height": 44
+              },
+              "rectInClip": [
+                8,
+                8,
+                109,
+                35
+              ],
+              "colX": 59,
+              "samples": [
+                {
+                  "y": 2,
+                  "off": -6,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 3,
+                  "off": -5,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 4,
+                  "off": -4,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 5,
+                  "off": -3,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 6,
+                  "off": -2,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 7,
+                  "off": -1,
+                  "px": [
+                    255,
+                    255,
+                    255
+                  ]
+                },
+                {
+                  "y": 8,
+                  "off": 0,
+                  "px": [
+                    245,
+                    249,
+                    246
+                  ]
+                },
+                {
+                  "y": 9,
+                  "off": 1,
+                  "px": [
+                    233,
+                    241,
+                    235
+                  ]
+                },
+                {
+                  "y": 10,
+                  "off": 2,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                },
+                {
+                  "y": 11,
+                  "off": 3,
+                  "px": [
+                    240,
+                    246,
+                    241
+                  ]
+                }
+              ],
+              "cardBg": [
+                255,
+                255,
+                255
+              ],
+              "ringPx": [
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ],
+                [
+                  255,
+                  255,
+                  255
+                ]
+              ],
+              "innerPx": [
+                240,
+                246,
+                241
+              ]
+            },
+            "focusRingPx": [
+              255,
+              255,
+              255
+            ],
+            "blurRingPx": [
+              255,
+              255,
+              255
+            ],
+            "contrastFocusRingVsCard": 1,
+            "contrastFocusRingVsInner": 1.1,
+            "contrastBlurRingVsCard": 1,
+            "contrastChanged": 1
+          }
+        }
+      }
+    }
+  }
+}

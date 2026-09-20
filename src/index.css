@@ -481,6 +481,16 @@ body {
 .react-flow__node:not(.dragging):hover {
   z-index: 8 !important;
 }
+
+/* R-51 P3-1：画布缩放下焦点环宽度补偿。
+   fitView 缩放（实测 0.5056）会把节点内声明的 2px 焦点环压到 1.01px 渲染宽度，
+   条带对比度随亚像素混合跌到 2.47–2.70:1。--rf-zoom 由 DotWaveBackground 按视口
+   实时写入 .react-flow 根；除以它使环的渲染宽度恒 ≈2px（缩放无关）。
+   只覆盖环宽，环色仍由各控件的 --gc-accent-deep 工具类提供（三主题 ≥3:1）。 */
+.react-flow :is(.focus-within\:ring-2:focus-within, .focus-visible\:ring-2:focus-visible) {
+  --tw-ring-shadow: 0 0 0 calc(2px / var(--rf-zoom, 1)) var(--tw-ring-color, currentcolor);
+}
+
 .react-flow__node:not(.dragging):hover .gc-node-card {
   border-color: var(--gc-node-accent) !important;
   box-shadow:

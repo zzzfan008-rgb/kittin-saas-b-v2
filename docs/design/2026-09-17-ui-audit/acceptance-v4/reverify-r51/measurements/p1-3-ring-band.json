@@ -1,0 +1,491 @@
+{
+  "current": {
+    "thumbSlot": {
+      "declaredFocusShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(74, 122, 23) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(228, 230, 234)",
+      "borderBlur": "rgb(228, 230, 234)",
+      "declaredRing": {
+        "color": [
+          74,
+          122,
+          23
+        ],
+        "widthPx": 2
+      },
+      "focus": {
+        "bandLum": {
+          "min": [
+            145,
+            174,
+            114
+          ],
+          "minContrastVsInner": 2.22
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          228,
+          235,
+          220
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            255,
+            255,
+            255
+          ],
+          "minContrastVsInner": 1.11
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          255,
+          255,
+          255
+        ]
+      },
+      "declaredRingContrastVsInner": 4.63
+    },
+    "promptChipTextarea": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(74, 122, 23)",
+      "borderBlur": "rgb(228, 230, 234)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            191,
+            244,
+            108
+          ],
+          "minContrastVsInner": 1.16
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          239,
+          252,
+          218
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            191,
+            244,
+            108
+          ],
+          "minContrastVsInner": 1.16
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          239,
+          252,
+          218
+        ]
+      }
+    },
+    "modelSelect": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(74, 122, 23)",
+      "borderBlur": "rgb(228, 230, 234)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            114,
+            152,
+            75
+          ],
+          "minContrastVsInner": 3
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 1,
+        "bandN": 56,
+        "meanPx": [
+          232,
+          238,
+          226
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            220,
+            222,
+            217
+          ],
+          "minContrastVsInner": 1.22
+        },
+        "innerRef": [
+          242,
+          243,
+          245
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 56,
+        "meanPx": [
+          247,
+          248,
+          247
+        ]
+      }
+    }
+  },
+  "white": {
+    "thumbSlot": {
+      "declaredFocusShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(0, 102, 204) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgba(0, 0, 0, 0.08)",
+      "borderBlur": "rgba(0, 0, 0, 0.08)",
+      "declaredRing": {
+        "color": [
+          0,
+          102,
+          204
+        ],
+        "widthPx": 2
+      },
+      "focus": {
+        "bandLum": {
+          "min": [
+            100,
+            162,
+            224
+          ],
+          "minContrastVsInner": 2.48
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          216,
+          232,
+          247
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            255,
+            255,
+            255
+          ],
+          "minContrastVsInner": 1.09
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          255,
+          255,
+          255
+        ]
+      },
+      "declaredRingContrastVsInner": 5.11
+    },
+    "promptChipTextarea": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(0, 102, 204)",
+      "borderBlur": "rgba(0, 0, 0, 0.08)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            29,
+            129,
+            230
+          ],
+          "minContrastVsInner": 3.62
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 21,
+        "bandN": 84,
+        "meanPx": [
+          199,
+          223,
+          249
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            28,
+            128,
+            229
+          ],
+          "minContrastVsInner": 3.66
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 21,
+        "bandN": 84,
+        "meanPx": [
+          198,
+          223,
+          249
+        ]
+      }
+    },
+    "modelSelect": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(0, 102, 204)",
+      "borderBlur": "rgba(0, 0, 0, 0.08)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            58,
+            136,
+            214
+          ],
+          "minContrastVsInner": 3.4
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 6,
+        "bandN": 56,
+        "meanPx": [
+          224,
+          235,
+          246
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            125,
+            175,
+            226
+          ],
+          "minContrastVsInner": 2.12
+        },
+        "innerRef": [
+          245,
+          245,
+          247
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 56,
+        "meanPx": [
+          245,
+          246,
+          248
+        ]
+      }
+    }
+  },
+  "eye": {
+    "thumbSlot": {
+      "declaredFocusShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(11, 122, 67) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(226, 236, 228)",
+      "borderBlur": "rgb(226, 236, 228)",
+      "declaredRing": {
+        "color": [
+          11,
+          122,
+          67
+        ],
+        "widthPx": 2
+      },
+      "focus": {
+        "bandLum": {
+          "min": [
+            106,
+            174,
+            140
+          ],
+          "minContrastVsInner": 2.38
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          218,
+          235,
+          226
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            255,
+            255,
+            255
+          ],
+          "minContrastVsInner": 1.1
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 84,
+        "meanPx": [
+          255,
+          255,
+          255
+        ]
+      },
+      "declaredRingContrastVsInner": 4.94
+    },
+    "promptChipTextarea": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(11, 122, 67)",
+      "borderBlur": "rgb(226, 236, 228)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            19,
+            126,
+            73
+          ],
+          "minContrastVsInner": 4.66
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 21,
+        "bandN": 84,
+        "meanPx": [
+          196,
+          223,
+          209
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            38,
+            137,
+            88
+          ],
+          "minContrastVsInner": 3.99
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 21,
+        "bandN": 84,
+        "meanPx": [
+          201,
+          225,
+          213
+        ]
+      }
+    },
+    "modelSelect": {
+      "declaredFocusShadow": "none",
+      "declaredBlurShadow": "none",
+      "borderFocus": "rgb(11, 122, 67)",
+      "borderBlur": "rgb(226, 236, 228)",
+      "declaredRing": null,
+      "focus": {
+        "bandLum": {
+          "min": [
+            65,
+            152,
+            108
+          ],
+          "minContrastVsInner": 3.23
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 6,
+        "bandN": 56,
+        "meanPx": [
+          224,
+          237,
+          230
+        ]
+      },
+      "blur": {
+        "bandLum": {
+          "min": [
+            129,
+            179,
+            154
+          ],
+          "minContrastVsInner": 2.17
+        },
+        "innerRef": [
+          240,
+          246,
+          241
+        ],
+        "pixelsAtOrAbove3": 0,
+        "bandN": 56,
+        "meanPx": [
+          245,
+          248,
+          246
+        ]
+      }
+    }
+  }
+}

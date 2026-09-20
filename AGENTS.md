@@ -175,9 +175,11 @@ a dependency change must update it in the same delivery batch.
   `tsc --noEmit`; do not run the full suite on every commit or push. Report any
   unavailable or degraded gate instead of treating it as passed.
 - GitHub Actions is a project gate. The CI design lives in
-  `docs/ci/2026-09-18-github-actions-gate.md`; every push and every pull request
-  targeting `main` runs the workflow, and merging to `main` requires its status
-  checks to be green. A red or absent CI run blocks delivery; a skipped, cancelled,
+  `docs/ci/2026-09-18-github-actions-gate.md`; every push to `main` and every pull
+  request targeting `main` runs the workflow, and merging to `main` requires its status
+  checks to be green. Delivery branches are covered by their pull request, not by their
+  push; a docs-only push to `main` is skipped by `paths-ignore` (the PR run on the exact
+  head is what gated it). A red or absent CI run blocks delivery; a skipped, cancelled,
   or degraded job must be reported as such and never claimed as passed.
 - `main` is protected: these five checks are required on the exact head, with the
   branch required to be up to date before merging —

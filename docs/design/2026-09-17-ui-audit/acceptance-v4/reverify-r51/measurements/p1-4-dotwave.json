@@ -1,0 +1,488 @@
+{
+  "current": {
+    "shot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-current-1280.png",
+    "size": [
+      1280,
+      720
+    ],
+    "dominantCanvasPx": [
+      22,
+      24,
+      29
+    ],
+    "dominantShare": 538323,
+    "warmPixelCount": 2953,
+    "warmSamples": [
+      {
+        "xy": [
+          456,
+          88
+        ],
+        "px": [
+          44,
+          42,
+          38
+        ]
+      },
+      {
+        "xy": [
+          477,
+          88
+        ],
+        "px": [
+          45,
+          43,
+          39
+        ]
+      },
+      {
+        "xy": [
+          498,
+          88
+        ],
+        "px": [
+          46,
+          43,
+          39
+        ]
+      },
+      {
+        "xy": [
+          518,
+          88
+        ],
+        "px": [
+          48,
+          45,
+          40
+        ]
+      },
+      {
+        "xy": [
+          519,
+          88
+        ],
+        "px": [
+          55,
+          51,
+          43
+        ]
+      },
+      {
+        "xy": [
+          539,
+          88
+        ],
+        "px": [
+          53,
+          49,
+          43
+        ]
+      }
+    ],
+    "warmColorHistogramTop": [
+      {
+        "px": [
+          72,
+          63,
+          51
+        ],
+        "n": 180,
+        "contrastVsCanvasDominant": 1.72
+      },
+      {
+        "px": [
+          51,
+          47,
+          41
+        ],
+        "n": 76,
+        "contrastVsCanvasDominant": 1.34
+      },
+      {
+        "px": [
+          54,
+          50,
+          43
+        ],
+        "n": 75,
+        "contrastVsCanvasDominant": 1.39
+      },
+      {
+        "px": [
+          71,
+          63,
+          50
+        ],
+        "n": 73,
+        "contrastVsCanvasDominant": 1.71
+      },
+      {
+        "px": [
+          46,
+          43,
+          39
+        ],
+        "n": 71,
+        "contrastVsCanvasDominant": 1.26
+      },
+      {
+        "px": [
+          68,
+          61,
+          49
+        ],
+        "n": 65,
+        "contrastVsCanvasDominant": 1.66
+      }
+    ],
+    "darkestWarm": {
+      "xy": [
+        457,
+        694
+      ],
+      "px": [
+        42,
+        39,
+        36
+      ],
+      "contrastVsCanvasDominant": 1.2
+    },
+    "brightestWarm": {
+      "xy": [
+        707,
+        297
+      ],
+      "px": [
+        110,
+        106,
+        99
+      ],
+      "contrastVsCanvasDominant": 3.3
+    }
+  },
+  "white": {
+    "shot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-white-1280.png",
+    "size": [
+      1280,
+      720
+    ],
+    "dominantCanvasPx": [
+      245,
+      245,
+      247
+    ],
+    "dominantShare": 561048,
+    "warmPixelCount": 4502,
+    "warmSamples": [
+      {
+        "xy": [
+          352,
+          88
+        ],
+        "px": [
+          241,
+          238,
+          234
+        ]
+      },
+      {
+        "xy": [
+          373,
+          88
+        ],
+        "px": [
+          241,
+          238,
+          235
+        ]
+      },
+      {
+        "xy": [
+          393,
+          88
+        ],
+        "px": [
+          241,
+          238,
+          234
+        ]
+      },
+      {
+        "xy": [
+          414,
+          88
+        ],
+        "px": [
+          240,
+          236,
+          231
+        ]
+      },
+      {
+        "xy": [
+          435,
+          88
+        ],
+        "px": [
+          239,
+          234,
+          229
+        ]
+      },
+      {
+        "xy": [
+          456,
+          88
+        ],
+        "px": [
+          238,
+          234,
+          228
+        ]
+      }
+    ],
+    "warmColorHistogramTop": [
+      {
+        "px": [
+          233,
+          223,
+          208
+        ],
+        "n": 199,
+        "contrastVsCanvasDominant": 1.21
+      },
+      {
+        "px": [
+          241,
+          238,
+          235
+        ],
+        "n": 127,
+        "contrastVsCanvasDominant": 1.06
+      },
+      {
+        "px": [
+          240,
+          236,
+          231
+        ],
+        "n": 123,
+        "contrastVsCanvasDominant": 1.08
+      },
+      {
+        "px": [
+          237,
+          231,
+          221
+        ],
+        "n": 114,
+        "contrastVsCanvasDominant": 1.13
+      },
+      {
+        "px": [
+          242,
+          239,
+          236
+        ],
+        "n": 108,
+        "contrastVsCanvasDominant": 1.05
+      },
+      {
+        "px": [
+          234,
+          225,
+          211
+        ],
+        "n": 107,
+        "contrastVsCanvasDominant": 1.19
+      }
+    ],
+    "darkestWarm": {
+      "xy": [
+        707,
+        298
+      ],
+      "px": [
+        212,
+        204,
+        191
+      ],
+      "contrastVsCanvasDominant": 1.46
+    },
+    "brightestWarm": {
+      "xy": [
+        1228,
+        110
+      ],
+      "px": [
+        243,
+        240,
+        237
+      ],
+      "contrastVsCanvasDominant": 1.04
+    }
+  },
+  "eye": {
+    "shot": "/tmp/gc-uiqa-r51/shots/p1-4-selection-eye-1280.png",
+    "size": [
+      1280,
+      720
+    ],
+    "dominantCanvasPx": [
+      233,
+      241,
+      234
+    ],
+    "dominantShare": 512634,
+    "warmPixelCount": 1707,
+    "warmSamples": [
+      {
+        "xy": [
+          477,
+          88
+        ],
+        "px": [
+          227,
+          226,
+          209
+        ]
+      },
+      {
+        "xy": [
+          518,
+          88
+        ],
+        "px": [
+          228,
+          227,
+          212
+        ]
+      },
+      {
+        "xy": [
+          539,
+          88
+        ],
+        "px": [
+          227,
+          226,
+          209
+        ]
+      },
+      {
+        "xy": [
+          540,
+          88
+        ],
+        "px": [
+          227,
+          226,
+          209
+        ]
+      },
+      {
+        "xy": [
+          581,
+          88
+        ],
+        "px": [
+          225,
+          224,
+          205
+        ]
+      },
+      {
+        "xy": [
+          602,
+          88
+        ],
+        "px": [
+          225,
+          223,
+          204
+        ]
+      }
+    ],
+    "warmColorHistogramTop": [
+      {
+        "px": [
+          224,
+          220,
+          199
+        ],
+        "n": 209,
+        "contrastVsCanvasDominant": 1.2
+      },
+      {
+        "px": [
+          225,
+          222,
+          201
+        ],
+        "n": 158,
+        "contrastVsCanvasDominant": 1.18
+      },
+      {
+        "px": [
+          225,
+          223,
+          204
+        ],
+        "n": 109,
+        "contrastVsCanvasDominant": 1.17
+      },
+      {
+        "px": [
+          224,
+          221,
+          200
+        ],
+        "n": 97,
+        "contrastVsCanvasDominant": 1.19
+      },
+      {
+        "px": [
+          226,
+          224,
+          206
+        ],
+        "n": 84,
+        "contrastVsCanvasDominant": 1.16
+      },
+      {
+        "px": [
+          224,
+          221,
+          199
+        ],
+        "n": 74,
+        "contrastVsCanvasDominant": 1.19
+      }
+    ],
+    "darkestWarm": {
+      "xy": [
+        707,
+        298
+      ],
+      "px": [
+        204,
+        202,
+        183
+      ],
+      "contrastVsCanvasDominant": 1.44
+    },
+    "brightestWarm": {
+      "xy": [
+        664,
+        340
+      ],
+      "px": [
+        229,
+        228,
+        213
+      ],
+      "contrastVsCanvasDominant": 1.11
+    }
+  }
+}

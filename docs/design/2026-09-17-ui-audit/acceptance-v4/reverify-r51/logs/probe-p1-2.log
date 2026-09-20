@@ -1,0 +1,7 @@
+current accent #B7F35A cta {"text":"生成效果图","disabled":false,"opacity":"1","bg":"rgb(183, 243, 90)","color":"rgb(19, 19, 19)","rect":{"x":374.3783874511719,"y":539.140869140625,"width":197.27450561523438,"height":21.74676513671875}}
+  gold elements: 5 [["bg-gold","rgb(183, 243, 90)","rgb(19, 19, 19)"],["border-gold","rgb(255, 255, 255)","rgb(29, 29, 31)"],["bg-gold","rgb(183, 243, 90)","rgb(19, 19, 19)"],["text-gold","rgba(0, 0, 0, 0)","rgb(183, 243, 90)"],["bg-gold","rgb(183, 243, 90)","rgb(19, 19, 19)"]]
+white accent #0071e3 cta {"text":"生成效果图","disabled":false,"opacity":"1","bg":"rgb(0, 113, 227)","color":"rgb(255, 255, 255)","rect":{"x":374.3783874511719,"y":539.140869140625,"width":197.27450561523438,"height":21.74676513671875}}
+  gold elements: 5 [["bg-gold","rgb(0, 113, 227)","rgb(255, 255, 255)"],["border-gold","rgb(255, 255, 255)","rgb(29, 29, 31)"],["bg-gold","rgb(0, 113, 227)","rgb(255, 255, 255)"],["text-gold","rgba(0, 0, 0, 0)","rgb(0, 113, 227)"],["bg-gold","rgb(0, 113, 227)","rgb(255, 255, 255)"]]
+eye accent #0B7A43 cta {"text":"生成效果图","disabled":false,"opacity":"1","bg":"rgb(11, 122, 67)","color":"rgb(255, 255, 255)","rect":{"x":374.3783874511719,"y":539.140869140625,"width":197.27450561523438,"height":21.74676513671875}}
+  gold elements: 5 [["bg-gold","rgb(11, 122, 67)","rgb(255, 255, 255)"],["border-gold","rgb(255, 255, 255)","rgb(18, 59, 43)"],["bg-gold","rgb(11, 122, 67)","rgb(255, 255, 255)"],["text-gold","rgba(0, 0, 0, 0)","rgb(11, 122, 67)"],["bg-gold","rgb(11, 122, 67)","rgb(255, 255, 255)"]]
+pageerrors: 0

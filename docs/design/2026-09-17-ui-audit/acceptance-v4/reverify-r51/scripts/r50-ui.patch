@@ -1,0 +1,94 @@
+diff --git a/scripts/verify-built-css.mjs b/scripts/verify-built-css.mjs
+index 8588f0a..d3b75df 100644
+--- a/scripts/verify-built-css.mjs
++++ b/scripts/verify-built-css.mjs
+@@ -26,7 +26,9 @@ requirePattern("品牌主色工具类 bg-gold", /\.bg-gold(?:[,{:]|\s*\{)/);
+ requirePattern("品牌文字工具类 text-gold", /\.text-gold(?:[,{:]|\s*\{)/);
+ requirePattern("响应式工具类", /\.(?:sm|md|lg)\\:/);
+ requirePattern("图片上传焦点 ring 宽度", /\.focus-within\\:ring-2(?:[,{:]|\s*\{)/);
+-requirePattern("图片上传焦点 ring 颜色", /\.focus-within\\:ring-gold\\\/60(?:[,{:]|\s*\{)/);
++// R-50 P1-3：ring-gold/60 在白节点卡上仅 1.19:1（WCAG 2.4.11 不达标），
++// 焦点环颜色改接行动色深档 --gc-accent-deep（三主题 5.14/5.57/5.41:1）。
++requirePattern("图片上传焦点 ring 颜色", /\.focus-within\\:ring-\\\(--gc-accent-deep\\\)(?:[,{:]|\s*\{)/);
+ requirePattern("shadcn 弹层背景工具类", /\.bg-popover(?:[,{:]|\s*\{)/);
+ requirePattern("shadcn 弹层文字工具类", /\.text-popover-foreground(?:[,{:]|\s*\{)/);
+ requirePattern("画布节点主题样式", /\.gc-node-card/);
+diff --git a/src/components/nodes/FabricRecolorNode.tsx b/src/components/nodes/FabricRecolorNode.tsx
+index db3c188..57f4976 100644
+--- a/src/components/nodes/FabricRecolorNode.tsx
++++ b/src/components/nodes/FabricRecolorNode.tsx
+@@ -201,7 +201,7 @@ export function FabricRecolorNode({
+                 onChange={(e) => setHexInput(e.target.value)}
+                 onKeyDown={(e) => e.key === "Enter" && addCustomHex()}
+                 placeholder="#RRGGBB"
+-                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 font-mono text-[10px] text-[var(--gc-text)] outline-hidden focus:border-gold/60"
++                className="h-6 flex-1 rounded-xs border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 font-mono text-[10px] text-[var(--gc-node-text)] outline-hidden focus:border-[var(--gc-accent-deep)]"
+               />
+               <button
+                 type="button"
+diff --git a/src/components/nodes/ImageInputNode.tsx b/src/components/nodes/ImageInputNode.tsx
+index 5a3cac7..542130a 100644
+--- a/src/components/nodes/ImageInputNode.tsx
++++ b/src/components/nodes/ImageInputNode.tsx
+@@ -161,7 +161,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
+               setDragOver(false);
+               void handleFile(e.dataTransfer.files?.[0]);
+             }}
+-            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-gold/60 ${
++            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
+               dragOver
+                 ? "border-gold bg-gold/8 text-gold"
+                 : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+@@ -187,7 +187,7 @@ export function ImageInputNode({ id, data, selected }: NodeProps<Node<ImageInput
+         )}
+         {data.imageUrl && (
+           <div className="nodrag flex gap-1.5">
+-            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-text-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-text)] focus-within:border-gold focus-within:ring-2 focus-within:ring-gold/60">
++            <div className="nodrag nopan relative flex-1 cursor-pointer rounded-md border border-[var(--gc-node-border)] py-1 text-center text-[10px] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)] hover:text-[var(--gc-node-text)] focus-within:border-(--gc-accent-deep) focus-within:ring-2 focus-within:ring-(--gc-accent-deep)">
+               {fileInput}
+               <span className="pointer-events-none">重新上传</span>
+             </div>
+diff --git a/src/components/nodes/NodeFrame.tsx b/src/components/nodes/NodeFrame.tsx
+index ed2338a..d172899 100644
+--- a/src/components/nodes/NodeFrame.tsx
++++ b/src/components/nodes/NodeFrame.tsx
+@@ -127,7 +127,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }:
+                 setEditing(false);
+               }
+             }}
+-            className="nodrag min-w-0 flex-1 rounded-sm border border-gold bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-text)] focus:outline-hidden"
++            className="nodrag min-w-0 flex-1 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+           />
+         ) : (
+           <span
+@@ -232,8 +232,11 @@ export function Developing() {
+ }
+ 
+ export const inputClass =
+-  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold focus:outline-hidden";
++  "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden";
+ 
+-/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义） */
++/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义）。
++ *  R-50 P1-3：亮 accent（--gc-node-accent）在白卡上仅 1.19–1.31:1，焦点边框改用
++ *  行动色深档 --gc-accent-deep（三主题 on #ffffff 实测 5.14 / 5.57 / 5.41:1 ≥3:1）；
++ *  静息左条保留亮 accent 作为 chip 身份标识，focus 时维持全亮。 */
+ export const promptChipClass =
+-  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-gold bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/70 focus:border-l-gold focus:outline-hidden";
++  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:border-l-[var(--gc-node-accent)] focus:outline-hidden";
+diff --git a/src/index.css b/src/index.css
+index 0341515..0d61e34 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -508,8 +508,10 @@ body {
+ [data-theme] .gc-node-card textarea,
+ [data-theme] .gc-node-card select {
+   background-color: var(--gc-node-inner) !important;
+-  border-color: var(--gc-node-border) !important;
+   color: var(--gc-node-text) !important;
++  /* border-color 反查已删除（R-50 P1-3）：该 !important 曾整体吃掉节点内
++     输入控件的 focus 边框与 V4 chip 的左 3px accent 引用条；控件自带
++     var(--gc-node-border) 静息边框，无需反查兜底。 */
+ }
+ 
+ [data-theme] .gc-node-card input::placeholder,

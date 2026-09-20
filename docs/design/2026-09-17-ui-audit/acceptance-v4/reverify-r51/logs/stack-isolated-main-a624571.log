@@ -1,0 +1,8 @@
+[web] VITE v6.4.3  ready in 128 ms
+[web] ➜  Local:   http://127.0.0.1:5411/
+[api] [garment-canvas] server listening on http://localhost:3411 (full)
+ready: api http://127.0.0.1:3411/api/ready
+ready: web http://127.0.0.1:5411/
+STACK UP api=3411 web=5411 tree=/tmp/gc-uiqa-r51/main @ main a624571
+stack supervisor alive
+[web] 4:46:48 PM [vite] (client) page reload playwright-report/index.html

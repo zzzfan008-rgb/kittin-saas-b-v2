@@ -1,0 +1,23 @@
+current [183,243,90] declared rgb(183, 243, 90) ctr(bg,f g) 14.14 sampled ctr 14.14
+white [0,113,227] declared rgb(0, 113, 227) ctr(bg,f g) 4.7 sampled ctr 4.7
+eye [11,122,67] declared rgb(11, 122, 67) ctr(bg,f g) 5.41 sampled ctr 5.41
+
+audit rows:
+-- current
+    {"goldClasses":"bg-gold","testid":null,"text":"运行此节点","bg":"rgb(183, 243, 90)","color":"rgb(19, 19, 19)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[12,475,296,28]}
+    {"goldClasses":"border-gold","testid":null,"text":"文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的","bg":"rgb(255, 255, 255)","color":"rgb(29, 29, 31)","borderTop":"rgb(183, 243, 90)","borderLeft":"rgb(183, 243, 90)","borderLeftWidth":"1px","opacity":"1","rect":[364,131,217,546]}
+    {"goldClasses":"bg-gold","testid":null,"text":"生成效果图","bg":"rgb(183, 243, 90)","color":"rgb(19, 19, 19)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[374,539,197,22]}
+    {"goldClasses":"text-gold","testid":null,"text":"未设置","bg":"rgba(0, 0, 0, 0)","color":"rgb(183, 243, 90)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[745,282,23,12]}
+    {"goldClasses":"bg-gold","testid":null,"text":"保存全部到文件夹","bg":"rgb(183, 243, 90)","color":"rgb(19, 19, 19)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"0.4","rect":[715,318,183,19]}
+-- white
+    {"goldClasses":"bg-gold","testid":null,"text":"运行此节点","bg":"rgb(0, 113, 227)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[12,475,296,28]}
+    {"goldClasses":"border-gold","testid":null,"text":"文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的","bg":"rgb(255, 255, 255)","color":"rgb(29, 29, 31)","borderTop":"rgb(0, 113, 227)","borderLeft":"rgb(0, 113, 227)","borderLeftWidth":"1px","opacity":"1","rect":[364,131,217,546]}
+    {"goldClasses":"bg-gold","testid":null,"text":"生成效果图","bg":"rgb(0, 113, 227)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[374,539,197,22]}
+    {"goldClasses":"text-gold","testid":null,"text":"未设置","bg":"rgba(0, 0, 0, 0)","color":"rgb(0, 113, 227)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[745,282,23,12]}
+    {"goldClasses":"bg-gold","testid":null,"text":"保存全部到文件夹","bg":"rgb(0, 113, 227)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"0.4","rect":[715,318,183,19]}
+-- eye
+    {"goldClasses":"bg-gold","testid":null,"text":"运行此节点","bg":"rgb(11, 122, 67)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[12,475,296,28]}
+    {"goldClasses":"border-gold","testid":null,"text":"文生图渲染提示词主题与任务：设计一套现代都市女装：廓形利落的","bg":"rgb(255, 255, 255)","color":"rgb(18, 59, 43)","borderTop":"rgb(11, 122, 67)","borderLeft":"rgb(11, 122, 67)","borderLeftWidth":"1px","opacity":"1","rect":[364,131,217,546]}
+    {"goldClasses":"bg-gold","testid":null,"text":"生成效果图","bg":"rgb(11, 122, 67)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[374,539,197,22]}
+    {"goldClasses":"text-gold","testid":null,"text":"未设置","bg":"rgba(0, 0, 0, 0)","color":"rgb(11, 122, 67)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"1","rect":[745,282,23,12]}
+    {"goldClasses":"bg-gold","testid":null,"text":"保存全部到文件夹","bg":"rgb(11, 122, 67)","color":"rgb(255, 255, 255)","borderTop":"oklch(0.928 0.006 264.531)","borderLeft":"oklch(0.928 0.006 264.531)","borderLeftWidth":"0px","opacity":"0.4","rect":[715,318,183,19]}
