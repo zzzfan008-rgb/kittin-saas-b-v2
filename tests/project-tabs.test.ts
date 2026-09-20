@@ -116,7 +116,7 @@ function aiNode(id: string, label: string): FlowNode {
 function runnableAiGraph(node: FlowNode): { nodes: FlowNode[]; edges: Edge[] } {
   const reference = imageNode(`${node.id}-reference`, `${node.data.label}参考图`);
   if (reference.data.kind !== "image") throw new Error("测试参考节点类型异常");
-  reference.data.imageUrl = `/api/files/${node.id}-reference.png`;
+  reference.data.outputImages = [`/api/files/${node.id}-reference.png`];
   return {
     nodes: [reference, node],
     edges: [{ id: `${node.id}-reference-edge`, source: reference.id, target: node.id }],
@@ -295,13 +295,16 @@ await test("后台任务可定向回写非当前页签", () => {
   useFlowStore.getState().switchTab(tabA);
   useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(tabB), "b-node", {
     status: "success",
-    imageUrl: "/api/files/background-result.png",
+    outputImages: ["/api/files/background-result.png"],
   });
   assert.equal(activeDocument().projectName, "项目 A");
   useFlowStore.getState().switchTab(tabB);
   const node = activeDocument().nodes.find((candidate) => candidate.id === "b-node");
   assert.equal(node?.data.status, "success");
-  assert.equal(node?.data.kind === "image" ? node.data.imageUrl : undefined, "/api/files/background-result.png");
+  assert.deepEqual(
+    node?.data.kind === "image" ? node.data.outputImages : undefined,
+    ["/api/files/background-result.png"],
+  );
 });
 
 await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片", () => {
@@ -533,7 +536,7 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
 await test("新连线不再写入角色数据（edge data 为空对象）", () => {
   const confirmedSource = imageNode("confirmed-edge-source", "参考人物");
   if (confirmedSource.data.kind !== "image") throw new Error("测试参考节点类型异常");
-  confirmedSource.data.imageUrl = "/api/files/confirmed-person.png";
+  confirmedSource.data.outputImages = ["/api/files/confirmed-person.png"];
   const firstTarget = aiNode("confirmed-edge-target", "第一目标");
   const secondTarget = aiNode("explicit-edge-target", "第二目标");
   useFlowStore.getState().openFlowTab({
@@ -728,7 +731,7 @@ await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", 
   const sharedNodeId = "same-tab-async-identity";
   const referenceNode = imageNode("same-tab-async-reference", "旧项目参考图");
   if (referenceNode.data.kind !== "image") throw new Error("测试参考节点类型异常");
-  referenceNode.data.imageUrl = "/api/files/garment-reference.png";
+  referenceNode.data.outputImages = ["/api/files/garment-reference.png"];
   const sourceNode = aiNode(sharedNodeId, "旧项目节点");
   sourceNode.data.status = "idle";
   useFlowStore.getState().loadFlow({
@@ -1293,7 +1296,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   await Promise.resolve().then(() => {
     useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(invariantTabId), "model-invariant-upload", {
       status: "success",
-      imageUrl: "/api/files/model-invariant-upload.png",
+      outputImages: ["/api/files/model-invariant-upload.png"],
     });
   });
   assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
@@ -1366,7 +1369,8 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   }
 });
 
-await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", () => {
+await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions，节点体不设第二处编辑入口", () => {
+  // 模型专属「业务画幅 ↔ provider 原生参数」联动助手行为保留（单元级契约）。
   assert.deepEqual(
     imageModelAspectRatioPatch(
       "gemini-3.1-flash-image",
@@ -1379,30 +1383,35 @@ await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", ()
     },
   );
 
-  const inspectorSource = fs.readFileSync(
+  // v7：旧 InspectorPanel / AiModifyNode / SketchToRenderNode 的画幅入口已随三节点重构
+  // 移除；原生参数统一在 NodeInspectorWindow 的 key/value 编辑器写回，避免两处入口漂移。
+  const inspectorWindowSource = fs.readFileSync(
+    new URL("../src/components/nodes/NodeInspectorWindowPortal.tsx", import.meta.url),
+    "utf8",
+  );
+  const legacyInspectorSource = fs.readFileSync(
     new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
     "utf8",
   );
-  const aiModifySource = fs.readFileSync(
-    new URL("../src/components/nodes/AiModifyNode.tsx", import.meta.url),
-    "utf8",
-  );
-  const sketchSource = fs.readFileSync(
-    new URL("../src/components/nodes/SketchToRenderNode.tsx", import.meta.url),
+  const imageNodeSource = fs.readFileSync(
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   assert.match(
-    inspectorSource,
-    /imageModelAspectRatioPatch\(selectedModelId, selectedModelOptions, e\.target\.value\)/,
-    "Inspector 修改画幅时必须同步业务比例与 provider modelOptions",
+    inspectorWindowSource,
+    /updateData\(node\.id, \{ modelOptions: \{ \.\.\.modelOptions, \[key\]: next \} \}\)/,
+    "Inspector 窗口必须是原生参数唯一写回入口",
   );
-  for (const source of [aiModifySource, sketchSource]) {
-    assert.match(
-      source,
-      /imageModelAspectRatioPatch\(data\.modelId, data\.modelOptions, e\.target\.value\)/,
-      "节点内画幅入口也必须复用同一 provider 参数补丁",
-    );
-  }
+  assert.doesNotMatch(
+    legacyInspectorSource,
+    /modelOptions/,
+    "旧 InspectorPanel 不得保留第二处原生参数编辑入口",
+  );
+  assert.doesNotMatch(
+    imageNodeSource,
+    /modelOptions:\s*\{/,
+    "图片节点体不得内联编辑原生参数（统一在 Inspector 窗口）",
+  );
 });
 
 await test("项目保存失败时显示错误且绝不提交生成", async () => {
@@ -1455,7 +1464,9 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
   try {
     const running = useFlowStore.getState().runNode("snapshot-run");
     assert.equal(projectResolvers.length, 1);
-    useFlowStore.getState().updateNodeData("snapshot-run", { prompt: "保存期间的新提示词" });
+    // v7：用户提示词归属上游 text 节点，图片节点不再携带 prompt；以持久化字段 label
+    // 作为「保存等待期间发生编辑」的载体，验证付费请求仍绑定点击时的不可变快照。
+    useFlowStore.getState().updateNodeData("snapshot-run", { label: "保存期间的新名称" });
     projectResolvers[0](Response.json({ ok: true }));
     await Promise.resolve();
     await Promise.resolve();
@@ -1466,7 +1477,7 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
     assert.equal(runBodies.length, 1);
     const submitted = runBodies[0].nodes.find((node) => node.id === "snapshot-run");
     assert.equal(submitted?.data.kind, "image");
-    assert.equal(submitted?.data.kind === "image" ? submitted.data.prompt : undefined, AI_TEST_PROMPT);
+    assert.equal(submitted?.data.label, "快照生成", "run-plan 必须提交点击时快照，不被等待期间的编辑改写");
     assert.match(
       activeDocument().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
       /画布尚未保存或已在其他位置更新/,
@@ -1590,31 +1601,31 @@ await test("React Flow 初始化尺寸不会移动节点或标记项目未保存
 
 await test("打开含蒙版节点的项目时只订阅稳定的首张输入图", () => {
   const source = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
-  assert.ok(source.includes("const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);"));
+  // v7：MaskRedrawNode 已并入 ImageNode；输入图经 useShallow 稳定订阅后只取首张作为蒙版源。
+  assert.match(source, /selectNodeInputImages\(document, id\)/);
+  assert.match(source, /const maskSource = referenceImages\[0\];/);
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
 });
 
-await test("羽化宽度滑块使用项目本地 shadcn Slider 并写入 featherRadius", () => {
-  const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+await test("羽化宽度经 ImageNode 透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
+  const imageNodeSource = fs.readFileSync(
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   const editorSource = fs.readFileSync(
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(redrawSource, /import \{ Slider \} from "@\/components\/ui\/slider"/);
-  assert.match(redrawSource, /min=\{FEATHER_RADIUS_MIN\}/);
-  assert.match(redrawSource, /max=\{FEATHER_RADIUS_MAX\}/);
-  assert.match(redrawSource, /aria-label="羽化宽度（像素）"/);
-  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: next \}\)/);
-  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: undefined \}\)/);
-  assert.match(redrawSource, /featherRadius=\{normalizeFeatherRadius\(data\.featherRadius\)\}/);
-  assert.doesNotMatch(redrawSource, /<input[^>]*type="range"/);
+  // v7：旧 MaskRedrawNode 的羽化 Slider 已随三节点重构移除；节点只把已保存的
+  // featherRadius 透传给 MaskEditor（缺省 = 自适应），不设第二处输入控件。
+  assert.match(imageNodeSource, /featherRadius=\{typeof data\.featherRadius === "number" \? data\.featherRadius : undefined\}/);
+  assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
   assert.match(editorSource, /featherRadius\?: number/);
+  // 0–64 边界钳制（原 Slider 的 min/max 约束）现在由预览侧保证。
+  assert.match(editorSource, /Math\.max\(0, Math\.min\(64, Math\.round\(featherRadius\)\)\)/);
   assert.match(editorSource, /adaptiveMaskFeatherRadius\(overlay\.width, overlay\.height, expansionRadius\)/);
 });
 
@@ -1632,7 +1643,7 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           kind: "image",
           label: "蒙版原图",
           status: "success",
-          imageUrl: sourceRef,
+          outputImages: [sourceRef],
         },
       },
       {
@@ -1729,8 +1740,9 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
+  // v7：MaskRedrawNode 已并入 ImageNode，蒙版上传 pending 与原图校验在其 onSave 闭包内。
   const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -1752,8 +1764,8 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   );
   assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
   assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
-  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== source/);
-  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: source/);
+  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== maskSource/);
+  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: maskSource/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);
