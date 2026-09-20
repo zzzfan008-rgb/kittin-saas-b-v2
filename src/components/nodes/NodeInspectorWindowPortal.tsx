@@ -9,8 +9,8 @@ import {
 } from "@/store/flowStore";
 import { useShallow } from "zustand/react/shallow";
 import {
-  NODE_SPECS,
   isNodeRunActive,
+  nodeTitleForKind,
   type ImageNodeData,
   type NodeKind,
   type WorkflowNodeData,
@@ -333,7 +333,7 @@ function InspectorDialog({
               <p className="rounded-[10px] border border-dashed border-black/15 px-3 py-4 text-center text-[11.5px]" style={{ color: "var(--iw-ink-muted, #6e6e73)" }}>
                 {search.trim()
                   ? `没有匹配「${search.trim()}」的已发布功能。`
-                  : `当前没有可用于${NODE_SPECS[data.kind].title}节点的已发布功能。`}
+                  : `当前没有可用于${nodeTitleForKind(data.kind)}节点的已发布功能。`}
               </p>
             ) : catalog.map((group) => (
               <div key={group.familyId}>
