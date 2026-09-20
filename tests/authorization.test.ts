@@ -1011,30 +1011,34 @@ await test("同 ID 项目不能被其他账号覆盖", async () => {
   assert.deepEqual(JSON.parse(row?.flow_json ?? "{}"), flow());
 });
 
-await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归一化后落库", async () => {
-  const invalidFlow = editFlow(PNG_DATA_URL);
-  invalidFlow.nodes[2].data.modelOptions = {
-    ...invalidFlow.nodes[2].data.modelOptions,
+await test("项目保存接受未知或跨模型 modelOptions，且原样落库不归一化", async () => {
+  const freeFlow = editFlow(PNG_DATA_URL);
+  freeFlow.nodes[2].data.modelOptions = {
+    ...freeFlow.nodes[2].data.modelOptions,
     aspect_ratio: "16:9",
   } as never;
   const response = await request("/projects", "owner", {
     method: "POST",
     body: JSON.stringify({
-      id: "invalid-model-options-project",
-      name: "非法模型参数",
-      flow: invalidFlow,
+      id: "free-model-options-project",
+      name: "自由模型参数",
+      flow: freeFlow,
     }),
   });
   const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /aspect_ratio/);
-  assert.equal(
-    await queryOne("SELECT id FROM projects WHERE id = 'invalid-model-options-project'"),
-    undefined,
+  assert.equal(response.status, 200, responseText);
+  const row = await queryOne<{ flow_json: string }>(
+    "SELECT flow_json FROM projects WHERE id = 'free-model-options-project'",
   );
+  assert.ok(row, "项目应已落库");
+  const persisted = JSON.parse(row.flow_json) as {
+    nodes: Array<{ data: { modelOptions?: Record<string, unknown> } }>;
+  };
+  // R5：自由 key-value，未知/跨模型取值不再被拒绝或归一化，原样保留。
+  assert.equal(persisted.nodes[2].data.modelOptions?.aspect_ratio, "16:9");
 });
 
-await test("直连生成在入队前拒绝未知 modelOptions", async () => {
+await test("直连生成在入队前拒绝偏离已评估参数档案的 modelOptions", async () => {
   const before = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
@@ -1049,7 +1053,9 @@ await test("直连生成在入队前拒绝未知 modelOptions", async () => {
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /aspect_ratio/);
+  // R5 删除了 modelOptions 取值硬校验，未知/跨模型取值在入队前由准入层的
+  // 「参数档案偏离」拒绝（parameter-drift），而非按字段名拒绝。
+  assert.match(responseText, /parameter-drift/);
   const after = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
@@ -1735,16 +1741,9 @@ await test("直连生成在入队前拒绝非图片引用与不安全 sourceNode
   });
   assert.equal(nonStringResponse.status, 400, await nonStringResponse.text());
 
-  const fabricRequestId = "direct-invalid-fabric-reference";
-  clientRequestIds.push(fabricRequestId);
-  const unsafeFabricReference = directGenerateBody(PNG_DATA_URL, undefined, fabricRequestId);
-  unsafeFabricReference.kind = "image";
-  (unsafeFabricReference.request as { fabricImageUrl?: unknown }).fabricImageUrl = "../../fabric.png";
-  const unsafeFabricResponse = await request("/generate", "owner", {
-    method: "POST",
-    body: JSON.stringify(unsafeFabricReference),
-  });
-  assert.equal(unsafeFabricResponse.status, 400, await unsafeFabricResponse.text());
+  // v7：fabricImageUrl 旁路已随参考图角色体系删除（docs/design/2026-09-17-remove-reference-roles），
+  // 服务端不再读取该字段；唯一的图片通道是 references[].dataUrl，其路径穿越/远程/非图片拒绝
+  // 已由上方六个用例覆盖，故不再为已删除的输入通道保留拒绝断言。
 
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
