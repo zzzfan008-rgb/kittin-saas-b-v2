@@ -24,6 +24,10 @@ import {
   type ImageModelOptions,
 } from "@/types/imageModels";
 import {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} from "@/types/modelParameterProfiles";
+import {
   TEXT_MODEL_IDS,
   isTextModelId,
   textModelLabel,
@@ -234,7 +238,21 @@ function InspectorDialog({
     };
     if (data.kind === "image" && isImageModelId(variant.modelId)) {
       patch.modelId = variant.modelId;
-      patch.modelOptions = defaultImageModelOptions(variant.modelId, (data as ImageNodeData).aspectRatio);
+      // v7（R-78/P2-b）：受审变体绑定唯一事实源——选中即确认并物化已评估参数档案
+      // （运行准入逐字比对该 patch）。档案不存在时退回合同推荐默认值，随后由
+      // parameter-drift 闸门 fail-closed 拦截，不会静默借用评估结论。
+      const profile = getModelParameterProfile(variant.parameterProfileId);
+      if (profile) {
+        const materialized = materializeModelParameterProfile(profile);
+        patch.modelOptions = materialized.modelOptions;
+        patch.batchSize = materialized.batchSize;
+        // "source" 档案的业务画幅运行时随首图推导，保留节点当前画幅；其余钉死档案值。
+        if (materialized.aspectRatio !== "source") {
+          patch.aspectRatio = materialized.aspectRatio;
+        }
+      } else {
+        patch.modelOptions = defaultImageModelOptions(variant.modelId, (data as ImageNodeData).aspectRatio);
+      }
     } else if (data.kind === "text") {
       patch.modelId = variant.modelId;
     }

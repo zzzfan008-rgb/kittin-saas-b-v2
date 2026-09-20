@@ -1,4 +1,4 @@
-import { useReducer, type ReactNode } from "react";
+import { useLayoutEffect, useReducer, useRef, type ReactNode } from "react";
 import { LibraryBigIcon, SlidersHorizontalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,10 +12,14 @@ import { cn } from "@/lib/utils";
 import {
   INITIAL_WORKBENCH_UI_STATE,
   workbenchUiReducer,
+  type WorkbenchUiState,
 } from "./workbenchState";
+import { dockWidthChange, emitDockViewportWillChange } from "@/lib/dockViewport";
 
 const LIBRARY_PANEL_ID = "workbench-library-panel";
 const INSPECTOR_PANEL_ID = "workbench-inspector-panel";
+
+type PanelId = "library" | "inspector";
 
 interface WorkbenchShellProps {
   library: ReactNode;
@@ -68,6 +72,27 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
   const libraryOpen = state.activePanel === "library";
   const inspectorOpen = state.activePanel === "inspector";
   const panelOpen = state.activePanel !== null;
+  const previousPanelOpenRef = useRef<boolean | null>(null);
+
+  // 在 React 已提交 Dock 宽度、浏览器绘制前同步通知画布：此时画布容器已经是新
+  // 宽度，CanvasFlow 可同步把 viewport 平移到正确矩阵，避免点击返回后读到旧矩阵。
+  useLayoutEffect(() => {
+    const previousPanelOpen = previousPanelOpenRef.current;
+    if (previousPanelOpen === null) {
+      previousPanelOpenRef.current = panelOpen;
+      return;
+    }
+    if (previousPanelOpen !== panelOpen) {
+      emitDockViewportWillChange({
+        widthDelta: dockWidthChange(previousPanelOpen, panelOpen),
+      });
+    }
+    previousPanelOpenRef.current = panelOpen;
+  }, [panelOpen]);
+
+  const togglePanel = (panel: PanelId) => {
+    dispatch({ type: "toggle-panel", panel });
+  };
 
   return (
     <TooltipProvider delay={250}>
@@ -87,7 +112,7 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
               label="节点库"
               controls={LIBRARY_PANEL_ID}
               active={libraryOpen}
-              onClick={() => dispatch({ type: "toggle-panel", panel: "library" })}
+              onClick={() => togglePanel("library")}
               icon={<LibraryBigIcon aria-hidden="true" />}
             />
           </Card>
@@ -100,7 +125,7 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
               label="属性 / 结果"
               controls={INSPECTOR_PANEL_ID}
               active={inspectorOpen}
-              onClick={() => dispatch({ type: "toggle-panel", panel: "inspector" })}
+              onClick={() => togglePanel("inspector")}
               icon={<SlidersHorizontalIcon aria-hidden="true" />}
             />
           </Card>

@@ -2,7 +2,12 @@ import fs from "node:fs";
 import { expect, test } from "./fixtures";
 
 const outputPath = process.env.PERFORMANCE_BASELINE_BROWSER_OUTPUT;
-test.skip(!outputPath, "run through npm run audit:performance-baseline");
+// 设计性 skip（不是脚本失效）：这是人工显式采集的性能基准，数字会落盘到
+// docs/audit/ 并跨机器比较，不能在隔离 e2e/CI 环境里随常规回归运行（硬件差异会让
+// p95/heap 失去可比性）。仅 npm run audit:performance-baseline 设置
+// PERFORMANCE_BASELINE_BROWSER_OUTPUT 时才真实执行；常规 e2e 收集时本用例带此明确
+// 原因出现在 skipped 列表，属于批准的 skip。
+test.skip(!outputPath, "performance baseline is captured only via npm run audit:performance-baseline");
 
 function summarize(values: readonly number[]) {
   const sorted = [...values].sort((left, right) => left - right);
@@ -45,13 +50,18 @@ test("capture 100-node desktop render latency and browser memory", async ({ page
       const storeModuleUrl = "/src/store/flowStore.ts";
       const store = await import(/* @vite-ignore */ storeModuleUrl);
       const nodes = Array.from({ length: count }, (_value, index) => ({
+        // v7 三基础节点（text/image/video，见 src/types/workflow.ts WORKFLOW_SCHEMA_VERSION）；
+        // v6 的 "image-input" 已非法。选 image 节点：它是三族里渲染最重的（上传槽 + 产出网格），
+        // 与原 image-input 基准意图一致。data 保持 ImageNode 真实渲染所需的最小合法形状
+        // （outputImages 必填，组件直接读 data.outputImages.length）。
         id: `performance-${index}`,
-        type: "image-input",
+        type: "image",
         position: { x: (index % 10) * 260, y: Math.floor(index / 10) * 230 },
         data: {
-          kind: "image-input",
+          kind: "image",
           label: `Performance ${index}`,
           status: "idle",
+          outputImages: [],
         },
       }));
       const started = performance.now();

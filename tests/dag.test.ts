@@ -199,7 +199,7 @@ function main() {
     );
   });
 
-  ok("R-78：未选变体仍 fail-closed 拒绝（operation-mode-incompatible）", () => {
+  ok("R-78/P2-b：未选变体仍 fail-closed 拒绝（missing-binding）", () => {
     const plan = buildExecutionPlan(
       [textNode("t1", "设计一套现代都市女装"), {
         id: "i1",
@@ -218,8 +218,10 @@ function main() {
     );
     assert.throws(
       () => assertPromptRunAdmissions(plan, { evaluationRun: true }),
-      (error) => error instanceof PromptRunAdmissionError && error.decision.allowed === false,
-      "未选变体（operationMode 缺失）必须在准入层拒绝",
+      (error) => error instanceof PromptRunAdmissionError
+        && error.decision.allowed === false
+        && error.decision.code === "missing-binding",
+      "未选变体（operationMode 缺失）必须在准入层以 missing-binding 拒绝",
     );
   });
 
