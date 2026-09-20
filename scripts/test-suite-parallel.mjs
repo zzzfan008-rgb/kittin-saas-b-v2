@@ -103,6 +103,7 @@ const TEST_FILES = [
   "tests/image-viewer-reference-evidence.test.ts",
   "tests/project-tabs-session.test.ts",
   "tests/initial-draft-client.test.ts",
+  "tests/empty-canvas.test.ts",
   "tests/flow-history.test.ts",
   "tests/text-edit-coalescing.test.ts",
   "tests/selection-consistency.test.ts",

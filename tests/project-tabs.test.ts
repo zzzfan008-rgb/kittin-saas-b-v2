@@ -166,7 +166,10 @@ setGenerationSafetyBlockReason(null);
 const initial = useFlowStore.getState();
 const tabA = initial.activeTabId;
 initial.setProjectName("项目 A");
-initial.updateNodeData(activeDocument(initial).nodes[0].id, { label: "A 上传节点" });
+// 方案 C：空白 tab 不再自带 starter 节点，测试显式添加一个 image 节点再改标签。
+const tabAStarterNodeId = initial.addNode("image", { x: 0, y: 0 });
+assert.ok(tabAStarterNodeId);
+initial.updateNodeData(tabAStarterNodeId, { label: "A 上传节点" });
 
 useFlowStore.getState().openFlowTab({
   projectId: "project-b",
@@ -361,7 +364,8 @@ await test("关闭当前页签后切换到相邻页签，至少保留一个画�
   useFlowStore.getState().closeTab(tabA);
   assert.equal(useFlowStore.getState().tabs.length, 1);
   assert.ok(useFlowStore.getState().activeTabId);
-  assert.equal(activeDocument().nodes.length, 1);
+  // 方案 C：关闭最后一个页签后重建的是空白画布（nodes=[]）。
+  assert.equal(activeDocument().nodes.length, 0);
 });
 
 await test("删除已选节点时同步清理 selectedNodeId", () => {
@@ -658,7 +662,9 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
     const firstSave = before.saveProject();
     assert.equal(requests.length, 1);
 
-    useFlowStore.getState().setProjectName("保存期间的新名称");
+    // 方案 C：空 tab 重命名是瞬态字段，不再 bump revision；用添加节点作为保存期间的实质编辑。
+    const editNodeId = useFlowStore.getState().addNode("text", { x: 0, y: 0 });
+    assert.ok(editNodeId);
     const secondSave = useFlowStore.getState().saveProject();
     assert.equal(requests.length, 1, "第二次保存应等待当前请求完成");
 
@@ -667,8 +673,8 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
     await Promise.resolve();
     assert.equal(requests.length, 2, "旧快照完成后应自动发送最新快照");
 
-    const latestPayload = JSON.parse(requests[1].body) as { name: string };
-    assert.equal(latestPayload.name, "保存期间的新名称");
+    const latestPayload = JSON.parse(requests[1].body) as { flow: { nodes: unknown[] } };
+    assert.equal(latestPayload.flow.nodes.length, 1);
     const duplicateSameSnapshot = useFlowStore.getState().saveProject();
     assert.equal(requests.length, 2, "同快照的显式重复保存应由当前请求覆盖");
     requests[1].resolve(Response.json({ ok: true }));

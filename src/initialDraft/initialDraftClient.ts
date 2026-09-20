@@ -246,9 +246,7 @@ export async function forceClearInitialDraft(): Promise<boolean> {
 }
 
 export function isServerInitialDraftPristine(draft: ServerInitialDraftSnapshot): boolean {
-  if (!/^未修改项目名称\d{8}000000$/.test(draft.name) || draft.flow.edges.length !== 0) return false;
-  if (draft.flow.nodes.length !== 1) return false;
-  const node = draft.flow.nodes[0];
-  // v7：空白起始节点是尚未上传图片的 image 节点（R8 输入输出同体）。
-  return node.data.kind === "image" && node.data.status === "idle" && node.data.outputImages.length === 0;
+  if (!/^未修改项目名称\d{8}000000$/.test(draft.name)) return false;
+  // 方案 C：空白草稿 = nodes=[] && edges=[]（与本地 isPristineProjectTab 锁步）。
+  return draft.flow.nodes.length === 0 && draft.flow.edges.length === 0;
 }

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { NODE_SPECS, type NodeKind } from "@/types/workflow";
 import {
+  ensureTextUpstreamForNode,
   selectActiveNodes,
   selectActivePrimarySelectedNodeId,
   useFlowStore,
@@ -59,6 +60,10 @@ function NodeList() {
       nodeId = useFlowStore.getState().addNode(kind, position);
     });
     if (!nodeId) return;
+    // 方案 C auto-text 兜底：点击添加 image/video 也必须有 text 上游（INV-1）。
+    if (kind === "image" || kind === "video") {
+      ensureTextUpstreamForNode(kind, position, nodeId);
+    }
     requestCanvasLanding({
       tabId: useFlowStore.getState().activeTabId,
       nodeId,

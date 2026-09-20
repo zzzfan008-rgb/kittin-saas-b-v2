@@ -12,6 +12,7 @@ import {
   beginHistoryTransaction,
   documentConnectionRejection,
   endHistoryTransaction,
+  ensureTextUpstreamForNode,
   selectActiveEdges,
   selectActiveNodes,
   selectActiveReadOnly,
@@ -302,31 +303,10 @@ export function CanvasFlow() {
       const kind = e.dataTransfer.getData(DND_MIME) as NodeKind | "";
       if (!kind || readOnly) return;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      addNode(kind, position);
-      // R3 画布层：新建 image/video 节点时若无可用 text 节点，自动在其左侧
-      // 生成一个空 text 节点并预连线（graph-invariants.md §3 画布行）。
-      if (kind === "image" || kind === "video") {
-        const state = useFlowStore.getState();
-        const document = state.tabs.find((tab) => tab.id === state.activeTabId);
-        const hasText = document?.nodes.some((node) => node.data.kind === "text");
-        if (document && !hasText) {
-          const textId = state.addNode("text", { x: position.x - 380, y: position.y });
-          if (textId) {
-            const nodeId = state.tabs
-              .find((tab) => tab.id === state.activeTabId)?.nodes.at(-1)?.id;
-            const newImageNodeId = nodeId && nodeId !== textId ? nodeId : null;
-            if (newImageNodeId) {
-              // 直接补一条 prompt 边（同一撤销语义由两次提交分别承载；连线在用户
-              // 拖动或保存时生效——addConnectedNode 的原子路径由快捷建图使用）。
-              useFlowStore.getState().onConnect({
-                source: textId,
-                target: newImageNodeId,
-                sourceHandle: "prompt",
-                targetHandle: "prompt",
-              });
-            }
-          }
-        }
+      const nodeId = addNode(kind, position);
+      // 方案 C auto-text 共享兜底：image/video 节点必须有 text 上游（INV-1）。
+      if (nodeId && (kind === "image" || kind === "video")) {
+        ensureTextUpstreamForNode(kind, position, nodeId);
       }
     },
     [addNode, screenToFlowPosition, readOnly],
