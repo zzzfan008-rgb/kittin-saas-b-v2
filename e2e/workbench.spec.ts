@@ -192,7 +192,7 @@ async function expectFlowCenter(
  * 方案 C（R-75 §2）首屏语义：进入工作台是本地空白 tab（nodes=0 && edges=0），
  * 不 bootstrap、也没有 TaskLauncher 浮层（R-76 已删除）。工作台用例断言的是「已开始
  * 项目」的画布/面板机制，因此 before 钩子用真实用户动作完成「首次实质变更」：
- * 从节点库点击添加一个视频节点 —— auto-text 兜底会补出文本节点与 prompt 边，
+ * 从节点库点击添加一个图片节点 —— auto-text 兜底会补出文本节点与 prompt 边，
  * 这次落库（POST /initial-draft/bootstrap）让项目真正诞生。
  *
  * 已落库草稿/正式项目被启动流程恢复时画布非空，本钩子不重复建节点，保持
@@ -270,9 +270,38 @@ async function addLibraryNode(page: Page, title: string): Promise<void> {
   ]);
 }
 
+/**
+ * 方案 C 的规范起点：空首屏（本地空 tab、不落库、无 TaskLauncher 浮层）。
+ *
+ * 隔离库里的初始草稿与页面 sessionStorage 都是跨用例、跨视口共享的：上一个用例的
+ * 「设为输入」等动作会把节点写进草稿，下一次 page.goto 就会把它们恢复出来。实测
+ * desktop-1280/1024 的「节点库加节点」用例因此读到两个 video 节点（旧草稿里的一个 +
+ * 本用例新加的一个），选中态断言打在旧节点上而超时。这里在起点非空时显式回到空首屏：
+ * 清本地会话 + 清服务端草稿 + 遮住正式项目列表，再重新加载。
+ */
+async function resetToEmptyFirstScreen(page: Page): Promise<void> {
+  if (await page.locator(".react-flow__node").count() === 0) return;
+  const cleared = await page.request.post("/api/projects/initial-draft/force-clear", {
+    data: { confirm: true },
+  });
+  expect(cleared.ok(), await cleared.text()).toBeTruthy();
+  await page.evaluate(() => window.sessionStorage.clear());
+  await page.route("**/api/projects", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
+  await page.reload();
+  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
+  await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
+  await resetToEmptyFirstScreen(page);
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
   await startFirstProject(page);
 });
