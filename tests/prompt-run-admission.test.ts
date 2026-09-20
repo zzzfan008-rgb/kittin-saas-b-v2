@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import {
   evaluatePromptRunAdmission,
+  evaluatePromptRunCompatibility,
   promptRunAdmissionInputFromParams,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
   synthesizeVariantTaskPrompt,
+  type PromptRunAdmissionInput,
   type PromptRunGraphNode,
 } from "../src/lib/promptRunAdmission";
 import { createPromptEvaluationReleaseSnapshot } from "../src/lib/promptEvaluationRelease";
@@ -103,6 +106,30 @@ assert.deepEqual(promptRunReferenceSnapshotsFromGraph(graphNodes, [
   { order: 2, sourceNodeId: "identity" },
 ], "旧 Provider 边同样按连线顺序逐图片展开");
 
+// v7（P2-b）：浏览器镜像闸按 dag 的 edges 顺序收集上游 text 正文（与
+// server/engine/dag.ts buildExecutionPlan 同源同语义），跳过非 text 来源、
+// 只取指向目标节点的边。若此处与服务端收集不一致，UI 会在 prompt-drift 误拦。
+const inputTextsGraphNodes: PromptRunGraphNode[] = [
+  { id: "t1", data: { kind: "text", label: "提示词1", status: "idle", text: "第一段正文" } },
+  { id: "img-a", data: { kind: "image", label: "上游图", status: "success", aspectRatio: "1:1", batchSize: 1, outputImages: ["a"] } },
+  { id: "t2", data: { kind: "text", label: "提示词2", status: "idle", text: "第二段正文" } },
+];
+assert.deepEqual(
+  promptRunInputTextsFromGraph(inputTextsGraphNodes, [
+    { source: "t1", target: "target" },
+    { source: "img-a", target: "target" },
+    { source: "t2", target: "target" },
+    { source: "t2", target: "other-node" },
+  ], "target"),
+  ["第一段正文", "第二段正文"],
+  "必须按 edges 顺序收集上游 text 正文，跳过非 text 来源与指向其他节点的边",
+);
+assert.deepEqual(
+  promptRunInputTextsFromGraph(inputTextsGraphNodes, [], "target"),
+  [],
+  "目标节点无上游入边时正文为空（随后由 prompt-drift 拒绝）",
+);
+
 const input = promptRunAdmissionInputFromParams("image", params, references);
 assert.equal(evaluatePromptRunAdmission(input).code, "support-status-blocked");
 assert.equal(evaluatePromptRunAdmission(input).allowed, false);
@@ -110,6 +137,53 @@ assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).code, "e
 assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).allowed, true);
 assert.equal(evaluatePromptRunAdmission({ ...input, promptVariantId: undefined }).code, "missing-binding");
 assert.equal(evaluatePromptRunAdmission({ ...input, contractHash: `sha256:${"0".repeat(64)}` }).code, "binding-mismatch");
+
+// v7 mode 归属反转（R-76/R-78，P2-b）：浏览器节点 data 不再携带 operationMode，
+// 也不携带 parameterProfileId / postprocessVersion（applyVariant 只写绑定五字段），
+// admission 输入必须从选中变体推导出这三项（与 dag.ts extractParams 同源），
+// golden-path 受审变体因此不再在 UI 镜像闸被 operation-mode-incompatible /
+// binding-mismatch / parameter-drift 死拦。
+const {
+  operationMode: _browserParamsDoNotCarryMode,
+  parameterProfileId: _browserParamsDoNotCarryProfile,
+  postprocessVersion: _browserParamsDoNotCarryPostprocess,
+  ...browserNodeParams
+} = params;
+const browserInput: PromptRunAdmissionInput = promptRunAdmissionInputFromParams(
+  "image",
+  browserNodeParams,
+  references,
+);
+assert.equal(
+  browserInput.operationMode,
+  variant.mode,
+  "节点 data 缺省 operationMode 时必须从绑定变体推导出 mode",
+);
+assert.equal(
+  evaluatePromptRunCompatibility(browserInput),
+  undefined,
+  "选中目录内变体后兼容性闸放行（发布状态在后续闸门判定）",
+);
+assert.equal(
+  evaluatePromptRunAdmission(browserInput).code,
+  "support-status-blocked",
+  "浏览器形状（无 operationMode 字段）不得被 mode 闸拦截",
+);
+assert.equal(
+  evaluatePromptRunCompatibility({ ...browserInput, promptVariantId: undefined })?.code,
+  "missing-binding",
+  "无绑定变体：兼容性闸 fail-closed（missing-binding）",
+);
+assert.equal(
+  evaluatePromptRunCompatibility({ ...browserInput, promptVariantId: "does.not.exist.generate.v1" })?.code,
+  "unknown-variant",
+  "未知变体 ID：兼容性闸 fail-closed（unknown-variant），不回退通用提示词",
+);
+assert.equal(
+  evaluatePromptRunCompatibility({ ...browserInput, operationMode: "generate" })?.code,
+  "operation-mode-incompatible",
+  "显式 mode 与变体声明不一致必须拒绝，系统不静默切换调用模式",
+);
 // v7 drift 语义（runtime.md §1 第 3 步）：受审身份是 variant.fullPrompt，由服务端目录
 // 钉死；用户正文沿 text 边进入 inputTexts，承载自由意图，其内容变化不构成 drift。
 assert.notEqual(
@@ -180,14 +254,52 @@ assert.match(retiredDecision.reason, /不会静默换模.*手动选择新模型/
 // 模型×kind 硬闸不再拒绝；fail-closed 落点变为绑定比对（modelId 与变体不符）。
 assert.equal(evaluatePromptRunAdmission({ ...input, modelId: "gpt-image-2.5-sunburst" }).code, "binding-mismatch");
 // v7：operationMode 归属反转给变体后，nodeKind×mode 硬闸删除；
-// generate + 参考图的冲突由 reference 闸拦截。
-assert.equal(evaluatePromptRunAdmission({ ...input, operationMode: "generate" }).code, "generate-reference-conflict");
-// v7：operationModeNeedsConfirmation 字段族删除，该断言随字段一并移除。
-// v7：旧「草图渲染节点 + generate + 参考图」冲突反例改为 image kind 表达。
-assert.equal(evaluatePromptRunAdmission({
-  ...input,
-  operationMode: "generate",
-}).code, "generate-reference-conflict");
+// generate + 参考图的冲突由 reference 闸拦截——但 mode 只能由 generate 变体自身
+// 推导（edit 变体显式塞 generate 属于 mode/变体不一致，上面已断言拒绝）。
+const generateVariant = requireGarmentPromptVariant({
+  familyId: "fashion-lookbook",
+  modelId: "gemini-3.1-flash-image",
+  nodeKind: "image",
+  mode: "generate",
+});
+const generateProfile = getModelParameterProfile(generateVariant.parameterProfileId)!;
+const generateMaterialized = materializeModelParameterProfile(generateProfile);
+const generateInput = promptRunAdmissionInputFromParams("image", {
+  modelId: generateVariant.modelId,
+  inputTexts: params.inputTexts,
+  promptVariantId: generateVariant.variantId,
+  promptFamilyId: generateVariant.familyId,
+  parameterProfileId: generateVariant.parameterProfileId,
+  contractHash: generateVariant.contractHash,
+  evaluationVersion: generateVariant.evaluationVersion,
+  postprocessVersion: generateProfile.postprocess.version,
+  aspectRatio: generateMaterialized.aspectRatio,
+  batchSize: generateMaterialized.batchSize,
+  modelOptions: generateMaterialized.modelOptions,
+}, references);
+assert.equal(generateInput.operationMode, "generate", "generate mode 同样只从变体推导");
+assert.equal(
+  evaluatePromptRunAdmission(generateInput).code,
+  "generate-reference-conflict",
+  "generate 变体携带参考图仍由 reference 闸拒绝",
+);
+assert.equal(
+  evaluatePromptRunCompatibility(promptRunAdmissionInputFromParams("image", {
+    modelId: generateVariant.modelId,
+    inputTexts: params.inputTexts,
+    promptVariantId: generateVariant.variantId,
+    promptFamilyId: generateVariant.familyId,
+    parameterProfileId: generateVariant.parameterProfileId,
+    contractHash: generateVariant.contractHash,
+    evaluationVersion: generateVariant.evaluationVersion,
+    postprocessVersion: generateProfile.postprocess.version,
+    aspectRatio: generateMaterialized.aspectRatio,
+    batchSize: generateMaterialized.batchSize,
+    modelOptions: generateMaterialized.modelOptions,
+  })),
+  undefined,
+  "generate 变体无参考图时兼容性闸放行",
+);
 assert.equal(evaluatePromptRunAdmission({ ...input, references: [] }).code, "edit-reference-missing");
 // v7：首版四族 kind 产品政策收窄清单随旧 kind 退役删除（nodeProductPolicy 恒 supported）；
 // 对应「node-product-policy-blocked」断言随之删除——三值 kind 无收窄位。
@@ -287,5 +399,27 @@ const maskInput = promptRunAdmissionInputFromParams("image", {
 }, [{ order: 0, sourceNodeId: "mask-source" }]);
 assert.equal(evaluatePromptRunAdmission(maskInput).allowed, false);
 assert.equal(evaluatePromptRunAdmission(maskInput, { evaluationRun: true }).code, "evaluation-only");
+
+// v7（P2-b）：蒙版节点浏览器形状同样不携带 operationMode——mode 从 needsMask 变体
+// 推导为 mask-edit，蒙版限位/联动闸不得因归属反转而回退到普通 edit 限位或死拦。
+const maskBrowserInput = promptRunAdmissionInputFromParams("image", {
+  modelId: maskVariant.modelId,
+  inputTexts: ["将蒙版区域改成银色拉链"],
+  promptVariantId: maskVariant.variantId,
+  promptFamilyId: maskVariant.familyId,
+  parameterProfileId: maskVariant.parameterProfileId,
+  contractHash: maskVariant.contractHash,
+  evaluationVersion: maskVariant.evaluationVersion,
+  postprocessVersion: maskProfile.postprocess.version,
+  aspectRatio: materializeModelParameterProfile(maskProfile).aspectRatio,
+  batchSize: materializeModelParameterProfile(maskProfile).batchSize,
+  modelOptions: {},
+}, [{ order: 0, sourceNodeId: "mask-source" }]);
+assert.equal(maskBrowserInput.operationMode, "mask-edit", "mask-edit 只从蒙版变体推导");
+assert.equal(evaluatePromptRunCompatibility(maskBrowserInput), undefined, "蒙版变体联动检查不回退");
+assert.equal(
+  evaluatePromptRunAdmission(maskBrowserInput, { evaluationRun: true }).code,
+  "evaluation-only",
+);
 
 console.log("提示词运行时发布门禁测试通过");

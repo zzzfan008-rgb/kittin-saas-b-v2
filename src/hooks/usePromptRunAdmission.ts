@@ -9,6 +9,7 @@ import type { WorkflowNodeData } from "@/types/workflow";
 import {
   evaluatePromptRunAdmission,
   promptRunAdmissionInputFromNode,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
   type PromptRunGraphEdge,
   type PromptRunGraphNode,
@@ -72,8 +73,9 @@ export function usePromptRunAdmission(nodeId: string, data: WorkflowNodeData) {
   const edges = useFlowStore(useShallow(selectActiveEdges));
   return useMemo(() => {
     const references = promptRunReferenceSnapshotsFromGraph(nodes, edges, nodeId);
+    const inputTexts = promptRunInputTextsFromGraph(nodes, edges, nodeId);
     return {
-      ...evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(data, references)),
+      ...evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(data, references, inputTexts)),
       referenceRows: promptRunBrowserReferencesFromGraph(nodes, edges, nodeId),
     };
   }, [data, edges, nodeId, nodes]);

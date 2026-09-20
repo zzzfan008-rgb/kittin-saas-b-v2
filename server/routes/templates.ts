@@ -30,6 +30,11 @@ import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
 } from "../../src/types/imageModels";
+import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
+import {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} from "../../src/types/modelParameterProfiles";
 
 export const templatesRouter = Router();
 
@@ -67,6 +72,16 @@ function imageNode(
   variantId: string,
   aspectRatio: string,
 ): PersistedWorkflowNode {
+  // v7（R-78/P2-b）：变体绑定是唯一事实源。种子节点直接物化已评估参数档案
+  // （modelOptions / batchSize / 业务画幅），模板落地后无需用户再点一次目录即可
+  // 通过运行准入；档案缺失时退回合同推荐默认值，由 parameter-drift 闸门拒绝。
+  const boundVariant = getGarmentPromptVariantById(variantId);
+  const boundProfile = boundVariant
+    ? getModelParameterProfile(boundVariant.parameterProfileId)
+    : undefined;
+  const materialized = boundProfile
+    ? materializeModelParameterProfile(boundProfile)
+    : undefined;
   return {
     id,
     type: "image",
@@ -77,9 +92,13 @@ function imageNode(
       status: "idle",
       promptVariantId: variantId,
       modelId: DEFAULT_GENERATION_MODEL_ID,
-      modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
-      aspectRatio,
-      batchSize: 1,
+      modelOptions: materialized
+        ? materialized.modelOptions
+        : defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
+      aspectRatio: materialized && materialized.aspectRatio !== "source"
+        ? materialized.aspectRatio
+        : aspectRatio,
+      batchSize: materialized ? materialized.batchSize : 1,
       outputImages: [],
     },
   };

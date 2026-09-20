@@ -54,6 +54,7 @@ import { waitForInitialDraftSyncBeforeFormalSave } from "@/initialDraft/initialD
 import {
   evaluatePromptRunAdmission,
   promptRunAdmissionInputFromNode,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
 } from "@/lib/promptRunAdmission";
 import type { HistoricalReferenceEvidence } from "@/lib/referenceEvidence";
@@ -3214,8 +3215,13 @@ export const useFlowStore = create<FlowState>()(
           initialDocument.edges,
           id,
         );
+        const promptInputTexts = promptRunInputTextsFromGraph(
+          initialDocument.nodes,
+          initialDocument.edges,
+          id,
+        );
         const promptAdmission = evaluatePromptRunAdmission(
-          promptRunAdmissionInputFromNode(node.data, promptReferences),
+          promptRunAdmissionInputFromNode(node.data, promptReferences, promptInputTexts),
         );
         if (!promptAdmission.allowed) {
           runWithoutHistory(() => updateTabNodes(set, target, (nodes) => nodes.map((candidate) => (
