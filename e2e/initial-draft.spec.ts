@@ -64,7 +64,7 @@ test("the empty first screen stays local and only persists after the first subst
   const cta = page.getByRole("region", { name: "开始创作" });
   await expect(cta).toBeVisible();
   await expect(cta.getByRole("button", { name: "上传图片开始" })).toBeVisible();
-  await expect(cta.getByText("从左侧节点库拖入文本 / 图片节点，或点击上方按钮上传图片")).toBeVisible();
+  await expect(cta.getByText("从左侧「添加」新建文本 / 图片 / 视频节点，或点击上方按钮上传图片")).toBeVisible();
   await expect(page.getByRole("region", { name: "开始第一个创作任务" })).toHaveCount(0);
   const nodes = page.locator(".react-flow__node");
   await expect(nodes).toHaveCount(0);

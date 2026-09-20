@@ -1806,9 +1806,9 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.equal((shellSource.match(/\{library\}/g) ?? []).length, 1);
   assert.equal((shellSource.match(/\{inspector\}/g) ?? []).length, 1);
   assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|mobilePanel/);
-  assert.match(shellSource, /aria-controls=\{controls\}/);
-  assert.match(shellSource, /controls=\{LIBRARY_PANEL_ID\}/);
-  assert.match(shellSource, /controls=\{INSPECTOR_PANEL_ID\}/);
+  assert.match(shellSource, /aria-controls=\{[^}]*INSPECTOR_PANEL_ID[^}]*\}/);
+  assert.match(shellSource, /id=\{LIBRARY_PANEL_ID\}/);
+  assert.match(shellSource, /id=\{INSPECTOR_PANEL_ID\}/);
   assert.match(shellSource, /transition-\[width,visibility\]/);
   assert.match(topBarSource, /grid-cols-\[1fr_auto_1fr\]/);
   assert.match(topBarSource, /Coin AI - Canvas/);

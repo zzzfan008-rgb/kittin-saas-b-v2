@@ -51,7 +51,7 @@ export function EmptyCanvasCTA() {
           上传图片开始
         </Button>
         <p className="text-xs leading-relaxed text-[var(--gc-text-muted)]">
-          从左侧节点库拖入文本 / 图片节点，或点击上方按钮上传图片
+          从左侧「添加」新建文本 / 图片 / 视频节点，或点击上方按钮上传图片
         </p>
       </div>
     </section>

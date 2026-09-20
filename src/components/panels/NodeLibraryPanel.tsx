@@ -25,6 +25,35 @@ export function nodeLibraryClickPosition(
   return { x: anchor.position.x + 380, y: anchor.position.y };
 }
 
+/**
+ * 在画布上新建一个基础节点（文本 / 图片 / 视频）。
+ * 供左侧节点库面板与左侧悬浮工具栏的「添加」菜单共用，避免两处各写一遍 landing 逻辑。
+ */
+export function addCanvasNode(kind: NodeKind): void {
+  const state = useFlowStore.getState();
+  const position = nodeLibraryClickPosition(
+    selectActiveNodes(state),
+    selectActivePrimarySelectedNodeId(state),
+  );
+  let nodeId: string | null = null;
+  flushSync(() => {
+    nodeId = useFlowStore.getState().addNode(kind, position);
+  });
+  if (!nodeId) return;
+  // 方案 C auto-text 兜底：点击添加 image/video 也必须有 text 上游（INV-1）。
+  if (kind === "image" || kind === "video") {
+    ensureTextUpstreamForNode(kind, position, nodeId);
+  }
+  requestCanvasLanding({
+    tabId: useFlowStore.getState().activeTabId,
+    nodeId,
+    fitView: false,
+    // v7：text 节点选中正文输入框；image 节点为上传槽位。
+    activateFilePicker: kind === "image",
+    selectText: kind === "text",
+  });
+}
+
 export function NodeLibraryPanel({ className }: { className?: string }) {
   return (
     <aside
@@ -49,31 +78,6 @@ export function NodeLibraryPanel({ className }: { className?: string }) {
 }
 
 function NodeList() {
-  const addByClick = (kind: NodeKind) => {
-    const state = useFlowStore.getState();
-    const position = nodeLibraryClickPosition(
-      selectActiveNodes(state),
-      selectActivePrimarySelectedNodeId(state),
-    );
-    let nodeId: string | null = null;
-    flushSync(() => {
-      nodeId = useFlowStore.getState().addNode(kind, position);
-    });
-    if (!nodeId) return;
-    // 方案 C auto-text 兜底：点击添加 image/video 也必须有 text 上游（INV-1）。
-    if (kind === "image" || kind === "video") {
-      ensureTextUpstreamForNode(kind, position, nodeId);
-    }
-    requestCanvasLanding({
-      tabId: useFlowStore.getState().activeTabId,
-      nodeId,
-      fitView: false,
-      // v7：text 节点选中正文输入框；image 节点为上传槽位。
-      activateFilePicker: kind === "image",
-      selectText: kind === "text",
-    });
-  };
-
   return (
     <div className="flex-1 space-y-2 overflow-y-auto p-3">
       {KIND_ORDER.map((kind) => {
@@ -88,7 +92,7 @@ function NodeList() {
               type="button"
               variant="ghost"
               draggable
-              onClick={() => addByClick(kind)}
+              onClick={() => addCanvasNode(kind)}
               onDragStart={(event) => {
                 event.dataTransfer.setData(DND_MIME, kind);
                 event.dataTransfer.effectAllowed = "move";

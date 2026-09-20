@@ -241,7 +241,7 @@ async function startFirstProject(page: Page): Promise<void> {
   await expect(emptyCta).toBeVisible();
   await expect(emptyCta.getByRole("button", { name: "上传图片开始" })).toBeVisible();
   await expect(
-    emptyCta.getByText("从左侧节点库拖入文本 / 图片节点，或点击上方按钮上传图片"),
+    emptyCta.getByText("从左侧「添加」新建文本 / 图片 / 视频节点，或点击上方按钮上传图片"),
   ).toBeVisible();
   await expect(page.getByRole("region", { name: "开始第一个创作任务" })).toHaveCount(0);
   await expect(nodes).toHaveCount(0);
@@ -262,15 +262,13 @@ async function startFirstProject(page: Page): Promise<void> {
     response.request().method() === "POST"
     && new URL(response.url()).pathname === "/api/projects/initial-draft/bootstrap"
   ));
-  await addLibraryNode(page, "点击添加图片节点，或拖拽到画布指定位置");
+  await addRailNode(page, "图片");
   // 图片节点 + auto-text 兜底补出的文本节点；两者之间一条 prompt 边。
   await expect(nodes).toHaveCount(2);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   // 首个实质变更后空态 CTA 退场，且整段过程恰好一次 bootstrap（惰性落库）。
   await expect(emptyCta).toHaveCount(0);
   await expect.poll(() => bootstrapUrls).toHaveLength(1);
-  await page.getByRole("button", { name: "节点库" }).click();
-  await expect(page.locator("#workbench-library-panel")).toHaveAttribute("aria-hidden", "true");
   // 落地意图会把焦点放到节点的首个可聚焦控件（图片节点是隐藏的 file input）；
   // 摘掉焦点，避免后续用例的 Cmd+A 被「输入框内快捷键让位原生编辑」规则吞掉。
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -317,14 +315,18 @@ async function activeDocumentGraph(page: Page): Promise<{
   });
 }
 
-/** 从节点库加节点时 image 会顺带打开文件选择器；这里显式消化它，避免悬挂。 */
-async function addLibraryNode(page: Page, title: string): Promise<void> {
-  await page.getByRole("button", { name: "节点库" }).click();
-  const button = page.getByTitle(title);
-  await expect(button).toBeVisible();
+/** 左侧悬浮工具栏「添加」工作流：hover 自动弹出菜单，选中即建节点（v8 起替代节点库面板）。 */
+async function addRailNode(page: Page, label: "文本" | "图片" | "视频"): Promise<void> {
+  const addButton = page.getByRole("button", { name: "添加" });
+  await addButton.hover();
+  const menu = page.getByRole("menu", { name: "添加" });
+  await expect(menu).toBeVisible();
+  const item = menu.getByRole("menuitem", { name: label });
+  await expect(item).toBeVisible();
+  // image 会顺带打开文件选择器；这里显式消化它，避免悬挂。
   await Promise.all([
     page.waitForEvent("filechooser", { timeout: 5_000 }).catch(() => undefined),
-    button.click(),
+    item.click(),
   ]);
 }
 
@@ -635,23 +637,20 @@ test("adding a library node keeps the canvas mounted and links its auto-text pro
   const initialNodeCount = await nodes.count();
   const initialEdgeCount = await edges.count();
 
-  // 方案 C 的 v7 等价行为：从节点库加一个需要文本上游的节点（视频），必须保持画布挂载
+  // 方案 C 的 v7 等价行为：加一个需要文本上游的节点（视频），必须保持画布挂载
   // 并由 auto-text 兜底补齐 text→节点 的 prompt 边（复用已有文本节点，不重复造节点）。
+  // v8 起入口改为左侧悬浮工具栏的「添加」工作流菜单（节点库面板下线）。
   const imageNodeId = await nodeIdOfKind(page, "image");
   await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
-  await page.getByRole("button", { name: "节点库" }).click();
-  const libraryPanel = page.locator("#workbench-library-panel");
-  await expect(libraryPanel).toHaveAttribute("aria-hidden", "false");
-  // 节点库固定暴露文本 / 图片 / 视频三个 v7 入口，title 文案即操作说明。
-  for (const title of ["文本", "图片", "视频"]) {
-    await expect(
-      libraryPanel.getByTitle(`点击添加${title}节点，或拖拽到画布指定位置`),
-    ).toBeVisible();
+  const addButton = page.getByRole("button", { name: "添加" });
+  await addButton.hover();
+  const addMenu = page.getByRole("menu", { name: "添加" });
+  await expect(addMenu).toBeVisible();
+  // 「添加」菜单固定暴露文本 / 图片 / 视频三个基础节点入口。
+  for (const label of ["文本", "图片", "视频"]) {
+    await expect(addMenu.getByRole("menuitem", { name: label })).toBeVisible();
   }
-  await Promise.all([
-    page.waitForEvent("filechooser", { timeout: 5_000 }).catch(() => undefined),
-    libraryPanel.getByTitle("点击添加视频节点，或拖拽到画布指定位置").click(),
-  ]);
+  await addMenu.getByRole("menuitem", { name: "视频" }).click();
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
   await expect(edges).toHaveCount(initialEdgeCount + 1);
@@ -833,11 +832,9 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   if (!viewport) throw new Error("Desktop viewport is required");
   const modifier = process.platform === "darwin" ? "Meta" : "Control";
 
-  const libraryToggle = page.getByRole("button", { name: "节点库" });
   const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
   const floatingRail = page.getByRole("navigation", { name: "工作台左侧工具" });
   const dock = page.locator('aside[aria-label="工作台左侧面板"]');
-  const libraryPanel = page.locator("#workbench-library-panel");
   const contextPanel = page.locator("#workbench-inspector-panel");
   const canvas = page.getByRole("application", { name: "工作流画布" });
   const zoomControls = page.getByTestId("canvas-zoom-controls");
@@ -847,7 +844,6 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   if (!originalCanvas) throw new Error("Canvas element is missing");
   const originalTransform = await readViewportMatrix(page.locator(".react-flow__viewport"));
   const originalFlowCenter = await flowCenter(canvas);
-  await expect(libraryToggle).toHaveAttribute("aria-expanded", "false");
   await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
   await expect(dock).toHaveAttribute("aria-hidden", "true");
   await expectInert(dock, true);
@@ -969,36 +965,22 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   expect(await resultsRegion.evaluate((current, original) => current === original, originalResultsRegion)).toBe(true);
   await expect.poll(async () => resultsScroller.evaluate((element) => element.scrollTop)).toBe(37);
 
-  // 节点库使用独立浮动按钮，并与上下文面板复用同一个左侧 Dock。
-  await libraryToggle.click();
-  await expect(libraryToggle).toBeFocused();
-  await expect(libraryToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(libraryPanel).toHaveAttribute("aria-hidden", "false");
-  await expectInert(libraryPanel, false);
-  await expect(contextPanel).toHaveAttribute("aria-hidden", "true");
-  await expectInert(contextPanel, true);
+  // v8：左侧工具栏只有「属性 / 结果」一个面板入口；节点库面板已下线，
+  // 加节点改由「添加」工作流菜单直接完成（见上方 library-node 用例）。
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(dock).toHaveAttribute("aria-hidden", "false");
+  await expectInert(dock, false);
+  await expect(contextPanel).toHaveAttribute("aria-hidden", "false");
+  await expectInert(contextPanel, false);
   await expectWidth(dock, 320);
   await expectWidth(canvas, viewport.width - 320);
-  await expect(libraryPanel.getByRole("button", { name: "素材库" })).toHaveCount(0);
-  const libraryButtons = libraryPanel.getByRole("button");
-  await libraryButtons.first().focus();
-  await expect(libraryButtons.first()).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(libraryButtons.nth(1)).toBeFocused();
   const sessionBeforeDomFocus = await page.evaluate(() => (
     window.sessionStorage.getItem("garment-canvas-project-tabs")
   ));
-  await libraryToggle.focus();
+  await contextToggle.focus();
   await expect.poll(() => page.evaluate(() => (
     window.sessionStorage.getItem("garment-canvas-project-tabs")
   ))).toBe(sessionBeforeDomFocus);
-
-  await contextToggle.click();
-  await expectInert(contextPanel, false);
-  await expectInert(libraryPanel, true);
-  await expectWidth(dock, 320);
-  await expectWidth(canvas, viewport.width - 320);
 
   const canvasRect = await rect(canvas);
   expect(Math.abs((await rect(dock)).right - canvasRect.left)).toBeLessThanOrEqual(1);
@@ -1139,7 +1121,6 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   await expectWidth(dock, 0);
   await expectWidth(canvas, viewport.width);
   await page.keyboard.press("Tab");
-  expect(await libraryPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
   expect(await contextPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
 
   expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
