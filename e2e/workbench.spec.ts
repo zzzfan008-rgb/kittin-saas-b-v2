@@ -203,6 +203,29 @@ async function startFirstProject(page: Page): Promise<void> {
   const nodes = page.locator(".react-flow__node");
   if (await nodes.count() > 0) return;
 
+  // 空态断言（方案 C）：中央 EmptyCanvasCTA 可见、旧 TaskLauncher 浮层（R-76 已删除）
+  // 不存在、画布 nodes/edges 皆空；首变更前不允许发起 bootstrap —— 空态必须保持本地。
+  const emptyCta = page.getByRole("region", { name: "开始创作" });
+  await expect(emptyCta).toBeVisible();
+  await expect(emptyCta.getByRole("button", { name: "上传图片开始" })).toBeVisible();
+  await expect(
+    emptyCta.getByText("从左侧节点库拖入文本 / 图片节点，或点击上方按钮上传图片"),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "开始第一个创作任务" })).toHaveCount(0);
+  await expect(nodes).toHaveCount(0);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+
+  const bootstrapUrls: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST"
+      && new URL(request.url()).pathname === "/api/projects/initial-draft/bootstrap"
+    ) {
+      bootstrapUrls.push(request.url());
+    }
+  });
+  expect(bootstrapUrls).toEqual([]);
+
   const bootstrapped = page.waitForResponse((response) => (
     response.request().method() === "POST"
     && new URL(response.url()).pathname === "/api/projects/initial-draft/bootstrap"
@@ -211,6 +234,9 @@ async function startFirstProject(page: Page): Promise<void> {
   // 图片节点 + auto-text 兜底补出的文本节点；两者之间一条 prompt 边。
   await expect(nodes).toHaveCount(2);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  // 首个实质变更后空态 CTA 退场，且整段过程恰好一次 bootstrap（惰性落库）。
+  await expect(emptyCta).toHaveCount(0);
+  await expect.poll(() => bootstrapUrls).toHaveLength(1);
   await page.getByRole("button", { name: "节点库" }).click();
   await expect(page.locator("#workbench-library-panel")).toHaveAttribute("aria-hidden", "true");
   // 落地意图会把焦点放到节点的首个可聚焦控件（图片节点是隐藏的 file input）；
@@ -581,7 +607,19 @@ test("adding a library node keeps the canvas mounted and links its auto-text pro
   // 并由 auto-text 兜底补齐 text→节点 的 prompt 边（复用已有文本节点，不重复造节点）。
   const imageNodeId = await nodeIdOfKind(page, "image");
   await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
-  await addLibraryNode(page, "点击添加视频节点，或拖拽到画布指定位置");
+  await page.getByRole("button", { name: "节点库" }).click();
+  const libraryPanel = page.locator("#workbench-library-panel");
+  await expect(libraryPanel).toHaveAttribute("aria-hidden", "false");
+  // 节点库固定暴露文本 / 图片 / 视频三个 v7 入口，title 文案即操作说明。
+  for (const title of ["文本", "图片", "视频"]) {
+    await expect(
+      libraryPanel.getByTitle(`点击添加${title}节点，或拖拽到画布指定位置`),
+    ).toBeVisible();
+  }
+  await Promise.all([
+    page.waitForEvent("filechooser", { timeout: 5_000 }).catch(() => undefined),
+    libraryPanel.getByTitle("点击添加视频节点，或拖拽到画布指定位置").click(),
+  ]);
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
   await expect(edges).toHaveCount(initialEdgeCount + 1);
