@@ -165,10 +165,42 @@ async function expectTwoLineTitle(locator: Locator) {
   expect(metrics.height).toBeLessThanOrEqual(33);
 }
 
+/**
+ * 画布视口矩阵的确定性读取。
+ *
+ * 项目在 `prefers-reduced-motion: reduce` 下用 `* { transition-duration: 0.01ms !important }`
+ * 兜底（src/index.css），但 `transition-property` 仍是 CSS 初值 `all`，于是每次写
+ * `.react-flow__viewport` 的 transform 都会生成一条 0.01ms 的 CSS 过渡。没有渲染帧的
+ * headless 环境下该过渡停在 currentTime=0，`getComputedStyle(transform)` 会持续返回**变更前**
+ * 的矩阵（R-82 实测 1024/1280：inline 已是 `translate(100px,218px)`，computed 仍是
+ * `matrix(…,-60,218)`，直到交互产生帧才追上）。量测几何前先把待处理过渡推到终态，
+ * 得到的就是元素真实的最终矩阵；断言强度不变。
+ */
+async function readViewportMatrix(locator: Locator): Promise<string> {
+  return locator.evaluate((element) => {
+    element.getAnimations().forEach((animation) => {
+      try {
+        animation.finish();
+      } catch {
+        /* 无限时长的动画无法直接结束，保持原状 */
+      }
+    });
+    return getComputedStyle(element).transform;
+  });
+}
+
 async function flowCenter(canvas: Locator): Promise<{ x: number; y: number }> {
   return canvas.evaluate((element) => {
     const viewport = element.querySelector<HTMLElement>(".react-flow__viewport");
     if (!viewport) throw new Error("React Flow viewport is missing");
+    // 与 readViewportMatrix 同理：先结束待处理的 transform 过渡，再量测几何。
+    viewport.getAnimations().forEach((animation) => {
+      try {
+        animation.finish();
+      } catch {
+        /* 无限时长的动画无法直接结束，保持原状 */
+      }
+    });
     const canvasRect = element.getBoundingClientRect();
     const transform = new DOMMatrixReadOnly(getComputedStyle(viewport).transform);
     return {
@@ -710,17 +742,13 @@ test("node drag is one undo transaction and selection stays canonical", async ({
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   }));
   const beforeRelease = await node.boundingBox();
-  const viewportBeforeRelease = await page.locator(".react-flow__viewport").evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
+  const viewportBeforeRelease = await readViewportMatrix(page.locator(".react-flow__viewport"));
   if (!beforeRelease) throw new Error("Dragged workflow node disappeared before pointer release");
   await page.mouse.up();
   const immediatelyAfterRelease = await node.boundingBox();
   await page.waitForTimeout(250);
   const settledAfterRelease = await node.boundingBox();
-  const viewportAfterRelease = await page.locator(".react-flow__viewport").evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
+  const viewportAfterRelease = await readViewportMatrix(page.locator(".react-flow__viewport"));
   if (!immediatelyAfterRelease || !settledAfterRelease) {
     throw new Error("Dragged workflow node disappeared after pointer release");
   }
@@ -770,24 +798,24 @@ test("dragging a node near the canvas edge never auto-pans the viewport", async 
   const viewport = page.locator(".react-flow__viewport");
 
   await expect(nodeHeader).toBeVisible();
+  // 先结束待处理的 transform 过渡：headless 无帧时 computed 矩阵会停在过渡起点（见
+  // readViewportMatrix 注释），那会让下面量到的节点/画布几何整体偏移一个 Dock 宽度。
+  await readViewportMatrix(viewport);
+
   const handle = await nodeHeader.boundingBox();
   const paneBox = await pane.boundingBox();
   if (!handle || !paneBox) throw new Error("Workflow node or React Flow pane is missing");
 
   const initialTransform = await node.evaluate((element) => (element as HTMLElement).style.transform);
-  const initialViewport = await viewport.evaluate((element) => getComputedStyle(element).transform);
+  const initialViewport = await readViewportMatrix(viewport);
   await page.mouse.move(handle.x + Math.min(24, handle.width / 2), handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(paneBox.x + paneBox.width - 8, handle.y + handle.height / 2, { steps: 16 });
   await page.waitForTimeout(250);
-  const viewportWhileDragging = await viewport.evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
+  const viewportWhileDragging = await readViewportMatrix(viewport);
   await page.mouse.up();
   await page.waitForTimeout(100);
-  const viewportAfterRelease = await viewport.evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
+  const viewportAfterRelease = await readViewportMatrix(viewport);
 
   expect(viewportWhileDragging).toBe(initialViewport);
   expect(viewportAfterRelease).toBe(initialViewport);
@@ -817,9 +845,7 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   const zoomOutput = zoomControls.locator("output");
   const originalCanvas = await canvas.elementHandle();
   if (!originalCanvas) throw new Error("Canvas element is missing");
-  const originalTransform = await page.locator(".react-flow__viewport").evaluate(
-    (element) => getComputedStyle(element).transform,
-  );
+  const originalTransform = await readViewportMatrix(page.locator(".react-flow__viewport"));
   const originalFlowCenter = await flowCenter(canvas);
   await expect(libraryToggle).toHaveAttribute("aria-expanded", "false");
   await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
@@ -1117,9 +1143,9 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   expect(await contextPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
 
   expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
-  await expect.poll(async () => page.locator(".react-flow__viewport").evaluate(
-    (element) => getComputedStyle(element).transform,
-  )).toBe(originalTransform);
+  await expect.poll(
+    () => readViewportMatrix(page.locator(".react-flow__viewport")),
+  ).toBe(originalTransform);
 });
 
 test("theme picker reports state and restores focus", async ({ page }) => {

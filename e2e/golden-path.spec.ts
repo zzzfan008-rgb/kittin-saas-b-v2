@@ -344,6 +344,12 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   // ---------- ⑥ 结果面板：结果、动作、查看器、主题 token、节点库 ----------
   await page.keyboard.press("Escape");
   await expect(inspector).toHaveCount(0);
+  // v7/R-80 布局：结果面板与属性面板同住在唯一占位 Dock 内（`WorkbenchShell` 的
+  // `属性 / 结果` 入口，默认收起）。这里按真实用户路径先展开 Dock，再切到结果页签；
+  // v6 的常驻右栏 / TaskLauncher 已不存在，等价入口只剩这一条。
+  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
+  await contextToggle.click();
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("tab", { name: "结果 / 记录" }).click();
   const results = page.getByRole("region", { name: "最近生成" });
   await expect(results).toBeVisible();
