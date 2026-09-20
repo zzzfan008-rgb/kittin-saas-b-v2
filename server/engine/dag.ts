@@ -28,6 +28,7 @@ import {
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
+import { getModelParameterProfile } from "../../src/types/modelParameterProfiles";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -272,24 +273,34 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       if (!isImageModelId(modelId)) {
         throw new DagError("Node data for image must select an explicit supported image model");
       }
-      // operationMode 由提示词变体携带（mode 归属反转，runtime.md §1）；此处从变体
-      // 解析落入 params，供准入（binding-mismatch 校验 operationMode === variant.mode）
-      // 与运行链路共用。未选变体则缺省，由准入的 missing-binding 拒绝。
-      const operationMode = typeof data.promptVariantId === "string"
-        ? getGarmentPromptVariantById(data.promptVariantId)?.mode
+      // v7 信任模型（runtime.md §1）：variant 绑定是唯一事实源，节点不自描述。
+      // operationMode / parameterProfileId / postprocessVersion 均由已选变体推导：
+      // - operationMode ← variant.mode（mode 归属反转）
+      // - parameterProfileId ← variant.parameterProfileId
+      // - postprocessVersion ← getModelParameterProfile(variant.parameterProfileId).postprocess.version
+      // （R-78：applyVariant 不写、也不应写这三项，避免双源漂移；此处解析落入 params，
+      //   供入队 assertPromptRunAdmissions 与认领 runQueue promptAdmission 两道 choke
+      //   point 及运行链路共用。未选变体则缺省，由准入的 missing-binding 拒绝。）
+      const variant = typeof data.promptVariantId === "string"
+        ? getGarmentPromptVariantById(data.promptVariantId)
+        : undefined;
+      const operationMode = variant?.mode;
+      const parameterProfileId = variant?.parameterProfileId;
+      const postprocessVersion = parameterProfileId
+        ? getModelParameterProfile(parameterProfileId)?.postprocess.version
         : undefined;
       return {
         modelId,
         ...(operationMode ? { operationMode } : {}),
+        ...(parameterProfileId ? { parameterProfileId } : {}),
+        ...(postprocessVersion ? { postprocessVersion } : {}),
         aspectRatio: data.aspectRatio,
         batchSize: data.batchSize,
         modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
         ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
-        ...(typeof data.parameterProfileId === "string" ? { parameterProfileId: data.parameterProfileId } : {}),
         ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
         ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
-        ...(typeof data.postprocessVersion === "string" ? { postprocessVersion: data.postprocessVersion } : {}),
         ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
         ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
         ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
