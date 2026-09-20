@@ -388,3 +388,23 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
     inputs: { text: 8, image: 1 }, outputs: "video",
   },
 };
+
+/**
+ * 未知/legacy kind 的稳健查表（R-79）。三值之外（旧档、脏数据、未来版本）返回
+ * undefined，调用方据此显式降级为「不支持的旧版本内容」占位，而不是抛异常白屏。
+ * `NODE_SPECS` 仍是最上层事实源：本函数不新增任何标题/描述文案。
+ */
+export function nodeSpecForKind(kind: unknown): NodeSpec | undefined {
+  if (typeof kind !== "string") return undefined;
+  return (NODE_SPECS as Record<string, NodeSpec | undefined>)[kind];
+}
+
+/**
+ * 展示用节点类型名（R-79）。已知 kind 返回 NODE_SPECS 标题；未知 kind 返回其原始
+ * 字符串（保证「类型可读」的降级要求）；空/非字符串返回「未知类型」。
+ */
+export function nodeTitleForKind(kind: unknown): string {
+  const spec = nodeSpecForKind(kind);
+  if (spec) return spec.title;
+  return typeof kind === "string" && kind.trim() !== "" ? kind : "未知类型";
+}
