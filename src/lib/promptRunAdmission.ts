@@ -101,6 +101,26 @@ export function promptRunReferenceSnapshotsFromGraph(
   return references;
 }
 
+/**
+ * Browser mirror of server/engine/dag.ts buildExecutionPlan 的 inputTexts 收集：
+ * 入边保持 edges 数组顺序，来源为 text 节点时收集其正文（runtime.md §0/§1：
+ * text 正文沿 text 边传播，不区分 targetHandle）。浏览器镜像闸必须与服务端用
+ * 同一份上游正文合成受审 taskPrompt，否则 UI 会在 prompt-drift 上误拦。
+ */
+export function promptRunInputTextsFromGraph(
+  nodes: readonly PromptRunGraphNode[],
+  edges: readonly PromptRunGraphEdge[],
+  targetNodeId: string,
+): string[] {
+  const texts: string[] = [];
+  for (const edge of edges) {
+    if (edge.target !== targetNodeId) continue;
+    const source = nodes.find((node) => node.id === edge.source);
+    if (source?.data.kind === "text") texts.push(source.data.text);
+  }
+  return texts;
+}
+
 /** Shared browser/server input. Unknown values must be proven, never coerced. */
 export interface PromptRunAdmissionInput {
   nodeKind: NodeKind;
@@ -282,6 +302,38 @@ function isImageOperationMode(value: unknown): value is ImageOperationMode {
   return value === "generate" || value === "edit" || value === "mask-edit";
 }
 
+/**
+ * v7（mode 归属反转）：operationMode 的唯一事实源是选中变体（与
+ * server/engine/dag.ts extractParams 的 `variant?.mode` 同源同语义）。
+ * 返回受审变体；未绑定 / 未知变体返回对应 fail-closed 决策，沿用既有拒绝码。
+ */
+function resolveBoundPromptVariant(
+  input: PromptRunAdmissionInput,
+): PromptVariant | PromptRunAdmissionDecision {
+  if (typeof input.promptVariantId !== "string" || !input.promptVariantId.trim()) {
+    return {
+      allowed: false,
+      code: "missing-binding",
+      reason: "该节点没有绑定当前版本的独立提示词变体；未验证或自由提示词不能发起付费运行。",
+    };
+  }
+  const variant = getGarmentPromptVariantById(input.promptVariantId);
+  if (!variant) {
+    return {
+      allowed: false,
+      code: "unknown-variant",
+      reason: `提示词变体 ${input.promptVariantId} 不在当前受审目录中，系统不会回退到通用提示词。`,
+    };
+  }
+  return variant;
+}
+
+function isPromptRunAdmissionDecision(
+  value: PromptVariant | PromptRunAdmissionDecision,
+): value is PromptRunAdmissionDecision {
+  return "allowed" in value;
+}
+
 /** Shared early model/mode/reference compatibility gate for UI, Store and DAG. */
 export function evaluatePromptRunCompatibility(
   input: PromptRunAdmissionInput,
@@ -321,45 +373,64 @@ export function evaluatePromptRunCompatibility(
       reason: `模型 ${input.modelId} 不支持节点 ${input.nodeKind} 的当前产品策略。`,
     };
   }
-  // v7：operationMode 由提示词变体携带（mode 归属反转），节点不再自描述；
-  // 该检查的变体驱动重写归 P2-b（promptRunAdmission 与 needsMask 联动）。
-  if (!isImageOperationMode(input.operationMode)) {
+  // v7（mode 归属反转，R-76/R-78）：operationMode 不再存节点 data，唯一事实源是
+  // 选中的提示词变体——与 server/engine/dag.ts extractParams 的 `variant?.mode`
+  // 同源同语义。未绑定/未知变体在此 fail-closed；浏览器 UI 镜像闸与服务端 choke
+  // point 共用同一推导，不再可能出现「服务端放行、UI 死拦」的双源漂移。
+  const bound = resolveBoundPromptVariant(input);
+  if (isPromptRunAdmissionDecision(bound)) return bound;
+  const variant = bound;
+  // 显式携带的 operationMode（服务端 step.params 会把推导结果落入 params）只允许
+  // 与变体声明逐字一致；任何不一致都拒绝，而不是静默切换到另一调用模式。
+  // 浏览器节点 data 不再携带该字段（R-76），缺省即直接采用 variant.mode。
+  if (input.operationMode !== undefined && input.operationMode !== variant.mode) {
     return {
       allowed: false,
       code: "operation-mode-incompatible",
-      reason: `operationMode ${String(input.operationMode)} 不是受支持的调用模式。`,
+      reason: `operationMode ${String(input.operationMode)} 与所选提示词变体声明的 ${variant.mode} 不一致；模式只能由变体携带，系统不会静默切换。`,
+    };
+  }
+  const operationMode: ImageOperationMode = variant.mode;
+  if (!isImageOperationMode(operationMode)) {
+    return {
+      allowed: false,
+      code: "operation-mode-incompatible",
+      reason: `operationMode ${String(operationMode)} 不是受支持的调用模式。`,
     };
   }
   const contract = getImageModelContract(input.modelId);
   if (
-    (input.operationMode === "generate" && !contract.generation)
-    || (input.operationMode !== "generate" && !contract.edit)
+    (operationMode === "generate" && !contract.generation)
+    || (operationMode !== "generate" && !contract.edit)
   ) {
     return {
       allowed: false,
       code: "operation-mode-incompatible",
-      reason: `模型 ${input.modelId} 的当前网关契约不支持 ${input.operationMode}。`,
+      reason: `模型 ${input.modelId} 的当前网关契约不支持 ${operationMode}。`,
     };
   }
   const references = input.references ?? [];
-  if (input.operationMode === "generate" && references.length > 0) {
+  if (operationMode === "generate" && references.length > 0) {
     return {
       allowed: false,
       code: "generate-reference-conflict",
       reason: "generate 模式不能携带参考图；请明确改为 edit，而不是由系统临时推断模式。",
     };
   }
-  if (input.operationMode !== "generate" && references.length === 0) {
+  if (operationMode !== "generate" && references.length === 0) {
     return {
       allowed: false,
       code: "edit-reference-missing",
-      reason: `${input.operationMode} 模式至少需要一张参考图。`,
+      reason: `${operationMode} 模式至少需要一张参考图。`,
     };
   }
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(input.modelId));
-  // v7：mask-redraw 特例随旧 kind 退役；蒙版参考图限位改由变体 needsMask 声明
-  // 驱动（runtime.md §1 第 5 步），P2-b 接线。当前统一按普通 image 节点限位。
-  const maxUserReferences = maxReferences;
+  // 蒙版参考图限位由变体 needsMask 声明驱动（runtime.md §1 第 5 步），与
+  // server/engine/dag.ts assertPlanInputs 同一把尺：蒙版运行额外附加一张系统
+  // 引导图，用户参考图限位相应减一。
+  const maxUserReferences = variant.needsMask
+    ? Math.min(MAX_MASK_USER_REFERENCE_IMAGES, Math.max(0, maxReferences - 1))
+    : maxReferences;
   if (references.length > maxUserReferences) {
     return {
       allowed: false,
@@ -387,21 +458,11 @@ export function evaluatePromptRunAdmission(
 ): PromptRunAdmissionDecision {
   const compatibility = evaluatePromptRunCompatibility(input);
   if (compatibility) return compatibility;
-  if (typeof input.promptVariantId !== "string" || !input.promptVariantId.trim()) {
-    return {
-      allowed: false,
-      code: "missing-binding",
-      reason: "该节点没有绑定当前版本的独立提示词变体；未验证或自由提示词不能发起付费运行。",
-    };
-  }
-  const variant = getGarmentPromptVariantById(input.promptVariantId);
-  if (!variant) {
-    return {
-      allowed: false,
-      code: "unknown-variant",
-      reason: `提示词变体 ${input.promptVariantId} 不在当前受审目录中，系统不会回退到通用提示词。`,
-    };
-  }
+  // 变体存在性与 mode 推导已在 compatibility 阶段 fail-closed；此处解析供后续
+  // drift / 参数档案 / shutdown / 发布状态判定共用（目录查询是纯函数，重复求值无副作用）。
+  const bound = resolveBoundPromptVariant(input);
+  if (isPromptRunAdmissionDecision(bound)) return bound;
+  const variant = bound;
   const bindingMatches = (
     input.modelId === variant.modelId
     && input.nodeKind === variant.nodeKind
@@ -495,21 +556,57 @@ export function promptRunAdmissionInputFromParams(
   params: Readonly<Record<string, unknown>>,
   references?: readonly PromptRunReferenceSnapshot[],
 ): PromptRunAdmissionInput {
+  // v7（mode 归属反转，R-76/R-78）：operationMode 不再读节点 data，绑定变体时
+  // 一律从受审目录推导（与 server/engine/dag.ts extractParams 的 variant?.mode
+  // 同源同语义）；未知变体落 undefined，由 compatibility 的 unknown-variant 拒绝。
+  // 未绑定变体时保留 params.operationMode 透传（仅无变体的直连回退路径会走到，
+  // 随后仍被 missing-binding fail-closed）。
+  const promptVariantId = typeof params.promptVariantId === "string"
+    ? params.promptVariantId
+    : undefined;
+  // 与 dag.ts extractParams 同准绳：variant 绑定是唯一事实源，节点不自描述。
+  // parameterProfileId / postprocessVersion 同样只从变体推导（applyVariant 不写
+  // 这三项），服务端 step.params 里的值本身也是这样推导出来的，重复求值结果一致。
+  const boundVariant = promptVariantId
+    ? getGarmentPromptVariantById(promptVariantId)
+    : undefined;
+  const operationMode = promptVariantId
+    ? boundVariant?.mode
+    : params.operationMode;
+  const parameterProfileId = promptVariantId
+    ? boundVariant?.parameterProfileId
+    : params.parameterProfileId;
+  const postprocessVersion = boundVariant
+    ? getModelParameterProfile(boundVariant.parameterProfileId)?.postprocess.version
+    : params.postprocessVersion;
+  // v7 绑定身份五字段（family/contract/evaluation）同样以受审目录钉死的变体为
+  // 唯一事实源：内置模板节点只携带 promptVariantId（templates.ts imageNode），
+  // applyVariant 写入或客户端伪造的差异值都不应影响受审身份。与服务端
+  // dag.ts extractParams「variant 绑定是唯一事实源，节点不自描述」同准绳。
+  const promptFamilyId = boundVariant
+    ? boundVariant.familyId
+    : params.promptFamilyId;
+  const contractHash = boundVariant
+    ? boundVariant.contractHash
+    : params.contractHash;
+  const evaluationVersion = boundVariant
+    ? boundVariant.evaluationVersion
+    : params.evaluationVersion;
   return {
     nodeKind,
     modelId: params.modelId as ImageModelId | undefined,
     retiredModelId: params.retiredModelId,
     modelSelectionNeedsConfirmation: params.modelSelectionNeedsConfirmation,
-    operationMode: params.operationMode as ImageOperationMode | undefined,
+    operationMode,
     operationModeNeedsConfirmation: params.operationModeNeedsConfirmation,
     prompt: params.prompt,
     inputTexts: params.inputTexts,
     promptVariantId: params.promptVariantId,
-    promptFamilyId: params.promptFamilyId,
-    parameterProfileId: params.parameterProfileId,
-    contractHash: params.contractHash,
-    evaluationVersion: params.evaluationVersion,
-    postprocessVersion: params.postprocessVersion,
+    promptFamilyId,
+    parameterProfileId,
+    contractHash,
+    evaluationVersion,
+    postprocessVersion,
     aspectRatio: params.aspectRatio,
     batchSize: params.batchSize,
     modelOptions: params.modelOptions,
@@ -520,10 +617,14 @@ export function promptRunAdmissionInputFromParams(
 export function promptRunAdmissionInputFromNode(
   data: WorkflowNodeData,
   references?: readonly PromptRunReferenceSnapshot[],
+  inputTexts?: readonly string[],
 ): PromptRunAdmissionInput {
-  return promptRunAdmissionInputFromParams(
+  const input = promptRunAdmissionInputFromParams(
     data.kind,
     data as unknown as Record<string, unknown>,
     references,
   );
+  // 浏览器镜像闸的上游 text 正文来自画布快照（dag.ts buildExecutionPlan
+  // 同源收集），image 节点 data 自身不携带正文。
+  return inputTexts === undefined ? input : { ...input, inputTexts };
 }
