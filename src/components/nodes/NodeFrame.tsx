@@ -1,5 +1,10 @@
 import { useRef, useState, type ReactNode } from "react";
-import { isNodeRunActive, type NodeKind, type NodeRunStatus } from "@/types/workflow";
+import {
+  isNodeRunActive,
+  nodeTitleForKind,
+  type NodeKind,
+  type NodeRunStatus,
+} from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
@@ -230,6 +235,32 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     >
       <p className="font-medium tracking-wide">暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>
+    </div>
+  );
+}
+
+/**
+ * R-79：未知/legacy kind 的显式降级占位。不是吞错——记录/节点仍渲染，但以统一
+ * 文案明确告知「内容不可查看/运行/编辑」，并保留节点名与类型可读。
+ */
+export function UnsupportedNodeKindNotice({
+  kind,
+  label,
+}: {
+  kind: unknown;
+  label?: string;
+}) {
+  const kindTitle = nodeTitleForKind(kind);
+  return (
+    <div
+      role="note"
+      data-unsupported-kind="true"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
+    >
+      <p className="font-medium tracking-wide">不支持的旧版本内容</p>
+      <p className="mt-0.5">
+        {label ? `节点「${label}」的` : "该"}类型「{kindTitle}」来自旧版本，当前版本不支持查看、运行或编辑。
+      </p>
     </div>
   );
 }

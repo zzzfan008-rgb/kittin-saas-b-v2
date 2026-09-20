@@ -100,6 +100,7 @@ const TEST_FILES = [
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   "tests/recent-results.test.ts",
+  "tests/unknown-kind-viewer.test.ts",
   "tests/image-viewer-reference-evidence.test.ts",
   "tests/project-tabs-session.test.ts",
   "tests/initial-draft-client.test.ts",

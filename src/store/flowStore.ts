@@ -20,6 +20,7 @@ import {
   NODE_SPECS,
   isNodeRunActive,
   isNodeRunTerminal,
+  nodeSpecForKind,
   type Asset,
   type NodeKind,
   type WorkflowNodeData,
@@ -1307,7 +1308,9 @@ export function isDocumentConnectionValid(
   const target = document.nodes.find((node) => node.id === connection.target);
   const source = document.nodes.find((node) => node.id === connection.source);
   if (!target || !source) return false;
-  const spec = NODE_SPECS[target.data.kind];
+  // R-79：未知/legacy kind 的目标节点不参与连线（优雅降级，不查表抛错）。
+  const spec = nodeSpecForKind(target.data.kind);
+  if (!spec) return false;
 
   const incoming = document.edges.filter((edge) => edge.target === connection.target);
   // 同一 (source, targetHandle) 组合只允许一条边，防重复连线。

@@ -7,10 +7,11 @@ import {
   type RecentResult,
 } from "@/store/flowStore";
 import {
-  NODE_SPECS,
   isNodeRunActive,
+  nodeSpecForKind,
+  nodeTitleForKind,
 } from "@/types/workflow";
-import { inputClass, STATUS_TEXT } from "../nodes/NodeFrame";
+import { inputClass, STATUS_TEXT, UnsupportedNodeKindNotice } from "../nodes/NodeFrame";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -31,21 +32,23 @@ function PropertySummary({ nodeId }: { nodeId: string }) {
   );
   if (!node) return null;
   const d = node.data;
-  const spec = NODE_SPECS[d.kind];
+  const spec = nodeSpecForKind(d.kind);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-neutral-200">{spec.title}节点</span>
+        <span className="text-xs font-medium text-neutral-200">{nodeTitleForKind(d.kind)}节点</span>
         <span className="text-[11px] text-neutral-500">{STATUS_TEXT[d.status]}</span>
       </div>
+
+      {!spec && <UnsupportedNodeKindNotice kind={d.kind} label={d.label} />}
 
       <label className="block space-y-1">
         <span className="text-[11px] text-neutral-500">节点名称</span>
         <input
           value={d.label}
           {...labelEdit.bind}
-          disabled={readOnly || isNodeRunActive(d.status)}
+          disabled={readOnly || !spec || isNodeRunActive(d.status)}
           className={inputClass}
         />
       </label>
@@ -54,7 +57,7 @@ function PropertySummary({ nodeId }: { nodeId: string }) {
         type="button"
         variant="outline"
         size="sm"
-        disabled={readOnly}
+        disabled={readOnly || !spec}
         onClick={() => openInspector(nodeId)}
         className="w-full"
       >
@@ -72,6 +75,7 @@ function PropertySummary({ nodeId }: { nodeId: string }) {
 function ResultRecordDetail({ resultId }: { resultId: string }) {
   const record = useFlowStore((s) => s.recentResults.find((r) => r.id === resultId));
   if (!record) return null;
+  const spec = nodeSpecForKind(record.kind);
   const time = new Date(record.startedAt).toLocaleTimeString("zh-CN", { hour12: false });
   const duration = (((record.finishedAt ?? Date.now()) - record.startedAt) / 1000).toFixed(1);
   const statusText: Record<RecentResult["status"], string> = {
@@ -106,6 +110,8 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
         </span>
       </div>
 
+      {!spec && <UnsupportedNodeKindNotice kind={record.kind} label={record.nodeLabel} />}
+
       {record.image && (
         <img
           src={record.thumbnail ?? thumbnailImageUrl(record.image)}
@@ -119,7 +125,7 @@ function ResultRecordDetail({ resultId }: { resultId: string }) {
       <dl className="space-y-1.5 text-[11px]">
         <div className="flex justify-between">
           <dt className="text-neutral-500">节点类型</dt>
-          <dd className="text-neutral-300">{NODE_SPECS[record.kind].title}</dd>
+          <dd className="text-neutral-300">{nodeTitleForKind(record.kind)}</dd>
         </div>
         {record.projectName && (
           <div className="flex justify-between gap-3">
