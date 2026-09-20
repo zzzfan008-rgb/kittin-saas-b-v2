@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import {
   WORKFLOW_SCHEMA_VERSION,
+  missingTextUpstreamNodeIds,
   type WorkflowTemplate,
 } from "../src/types/workflow";
 import { expect, test } from "./fixtures";
@@ -188,72 +189,134 @@ async function expectFlowCenter(
 }
 
 /**
- * 结束 pristine 初始草稿的「首次创作」启动器浮层，让画布指针事件可命中节点。
+ * 方案 C（R-75 §2）首屏语义：进入工作台是本地空白 tab（nodes=0 && edges=0），
+ * 不 bootstrap、也没有 TaskLauncher 浮层（R-76 已删除）。工作台用例断言的是「已开始
+ * 项目」的画布/面板机制，因此 before 钩子用真实用户动作完成「首次实质变更」：
+ * 从节点库点击添加一个视频节点 —— auto-text 兜底会补出文本节点与 prompt 边，
+ * 这次落库（POST /initial-draft/bootstrap）让项目真正诞生。
  *
- * 该浮层（TaskLauncher，`开始第一个创作任务`）是产品在有且仅有一个未编辑的
- * image-input 节点、从未重命名/保存的初始草稿上显示的首次引导，属正确产品行为，
- * 而非缺陷。工作台用例断言的是「已开始项目」的画布节点拖拽/几何机制；若 before
- * 钩子不先结束 pristine 状态，z-20 覆盖层会拦截 pointer 事件，使 nodeHeader.hover()
- * 超时。这里用「重命名初始草稿」这一真实用户动作结束 pristine（保持单一 image-input
- * 节点不变，不绕过产品行为），与 initial-draft 用例既有的重命名做法一致。
+ * 已落库草稿/正式项目被启动流程恢复时画布非空，本钩子不重复建节点，保持
+ * 「空态不落库、首变更才落库」的单次语义；节点库面板在结束时恢复为关闭状态，
+ * 以免后续用例的「节点库」切换按钮把它反向关闭。
  */
-async function dismissPristineLauncher(page: Page): Promise<void> {
-  const launcher = page.getByRole("region", { name: "开始第一个创作任务" });
-  if (!(await launcher.isVisible())) return;
+async function startFirstProject(page: Page): Promise<void> {
+  const nodes = page.locator(".react-flow__node");
+  if (await nodes.count() > 0) return;
 
-  const draftResponse = await page.context().request.get("/api/projects/initial-draft");
-  expect(draftResponse.ok()).toBeTruthy();
-  const { draft } = await draftResponse.json() as {
-    draft: { id: string; name: string; revision: number; flow: unknown } | null;
-  };
-  if (!draft) throw new Error("Workbench tests require an existing initial draft");
+  const bootstrapped = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && new URL(response.url()).pathname === "/api/projects/initial-draft/bootstrap"
+  ));
+  await addLibraryNode(page, "点击添加图片节点，或拖拽到画布指定位置");
+  // 图片节点 + auto-text 兜底补出的文本节点；两者之间一条 prompt 边。
+  await expect(nodes).toHaveCount(2);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await page.getByRole("button", { name: "节点库" }).click();
+  await expect(page.locator("#workbench-library-panel")).toHaveAttribute("aria-hidden", "true");
+  // 落地意图会把焦点放到节点的首个可聚焦控件（图片节点是隐藏的 file input）；
+  // 摘掉焦点，避免后续用例的 Cmd+A 被「输入框内快捷键让位原生编辑」规则吞掉。
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
-  const renameResponse = await page.context().request.put(
-    `/api/projects/initial-draft/${draft.id}`,
-    {
-      data: {
-        expectedRevision: draft.revision,
-        name: `E2E 工作台画布 ${draft.id}`,
-        flow: draft.flow,
-      },
-    },
-  );
-  expect(renameResponse.ok(), await renameResponse.text()).toBeTruthy();
+  const response = await bootstrapped;
+  expect(response.ok(), `首次落库失败：HTTP ${response.status()}`).toBeTruthy();
+}
 
-  await page.reload();
-  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
-  await expect(launcher).toBeHidden();
+/** 按节点种类取画布节点：React Flow 在 `.react-flow__node` 上暴露 data-id。 */
+async function nodeIdOfKind(page: Page, kind: "text" | "image" | "video"): Promise<string> {
+  const id = await page.evaluate(async (nodeKind) => {
+    const storeModuleUrl = "/src/store/flowStore.ts";
+    const store = await import(/* @vite-ignore */ storeModuleUrl);
+    const state = store.useFlowStore.getState();
+    const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
+    return tab?.nodes.find((node: { data: { kind: string } }) => node.data.kind === nodeKind)?.id ?? null;
+  }, kind);
+  if (!id) throw new Error(`当前文档里没有 ${kind} 节点`);
+  return id;
+}
+
+/** 当前文档的节点/边（只读形状），供 INV-1 等价断言使用。 */
+async function activeDocumentGraph(page: Page): Promise<{
+  nodes: Array<{ id: string; data: { kind: "text" | "image" | "video" } }>;
+  edges: Array<{ source: string; target: string; targetHandle: string | null }>;
+}> {
+  return page.evaluate(async () => {
+    const storeModuleUrl = "/src/store/flowStore.ts";
+    const store = await import(/* @vite-ignore */ storeModuleUrl);
+    const state = store.useFlowStore.getState();
+    const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
+    if (!tab) throw new Error("当前没有活动文档");
+    return {
+      nodes: tab.nodes.map((node: { id: string; data: { kind: string } }) => ({
+        id: node.id,
+        data: { kind: node.data.kind },
+      })),
+      edges: tab.edges.map((edge: { source: string; target: string; targetHandle?: string | null }) => ({
+        source: edge.source,
+        target: edge.target,
+        targetHandle: edge.targetHandle ?? null,
+      })),
+    };
+  });
+}
+
+/** 从节点库加节点时 image 会顺带打开文件选择器；这里显式消化它，避免悬挂。 */
+async function addLibraryNode(page: Page, title: string): Promise<void> {
+  await page.getByRole("button", { name: "节点库" }).click();
+  const button = page.getByTitle(title);
+  await expect(button).toBeVisible();
+  await Promise.all([
+    page.waitForEvent("filechooser", { timeout: 5_000 }).catch(() => undefined),
+    button.click(),
+  ]);
 }
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
   await expect(page.getByText(/正在确认运行历史|运行历史同步失败/)).toHaveCount(0);
-  await dismissPristineLauncher(page);
+  await startFirstProject(page);
 });
 
 test("unverified prompt variants stay disabled with an explicit runtime reason", async ({ page }) => {
-  await page.getByRole("button", { name: "节点库" }).click();
-  await page.getByTitle("点击添加草图→效果图，或拖拽到画布指定位置").click();
-  await page.getByRole("button", { name: "属性 / 结果" }).click();
+  // 方案 C：空首屏已无 TaskLauncher 浮层，v6 的「服装提示词预设 / 确认应用」控件也已退役。
+  // 断言强度转到 v7 等价入口：节点的「功能设置」窗口。
+  // ① 图片节点（before 钩子落库的那个）：已发布目录只列未发布变体，全部禁用且给出原因。
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);
+  await imageNode.locator(".gc-node-header").click();
+  await imageNode.getByRole("button", { name: "选择功能" }).click();
 
-  const properties = page.getByRole("tabpanel", { name: "属性" });
-  await expect(properties).toBeVisible();
-
-  const presetDisclosure = properties.getByRole("button", { name: "服装提示词预设" });
-  await expect(presetDisclosure).toHaveAttribute("data-slot", "collapsible-trigger");
-  await presetDisclosure.click();
-  const presets = properties.getByRole("button", { name: /写实穿搭|电商主图|服装设定表/ });
-  await expect(presets).toHaveCount(3);
-  for (const preset of await presets.all()) {
-    await preset.scrollIntoViewIfNeeded();
-    expectInside(await rect(preset), await rect(properties));
-    await expect(preset).toBeDisabled();
+  const inspector = page.getByRole("dialog", { name: "图片 · 功能设置" });
+  await expect(inspector).toBeVisible();
+  // 窗口先以 -9999px 离屏挂载，锚定几何在 effect/ResizeObserver 里收敛；等它落到画布内再量测。
+  await expect.poll(async () => (await rect(inspector)).left).toBeGreaterThan(0);
+  const catalog = inspector.getByRole("region", { name: "功能（系统提示词）" });
+  await expect(catalog).toContainText("只列已发布");
+  const variants = catalog.getByRole("button");
+  const variantCount = await variants.count();
+  expect(variantCount).toBeGreaterThan(0);
+  const inspectorRect = await rect(inspector);
+  for (let index = 0; index < variantCount; index += 1) {
+    const variant = variants.nth(index);
+    await variant.scrollIntoViewIfNeeded();
+    expectInside(await rect(variant), inspectorRect);
+    await expect(variant).toContainText("未发布");
+    await expect(variant).toBeDisabled();
+    await expect(variant).toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
   }
-  await expect(properties.getByText(/尚未完成当前契约版本的真实评估/)).toHaveCount(3);
-  const runButton = properties.getByRole("button", { name: "未验证不可运行" });
+  const runButton = inspector.getByRole("button", { name: "运 行" });
   await expect(runButton).toBeDisabled();
-  await expect(properties.getByText(/没有绑定当前版本的独立提示词变体/)).toBeVisible();
+  await expect(inspector.getByText("请先选择功能")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+
+  // ② auto-text 兜底补出的文本节点：未绑定受审模型/变体时给出运行前的明确原因。
+  const textNodeId = await nodeIdOfKind(page, "text");
+  const textNode = page.locator(`.react-flow__node[data-id="${textNodeId}"]`);
+  await expect(textNode.getByRole("button", { name: "先在功能设置中选择功能" })).toBeDisabled();
+  await expect(
+    textNode.getByText("必须选择当前五模型契约中的明确模型，未知模型不会被静默替换。"),
+  ).toBeVisible();
 });
 
 test("project center separates built-in and user templates and keeps template actions reachable", async ({ page }, testInfo) => {
@@ -475,23 +538,37 @@ test("results and project center follow desktop density for cards", async ({ pag
   }
 });
 
-test("adding a local edit node keeps the canvas mounted and exposes one clear workflow", async ({ page }) => {
+test("adding a library node keeps the canvas mounted and links its auto-text prompt edge", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  const canvas = page.getByRole("application", { name: "工作流画布" });
+  const originalCanvas = await canvas.elementHandle();
   const nodes = page.locator(".react-flow__node");
+  const edges = page.locator(".react-flow__edge");
   const initialNodeCount = await nodes.count();
+  const initialEdgeCount = await edges.count();
 
-  await page.getByRole("button", { name: "节点库" }).click();
-  await page.getByTitle("点击添加局部修改，或拖拽到画布指定位置").click();
+  // 方案 C 的 v7 等价行为：从节点库加一个需要文本上游的节点（视频），必须保持画布挂载
+  // 并由 auto-text 兜底补齐 text→节点 的 prompt 边（复用已有文本节点，不重复造节点）。
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
+  await addLibraryNode(page, "点击添加视频节点，或拖拽到画布指定位置");
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
-  await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
-  const addedNode = nodes.last();
-  await expect(addedNode.getByText(/涂抹区不是裁切框/)).toBeVisible();
-  await expect(addedNode.getByRole("button", { name: "未验证不可运行" })).toBeDisabled();
-  await expect(addedNode.getByText(/mask-edit 模式至少需要一张参考图/)).toBeVisible();
-  await expect(page.getByRole("group", { name: "蒙版处理方式" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "取消" })).toHaveCount(0);
+  await expect(edges).toHaveCount(initialEdgeCount + 1);
+  const graph = await activeDocumentGraph(page);
+  expect(missingTextUpstreamNodeIds(graph.nodes, graph.edges)).toEqual([]);
+
+  const videoNodeId = await nodeIdOfKind(page, "video");
+  const videoNode = page.locator(`.react-flow__node[data-id="${videoNodeId}"]`);
+  await expect(videoNode.getByText("连接文本节点写描述；可选拉一张图片作首帧")).toBeVisible();
+  // 入口条只在选中态渲染（R-40 裁定 B）：新落地的视频节点即选中态，被覆盖的图片节点不是。
+  await expect(videoNode.getByRole("button", { name: "选择功能" })).toBeVisible();
+  await expect(
+    page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).getByRole("button", { name: "选择功能" }),
+  ).toHaveCount(0);
+  await expect(canvas).toBeVisible();
+  expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
   await expect(page.getByText("页面出现异常")).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
