@@ -1,5 +1,9 @@
 # R-74 空白起始草稿两修法 A'/B' 完整影响面对比（供拍板）
 
+> **已拍板：见方案 C 定稿 [r75-lazy-empty-canvas.md](./r75-lazy-empty-canvas.md)**
+> （用户已选择第三方案 C——空首屏 + 惰性落库 + auto-text 共享兜底，含三项裁定。本文 A'/B' 对比
+> 保留为历史分析证据，其根因链 §0 与触点清单 §1 仍是方案 C 的事实来源。）
+
 - 定位：ui-qa R-73 实测确认，证据已验收 ✓
 - 本文性质：只读分析，不改 `src/**` / `server/**` 产品代码
 - 基座：worktree `.worktrees/p2r74`，分支 `p2r74-options`，head `5b27df8`
