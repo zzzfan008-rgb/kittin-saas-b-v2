@@ -386,11 +386,13 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   }
 
   const canvasNodes = page.locator(".react-flow__node");
-  const nodeCountBeforeLibraryClick = await canvasNodes.count();
-  await page.getByRole("button", { name: "节点库" }).click();
-  const library = page.getByRole("region", { name: "节点库" });
-  await library.getByTitle("点击添加文本节点，或拖拽到画布指定位置").click();
-  await expect(canvasNodes).toHaveCount(nodeCountBeforeLibraryClick + 1);
+  const nodeCountBeforeAdd = await canvasNodes.count();
+  // v8：加节点入口是左侧工具栏的「添加」工作流菜单（节点库面板已下线）。
+  await page.getByRole("button", { name: "添加" }).hover();
+  const addMenu = page.getByRole("menu", { name: "添加" });
+  await expect(addMenu).toBeVisible();
+  await addMenu.getByRole("menuitem", { name: "文本" }).click();
+  await expect(canvasNodes).toHaveCount(nodeCountBeforeAdd + 1);
 
   expect(await page.getByText("页面出现异常").count()).toBe(0);
   expect(pageErrors).toEqual([]);

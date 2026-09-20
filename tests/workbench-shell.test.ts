@@ -101,7 +101,7 @@ assert.match(combined, /@\/components\/ui\//, "新外壳必须复用已安装的
 assert.match(combined, /aria-(?:label|labelledby|expanded|controls)/, "新外壳的交互入口必须提供可感知名称或状态");
 assert.match(combined, /transition-\[width,visibility\]/, "桌面 Dock 应通过占位宽度开合，避免遮挡画布控件与结果");
 assert.doesNotMatch(shellSource, /工作台右侧工具|border-l border-\[var\(--gc-border\)\]/, "工作台不得保留右侧工具栏或右侧 Dock");
-assert.match(shellSource, /absolute top-3 z-40/, "节点与上下文入口应为画布左侧悬浮按钮");
+assert.match(shellSource, /absolute left-4 top-4 z-40/, "工具栏入口应为画布左侧悬浮胶囊");
 assert.match(canvasFlowSource, /new ResizeObserver/, "Dock 改变画布尺寸时必须监听容器几何变化");
 assert.match(
   canvasFlowSource,
