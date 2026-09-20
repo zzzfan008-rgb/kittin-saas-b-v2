@@ -53,13 +53,20 @@ try {
   assert.match(baseline.stdout, /Total: \d+ tests in 6 files/);
   assert.match(
     baseline.stdout,
-    /\[golden-path\].*unverified upload stays blocked while a test-reviewed text starter completes the isolated golden path/,
+    /\[golden-path\].*unverified starter stays blocked while a test-reviewed variant completes the isolated golden path/,
     "isolated golden-path project must remain in the browser regression matrix",
+  );
+  // v7 起 initial-draft 拆成「空态惰性落库」与「重登录恢复」两条用例（R-77 重命名），
+  // 两条都必须留在矩阵里（原断言只钉其中一条的旧标题）。
+  assert.match(
+    baseline.stdout,
+    /\[initial-draft\].*empty first screen stays local and only persists after the first substantial change/,
+    "initial-draft lazy persistence must remain in the isolated browser regression matrix",
   );
   assert.match(
     baseline.stdout,
-    /\[initial-draft\].*hard refresh, a second tab, and relogin restore the same initial draft/,
-    "initial-draft recovery must remain in the isolated browser regression matrix",
+    /\[initial-draft\].*relogin opens the latest saved project instead of bootstrapping a blank page/,
+    "initial-draft relogin recovery must remain in the isolated browser regression matrix",
   );
   assert.match(
     baseline.stdout,
