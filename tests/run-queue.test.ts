@@ -12,6 +12,7 @@ import type { GenerationRecordContext } from "../server/engine/runQueue";
 import type { EvaluationRunPolicy } from "../server/lib/evaluationRunPolicy";
 import type { ProviderResolver } from "../server/engine/runner";
 import type { AIProvider, ExecutionPlan, ImageGenRequest, ImageGenResult, NodeExecution } from "../src/types/workflow";
+import type { ImageModelId } from "../src/types/imageModels";
 import type { EvaluationShutdownRule } from "../src/types/promptEvaluation";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
@@ -43,6 +44,7 @@ const {
   getModelParameterProfile,
   materializeModelParameterProfile,
 } = await import("../src/types/modelParameterProfiles");
+const { renderProviderPrompt } = await import("../src/lib/providerPromptRenderer");
 const { PROMPT_RUNTIME_SHUTDOWN_RULES } = await import("../src/lib/promptRuntimeShutdown");
 const {
   promotePromptVariantForTest,
@@ -147,6 +149,20 @@ function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecuti
     upstream,
     params: boundQueueParams("生成服装效果图"),
   };
+}
+
+// 租约恢复测试手工模拟「Provider 请求已发出」状态；该请求必须逐字复刻
+// runner.ts executeImageStep 的渲染输出（runtime.md §1 第 3/6 步），否则
+// 评估证据侧会判定 prompt 与共享受审渲染器漂移。
+function runnerPromptForGenerateStep(step: NodeExecution): string {
+  return renderProviderPrompt({
+    nodeKind: "image",
+    modelId: queueVariant.modelId as ImageModelId,
+    operationMode: queueVariant.mode,
+    taskPrompt: `${queueVariant.fullPrompt}\n\n${String(step.params.prompt)}`,
+    references: [],
+    needsMask: false,
+  });
 }
 
 function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
@@ -1617,7 +1633,7 @@ await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前�
   ), []);
 });
 
-await test("结果节点汇总多上游多图时逐张保留 Provider 与业务成品映射", async () => {
+await test("多步运行逐节点保留 Provider 与业务成品映射，历史暴露目标编辑节点的配对", async () => {
   const testId = ++sequence;
   const firstNodeId = `mapping-first-${testId}`;
   const secondNodeId = `mapping-second-${testId}`;
@@ -1628,20 +1644,42 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
     inputImages: [],
     params: boundQueueParams(prompt),
   });
+  // v7（runtime.md §5「result 归位」）：独立 result 汇总节点已删除，run 的业务产出
+  // 锚定目标 image 节点。目标节点是真实的付费 edit 步骤，运行时消费两个上游生成
+  // 节点本次运行的产出（flare edit 契约允许 1-8 张参考图）；inputReferences 是
+  // 入队时的画布快照，Worker 以本次 run 的实际产出在 Provider 边界替换。
+  const editStep: NodeExecution = {
+    nodeId: targetNodeId,
+    kind: "image",
+    inputImages: [PNG_DATA_URL, PNG_DATA_URL],
+    inputReferences: [
+      { imageRef: PNG_DATA_URL, order: 0, sourceNodeId: firstNodeId },
+      { imageRef: PNG_DATA_URL, order: 1, sourceNodeId: secondNodeId },
+    ],
+    upstream: [
+      { nodeId: firstNodeId, images: [] },
+      { nodeId: secondNodeId, images: [] },
+    ],
+    params: {
+      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "整合两组服装效果图为统一商业棚拍画面"),
+      promptVariantId: runtimeEditVariant.variantId,
+      promptFamilyId: runtimeEditVariant.familyId,
+      parameterProfileId: runtimeEditVariant.parameterProfileId,
+      contractHash: runtimeEditVariant.contractHash,
+      evaluationVersion: runtimeEditVariant.evaluationVersion,
+      postprocessVersion: runtimeEditProfile.postprocess.version,
+      operationMode: runtimeEditVariant.mode,
+      modelId: runtimeEditVariant.modelId,
+      modelOptions: runtimeEditParameters.modelOptions,
+      aspectRatio: runtimeEditParameters.aspectRatio,
+      batchSize: runtimeEditParameters.batchSize,
+    },
+  };
   const plan: ExecutionPlan = {
     steps: [
       generationStep(firstNodeId, "第一组效果图"),
       generationStep(secondNodeId, "第二组效果图"),
-      {
-        nodeId: targetNodeId,
-        kind: "image",
-        inputImages: [],
-        upstream: [
-          { nodeId: firstNodeId, images: [] },
-          { nodeId: secondNodeId, images: [] },
-        ],
-        params: {},
-      },
+      editStep,
     ],
   };
   const fake = resolver((request) => ({
@@ -1653,7 +1691,7 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
     nodeId: targetNodeId,
     nodeLabel: targetNodeId,
     kind: "image",
-    requestedCount: 2,
+    requestedCount: 1,
   });
   for (let jobIndex = 0; jobIndex < 3; jobIndex += 1) {
     const now = tick();
@@ -1663,35 +1701,61 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
       random: () => 0,
     }), true);
   }
-  assert.equal(fake.calls(), 2);
+  assert.equal(fake.calls(), 3);
   assert.deepEqual(await runRow(run.id), {
-    status: "succeeded", error: null, provider_requests: 2, successful_count: 2,
+    status: "succeeded", error: null, provider_requests: 3, successful_count: 1,
   });
 
-  const upstreamSteps = await database.query<{
+  const allSteps = await database.query<{
     node_id: string; output_images_json: string; provider_images_json: string;
+    reference_inputs_json: string;
   }>(`
-    SELECT node_id, output_images_json, provider_images_json
+    SELECT node_id, output_images_json, provider_images_json, reference_inputs_json
     FROM generation_run_steps
     WHERE run_id = $1 AND node_id = ANY($2::text[])
     ORDER BY step_index
-  `, [run.id, [firstNodeId, secondNodeId]]);
-  assert.deepEqual(upstreamSteps.map((row) => row.node_id), [firstNodeId, secondNodeId]);
-  const expectedImages = upstreamSteps.flatMap(
-    (row) => JSON.parse(row.output_images_json) as string[],
+  `, [run.id, [firstNodeId, secondNodeId, targetNodeId]]);
+  assert.deepEqual(allSteps.map((row) => row.node_id), [firstNodeId, secondNodeId, targetNodeId]);
+  const businessByNode = new Map<string, string[]>();
+  const providerByNode = new Map<string, string[]>();
+  for (const row of allSteps) {
+    const business = JSON.parse(row.output_images_json) as string[];
+    const providers = JSON.parse(row.provider_images_json) as string[];
+    assert.equal(business.length, 1, `${row.node_id} 每个 image 步骤产出一张业务成品`);
+    assert.equal(providers.length, 1, `${row.node_id} 每张业务成品必须有独立 Provider 原图证据`);
+    assert.notEqual(
+      business[0],
+      providers[0],
+      `${row.node_id} Provider 原图与业务成品必须使用独立证据地址`,
+    );
+    businessByNode.set(row.node_id, business);
+    providerByNode.set(row.node_id, providers);
+  }
+  // 三个步骤的业务成品与 Provider 原图都必须逐张可区分（相同字节也落独立证据）。
+  assert.equal(new Set([...businessByNode.values()].flat()).size, 3);
+  assert.equal(new Set([...providerByNode.values()].flat()).size, 3);
+  const targetStepRow = allSteps.find((row) => row.node_id === targetNodeId)!;
+  const targetRuntimeReferences = JSON.parse(targetStepRow.reference_inputs_json) as Array<{
+    order: number;
+    sourceNodeId?: string;
+  }>;
+  assert.deepEqual(
+    targetRuntimeReferences.map(({ order, sourceNodeId }) => ({ order, sourceNodeId })),
+    [
+      { order: 0, sourceNodeId: firstNodeId },
+      { order: 1, sourceNodeId: secondNodeId },
+    ],
   );
-  const expectedProviderImages = upstreamSteps.flatMap(
-    (row) => JSON.parse(row.provider_images_json) as string[],
-  );
-  assert.equal(expectedImages.length, 2);
-  assert.equal(expectedProviderImages.length, 2);
-  assert.equal(new Set(expectedProviderImages).size, 2);
 
   const outputRows = await database.query<{ image: string; provider_image: string | null }>(`
     SELECT image, provider_image FROM generation_outputs
     WHERE run_id = $1 AND status = 'success'
     ORDER BY created_at, id
   `, [run.id]);
+  const targetPair = {
+    image: businessByNode.get(targetNodeId)![0] as string,
+    providerImage: providerByNode.get(targetNodeId)![0] as string,
+  };
   const app = express();
   app.use((req, _res, next) => {
     (req as AuthenticatedRequest).authUser = {
@@ -1714,15 +1778,20 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
     const responseText = await response.text();
     assert.equal(response.status, 200, responseText);
     const payload = JSON.parse(responseText) as {
-      records: Array<{ runId: string; image: string; providerImage: string }>;
+      records: Array<{
+        runId: string;
+        image: string;
+        providerImage: string;
+        providerImages: string[];
+      }>;
     };
     const historyRows = payload.records
       .filter((record) => record.runId === run.id)
       .map((record) => ({ image: record.image, providerImage: record.providerImage }));
-    const expectedPairs = expectedImages.map((image, index) => ({
-      image,
-      providerImage: expectedProviderImages[index],
-    }));
+    const historyProviderImages = payload.records
+      .filter((record) => record.runId === run.id)
+      .flatMap((record) => record.providerImages);
+    const expectedPairs = [targetPair];
     assert.deepEqual({
       outputs: outputRows.map((row) => ({ image: row.image, providerImage: row.provider_image })),
       history: historyRows,
@@ -1730,8 +1799,10 @@ await test("结果节点汇总多上游多图时逐张保留 Provider 与业务�
     }, {
       outputs: expectedPairs,
       history: expectedPairs,
-      distinctHistoryProviderImages: expectedPairs.length,
+      distinctHistoryProviderImages: 1,
     });
+    // 历史列表的 Provider 原图数组优先取目标步骤证据，且逐张对应业务成品。
+    assert.deepEqual(historyProviderImages, [targetPair.providerImage]);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
@@ -1814,7 +1885,7 @@ await test("评估恢复仍存在 started 请求时保持 outcome_unknown 并等
   assert.ok(claimed);
   assert.equal(claimed.runId, run.id);
   const request: ImageGenRequest = {
-    prompt: String(claimed.step.params.prompt),
+    prompt: runnerPromptForGenerateStep(claimed.step),
     operationMode: "generate",
     aspectRatio: claimed.step.params.aspectRatio as string,
     batchSize: 1,
@@ -1879,7 +1950,7 @@ await test("评估请求已成功且原图落库后租约过期按后处理失�
   assert.ok(claimed);
   assert.equal(claimed.runId, run.id);
   const request: ImageGenRequest = {
-    prompt: String(claimed.step.params.prompt),
+    prompt: runnerPromptForGenerateStep(claimed.step),
     operationMode: "generate",
     aspectRatio: claimed.step.params.aspectRatio as string,
     batchSize: 1,
@@ -2059,6 +2130,8 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           evaluationVersion: maskVariant.evaluationVersion,
           postprocessVersion: maskProfile.postprocess.version,
           operationMode: "mask-edit",
+          aspectRatio: maskParameters.aspectRatio,
+          batchSize: maskParameters.batchSize,
           references: [{
             dataUrl: PNG_DATA_URL,
             order: 0,
@@ -2107,6 +2180,8 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           evaluationVersion: maskVariant.evaluationVersion,
           postprocessVersion: maskProfile.postprocess.version,
           operationMode: "mask-edit",
+          aspectRatio: maskParameters.aspectRatio,
+          batchSize: maskParameters.batchSize,
           references: Array.from({ length: 8 }, (_value, order) => ({
             dataUrl: PNG_DATA_URL,
             order,
