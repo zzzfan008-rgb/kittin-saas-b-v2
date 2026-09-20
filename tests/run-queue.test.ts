@@ -37,7 +37,6 @@ const { generateRouter } = await import("../server/routes/generate");
 const { historyRouter } = await import("../server/routes/history");
 const { streamDurableRunEvents } = await import("../server/routes/runPlan");
 const {
-  buildGarmentPrompt,
   requireGarmentPromptVariant,
 } = await import("../src/lib/garmentPromptPresets");
 const {
@@ -125,7 +124,8 @@ function boundQueueParams(
   overrides: Readonly<Record<string, unknown>> = {},
 ): NodeExecution["params"] {
   return {
-    prompt: buildGarmentPrompt(queueVariant.variantId, intent),
+    // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts，params 无 prompt。
+    inputTexts: [intent],
     promptVariantId: queueVariant.variantId,
     promptFamilyId: queueVariant.familyId,
     parameterProfileId: queueVariant.parameterProfileId,
@@ -154,12 +154,24 @@ function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecuti
 // 租约恢复测试手工模拟「Provider 请求已发出」状态；该请求必须逐字复刻
 // runner.ts executeImageStep 的渲染输出（runtime.md §1 第 3/6 步），否则
 // 评估证据侧会判定 prompt 与共享受审渲染器漂移。
+function runnerTaskPromptForStep(step: NodeExecution): string {
+  // 与 runner.ts inputTextsOf + 合成表达式逐字一致（inputTexts 优先，
+  // 无 text 上游时回退 params.prompt；直连路径）。
+  const inputTexts = Array.isArray(step.params.inputTexts)
+    ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
+    : [];
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof step.params.prompt === "string" ? step.params.prompt : "");
+  return `${queueVariant.fullPrompt}\n\n${userPrompt}`.trim();
+}
+
 function runnerPromptForGenerateStep(step: NodeExecution): string {
   return renderProviderPrompt({
     nodeKind: "image",
     modelId: queueVariant.modelId as ImageModelId,
     operationMode: queueVariant.mode,
-    taskPrompt: `${queueVariant.fullPrompt}\n\n${String(step.params.prompt)}`,
+    taskPrompt: runnerTaskPromptForStep(step),
     references: [],
     needsMask: false,
   });
@@ -176,7 +188,8 @@ function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
       sourceNodeId: `${nodeId}-source`,
     }],
     params: {
-      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "保持服装结构并优化商业棚拍光线"),
+      // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts。
+      inputTexts: ["保持服装结构并优化商业棚拍光线"],
       promptVariantId: runtimeEditVariant.variantId,
       promptFamilyId: runtimeEditVariant.familyId,
       parameterProfileId: runtimeEditVariant.parameterProfileId,
@@ -532,7 +545,8 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       sourceNodeId: `${nodeId}:user-garment`,
     }],
     params: {
-      prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
+      // v7：真实 DAG 产出——蒙版用户正文沿 text 边进入 inputTexts。
+      inputTexts: ["仅修改蒙版区域的拉链颜色"],
       promptVariantId: maskVariant.variantId,
       promptFamilyId: maskVariant.familyId,
       parameterProfileId: maskVariant.parameterProfileId,
@@ -677,7 +691,8 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
       sourceNodeId: `${nodeId}:user-garment`,
     }],
     params: {
-      prompt: buildGarmentPrompt(maskVariant.variantId, "仅修改蒙版区域的拉链颜色"),
+      // v7：真实 DAG 产出——蒙版用户正文沿 text 边进入 inputTexts。
+      inputTexts: ["仅修改蒙版区域的拉链颜色"],
       promptVariantId: maskVariant.variantId,
       promptFamilyId: maskVariant.familyId,
       parameterProfileId: maskVariant.parameterProfileId,
@@ -912,7 +927,8 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
       sourceNodeId: `${nodeId}:user-garment`,
     }],
     params: {
-      prompt: buildGarmentPrompt(maskVariant.variantId, "仅将蒙版区域改为银色拉链"),
+      // v7：真实 DAG 产出——蒙版用户正文沿 text 边进入 inputTexts。
+      inputTexts: ["仅将蒙版区域改为银色拉链"],
       promptVariantId: maskVariant.variantId,
       promptFamilyId: maskVariant.familyId,
       parameterProfileId: maskVariant.parameterProfileId,
@@ -1053,7 +1069,7 @@ await test("同一付费请求号并发重试只创建一个 run，语义漂移�
     `, [first.id]))?.count, 1);
 
     const changed = step(nodeId);
-    changed.params = { ...changed.params, prompt: "另一份付费语义" };
+    changed.params = { ...changed.params, inputTexts: ["另一份付费语义"] };
     await assert.rejects(
       queue.enqueueGenerationRun({ steps: [changed] }, owner.id, runContext),
       queue.GenerationRequestConflictError,
@@ -1661,7 +1677,8 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
       { nodeId: secondNodeId, images: [] },
     ],
     params: {
-      prompt: buildGarmentPrompt(runtimeEditVariant.variantId, "整合两组服装效果图为统一商业棚拍画面"),
+      // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts。
+      inputTexts: ["整合两组服装效果图为统一商业棚拍画面"],
       promptVariantId: runtimeEditVariant.variantId,
       promptFamilyId: runtimeEditVariant.familyId,
       parameterProfileId: runtimeEditVariant.parameterProfileId,
@@ -2122,7 +2139,9 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         kind: "image",
         nodeId: "direct-mask-test",
         request: {
-          prompt: buildGarmentPrompt(maskVariant.variantId, "只修改左侧衣袖"),
+          // v7 直连路径：request.prompt 是纯用户正文（runner 回退 params.prompt
+          // 后再内联 variant.fullPrompt），不再提交 v6 包装文本。
+          prompt: "只修改左侧衣袖",
           promptVariantId: maskVariant.variantId,
           promptFamilyId: maskVariant.familyId,
           parameterProfileId: maskVariant.parameterProfileId,
@@ -2172,7 +2191,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         kind: "image",
         nodeId: "direct-mask-over-limit",
         request: {
-          prompt: buildGarmentPrompt(maskVariant.variantId, "局部修改"),
+          prompt: "局部修改",
           promptVariantId: maskVariant.variantId,
           promptFamilyId: maskVariant.familyId,
           parameterProfileId: maskVariant.parameterProfileId,

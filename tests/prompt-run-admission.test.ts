@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { buildGarmentPrompt, requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
+import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import {
   evaluatePromptRunAdmission,
   promptRunAdmissionInputFromParams,
   promptRunReferenceSnapshotsFromGraph,
+  synthesizeVariantTaskPrompt,
   type PromptRunGraphNode,
 } from "../src/lib/promptRunAdmission";
 import { createPromptEvaluationReleaseSnapshot } from "../src/lib/promptEvaluationRelease";
@@ -24,7 +25,9 @@ const materialized = materializeModelParameterProfile(profile);
 const params = {
   modelId: variant.modelId,
   operationMode: variant.mode,
-  prompt: buildGarmentPrompt(variant.variantId, "把黑色蕾丝上衣与白色阔腿裤穿到模特身上"),
+  // v7：用户提示词只沿 text 边进入 params.inputTexts（dag.ts buildExecutionPlan），
+  // image 分支不再产出 params.prompt。
+  inputTexts: ["把黑色蕾丝上衣与白色阔腿裤穿到模特身上"],
   promptVariantId: variant.variantId,
   promptFamilyId: variant.familyId,
   parameterProfileId: variant.parameterProfileId,
@@ -107,7 +110,41 @@ assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).code, "e
 assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).allowed, true);
 assert.equal(evaluatePromptRunAdmission({ ...input, promptVariantId: undefined }).code, "missing-binding");
 assert.equal(evaluatePromptRunAdmission({ ...input, contractHash: `sha256:${"0".repeat(64)}` }).code, "binding-mismatch");
-assert.equal(evaluatePromptRunAdmission({ ...input, prompt: `${params.prompt}\n额外静默改写` }).code, "prompt-drift");
+// v7 drift 语义（runtime.md §1 第 3 步）：受审身份是 variant.fullPrompt，由服务端目录
+// 钉死；用户正文沿 text 边进入 inputTexts，承载自由意图，其内容变化不构成 drift。
+assert.notEqual(
+  evaluatePromptRunAdmission({ ...input, inputTexts: ["任意自由用户意图：换成其他文案也仍绑定同一受审系统提示词"] }).code,
+  "prompt-drift",
+  "用户正文内容自由，不再有 v6 客户端包装后缀校验",
+);
+// 合成必须与 runner.executeImageStep 逐字同一套：fullPrompt + "\n\n" + inputTexts.join("\n\n")。
+assert.equal(
+  synthesizeVariantTaskPrompt(input, variant),
+  `${variant.fullPrompt}\n\n${params.inputTexts.join("\n\n")}`.trim(),
+);
+// 无 text 上游的直连路径回退 params.prompt（generate.ts），合成规则同样逐字一致。
+assert.equal(
+  synthesizeVariantTaskPrompt({ prompt: "直连用户正文" }, variant),
+  `${variant.fullPrompt}\n\n直连用户正文`,
+);
+// v6 包装协议彻底失效：包装形状的字符串不再被识别为身份证据，它在回退路径里
+// 只是普通用户正文（能否通过只看 v7 合成，不看任何「提示词变体：」后缀）。
+const v6Wrapped = `任意前缀\n提示词变体：${variant.variantId}\n${variant.fullPrompt}`;
+assert.equal(
+  synthesizeVariantTaskPrompt({ prompt: v6Wrapped }, variant),
+  `${variant.fullPrompt}\n\n${v6Wrapped}`,
+);
+// fail-closed：既无上游 text 正文也无回退 prompt，无法合成受审运行提示词。
+const { inputTexts: _omittedTexts, ...inputWithoutTexts } = input;
+assert.equal(
+  evaluatePromptRunAdmission(inputWithoutTexts).code,
+  "prompt-drift",
+  "空用户正文不得借用受审变体身份发起付费运行",
+);
+// fail-closed：inputTexts 形状非法（伪造请求/脏持久化）不得静默过滤放行。
+assert.equal(evaluatePromptRunAdmission({ ...input, inputTexts: "not-an-array" }).code, "prompt-drift");
+assert.equal(evaluatePromptRunAdmission({ ...input, inputTexts: ["正文", 42] }).code, "prompt-drift");
+assert.equal(evaluatePromptRunAdmission({ ...input, inputTexts: [] }).code, "prompt-drift");
 assert.equal(evaluatePromptRunAdmission({ ...input, modelOptions: { imageSize: "4K" } }).code, "parameter-drift");
 assert.equal(evaluatePromptRunAdmission(input, {
   evaluationRun: true,
@@ -235,7 +272,8 @@ const maskProfile = getModelParameterProfile(maskVariant.parameterProfileId)!;
 const maskInput = promptRunAdmissionInputFromParams("image", {
   modelId: maskVariant.modelId,
   operationMode: maskVariant.mode,
-  prompt: buildGarmentPrompt(maskVariant.variantId, "将蒙版区域改成银色拉链"),
+  // v7：蒙版用户正文同样沿 text 边进入 inputTexts。
+  inputTexts: ["将蒙版区域改成银色拉链"],
   promptVariantId: maskVariant.variantId,
   promptFamilyId: maskVariant.familyId,
   parameterProfileId: maskVariant.parameterProfileId,

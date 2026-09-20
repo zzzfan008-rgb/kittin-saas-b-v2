@@ -110,6 +110,12 @@ export interface PromptRunAdmissionInput {
   operationMode?: unknown;
   operationModeNeedsConfirmation?: unknown;
   prompt?: unknown;
+  /**
+   * v7：上游 text 节点正文（buildExecutionPlan 按边顺序收集，runtime.md §0/§1）。
+   * 付费 DAG 路径的用户提示词只从这里进入；prompt 仅保留给无 text 上游的直连
+   * 生成路由（/api/generate）作回退。unknown：形状必须被证明，绝不静默过滤。
+   */
+  inputTexts?: unknown;
   promptVariantId?: unknown;
   promptFamilyId?: unknown;
   parameterProfileId?: unknown;
@@ -215,10 +221,53 @@ function canonicalJson(value: unknown): string {
   return `{${entries.map(([key, nested]) => `${JSON.stringify(key)}:${canonicalJson(nested)}`).join(",")}}`;
 }
 
-function exactPromptMatchesVariant(prompt: unknown, variant: PromptVariant): boolean {
-  if (typeof prompt !== "string") return false;
-  const suffix = `提示词变体：${variant.variantId}\n${variant.fullPrompt}`;
-  return prompt.trimEnd().endsWith(suffix);
+/**
+ * v7 task prompt 合成（runtime.md §1 第 3 步），必须与
+ * server/engine/runner.ts executeImageStep、server/lib/evaluationEvidence.ts
+ * 逐字同一套：taskPrompt = variant.fullPrompt + "\n\n" + userPrompt；
+ * userPrompt 取上游 text 正文（inputTexts，边顺序、"\n\n" 拼接），无 text
+ * 上游的直连生成路径回退 params.prompt。
+ *
+ * 准入是 fail-closed 证据边界：inputTexts 一旦提供就必须是全字符串数组
+ * （DAG 产出的形状）；伪造请求或脏持久化产生的其他形状返回 null，绝不按
+ * runner 的容错 filter 静默丢弃。用户正文缺失时同样返回 null。
+ */
+export function synthesizeVariantTaskPrompt(
+  input: { inputTexts?: unknown; prompt?: unknown },
+  variant: Pick<PromptVariant, "fullPrompt">,
+): string | null {
+  let inputTexts: string[];
+  if (input.inputTexts === undefined) {
+    inputTexts = [];
+  } else if (
+    Array.isArray(input.inputTexts)
+    && input.inputTexts.every((value) => typeof value === "string")
+  ) {
+    inputTexts = input.inputTexts;
+  } else {
+    return null;
+  }
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof input.prompt === "string" ? input.prompt : "");
+  if (!userPrompt) return null;
+  return `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+}
+
+/**
+ * v7 drift 语义：受审身份是服务端目录钉死的 variant.fullPrompt（变体绑定五字段
+ * + parameterProfile 已单独比对），客户端无法影响系统提示词。这里验证合成出的
+ * taskPrompt 确实把该 fullPrompt 完整内联在最前；v6 的「提示词变体：<id>」
+ * 客户端包装后缀校验已删除，且没有任何兼容路径。
+ */
+function synthesizedPromptMatchesVariant(
+  input: PromptRunAdmissionInput,
+  variant: PromptVariant,
+): boolean {
+  const taskPrompt = synthesizeVariantTaskPrompt(input, variant);
+  if (taskPrompt === null) return false;
+  // trim 后仍须以受审 fullPrompt + 分隔起始，杜绝任何前缀注入空间。
+  return taskPrompt.startsWith(`${variant.fullPrompt}\n\n`);
 }
 
 function blockedStatusReason(status: PromptSupportStatus, variant: PromptVariant, reason: string): string {
@@ -370,11 +419,11 @@ export function evaluatePromptRunAdmission(
       variant,
     };
   }
-  if (!exactPromptMatchesVariant(input.prompt, variant)) {
+  if (!synthesizedPromptMatchesVariant(input, variant)) {
     return {
       allowed: false,
       code: "prompt-drift",
-      reason: "提示词正文已偏离所绑定变体；为避免借用旧评估结论，必须重新选择并确认。",
+      reason: "无法用所绑定变体内联合成当前运行提示词（缺少上游文本正文或正文形状不受信）；为避免借用旧评估结论，必须重新选择并确认。",
       variant,
     };
   }
@@ -454,6 +503,7 @@ export function promptRunAdmissionInputFromParams(
     operationMode: params.operationMode as ImageOperationMode | undefined,
     operationModeNeedsConfirmation: params.operationModeNeedsConfirmation,
     prompt: params.prompt,
+    inputTexts: params.inputTexts,
     promptVariantId: params.promptVariantId,
     promptFamilyId: params.promptFamilyId,
     parameterProfileId: params.parameterProfileId,
