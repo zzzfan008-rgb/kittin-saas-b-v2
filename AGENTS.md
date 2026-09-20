@@ -175,11 +175,9 @@ a dependency change must update it in the same delivery batch.
   `tsc --noEmit`; do not run the full suite on every commit or push. Report any
   unavailable or degraded gate instead of treating it as passed.
 - GitHub Actions is a project gate. The CI design lives in
-  `docs/ci/2026-09-18-github-actions-gate.md`; every push to `main` and every pull
-  request targeting `main` runs the workflow, and merging to `main` requires its status
-  checks to be green. Delivery branches are covered by their pull request, not by their
-  push; a docs-only push to `main` is skipped by `paths-ignore` (the PR run on the exact
-  head is what gated it). A red or absent CI run blocks delivery; a skipped, cancelled,
+  `docs/ci/2026-09-18-github-actions-gate.md`; every push and every pull request
+  targeting `main` runs the workflow, and merging to `main` requires its status
+  checks to be green. A red or absent CI run blocks delivery; a skipped, cancelled,
   or degraded job must be reported as such and never claimed as passed.
 - `main` is protected: these five checks are required on the exact head, with the
   branch required to be up to date before merging —
@@ -212,7 +210,32 @@ a dependency change must update it in the same delivery batch.
   authorize merging to `main`, tagging, releasing, or deploying.
 - The review path is GitHub Actions status checks on the exact head being merged,
   plus the user's explicit approval. Local `gate:codex` runs and external review
-  services (CodeRabbit, etc.) remain optional advisory evidence, not required gates.
+  services remain optional advisory evidence, not required gates.
+
+### Review sources and the feedback loop
+
+Every check that decides a delivery runs on **GitHub Actions**. Local runs (tsc, focused
+tests, ast-grep, depcruise, build, playwright e2e) are self-checks only — they are never
+delivery evidence.
+
+| Source | Nature | When |
+|---|---|---|
+| GitHub Actions (static / unit / e2e / production-smoke / code-intelligence) | **required gate** | on every PR; on `main` pushes |
+| **CodeRabbit** (`.coderabbit.yaml`; free for this public repo) | **advisory feedback source** | automatically on every PR push, drafts included (incremental) |
+| `reviewer` agent | domain review (advisory) | delivery gate |
+| `ui-qa` agent | visual / accessibility acceptance | after delivery |
+| `architect` agent | release gate | before merge / release |
+| the user | **final merge authorization** | at merge time |
+
+Loop: CodeRabbit findings are collected by the orchestrator and routed by responsibility
+(contracts / plans → `architect`; `server/**` → `backend`; `src/**` → `frontend`;
+`docs/design/**` → `designer`; `e2e/**` and acceptance → `ui-qa`). The owning agent fixes
+them and reports back; the bot re-reviews incrementally; the orchestrator verifies. The
+orchestrator never fixes review findings itself.
+
+Priority: a red GitHub Actions check **blocks**; CodeRabbit comments are **suggestions**
+(triaged, then routed); when the two disagree, GitHub Actions and the settled contracts win.
+
 - Deliver through GitHub. Push every delivery to `origin` so GitHub Actions runs on it;
   a commit that exists only locally has no CI coverage. Pushing a delivery branch — and
   opening a pull request for it — is expected, not a special request. Merging to `main`
