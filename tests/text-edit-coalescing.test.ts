@@ -29,10 +29,10 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
 function aiNode(id = "coalesced-text-node"): FlowNode {
   return {
     id,
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "连续文本节点",
       status: "idle",
       prompt: "初始提示词",
@@ -59,7 +59,7 @@ function activeTarget(): DocumentTarget {
 
 function prompt(): string {
   const data = activeDocument().nodes[0].data;
-  return data.kind === "ai-modify" ? data.prompt : "";
+  return data.kind === "image" ? data.prompt : "";
 }
 
 function resetDocument(id = "coalesced-text-node") {
@@ -301,7 +301,7 @@ await test("页面退出、关闭页签和所有文本入口都接入统一提�
   assert.match(projectTabs, /flushActiveTextEdit\(\);[\s\S]*useFlowStore\.getState\(\)\.tabs\.find/);
   assert.match(projectTabs, /useCoalescedTextEdit\([\s\S]*kind: "project-name"/);
   assert.doesNotMatch(topBar, /kind: "project-name"/);
-  assert.match(inspector, /field: "label"[\s\S]*field: "prompt"[\s\S]*field: "note"/);
+  assert.match(inspector, /field: "label"/);
   assert.match(nodeFrame, /labelEdit\.cancel\(\)/);
   assert.match(textEditHook, /markKeyDown\(event\.key, composing\)/);
   assert.match(textEditHook, /consumeKeyUp\(event\.key\)\) return/);

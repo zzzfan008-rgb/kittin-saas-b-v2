@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { maskRedrawReadiness } from "../src/lib/maskRedraw";
+import { maskRedrawReadiness } from "./lib/maskRedraw";
 import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
 import { imageModelAspectRatioPatch } from "../src/types/imageModels";
 import type { Edge } from "@xyflow/react";
@@ -35,7 +35,7 @@ import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
 const aiTestVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 // These tests exercise store concurrency and persistence after admission. Keep
@@ -47,7 +47,7 @@ const AI_TEST_PROMPT = buildGarmentPrompt(aiTestVariant.variantId, "修改衣领
 const geminiTestVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 promotePromptVariantForTest(geminiTestVariant);
@@ -80,19 +80,19 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
 function imageNode(id: string, label: string): FlowNode {
   return {
     id,
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label, status: "idle" },
+    data: { kind: "image", label, status: "idle" },
   };
 }
 
 function aiNode(id: string, label: string): FlowNode {
   return {
     id,
-    type: "ai-modify",
+    type: "image",
     position: { x: 320, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label,
       status: "success",
       prompt: AI_TEST_PROMPT,
@@ -115,8 +115,8 @@ function aiNode(id: string, label: string): FlowNode {
 
 function runnableAiGraph(node: FlowNode): { nodes: FlowNode[]; edges: Edge[] } {
   const reference = imageNode(`${node.id}-reference`, `${node.data.label}参考图`);
-  if (reference.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
-  reference.data.imageUrl = `/api/files/${node.id}-reference.png`;
+  if (reference.data.kind !== "image") throw new Error("测试参考节点类型异常");
+  reference.data.outputImages = [`/api/files/${node.id}-reference.png`];
   return {
     nodes: [reference, node],
     edges: [{ id: `${node.id}-reference-edge`, source: reference.id, target: node.id }],
@@ -166,7 +166,10 @@ setGenerationSafetyBlockReason(null);
 const initial = useFlowStore.getState();
 const tabA = initial.activeTabId;
 initial.setProjectName("项目 A");
-initial.updateNodeData(activeDocument(initial).nodes[0].id, { label: "A 上传节点" });
+// 方案 C：空白 tab 不再自带 starter 节点，测试显式添加一个 image 节点再改标签。
+const tabAStarterNodeId = initial.addNode("image", { x: 0, y: 0 });
+assert.ok(tabAStarterNodeId);
+initial.updateNodeData(tabAStarterNodeId, { label: "A 上传节点" });
 
 useFlowStore.getState().openFlowTab({
   projectId: "project-b",
@@ -295,13 +298,16 @@ await test("后台任务可定向回写非当前页签", () => {
   useFlowStore.getState().switchTab(tabA);
   useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(tabB), "b-node", {
     status: "success",
-    imageUrl: "/api/files/background-result.png",
+    outputImages: ["/api/files/background-result.png"],
   });
   assert.equal(activeDocument().projectName, "项目 A");
   useFlowStore.getState().switchTab(tabB);
   const node = activeDocument().nodes.find((candidate) => candidate.id === "b-node");
   assert.equal(node?.data.status, "success");
-  assert.equal(node?.data.kind === "image-input" ? node.data.imageUrl : undefined, "/api/files/background-result.png");
+  assert.deepEqual(
+    node?.data.kind === "image" ? node.data.outputImages : undefined,
+    ["/api/files/background-result.png"],
+  );
 });
 
 await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片", () => {
@@ -324,7 +330,7 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
   assert.equal(failedNode?.data.status, "error");
   assert.equal(failedNode?.data.error, "AI 网关暂不可用");
   assert.deepEqual(
-    failedNode?.data.kind === "ai-modify" ? failedNode.data.outputImages : undefined,
+    failedNode?.data.kind === "image" ? failedNode.data.outputImages : undefined,
     ["/api/files/previous.png"],
   );
   useFlowStore.getState().switchTab(tabB);
@@ -358,7 +364,8 @@ await test("关闭当前页签后切换到相邻页签，至少保留一个画�
   useFlowStore.getState().closeTab(tabA);
   assert.equal(useFlowStore.getState().tabs.length, 1);
   assert.ok(useFlowStore.getState().activeTabId);
-  assert.equal(activeDocument().nodes.length, 1);
+  // 方案 C：关闭最后一个页签后重建的是空白画布（nodes=[]）。
+  assert.equal(activeDocument().nodes.length, 0);
 });
 
 await test("删除已选节点时同步清理 selectedNodeId", () => {
@@ -393,10 +400,10 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   );
   assert.ok(addedId);
   const added = activeDocument().nodes.find((node) => node.id === addedId);
-  assert.equal(added?.data.kind, "image-input");
+  assert.equal(added?.data.kind, "image");
   assert.equal(added?.data.label, "金色面料");
   assert.equal(added?.data.status, "success");
-  assert.equal(added?.data.kind === "image-input" ? added.data.imageUrl : undefined, "/api/files/gold-fabric.png");
+  assert.deepEqual(added?.data.kind === "image" ? added.data.outputImages : [], ["/api/files/gold-fabric.png"]);
 
   useFlowStore.getState().undo();
   assert.equal(activeDocument().nodes.length, 1);
@@ -497,7 +504,7 @@ await test("空白项目启动器只在从未持久化的 pristine 文档中生�
   assert.equal(isPristineProjectTab(activeDocument()), false);
 
   useFlowStore.getState().createBlankTab();
-  const addedId = useFlowStore.getState().addNode("sketch-to-render", { x: 380, y: 0 });
+  const addedId = useFlowStore.getState().addNode("image", { x: 380, y: 0 });
   assert.ok(addedId);
   assert.equal(isPristineProjectTab(activeDocument()), false);
 });
@@ -513,7 +520,7 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   const beforeRevision = activeDocument().revision;
   const addedId = useFlowStore.getState().addConnectedNode(
     anchor.id,
-    "sketch-to-render",
+    "image",
     "downstream",
   );
   assert.ok(addedId);
@@ -532,8 +539,8 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
 
 await test("新连线不再写入角色数据（edge data 为空对象）", () => {
   const confirmedSource = imageNode("confirmed-edge-source", "参考人物");
-  if (confirmedSource.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
-  confirmedSource.data.imageUrl = "/api/files/confirmed-person.png";
+  if (confirmedSource.data.kind !== "image") throw new Error("测试参考节点类型异常");
+  confirmedSource.data.outputImages = ["/api/files/confirmed-person.png"];
   const firstTarget = aiNode("confirmed-edge-target", "第一目标");
   const secondTarget = aiNode("explicit-edge-target", "第二目标");
   useFlowStore.getState().openFlowTab({
@@ -562,15 +569,15 @@ await test("新连线不再写入角色数据（edge data 为空对象）", () =
   ]);
 });
 
-await test("专用面料节点句柄在新连线时不再写入角色数据", () => {
+await test("专用面料/角色句柄在新连线时被拒绝，不再写入角色数据", () => {
   const source = imageNode("dedicated-handle-source", "参考来源");
   const targetId = "dedicated-handle-target";
   const target = {
     id: targetId,
-    type: "fabric-recolor",
+    type: "image",
     position: { x: 320, y: 0 },
     data: {
-      kind: "fabric-recolor" as const,
+      kind: "image" as const,
       label: "面料换色",
       status: "idle" as const,
       colors: [],
@@ -602,41 +609,29 @@ await test("专用面料节点句柄在新连线时不再写入角色数据", ()
     targetHandle: "garment",
   });
 
-  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), [
-    {},
-    {},
-  ]);
+  assert.deepEqual(activeDocument().edges.map((edge) => edge.data), []);
 });
 
 await test("快捷建图复用输入上限与只读门禁", () => {
-  const source = imageNode("full-source", "已有上游");
   const target: FlowNode = {
     id: "full-target",
-    type: "upscale",
+    type: "image",
     position: { x: 380, y: 0 },
-    data: {
-      kind: "upscale",
-      label: "高清放大",
-      status: "idle",
-      imageSize: "2K",
-      outputImages: [],
-      modelId: "gpt-image-2.5-flare-vip",
-      modelOptions: { size: "auto" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-    },
+    data: { kind: "image", label: "图片", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   };
+  // 图片节点 reference 入边上限为 8：8 个上游已满，第 9 个快捷建图被拒绝。
+  const upstreams = Array.from({ length: 8 }, (_, index) => imageNode(`upstream-${index}`, `上游 ${index + 1}`));
   useFlowStore.getState().openFlowTab({
     projectId: "quick-connect-full",
     projectName: "输入已满",
-    nodes: [source, target],
-    edges: [{ id: "already-connected", source: source.id, target: target.id }],
+    nodes: [...upstreams, target],
+    edges: upstreams.map((node, index) => ({ id: `upstream-${index}-edge`, source: node.id, target: target.id })),
   });
   assert.equal(
-    useFlowStore.getState().addConnectedNode(target.id, "image-input", "upstream"),
+    useFlowStore.getState().addConnectedNode(target.id, "image", "upstream"),
     null,
   );
-  assert.equal(activeDocument().nodes.length, 2);
+  assert.equal(activeDocument().nodes.length, 9);
 
   useFlowStore.getState().openFlowTab({
     projectId: "quick-connect-readonly",
@@ -646,7 +641,7 @@ await test("快捷建图复用输入上限与只读门禁", () => {
     readOnly: true,
   });
   assert.equal(
-    useFlowStore.getState().addConnectedNode("readonly-anchor", "ai-modify", "downstream"),
+    useFlowStore.getState().addConnectedNode("readonly-anchor", "image", "downstream"),
     null,
   );
   assert.equal(activeDocument().nodes.length, 1);
@@ -667,7 +662,9 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
     const firstSave = before.saveProject();
     assert.equal(requests.length, 1);
 
-    useFlowStore.getState().setProjectName("保存期间的新名称");
+    // 方案 C：空 tab 重命名是瞬态字段，不再 bump revision；用添加节点作为保存期间的实质编辑。
+    const editNodeId = useFlowStore.getState().addNode("text", { x: 0, y: 0 });
+    assert.ok(editNodeId);
     const secondSave = useFlowStore.getState().saveProject();
     assert.equal(requests.length, 1, "第二次保存应等待当前请求完成");
 
@@ -676,8 +673,8 @@ await test("保存期间继续编辑会排队并最终写入最新版本", async
     await Promise.resolve();
     assert.equal(requests.length, 2, "旧快照完成后应自动发送最新快照");
 
-    const latestPayload = JSON.parse(requests[1].body) as { name: string };
-    assert.equal(latestPayload.name, "保存期间的新名称");
+    const latestPayload = JSON.parse(requests[1].body) as { flow: { nodes: unknown[] } };
+    assert.equal(latestPayload.flow.nodes.length, 1);
     const duplicateSameSnapshot = useFlowStore.getState().saveProject();
     assert.equal(requests.length, 2, "同快照的显式重复保存应由当前请求覆盖");
     requests[1].resolve(Response.json({ ok: true }));
@@ -739,8 +736,8 @@ await test("旧保存响应不得将同页签新项目标记为已保存", async
 await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", async () => {
   const sharedNodeId = "same-tab-async-identity";
   const referenceNode = imageNode("same-tab-async-reference", "旧项目参考图");
-  if (referenceNode.data.kind !== "image-input") throw new Error("测试参考节点类型异常");
-  referenceNode.data.imageUrl = "/api/files/garment-reference.png";
+  if (referenceNode.data.kind !== "image") throw new Error("测试参考节点类型异常");
+  referenceNode.data.outputImages = ["/api/files/garment-reference.png"];
   const sourceNode = aiNode(sharedNodeId, "旧项目节点");
   sourceNode.data.status = "idle";
   useFlowStore.getState().loadFlow({
@@ -1208,7 +1205,7 @@ await test("runNode 创建 queued 记录时保留当前结果选择", async () =
     image: "/api/files/kept.png",
     nodeId: "older-node",
     nodeLabel: "原已选结果",
-    kind: "ai-modify",
+    kind: "image",
     projectId: "older-project",
     startedAt: 1,
     finishedAt: 2,
@@ -1272,10 +1269,10 @@ await test("历史安全门从 runNode 唯一入口阻止新的付费运行", as
 await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保真", async () => {
   const generationNode = aiNode("model-invariant-ai", "Gemini 保真节点");
   generationNode.data.status = "idle";
-  if (generationNode.data.kind !== "ai-modify") throw new Error("测试生成节点类型错误");
+  if (generationNode.data.kind !== "image") throw new Error("测试生成节点类型错误");
   generationNode.data.outputImages = [];
   const invariantUpload = imageNode("model-invariant-upload", "异步上传");
-  if (invariantUpload.data.kind !== "image-input") throw new Error("测试上传节点类型错误");
+  if (invariantUpload.data.kind !== "image") throw new Error("测试上传节点类型错误");
   useFlowStore.getState().openFlowTab({
     projectId: "model-invariant-project",
     projectName: "模型保真项目",
@@ -1305,17 +1302,17 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   await Promise.resolve().then(() => {
     useFlowStore.getState().updateNodeDataInTab(documentTargetForTab(invariantTabId), "model-invariant-upload", {
       status: "success",
-      imageUrl: "/api/files/model-invariant-upload.png",
+      outputImages: ["/api/files/model-invariant-upload.png"],
     });
   });
   assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
   useFlowStore.getState().addExistingNode({
     id: "model-invariant-mask",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 320, y: 240 },
     data: {
-      kind: "mask-redraw",
+      kind: "image",
       label: "蒙版局部重绘",
       status: "idle",
       prompt: "仅替换被选中区域",
@@ -1378,7 +1375,8 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   }
 });
 
-await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", () => {
+await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions，节点体不设第二处编辑入口", () => {
+  // 模型专属「业务画幅 ↔ provider 原生参数」联动助手行为保留（单元级契约）。
   assert.deepEqual(
     imageModelAspectRatioPatch(
       "gemini-3.1-flash-image",
@@ -1391,30 +1389,35 @@ await test("节点与 Inspector 共用画幅补丁并同步 provider 参数", ()
     },
   );
 
-  const inspectorSource = fs.readFileSync(
+  // v7：旧 InspectorPanel / AiModifyNode / SketchToRenderNode 的画幅入口已随三节点重构
+  // 移除；原生参数统一在 NodeInspectorWindow 的 key/value 编辑器写回，避免两处入口漂移。
+  const inspectorWindowSource = fs.readFileSync(
+    new URL("../src/components/nodes/NodeInspectorWindowPortal.tsx", import.meta.url),
+    "utf8",
+  );
+  const legacyInspectorSource = fs.readFileSync(
     new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
     "utf8",
   );
-  const aiModifySource = fs.readFileSync(
-    new URL("../src/components/nodes/AiModifyNode.tsx", import.meta.url),
-    "utf8",
-  );
-  const sketchSource = fs.readFileSync(
-    new URL("../src/components/nodes/SketchToRenderNode.tsx", import.meta.url),
+  const imageNodeSource = fs.readFileSync(
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   assert.match(
-    inspectorSource,
-    /imageModelAspectRatioPatch\(selectedModelId, selectedModelOptions, e\.target\.value\)/,
-    "Inspector 修改画幅时必须同步业务比例与 provider modelOptions",
+    inspectorWindowSource,
+    /updateData\(node\.id, \{ modelOptions: \{ \.\.\.modelOptions, \[key\]: next \} \}\)/,
+    "Inspector 窗口必须是原生参数唯一写回入口",
   );
-  for (const source of [aiModifySource, sketchSource]) {
-    assert.match(
-      source,
-      /imageModelAspectRatioPatch\(data\.modelId, data\.modelOptions, e\.target\.value\)/,
-      "节点内画幅入口也必须复用同一 provider 参数补丁",
-    );
-  }
+  assert.doesNotMatch(
+    legacyInspectorSource,
+    /modelOptions/,
+    "旧 InspectorPanel 不得保留第二处原生参数编辑入口",
+  );
+  assert.doesNotMatch(
+    imageNodeSource,
+    /modelOptions:\s*\{/,
+    "图片节点体不得内联编辑原生参数（统一在 Inspector 窗口）",
+  );
 });
 
 await test("项目保存失败时显示错误且绝不提交生成", async () => {
@@ -1467,7 +1470,9 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
   try {
     const running = useFlowStore.getState().runNode("snapshot-run");
     assert.equal(projectResolvers.length, 1);
-    useFlowStore.getState().updateNodeData("snapshot-run", { prompt: "保存期间的新提示词" });
+    // v7：用户提示词归属上游 text 节点，图片节点不再携带 prompt；以持久化字段 label
+    // 作为「保存等待期间发生编辑」的载体，验证付费请求仍绑定点击时的不可变快照。
+    useFlowStore.getState().updateNodeData("snapshot-run", { label: "保存期间的新名称" });
     projectResolvers[0](Response.json({ ok: true }));
     await Promise.resolve();
     await Promise.resolve();
@@ -1477,8 +1482,8 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
 
     assert.equal(runBodies.length, 1);
     const submitted = runBodies[0].nodes.find((node) => node.id === "snapshot-run");
-    assert.equal(submitted?.data.kind, "ai-modify");
-    assert.equal(submitted?.data.kind === "ai-modify" ? submitted.data.prompt : undefined, AI_TEST_PROMPT);
+    assert.equal(submitted?.data.kind, "image");
+    assert.equal(submitted?.data.label, "快照生成", "run-plan 必须提交点击时快照，不被等待期间的编辑改写");
     assert.match(
       activeDocument().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
       /画布尚未保存或已在其他位置更新/,
@@ -1602,31 +1607,31 @@ await test("React Flow 初始化尺寸不会移动节点或标记项目未保存
 
 await test("打开含蒙版节点的项目时只订阅稳定的首张输入图", () => {
   const source = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
-  assert.ok(source.includes("const source = useFlowStore((state) => selectActiveNodeInputImages(state, id)[0]);"));
+  // v7：MaskRedrawNode 已并入 ImageNode；输入图经 useShallow 稳定订阅后只取首张作为蒙版源。
+  assert.match(source, /selectNodeInputImages\(document, id\)/);
+  assert.match(source, /const maskSource = referenceImages\[0\];/);
   assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
 });
 
-await test("羽化宽度滑块使用项目本地 shadcn Slider 并写入 featherRadius", () => {
-  const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+await test("羽化宽度经 ImageNode 透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
+  const imageNodeSource = fs.readFileSync(
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   const editorSource = fs.readFileSync(
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(redrawSource, /import \{ Slider \} from "@\/components\/ui\/slider"/);
-  assert.match(redrawSource, /min=\{FEATHER_RADIUS_MIN\}/);
-  assert.match(redrawSource, /max=\{FEATHER_RADIUS_MAX\}/);
-  assert.match(redrawSource, /aria-label="羽化宽度（像素）"/);
-  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: next \}\)/);
-  assert.match(redrawSource, /updateNodeData\(id, \{ featherRadius: undefined \}\)/);
-  assert.match(redrawSource, /featherRadius=\{normalizeFeatherRadius\(data\.featherRadius\)\}/);
-  assert.doesNotMatch(redrawSource, /<input[^>]*type="range"/);
+  // v7：旧 MaskRedrawNode 的羽化 Slider 已随三节点重构移除；节点只把已保存的
+  // featherRadius 透传给 MaskEditor（缺省 = 自适应），不设第二处输入控件。
+  assert.match(imageNodeSource, /featherRadius=\{typeof data\.featherRadius === "number" \? data\.featherRadius : undefined\}/);
+  assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
   assert.match(editorSource, /featherRadius\?: number/);
+  // 0–64 边界钳制（原 Slider 的 min/max 约束）现在由预览侧保证。
+  assert.match(editorSource, /Math\.max\(0, Math\.min\(64, Math\.round\(featherRadius\)\)\)/);
   assert.match(editorSource, /adaptiveMaskFeatherRadius\(overlay\.width, overlay\.height, expansionRadius\)/);
 });
 
@@ -1638,21 +1643,21 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     nodes: [
       {
         id: "mask-source",
-        type: "image-input",
+        type: "image",
         position: { x: 0, y: 0 },
         data: {
-          kind: "image-input",
+          kind: "image",
           label: "蒙版原图",
           status: "success",
-          imageUrl: sourceRef,
+          outputImages: [sourceRef],
         },
       },
       {
         id: "mask-node",
-        type: "mask-redraw",
+        type: "image",
         position: { x: 320, y: 0 },
         data: {
-          kind: "mask-redraw",
+          kind: "image",
           label: "蒙版局部重绘",
           status: "idle",
           modelId: "gpt-image-2.5-sunburst",
@@ -1677,8 +1682,8 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     maskSourceRef: source,
   });
   const savedNode = activeDocument().nodes.find((node) => node.id === "mask-node");
-  assert.equal(savedNode?.data.kind, "mask-redraw");
-  if (savedNode?.data.kind !== "mask-redraw") throw new Error("蒙版节点丢失");
+  assert.equal(savedNode?.data.kind, "image");
+  if (savedNode?.data.kind !== "image") throw new Error("蒙版节点丢失");
   const afterSave = maskRedrawReadiness({
     source,
     mask: savedNode.data.mask,
@@ -1741,8 +1746,9 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
+  // v7：MaskRedrawNode 已并入 ImageNode，蒙版上传 pending 与原图校验在其 onSave 闭包内。
   const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -1764,8 +1770,8 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   );
   assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
   assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
-  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== source/);
-  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: source/);
+  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== maskSource/);
+  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: maskSource/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);

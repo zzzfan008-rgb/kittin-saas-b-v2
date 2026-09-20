@@ -52,7 +52,7 @@ const PRICE_MINOR = 17;
 const evaluationPlan: ExecutionPlan = {
   steps: [{
     nodeId: "evaluation-campaign-node",
-    kind: "sketch-to-render",
+    kind: "image",
     inputImages: [],
     inputReferences: [],
     params: {
@@ -207,7 +207,7 @@ async function bindCampaignRun(prefix: string): Promise<BoundCampaign> {
         evaluation_campaign_id, evaluation_slot_id, billing_reconciliation_status
       ) VALUES (
         $1, $2, 'evaluation-campaign-node', 'Evaluation campaign node',
-        'sketch-to-render', 'sealed campaign regression', 1, 0, 0,
+        'image', 'sealed campaign regression', 1, 0, 0,
         'queued', $3, $3, 'evaluation', 'no-retry', $4, $5, $6, $7, 'pending'
       )
     `, [
@@ -276,7 +276,7 @@ async function persistSucceededEvidence(input: BoundCampaign): Promise<{
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
         $9, 'build-identity', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
-        'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
+        'image', 'generate', 'fashion-lookbook', 'fashion-lookbook',
         'fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1', 'prompt-v1', $10,
         'evaluation-v1', $11, $12, 'profile-v1', '1.0.0', 'fit-pad-v1',
         'reference-input-sha256-v1', 'garment-gold-v1', 'garment-rubric-v1',

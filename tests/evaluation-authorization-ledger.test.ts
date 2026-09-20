@@ -43,7 +43,7 @@ function plan(overrides: Record<string, unknown> = {}): ExecutionPlan {
   return {
     steps: [{
       nodeId: `evaluation-node-${++sequence}`,
-      kind: "sketch-to-render",
+      kind: "image",
       inputImages: [],
       inputReferences: [],
       params: {
@@ -148,7 +148,7 @@ async function insertEvaluationRun(
       evaluation_case_id, evaluation_authorization_id, evaluation_campaign_id,
       evaluation_slot_id, billing_reconciliation_status
     ) VALUES (
-      $1, $2, $3, $3, 'sketch-to-render', '评估测试', $4,
+      $1, $2, $3, $3, 'image', '评估测试', $4,
       'queued', $5, $5, 'evaluation', 'no-retry', $6, $7, $8, $9, 'not-required'
     )
   `, [

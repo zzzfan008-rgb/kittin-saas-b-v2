@@ -26,7 +26,7 @@ export const DEFAULT_EVALUATION_MANIFEST_PATH = resolve(
 );
 const PLAN_PATH = resolve(ROOT_DIR, "docs/ai/evaluation/evaluation-plan-v2.json");
 
-const EXPECTED_BASE_UNIT_COUNT = 25;
+const EXPECTED_BASE_UNIT_COUNT = 41;
 const EXPECTED_PILOT_UNIT_COUNT = 9;
 
 export interface EvaluationManifestStageRequestCap {
@@ -172,18 +172,23 @@ function stageRequestCaps(): EvaluationManifestStageRequestCap[] {
 }
 
 function currentBaseUnits(): EvaluationManifestUnit[] {
-  return GARMENT_PROMPT_VARIANTS.map((variant) => {
-    const target = currentEvaluationPromotionTarget(variant.variantId);
-    const profile = getModelParameterProfile(variant.parameterProfileId);
-    if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
-    return {
-      unitId: variant.variantId,
-      unit: target.unit,
-      versions: target.versions,
-      businessFrame: { ...profile.businessFrame },
-      releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant)),
-    };
-  });
+  // 按域分道：方案 A 的评估清单只物化 image 域变体（garment 评分规则 / 图像黄金集 /
+  // 双层图像证据，见 docs/ai/evaluation/README.md）。text / video 域尚无评分规则与
+  // 证据契约，不属于本清单——由各域后续评估设计另行覆盖。
+  return GARMENT_PROMPT_VARIANTS
+    .filter((variant) => variant.nodeKind === "image")
+    .map((variant) => {
+      const target = currentEvaluationPromotionTarget(variant.variantId);
+      const profile = getModelParameterProfile(variant.parameterProfileId);
+      if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
+      return {
+        unitId: variant.variantId,
+        unit: target.unit,
+        versions: target.versions,
+        businessFrame: { ...profile.businessFrame },
+        releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant)),
+      };
+    });
 }
 
 function representativeProbeUnitIds(units: readonly EvaluationManifestUnit[]): string[] {
@@ -288,7 +293,7 @@ function assertManifestInvariants(manifest: EvaluationManifest): EvaluationManif
     throw new Error(`representative pilot must contain ${EXPECTED_PILOT_UNIT_COUNT} unique units`);
   }
   if (pilotIds.some((unitId) => !unitIds.includes(unitId))) {
-    throw new Error("representative pilot contains a unit outside the 25-unit base manifest");
+    throw new Error(`representative pilot contains a unit outside the ${EXPECTED_BASE_UNIT_COUNT}-unit base manifest`);
   }
   const pilotPairs = pilotIds.map((unitId) => {
     const unit = manifest.baseUnits.find((candidate) => candidate.unitId === unitId)?.unit;

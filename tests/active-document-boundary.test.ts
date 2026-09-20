@@ -77,9 +77,9 @@ function sourceFiles(root: string): string[] {
 function imageNode(id: string, label: string): FlowNode {
   return {
     id,
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label, status: "idle" },
+    data: { kind: "image", label, status: "idle" },
   };
 }
 
@@ -115,7 +115,7 @@ useFlowStore.setState({
     image: "/api/files/selector-result.png",
     nodeId: "selector-a-node",
     nodeLabel: "Selector result",
-    kind: "ai-modify",
+    kind: "image",
     projectId: "selector-a",
     startedAt: 1,
     finishedAt: 2,
@@ -205,10 +205,10 @@ useFlowStore.getState().loadFlow({
   projectName: "Print source",
   nodes: [{
     id: "selector-print-node",
-    type: "print-extract",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "print-extract",
+      kind: "image",
       label: "Print source",
       status: "success",
       prompt: "",
@@ -245,8 +245,8 @@ const postSaveState = useFlowStore.getState();
 const printSource = selectDocumentForTab(postSaveState, printSourceTabId);
 const destination = selectDocumentForTab(postSaveState, destinationTabId);
 const savedPrint = printSource?.nodes.find((node) => node.id === "selector-print-node")?.data;
-assert.equal(savedPrint?.kind, "print-extract");
-assert.deepEqual(savedPrint?.kind === "print-extract" ? savedPrint.savedAsAssets : [], [printUrl]);
+assert.equal(savedPrint?.kind, "image");
+assert.deepEqual(savedPrint?.kind === "image" ? savedPrint.outputImages : [], [printUrl]);
 assert.equal(destination?.nodes.some((node) => node.id === "selector-print-node"), false);
 assert.equal(postSaveState.activeTabId, destinationTabId);
 console.log("  ✓ 异步素材保存在切页后仍定向回写发起命令的原页签");
@@ -256,10 +256,10 @@ useFlowStore.getState().loadFlow({
   projectName: "Replaced print source",
   nodes: [{
     id: "selector-replaced-print-node",
-    type: "print-extract",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "print-extract",
+      kind: "image",
       label: "Old print source",
       status: "success",
       prompt: "",

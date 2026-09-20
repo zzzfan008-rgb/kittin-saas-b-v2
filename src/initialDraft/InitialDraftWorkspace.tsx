@@ -25,7 +25,6 @@ import { readWorkspaceOwner } from "@/auth/session";
 import { clearProjectTabSessionStorage } from "@/lib/tabSessionStorage";
 import {
   applyServerInitialDraftToTab,
-  createFreshLocalTabForInitialDraft,
   didRestoreProjectTabSessionWorkspace,
   isPristineProjectTab,
   markInitialDraftSynced,
@@ -277,6 +276,40 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     return task;
   }, []);
 
+  // 方案 C 首次落库：空 local tab 首次实质变更后触发 bootstrap，成功后转 initial_draft。
+  const bootstrapLocalTab = useCallback(async (tabId: string): Promise<boolean> => {
+    const snapshot = useFlowStore.getState().tabs.find((tab) => tab.id === tabId);
+    if (
+      !snapshot ||
+      snapshot.readOnly ||
+      projectTabLifecycle(snapshot) !== "local" ||
+      (snapshot.nodes.length === 0 && snapshot.edges.length === 0)
+    ) return false;
+    setSyncState("syncing");
+    setSyncError(null);
+    try {
+      const bootstrapped = await bootstrapInitialDraft({
+        id: snapshot.projectId,
+        name: snapshot.projectName,
+        flow: persistedWorkflowForProjectTab(snapshot),
+      });
+      const latest = useFlowStore.getState().tabs.find((tab) => tab.id === tabId);
+      if (!latest || projectTabLifecycle(latest) !== "local") return false;
+      applyDraft(latest, bootstrapped.draft, { forceDirty: true });
+      setSyncState("idle");
+      return true;
+    } catch (error) {
+      if (error instanceof InitialDraftApiError && error.status === 409) {
+        const server = await fetchInitialDraft().catch(() => null);
+        const latest = useFlowStore.getState().tabs.find((tab) => tab.id === tabId);
+        if (server && latest) setConflict({ localTabId: latest.id, server });
+      }
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  }, []);
+
   const runInitialization = useCallback(async (signal: AbortSignal) => {
     setGateState("loading");
     setGateError(null);
@@ -318,11 +351,15 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       let decision = decideInitialDraftStartup(placeholder, local, server);
 
       if (decision.kind === "bootstrap-pristine" || decision.kind === "bootstrap-local") {
-        const needsFreshIdentity = bootstrapNeedsFreshProjectIdentity(decision);
-        const source = decision.kind === "bootstrap-pristine"
-          ? createFreshLocalTabForInitialDraft(decision.local.id)
-          : decision.local;
+        const source = decision.local;
         if (!source) throw new Error("无法创建新的未保存项目，请刷新后重试");
+        // 方案 C：空白本地 tab（nodes=[]&&edges=[]）不落库，直接进入空画布；
+        // 首次实质变更时才由首次落库 effect 触发 bootstrap。
+        if (source.nodes.length === 0 && source.edges.length === 0) {
+          setGateState("ready");
+          return;
+        }
+        const needsFreshIdentity = bootstrapNeedsFreshProjectIdentity(decision);
         const prepared = decision.kind === "bootstrap-local" && needsFreshIdentity
           ? await copyProjectScopedMasks({
               sourceProjectId: source.projectId,
@@ -409,6 +446,39 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       syncTimer.current = null;
     };
   }, [conflict, gateState, initialDraftSignal, synchronizeTab]);
+
+  // 方案 C 首次落库触发：追踪「空 local tab → 非空」的转变，调用 bootstrapLocalTab。
+  // 模板/打开项目等从创建起就非空的 local tab 不会被追踪，因此不会被误 bootstrap。
+  useEffect(() => {
+    if (gateState !== "ready") return;
+    const emptyLocalTabIds = new Set<string>();
+    const bootstrapInFlight = new Set<string>();
+    const registerEmpty = (tabs: ProjectTab[]) => {
+      for (const tab of tabs) {
+        if (projectTabLifecycle(tab) === "local" && tab.nodes.length === 0 && tab.edges.length === 0) {
+          emptyLocalTabIds.add(tab.id);
+        }
+      }
+    };
+    registerEmpty(useFlowStore.getState().tabs);
+    const unsubscribe = useFlowStore.subscribe((state) => {
+      registerEmpty(state.tabs);
+      for (const tab of state.tabs) {
+        if (tab.readOnly || projectTabLifecycle(tab) !== "local") continue;
+        if (tab.nodes.length === 0 && tab.edges.length === 0) continue;
+        if (!emptyLocalTabIds.has(tab.id) || bootstrapInFlight.has(tab.id)) continue;
+        bootstrapInFlight.add(tab.id);
+        const tabId = tab.id;
+        // 延迟到当前同步块结束再落库：保证 addNode + auto-text（补 text 节点与
+        // prompt 边）都在 bootstrap 读取快照之前完成，避免序列化出无 text 上游的
+        // 非法 image 节点（INV-1 400）。
+        void queueMicrotask(() => {
+          void bootstrapLocalTab(tabId).finally(() => bootstrapInFlight.delete(tabId));
+        });
+      }
+    });
+    return unsubscribe;
+  }, [bootstrapLocalTab, gateState]);
 
   useEffect(() => registerInitialDraftSaveBarrier(async (target) => {
     if (syncTimer.current !== null) {
@@ -521,11 +591,7 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
       });
       const fresh = replaceAbandonedInitialDraftWithFreshLocalTab(tabId);
       if (!fresh) throw new Error("初始草稿已变化，请刷新后重试");
-      const next = await bootstrapInitialDraft({
-        id: fresh.projectId,
-        flow: persistedWorkflowForProjectTab(fresh),
-      });
-      applyDraft(fresh, next.draft, { forceDirty: false });
+      // 方案 C：放弃后重建的是空白本地 tab，不立即落库；首次实质变更才由首次落库 effect 触发。
       setSyncState("idle");
       return true;
     } catch (error) {

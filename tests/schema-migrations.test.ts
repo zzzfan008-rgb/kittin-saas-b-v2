@@ -14,7 +14,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { migrateLegacyData } = await import("../server/lib/legacyMigration");
 
-console.log("PostgreSQL 20 编号迁移回归测试");
+console.log("PostgreSQL 21 编号迁移回归测试");
 await initializeDatabase();
 
 const versions = await query<{ version: number; name: string }>(
@@ -41,6 +41,7 @@ assert.deepEqual(versions, [
   { version: 18, name: "evaluation_code_identity_binding" },
   { version: 19, name: "immutable_evaluation_campaign_ledger" },
   { version: 20, name: "provider_request_id_evidence" },
+  { version: 21, name: "video_step_output_metadata" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -680,7 +681,7 @@ await query(`
     run_type, retry_policy, evaluation_case_id, evaluation_authorization_id,
     evaluation_campaign_id, evaluation_slot_id, billing_reconciliation_status
   ) VALUES (
-    $1, $2, 'legacy-node', 'Legacy identity node', 'sketch-to-render',
+    $1, $2, 'legacy-node', 'Legacy identity node', 'image',
     'legacy identity evidence', 1, 0, 0, 'queued', $3, $3,
     'evaluation', 'no-retry', $4, $5, $6, $7, 'not-required'
   )
@@ -739,7 +740,7 @@ await query(`
   ) VALUES (
     $1, $2, $3, $4, 'legacy-sample', $5, $6, $7,
     $8, 'deployment-env', FALSE, 'gpt-image-2.5-flare-vip', 'gpt-image-2.5-flare-vip',
-    'sketch-to-render', 'generate', 'fashion-lookbook', 'fashion-lookbook',
+    'image', 'generate', 'fashion-lookbook', 'fashion-lookbook',
     'legacy-variant', 'legacy-prompt-v1', $9, 'legacy-evaluation-v1', $10,
     $11, 'legacy-profile', '1.0.0', 'fit-pad-v1',
     'reference-input-sha256-v1', 'legacy-golden-v1', 'legacy-rubric-v1',

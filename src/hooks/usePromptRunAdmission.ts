@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   selectActiveEdges,
   selectActiveNodes,
@@ -8,6 +9,7 @@ import type { WorkflowNodeData } from "@/types/workflow";
 import {
   evaluatePromptRunAdmission,
   promptRunAdmissionInputFromNode,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
   type PromptRunGraphEdge,
   type PromptRunGraphNode,
@@ -25,20 +27,11 @@ export interface PromptRunBrowserReference {
 
 function sourceImageRefs(node: PromptRunGraphNode | undefined): Array<string | undefined> {
   if (!node) return [undefined];
-  switch (node.data.kind) {
-    case "image-input":
-      return [node.data.imageUrl];
-    case "result":
-      return node.data.images.length > 0 ? node.data.images : [undefined];
-    case "sketch-to-render":
-    case "ai-modify":
-    case "fabric-recolor":
-    case "upscale":
-    case "print-extract":
-    case "print-mutate":
-    case "mask-redraw":
-      return node.data.outputImages.length > 0 ? node.data.outputImages : [undefined];
+  // v7：只有 image 节点产出参考图（R8 输入输出同体，outputImages 承载）。
+  if (node.data.kind === "image") {
+    return node.data.outputImages.length > 0 ? node.data.outputImages : [undefined];
   }
+  return [undefined];
 }
 
 export function promptRunBrowserReferencesFromGraph(
@@ -76,12 +69,13 @@ export function promptRunBrowserReferencesFromGraph(
 
 /** Browser mirror of the server admission gate; the server remains authoritative. */
 export function usePromptRunAdmission(nodeId: string, data: WorkflowNodeData) {
-  const nodes = useFlowStore(selectActiveNodes);
-  const edges = useFlowStore(selectActiveEdges);
+  const nodes = useFlowStore(useShallow(selectActiveNodes));
+  const edges = useFlowStore(useShallow(selectActiveEdges));
   return useMemo(() => {
     const references = promptRunReferenceSnapshotsFromGraph(nodes, edges, nodeId);
+    const inputTexts = promptRunInputTextsFromGraph(nodes, edges, nodeId);
     return {
-      ...evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(data, references)),
+      ...evaluatePromptRunAdmission(promptRunAdmissionInputFromNode(data, references, inputTexts)),
       referenceRows: promptRunBrowserReferencesFromGraph(nodes, edges, nodeId),
     };
   }, [data, edges, nodeId, nodes]);

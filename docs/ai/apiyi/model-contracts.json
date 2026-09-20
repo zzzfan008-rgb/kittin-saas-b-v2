@@ -57,7 +57,7 @@
     {
       "id": "gpt-image-2.5-sunburst",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:c143bba099efdd135195e26d5af141e0b7304bf61414551fd3931d9d4fc98001",
+      "contractHash": "sha256:7d8f66ec92ec53ac60a68a8ebd5d805aead90dd8b0013877bb2b785b6c30c94d",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -151,12 +151,13 @@
           "b64_json"
         ],
         "maxImages": 1
-      }
+      },
+      "recommendedOptions": {}
     },
     {
       "id": "gpt-image-2.5-all",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:3fc8ddff6557099e3e7ea16647da0a4b76add30acfe2c0c7bce89362c8484b4a",
+      "contractHash": "sha256:87cdbc16dcf2e1f5f62ec2c3e7e86bdc58c5f6c44a560db95105ffbac0800054",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -208,12 +209,13 @@
           "url"
         ],
         "maxImages": 1
-      }
+      },
+      "recommendedOptions": {}
     },
     {
       "id": "gpt-image-2.5-sunburst-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:2b577588de58adff5800643a00a080b4ff0f73c4e080e8e2c5ab05a8bebd400a",
+      "contractHash": "sha256:1da7f49f417ab5b97197022be0464c4305a185265aa911e38336def91c895618",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -304,12 +306,25 @@
           "url"
         ],
         "maxImages": 1
+      },
+      "recommendedOptions": {
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
       }
     },
     {
       "id": "gpt-image-2.5-flare-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:215fcbc25ba1ac18acb145133c0e05fd14ba7025a27d5ce89fb319b4f6de3123",
+      "contractHash": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -400,12 +415,25 @@
           "url"
         ],
         "maxImages": 1
+      },
+      "recommendedOptions": {
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
       }
     },
     {
       "id": "gemini-3-pro-image-preview",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:03916d7adc0842ad26d7f572826f094f93cd94f5989c22aa0988fc1a81998397",
+      "contractHash": "sha256:c0ffeb30211869e4d1ef6c9e5b62a3b85aad54450369f7d4573a1ebd050c4704",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -465,12 +493,25 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
       }
     },
     {
       "id": "gemini-3.1-flash-lite-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:a645c5bfafac02beecab4095e53e1f4938322758c9b52f5566fc1362f46b5677",
+      "contractHash": "sha256:b24cd590b4fb401f54abeb0d22b87422292bf43f2bcff5d04b2653c06064d5fa",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -532,12 +573,20 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "1K"
+        }
       }
     },
     {
       "id": "gemini-3.1-flash-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:24a5a90505c05af3a7f4065e3cd5411221b1b5fa57b558fa917c66f78f622045",
+      "contractHash": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -602,12 +651,26 @@
           "inlineData"
         ],
         "scanAllParts": true
+      },
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "1:1"
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "512",
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
       }
     },
     {
       "id": "flux-2-pro",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e2899e0a496feb2148a867ce764baf507dbe68128ac22d7b65cebc5fc6d11732",
+      "contractHash": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -663,12 +726,21 @@
         ],
         "maxImages": 1,
         "urlTtlSeconds": 600
+      },
+      "recommendedOptions": {
+        "outputFormat": {
+          "default": "png",
+          "examples": [
+            "jpeg",
+            "png"
+          ]
+        }
       }
     },
     {
       "id": "seedream-5-0-260128",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:0f673bf58953b6a44704c342ba6d5b94d7abe81c052114d8044f263f55d1f3db",
+      "contractHash": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -723,7 +795,170 @@
           "b64_json"
         ],
         "recordActualSize": true
+      },
+      "recommendedOptions": {
+        "size": {
+          "default": "2K",
+          "examples": [
+            "2K",
+            "3K"
+          ]
+        }
       }
+    }
+  ],
+  "textModels": [
+    {
+      "id": "gpt-4o",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:827409deddb8889b115718fe2b9b3244115f60a5ca337924807136e90b354a9f",
+      "label": "GPT-4o（默认/主力）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 128000,
+        "maxOutputTokens": 16384
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "temperature": {
+          "default": 0.7,
+          "examples": [
+            0,
+            0.5,
+            0.7,
+            1,
+            1.5
+          ]
+        },
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192,
+            16384
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/model-info.md",
+          "sha256": "cbae72a3a2117b8d8c7c4dcea8a9eb35f800084191a0dde1fe56abb7993f816e"
+        }
+      ]
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:025b33f93a0e37af373b8e5c5a1ab0f42ae77861f2f490c85b29e1adf969a56e",
+      "label": "Claude Sonnet 4.5（备选）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 200000,
+        "maxOutputTokens": 64000
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "temperature": {
+          "default": 0.7,
+          "examples": [
+            0,
+            0.5,
+            0.7,
+            1
+          ]
+        },
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192,
+            16384
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/model-info.md",
+          "sha256": "cbae72a3a2117b8d8c7c4dcea8a9eb35f800084191a0dde1fe56abb7993f816e"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/scenarios/chat/chathub.md",
+          "sha256": "9da7ec41696442a10207f936443bffdc9dabd9e8300c6ed0452b4bcaeccb9a3b"
+        }
+      ]
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "contractHashScope": "sha256-canonical-text-model-envelope-v1",
+      "contractHash": "sha256:dd4790174f12037c7555eba392acb21550a3e96546bb24a0cca123562c08ea3e",
+      "label": "Gemini 3 Pro Preview（备选）",
+      "channel": "official",
+      "endpoint": {
+        "path": "/v1/chat/completions",
+        "contentType": "application/json"
+      },
+      "contextWindow": {
+        "inputTokens": 1000000,
+        "maxOutputTokens": 65536
+      },
+      "timeoutMs": 60000,
+      "recommendedOptions": {
+        "temperature": {
+          "default": 0.7,
+          "examples": [
+            0,
+            0.5,
+            0.7,
+            1,
+            1.5
+          ]
+        },
+        "maxTokens": {
+          "default": 4096,
+          "examples": [
+            1024,
+            2048,
+            4096,
+            8192,
+            16384,
+            65536
+          ]
+        }
+      },
+      "knowledgeSources": [
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/news/gemini-3-pro-preview-launch.md",
+          "sha256": "d1e30e09c27a7a98cd2cb62a5a728f4340e9caf79f3686cf71f5cef809564eb8"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/models.md",
+          "sha256": "33100d3f0d97e8282bc1b1489472568dc1285d0642a5d79e4cdc0907859f00ed"
+        },
+        {
+          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gemini/native.md",
+          "sha256": "e181e988193d1871ae901f2cecdb5d24ccfbab1acbb19c843a716077affe3b11"
+        }
+      ]
     }
   ]
 }

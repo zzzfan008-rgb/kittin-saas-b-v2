@@ -7,7 +7,7 @@ import type {
 } from "../../../src/types/workflow";
 import type { PoolClient } from "pg";
 import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import type { ProviderResolver } from "../runner";
+import type { ProviderResolver, VideoProviderResolver } from "../runner";
 import {
   ActiveRunLimitError,
   CancelledBeforeProviderCall,
@@ -95,6 +95,8 @@ export interface EvaluationRecoveryEvidenceSummary {
 
 export interface ProcessGenerationJobOptions {
   resolveProvider?: ProviderResolver;
+  /** video 节点 Provider 解析器（测试注入用）；缺省走 getVideoProvider。 */
+  resolveVideoProvider?: VideoProviderResolver;
   /** Test-only injection; production workers always resolve the fail-closed runtime identity. */
   evaluationCodeIdentity?: EvaluationCodeIdentity;
   now?: () => number;

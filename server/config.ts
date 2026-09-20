@@ -66,6 +66,14 @@ export const config = {
   /** API易图片接口；路径由本地模型知识库逐模型声明。 */
   apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.apiyi.com").replace(/\/+$/, ""),
   apiyiApiKey: () => required("APIYI_API_KEY"),
+  /**
+   * API易视频（Seedance）专用令牌。用户已为 Seedance 单独建令（需勾选 SeeDance2 分组）。
+   * 缺省回退主图片令牌；显式配置时仅视频链路使用，不覆盖图片链路。
+   */
+  apiyiVideoApiKey: () => {
+    const key = (process.env.APIYI_VIDEO_API_KEY ?? "").trim();
+    return key || required("APIYI_API_KEY");
+  },
 
   port: () => Number(process.env.PORT ?? 3001),
   dataDir: () => path.resolve(ROOT_DIR, process.env.DATA_DIR ?? "./data"),

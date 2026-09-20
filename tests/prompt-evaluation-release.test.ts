@@ -30,7 +30,7 @@ const TEST_SHA256 = "0".repeat(64);
 const catalogVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 const promoted = { ...catalogVariant, supportStatus: "verified" } satisfies PromptVariant;
@@ -138,13 +138,13 @@ assert.equal(getRuntimePromptVariantAvailability({
 const editVariant = requireGarmentPromptVariant({
   familyId: "fashion-lookbook",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 const maskVariant = requireGarmentPromptVariant({
   familyId: "mask-local-edit",
   modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "mask-redraw",
+  nodeKind: "image",
   mode: "mask-edit",
 });
 
@@ -180,16 +180,10 @@ try {
   mutableReleases.splice(0, mutableReleases.length, ...originalReleases);
 }
 
-const inspectorSource = fs.readFileSync(
-  new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+const referenceListSource = fs.readFileSync(
+  new URL("../src/components/nodes/ReferenceImageList.tsx", import.meta.url),
   "utf8",
 );
-assert.match(inspectorSource, /ReferenceImageList/);
-
-const maskNodeSource = fs.readFileSync(
-  new URL("../src/components/nodes/MaskRedrawNode.tsx", import.meta.url),
-  "utf8",
-);
-assert.match(maskNodeSource, /ReferenceImageList/);
+assert.match(referenceListSource, /export function ReferenceImageList/);
 
 console.log("提示词评估发布快照与自动降级测试通过");

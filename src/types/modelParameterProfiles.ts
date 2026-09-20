@@ -1,7 +1,14 @@
 import type { GenerationImageModelId, ImageModelId, ImageModelOptions } from "./imageModels";
 import type { ImageOperationMode } from "./imageOperations";
 
-export type GarmentTaskFamilyId = "fashion-lookbook" | "commerce-hero" | "design-sheet";
+export type GarmentTaskFamilyId =
+  | "fashion-lookbook"
+  | "commerce-hero"
+  | "design-sheet"
+  | "upscale"
+  | "print-extract"
+  | "print-mutate"
+  | "fabric-recolor";
 
 interface ParameterProfileBase {
   profileId: string;
@@ -40,6 +47,11 @@ export type ModelParameterProfile =
         size: string;
         referenceLimit: 8;
         omittedFields: readonly ["quality", "n", "aspect_ratio"];
+        /**
+         * `source` 画幅时尺寸不能回退到默认比例；必须从参考图推导。
+         * 标记 true 以 fail-closed 方式保留此约束，等待后端运行时解析首图尺寸后填充。
+         */
+        derivedFromFirstReference?: true;
       };
     })
   | (ParameterProfileBase & {
@@ -62,6 +74,11 @@ export type ModelParameterProfile =
         maxPixels: 4_194_304;
         outputFormat: "png";
         referenceLimit: 8;
+        /**
+         * `source` 画幅时尺寸不能回退到默认比例；必须从参考图推导。
+         * 标记 true 以 fail-closed 方式保留此约束，等待后端运行时解析首图尺寸后填充。
+         */
+        derivedFromFirstReference?: true;
       };
     })
   | (ParameterProfileBase & {
@@ -79,10 +96,16 @@ export type ModelParameterProfile =
       };
     });
 
-const FAMILY_FRAMES: Record<GarmentTaskFamilyId, "1:1" | "3:4" | "4:3"> = {
+type FamilyFrame = "1:1" | "3:4" | "4:3" | "source";
+
+const FAMILY_FRAMES: Record<GarmentTaskFamilyId, FamilyFrame> = {
   "fashion-lookbook": "3:4",
   "commerce-hero": "1:1",
   "design-sheet": "4:3",
+  "upscale": "source",
+  "print-extract": "1:1",
+  "print-mutate": "1:1",
+  "fabric-recolor": "source",
 };
 
 const VIP_SIZE: Record<"1:1" | "3:4" | "4:3", string> = {
@@ -97,6 +120,20 @@ const FLUX_DIMENSIONS: Record<"1:1" | "3:4" | "4:3", { width: number; height: nu
   "4:3": { width: 2048, height: 1536 },
 };
 
+/**
+ * `source` 画幅对 vip / flux 两模型的 native 尺寸无法从固定比例表查得。
+ * 按契约要求，这两模型必须显式给定输出尺寸；运行时 edit 路径必有参考图，
+ * 因此 native 尺寸声明为「从参考图推导」。具体尺寸换算由后端运行时解析首图
+ * 元数据后填入 Provider 请求（backend 职责，见 prompt-variant-schema.md
+ * R-59 裁定记录「约束 1」与本卡边界）。
+ */
+const SOURCE_DERIVED_SIZE_MARKER = "source-derived" as const;
+const SOURCE_DERIVED_DIMENSIONS_MARKER = {
+  width: 0,
+  height: 0,
+  derivedFromFirstReference: true,
+} as const;
+
 const GENERAL_MODELS = [
   "gpt-image-2.5-flare-vip",
   "gemini-3.1-flash-image",
@@ -105,6 +142,7 @@ const GENERAL_MODELS = [
 ] as const satisfies readonly GenerationImageModelId[];
 const GENERAL_MODES: readonly Exclude<ImageOperationMode, "mask-edit">[] = ["generate", "edit"];
 const FAMILIES = Object.keys(FAMILY_FRAMES) as GarmentTaskFamilyId[];
+const EDIT_ONLY_FAMILIES: readonly GarmentTaskFamilyId[] = ["upscale", "print-extract", "print-mutate", "fabric-recolor"];
 
 function generalProfile(
   modelId: (typeof GENERAL_MODELS)[number],
@@ -126,21 +164,33 @@ function generalProfile(
     },
   };
   switch (modelId) {
-    case "gpt-image-2.5-flare-vip":
+    case "gpt-image-2.5-flare-vip": {
+      const derivedFromFirstReference = aspectRatio === "source" ? true as const : undefined;
+      const size = aspectRatio === "source" ? SOURCE_DERIVED_SIZE_MARKER : VIP_SIZE[aspectRatio];
       return { ...base, modelId, native: {
-        kind: "gpt-image-2-vip", size: VIP_SIZE[aspectRatio], referenceLimit: 8,
+        kind: "gpt-image-2-vip", size, referenceLimit: 8,
         omittedFields: ["quality", "n", "aspect_ratio"],
+        ...(derivedFromFirstReference ? { derivedFromFirstReference } : {}),
       } };
+    }
     case "gemini-3.1-flash-image":
+      // Gemini aspectRatio 不接受 "source"·运行时 edit 有参考图，通过 imageModelOptionsForAspectRatio
+      // 从首图实际比例转换为契约支持的固定比例后填充（不在档案本体约束）。
       return { ...base, modelId, native: {
-        kind: "gemini-image", aspectRatio, imageSize: "2K", referenceLimit: 8,
-        emptyImageOnHttp200IsError: true,
+        kind: "gemini-image", aspectRatio: aspectRatio === "source" ? "1:1" : aspectRatio,
+        imageSize: "2K", referenceLimit: 8, emptyImageOnHttp200IsError: true,
       } };
-    case "flux-2-pro":
+    case "flux-2-pro": {
+      const derivedFromFirstReference = aspectRatio === "source" ? true as const : undefined;
+      const dimensions = aspectRatio === "source"
+        ? SOURCE_DERIVED_DIMENSIONS_MARKER
+        : FLUX_DIMENSIONS[aspectRatio];
       return { ...base, modelId, native: {
-        kind: "flux-image", ...FLUX_DIMENSIONS[aspectRatio], multipleOf: 16,
+        kind: "flux-image", ...dimensions, multipleOf: 16,
         maxPixels: 4_194_304, outputFormat: "png", referenceLimit: 8,
+        ...(derivedFromFirstReference ? { derivedFromFirstReference } : {}),
       } };
+    }
     case "seedream-5-0-260128":
       return { ...base, modelId, native: {
         kind: "seedream-image", size: "2K", referenceLimit: 8,
@@ -173,9 +223,10 @@ const maskProfile: ModelParameterProfile = {
 };
 
 export const MODEL_PARAMETER_PROFILES: readonly ModelParameterProfile[] = [
-  ...GENERAL_MODELS.flatMap((modelId) => FAMILIES.flatMap((familyId) => (
-    GENERAL_MODES.map((mode) => generalProfile(modelId, familyId, mode))
-  ))),
+  ...GENERAL_MODELS.flatMap((modelId) => FAMILIES.flatMap((familyId) => {
+    const modes = EDIT_ONLY_FAMILIES.includes(familyId) ? ["edit"] as const : GENERAL_MODES;
+    return modes.map((mode) => generalProfile(modelId, familyId, mode));
+  })),
   maskProfile,
 ];
 
@@ -225,11 +276,13 @@ export function materializeModelParameterProfile(
       return {
         aspectRatio,
         batchSize: 1,
-        modelOptions: {
-          width: profile.native.width,
-          height: profile.native.height,
-          outputFormat: profile.native.outputFormat,
-        },
+        modelOptions: profile.native.derivedFromFirstReference
+          ? { outputFormat: profile.native.outputFormat }
+          : {
+              width: profile.native.width,
+              height: profile.native.height,
+              outputFormat: profile.native.outputFormat,
+            },
         ignoredNativeFields: [],
       };
     case "seedream-image":

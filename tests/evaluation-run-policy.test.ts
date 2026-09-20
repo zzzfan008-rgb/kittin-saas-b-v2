@@ -72,7 +72,7 @@ assert.throws(
 );
 
 const paidPlan: ExecutionPlan = { steps: [{
-  nodeId: "generate", kind: "sketch-to-render", inputImages: [],
+  nodeId: "generate", kind: "image", inputImages: [],
   params: { modelId: "gpt-image-2.5-flare-vip", operationMode: "generate", prompt: "test" },
 }] };
 assert.deepEqual(

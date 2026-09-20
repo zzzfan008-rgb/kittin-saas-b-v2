@@ -22,12 +22,19 @@ import { lockActiveOwner, lockActiveOwnerMutation } from "../lib/ownerMutation";
 import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
 import {
   WORKFLOW_SCHEMA_VERSION,
+  type PersistedWorkflowEdge,
+  type PersistedWorkflowNode,
   type WorkflowTemplate,
 } from "../../src/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
 } from "../../src/types/imageModels";
+import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
+import {
+  getModelParameterProfile,
+  materializeModelParameterProfile,
+} from "../../src/types/modelParameterProfiles";
 
 export const templatesRouter = Router();
 
@@ -46,414 +53,197 @@ function templatePath(sub: "builtin" | "user", id: string): string {
   return path.join(templatesDir(sub), `${path.basename(id)}.json`);
 }
 
-// ---------- 内置模板（flow 为 React Flow 格式，data 默认值同前端 flowStore.defaultNodeData）----------
+// ---------- 内置模板（v7 三基础节点；data 默认值见 contracts/template-format.md §1）----------
 const BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
+// 六族功能 → 新变体清单归 P2-d 目录重写；此处先落到当前目录已注册的变体
+// （generate/edit 族），P2-d 重写目录时按 prompt-variant-schema.md §3 一一替换。
+const GENERATE_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1";
+const EDIT_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+
+function textNode(id: string, x: number, y: number, label: string, text: string): PersistedWorkflowNode {
+  return { id, type: "text", position: { x, y }, data: { kind: "text", label, status: "idle", text } };
+}
+
+function imageNode(
+  id: string,
+  x: number,
+  y: number,
+  label: string,
+  variantId: string,
+  aspectRatio: string,
+): PersistedWorkflowNode {
+  // v7（R-78/P2-b）：变体绑定是唯一事实源。种子节点直接物化已评估参数档案
+  // （modelOptions / batchSize / 业务画幅），模板落地后无需用户再点一次目录即可
+  // 通过运行准入；档案缺失时退回合同推荐默认值，由 parameter-drift 闸门拒绝。
+  const boundVariant = getGarmentPromptVariantById(variantId);
+  const boundProfile = boundVariant
+    ? getModelParameterProfile(boundVariant.parameterProfileId)
+    : undefined;
+  const materialized = boundProfile
+    ? materializeModelParameterProfile(boundProfile)
+    : undefined;
+  return {
+    id,
+    type: "image",
+    position: { x, y },
+    data: {
+      kind: "image",
+      label,
+      status: "idle",
+      promptVariantId: variantId,
+      modelId: DEFAULT_GENERATION_MODEL_ID,
+      modelOptions: materialized
+        ? materialized.modelOptions
+        : defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
+      aspectRatio: materialized && materialized.aspectRatio !== "source"
+        ? materialized.aspectRatio
+        : aspectRatio,
+      batchSize: materialized ? materialized.batchSize : 1,
+      outputImages: [],
+    },
+  };
+}
+
+function edge(id: string, source: string, target: string, targetHandle?: "prompt" | "reference"): PersistedWorkflowEdge {
+  return { id, source, target, ...(targetHandle ? { targetHandle } : {}), data: {} };
+}
 
 function builtinTemplates(): WorkflowTemplate[] {
   return [
-    {
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-sketch-recolor",
-      name: "草图→效果图→改款→多配色",
-      description: "上传草图，渲染效果图后 AI 改款，再按配色批量出图",
-      builtIn: true,
-      createdAt: BUILTIN_CREATED_AT,
-      flow: {
-        schemaVersion: WORKFLOW_SCHEMA_VERSION,
-        nodes: [
-          {
-            id: "n1",
-            type: "image-input",
-            position: { x: 0, y: 0 },
-            data: {
-              kind: "image-input", label: "图片上传", status: "idle",
-            },
-          },
-          {
-            id: "n2",
-            type: "sketch-to-render",
-            position: { x: 380, y: 0 },
-            data: {
-              kind: "sketch-to-render",
-              label: "草图→效果图",
-              status: "idle",
-              prompt: "",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "n3",
-            type: "ai-modify",
-            position: { x: 760, y: 0 },
-            data: {
-              kind: "ai-modify",
-              label: "AI 改款",
-              status: "idle",
-              prompt: "",
-              aspectRatio: "1:1",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
-            },
-          },
-          {
-            id: "n4",
-            type: "fabric-recolor",
-            position: { x: 1140, y: 0 },
-            data: {
-              kind: "fabric-recolor",
-              label: "面料/配色替换",
-              status: "idle",
-              colors: [],
-              prompt: "",
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-            },
-          },
-        ],
-        edges: [
-          {
-            id: "e1", source: "n1", target: "n2",
-            data: {},
-          },
-          {
-            id: "e2", source: "n2", target: "n3",
-            data: {},
-          },
-          {
-            id: "e3", source: "n3", target: "n4", targetHandle: "garment",
-            data: {},
-          },
-        ],
-      },
-    },
-    {
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-sketch-upscale",
-      name: "草图→效果图→高清放大",
-      description: "上传草图渲染效果图，再放大至 2K/4K 精修细节",
-      builtIn: true,
-      createdAt: BUILTIN_CREATED_AT,
-      flow: {
-        schemaVersion: WORKFLOW_SCHEMA_VERSION,
-        nodes: [
-          {
-            id: "n1",
-            type: "image-input",
-            position: { x: 0, y: 0 },
-            data: {
-              kind: "image-input", label: "图片上传", status: "idle",
-            },
-          },
-          {
-            id: "n2",
-            type: "sketch-to-render",
-            position: { x: 380, y: 0 },
-            data: {
-              kind: "sketch-to-render",
-              label: "草图→效果图",
-              status: "idle",
-              prompt: "",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "n3",
-            type: "upscale",
-            position: { x: 760, y: 0 },
-            data: {
-              kind: "upscale",
-              label: "高清放大",
-              status: "idle",
-              imageSize: "2K",
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-            },
-          },
-        ],
-        edges: [
-          {
-            id: "e1", source: "n1", target: "n2",
-            data: {},
-          },
-          {
-            id: "e2", source: "n2", target: "n3",
-            data: {},
-          },
-        ],
-      },
-    },
-    {
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-text-recolor",
-      name: "文生款式→多配色",
-      description: "纯提示词文生款式效果图，再按配色批量出图",
-      builtIn: true,
-      createdAt: BUILTIN_CREATED_AT,
-      flow: {
-        schemaVersion: WORKFLOW_SCHEMA_VERSION,
-        nodes: [
-          {
-            id: "n1",
-            type: "sketch-to-render",
-            position: { x: 0, y: 0 },
-            data: {
-              kind: "sketch-to-render",
-              label: "草图→效果图",
-              status: "idle",
-              prompt: "设计一款简约通勤风女装连衣裙，正面全身效果图，浅灰纯色背景",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "generate",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "n2",
-            type: "fabric-recolor",
-            position: { x: 380, y: 0 },
-            data: {
-              kind: "fabric-recolor",
-              label: "面料/配色替换",
-              status: "idle",
-              colors: [],
-              prompt: "",
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-            },
-          },
-        ],
-        edges: [{
-          id: "e1", source: "n1", target: "n2", targetHandle: "garment",
-          data: {},
-        }],
-      },
-    },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
       id: "builtin-text-to-image",
       name: "文生图（服装设计）",
       description: "输入款式、面料、色彩、模特、场景与摄影要求，直接生成服装设计效果图",
       builtIn: true,
-      createdAt: "2026-08-13T00:00:00.000Z",
+      createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          {
-            id: "generate",
-            type: "sketch-to-render",
-            position: { x: 0, y: 0 },
-            data: {
-              kind: "sketch-to-render",
-              label: "文生图",
-              status: "idle",
-              prompt: "设计一套现代都市女装：廓形利落的短款西装搭配高腰阔腿长裤，使用有细腻垂坠感的深灰羊毛混纺面料，局部加入哑光黑色皮革滚边；年轻亚洲女模特全身站姿，正面略微侧身，服装结构、面料纹理和缝线细节清晰；极简浅灰摄影棚背景，柔和侧光，高级时装品牌 Lookbook 风格，写实摄影，高质感，画面干净，无文字、无水印。",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "generate",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "result",
-            type: "result",
-            position: { x: 430, y: 0 },
-            data: {
-              kind: "result",
-              label: "生成结果",
-              status: "idle",
-              images: [],
-              note: "可修改提示词、画幅比例和生成数量后重新生成",
-            },
-          },
+          textNode(
+            "prompt-1", 0, 0, "提示词",
+            "设计一套现代都市女装：廓形利落的短款西装搭配高腰阔腿长裤，使用有细腻垂坠感的深灰羊毛混纺面料；年轻亚洲女模特全身站姿，正面略微侧身，服装结构、面料纹理和缝线细节清晰；极简浅灰摄影棚背景，柔和侧光，高级时装品牌 Lookbook 风格，写实摄影，高质感，画面干净，无文字、无水印。",
+          ),
+          imageNode("gen-1", 380, 0, "文生图", GENERATE_VARIANT, "3:4"),
         ],
-        edges: [{
-          id: "generate-to-result", source: "generate", target: "result",
-          data: {},
-        }],
+        edges: [edge("e1", "prompt-1", "gen-1", "prompt")],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-sketch-recolor",
+      name: "草图→换色",
+      description: "上传草图，说明配色方案，生成多配色效果图",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("sketch-note", -380, -170, "草图说明", "保持草图构图、款式与主体不变"),
+          imageNode("sketch", 0, -170, "草图上传", EDIT_VARIANT, "3:4"),
+          textNode("recolor-note", 0, 190, "换色说明", "将服装颜色替换为：奶白 + 驼色，保持版型与细节不变"),
+          imageNode("recolor", 380, 0, "换色", EDIT_VARIANT, "3:4"),
+        ],
+        edges: [
+          edge("e-sketch-prompt", "sketch-note", "sketch", "prompt"),
+          edge("e-sketch-ref", "sketch", "recolor", "reference"),
+          edge("e-recolor-prompt", "recolor-note", "recolor", "prompt"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-sketch-upscale",
+      name: "草图→高清放大",
+      description: "上传草图，放大至超高清精修细节",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("upload-note", -380, 0, "上传说明", "（可空）保持原构图"),
+          imageNode("upload", 0, 0, "图片上传", EDIT_VARIANT, "3:4"),
+          textNode("upscale-note", 380, -170, "放大说明", "放大为超高清版本，增强面料纹理、走线与边缘细节，保持构图、色彩和光影不变"),
+          imageNode("upscale", 760, 0, "高清放大", EDIT_VARIANT, "3:4"),
+        ],
+        edges: [
+          edge("e-upload-prompt", "upload-note", "upload", "prompt"),
+          edge("e-upload-ref", "upload", "upscale", "reference"),
+          edge("e-upscale-prompt", "upscale-note", "upscale", "prompt"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-text-recolor",
+      name: "文生款式→换色",
+      description: "纯提示词文生款式效果图，再按配色说明换色",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("design", 0, -170, "款式描述", "设计一款简约通勤风女装连衣裙，正面全身效果图，浅灰纯色背景"),
+          imageNode("gen", 380, -170, "文生款式", GENERATE_VARIANT, "3:4"),
+          textNode("recolor", 380, 190, "换色说明", "将连衣裙颜色替换为：藏青 + 酒红，保持版型与细节不变"),
+          imageNode("recolor-out", 760, 0, "换色", EDIT_VARIANT, "3:4"),
+        ],
+        edges: [
+          edge("e-design", "design", "gen", "prompt"),
+          edge("e-gen-ref", "gen", "recolor-out", "reference"),
+          edge("e-recolor", "recolor", "recolor-out", "prompt"),
+        ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
       id: "builtin-person-scene-transfer",
-      name: "人物场景迁移（人物→背景/座椅）",
+      name: "人物场景迁移",
       description: "上传图1人物与图2场景，将人物保真迁移到场景中并匹配座椅、姿态、光影与透视",
       builtIn: true,
-      createdAt: "2026-08-13T00:00:00.000Z",
+      createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          {
-            id: "subject",
-            type: "image-input",
-            position: { x: 0, y: -170 },
-            data: {
-              kind: "image-input",
-              label: "图1 · 人物主体",
-              status: "idle",
-            },
-          },
-          {
-            id: "scene",
-            type: "image-input",
-            position: { x: 0, y: 190 },
-            data: {
-              kind: "image-input",
-              label: "图2 · 场景背景",
-              status: "idle",
-            },
-          },
-          {
-            id: "transfer",
-            type: "ai-modify",
-            position: { x: 430, y: 0 },
-            data: {
-              kind: "ai-modify",
-              label: "人物场景迁移",
-              status: "idle",
-              prompt: "严格按照输入顺序处理：图1是需要保留的人物主体，图2是目标场景。将图1中的同一人物完整迁移到图2的背景中，并让人物自然坐在图2的椅子上。保持图1人物的脸部身份、发型、体型、服装款式、颜色与材质细节不变；保持图2的背景、椅子、构图与空间陈设不变。根据椅子的朝向和高度调整人物坐姿、肢体遮挡、比例与透视，使身体与椅面正确接触，补充自然的接触阴影，并统一光线方向、色温、景深与画面质感。不要复制图2中的人物，不要改变人物身份，不要新增多余人物或家具。输出一张真实、自然、无拼贴痕迹的完整图片。",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "result",
-            type: "result",
-            position: { x: 860, y: 0 },
-            data: {
-              kind: "result",
-              label: "迁移结果",
-              status: "idle",
-              images: [],
-              note: "人物来自图1，场景与椅子来自图2",
-            },
-          },
+          textNode("subject-note", -380, -170, "人物说明", "保持人物身份、发型、体型、服装不变"),
+          imageNode("subject", 0, -170, "图1 · 人物主体", EDIT_VARIANT, "3:4"),
+          textNode("scene-note", -380, 190, "场景说明", "保持场景、椅子、构图与空间陈设不变"),
+          imageNode("scene", 0, 190, "图2 · 场景背景", EDIT_VARIANT, "3:4"),
+          textNode("transfer-note", 380, 0, "合成说明", "将图1中的同一人物完整迁移到图2的背景中，并让人物自然坐在椅子上，保持身份与场景不变"),
+          imageNode("transfer", 760, 0, "人物场景迁移", EDIT_VARIANT, "3:4"),
         ],
         edges: [
-          {
-            id: "subject-to-transfer", source: "subject", target: "transfer",
-            data: {},
-          },
-          {
-            id: "scene-to-transfer", source: "scene", target: "transfer",
-            data: {},
-          },
-          {
-            id: "transfer-to-result", source: "transfer", target: "result",
-            data: {},
-          },
+          edge("e-subject-prompt", "subject-note", "subject", "prompt"),
+          edge("e-scene-prompt", "scene-note", "scene", "prompt"),
+          edge("e-subject-ref", "subject", "transfer", "reference"),
+          edge("e-scene-ref", "scene", "transfer", "reference"),
+          edge("e-transfer-prompt", "transfer-note", "transfer", "prompt"),
         ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
       id: "builtin-pattern-style-transfer",
-      name: "图案风格迁移（图案→参考风格）",
+      name: "图案风格迁移",
       description: "保留图1的主题与构图，使用图2的材料、工艺、色彩和视觉语言重新演绎",
       builtIn: true,
-      createdAt: "2026-08-13T00:00:00.000Z",
+      createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          {
-            id: "pattern",
-            type: "image-input",
-            position: { x: 0, y: -170 },
-            data: {
-              kind: "image-input",
-              label: "图1 · 原始图案",
-              status: "idle",
-            },
-          },
-          {
-            id: "style",
-            type: "image-input",
-            position: { x: 0, y: 190 },
-            data: {
-              kind: "image-input",
-              label: "图2 · 风格参考",
-              status: "idle",
-            },
-          },
-          {
-            id: "transfer",
-            type: "ai-modify",
-            position: { x: 430, y: 0 },
-            data: {
-              kind: "ai-modify",
-              label: "图案风格迁移",
-              status: "idle",
-              prompt: "严格按照输入顺序处理：图1是必须保留的原始图案，图2是仅用于学习材料、工艺、色彩和视觉语言的风格参考。保留图1的主题元素、数量、构图布局、轮廓比例和主要识别特征，将它们重新演绎为图2的面料纹理、手工工艺、笔触、配色和质感。不要复制图2的主体或构图，不要丢失图1的主体，不要新增无关文字、水印或元素。输出完整、清晰、可用于服装印花的单张图案。",
-              aspectRatio: "3:4",
-              batchSize: 1,
-              outputImages: [],
-              operationMode: "edit",
-              operationModeNeedsConfirmation: false,
-              modelId: DEFAULT_GENERATION_MODEL_ID,
-              modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
-            },
-          },
-          {
-            id: "result",
-            type: "result",
-            position: { x: 860, y: 0 },
-            data: {
-              kind: "result",
-              label: "迁移结果",
-              status: "idle",
-              images: [],
-              note: "图案主题来自图1，材料、工艺与视觉风格来自图2",
-            },
-          },
+          textNode("pattern-note", -380, -170, "图案说明", "保持图案主题与构图"),
+          imageNode("pattern", 0, -170, "图1 · 原始图案", EDIT_VARIANT, "3:4"),
+          textNode("style-note", -380, 190, "风格说明", "保持风格参考材料与工艺"),
+          imageNode("style", 0, 190, "图2 · 风格参考", EDIT_VARIANT, "3:4"),
+          textNode("transfer-note", 380, 0, "迁移说明", "保留图1的主题元素与构图，重新演绎为图2的面料纹理、手工工艺、笔触、配色和质感"),
+          imageNode("transfer", 760, 0, "风格迁移", EDIT_VARIANT, "3:4"),
         ],
         edges: [
-          {
-            id: "pattern-to-transfer", source: "pattern", target: "transfer",
-            data: {},
-          },
-          {
-            id: "style-to-transfer", source: "style", target: "transfer",
-            data: {},
-          },
-          {
-            id: "transfer-to-result", source: "transfer", target: "result",
-            data: {},
-          },
+          edge("e-pattern-prompt", "pattern-note", "pattern", "prompt"),
+          edge("e-style-prompt", "style-note", "style", "prompt"),
+          edge("e-pattern-ref", "pattern", "transfer", "reference"),
+          edge("e-style-ref", "style", "transfer", "reference"),
+          edge("e-transfer-prompt", "transfer-note", "transfer", "prompt"),
         ],
       },
     },

@@ -7,6 +7,7 @@ import path from "node:path";
 import express, { type Request } from "express";
 import sharp from "sharp";
 import type { AIProvider, NodeExecution } from "../src/types/workflow";
+import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-upload-normalization-"));
@@ -353,22 +354,38 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     }
 
     const maskFlow = (mask: string, maskNodeId = "mask-node") => ({
-      schemaVersion: 2,
+      schemaVersion: 7,
       nodes: [{
-        id: "source-node",
-        type: "image-input",
+        id: "prompt-node",
+        type: "text",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "原图", status: "idle", imageUrl: body.url },
+        data: { kind: "text", label: "提示词", status: "idle", text: "改成银色" },
       }, {
-        id: maskNodeId,
-        type: "mask-redraw",
+        id: "source-node",
+        type: "image",
         position: { x: 300, y: 0 },
         data: {
-          kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改成银色",
-          modelId: "gpt-image-2.5-sunburst", modelOptions: {}, outputImages: [], mask, maskSourceRef: body.url,
+          kind: "image", label: "原图", status: "idle",
+          aspectRatio: "3:4", batchSize: 1,
+          outputImages: [body.url],
+        },
+      }, {
+        id: maskNodeId,
+        type: "image",
+        position: { x: 600, y: 0 },
+        data: {
+          kind: "image", label: "局部重绘", status: "idle",
+          modelId: "gpt-image-2.5-sunburst", modelOptions: {},
+          aspectRatio: "3:4", batchSize: 1,
+          outputImages: [],
+          mask, maskSourceRef: body.url,
         },
       }],
-      edges: [{ id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId }],
+      edges: [
+        { id: "prompt-source", source: "prompt-node", target: "source-node", targetHandle: "prompt" },
+        { id: "prompt-mask", source: "prompt-node", target: maskNodeId, targetHandle: "prompt" },
+        { id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId },
+      ],
     });
     const saveMaskProject = async (
       mask: string,
@@ -488,14 +505,28 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
 
     const blankFlow = {
-      schemaVersion: 2,
+      schemaVersion: 7,
       nodes: [{
-        id: "starter",
-        type: "image-input",
+        id: "starter-prompt",
+        type: "text",
         position: { x: 0, y: 0 },
-        data: { kind: "image-input", label: "上传服装图", status: "idle" },
+        data: { kind: "text", label: "提示词", status: "idle", text: "" },
+      }, {
+        id: "starter",
+        type: "image",
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "image", label: "上传服装图", status: "idle",
+          aspectRatio: "3:4", batchSize: 1, outputImages: [],
+        },
       }],
-      edges: [],
+      edges: [{
+        id: "starter-prompt-edge",
+        source: "starter-prompt",
+        target: "starter",
+        targetHandle: "prompt",
+        data: {},
+      }],
     };
     const initialTargetId = "mask-sync-draft";
     const targetBootstrap = await fetch(`${server.baseUrl}/api/projects/initial-draft/bootstrap`, {
@@ -630,7 +661,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
       INSERT INTO generation_runs (
         id, owner_id, project_id, node_id, node_label, kind,
         requested_count, status, started_at, plan_json, run_type, updated_at
-      ) VALUES ($1, $2, 'mask-project', 'mask-node', '局部重绘', 'mask-redraw',
+      ) VALUES ($1, $2, 'mask-project', 'mask-node', '局部重绘', 'image',
         1, 'queued', $3, $4, 'workflow', $3)
     `, [
       "active-mask-retention-run", admin.id, Date.now(),
@@ -702,15 +733,22 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
       return { images: [prepared], model: "normalization-gate-test" };
     },
   };
+  const normalizationVariant = requireGarmentPromptVariant({
+    familyId: "commerce-hero",
+    modelId: "flux-2-pro",
+    nodeKind: "image",
+    mode: "edit",
+  });
   const step: NodeExecution = {
     nodeId: "normalization-gate",
-    kind: "print-extract",
+    kind: "image",
     inputImages: [`/api/files/${legacyId}`],
     params: {
       prompt: "提取主图案",
       operationMode: "edit",
       modelId: "flux-2-pro",
       modelOptions: { width: 1024, height: 1024, outputFormat: "png" },
+      promptVariantId: normalizationVariant.variantId,
     },
   };
   await executeStep(step, step.inputImages, () => provider);
@@ -738,9 +776,9 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
 });
 
 await test("前端未拿到 normalized:true 时不会把图片写入节点", () => {
-  const source = fs.readFileSync(new URL("../src/components/nodes/ImageInputNode.tsx", import.meta.url), "utf8");
+  const source = fs.readFileSync(new URL("../src/components/nodes/ImageNode.tsx", import.meta.url), "utf8");
   assert.match(source, /data\.normalized !== true[\s\S]*服务端未完成素材标准化/);
-  assert.match(source, /const upload = await uploadFile\(file\)[\s\S]*imageUrl: upload\.url/);
+  assert.match(source, /const upload = await uploadFile\(file\)[\s\S]*outputImages: \[upload\.url\]/);
 });
 
 await closeDatabaseForTests();

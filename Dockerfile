@@ -28,6 +28,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 COPY --from=build /app/.garment-canvas-build-identity.json ./.garment-canvas-build-identity.json
+# data/ 目录持久化项目/上传图片/蒙版与视频产物。视频（Seedance MP4）单文件 5–50MB
+# 落 data/uploads/；按 D3 裁定有意不设保留期/容量上限/自动清理，磁盘监控属运维常规动作。
 RUN mkdir -p /app/data \
   && chown -R root:root /app \
   && chmod -R a-w /app \

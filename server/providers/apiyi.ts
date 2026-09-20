@@ -9,7 +9,6 @@ import {
   MASK_REDRAW_MODEL_ID,
   defaultImageModelOptions,
   getImageModelContract,
-  imageModelOptionsErrorForOperation,
   modelMaxReferenceImages,
   type ImageModelId,
   type ImageModelOptions,
@@ -46,10 +45,9 @@ function record(value: unknown): Record<string, unknown> | undefined {
 }
 
 function requestOptions(modelId: ImageModelId, req: ImageGenRequest): ImageModelOptions {
-  const options = req.modelOptions ?? defaultImageModelOptions(modelId, req.aspectRatio);
-  const error = imageModelOptionsErrorForOperation(modelId, options, req.operationMode);
-  if (error) throw new ProviderError(`模型参数无效：${error}`, 400, modelId, "invalid_request");
-  return options;
+  // v7（R5）：参数取值硬校验删除，降级为 warning（不阻断）；Provider 侧
+  // 不再因 modelOptions 拒绝请求。警告接线（响应 meta 透出）归 P2-b。
+  return (req.modelOptions ?? defaultImageModelOptions(modelId, req.aspectRatio)) as ImageModelOptions;
 }
 
 function referenceData(req: ImageGenRequest, modelId: ImageModelId): string[] {

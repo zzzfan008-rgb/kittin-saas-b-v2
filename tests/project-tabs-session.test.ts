@@ -21,7 +21,7 @@ import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
 const boundaryVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 // This isolated serializer fixture needs to cross the client admission gate so
@@ -66,12 +66,15 @@ function memoryStorage(
 function storedSelectionNode(id: string, selected?: boolean) {
   return {
     id,
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image-input",
+      kind: "image",
       label: id,
       status: "idle",
+      aspectRatio: "3:4",
+      batchSize: 1,
+      outputImages: [] as string[],
     },
     ...(selected === undefined ? {} : { selected }),
   };
@@ -119,19 +122,19 @@ const storedSession = {
       nodes: [
         {
           id: "node-a",
-          type: "image-input",
+          type: "image",
           position: { x: 0, y: 0 },
           data: {
-            kind: "image-input",
+            kind: "image",
             label: "输入",
             status: "idle",
           },
         },
         {
           id: "node-b",
-          type: "result",
+          type: "image",
           position: { x: 300, y: 0 },
-          data: { kind: "result", label: "结果", status: "idle", images: [] },
+          data: { kind: "image", label: "结果", status: "idle", images: [] },
         },
       ],
       edges: [restoredEdge],
@@ -153,7 +156,7 @@ const storedRecentResults = [
     image: "/api/files/project-b.png",
     nodeId: "node-project-b",
     nodeLabel: "项目 B 的生成记录",
-    kind: "ai-modify",
+    kind: "image",
     projectId: "project-b",
     projectName: "项目 B",
     startedAt: 1_000,
@@ -165,7 +168,7 @@ const storedRecentResults = [
     image: "/api/files/legacy.png",
     nodeId: "node-legacy",
     nodeLabel: "旧版生成记录",
-    kind: "sketch-to-render",
+    kind: "image",
     startedAt: 3_000,
     finishedAt: 4_000,
     status: "success",
@@ -355,7 +358,7 @@ const transientDraggingIsDiscarded = normalizeTabSessionValue({
   activeTabId: "dragging-session-tab",
   tabs: [storedSelectionTab(
     "dragging-session-tab",
-    [{ ...storedSelectionNode("dragging-node"), dragging: true }],
+    [{ ...storedSelectionNode("dragging-node"), dragging: true } as ReturnType<typeof storedSelectionNode>],
   )],
 });
 assert.ok(transientDraggingIsDiscarded);
@@ -428,16 +431,16 @@ const migrated = normalizeTabSessionValue({
     nodes: [
       {
         id: "legacy-ai",
-        type: "ai-modify",
+        type: "image",
         position: { x: 10, y: 20 },
-        data: { kind: "ai-modify", label: "改款", status: "idle", prompt: "换领型" },
+        data: { kind: "image", label: "改款", status: "idle", prompt: "换领型" },
       },
       { id: "broken", type: "unknown", position: { x: 0, y: 0 }, data: {} },
       {
         id: "legacy-result",
-        type: "result",
+        type: "image",
         position: { x: 300, y: 20 },
-        data: { kind: "result", label: "结果", status: "idle" },
+        data: { kind: "image", label: "结果", status: "idle" },
       },
     ],
     edges: [
@@ -455,9 +458,9 @@ assert.equal(migrated.schemaVersion, TAB_SESSION_SCHEMA_VERSION);
 assert.deepEqual(migrated.tabs[0].nodes.map((node) => node.id), ["legacy-ai", "legacy-result"]);
 assert.deepEqual(migrated.tabs[0].edges.map((edge) => edge.id), ["valid-edge"]);
 const migratedAi = migrated.tabs[0].nodes[0].data;
-assert.equal(migratedAi.kind, "ai-modify");
-if (migratedAi.kind !== "ai-modify") throw new Error("unexpected node kind");
-assert.equal(migratedAi.aspectRatio, "1:1");
+assert.equal(migratedAi.kind, "image");
+if (migratedAi.kind !== "image") throw new Error("unexpected node kind");
+assert.equal(migratedAi.aspectRatio, "3:4");
 assert.equal(migratedAi.batchSize, 1);
 assert.deepEqual(migratedAi.outputImages, []);
 assert.equal(migrated.tabs[0].saveState, "idle");
@@ -486,10 +489,10 @@ const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
     projectName: "通用模型恢复",
     nodes: generalModelPairs.map((pair, index) => ({
       id: `model-pair-${index}`,
-      type: "ai-modify",
+      type: "image",
       position: { x: index * 80, y: 0 },
       data: {
-        kind: "ai-modify",
+        kind: "image",
         label: pair.modelId,
         status: "idle",
         prompt: "保留模型参数",
@@ -520,10 +523,10 @@ const retiredModelSession = normalizeTabSessionValue({
     projectName: "退役模型会话",
     nodes: [{
       id: "retired-model-node",
-      type: "ai-modify",
+      type: "image",
       position: { x: 0, y: 0 },
       data: {
-        kind: "ai-modify",
+        kind: "image",
         label: "历史 Grok 节点",
         status: "idle",
         prompt: "旧提示词",
@@ -533,7 +536,7 @@ const retiredModelSession = normalizeTabSessionValue({
         modelId: "grok-imagine-image",
         modelOptions: { aspectRatio: "4:3", resolution: "1k" },
         operationMode: "edit",
-        promptVariantId: "fashion-lookbook.grok-imagine-image.ai-modify.edit.v1",
+        promptVariantId: "fashion-lookbook.grok-imagine-image.edit.v1",
         parameterProfileId: "grok-imagine-image:fashion-lookbook:edit:v1",
       },
     }],
@@ -542,15 +545,15 @@ const retiredModelSession = normalizeTabSessionValue({
 });
 assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
-assert.equal(retiredModelData.kind, "ai-modify");
-if (retiredModelData.kind !== "ai-modify") throw new Error("unexpected retired node kind");
+assert.equal(retiredModelData.kind, "image");
+if (retiredModelData.kind !== "image") throw new Error("unexpected retired node kind");
 assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
-assert.equal(retiredModelData.retiredModelId, "grok-imagine-image");
-assert.equal(retiredModelData.modelSelectionNeedsConfirmation, true);
-assert.deepEqual(retiredModelData.modelOptions, { size: "2048x1536" });
-assert.equal(retiredModelData.promptVariantId, undefined);
-assert.equal(retiredModelData.parameterProfileId, undefined);
-console.log("  ✓ 退役 Grok 会话恢复保留原 ID、清除旧绑定并要求用户手选新模型");
+assert.equal(retiredModelData.retiredModelId, undefined);
+assert.equal(retiredModelData.modelSelectionNeedsConfirmation, undefined);
+assert.deepEqual(retiredModelData.modelOptions, { aspectRatio: "4:3", resolution: "1k" });
+assert.equal(retiredModelData.promptVariantId, "fashion-lookbook.grok-imagine-image.edit.v1");
+assert.equal(retiredModelData.parameterProfileId, "grok-imagine-image:fashion-lookbook:edit:v1");
+console.log("  ✓ 退役 Grok 会话恢复替换为默认模型、丢弃退役标记字段并保留旧绑定交由运行准入拦截");
 
 assert.deepEqual(state.recentResults, [], "登录后的历史必须以服务器为准，不能泄露上一账号的 localStorage");
 const writesBeforeHistory = sessionWrites;
@@ -564,10 +567,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "运行恢复项目",
   nodes: [{
     id: "run-recovery-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "运行恢复节点",
       status: "queued",
       prompt: "换领型",
@@ -592,7 +595,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "run-recovery-node",
   nodeLabel: "运行恢复节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "run-recovery-project",
   projectName: "运行恢复项目",
   startedAt: 5_000,
@@ -609,7 +612,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "late-open-node",
   nodeLabel: "稍后打开节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "late-open-project",
   projectName: "稍后打开项目",
   startedAt: 6_000,
@@ -620,7 +623,7 @@ reconcileRunHistory([{
   image: "",
   nodeId: "late-open-node",
   nodeLabel: "稍后打开节点",
-  kind: "ai-modify",
+  kind: "image",
   projectId: "late-open-project",
   projectName: "稍后打开项目",
   startedAt: 5_500,
@@ -631,10 +634,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "稍后打开项目",
   nodes: [{
     id: "late-open-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "稍后打开节点",
       status: "idle",
       prompt: "换袖型",
@@ -658,7 +661,7 @@ const overflowActiveRecords = Array.from({ length: 180 }, (_, index) => ({
   image: "",
   nodeId: `overflow-node-${index}`,
   nodeLabel: `活动节点 ${index}`,
-  kind: "ai-modify" as const,
+  kind: "image" as const,
   projectId: `overflow-project-${index}`,
   projectName: `活动项目 ${index}`,
   startedAt: 10_000 - index,
@@ -670,7 +673,7 @@ const overflowTerminalRecords = Array.from({ length: 160 }, (_, index) => ({
   image: `/api/files/overflow-${index}.png`,
   nodeId: `terminal-node-${index}`,
   nodeLabel: "终态输出",
-  kind: "ai-modify" as const,
+  kind: "image" as const,
   projectId: "terminal-project",
   projectName: "终态项目",
   startedAt: 20_000 - index,
@@ -682,10 +685,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "最旧活动项目",
   nodes: [{
     id: "overflow-node-179",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "最旧活动节点",
       status: "idle",
       prompt: "保持运行",
@@ -742,20 +745,21 @@ useFlowStore.getState().openFlowTab({
   projectName: "容量恢复项目",
   nodes: [{
     id: "quota-source",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image-input", label: "原图", status: "idle",
-      imageUrl: "/api/files/quota-source.png",
+      kind: "image", label: "原图", status: "idle",
+      aspectRatio: "3:4", batchSize: 1,
+      outputImages: ["/api/files/quota-source.png"],
     },
   }, {
     id: "quota-mask",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 300, y: 0 },
     data: {
-      kind: "mask-redraw", label: "局部重绘", status: "idle", prompt: "改色",
+      kind: "image", label: "局部重绘", status: "idle", prompt: "改色",
       modelId: "gpt-image-2.5-sunburst", modelOptions: {},
-      operationMode: "mask-edit", operationModeNeedsConfirmation: false,
+      aspectRatio: "3:4", batchSize: 1,
       outputImages: [],
       mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
@@ -886,9 +890,9 @@ useFlowStore.getState().loadFlow({
   projectName: "拖拽会话项目",
   nodes: [{
     id: "drag-session-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -925,10 +929,10 @@ useFlowStore.getState().loadFlow({
   projectName: "无位移成功项目",
   nodes: [{
     id: "drag-session-no-move-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "无位移生成节点",
       status: "idle",
       prompt: "生成成功",
@@ -972,10 +976,10 @@ useFlowStore.getState().loadFlow({
   projectName: "净零位移成功项目",
   nodes: [{
     id: "drag-session-net-zero-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "净零位移生成节点",
       status: "idle",
       prompt: "生成成功",
@@ -1033,9 +1037,9 @@ useFlowStore.getState().loadFlow({
   projectName: "拖拽会话项目",
   nodes: [{
     id: "drag-session-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "拖拽节点", status: "idle" },
+    data: { kind: "image", label: "拖拽节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -1045,9 +1049,9 @@ useFlowStore.getState().openFlowTab({
   projectName: "切换目标",
   nodes: [{
     id: "drag-session-target-node",
-    type: "image-input",
+    type: "image",
     position: { x: 0, y: 0 },
-    data: { kind: "image-input", label: "目标节点", status: "idle" },
+    data: { kind: "image", label: "目标节点", status: "idle", aspectRatio: "3:4", batchSize: 1, outputImages: [] },
   }],
   edges: [],
 });
@@ -1074,7 +1078,7 @@ console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切�
 
 const unsafeDocumentNode = {
   id: "pure-boundary-node",
-  type: "sketch-to-render",
+  type: "image",
   position: { x: 120, y: 48 },
   selected: true,
   dragging: true,
@@ -1083,7 +1087,7 @@ const unsafeDocumentNode = {
   height: 180,
   unknownNodeShell: "不得持久化",
   data: {
-    kind: "sketch-to-render",
+    kind: "image",
     label: "纯文档边界",
     status: "error",
     error: "旧运行错误不得持久化",
@@ -1114,18 +1118,22 @@ const unsafeDocumentEdge = {
 };
 const boundaryResultNode = {
   id: "pure-boundary-result",
-  type: "result",
+  type: "image",
   position: { x: 520, y: 48 },
   data: {
-    kind: "result",
+    kind: "image",
     label: "纯文档边界结果",
     status: "idle",
-    images: [],
+    aspectRatio: "3:4",
+    batchSize: 1,
+    outputImages: [],
   },
 } as import("../src/store/flowStore").FlowNode;
 useFlowStore.getState().openFlowTab({
   projectId: "pure-boundary-project",
   projectName: "纯文档边界项目",
+  // boundaryResultNode 是从未选择模型的 image 节点（v7 modelId 可选，见
+  // data-model.md §3）：会话恢复不得替它补默认模型（R-67 A2）。
   nodes: [unsafeDocumentNode, boundaryResultNode],
   edges: [unsafeDocumentEdge],
 });
@@ -1191,6 +1199,10 @@ assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "posi
 assert.equal(persistedBoundaryData.status, "idle");
 assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
+const persistedBoundaryResult = projectPayload.flow.nodes[1] as Record<string, unknown>;
+const persistedBoundaryResultData = persistedBoundaryResult.data as Record<string, unknown>;
+assert.equal("modelId" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelId");
+assert.equal("modelOptions" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelOptions");
 assert.deepEqual(
   Object.keys(projectPayload.flow.edges[0] as Record<string, unknown>).sort(),
   ["data", "id", "source", "sourceHandle", "target", "targetHandle"],
@@ -1249,9 +1261,9 @@ console.log("  ✓ saveState 即使不改变 revision/dirty 也会更新可恢�
 
 sessionWriteKeys.length = 0;
 const writesBeforeDebouncedChanges = sessionWrites;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身" });
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改" });
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "保留衣身，只修改袖型" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身，只修改" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "保留衣身，只修改袖型" });
 assert.equal(sessionWrites, writesBeforeDebouncedChanges, "连续文档修改在 debounce 前不得同步写盘");
 assert.equal(timeoutCallbacks.size, 1, "连续修改必须重置为同一个 debounce 任务");
 assert.equal(idleCallbacks.size, 0);
@@ -1270,7 +1282,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "保留衣身，只修改袖型",
 );
 console.log("  ✓ revision/topology 驱动持久化：瞬态零写入，连续修改 debounce 为单次分片写入");
@@ -1279,12 +1291,12 @@ sessionWriteKeys.length = 0;
 const revisionBeforeTextBurst = activeDocument().revision;
 const writesBeforeTextBurst = sessionWrites;
 let textToken = updateCoalescedTextEdit(
-  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "label" },
   "合并输入第一段",
 );
 assert.ok(textToken);
 textToken = updateCoalescedTextEdit(
-  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "prompt" },
+  { kind: "node-data", nodeId: unsafeDocumentNode.id, field: "label" },
   "合并输入最终内容",
   textToken,
 );
@@ -1305,13 +1317,13 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "合并输入最终内容",
 );
 console.log("  ✓ 连续文本输入实时可见，但每个 burst 只提交一次 revision/session 分片");
 
 sessionWriteKeys.length = 0;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "页面隐藏前的最后内容" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "页面隐藏前的最后内容" });
 assert.equal(timeoutCallbacks.size, 1);
 assert.equal(flushTabSessionPersistence(), true);
 assert.equal(timeoutCallbacks.size, 0, "生命周期同步 flush 必须取消尚未执行的 debounce");
@@ -1320,7 +1332,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "页面隐藏前的最后内容",
 );
 const writesAfterLifecycleFlush = sessionWrites;
@@ -1339,10 +1351,10 @@ useFlowStore.getState().openFlowTab({
   projectName: "后台持久化项目",
   nodes: [{
     id: "background-session-node",
-    type: "ai-modify",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "ai-modify",
+      kind: "image",
       label: "后台生成节点",
       status: "idle",
       prompt: "后台成功",
@@ -1363,7 +1375,7 @@ useFlowStore.getState().switchTab(debouncedTabId);
 flushTabSessionPersistence();
 
 deferIdleWrites = true;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "拖拽前稳定编辑" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "拖拽前稳定编辑" });
 assert.equal(timeoutCallbacks.size, 1);
 const lifecycleDrag = beginHistoryTransaction("lifecycle-stable-rebase");
 assert.equal(timeoutCallbacks.size, 0, "开始实时事务前必须同步落盘已稳定的 debounce 编辑");
@@ -1371,7 +1383,7 @@ assert.equal(
   persistedSession().tabs
     .find((tab) => tab.id === debouncedTabId)
     ?.nodes.find((node) => node.id === unsafeDocumentNode.id)
-    ?.data.prompt,
+    ?.data.label,
   "拖拽前稳定编辑",
 );
 const writesAfterTransactionBaseline = sessionWrites;
@@ -1419,7 +1431,7 @@ console.log("  ✓ 实时事务前 flush 稳定编辑；事务期生命周期只
 
 failedSessionTabId = debouncedTabId;
 failSessionWrites = true;
-useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { prompt: "等待事务后重试" });
+useFlowStore.getState().updateNodeData(unsafeDocumentNode.id, { label: "等待事务后重试" });
 assert.equal(sessionStorage.getItem(projectTabStorageKey(debouncedTabId)), null);
 assert.match(useFlowStore.getState().tabSessionPersistenceError ?? "", /刷新会丢失/);
 const deferredRetryTransaction = beginHistoryTransaction("deferred-session-retry");

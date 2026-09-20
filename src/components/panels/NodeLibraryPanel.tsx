@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { NODE_SPECS, type NodeKind } from "@/types/workflow";
 import {
+  ensureTextUpstreamForNode,
   selectActiveNodes,
   selectActivePrimarySelectedNodeId,
   useFlowStore,
@@ -11,19 +12,9 @@ import {
 import { DND_MIME } from "../CanvasFlow";
 import { cn } from "@/lib/utils";
 import { requestCanvasLanding } from "@/lib/canvasLanding";
-import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 
-const KIND_ORDER: NodeKind[] = [
-  "image-input",
-  "sketch-to-render",
-  "ai-modify",
-  "fabric-recolor",
-  "upscale",
-  "print-extract",
-  "print-mutate",
-  "mask-redraw",
-  "result",
-];
+/** v7：三种基础节点（R1）。 */
+const KIND_ORDER: NodeKind[] = ["text", "image", "video"];
 
 export function nodeLibraryClickPosition(
   nodes: readonly FlowNode[],
@@ -69,12 +60,17 @@ function NodeList() {
       nodeId = useFlowStore.getState().addNode(kind, position);
     });
     if (!nodeId) return;
+    // 方案 C auto-text 兜底：点击添加 image/video 也必须有 text 上游（INV-1）。
+    if (kind === "image" || kind === "video") {
+      ensureTextUpstreamForNode(kind, position, nodeId);
+    }
     requestCanvasLanding({
       tabId: useFlowStore.getState().activeTabId,
       nodeId,
       fitView: false,
-      activateFilePicker: kind === "image-input",
-      selectText: kind !== "image-input" && kind !== "result",
+      // v7：text 节点选中正文输入框；image 节点为上传槽位。
+      activateFilePicker: kind === "image",
+      selectText: kind === "text",
     });
   };
 
@@ -82,8 +78,6 @@ function NodeList() {
     <div className="flex-1 space-y-2 overflow-y-auto p-3">
       {KIND_ORDER.map((kind) => {
         const spec = NODE_SPECS[kind];
-        const productPolicy = nodeProductPolicy(kind);
-        const unavailable = !productPolicy.canCreate;
         return (
           <Card
             key={kind}
@@ -93,38 +87,21 @@ function NodeList() {
             <Button
               type="button"
               variant="ghost"
-              draggable={!unavailable}
-              disabled={unavailable}
-              aria-describedby={unavailable ? `node-policy-${kind}` : undefined}
-              onClick={() => {
-                if (!unavailable) addByClick(kind);
-              }}
+              draggable
+              onClick={() => addByClick(kind)}
               onDragStart={(event) => {
-                if (unavailable) return;
                 event.dataTransfer.setData(DND_MIME, kind);
                 event.dataTransfer.effectAllowed = "move";
               }}
-              title={unavailable
-                ? productPolicy.reason
-                : `点击添加${spec.title}，或拖拽到画布指定位置`}
-              className="h-auto w-full cursor-grab select-none flex-col items-start gap-1 rounded-lg p-2.5 text-left whitespace-normal text-[var(--gc-node-text)] hover:bg-[var(--gc-node-inner-hover)] hover:text-[var(--gc-node-text)] active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-70"
+              title={`点击添加${spec.title}节点，或拖拽到画布指定位置`}
+              className="h-auto w-full cursor-grab select-none flex-col items-start gap-1 rounded-lg p-2.5 text-left whitespace-normal text-[var(--gc-node-text)] hover:bg-[var(--gc-node-inner-hover)] hover:text-[var(--gc-node-text)] active:cursor-grabbing"
             >
               <span className="flex w-full items-center justify-between gap-2 text-xs font-medium text-[var(--gc-node-text)]">
                 <span>{spec.title}</span>
-                {unavailable && (
-                  <span className="shrink-0 rounded border border-[var(--gc-border)] px-1 py-0.5 text-[11px] font-medium text-[var(--gc-text-muted)]">
-                    暂不支持
-                  </span>
-                )}
               </span>
               <span className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
                 {spec.description}
               </span>
-              {unavailable && (
-                <span id={`node-policy-${kind}`} className="sr-only">
-                  {productPolicy.reason}
-                </span>
-              )}
             </Button>
           </Card>
         );

@@ -5,6 +5,7 @@
 - v2：Q1=B（text 可运行文本模型）、Q2=A（视频落地形态）、Q4=A（mask 保留、循环取消）、Q5=A（清理范围）已落地。
 - v3：Q3=A（fabric handle 抹平）——边类型仅 `prompt`/`reference` 两种，见 contracts/graph-invariants.md §2。
 - v3.1（缺口修复）：§3 补 `outputText` 超长处置与持久化口径；§7 定版首帧缩略图（前端渲染，无 ffmpeg 依赖）与 `outputVideos` 语义；§7 补视频容量策略裁定。
+- v4（R10 最终裁定，2026-09-19）：§5 `VideoModelId` 收敛为单个 `doubao-seedance-2-5-260628`（Veo 3.1 不接入）；§5 令牌口径改为「支持配置专用令牌」（`SeeDance2` 分组勾选动作作废）；§5b `TextModelId` 实名定版为 `gpt-4o`（默认）/`claude-sonnet-4-5`/`gemini-3-pro-preview`。裁定全文见 plan.md §6 R10 条目。
 
 ## 1. NodeKind
 
@@ -126,36 +127,36 @@ export interface ImageModelOptions {
 }
 ```
 
-## 5. 视频参数（Q2=A 已裁定）
+## 5. 视频参数（Q2=A 已裁定；R10 最终裁定 2026-09-19：仅 Seedance 2.5）
 
 ```ts
-export type VideoModelId =
-  | "doubao-seedance-2-0-260128"
-  | "doubao-seedance-2-0-fast-260128"
-  | "doubao-seedance-2-0-mini-260615"
-  | "doubao-seedance-2-5-260628"
-  | "veo-3.1-fast-generate-preview"
-  | "veo-3.1-generate-preview";
+export type VideoModelId = "doubao-seedance-2-5-260628";
 
 export interface VideoModelOptions {
-  seconds?: string;        // Veo 要求字符串 "4"|"6"|"8"；Seedance 4–15/30 或 "-1"
-  resolution?: string;     // "480p"|"720p"|"1080p"|"4k"（联动约束由 UI 负责）
-  aspectRatio?: string;
+  seconds?: string;        // Seedance 2.5：4–30 整数或 "-1"（模型自定时长）
+  resolution?: string;     // "480p"|"720p"|"1080p"（2.5 支持到 1080p；不支持 4k）
+  aspectRatio?: string;    // Seedance 参数名为 ratio，七选一含 adaptive
   seed?: number;
   [key: string]: string | number | boolean | undefined;
 }
 ```
 
+R10 最终裁定（2026-09-19，用户拍板）：
+
+- 视频清单**收敛为单个模型** `doubao-seedance-2-5-260628`（原方案 Seedance 2.0 三档 + Veo 3.1 品质档的提案**作废**，`veo-3.1-*` 不接入、从清单移除）。
+- **令牌形态变更**：不再要求勾选 `SeeDance2` 分组（0.18x）的运营动作——用户已**新建专用令牌**调用 Seedance。方案与契约口径改为「支持配置专用令牌」，具体配置形态（环境变量/设置项/按 Provider 绑定）归 P2-e 落地，本契约不预设。
+- 完整视频契约产物 `video-model-contracts.json` 仍归 P2-e（不变）。
+
 视频模型契约产物：新增 `docs/ai/apiyi/video-model-contracts.json`（与 image 的 model-contracts.json 同级、同评审流程），**不在本阶段生成**——P2-e 按 §5 知识库门禁走 `docs:apiyi:lookup` 后产出。
 
-## 5b. 文本参数（Q1=B 已裁定）
+## 5b. 文本参数（Q1=B 已裁定；R10 最终裁定 2026-09-19 实名定版）
 
 ```ts
 export type TextModelId =
-  | "gpt-5.3"                  // 主力（推荐，见 model-proposals.md §4）
-  | "gemini-3.6-flash"         // 轻量档（推荐）
-  | "deepseek-v4-flash";       // 备选
-// 最终清单以 R10 用户确认（plan.md §5.3）为准；类型与契约一致性断言沿用 imageModels.ts 顶部 throw 同款防线。
+  | "gpt-4o"                 // 默认/主力（R10 最终裁定）
+  | "claude-sonnet-4-5"      // 备选
+  | "gemini-3-pro-preview";  // 备选
+// 类型与契约一致性断言沿用 imageModels.ts 顶部 throw 同款防线。
 
 export interface TextModelOptions {
   temperature?: number;

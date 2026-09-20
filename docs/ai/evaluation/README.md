@@ -18,11 +18,11 @@
 
 ## 节点、提示词与 Provider 参数离线复核
 
-`node-prompt-parameter-matrix-v1.json` 是当前节点能力、逐模型提示词、判别联合参数档案和 API易请求形状的可重算离线证据。`npm run evaluation:node-matrix:check` 会从生产代码重新生成预期结构并与物化文件精确比较；测试还逐一核对提示词是否包含主体与任务、构图、风格与材质、文字限制、画幅输出和负面约束。
+`node-prompt-parameter-matrix-v1.json` 是当前功能族 × 模型能力、逐模型提示词、判别联合参数档案和 API易请求形状的可重算离线证据。`npm run evaluation:node-matrix:check` 会从生产代码重新生成预期结构并与物化文件精确比较；测试还逐一核对提示词的审查维度（checklist 只登记测试真实断言过的维度，不虚报）。
 
-- 矩阵固定覆盖 7 类节点 × 5 个现役模型，共 35 个组合。
-- 其中 9 个产品允许组合仍为 `unverified`：四个普通模型分别对应 `sketch-to-render` 与 `ai-modify`，以及 `gpt-image-2` 对应 `mask-redraw`。`unverified` 不是可运行状态，当前发布清单为空时仍会被浏览器、路由和 Worker 拒绝。
-- 其余 26 个组合为 `unsupported`，没有提示词、参数档案或 Provider 请求形状。`fabric-recolor`、`upscale`、`print-extract`、`print-mutate` 全部保持产品级 fail-closed；`gpt-image-2` 也不扩展到普通生成或普通编辑节点。
+- 三节点重构后（R-68，2026-09-20）矩阵主轴为 **familyId × modelId（域内模型全集）**，mode 由变体携带（模式归属反转），nodeKind 为派生属性。网格 = image 域 8 族 × 9 模型（72 条目）+ text 域 2 族 × 3 模型（6 条目）+ video 域 1 族 × 1 模型（1 条目），共 79 个组合。
+- 其中 36 个产品允许组合仍为 `unverified`：image 域 29 个（三任务族 × 四普通模型、四功能族 × 四普通模型、`gpt-image-2.5-sunburst` × `mask-local-edit`）、text 域 6 个、video 域 1 个。`unverified` 不是可运行状态，当前发布清单为空时仍会被浏览器、路由和 Worker 拒绝。
+- 其余 43 个组合为 `unsupported`，没有提示词、参数档案或 Provider 请求形状。`gpt-image-2.5-sunburst` 不扩展到 `mask-local-edit` 之外的任何功能族；`mask-local-edit` 也不扩展到其他模型。text / video 变体声明的 `parameterProfileId` 在矩阵中保留，但物化参数档案为空——参数档案 store 当前仅覆盖 image 域，该缺口显式登记而非虚构。
 - awesome-gpt-image-2 只提供提示词分类与六段式编写依据。生产提示词按模型、任务族和模式独立保存，不读取社区模板作为运行时回退。
 - API易参数复核绑定当前本地契约与 Provider 构造器。Seedream 固定使用 `response_format=b64_json`、`watermark=false`、`sequential_image_generation=disabled`，禁止 `n` 和 `aspect_ratio`，并保留 Provider 实际输出尺寸。
 - 该矩阵生成与检查不读取 API Key，不发送 Provider 请求；`noProviderCallsPerformed=true` 且 `imageGenerationOrEditCalls=0` 是证据范围声明，不是外部端点可用性证明。
@@ -39,17 +39,17 @@
 - `sampleId` 标识黄金集或实验集中的原始样本，`caseId` 标识该样本的一次具体运行。两者都必填；获准重跑时保留 `sampleId`，但必须使用新的 `caseId` 和新授权。
 - `providerContractVersion`、实际解析模型版本、Provider 提示词 renderer 版本/hash、输入归一化、后处理、黄金集或评分规则任一变化，已验证状态自动降为 `unverified`，重新跑完整评估。
 
-## 方案 A：25 个基础单元与 9 个首批探针
+## 方案 A：41 个基础单元与 9 个首批探针
 
-`evaluation-manifest-v1.json` 是当前零费用准备清单。它将 25 个现役提示词变体逐一物化为完整 `PromptEvaluationUnit`，并绑定当前版本向量、业务画幅及不含代码 SHA 的 release-vector SHA-256。`npm run evaluation:manifest:check` 会从当前提示词目录、参数档案、评估计划和生产权威构造器重新计算全部内容；任一字段漂移都会失败，不能静默沿用旧清单。
+`evaluation-manifest-v1.json` 是当前零费用准备清单。它将 41 个现役图片域提示词变体（R-62：text / video 域变体无评分规则与证据契约，排除出本清单）逐一物化为完整 `PromptEvaluationUnit`，并绑定当前版本向量、业务画幅及不含代码 SHA 的 release-vector SHA-256。`npm run evaluation:manifest:check` 会从当前提示词目录、参数档案、评估计划和生产权威构造器重新计算全部内容；任一字段漂移都会失败，不能静默沿用旧清单。
 
-方案 A 的 9 个首批 `model × mode` 探针采用最低参考图复杂度：四个普通模型各选 `commerce-hero` 的 generate 与 edit，GPT Image 2 使用唯一的 `mask-local-edit`。普通 generate 为 1:1、零参考图；普通 edit 只使用一张 `garment_full`；蒙版输入顺序固定为 `garment_full → generic 系统引导图 → mask`。这 9 个单位只代表自身，未入选的 16 个基础单位继续保持 `unverified`，不得借用探针证据。
+方案 A 的 9 个首批 `model × mode` 探针采用最低参考图复杂度：四个普通模型各选 `commerce-hero` 的 generate 与 edit，GPT Image 2 使用唯一的 `mask-local-edit`。普通 generate 为 1:1、零参考图；普通 edit 只使用一张 `garment_full`；蒙版输入顺序固定为 `garment_full → generic 系统引导图 → mask`。这 9 个单位只代表自身，未入选的 32 个基础单位继续保持 `unverified`，不得借用探针证据。
 
 当前固定、不复用的请求上限为：
 
 - 单位完整生命周期规划上限：`1 + 8 + 24 + 50 × 2 = 133` 次。
 - 9 个首批连通性探针：最多 `9` 次；若未来让这 9 个单位全部走完各阶段，则最多 `1,197` 次。
-- 25 个基础单位全部走完各阶段：最多 `3,325` 次。
+- 41 个基础单位全部走完各阶段：最多 `5,453` 次。
 
 这些数字不包含补样，也是预算规划而非当前可执行授权。当前 `automaticRetries = 0`、`supplementalSamplesPerStage = 0`；任何无效结果、超时、断连或 `outcome_unknown` 都会停止后续调用，核对账单后另行决定是否建立新 case 和新授权。清单本身授权的付费调用数恒为 0，也尚未绑定干净 exact-SHA。真实探针前必须封存具体 Campaign/Slot：提供样本与素材哈希、当前单价和币种、campaign 硬预算、case ID 和逐 case 一次性管理员授权；账本会拒绝遗漏、重复或超额槽位。推荐阶段的 100 次候选/基线配对预算在基础提示词语义和双侧证据契约获批前不得授权或执行。
 
@@ -185,3 +185,37 @@ docker compose -f compose.yaml -f compose.evaluation-release.yaml config --quiet
 ```
 
 宿主预检绑定外置目录、固定 registry 位置、registry 原始字节哈希、闭包哈希以及构建/运行代码 SHA，并只接受恰好 40 或 64 位的小写十六进制代码 SHA。预检输出中的 `ok: true` 仅说明 `hostMountOnly: true`；它会同时返回 `campaignStatus: ready` 表示账本实现已存在，但 `campaignReady: false` 明确表示宿主挂载预检本身没有加载某个具体 campaign 的完整 case/证据闭包，不能解读为发布、构建或运行时已获准。生产运行时再次重算闭包并与环境变量、前端 manifest、服务端 manifest 和服务端内嵌最小 registry 投影核对。所有这些步骤都是零 Provider 调用；真实探针与质量样本仍需独立付费授权。
+
+## 提示词目录治理：新增、修订、撤销与回滚
+
+本节是三基础节点模型（schema v7）下「功能」的治理流程正文，契约来源为 `docs/design/2026-09-18-three-node-model/contracts/prompt-variant-schema.md` §4（设置流程）与 §1.1，运行语义边界见 `contracts/runtime.md` §5c / §5d。
+
+目录的唯一定义位置是 `src/lib/garmentPromptPresets.ts`：一个「功能」就是一个 `PromptVariant`，节点的 `promptVariantId` 只是引用。node 不复制正文，因此目录修订/撤销只改目录与 registry，不改用户文档。
+
+### 新增一个功能（从提出到普通用户可选）
+
+1. **提 PR（任何开发者）**：在 `garmentPromptPresets.ts` 追加变体条目，逐字段填齐 `PromptVariant` 全部字段。新功能通常意味着在 `PromptFamilyId` 联合中追加一个新 `familyId`。`fullPrompt` 是功能文案的唯一来源（runner 内不得再出现功能文案）；`needsMask` 必须显式写 `true`/`false`（不留 `undefined`）；新增变体的 `supportStatus` 只能填 `unverified`，`statusReason` 用 `UNVERIFIED_REASON`；`contractHash` 取对应模型域的 `imageModelContractHash` / `textModelContractHash` / `videoModelContractHash`，`parameterProfileId` 按 `{modelId}:{familyId}:{mode}:v{n}` 命名。
+2. **类型层不得私改**：需要新 `mode` 取值或新 `nodeKind` 值时必须停步——它们是类型层变更，须回到方案评审，不属于「新增一个功能」。
+3. **评审与合入（PR + 门禁）**：走既有 PR 评审、`npm run check`、`npm run build`、ast-grep/dependency-cruiser 扫描与 CI 五个必需检查。目录加载断言（`variantById` / `variantByQuery` 唯一性 throw，防同一四键组合出现两份文案）由 `tests/prompt-presets.test.ts` 覆盖，冲突即红。
+4. **合入后状态 = `unverified`**：普通用户不可见不可选（运行准入 fail-closed；只有 `verified` / `recommended` 可普通运行）。上线不依赖评估完成，评估节奏由 orchestrator 排期。
+5. **评估 campaign**：按本文上方 campaign 流程封存 Campaign/Slot 总账，逐阶段（`contract` → `provider-probe` → `internal-experiment` → `formal-validation`）跑真实评估并保留 receipt 链。付费前必须有真实数据库账本、逐 case 一次性授权与精确 slot 绑定。
+6. **release registry 发布（可选时才可选）**：评估通过后走 `evaluation:review gate` → `promote` → registry 登记，`supportStatus` 经发布动作升为 `verified` / `recommended`，普通用户才可选。registry 为空时任何变体都不会被激活。
+
+### 修订纪律：正文修订必改 ID
+
+变体 ID（`{familyId}.{modelId}.{mode}.v{n}`）是稳定键，**版本推进 = 新变体 ID + 旧 ID 走撤销流程**，不存在「同 ID 内容原地变更」。现行 registry schema 按 `variantId` 唯一键拒绝重复（`duplicate release key`），因此同 ID 多 release（`evaluationVersion` 递增）**默认不启动**；如需该路径，必须先扩展 registry schema（`schemaVersion: 2`，同 ID 取最新 `generatedAt`）并走方案评审。
+
+### 变体撤销与存量节点语义
+
+- 撤销 = 目录侧删除/停用该变体 + registry 中该变体标记撤销。存量节点**运行时拒绝**（`promptRunAdmission` fail-closed，节点错误文案「所选功能已被撤销，请重新选择」）。
+- **不做自动回退**：节点 `promptVariantId` 保留不动，等待用户手动改选；不自动改写用户文档。
+- 旧 ID 未撤销的并行期，存量节点继续可用；旧 ID 撤销后按上一条处理。
+- `contractHash` 绑定的是 registry 中该变体 ID 的发布记录：ID 不变则 hash 不变；ID 被撤销后准入已拒绝，不会带着过期 hash 进入运行。
+
+### R5 之后「已评估」的口径弱化（审计影响）
+
+`modelOptions` 硬校验放开后，`contractHash` / `evaluationVersion` 仍随请求透传，但语义弱化为：**「该变体已评估」只覆盖 registry 登记的推荐参数面**——用户自定义的 `modelOptions` 组合不在既有评估证据覆盖范围内。这是 R5 裁定的直接后果，不是缺陷。审计与计费对账时不得把 `contractHash` 当作参数合规证据（悬浮窗口侧以「已评估参数 / 自定义参数（未评估）」标记提示用户，纯信息展示、不阻断）。
+
+### 回滚
+
+目录 PR `revert` + registry 中该变体标记撤销；与代码发布解耦，不需要回滚代码。存量引用节点按「变体撤销」处理（运行 fail-closed，不自动回退用户文档）。任何回归审计都会同时作用于浏览器提示与服务端权威准入（静态关闭规则 `PROMPT_RUNTIME_SHUTDOWN_RULES`，见上文「四级静态关闭」）。

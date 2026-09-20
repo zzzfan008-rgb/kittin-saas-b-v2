@@ -26,7 +26,7 @@ import {
   PROVIDER_PROMPT_RENDERER_HASH,
   PROVIDER_PROMPT_RENDERER_VERSION,
 } from "../../src/lib/providerPromptRenderer";
-import { getImageModelContract, IMAGE_MODEL_IDS } from "../../src/types/imageModels";
+import { getImageModelContract, IMAGE_MODEL_IDS, isImageModelId } from "../../src/types/imageModels";
 import { getModelParameterProfile } from "../../src/types/modelParameterProfiles";
 import type {
   EvaluationHardBlocker,
@@ -563,8 +563,19 @@ export function currentEvaluationPromotionTarget(
 ): { unit: PromptEvaluationUnit; versions: PromptEvaluationVersionVector } {
   const variant = getGarmentPromptVariantById(variantId);
   if (!variant) throw new Error(`prompt variant ${variantId} is not in the reviewed catalog`);
-  if (variant.nodeKind === "image-input" || variant.nodeKind === "result") {
-    throw new Error("evaluation promotion requires a Provider-backed prompt variant");
+  // 按域分道（contracts/data-model.md §1 NodeKind 三值；contracts/prompt-variant-schema.md §1.1
+  // modelId 跨 image/text/video 三域）：当前评估晋升链（garment 评分规则 / 图像黄金集 /
+  // 双层图像证据，见 docs/ai/evaluation/README.md）只覆盖 image 域。text / video 域尚无
+  // 评分规则与证据契约，不进入本晋升链——调用方（scripts/evaluation-manifest.ts）按
+  // nodeKind 过滤，只把 image 变体送进晋升链。
+  if (variant.nodeKind !== "image") {
+    throw new Error(
+      `evaluation promotion is only defined for image-kind variants (received ${variant.nodeKind})`,
+    );
+  }
+  // 图片晋升要求 modelId 落在 image 契约清单（isImageModelId）。
+  if (!isImageModelId(variant.modelId)) {
+    throw new Error("image evaluation promotion requires an image model from the reviewed image contract list");
   }
   const profile = getModelParameterProfile(variant.parameterProfileId);
   if (!profile) throw new Error(`parameter profile ${variant.parameterProfileId} is missing`);

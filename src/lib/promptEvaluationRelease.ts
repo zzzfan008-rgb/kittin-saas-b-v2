@@ -157,10 +157,11 @@ export function effectivePromptSupport(
 }
 
 function unsupportedReason(query: PromptVariantQuery): string {
+  // v7：nodeKind 收敛三值后，mask-redraw 旧 kind 分支改为 mask-edit 模式语义。
   if (query.modelId === "gpt-image-2.5-sunburst") {
-    return "GPT Image 2.5 Sunburst 首版产品策略仅允许蒙版局部修改（mask-local-edit × mask-redraw × mask-edit）。";
+    return "GPT Image 2.5 Sunburst 首版产品策略仅允许蒙版局部修改（mask-local-edit × image × mask-edit）。";
   }
-  if (query.mode === "mask-edit" || query.nodeKind === "mask-redraw") {
+  if (query.mode === "mask-edit") {
     return "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst。";
   }
   return "该任务族×模型×节点×操作模式没有独立变体；系统不会回退到通用模板。";

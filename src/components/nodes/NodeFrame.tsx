@@ -1,5 +1,10 @@
 import { useRef, useState, type ReactNode } from "react";
-import { isNodeRunActive, type NodeKind, type NodeRunStatus } from "@/types/workflow";
+import {
+  isNodeRunActive,
+  nodeTitleForKind,
+  type NodeKind,
+  type NodeRunStatus,
+} from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
@@ -73,11 +78,18 @@ interface NodeFrameProps {
   selected?: boolean;
   /** 传入 nodeId 后标题支持双击改名（回车/失焦确认，Esc 取消） */
   nodeId?: string;
+  /**
+   * R-40 §2.1.1：双击节点体（非标题）打开功能设置窗口。
+   * 节点体此前无既有双击语义；处理器内部负责 stopPropagation 防止冒泡缩放。
+   */
+  onBodyDoubleClick?: (event: React.MouseEvent) => void;
+  /** 入口条（仅选中态渲染，R-40 裁定 B）；不传则不渲染。 */
+  entryBar?: ReactNode;
   children: ReactNode;
 }
 
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 */
-export function NodeFrame({ title, status, error, selected, nodeId, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, onBodyDoubleClick, entryBar, children }: NodeFrameProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);
@@ -147,7 +159,14 @@ export function NodeFrame({ title, status, error, selected, nodeId, children }: 
           </span>
         )}
       </div>
-      <div className="gc-node-body space-y-3 p-3">{children}</div>
+      <div
+        className="gc-node-body space-y-3 p-3"
+        onDoubleClick={onBodyDoubleClick}
+      >
+        {children}
+        {/* R-40 裁定 B：入口条仅选中态渲染；未选中时节点卡上不渲染任何入口条 DOM。 */}
+        {selected && entryBar}
+      </div>
       {error && (
         <div className="mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-[11px] leading-relaxed text-red-400">
           {error}
@@ -216,6 +235,32 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     >
       <p className="font-medium tracking-wide">暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>
+    </div>
+  );
+}
+
+/**
+ * R-79：未知/legacy kind 的显式降级占位。不是吞错——记录/节点仍渲染，但以统一
+ * 文案明确告知「内容不可查看/运行/编辑」，并保留节点名与类型可读。
+ */
+export function UnsupportedNodeKindNotice({
+  kind,
+  label,
+}: {
+  kind: unknown;
+  label?: string;
+}) {
+  const kindTitle = nodeTitleForKind(kind);
+  return (
+    <div
+      role="note"
+      data-unsupported-kind="true"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
+    >
+      <p className="font-medium tracking-wide">不支持的旧版本内容</p>
+      <p className="mt-0.5">
+        {label ? `节点「${label}」的` : "该"}类型「{kindTitle}」来自旧版本，当前版本不支持查看、运行或编辑。
+      </p>
     </div>
   );
 }

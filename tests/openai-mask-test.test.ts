@@ -102,7 +102,7 @@ try {
   assert.equal((await send({...body,id:"failure-once"})).status,200); assert.equal(calls,3);
   console.log("PASS owner isolation, persisted raw output, duplicate/conflicting IDs, one call on server error");
   const testData = { prompt, source:input.url,mask:selection.url,requestId:body.id };
-  const snapshot=createDocumentSnapshot({projectName:"Native",nodes:[{id:"native",type:"image-input",position:{x:0,y:0},data:{kind:"image-input",label:"Native",status:"idle",openaiMaskTest:testData}}],edges:[]});
+  const snapshot=createDocumentSnapshot({projectName:"Native",nodes:[{id:"native",type:"image",position:{x:0,y:0},data:{kind:"image",label:"Native",status:"idle",openaiMaskTest:testData}}],edges:[]});
   const flow=validateAndMigrateFlow(documentSnapshotToPersistedWorkflow(snapshot));
   assert.deepEqual(flow.nodes[0].data.openaiMaskTest,testData);
   console.log("PASS project snapshot and schema round trip");

@@ -22,7 +22,7 @@ import { ProjectTabs } from "@/components/panels/ProjectTabs";
 import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
 import { ContextPanel } from "@/components/panels/ContextPanel";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
-import { TaskLauncher } from "@/components/TaskLauncher";
+import { EmptyCanvasCTA } from "@/components/EmptyCanvasCTA";
 import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
@@ -391,7 +391,7 @@ function Workspace() {
       >
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <ReactFlowProvider key={activeTabId}>
-            <TaskLauncher />
+            <EmptyCanvasCTA />
             <CanvasFlow />
           </ReactFlowProvider>
         </div>

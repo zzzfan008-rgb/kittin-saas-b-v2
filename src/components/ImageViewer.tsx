@@ -3,6 +3,7 @@ import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
+import { nodeSpecForKind } from "@/types/workflow";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 2;
@@ -61,6 +62,7 @@ export function ImageViewer() {
   ));
   const closeViewer = useFlowStore((s) => s.closeViewer);
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();
+  const unsupportedKind = record !== undefined && !nodeSpecForKind(record.kind);
   const [scale, setScale] = useState(1);
   const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const imgRef = useRef<HTMLImageElement>(null);
@@ -185,8 +187,8 @@ export function ImageViewer() {
             <button
               type="button"
               onClick={runAgain}
-              disabled={Boolean(generationSafetyBlockReason)}
-              title={generationSafetyBlockReason ?? undefined}
+              disabled={Boolean(generationSafetyBlockReason) || unsupportedKind}
+              title={generationSafetyBlockReason ?? (unsupportedKind ? "该结果来自旧版本，不支持重新生成" : undefined)}
               className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}

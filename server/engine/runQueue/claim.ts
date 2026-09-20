@@ -170,6 +170,38 @@ export async function markAttemptStarted(
 
 
 
+/**
+ * 视频异步任务提交成功后的幂等护栏：持久化 Seedance taskId 为审计证据，并标记
+ * attempt_started，使 worker 崩溃后租约过期时按 outcome_unknown 关闭（绝不静默重提交重计费）。
+ */
+export async function markVideoTaskSubmitted(
+  job: ClaimedJob,
+  workerId: string,
+  taskId: string,
+  now: number,
+  leaseMs: number,
+): Promise<void> {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(taskId)) {
+    throw new Error("video provider task id is invalid");
+  }
+  await transaction(async (client) => {
+    const row = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(`
+      SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE
+    `, [job.id])).rows[0];
+    if (!row || row.worker_id !== workerId) throw new Error("generation job lease was lost");
+    if (row.status !== "running") throw new Error(`generation job is ${row.status}`);
+    await client.query(`
+      UPDATE generation_jobs SET attempt_started_at = COALESCE(attempt_started_at, $1),
+        lease_expires_at = $2, updated_at = $1 WHERE id = $3
+    `, [now, now + leaseMs, job.id]);
+    await client.query(`
+      UPDATE generation_run_steps SET provider_requests = provider_requests + 1,
+        provider_task_id = $1 WHERE id = $2
+    `, [taskId, job.stepId]);
+  });
+}
+
+
 export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<number> {
   return transaction(async (client) => {
     const rows = (await client.query<JobLockRow>(`

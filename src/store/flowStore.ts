@@ -18,21 +18,18 @@ import {
 export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 import {
   NODE_SPECS,
-  allowedOperationModesForNode,
-  defaultOperationModeForNode,
   isNodeRunActive,
   isNodeRunTerminal,
+  nodeSpecForKind,
   type Asset,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
-  type ImageInputNodeData,
   type PersistedWorkflow,
   type ReferenceImageEvidence,
 } from "@/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
-  MASK_REDRAW_MODEL_ID,
   defaultImageModelOptions,
   isImageModelId,
   isModelAllowedForNode,
@@ -57,6 +54,7 @@ import { waitForInitialDraftSyncBeforeFormalSave } from "@/initialDraft/initialD
 import {
   evaluatePromptRunAdmission,
   promptRunAdmissionInputFromNode,
+  promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
 } from "@/lib/promptRunAdmission";
 import type { HistoricalReferenceEvidence } from "@/lib/referenceEvidence";
@@ -153,7 +151,7 @@ export interface DocumentTarget {
 
 export type CoalescedTextEditDescriptor =
   | { kind: "project-name" }
-  | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" };
+  | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" | "text" | "outputText" };
 
 export interface CoalescedTextEditToken {
   readonly id: symbol;
@@ -801,6 +799,38 @@ export function addExistingNodes(nodes: FlowNode[]): string[] {
   return changed ? addedIds : [];
 }
 
+/**
+ * 方案 C auto-text 共享兜底（必做项，R-75 §3.6）：保证每个 image/video 节点
+ * 都有 ≥1 条 text→该节点的 prompt 入边（server INV-1 / graph-invariants.md §1）。
+ * 若当前文档已有 text 节点则复用它，否则在目标节点左侧补一个空 text 节点；
+ * 两种情况都补上 prompt 边。幂等：目标已有 prompt 入边时不重复连线。
+ */
+export function ensureTextUpstreamForNode(
+  kind: "image" | "video",
+  position: { x: number; y: number },
+  targetNodeId: string,
+): void {
+  const state = useFlowStore.getState();
+  const tab = selectActiveDocument(state);
+  if (tab.readOnly) return;
+  const target = tab.nodes.find((node) => node.id === targetNodeId);
+  if (!target || target.data.kind !== kind) return;
+  if (tab.edges.some((edge) => edge.target === targetNodeId && edge.targetHandle === "prompt")) {
+    return;
+  }
+  let textId = tab.nodes.find((node) => node.data.kind === "text")?.id;
+  if (!textId) {
+    textId = state.addNode("text", { x: position.x - 380, y: position.y }) ?? undefined;
+  }
+  if (!textId || textId === targetNodeId) return;
+  state.onConnect({
+    source: textId,
+    target: targetNodeId,
+    sourceHandle: "prompt",
+    targetHandle: "prompt",
+  });
+}
+
 /** 开始一组实时可见、但只在结束时写入一次历史与 revision 的文档事务。 */
 export function beginHistoryTransaction(
   label = "document-transaction",
@@ -1045,66 +1075,26 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
   const spec = NODE_SPECS[kind];
   const base = { label: spec.title, status: "idle" as NodeRunStatus };
   switch (kind) {
-    case "image-input":
-      return { ...base, kind };
-    case "sketch-to-render":
+    case "text":
+      // R2：正文由文本节点承载；三项窗口配置（功能/参数/模型）初始未选。
+      return { ...base, kind, text: "" };
+    case "image":
       return {
-        ...base, kind, prompt: "", aspectRatio: "3:4", batchSize: 1, outputImages: [],
-        operationMode: "generate", operationModeNeedsConfirmation: false,
+        ...base, kind,
+        aspectRatio: "3:4", batchSize: 1, outputImages: [],
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
       };
-    case "ai-modify":
-      return {
-        ...base, kind, prompt: "", aspectRatio: "1:1", batchSize: 1, outputImages: [],
-        operationMode: "edit", operationModeNeedsConfirmation: false,
-        modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-      };
-    case "fabric-recolor":
-      return {
-        ...base, kind, colors: [], prompt: "", outputImages: [],
-        operationMode: "edit", operationModeNeedsConfirmation: false,
-        modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-      };
-    case "upscale":
-      return {
-        ...base, kind, imageSize: "2K", outputImages: [],
-        operationMode: "edit", operationModeNeedsConfirmation: false,
-        modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-      };
-    case "print-extract":
-      return {
-        ...base, kind, prompt: "", outputImages: [], savedAsAssets: [],
-        operationMode: "edit", operationModeNeedsConfirmation: false,
-        modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-      };
-    case "print-mutate":
-      return {
-        ...base, kind, prompt: "", count: 4, outputImages: [],
-        operationMode: "edit", operationModeNeedsConfirmation: false,
-        modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID),
-      };
-    case "mask-redraw":
-      return {
-        ...base, kind, prompt: "", outputImages: [],
-        operationMode: "mask-edit", operationModeNeedsConfirmation: false,
-        modelId: MASK_REDRAW_MODEL_ID, modelOptions: {},
-      };
-    case "result":
-      return { ...base, kind, images: [] };
+    case "video":
+      // R10：视频唯一模型 doubao-seedance-2-5-260628；契约产物归 P2-e。
+      return { ...base, kind, outputVideos: [] };
   }
 }
 
-/** 从节点 data 中取它对外输出的图片 */
+/** 从节点 data 中取它对外输出的图片（text/video 节点不产参考图）。 */
 function nodeOutputImages(data: WorkflowNodeData): string[] {
-  if (data.kind === "image-input") return data.imageUrl ? [data.imageUrl] : [];
-  if (data.kind === "result") return [];
-  return data.outputImages ?? [];
+  if (data.kind === "image") return data.outputImages ?? [];
+  return [];
 }
 
 function sameStringList(left: string[], right: string[]): boolean {
@@ -1169,15 +1159,6 @@ function selectionIdsAfterNodeChanges(
     if (node.selected && !nextIds.includes(node.id)) nextIds.push(node.id);
   }
   return nextIds;
-}
-
-function makeStarterNode(): FlowNode {
-  return {
-    id: nanoid(8),
-    type: "image-input",
-    position: { x: 0, y: 0 },
-    data: defaultNodeData("image-input"),
-  };
 }
 
 /**
@@ -1274,7 +1255,7 @@ export function selectHasDirtyTabs(state: FlowState): boolean {
   return state.tabs.some((tab) => tab.dirty);
 }
 
-/** 只有从未编辑、未保存的初始空白项目才显示任务启动器。 */
+/** 只有从未编辑、未保存的空白项目（nodes=[] && edges=[]）才显示空状态。 */
 export function isPristineProjectTab(tab: ProjectTab): boolean {
   const lifecycle = projectTabLifecycle(tab);
   if (
@@ -1287,13 +1268,10 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
     (lifecycle === "initial_draft"
       ? !/^\u672a\u4fee\u6539\u9879\u76ee\u540d\u79f0\d{8}000000$/.test(tab.projectName)
       : tab.projectName !== DEFAULT_PROJECT_NAME) ||
-    tab.edges.length !== 0 ||
-    tab.nodes.length !== 1
+    tab.nodes.length !== 0 ||
+    tab.edges.length !== 0
   ) return false;
-  const node = tab.nodes[0];
-  return node.data.kind === "image-input" &&
-    node.data.status === "idle" &&
-    !node.data.imageUrl;
+  return true;
 }
 
 export function projectTabLifecycle(tab: ProjectTab): ProjectLifecycle {
@@ -1311,11 +1289,13 @@ export function projectTabHasLocalDraftChanges(tab: ProjectTab): boolean {
   return !isPristineProjectTab(tab);
 }
 
-export function selectActiveProjectIsPristine(state: FlowState): boolean {
-  return isPristineProjectTab(selectActiveDocument(state));
-}
-
-/** 连接规则的唯一纯函数；React Flow 拖线和快捷建图必须共用它。 */
+/**
+ * 连接规则的唯一纯函数；React Flow 拖线和快捷建图必须共用它。
+ * v7（graph-invariants.md §2）按「边类型 = targetHandle + source kind」判定：
+ * - prompt 边：text → text/image/video，targetHandle="prompt"；text 节点可串联（Q1=B）。
+ * - reference 边：image → image/video，targetHandle 缺省或 "reference"；image≤8 / video≤1（首帧）。
+ * 违反组合（image→text、text 经 reference 边等）一律拒绝。
+ */
 export function isDocumentConnectionValid(
   document: Pick<ProjectTab, "nodes" | "edges">,
   connection: Connection | Edge,
@@ -1327,14 +1307,54 @@ export function isDocumentConnectionValid(
     !document.nodes.some((node) => node.id === connection.source)
   ) return false;
   const target = document.nodes.find((node) => node.id === connection.target);
-  if (!target) return false;
-  const spec = NODE_SPECS[target.data.kind];
+  const source = document.nodes.find((node) => node.id === connection.source);
+  if (!target || !source) return false;
+  // R-79：未知/legacy kind 的目标节点不参与连线（优雅降级，不查表抛错）。
+  const spec = nodeSpecForKind(target.data.kind);
+  if (!spec) return false;
+
   const incoming = document.edges.filter((edge) => edge.target === connection.target);
-  if (incoming.length >= spec.inputs) return false;
-  return !incoming.some(
+  // 同一 (source, targetHandle) 组合只允许一条边，防重复连线。
+  if (incoming.some(
     (edge) => edge.source === connection.source &&
       (edge.targetHandle ?? null) === (connection.targetHandle ?? null),
-  );
+  )) return false;
+
+  if (connection.targetHandle === "prompt") {
+    // text 边：source 必须是 text 节点（text→text 串联、text→image/video 提供正文）。
+    if (source.data.kind !== "text") return false;
+    return incoming.filter((edge) => edge.targetHandle === "prompt").length < spec.inputs.text;
+  }
+
+  // reference 边（targetHandle 缺省或 "reference"）：image 源 → image/video 目标。
+  if (connection.targetHandle !== undefined && connection.targetHandle !== null &&
+    connection.targetHandle !== "reference") return false;
+  if (source.data.kind !== "image" || target.data.kind === "text") return false;
+  return incoming.filter((edge) => edge.targetHandle !== "prompt").length < spec.inputs.image;
+}
+
+/** 连线被拒时的用户可读原因（连错线要有明确反馈，不是静默失败）。 */
+export function documentConnectionRejection(
+  document: Pick<ProjectTab, "nodes" | "edges">,
+  connection: Connection | Edge,
+): string | null {
+  if (isDocumentConnectionValid(document, connection)) return null;
+  const source = document.nodes.find((node) => node.id === connection.source);
+  const target = document.nodes.find((node) => node.id === connection.target);
+  if (!source || !target || connection.source === connection.target) return null;
+  if (connection.targetHandle === "prompt") {
+    if (source.data.kind !== "text") {
+      return "提示词入口只接受文本节点；图片请连接参考图入口";
+    }
+    return "该节点的文本输入已达上限";
+  }
+  if (source.data.kind !== "image") {
+    return "参考图入口只接受图片节点";
+  }
+  if (target.data.kind === "video") {
+    return "视频节点最多接受 1 张首帧图片";
+  }
+  return "该节点的参考图输入已达上限";
 }
 
 function connectionWithReferenceData(
@@ -1611,7 +1631,7 @@ function newTab(opts?: {
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
   const persisted = opts?.persisted === true && !markDirty;
-  const selection = normalizeNodeSelection(opts?.nodes ?? [makeStarterNode()], []);
+  const selection = normalizeNodeSelection(opts?.nodes ?? [], []);
   return {
     id: nanoid(10),
     projectId: opts?.projectId ?? nanoid(10),
@@ -1748,85 +1768,47 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
     status,
   };
   if (typeof input.error !== "string") delete data.error;
-  if (NODE_SPECS[kind].providerId) {
-    const selectedModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
-      ? input.modelId
-      : undefined;
-    const retiredModelId = kind === "mask-redraw"
-      ? undefined
-      : typeof input.retiredModelId === "string" && input.retiredModelId.trim()
-        ? input.retiredModelId
-        : isRetiredImageModelId(input.modelId)
-          ? input.modelId
-          : typeof input.modelId === "string" && input.modelId.trim() && !selectedModelId
-            ? input.modelId
-            : undefined;
-    const modelId = selectedModelId
-      ?? (kind === "mask-redraw" ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID);
-    const preferredAspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "1:1";
-    data.modelId = modelId;
-    if (retiredModelId) {
-      data.retiredModelId = retiredModelId;
-      data.modelSelectionNeedsConfirmation = true;
-      delete data.promptVariantId;
-      delete data.promptFamilyId;
-      delete data.parameterProfileId;
-      delete data.contractHash;
-      delete data.evaluationVersion;
-      delete data.postprocessVersion;
-    } else {
-      delete data.retiredModelId;
-      data.modelSelectionNeedsConfirmation = input.modelSelectionNeedsConfirmation === true;
-    }
-    data.modelOptions = normalizeImageModelOptions(modelId, input.modelOptions, preferredAspectRatio);
-    const allowedModes = allowedOperationModesForNode(kind);
-    data.operationMode = allowedModes.includes(input.operationMode as never)
-      ? input.operationMode
-      : defaultOperationModeForNode(kind);
-    data.operationModeNeedsConfirmation = input.operationModeNeedsConfirmation === true;
-  }
+  // v7 删除字段族（operationMode / retiredModel / modelSelectionNeedsConfirmation）
+  // 不再参与会话归一：历史会话里的这些键直接丢弃。
+  delete data.operationMode;
+  delete data.operationModeNeedsConfirmation;
+  delete data.retiredModelId;
+  delete data.modelSelectionNeedsConfirmation;
 
   switch (kind) {
-    case "image-input":
-      if (typeof input.imageUrl !== "string") delete data.imageUrl;
+    case "text":
+      data.text = typeof input.text === "string" ? input.text : "";
+      if (typeof input.outputText !== "string") delete data.outputText;
+      if (typeof input.lastRunInput !== "string") delete data.lastRunInput;
+      if (typeof input.promptVariantId !== "string" || !input.promptVariantId) delete data.promptVariantId;
       break;
-    case "sketch-to-render":
-    case "ai-modify":
-      data.prompt = typeof input.prompt === "string" ? input.prompt : "";
+    case "image": {
+      const validModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
+        ? input.modelId
+        : undefined;
+      const preferredAspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "3:4";
+      if (validModelId) {
+        data.modelId = validModelId;
+        data.modelOptions = normalizeImageModelOptions(validModelId, input.modelOptions);
+      } else if (typeof input.modelId === "string" && input.modelId.trim()) {
+        // R-61：非空但已退役/契约外的模型 ID 视为「用户曾选过、模型已失效」，
+        // 会话恢复替换为默认模型；旧 promptVariantId 等绑定保留，运行准入拦截
+        // （对应测试「退役 Grok 会话恢复替换为默认模型」）。
+        const fallbackId = DEFAULT_GENERATION_MODEL_ID;
+        data.modelId = fallbackId;
+        data.modelOptions = normalizeImageModelOptions(fallbackId, input.modelOptions);
+      } else {
+        // 节点从未选择模型（modelId 缺省/空串/脏值）：modelId 在 v7 是可选文档字段
+        // （contracts/data-model.md §3 ImageNodeData），会话恢复不得替用户补默认模型、
+        // 改写文档形状；未选模型不可运行，由 promptRunAdmission 提示选择
+        // （contracts/runtime.md §1/§1b）。
+        delete data.modelId;
+        delete data.modelOptions;
+      }
       data.aspectRatio = typeof input.aspectRatio === "string" && ["1:1", "3:4", "4:3", "9:16", "16:9"].includes(input.aspectRatio)
         ? input.aspectRatio
-        : kind === "sketch-to-render" ? "3:4" : "1:1";
+        : preferredAspectRatio;
       data.batchSize = [1, 2, 4, 8].includes(Number(input.batchSize)) ? Number(input.batchSize) : 1;
-      data.outputImages = stringList(input.outputImages);
-      break;
-    case "fabric-recolor":
-      data.colors = stringList(input.colors, 8).filter((color) => /^#[0-9a-fA-F]{6}$/.test(color));
-      data.prompt = typeof input.prompt === "string" ? input.prompt : "";
-      data.outputImages = stringList(input.outputImages);
-      if (typeof input.fabricImageUrl !== "string") delete data.fabricImageUrl;
-      break;
-    case "upscale":
-      data.imageSize = input.imageSize === "4K" ? "4K" : "2K";
-      data.outputImages = stringList(input.outputImages);
-      break;
-    case "print-extract":
-      data.prompt = typeof input.prompt === "string" ? input.prompt : "";
-      data.outputImages = stringList(input.outputImages);
-      data.savedAsAssets = stringList(input.savedAsAssets);
-      break;
-    case "print-mutate":
-      data.prompt = typeof input.prompt === "string" ? input.prompt : "";
-      data.count = Number.isInteger(input.count) && Number(input.count) >= 1 && Number(input.count) <= 8
-        ? input.count
-        : 4;
-      data.outputImages = stringList(input.outputImages);
-      break;
-    case "mask-redraw":
-      data.modelId = MASK_REDRAW_MODEL_ID;
-      delete data.retiredModelId;
-      data.modelSelectionNeedsConfirmation = false;
-      data.modelOptions = {};
-      data.prompt = typeof input.prompt === "string" ? input.prompt : "";
       data.outputImages = stringList(input.outputImages);
       if (typeof input.mask !== "string") delete data.mask;
       if (typeof input.maskSourceRef !== "string") delete data.maskSourceRef;
@@ -1840,9 +1822,10 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
         data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
       }
       break;
-    case "result":
-      data.images = stringList(input.images);
-      if (typeof input.note !== "string") delete data.note;
+    }
+    case "video":
+      data.outputVideos = stringList(input.outputVideos);
+      if (typeof input.promptVariantId !== "string" || !input.promptVariantId) delete data.promptVariantId;
       break;
   }
 
@@ -2924,6 +2907,16 @@ export const useFlowStore = create<FlowState>()(
       setProjectName: (name) => {
         const tab = selectActiveDocument(get());
         if (tab.readOnly || name === tab.projectName) return;
+        // 方案 C 裁定 2：未落库空 tab（lifecycle=local 且 nodes=[]&&edges=[]）的重命名
+        // 只改本地瞬态字段，不 bump revision、不置 dirty、不写 history，也不触发落库同步。
+        if (
+          projectTabLifecycle(tab) === "local" &&
+          tab.nodes.length === 0 &&
+          tab.edges.length === 0
+        ) {
+          patchTab(set, tab.id, { projectName: name });
+          return;
+        }
         commitDocumentMutationWithSet(set, { projectName: name });
       },
       setSelectedNodeIds: (ids) => {
@@ -3098,19 +3091,42 @@ export const useFlowStore = create<FlowState>()(
         const tab = selectActiveDocument(state);
         if (tab.readOnly) return null;
         const id = nanoid(8);
+        // v7（R8）：素材以 image 节点落地，上传图直写 outputImages。
         const node: FlowNode = {
           id,
-          type: "image-input",
+          type: "image",
           position,
           data: {
-            ...defaultNodeData("image-input"),
+            ...defaultNodeData("image"),
             label: asset.name,
             status: "success",
-            imageUrl: asset.image,
-          } as ImageInputNodeData,
+            outputImages: [asset.image],
+          } as WorkflowNodeData,
         };
-        const selection = normalizeNodeSelection([...tab.nodes, node], [id]);
-        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
+        // 方案 C auto-text 兜底：素材 image 节点必须与 text 上游原子加入（INV-1），
+        // 一次撤销完整移除（与历史单步语义一致）。
+        const existingText = tab.nodes.find((candidate) => candidate.data.kind === "text");
+        const textNode: FlowNode | null = existingText
+          ? null
+          : {
+            id: nanoid(8),
+            type: "text",
+            position: { x: position.x - 380, y: position.y },
+            data: defaultNodeData("text"),
+          };
+        const textId = existingText?.id ?? textNode!.id;
+        const nextNodes = textNode ? [...tab.nodes, node, textNode] : [...tab.nodes, node];
+        const connection: Connection = {
+          source: textId,
+          target: id,
+          sourceHandle: "prompt",
+          targetHandle: "prompt",
+        };
+        const nextEdges = isDocumentConnectionValid({ nodes: nextNodes, edges: tab.edges }, connection)
+          ? addEdge(connectionWithReferenceData(nextNodes, connection), tab.edges)
+          : tab.edges;
+        const selection = normalizeNodeSelection(nextNodes, [id]);
+        commitDocumentMutationWithSet(set, { ...selection, edges: nextEdges, selectedResultId: null });
         return id;
       },
 
@@ -3192,15 +3208,20 @@ export const useFlowStore = create<FlowState>()(
           )
         ) return;
         const kind = node.data.kind;
-        const spec = NODE_SPECS[kind];
-        if (!spec.providerId) return;
+        // v7：三种节点都可运行（text=润色/生成、image=生成、video=图生视频）。
+        // 可运行前置检查（变体准入/R3 上游）由 evaluatePromptRunAdmission 与服务端兜底。
         const promptReferences = promptRunReferenceSnapshotsFromGraph(
           initialDocument.nodes,
           initialDocument.edges,
           id,
         );
+        const promptInputTexts = promptRunInputTextsFromGraph(
+          initialDocument.nodes,
+          initialDocument.edges,
+          id,
+        );
         const promptAdmission = evaluatePromptRunAdmission(
-          promptRunAdmissionInputFromNode(node.data, promptReferences),
+          promptRunAdmissionInputFromNode(node.data, promptReferences, promptInputTexts),
         );
         if (!promptAdmission.allowed) {
           runWithoutHistory(() => updateTabNodes(set, target, (nodes) => nodes.map((candidate) => (
@@ -3997,7 +4018,7 @@ export function applyRunEventToTab(
   updateTabFromRunEvent(useFlowStore.setState, target, nodeId, event);
 }
 
-/** 读取 result 节点聚合的上游图片（直接上游） */
+/** 读取上游聚合图片；v7 中 result 节点已退役，保留该选择器供蒙版/参考图等输入位复用。 */
 export function selectResultImages(state: FlowState, nodeId: string): string[] {
   const document = selectActiveDocument(state);
   const urls: string[] = [];

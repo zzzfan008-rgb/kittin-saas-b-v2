@@ -77,13 +77,9 @@ function hasExactExecutionEdgeSemantics(
 }
 
 export function requestedCountForStep(kind: string, params: Record<string, unknown>): number {
-  return kind === "fabric-recolor"
-    ? Math.max(1, Array.isArray(params.colors) ? params.colors.length : 1)
-    : kind === "print-mutate"
-      ? Math.max(1, Math.min(8, Number(params.count) || 4))
-      : kind === "sketch-to-render" || kind === "ai-modify"
-        ? Math.max(1, Math.min(8, Number(params.batchSize) || 1))
-        : 1;
+  // v7：image 节点按 batchSize；text/video 各 1（video 归 P2-e）。
+  if (kind !== "image") return 1;
+  return Math.max(1, Math.min(8, Number(params.batchSize) || 1));
 }
 
 function plannedStepReferences(step: NodeExecution): ImageReferenceAccessEvidence[] {
@@ -122,36 +118,13 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
   const staticOutputsByNode = new Map<string, Array<{ imageRef: string; order: number }>>();
   const references: ImageReferenceAccessEvidence[] = [];
   for (const step of plan.steps) {
-    if (!NODE_SPECS[step.kind].providerId) {
-      if (step.kind === "image-input") {
-        staticOutputsByNode.set(
-          step.nodeId,
-          typeof step.params.imageUrl === "string"
-            ? [{ imageRef: step.params.imageUrl, order: 0 }]
-            : [],
-        );
-      } else if (step.kind === "result") {
-        let offset = 0;
-        const outputs: Array<{ imageRef: string; order: number }> = [];
-        for (const upstream of step.upstream ?? []) {
-          const upstreamOutputs = executingNodeIds.has(upstream.nodeId)
-            ? staticOutputsByNode.get(upstream.nodeId) ?? []
-            : upstream.images.map((imageRef, order) => ({ imageRef, order }));
-          outputs.push(...upstreamOutputs.map((output) => ({
-            imageRef: output.imageRef,
-            order: offset + output.order,
-          })));
-          // Preserve planned slots occupied by dynamic outputs so a surviving
-          // static reference keeps its request-relative order.
-          offset += upstream.images.length;
-        }
-        staticOutputsByNode.set(step.nodeId, outputs);
-      } else {
-        staticOutputsByNode.set(step.nodeId, []);
-      }
+    if (step.kind === "text") {
+      // text 节点无图片输入/输出。
+      staticOutputsByNode.set(step.nodeId, []);
       continue;
     }
 
+    // image/video 节点均为 Provider 节点，静态输出为空（运行时由持久化快照替换）。
     const actualStaticInputs: ImageReferenceAccessEvidence[] = [];
     if (!step.upstream?.length) {
       // Keep the exported helper fail-closed for persisted/evaluation plan
@@ -174,20 +147,9 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
     }
     references.push(...actualStaticInputs);
 
+    // 蒙版（image 节点 needsMask 变体，operationMode === "mask-edit"）追加到引用检查。
     const plannedInputCount = plannedStepReferences(step).length;
-    // 仅 fabric-recolor 会携带 fabricImageUrl：删除原先 `|| step.kind === "fabric-replace"`
-    // 是行为等价的死代码清理。fabric-replace 不是受支持的节点 kind（不在运行时 NODE_SPECS
-    // 中，TypeScript 亦以 TS2367 证明该比较恒为 false），上游校验会拒绝未知 kind；
-    // 回归不变量见 tests/generation-kind-contract.test.ts。
-    if (step.kind === "fabric-recolor" && typeof step.params.fabricImageUrl === "string") {
-      references.push({
-        imageRef: step.params.fabricImageUrl,
-        order: plannedInputCount,
-        sourceNodeId: step.nodeId,
-        targetNodeId: step.nodeId,
-      });
-    }
-    if (step.kind === "mask-redraw" && typeof step.params.mask === "string") {
+    if (step.kind === "image" && step.params.operationMode === "mask-edit" && typeof step.params.mask === "string") {
       references.push({
         imageRef: step.params.mask,
         order: plannedInputCount,

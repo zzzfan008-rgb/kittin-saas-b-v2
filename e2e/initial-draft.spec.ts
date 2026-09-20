@@ -1,3 +1,7 @@
+import sharp from "sharp";
+import {
+  WORKFLOW_SCHEMA_VERSION,
+} from "../src/types/workflow";
 import { expect, test } from "./fixtures";
 
 interface InitialDraftBody {
@@ -5,7 +9,7 @@ interface InitialDraftBody {
     id: string;
     name: string;
     revision: number;
-    flow: unknown;
+    flow: { schemaVersion: number; nodes: unknown[]; edges: unknown[] };
   };
 }
 
@@ -14,7 +18,10 @@ interface ProjectSummaryBody {
   name: string;
 }
 
-test("hard refresh, a second tab, and relogin restore the same initial draft", async ({ page }) => {
+const EMPTY_V7_FLOW = { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] };
+
+test("the empty first screen stays local and only persists after the first substantial change", async ({ page }) => {
+  test.slow();
   const accountId = process.env.E2E_ACCOUNT_ID;
   const password = process.env.E2E_PASSWORD;
   if (!accountId || !password) throw new Error("Missing E2E login credentials");
@@ -25,44 +32,88 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
     return (await response.json() as InitialDraftBody).draft;
   };
 
-  const beginRename = async (targetPage: typeof page) => {
-    const tabName = targetPage.getByTitle(/双击重命名/).first();
-    await expect(tabName).toBeVisible();
-    await tabName.dblclick();
-    const input = targetPage.getByRole("textbox", { name: "项目名称" });
-    await expect(input).toBeVisible();
-    return input;
-  };
+  // 方案 C 的空首屏前提是「无服务端草稿 + 无正式项目」。隔离库里前面的用例会同时留下
+  // 两者，所以先清掉草稿、并把正式项目列表挡住（夹具动作，只作用于隔离测试账号）。
+  const cleared = await page.request.post("/api/projects/initial-draft/force-clear", {
+    data: { confirm: true },
+  });
+  expect(cleared.ok(), await cleared.text()).toBeTruthy();
+  await page.route("**/api/projects", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
 
-  // Earlier desktop/golden-path projects intentionally remain in the isolated
-  // database. Seed a non-pristine draft boundary so the startup contract
-  // selects the draft even when a recent formal project also exists.
-  let existingBeforeStartup = await readDraft();
-  if (!existingBeforeStartup) {
-    const bootstrap = await page.request.post("/api/projects/initial-draft/bootstrap", {
-      data: { flow: { schemaVersion: 3, nodes: [], edges: [] } },
-    });
-    expect(bootstrap.ok(), await bootstrap.text()).toBeTruthy();
-    existingBeforeStartup = await readDraft();
-  }
-  expect(existingBeforeStartup).not.toBeNull();
-  if (!existingBeforeStartup) throw new Error("Initial draft was not bootstrapped");
-  if (/^未修改项目名称\d{8}000000$/.test(existingBeforeStartup.name)) {
-    const seed = await page.request.put(`/api/projects/initial-draft/${existingBeforeStartup.id}`, {
-      data: {
-        expectedRevision: existingBeforeStartup.revision,
-        name: `E2E 初始草稿 ${Date.now()}`,
-        flow: existingBeforeStartup.flow,
-      },
-    });
-    expect(seed.ok(), await seed.text()).toBeTruthy();
-  }
+  const bootstrapRequests: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/projects/initial-draft/bootstrap"
+    ) {
+      bootstrapRequests.push(request.url());
+    }
+  });
 
+  const canvas = page.getByRole("application", { name: "工作流画布" });
   await page.goto("/");
-  await expect.poll(readDraft, { timeout: 10_000 }).not.toBeNull();
-  const initial = await readDraft();
-  expect(initial).not.toBeNull();
-  if (!initial) throw new Error("Initial draft was not bootstrapped");
+  await expect(canvas).toBeVisible();
+
+  // 空首屏：中央「上传图片开始」CTA（TaskLauncher 浮层已随 R-76 删除），画布为空。
+  const cta = page.getByRole("region", { name: "开始创作" });
+  await expect(cta).toBeVisible();
+  await expect(cta.getByRole("button", { name: "上传图片开始" })).toBeVisible();
+  await expect(cta.getByText("从左侧节点库拖入文本 / 图片节点，或点击上方按钮上传图片")).toBeVisible();
+  await expect(page.getByRole("region", { name: "开始第一个创作任务" })).toHaveCount(0);
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(0);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+  // 空态不落库：既没有 bootstrap 请求，也没有服务端草稿记录。
+  expect(bootstrapRequests).toEqual([]);
+  expect(await readDraft()).toBeNull();
+
+  // 仅重命名（blur 提交，非 Enter 保存）：改名只走瞬态本地路径，不触发 bootstrap、不落库。
+  const transientName = `E2E 瞬态改名 ${Date.now()}`;
+  const localTabName = page.getByTitle(/双击重命名/).first();
+  await localTabName.dblclick();
+  const nameBox = page.getByRole("textbox", { name: "项目名称" });
+  await expect(nameBox).toBeVisible();
+  await nameBox.fill(transientName);
+  await nameBox.blur();
+  await expect(nameBox).toBeHidden();
+  await expect(page.getByTitle(`${transientName} · 双击重命名`)).toBeVisible();
+  // 等待超过 initial_draft 同步防抖窗口（700ms），确认空改名没有迟到的落库请求。
+  await page.waitForTimeout(1200);
+  expect(bootstrapRequests).toEqual([]);
+  expect(await readDraft()).toBeNull();
+
+  // 首次实质变更（CTA 一键建图片节点 + auto-text 兜底补文本节点与 prompt 边）才落库；
+  // 之前的瞬态改名随 bootstrap 的 name 字段一并持久化。
+  await cta.getByRole("button", { name: "上传图片开始" }).click();
+  await expect(nodes).toHaveCount(2);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await expect(cta).toHaveCount(0);
+  await expect.poll(() => bootstrapRequests.length).toBe(1);
+  await expect.poll(async () => (await readDraft())?.id ?? null).not.toBeNull();
+  const bootstrapped = await readDraft();
+  if (!bootstrapped) throw new Error("首次实质变更没有落库");
+  expect(bootstrapped.flow.schemaVersion).toBe(WORKFLOW_SCHEMA_VERSION);
+  expect(bootstrapped.flow.nodes).toHaveLength(2);
+  expect(bootstrapped.flow.edges).toHaveLength(1);
+  expect(bootstrapped.name).toBe(transientName);
+
+  // v7 上传：图片直写 image 节点输出，且不破坏 text→image 的 prompt 边（INV-1）。
+  const uploadImage = await sharp({
+    create: { width: 96, height: 64, channels: 3, background: "#735b42" },
+  }).png().toBuffer();
+  await page.getByLabel("上传图片").setInputFiles({
+    name: "first-screen.png",
+    mimeType: "image/png",
+    buffer: uploadImage,
+  });
+  await expect(page.getByAltText("已上传图片")).toBeVisible();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 
   let draftSyncRequests = 0;
   await page.route("**/api/projects/initial-draft/*", async (route) => {
@@ -74,36 +125,44 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
     await new Promise((resolve) => setTimeout(resolve, 900));
     await route.continue();
   });
-  const canvas = page.getByRole("application", { name: "工作流画布" });
   const canvasBeforeSync = await canvas.boundingBox();
   if (!canvasBeforeSync) throw new Error("Initial draft canvas is missing");
 
   const editedName = `E2E 未保存草稿 ${Date.now()}`;
-  const projectName = await beginRename(page);
+  const tabName = page.getByTitle(/双击重命名/).first();
+  await expect(tabName).toBeVisible();
+  await tabName.dblclick();
+  const projectName = page.getByRole("textbox", { name: "项目名称" });
+  await expect(projectName).toBeVisible();
   await projectName.fill(editedName);
   await projectName.blur();
   await expect(projectName).toBeHidden();
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   await expect.poll(() => draftSyncRequests, { timeout: 5_000 }).toBeGreaterThan(0);
-  await expect(page.getByText("正在同步未保存项目…")).toHaveCount(0);
+  // PUT 仍在途（路由里刻意延迟 900ms）：同步状态由 sr-only 的「正在同步未保存项目」
+  // 暴露（InitialDraftSyncNotice），这里正反两面都断言，避免恒真/恒假 needle：
+  // 在途时必须存在，收敛后必须消失；视觉位移由下面的 boundingBox 断言负责。
+  await expect(page.getByText("正在同步未保存项目")).toHaveCount(1);
   const canvasDuringSync = await canvas.boundingBox();
   if (!canvasDuringSync) throw new Error("Initial draft canvas disappeared during sync");
   expect(Math.abs(canvasDuringSync.y - canvasBeforeSync.y)).toBeLessThan(1);
   expect(Math.abs(canvasDuringSync.height - canvasBeforeSync.height)).toBeLessThan(1);
   await expect.poll(async () => (await readDraft())?.name).toBe(editedName);
+  await expect(page.getByText("正在同步未保存项目")).toHaveCount(0);
   const synchronized = await readDraft();
-  expect(synchronized?.id).toBe(initial.id);
+  expect(synchronized?.id).toBe(bootstrapped.id);
 
   await page.reload();
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
-  expect((await readDraft())?.id).toBe(initial.id);
+  await expect(page.locator(".react-flow__node")).toHaveCount(2);
+  expect((await readDraft())?.id).toBe(bootstrapped.id);
 
   const secondPage = await page.context().newPage();
   await secondPage.goto("/");
   await expect(secondPage.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   const secondTabDraft = await secondPage.context().request.get("/api/projects/initial-draft");
   expect(secondTabDraft.ok()).toBeTruthy();
-  expect(((await secondTabDraft.json()) as InitialDraftBody).draft?.id).toBe(initial.id);
+  expect(((await secondTabDraft.json()) as InitialDraftBody).draft?.id).toBe(bootstrapped.id);
   await secondPage.close();
 
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
@@ -115,8 +174,26 @@ test("hard refresh, a second tab, and relogin restore the same initial draft", a
 
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
   const afterRelogin = await readDraft();
-  expect(afterRelogin?.id).toBe(initial.id);
+  expect(afterRelogin?.id).toBe(bootstrapped.id);
   expect(afterRelogin?.name).toBe(editedName);
+});
+
+/**
+ * 本文件的用例内部会「退出登录 → 重新登录」，而账号是单设备会话：重登会吊销 storageState
+ * 里 setup 写入的 token。常规运行时每个 e2e 隔离进程都从 npm run test:e2e 的全新库起步，
+ * 收尾后内存态无所谓；但 CI 下 retries=1，失败重试会带着失效 token 起步（实测重试时在
+ * force-clear 处得到 SESSION_REPLACED/401）。因此在 CI 中回写重登后的有效会话。
+ * 这里刻意不用 --repeat-each 兼容同一进程内的二次执行：setup 依赖的「空库」前提只有
+ * 外层 runner 重置数据库才能满足，那不是本文件该承担的状态。
+ */
+test.afterEach(async ({ page }) => {
+  if (!process.env.CI) return;
+  const authStatePath = process.env.E2E_AUTH_STATE_PATH;
+  const accountId = process.env.E2E_ACCOUNT_ID;
+  const password = process.env.E2E_PASSWORD;
+  if (!authStatePath || !accountId || !password) return;
+  const login = await page.request.post("/api/auth/login", { data: { accountId, password } });
+  if (login.ok()) await page.context().storageState({ path: authStatePath });
 });
 
 test("relogin opens the latest saved project instead of bootstrapping a blank page", async ({ page }) => {
@@ -146,7 +223,7 @@ test("relogin opens the latest saved project instead of bootstrapping a blank pa
   const createProject = await page.request.post("/api/projects", {
     data: {
       name: projectName,
-      flow: { schemaVersion: 3, nodes: [], edges: [] },
+      flow: EMPTY_V7_FLOW,
     },
   });
   expect(createProject.ok(), await createProject.text()).toBeTruthy();

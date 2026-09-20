@@ -70,6 +70,35 @@ body {
 
 :root {
   --gc-media-overlay-text: #f4f4f4;
+  /* 媒体浮层底色（R-38 序号徽标 / ResultsPanel 动作条共用；三主题同值） */
+  --gc-media-overlay: rgba(0, 0, 0, 0.62);
+  /* ---- R-40 悬浮窗口（功能设置）token：唯一事实源为设计 tokens.css，此处接入 ---- */
+  --iw-width: 320px;
+  --iw-max-h: 560px;
+  --iw-anchor-gap: 12px;
+  --iw-anchor-offset-top: -8px;
+  --iw-radius: 14px;
+  --iw-canvas-edge-flip-margin: 8px;
+  --iw-surface: #ffffff;
+  --iw-ink: #1d1d1f;
+  --iw-ink-muted: #6e6e73;
+  --iw-field-bg: #f5f5f7;
+  --iw-border: rgba(0, 0, 0, 0.08);
+  --iw-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    0 12px 32px rgba(0, 0, 0, 0.14),
+    0 24px 64px rgba(0, 0, 0, 0.1);
+  --iw-pad-x: 16px;
+  --iw-section-gap: 20px;
+  --iw-field-gap: 8px;
+  --iw-cat-max-h: 232px;
+  --iw-entry-h: 34px;
+  --iw-entry-radius: 999px;
+  --iw-entry-gap: 8px;
+  --iw-run-h: 36px;
+  --iw-run-radius: 999px;
+  --iw-output-max-h: 160px;
   /* ---- 字阶（tokens.css §0 唯一事实源；此处仅接入变量名） ---- */
   --gc-font-ui: 12px;
   --gc-font-body: 13px;
@@ -336,16 +365,10 @@ body {
   --gc-handle-dark: #4a7a17;
   --gc-handle-ring: rgba(183, 243, 90, 0.75);
   --gc-handle-glow: rgba(142, 217, 78, 0.8);
-  /* 节点类型标识色（WorkflowMini 微缩图用） */
-  --gc-kind-image-input: #4a90d9;
-  --gc-kind-sketch-to-render: #B7F35A;
-  --gc-kind-ai-modify: #9b72cf;
-  --gc-kind-fabric-recolor: #d9707e;
-  --gc-kind-upscale: #4fa37c;
-  --gc-kind-print-extract: #e8935a;
-  --gc-kind-print-mutate: #5aa8e8;
-  --gc-kind-mask-redraw: #e05252;
-  --gc-kind-result: #6e6e6e;
+  /* 节点类型标识色（WorkflowMini 微缩图用；v7 三值） */
+  --gc-kind-text: #4a90d9;
+  --gc-kind-image: #B7F35A;
+  --gc-kind-video: #9b72cf;
 }
 /* 曜黑章 gold 工具类跟随荧光绿（与 white/eye 反查段同构，消除双金并存） */
 [data-theme="current"] .text-gold { color: #B7F35A !important; }

@@ -29,7 +29,6 @@ import {
 } from "../../src/types/imageModels";
 import {
   NODE_SPECS,
-  allowedOperationModesForNode,
   type ExecutionPlan,
   type ImageGenRequest,
   type NodeExecution,
@@ -269,7 +268,9 @@ export interface EvaluationCaseEvidenceRecord {
 }
 
 function requireExactProviderStep(plan: ExecutionPlan, step: NodeExecution): NodeExecution {
-  const providerSteps = plan.steps.filter((candidate) => NODE_SPECS[candidate.kind].providerId);
+  // v7：providerId 从 NodeSpec 删除；Provider-backed 判定改为 kind === "image"
+  //（评估快照的图片评估只认 image step；text/video 评估链归后续阶段）。
+  const providerSteps = plan.steps.filter((candidate) => candidate.kind === "image");
   if (providerSteps.length !== 1) {
     throw new Error("an evaluation runtime snapshot requires exactly one Provider-backed step");
   }
@@ -406,29 +407,39 @@ export function buildEvaluationCaseSnapshotFromRuntime(
     reference.sourceNodeId !== `${step.nodeId}:mask-guide`
   ));
   const providerPromptReferences: ProviderPromptReference[] = promptReferences.map(() => ({}));
+  // runtime.md §1 第 1–3 步：userPrompt 取上游 text 正文（params.inputTexts），直接生成
+  // 路径回退 params.prompt；taskPrompt = variant.fullPrompt + "\n\n" + userPrompt。
+  // 必须与 runner.ts executeImageStep 保持逐字一致，否则评估证据侧会与渲染器输出漂移。
+  const inputTexts = Array.isArray(step.params.inputTexts)
+    ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
+    : [];
+  const userPrompt = inputTexts.length > 0
+    ? inputTexts.join("\n\n")
+    : (typeof step.params.prompt === "string" ? step.params.prompt : "");
+  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+  // needsMask 由 mask-edit 模式驱动，与 runner.ts executeImageStep 逐字对齐；
+  // 否则评估证据侧的渲染器输出会与 Provider 实际收到的蒙版包装提示词漂移。
+  const needsMask = operationMode === "mask-edit";
   const expectedResolvedPrompt = renderProviderPrompt({
     nodeKind: step.kind,
     modelId,
     operationMode: variant.mode,
-    taskPrompt: typeof step.params.prompt === "string" ? step.params.prompt : "",
+    taskPrompt,
     references: providerPromptReferences,
+    needsMask,
   });
   if (input.request.prompt !== expectedResolvedPrompt) {
     throw new Error("actual ImageGenRequest prompt differs from the shared reviewed Provider renderer output");
   }
-  if (
-    !expectedResolvedPrompt.includes(`提示词变体：${variant.variantId}`)
-    || !expectedResolvedPrompt.includes(variant.fullPrompt)
-  ) {
+  // v7：buildGarmentPrompt 的「提示词变体：…」包装已按 runtime.md §1 第 3 步移除，
+  // 变体绑定由 taskPrompt 前置 fullPrompt 表达，故只校验 fullPrompt 完整内联。
+  if (!expectedResolvedPrompt.includes(variant.fullPrompt)) {
     throw new Error("actual ImageGenRequest prompt is not bound to the complete reviewed prompt variant");
   }
 
   const materialized = materializeModelParameterProfile(profile);
-  const requestedImageCount = step.kind === "fabric-recolor"
-    ? (Array.isArray(step.params.colors) ? step.params.colors.length : 1)
-    : step.kind === "print-mutate"
-      ? Number(step.params.count)
-      : Number(step.params.batchSize ?? 1);
+  // v7：一色一图 / count 分批机制删除（Q4=A）；张数一律由 batchSize 表达。
+  const requestedImageCount = Number(step.params.batchSize ?? 1);
   if (
     !Number.isSafeInteger(requestedImageCount)
     || requestedImageCount !== materialized.batchSize
@@ -447,9 +458,8 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   if (actualAspectRatio !== materialized.aspectRatio) {
     throw new Error("actual ImageGenRequest aspect ratio drifted from the evaluated parameter profile");
   }
-  if (input.request.imageSize !== undefined) {
-    throw new Error("evaluated garment prompt variants do not use the generic imageSize field");
-  }
+  // v7：ImageGenRequest.imageSize 字段已删除（upscale 档位语义随旧 kind 退役），
+  // 对应检查移除；native 参数仍按 profile 比对。
   const actualModelOptions = input.request.modelOptions ?? {};
   if (profile.native.kind === "gpt-image-2-mask") {
     const keys = Object.keys(actualModelOptions);
@@ -461,8 +471,9 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   }
 
   const references = evaluationReferenceInputs(input.request, step);
-  if (variant.nodeKind === "image-input" || variant.nodeKind === "result") {
-    throw new Error("evaluation prompt variants must target a Provider-backed node kind");
+  // v7：旧 image-input/result kind 已不存在，Provider 目标检查简化为 text 排除。
+  if (variant.nodeKind === "text") {
+    throw new Error("image evaluation prompt variants must target an image node kind");
   }
   const unit: PromptEvaluationUnit = {
     taskFamilyId: variant.familyId,
@@ -577,15 +588,17 @@ export function buildEvaluationCaseSnapshot(
   if (!Object.prototype.hasOwnProperty.call(NODE_SPECS, input.unit.nodeKind)) {
     throw new TypeError("unit.nodeKind is invalid");
   }
-  if (!NODE_SPECS[input.unit.nodeKind].providerId) {
-    throw new Error("evaluation case must target a Provider-backed node");
+  if (!NODE_SPECS[input.unit.nodeKind]) {
+    throw new Error("evaluation case must target a known node kind");
+  }
+  if (input.unit.nodeKind !== "image") {
+    throw new Error("image evaluation cases must target the image node kind");
   }
   if (!isModelAllowedForNode(input.unit.modelId, input.unit.nodeKind)) {
     throw new Error("unit model is not allowed for its node kind");
   }
-  if (!allowedOperationModesForNode(input.unit.nodeKind).includes(input.unit.operationMode)) {
-    throw new Error("unit operation mode is not allowed for its node kind");
-  }
+  // v7：mode×kind 硬闸删除（mode 由变体携带）；评估单元的 mode 合法性
+  // 由其绑定的变体验证（binding 校验在 promptRunAdmission 层）。
   assertString(input.contractHash, "contractHash", { max: 71, pattern: CONTRACT_HASH_PATTERN });
   if (input.contractHash !== imageModelContractHash(input.unit.modelId)) {
     throw new Error("contractHash does not match the current reviewed model contract");

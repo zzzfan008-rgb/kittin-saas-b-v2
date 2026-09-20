@@ -39,7 +39,6 @@ const {
   reconcileUserTemplateAccountMutations,
 } = await import("../server/lib/userTemplateLifecycle");
 const {
-  buildGarmentPrompt,
   requireGarmentPromptVariant,
 } = await import("../src/lib/garmentPromptPresets");
 const {
@@ -51,13 +50,13 @@ const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport
 const generationVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gemini-3.1-flash-image",
-  nodeKind: "sketch-to-render",
+  nodeKind: "image",
   mode: "generate",
 });
 const editVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   mode: "edit",
 });
 // Route authorization tests need accepted jobs without changing production status.
@@ -104,81 +103,101 @@ async function test(name: string, fn: () => void | Promise<void>) {
   console.log(`  ✓ ${name}`);
 }
 
+function promptTextNode(text: string) {
+  return {
+    id: "prompt",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text },
+  };
+}
+
+function promptEdge(id: string, target: string) {
+  return { id, source: "prompt", target, targetHandle: "prompt", data: {} };
+}
+
 function flow(images: string[] = []) {
   return {
-    schemaVersion: 1,
-    nodes: images.map((imageUrl, index) => ({
-      id: `image_${index}`,
-      type: "image-input",
-      position: { x: index * 100, y: 0 },
-      data: {
-        kind: "image-input",
-        label: `图片 ${index + 1}`,
-        status: "idle",
-        imageUrl,
-      },
-    })),
-    edges: [],
+    schemaVersion: 7,
+    nodes: [
+      promptTextNode("授权测试"),
+      ...images.map((imageUrl, index) => ({
+        id: `image_${index}`,
+        type: "image",
+        position: { x: (index + 1) * 100, y: 0 },
+        data: {
+          kind: "image",
+          label: `图片 ${index + 1}`,
+          status: "idle",
+          aspectRatio: "1:1",
+          batchSize: 1,
+          outputImages: [imageUrl],
+        },
+      })),
+    ],
+    edges: images.map((_, index) => promptEdge(`prompt-image-${index}`, `image_${index}`)),
   };
 }
 
 function generationFlow(prompt: string) {
   return {
-    schemaVersion: 4,
-    nodes: [{
-      id: "generate",
-      type: "sketch-to-render",
-      position: { x: 0, y: 0 },
-      data: {
-        kind: "sketch-to-render",
-        label: "生成效果图",
-        status: "idle",
-        modelId: "gemini-3.1-flash-image",
-        modelOptions: generationParameters.modelOptions,
-        operationMode: "generate",
-        prompt: buildGarmentPrompt(generationVariant.variantId, prompt),
-        promptVariantId: generationVariant.variantId,
-        promptFamilyId: generationVariant.familyId,
-        parameterProfileId: generationVariant.parameterProfileId,
-        contractHash: generationVariant.contractHash,
-        evaluationVersion: generationVariant.evaluationVersion,
-        postprocessVersion: generationProfile.postprocess.version,
-        aspectRatio: generationParameters.aspectRatio,
-        batchSize: 1,
-        outputImages: [],
+    schemaVersion: 7,
+    nodes: [
+      promptTextNode(prompt),
+      {
+        id: "generate",
+        type: "image",
+        position: { x: 320, y: 0 },
+        data: {
+          kind: "image",
+          label: "生成效果图",
+          status: "idle",
+          modelId: "gemini-3.1-flash-image",
+          modelOptions: generationParameters.modelOptions,
+          promptVariantId: generationVariant.variantId,
+          promptFamilyId: generationVariant.familyId,
+          parameterProfileId: generationVariant.parameterProfileId,
+          contractHash: generationVariant.contractHash,
+          evaluationVersion: generationVariant.evaluationVersion,
+          postprocessVersion: generationProfile.postprocess.version,
+          aspectRatio: generationParameters.aspectRatio,
+          batchSize: 1,
+          outputImages: [],
+        },
       },
-    }],
-    edges: [],
+    ],
+    edges: [promptEdge("prompt-generate", "generate")],
   };
 }
 
 function editFlow(imageUrl: string) {
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     nodes: [
+      promptTextNode("改成短袖"),
       {
         id: "source",
-        type: "image-input",
-        position: { x: 0, y: 0 },
+        type: "image",
+        position: { x: 320, y: 0 },
         data: {
-          kind: "image-input",
+          kind: "image",
           label: "原图",
           status: "idle",
-          imageUrl,
+          aspectRatio: "1:1",
+          batchSize: 1,
+          outputImages: [imageUrl],
         },
       },
       {
         id: "edit",
-        type: "ai-modify",
-        position: { x: 320, y: 0 },
+        type: "image",
+        position: { x: 640, y: 0 },
         data: {
-          kind: "ai-modify",
+          kind: "image",
           label: "改款",
           status: "idle",
           modelId: "gpt-image-2.5-flare-vip",
           modelOptions: editParameters.modelOptions,
-          operationMode: "edit",
-          prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
           promptVariantId: editVariant.variantId,
           promptFamilyId: editVariant.familyId,
           parameterProfileId: editVariant.parameterProfileId,
@@ -191,12 +210,11 @@ function editFlow(imageUrl: string) {
         },
       },
     ],
-    edges: [{
-      id: "source-edit",
-      source: "source",
-      target: "edit",
-      data: {},
-    }],
+    edges: [
+      promptEdge("prompt-source", "source"),
+      promptEdge("prompt-edit", "edit"),
+      { id: "source-edit", source: "source", target: "edit", data: {} },
+    ],
   };
 }
 
@@ -204,34 +222,42 @@ function independentEditFlow(firstImageUrl: string, secondImageUrl: string) {
   const first = editFlow(firstImageUrl);
   const second = editFlow(secondImageUrl);
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     nodes: [
-      { ...first.nodes[0], id: "source-a" },
-      { ...first.nodes[1], id: "edit-a" },
-      { ...second.nodes[0], id: "source-b" },
-      { ...second.nodes[1], id: "edit-b" },
+      first.nodes[0],
+      { ...first.nodes[1], id: "source-a" },
+      { ...first.nodes[2], id: "edit-a" },
+      { ...second.nodes[1], id: "source-b" },
+      { ...second.nodes[2], id: "edit-b" },
     ],
     edges: [
-      { ...first.edges[0], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
-      { ...second.edges[0], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
+      { ...first.edges[0], id: "prompt-source-a", target: "source-a" },
+      { ...first.edges[1], id: "prompt-edit-a", target: "edit-a" },
+      { ...first.edges[2], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
+      { ...second.edges[0], id: "prompt-source-b", target: "source-b" },
+      { ...second.edges[1], id: "prompt-edit-b", target: "edit-b" },
+      { ...second.edges[2], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
     ],
   };
 }
 
 function branchedEditFlow(imageUrl: string) {
   const base = editFlow(imageUrl);
-  const firstEdit = { ...base.nodes[1], id: "edit-a" };
+  const firstEdit = { ...base.nodes[2], id: "edit-a" };
   const secondEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-b",
-    position: { x: 320, y: 240 },
+    position: { x: 640, y: 240 },
   };
   return {
-    schemaVersion: 6,
-    nodes: [base.nodes[0], firstEdit, secondEdit],
+    schemaVersion: 7,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
     edges: [
-      { ...base.edges[0], id: "source-edit-a", target: "edit-a" },
-      { ...base.edges[0], id: "source-edit-b", target: "edit-b" },
+      { ...base.edges[0], id: "prompt-source", target: "source" },
+      { ...base.edges[1], id: "prompt-edit-a", target: "edit-a" },
+      { ...base.edges[2], id: "source-edit-a", source: "source", target: "edit-a" },
+      { ...base.edges[1], id: "prompt-edit-b", target: "edit-b" },
+      { ...base.edges[2], id: "source-edit-b", source: "source", target: "edit-b" },
     ],
   };
 }
@@ -239,27 +265,25 @@ function branchedEditFlow(imageUrl: string) {
 function chainedEditFlow(sourceImageUrl: string, savedFirstOutput: string) {
   const base = editFlow(sourceImageUrl);
   const firstEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-first",
-    data: { ...base.nodes[1].data, outputImages: [savedFirstOutput] },
+    data: { ...base.nodes[2].data, outputImages: [savedFirstOutput] },
   };
   const secondEdit = {
-    ...base.nodes[1],
+    ...base.nodes[2],
     id: "edit-second",
-    position: { x: 640, y: 0 },
-    data: { ...base.nodes[1].data, outputImages: [] },
+    position: { x: 960, y: 0 },
+    data: { ...base.nodes[2].data, outputImages: [] },
   };
   return {
-    schemaVersion: 6,
-    nodes: [base.nodes[0], firstEdit, secondEdit],
+    schemaVersion: 7,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
     edges: [
-      { ...base.edges[0], id: "source-edit-first", target: "edit-first" },
-      {
-        ...base.edges[0],
-        id: "edit-first-edit-second",
-        source: "edit-first",
-        target: "edit-second",
-      },
+      { ...base.edges[0], id: "prompt-source", target: "source" },
+      { ...base.edges[1], id: "prompt-edit-first", target: "edit-first" },
+      { ...base.edges[2], id: "source-edit-first", source: "source", target: "edit-first" },
+      { ...base.edges[1], id: "prompt-edit-second", target: "edit-second" },
+      { ...base.edges[2], id: "edit-first-edit-second", source: "edit-first", target: "edit-second" },
     ],
   };
 }
@@ -353,12 +377,14 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
   return {
     clientRequestId,
     modelId: "gpt-image-2.5-flare-vip",
-    kind: "ai-modify",
+    kind: "image",
     projectId,
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
     request: {
-      prompt: buildGarmentPrompt(editVariant.variantId, "改成短袖"),
+      // v7 直连：request.prompt 是纯用户正文；fullPrompt 由 worker 内联，
+      // 不再提交 buildGarmentPrompt 包装。
+      prompt: "改成短袖",
       promptVariantId: editVariant.variantId,
       promptFamilyId: editVariant.familyId,
       parameterProfileId: editVariant.parameterProfileId,
@@ -558,14 +584,18 @@ await test("模板账号 journal 可在数据库回滚或提交后恢复文件�
 await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式越权", async () => {
   const plan = buildExecutionPlan([{
     id: "result",
-    type: "result",
-    data: { kind: "result", label: "结果", status: "idle", images: [] },
+    type: "image",
+    data: {
+      kind: "image", label: "结果", status: "idle",
+      modelId: "gpt-image-2.5-flare-vip",
+      aspectRatio: "3:4", batchSize: 1, outputImages: [],
+    },
   }], []);
   const run = await enqueueGenerationRun(plan, users.owner.id, {
     userId: users.owner.id,
     nodeId: "result",
     nodeLabel: "结果",
-    kind: "result",
+    kind: "image",
     requestedCount: 1,
   });
 
@@ -884,8 +914,8 @@ await test("不存在或已删除的 projectId 不能污染运行历史元数据
     method: "POST",
     body: JSON.stringify({
       nodes: [{
-        id: "result-only", type: "result", position: { x: 0, y: 0 },
-        data: { kind: "result", label: "结果", status: "idle", images: [] },
+        id: "result-only", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "结果", status: "idle", images: [] },
       }],
       edges: [],
       projectId: "missing-project",
@@ -982,30 +1012,34 @@ await test("同 ID 项目不能被其他账号覆盖", async () => {
   assert.deepEqual(JSON.parse(row?.flow_json ?? "{}"), flow());
 });
 
-await test("项目保存拒绝 v6 中未知或跨模型 modelOptions，不得归一化后落库", async () => {
-  const invalidFlow = editFlow(PNG_DATA_URL);
-  invalidFlow.nodes[1].data.modelOptions = {
-    ...invalidFlow.nodes[1].data.modelOptions,
+await test("项目保存接受未知或跨模型 modelOptions，且原样落库不归一化", async () => {
+  const freeFlow = editFlow(PNG_DATA_URL);
+  freeFlow.nodes[2].data.modelOptions = {
+    ...freeFlow.nodes[2].data.modelOptions,
     aspect_ratio: "16:9",
   } as never;
   const response = await request("/projects", "owner", {
     method: "POST",
     body: JSON.stringify({
-      id: "invalid-model-options-project",
-      name: "非法模型参数",
-      flow: invalidFlow,
+      id: "free-model-options-project",
+      name: "自由模型参数",
+      flow: freeFlow,
     }),
   });
   const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /aspect_ratio/);
-  assert.equal(
-    await queryOne("SELECT id FROM projects WHERE id = 'invalid-model-options-project'"),
-    undefined,
+  assert.equal(response.status, 200, responseText);
+  const row = await queryOne<{ flow_json: string }>(
+    "SELECT flow_json FROM projects WHERE id = 'free-model-options-project'",
   );
+  assert.ok(row, "项目应已落库");
+  const persisted = JSON.parse(row.flow_json) as {
+    nodes: Array<{ data: { modelOptions?: Record<string, unknown> } }>;
+  };
+  // R5：自由 key-value，未知/跨模型取值不再被拒绝或归一化，原样保留。
+  assert.equal(persisted.nodes[2].data.modelOptions?.aspect_ratio, "16:9");
 });
 
-await test("直连生成在入队前拒绝未知 modelOptions", async () => {
+await test("直连生成在入队前拒绝偏离已评估参数档案的 modelOptions", async () => {
   const before = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
@@ -1020,7 +1054,9 @@ await test("直连生成在入队前拒绝未知 modelOptions", async () => {
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /aspect_ratio/);
+  // R5 删除了 modelOptions 取值硬校验，未知/跨模型取值在入队前由准入层的
+  // 「参数档案偏离」拒绝（parameter-drift），而非按字段名拒绝。
+  assert.match(responseText, /parameter-drift/);
   const after = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
@@ -1062,8 +1098,14 @@ await test("run-plan 保留显式确认参考角色的普通 edit 正向入队",
   `, [payload.runId]))?.count, 1);
 });
 
-await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且零入队", async () => {
-  const savedFlow = generationFlow("严格参数项目");
+await test("run-plan 对已保存快照中偏离已评估档案的未知 modelOptions 严格拒绝且零入队", async () => {
+  // v7：提交画布必须与已保存快照同拓扑（不一致由 409 快照冲突负责）；参数漂移
+  // 针对的是快照本身——历史画布可能携带当前五模型契约不认识的原生键。
+  const savedFlow = structuredClone(generationFlow("严格参数项目"));
+  (savedFlow.nodes[1] as unknown as { data: { modelOptions: unknown } }).data.modelOptions = {
+    size: "2048x2048",
+    aspect_ratio: "16:9",
+  };
   const save = await request("/projects", "owner", {
     method: "POST",
     body: JSON.stringify({
@@ -1074,16 +1116,11 @@ await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且�
   });
   assert.equal(save.status, 200, await save.text());
 
-  const invalidSubmittedFlow = structuredClone(savedFlow);
-  invalidSubmittedFlow.nodes[0].data.modelId = "gpt-image-2.5-flare-vip" as never;
-  invalidSubmittedFlow.nodes[0].data.modelOptions = {
-    size: "2048x2048",
-    aspect_ratio: "16:9",
-  } as never;
+  // 提交同一份已保存快照：通过 409 一致性检查后，必须在准入层被 parameter-drift 拒绝。
   const response = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({
-      ...invalidSubmittedFlow,
+      ...savedFlow,
       onlyNodeId: "generate",
       projectId: "strict-model-options-run-project",
       clientRequestId: "invalid-model-options-run-plan",
@@ -1091,7 +1128,7 @@ await test("run-plan 对客户端 v6 快照严格拒绝未知 modelOptions 且�
   });
   const responseText = await response.text();
   assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /aspect_ratio/);
+  assert.match(responseText, /偏离已评估参数档案/);
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
     WHERE client_request_id = 'invalid-model-options-run-plan'
@@ -1123,9 +1160,9 @@ await test("运行只接受当前已保存画布，且项目名称以服务端�
   assert.equal(forged.status, 409, await forged.text());
 
   const queuedClientFlow = structuredClone(savedFlow);
-  queuedClientFlow.nodes[0].position = { x: 999, y: 999 };
-  queuedClientFlow.nodes[0].data.label = "客户端瞬态标签";
-  queuedClientFlow.nodes[0].data.status = "queued";
+  queuedClientFlow.nodes[1].position = { x: 999, y: 999 };
+  queuedClientFlow.nodes[1].data.label = "客户端瞬态标签";
+  queuedClientFlow.nodes[1].data.status = "queued";
   const accepted = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({
@@ -1143,10 +1180,13 @@ await test("运行只接受当前已保存画布，且项目名称以服务端�
     [payload.runId],
   );
   assert.equal(row?.project_name, "服务端项目名");
-  assert.equal(
-    (JSON.parse(row?.parameters_json ?? "{}") as { prompt?: string }).prompt,
-    buildGarmentPrompt(generationVariant.variantId, "已保存提示词"),
-  );
+  // v7：DAG 路径不再持久化 v6 包装 prompt；用户正文沿 text 边进入 inputTexts。
+  const persistedParameters = JSON.parse(row?.parameters_json ?? "{}") as {
+    prompt?: unknown;
+    inputTexts?: unknown;
+  };
+  assert.equal(persistedParameters.prompt, undefined, "v7 DAG 参数不再携带包装 prompt");
+  assert.deepEqual(persistedParameters.inputTexts, ["已保存提示词"]);
 
   const replay = await request("/run-plan", "owner", {
     method: "POST",
@@ -1369,14 +1409,18 @@ await test("多 Provider 计划会报告非目标步骤的静态不可用引用"
     "/api/files/own-private.png",
   );
   await query(`
-    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
-    VALUES ($1, $2, '多步静态引用', $3, $4, $4)
+    INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, updated_at, created_at)
+    VALUES ($1, $2, '多步静态引用', $3, 'saved', $4, $4)
   `, [projectId, users.owner.id, JSON.stringify(projectFlow), now]);
 
   const response = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({
       ...projectFlow,
+      // v7：source 节点是静态输入而非执行目标；单节点运行只跑 edit-a，
+      // 其画布快照引用（source-a）在入队前做静态可达性检查。
+      onlyNodeId: "edit-a",
+      includeDownstream: false,
       projectId,
       clientRequestId,
     }),
@@ -1398,66 +1442,48 @@ await test("多 Provider 计划会报告非目标步骤的静态不可用引用"
   `, [clientRequestId]))?.count, 0);
 });
 
-await test("run-plan 静态引用投影穿透 result 并保留动态输出占位顺序", () => {
+await test("run-plan 静态引用投影：同轮 Provider 旧快照占位，非执行静态来源保留顺序", () => {
+  // v7（runtime.md §5 result 归位）：独立 result 汇总节点已删除。同一轮里要执行的
+  // Provider 节点其持久化旧输出一律占位为空；不在本轮执行范围的静态来源才把快照
+  // 投影进入入队前可达性检查。
   const plan: ExecutionPlan = {
     steps: [
       {
-        nodeId: "static-source",
-        kind: "image-input",
-        inputImages: [],
-        upstream: [],
-        params: { imageUrl: "/api/files/actual-static.png" },
-      },
-      {
         nodeId: "provider-a",
-        kind: "sketch-to-render",
+        kind: "image",
         inputImages: [],
         upstream: [],
-        params: {},
-      },
-      {
-        nodeId: "bridge-result",
-        kind: "result",
-        inputImages: [
-          "/api/files/stale-provider.png",
-          "/api/files/stale-static.png",
-        ],
-        upstream: [
-          { nodeId: "provider-a", images: ["/api/files/stale-provider.png"] },
-          { nodeId: "static-source", images: ["/api/files/stale-static.png"] },
-        ],
         params: {},
       },
       {
         nodeId: "provider-b",
-        kind: "ai-modify",
+        kind: "image",
         inputImages: [
-          "/api/files/stale-result-provider.png",
-          "/api/files/stale-result-static.png",
+          "/api/files/stale-provider.png",
+          "/api/files/actual-static.png",
         ],
-        upstream: [{
-          nodeId: "bridge-result",
-          images: [
-            "/api/files/stale-result-provider.png",
-            "/api/files/stale-result-static.png",
-          ],
-        }],
+        upstream: [
+          { nodeId: "provider-a", images: ["/api/files/stale-provider.png"] },
+          { nodeId: "static-source", images: ["/api/files/actual-static.png"] },
+        ],
         params: {},
       },
     ],
   };
 
   assert.deepEqual(staticImageReferencesForPlan(plan), [{
+    // provider-a 同轮执行 → 陈旧快照占位丢弃（但顺序位保留）；
+    // static-source 不在执行范围 → 投影，order 接续占位为 1。
     imageRef: "/api/files/actual-static.png",
     order: 1,
-    sourceNodeId: "bridge-result",
+    sourceNodeId: "static-source",
     targetNodeId: "provider-b",
   }]);
 
   const inputOnlyPlan: ExecutionPlan = {
     steps: [{
       nodeId: "input-only-provider",
-      kind: "ai-modify",
+      kind: "image",
       inputImages: ["/api/files/input-only-static.png"],
       inputReferences: [{
         imageRef: "/api/files/input-only-static.png",
@@ -1474,45 +1500,27 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
     targetNodeId: "input-only-provider",
   }]);
 
+  // v7：面料（fabricImageUrl）特化随旧 kind 删除；蒙版辅助引用改由
+  // mask-edit 变体（params.operationMode）驱动，仍进入同一静态准入序列。
   const auxiliaryPlan: ExecutionPlan = {
     steps: [
       {
-        nodeId: "fabric-provider",
-        kind: "fabric-recolor",
-        inputImages: ["/api/files/fabric-base.png"],
-        inputReferences: [{
-          imageRef: "/api/files/fabric-base.png",
-          order: 0,
-          sourceNodeId: "fabric-base-source",
-        }],
-        params: { fabricImageUrl: "https://references.example/fabric.png" },
-      },
-      {
         nodeId: "mask-provider",
-        kind: "mask-redraw",
+        kind: "image",
         inputImages: ["/api/files/mask-base.png"],
         inputReferences: [{
           imageRef: "/api/files/mask-base.png",
           order: 0,
           sourceNodeId: "mask-base-source",
         }],
-        params: { mask: "https://references.example/mask.png" },
+        params: {
+          operationMode: "mask-edit",
+          mask: "https://references.example/mask.png",
+        },
       },
     ],
   };
   assert.deepEqual(staticImageReferencesForPlan(auxiliaryPlan), [
-    {
-      imageRef: "/api/files/fabric-base.png",
-      order: 0,
-      sourceNodeId: "fabric-base-source",
-      targetNodeId: "fabric-provider",
-    },
-    {
-      imageRef: "https://references.example/fabric.png",
-      order: 1,
-      sourceNodeId: "fabric-provider",
-      targetNodeId: "fabric-provider",
-    },
     {
       imageRef: "/api/files/mask-base.png",
       order: 0,
@@ -1525,49 +1533,55 @@ await test("run-plan 静态引用投影穿透 result 并保留动态输出占位
       sourceNodeId: "mask-provider",
       targetNodeId: "mask-provider",
     },
-  ], "面料与蒙版辅助引用也必须进入同一静态准入序列");
+  ], "蒙版辅助引用必须与用户参考图进入同一静态准入序列");
 });
 
 await test("同一静态来源输入多个 Provider 时失败证据可唯一归因", async () => {
   const projectId = "branched-static-reference";
-  const clientRequestId = "branched-static-reference-request";
   const projectFlow = branchedEditFlow("/api/files/missing-image.png");
   await query(`
-    INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
-    VALUES ($1, $2, '分支静态引用', $3, $4, $4)
+    INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, updated_at, created_at)
+    VALUES ($1, $2, '分支静态引用', $3, 'saved', $4, $4)
   `, [projectId, users.owner.id, JSON.stringify(projectFlow), now]);
 
-  const response = await request("/run-plan", "owner", {
-    method: "POST",
-    body: JSON.stringify({ ...projectFlow, projectId, clientRequestId }),
-  });
-  const payload = await response.json();
-  assert.equal(response.status, 403, JSON.stringify(payload));
-  assert.deepEqual(payload, {
-    error: "参考图不可用，请重新选择后再试",
-    code: "reference-image-unavailable",
-    references: [
-      {
-        order: 0,
-        sourceNodeId: "source",
-        targetNodeId: "edit-a",
-        reason: "reference image is unavailable",
-      },
-      {
-        order: 0,
-        sourceNodeId: "source",
-        targetNodeId: "edit-b",
-        reason: "reference image is unavailable",
-      },
-    ],
-  });
+  // v7：单节点运行，两个分支 edit 分别提交；source 是静态输入不参与执行，
+  // 失败证据各自归因到目标节点。
+  for (const [targetNodeId, requestId] of [
+    ["edit-a", "branched-static-reference-request-a"],
+    ["edit-b", "branched-static-reference-request-b"],
+  ] as const) {
+    const response = await request("/run-plan", "owner", {
+      method: "POST",
+      body: JSON.stringify({
+        ...projectFlow,
+        onlyNodeId: targetNodeId,
+        includeDownstream: false,
+        projectId,
+        clientRequestId: requestId,
+      }),
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 403, JSON.stringify(payload));
+    assert.deepEqual(payload, {
+      error: "参考图不可用，请重新选择后再试",
+      code: "reference-image-unavailable",
+      references: [
+        {
+          order: 0,
+          sourceNodeId: "source",
+          targetNodeId: targetNodeId,
+          reason: "reference image is unavailable",
+        },
+      ],
+    });
+  }
   assert.equal((await queryOne<{ count: number }>(`
-    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id = $1
-  `, [clientRequestId]))?.count, 0);
+    SELECT COUNT(*)::int AS count FROM generation_runs WHERE client_request_id LIKE 'branched-static-reference-request-%'
+  `))?.count, 0);
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_jobs
-    WHERE run_id IN (SELECT id FROM generation_runs WHERE client_request_id = $1)
-  `, [clientRequestId]))?.count, 0);
+    WHERE run_id IN (SELECT id FROM generation_runs WHERE client_request_id LIKE 'branched-static-reference-request-%')
+  `, []))?.count, 0);
 });
 
 await test("run-plan 在入队前真解码实际静态 inline 图片", async () => {
@@ -1623,6 +1637,10 @@ await test("同一轮上游 Provider 会替换的旧输出快照不阻断入队"
     method: "POST",
     body: JSON.stringify({
       ...projectFlow,
+      // v7：从 edit-first 起跑并含下游 edit-second；source 为静态输入不执行，
+      // edit-first 同轮产出在 Provider 边界替换其持久化旧快照。
+      onlyNodeId: "edit-first",
+      includeDownstream: true,
       projectId,
       clientRequestId,
     }),
@@ -1706,16 +1724,9 @@ await test("直连生成在入队前拒绝非图片引用与不安全 sourceNode
   });
   assert.equal(nonStringResponse.status, 400, await nonStringResponse.text());
 
-  const fabricRequestId = "direct-invalid-fabric-reference";
-  clientRequestIds.push(fabricRequestId);
-  const unsafeFabricReference = directGenerateBody(PNG_DATA_URL, undefined, fabricRequestId);
-  unsafeFabricReference.kind = "fabric-recolor";
-  (unsafeFabricReference.request as { fabricImageUrl?: unknown }).fabricImageUrl = "../../fabric.png";
-  const unsafeFabricResponse = await request("/generate", "owner", {
-    method: "POST",
-    body: JSON.stringify(unsafeFabricReference),
-  });
-  assert.equal(unsafeFabricResponse.status, 400, await unsafeFabricResponse.text());
+  // v7：fabricImageUrl 旁路已随参考图角色体系删除（docs/design/2026-09-17-remove-reference-roles），
+  // 服务端不再读取该字段；唯一的图片通道是 references[].dataUrl，其路径穿越/远程/非图片拒绝
+  // 已由上方六个用例覆盖，故不再为已删除的输入通道保留拒绝断言。
 
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
@@ -1830,7 +1841,7 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
     "run-persisted-project",
     "direct-project-request",
   );
-  changedBody.request.prompt = buildGarmentPrompt(editVariant.variantId, "同请求号的另一份语义");
+  changedBody.request.prompt = "同请求号的另一份语义";
   const conflict = await request("/generate", "owner", {
     method: "POST",
     body: JSON.stringify(changedBody),
@@ -2362,10 +2373,10 @@ await test("强制清除草稿：含退役 modelId 的损坏草稿无需解析�
     schemaVersion: 6,
     nodes: [{
       id: "retired-model-node",
-      type: "sketch-to-render",
+      type: "image",
       position: { x: 0, y: 0 },
       data: {
-        kind: "sketch-to-render",
+        kind: "image",
         label: "退役模型节点",
         status: "idle",
         modelId: "gpt-image-2-vip",
@@ -2611,7 +2622,7 @@ await test("真实账号删除先持 owner 锁时，全部并发写入等待后�
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-    ) VALUES ($1, $2, 'history-node', '历史节点', 'ai-modify', 1, 'failed', 1, 2)
+    ) VALUES ($1, $2, 'history-node', '历史节点', 'image', 1, 'failed', 1, 2)
   `, [runId, source.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2742,8 +2753,8 @@ await test("历史记录只有所有者能删除，其他人与不存在记录�
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
     ) VALUES
-      ('history-other-run', $1, 'node', '节点', 'ai-modify', 1, 'error', 1, 2),
-      ('history-owner-run', $2, 'node', '节点', 'ai-modify', 1, 'error', 1, 2)
+      ('history-other-run', $1, 'node', '节点', 'image', 1, 'error', 1, 2),
+      ('history-owner-run', $2, 'node', '节点', 'image', 1, 'error', 1, 2)
   `, [users.other.id, users.owner.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2777,8 +2788,8 @@ await test("普通历史不会把无执行计划的旧活动状态恢复成正�
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
       ) VALUES
-        ($1, $3, 'legacy-active-node', '旧活动任务', 'ai-modify', 1, 'queued', 95000, NULL),
-        ($2, $3, 'legacy-terminal-node', '旧终态任务', 'ai-modify', 1, 'failed', 94000, 94001)
+        ($1, $3, 'legacy-active-node', '旧活动任务', 'image', 1, 'queued', 95000, NULL),
+        ($2, $3, 'legacy-terminal-node', '旧终态任务', 'image', 1, 'failed', 94000, 94001)
     `, [runIds[0], runIds[1], users.owner.id]);
 
     const response = await request("/history?limit=20&before=100000", "owner");
@@ -2799,7 +2810,7 @@ await test("活动任务使用独立完整集合，不会被最近历史的 20 �
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
         plan_json, client_request_id, request_fingerprint
       ) VALUES (
-        'old-active-run', $1, 'old-active-node', '旧活动任务', 'ai-modify', 1, 'running', 90000,
+        'old-active-run', $1, 'old-active-node', '旧活动任务', 'image', 1, 'running', 90000,
         '{"steps":[]}', 'old-active-request', 'old-active-fingerprint'
       )
     `, [users.owner.id]);
@@ -2810,7 +2821,7 @@ await test("活动任务使用独立完整集合，不会被最近历史的 20 �
         INSERT INTO generation_runs (
           id, owner_id, node_id, node_label, kind, requested_count, status, started_at,
           finished_at, plan_json
-        ) VALUES ($1, $2, 'terminal-node', '新终态', 'ai-modify', 1, 'failed', $3, $3, '{"steps":[]}')
+        ) VALUES ($1, $2, 'terminal-node', '新终态', 'image', 1, 'failed', $3, $3, '{"steps":[]}')
       `, [id, users.owner.id, 100000 + index]);
     }
 
@@ -2841,7 +2852,7 @@ await test("活动任务超过安全恢复上限时接口 fail-closed", async ()
       )
       SELECT
         'active-overflow-' || index, $1, 'active-overflow-node-' || index,
-        '活动任务上限', 'ai-modify', 1, 'running', 300000 + index, '{"steps":[]}'
+        '活动任务上限', 'image', 1, 'running', 300000 + index, '{"steps":[]}'
       FROM generate_series(1, 181) AS index
     `, [users.owner.id]);
     const response = await request("/history/active", "owner");
@@ -2872,7 +2883,7 @@ await test("历史分页固定在首次快照，期间新增记录不会推移�
     await query(`
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 1, 'error', $3, $3)
+      ) VALUES ($1, $2, 'node', '节点', 'image', 1, 'error', $3, $3)
     `, [id, users.owner.id, startedAt]);
     await query(`
       INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2888,7 +2899,7 @@ await test("历史分页固定在首次快照，期间新增记录不会推移�
   await query(`
     INSERT INTO generation_runs (
       id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at
-    ) VALUES ('snapshot-new', $1, 'node', '节点', 'ai-modify', 1, 'error', 4000, 4000)
+    ) VALUES ('snapshot-new', $1, 'node', '节点', 'image', 1, 'error', 4000, 4000)
   `, [users.owner.id]);
   await query(`
     INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
@@ -2912,7 +2923,7 @@ await test("运行任务完成并展开为多条输出时不会令下一页漏�
       INSERT INTO generation_runs (
         id, owner_id, node_id, node_label, kind, requested_count, status, started_at, finished_at,
         plan_json
-      ) VALUES ($1, $2, 'node', '节点', 'ai-modify', 2, $3, $4, $4, $5)
+      ) VALUES ($1, $2, 'node', '节点', 'image', 2, $3, $4, $4, $5)
     `, [id, users.owner.id, status, startedAt, status === "running" ? '{"steps":[]}' : null]);
     if (status === "error") {
       await query(`
@@ -2957,8 +2968,8 @@ await query(`
     id, owner_id, project_id, node_id, node_label, kind, model,
     requested_count, successful_count, provider_requests, status, started_at, finished_at
   ) VALUES
-    ('usage-owner-run', $1, '+PROJECT', '@NODE', '测试节点', 'ai-modify', '-MODEL', 1, 1, 1, 'success', 1, 2),
-    ('usage-other-run', $2, 'other-project', 'other-node', '其他节点', 'ai-modify', 'safe-model', 1, 1, 1, 'success', 1, 2)
+    ('usage-owner-run', $1, '+PROJECT', '@NODE', '测试节点', 'image', '-MODEL', 1, 1, 1, 'success', 1, 2),
+    ('usage-other-run', $2, 'other-project', 'other-node', '其他节点', 'image', 'safe-model', 1, 1, 1, 'success', 1, 2)
 `, [users.owner.id, users.other.id]);
 await query(`
   INSERT INTO usage_events (

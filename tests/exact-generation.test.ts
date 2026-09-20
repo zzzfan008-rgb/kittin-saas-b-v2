@@ -155,14 +155,14 @@ await test("内容安全拒绝是确定失败，不会为同一输入重复付�
   assert.equal(calls, 1);
 });
 
-await test("印花裂变缺省 requested_count 与实际默认 4 张一致", async () => {
-  assert.equal(requestedCountForStep("print-mutate", {}), 4);
-  assert.equal(requestedCountForStep("print-mutate", { count: 7 }), 7);
+await test("image 节点缺省 batchSize 与实际默认 1 张一致", async () => {
+  assert.equal(requestedCountForStep("image", {}), 1);
+  assert.equal(requestedCountForStep("image", { batchSize: 4 }), 4);
 });
 
 await test("直连与 DAG 的 AI 批量生成统一限制为最多 8 张", async () => {
-  assert.equal(requestedCountForStep("sketch-to-render", { batchSize: 8 }), 8);
-  assert.equal(requestedCountForStep("ai-modify", { batchSize: 99 }), 8);
+  assert.equal(requestedCountForStep("image", { batchSize: 8 }), 8);
+  assert.equal(requestedCountForStep("image", { batchSize: 99 }), 8);
 });
 
 await test("部分成功保留图片并明确记录 N/M", async () => {
@@ -259,42 +259,42 @@ await test("高清放大保持原比例，2K/4K 长边精确且文件不超 20 M
   assert.ok(landscapeInfo.byteLength <= MAX_IMAGE_BYTES);
 });
 
-await test("runner 仅对生成/改款画幅和高清放大应用尺寸后处理", async () => {
+await test("runner 不再对图像输出做本地尺寸后处理（画幅由 Provider 侧控制）", async () => {
   const portrait = await fixtureDataUrl(100, 200);
-  const sketch = await postProcessGeneratedOutputImages("sketch-to-render", { aspectRatio: "9:16" }, [portrait]);
-  assert.deepEqual((await imageInfo(sketch[0])).metadata.width, 864);
-  assert.deepEqual((await imageInfo(sketch[0])).metadata.height, 1536);
+  const untouchedPortrait = [portrait];
+  assert.strictEqual(
+    await postProcessGeneratedOutputImages("image", { aspectRatio: "9:16" }, untouchedPortrait),
+    untouchedPortrait,
+  );
 
   const landscape = await fixtureDataUrl(200, 100);
-  const modify = await postProcessGeneratedOutputImages("ai-modify", { aspectRatio: "16:9" }, [landscape]);
-  assert.equal((await imageInfo(modify[0])).metadata.width, 1536);
-  assert.equal((await imageInfo(modify[0])).metadata.height, 864);
-
-  const upscale = await postProcessGeneratedOutputImages("upscale", { imageSize: "2K" }, [landscape]);
-  assert.equal((await imageInfo(upscale[0])).metadata.width, 2048);
-  assert.equal((await imageInfo(upscale[0])).metadata.height, 1024);
-
-  const untouched = [portrait];
-  assert.strictEqual(await postProcessGeneratedOutputImages("print-extract", {}, untouched), untouched);
+  const untouchedLandscape = [landscape];
+  assert.strictEqual(
+    await postProcessGeneratedOutputImages("image", { aspectRatio: "16:9" }, untouchedLandscape),
+    untouchedLandscape,
+  );
+  assert.strictEqual(
+    await postProcessGeneratedOutputImages("image", { imageSize: "2K" }, untouchedLandscape),
+    untouchedLandscape,
+  );
+  assert.strictEqual(await postProcessGeneratedOutputImages("image", {}, untouchedPortrait), untouchedPortrait);
 });
 
-await test("直接生成接口对显式节点种类严格校验尺寸参数", async () => {
+await test("直接生成接口校验操作模式、参考图与节点种类", async () => {
   assert.deepEqual(
-    validateDirectGenerateRequest("sketch-to-render", {
+    validateDirectGenerateRequest("image", {
       prompt: "效果图",
       operationMode: "generate",
-      aspectRatio: "3:4",
     }),
-    { ok: true, kind: "sketch-to-render" },
+    { ok: true, kind: "image" },
   );
   assert.deepEqual(
-    validateDirectGenerateRequest("upscale", {
+    validateDirectGenerateRequest("image", {
       prompt: "放大",
       operationMode: "edit",
       referenceImages: ["data:image/png;base64,AA=="],
-      imageSize: "4K",
     }),
-    { ok: true, kind: "upscale" },
+    { ok: true, kind: "image" },
   );
   assert.deepEqual(
     validateDirectGenerateRequest(undefined, {
@@ -303,108 +303,82 @@ await test("直接生成接口对显式节点种类严格校验尺寸参数", as
     }),
     { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" },
   );
-  assert.equal(validateDirectGenerateRequest("result", {
-    prompt: "非 AI 节点",
+  assert.deepEqual(validateDirectGenerateRequest("text", {
+    prompt: "非图像节点种类",
     operationMode: "generate",
-  }).ok, false);
-  assert.equal(
-    validateDirectGenerateRequest("sketch-to-render", {
-      prompt: "缺少比例",
-      operationMode: "generate",
-    }).ok,
-    false,
-  );
-  assert.equal(
-    validateDirectGenerateRequest("ai-modify", {
-      prompt: "错误比例",
-      operationMode: "edit",
-      referenceImages: ["data:image/png;base64,AA=="],
-      aspectRatio: "2:3",
-    }).ok,
-    false,
-  );
-  assert.equal(
-    validateDirectGenerateRequest("upscale", {
-      prompt: "错误尺寸",
-      operationMode: "edit",
-      referenceImages: ["data:image/png;base64,AA=="],
-      imageSize: "8K",
-    }).ok,
-    false,
-  );
+  }), { ok: false, error: "kind must identify a supported AI node" });
   assert.deepEqual(
-    validateDirectGenerateRequest("print-mutate", {
-      prompt: "其他 AI 节点不要尺寸参数",
-      operationMode: "edit",
+    validateDirectGenerateRequest("image", {
+      prompt: "generate 不能带参考图",
+      operationMode: "generate",
       referenceImages: ["data:image/png;base64,AA=="],
     }),
-    { ok: true, kind: "print-mutate" },
+    { ok: false, error: "generate mode cannot contain reference images" },
   );
-  const tooManyMaskReferences = Array.from({ length: 8 }, (_, index) => `/api/files/mask-ref-${index}.png`);
-  const invalidMaskReferences = validateDirectGenerateRequest("mask-redraw", {
-    prompt: "局部修改",
-    operationMode: "mask-edit",
-    referenceImages: tooManyMaskReferences,
-    mask: "/api/files/mask.png",
-  });
-  assert.equal(invalidMaskReferences.ok, false);
-  if (!invalidMaskReferences.ok) {
-    assert.match(invalidMaskReferences.error, /at most 7 user images/);
-  }
+  assert.deepEqual(
+    validateDirectGenerateRequest("image", {
+      prompt: "edit 缺参考图",
+      operationMode: "edit",
+    }),
+    { ok: false, error: "edit mode requires at least one reference image" },
+  );
 });
 
-await test("直接生成接口复用 runner 的精确比例与 2K/4K 后处理", async () => {
+await test("直接生成接口不再做本地比例/放大后处理", async () => {
   const portrait = await fixtureDataUrl(100, 200);
-  const sketch = await postProcessDirectGenerateImages(
-    "sketch-to-render",
-    { prompt: "效果图", operationMode: "generate", aspectRatio: "9:16" },
-    [portrait],
+  const untouchedPortrait = [portrait];
+  assert.strictEqual(
+    await postProcessDirectGenerateImages(
+      "image",
+      { prompt: "效果图", operationMode: "generate", aspectRatio: "9:16" },
+      untouchedPortrait,
+    ),
+    untouchedPortrait,
   );
-  assert.equal((await imageInfo(sketch[0])).metadata.width, 864);
-  assert.equal((await imageInfo(sketch[0])).metadata.height, 1536);
 
   const landscape = await fixtureDataUrl(200, 100);
-  const modify = await postProcessDirectGenerateImages(
-    "ai-modify",
-    {
-      prompt: "改款",
-      operationMode: "edit",
-      referenceImages: ["data:image/png;base64,AA=="],
-      aspectRatio: "16:9",
-    },
-    [landscape],
-  );
-  assert.equal((await imageInfo(modify[0])).metadata.width, 1536);
-  assert.equal((await imageInfo(modify[0])).metadata.height, 864);
-
-  const upscale = await postProcessDirectGenerateImages(
-    "upscale",
-    {
-      prompt: "高清放大",
-      operationMode: "edit",
-      referenceImages: ["data:image/png;base64,AA=="],
-      imageSize: "4K",
-    },
-    [landscape],
-  );
-  assert.equal((await imageInfo(upscale[0])).metadata.width, 4096);
-  assert.equal((await imageInfo(upscale[0])).metadata.height, 2048);
-
-  const untouched = [portrait];
+  const untouchedLandscape = [landscape];
   assert.strictEqual(
-    await postProcessDirectGenerateImages("fabric-recolor", {
+    await postProcessDirectGenerateImages(
+      "image",
+      {
+        prompt: "改款",
+        operationMode: "edit",
+        referenceImages: ["data:image/png;base64,AA=="],
+        aspectRatio: "16:9",
+      },
+      untouchedLandscape,
+    ),
+    untouchedLandscape,
+  );
+  assert.strictEqual(
+    await postProcessDirectGenerateImages(
+      "image",
+      {
+        prompt: "高清放大",
+        operationMode: "edit",
+        referenceImages: ["data:image/png;base64,AA=="],
+        imageSize: "4K",
+      },
+      untouchedLandscape,
+    ),
+    untouchedLandscape,
+  );
+
+  assert.strictEqual(
+    await postProcessDirectGenerateImages("image", {
       prompt: "换色",
       operationMode: "edit",
       referenceImages: ["data:image/png;base64,AA=="],
-    }, untouched),
-    untouched,
+    }, untouchedPortrait),
+    untouchedPortrait,
   );
   assert.strictEqual(
     await postProcessDirectGenerateImages(undefined, {
       prompt: "旧请求保持原始输出",
       operationMode: "generate",
-    }, untouched),
-    untouched,
+    }, untouchedPortrait),
+    untouchedPortrait,
   );
 });
 
@@ -415,16 +389,15 @@ await test("runner 对旧项目缺省或无效尺寸参数安全回退", async (
   assert.equal(normalizeUpscaleSize("8K"), "2K");
 
   const portrait = await fixtureDataUrl(100, 200);
-  const missingAspect = await postProcessGeneratedOutputImages("ai-modify", {}, [portrait]);
-  const aspectInfo = await imageInfo(missingAspect[0]);
-  assert.equal(aspectInfo.metadata.width, 1024);
-  assert.equal(aspectInfo.metadata.height, 1024);
+  const untouchedPortrait = [portrait];
+  assert.strictEqual(await postProcessGeneratedOutputImages("image", {}, untouchedPortrait), untouchedPortrait);
 
   const landscape = await fixtureDataUrl(200, 100);
-  const invalidUpscale = await postProcessGeneratedOutputImages("upscale", { imageSize: "8K" }, [landscape]);
-  const upscaleInfo = await imageInfo(invalidUpscale[0]);
-  assert.equal(upscaleInfo.metadata.width, 2048);
-  assert.equal(upscaleInfo.metadata.height, 1024);
+  const untouchedLandscape = [landscape];
+  assert.strictEqual(
+    await postProcessGeneratedOutputImages("image", { imageSize: "8K" }, untouchedLandscape),
+    untouchedLandscape,
+  );
 });
 
 await test("结果下载能从 data URL 和本地文件 URL 推导真实扩展名", async () => {

@@ -26,10 +26,10 @@ const RECORDED_AT = "2026-09-02T01:00:03.000Z";
 
 const unit: PromptEvaluationUnit = {
   taskFamilyId: "fashion-lookbook",
-  promptVariantId: "fashion-lookbook.gemini-3.1-flash-image.ai-modify.edit.v1",
+  promptVariantId: "fashion-lookbook.gemini-3.1-flash-image.edit.v1",
   presetId: "fashion-lookbook-gemini",
   presetVersion: "1.0.0",
-  nodeKind: "ai-modify",
+  nodeKind: "image",
   modelId: "gemini-3.1-flash-image",
   operationMode: "edit",
   parameterProfileId: "gemini-3.1-flash-image:fashion-lookbook:edit:v1",
@@ -56,7 +56,7 @@ function snapshotInput(
     caseId: CASE_ID,
     authorizationId: "evaluation-authorization-001",
     codeSha: "1".repeat(40),
-    nodeId: "node-ai-modify-001",
+    nodeId: "node-edit-001",
     capturedAt: CAPTURED_AT,
     unit,
     contractHash: imageModelContractHash(unit.modelId),

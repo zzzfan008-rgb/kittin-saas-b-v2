@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
 import {
-  deleteStoredImage, ensureThumbnail, isSupportedImageFile, mimeOfFile,
+  deleteStoredImage, ensureThumbnail, isSupportedImageFile, isSupportedStoredFile, mimeOfFile,
   normalizeImageRef, resolveToDataUrl, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
 } from "../lib/fileStore";
 import { ProviderError } from "../providers/base";
@@ -362,7 +362,7 @@ filesRouter.get("/:id/thumbnail", asyncHandler(async (req, res) => {
 
 filesRouter.get("/:id", asyncHandler(async (req, res) => {
   const id = path.basename(req.params.id); // 防路径穿越
-  if (id !== req.params.id || !isSupportedImageFile(id)) {
+  if (id !== req.params.id || !isSupportedStoredFile(id)) {
     res.status(400).json({ error: "invalid file id" });
     return;
   }
@@ -380,5 +380,28 @@ filesRouter.get("/:id", asyncHandler(async (req, res) => {
   }
   res.setHeader("Content-Type", mimeOfFile(id));
   setFileCacheHeaders(res);
+  // 视频（<video> 首帧/拖动）需要 Range；图片也顺带支持，无副作用。
+  const stat = fs.statSync(filePath);
+  res.setHeader("Accept-Ranges", "bytes");
+  const range = req.headers.range;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (match && (match[1] !== "" || match[2] !== "")) {
+      const start = match[1] === "" ? 0 : Number.parseInt(match[1], 10);
+      const end = match[2] === "" ? stat.size - 1 : Math.min(Number.parseInt(match[2], 10), stat.size - 1);
+      if (Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end && start < stat.size) {
+        res.status(206);
+        res.setHeader("Content-Range", `bytes ${start}-${end}/${stat.size}`);
+        res.setHeader("Content-Length", String(end - start + 1));
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+        return;
+      }
+      res.status(416);
+      res.setHeader("Content-Range", `bytes */${stat.size}`);
+      res.end();
+      return;
+    }
+  }
+  res.setHeader("Content-Length", String(stat.size));
   fs.createReadStream(filePath).pipe(res);
 }));

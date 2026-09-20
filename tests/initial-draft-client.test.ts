@@ -40,12 +40,8 @@ function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
     projectId: "project-local",
     projectName: "未命名设计项目",
     readOnly: false,
-    nodes: [{
-      id: "starter",
-      type: "image-input",
-      position: { x: 0, y: 0 },
-      data: { kind: "image-input", label: "上传服装图", status: "idle" },
-    }],
+    // 方案 C：空白项目从空画布开始（nodes=[]&&edges=[]）。
+    nodes: [],
     edges: [],
     selectedNodeIds: [],
     selectedNodeId: null,
@@ -245,10 +241,10 @@ const maskLocal = tab({
   projectId: "mask-source-project",
   nodes: [{
     id: "mask-node",
-    type: "mask-redraw",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      kind: "mask-redraw",
+      kind: "image",
       label: "局部重绘",
       status: "idle",
       modelId: "gpt-image-2.5-sunburst",
@@ -284,8 +280,8 @@ try {
   assert.equal(maskCopyPayload?.targetProjectId, "mask-target-project");
   assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
   assert.equal(copied.targetProjectId, "mask-target-project");
-  assert.equal(copied.flow.nodes[0].data.kind, "mask-redraw");
-  if (copied.flow.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected node kind");
+  assert.equal(copied.flow.nodes[0].data.kind, "image");
+  if (copied.flow.nodes[0].data.kind !== "image") throw new Error("unexpected node kind");
   assert.equal(copied.flow.nodes[0].data.mask, "/api/files/copied-mask.png");
 } finally {
   globalThis.fetch = originalFetch;
@@ -435,7 +431,7 @@ const conflictLocal = tab({
 useFlowStore.setState({ tabs: [conflictLocal], activeTabId: conflictLocal.id, viewer: null });
 const copiedBackupFlow = {
   ...persistedWorkflowForProjectTab(conflictLocal),
-  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "mask-redraw"
+  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "image"
     ? { ...node, data: { ...node.data, mask: "/api/files/backup-mask.png" } }
     : node),
 };
@@ -445,8 +441,8 @@ assert.equal(applyServerInitialDraftToTab(conflictLocal.id, draft({ id: "conflic
 const backup = useFlowStore.getState().tabs.find((candidate) => candidate.projectId === "backup-project");
 assert.ok(backup);
 assert.equal(projectTabLifecycle(backup), "local");
-assert.equal(backup.nodes[0].data.kind, "mask-redraw");
-if (backup.nodes[0].data.kind !== "mask-redraw") throw new Error("unexpected backup node kind");
+assert.equal(backup.nodes[0].data.kind, "image");
+if (backup.nodes[0].data.kind !== "image") throw new Error("unexpected backup node kind");
 assert.equal(backup.nodes[0].data.mask, "/api/files/backup-mask.png");
 console.log("  ✓ 采用云端冲突版本时，本机备份使用独立项目 ID 与复制后的蒙版");
 
@@ -493,10 +489,6 @@ assert.match(initialDraftWorkspaceSource, /clearProjectTabSessionStorage/);
 assert.match(initialDraftWorkspaceSource, /setClearDraftDialogOpen\(true\)/);
 console.log("  ✓ 错误态阻断页提供清除草稿自救按钮，经 AlertDialog 二次确认后清理本地并重建");
 
-const taskLauncherSource = readFileSync(
-  new URL("../src/components/TaskLauncher.tsx", import.meta.url),
-  "utf8",
-);
 const templateLaunchSource = readFileSync(
   new URL("../src/lib/templateLaunch.ts", import.meta.url),
   "utf8",
@@ -508,15 +500,21 @@ const templatePresentationSource = readFileSync(
 function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
   return {
     flow: {
-      nodes: kinds.map((kind, index) => ({ id: `node-${index}`, data: { kind } })),
+      nodes: kinds.map((kind, index) => ({
+        id: `node-${index}`,
+        data: kind === "image"
+          ? { kind, outputImages: [] }
+          : kind === "text"
+            ? { kind, text: "示例文本" }
+            : { kind },
+      })),
       edges: [],
     },
   } as unknown as Pick<WorkflowTemplate, "flow">;
 }
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image-input"])), "upload");
-assert.equal(inferTemplateLaunchMode(launchModeTemplate(["sketch-to-render"])), "text");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
+assert.equal(inferTemplateLaunchMode(launchModeTemplate(["text"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
-assert.match(taskLauncherSource, /inferTemplateLaunchMode\(template\)/);
 for (const cover of [
   "pattern-style-transfer",
   "person-scene-transfer",
@@ -529,8 +527,7 @@ for (const cover of [
   assert.ok(existsSync(new URL(`../public/assets/project-center/templates/${cover}.webp`, import.meta.url)));
 }
 assert.doesNotMatch(templatePresentationSource, /project-center\/templates\/[^\n]+\.png/);
-assert.match(taskLauncherSource, /launchStarterTemplate/);
 assert.match(templateLaunchSource, /projectTabLifecycle\(active\) !== "initial_draft"/);
 assert.match(templateLaunchSource, /commitDocumentMutation\(/);
 assert.match(templateLaunchSource, /projectId: active\.projectId/);
-console.log("  ✓ 首次任务复用唯一初始草稿 ID，并按模板类型落地到上传或文本输入");
+console.log("  ✓ 模板落地模式（upload/text/default）与内置封面资源保持有效");
