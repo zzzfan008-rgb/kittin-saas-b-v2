@@ -18,14 +18,14 @@ const summary = validateEvaluationManifest(manifest);
 
 assert.deepEqual(summary, {
   version: "garment-base-evaluation-manifest-v1",
-  baseUnits: 25,
+  baseUnits: 41,
   representativeProbeUnits: 9,
-  unselectedBaseUnits: 16,
+  unselectedBaseUnits: 32,
   legalModelModePairs: 9,
   perBaseUnitFullLifecycle: 133,
   initialPilotConnectivity: 9,
   initialPilotFullLifecycle: 1_197,
-  allBaseUnitsFullLifecycle: 3_325,
+  allBaseUnitsFullLifecycle: 5_453,
   recommendationBaselineStatus: "blocked-pending-reviewed-definition",
   paidCampaignStatus: "ready",
   paidProviderCallsAuthorized: 0,
@@ -34,50 +34,52 @@ assert.deepEqual(manifest, createExpectedEvaluationManifest(), "静态清单必�
 
 const units = manifest.baseUnits.map(({ unit }) => unit);
 assert.equal(units.filter(({ operationMode }) => operationMode === "generate").length, 12);
-assert.equal(units.filter(({ operationMode }) => operationMode === "edit").length, 12);
+assert.equal(units.filter(({ operationMode }) => operationMode === "edit").length, 28);
 assert.equal(units.filter(({ operationMode }) => operationMode === "mask-edit").length, 1);
 assert.ok((units as unknown as Array<Record<string, unknown>>)
   .every((unit) => unit.referenceRoleProfile === undefined));
 const maskUnit = units.find(({ operationMode }) => operationMode === "mask-edit");
 assert.equal(Object.hasOwn(maskUnit ?? {}, "versions"), false, "版本向量只存放在单元外层，不污染 PromptEvaluationUnit");
 
-assert.equal(new Set(units.map(promptEvaluationUnitKey)).size, 25);
+assert.equal(new Set(units.map(promptEvaluationUnitKey)).size, 41);
 assert.ok(manifest.baseUnits.every(({ releaseVectorSha256 }) => /^sha256:[a-f0-9]{64}$/.test(releaseVectorSha256)));
 assert.ok(manifest.baseUnits.every(({ unit }) => unit.modelId !== ("grok-imagine-image" as never)));
-const variantModelIds = [...new Set(GARMENT_PROMPT_VARIANTS.map(({ modelId }) => modelId))].sort();
+assert.ok(manifest.baseUnits.every(({ unit }) => unit.nodeKind === "image"), "R-62：text/video 域排除出图片评估清单");
+const imageVariantModelIds = [...new Set(GARMENT_PROMPT_VARIANTS.filter(({ nodeKind }) => nodeKind === "image").map(({ modelId }) => modelId))].sort();
 assert.deepEqual(
   [...new Set(units.map(({ modelId }) => modelId))].sort(),
-  variantModelIds,
-  "基础单元必须精确覆盖当前有提示词变体的模型集合",
+  imageVariantModelIds,
+  "基础单元必须精确覆盖当前有图片提示词变体的模型集合",
 );
 assert.deepEqual(
-  Object.fromEntries(variantModelIds.map((modelId) => [
+  Object.fromEntries(imageVariantModelIds.map((modelId) => [
     modelId,
     units.filter((unit) => unit.modelId === modelId).length,
   ])),
   {
     "gpt-image-2.5-sunburst": 1,
-    "gpt-image-2.5-flare-vip": 6,
-    "gemini-3.1-flash-image": 6,
-    "flux-2-pro": 6,
-    "seedream-5-0-260128": 6,
+    "gpt-image-2.5-flare-vip": 10,
+    "gemini-3.1-flash-image": 10,
+    "flux-2-pro": 10,
+    "seedream-5-0-260128": 10,
   },
-  "基础单元分布必须保持四个普通模型各 6 个、GPT Image 2 为 1 个（6+6+6+6+1）",
+  "基础单元分布必须保持四个普通模型各 10 个（三任务族 generate/edit 6 条 + 四功能族 edit 4 条）、GPT Image 2 为 1 个（10+10+10+10+1）",
 );
 
 const manifestVariantIds = manifest.baseUnits.map(({ unit }) => unit.promptVariantId);
 const manifestParameterProfileIds = manifest.baseUnits.map(({ unit }) => unit.parameterProfileId);
-assert.equal(new Set(manifestVariantIds).size, 25);
-assert.equal(new Set(manifestParameterProfileIds).size, 25);
+assert.equal(new Set(manifestVariantIds).size, 41);
+assert.equal(new Set(manifestParameterProfileIds).size, 41);
+const imageVariantIds = GARMENT_PROMPT_VARIANTS.filter(({ nodeKind }) => nodeKind === "image").map(({ variantId }) => variantId);
 assert.deepEqual(
   [...manifestVariantIds].sort(),
-  GARMENT_PROMPT_VARIANTS.map(({ variantId }) => variantId).sort(),
-  "25 个基础单元必须与 25 个提示词变体双向一一对应",
+  [...imageVariantIds].sort(),
+  "41 个基础单元必须与 41 个图片域提示词变体双向一一对应（R-62：text/video 变体不进本清单）",
 );
 assert.deepEqual(
   [...manifestParameterProfileIds].sort(),
   MODEL_PARAMETER_PROFILES.map(({ profileId }) => profileId).sort(),
-  "25 个基础单元必须与 25 个参数档案双向一一对应",
+  "41 个基础单元必须与 41 个参数档案双向一一对应",
 );
 for (const { unit } of manifest.baseUnits) {
   const variant = GARMENT_PROMPT_VARIANTS.find(({ variantId }) => variantId === unit.promptVariantId);
@@ -108,7 +110,7 @@ for (const invalid of [
   changed((draft) => { draft.recommendationBaseline.detachedBaselineScoresAccepted = true as false; }),
   changed((draft) => { draft.recommendationBaseline.pairedCandidateBaselineCasesRequired = false as true; }),
   changed((draft) => { draft.stageRequestCaps[3]!.maxProviderRequestsPerSample = 1; }),
-  changed((draft) => { draft.requestCaps.allBaseUnitsFullLifecycle = 3_324; }),
+  changed((draft) => { draft.requestCaps.allBaseUnitsFullLifecycle = 5_452; }),
   changed((draft) => { draft.representativeProbePilot.unitIds.pop(); }),
   changed((draft) => { draft.baseUnits.pop(); }),
 ]) {
@@ -167,4 +169,4 @@ assert.ok(noReuseGate.hardBlockers.some(({ code, detail }) => (
   code === "evidence-integrity-failure" && detail === "Attempt belongs to a different evaluation unit."
 )));
 
-console.log("方案 A 的 25 基础单元、9 探针与零付费预算清单测试通过");
+console.log("方案 A 的 41 基础单元、9 探针与零付费预算清单测试通过");

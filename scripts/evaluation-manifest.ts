@@ -26,7 +26,7 @@ export const DEFAULT_EVALUATION_MANIFEST_PATH = resolve(
 );
 const PLAN_PATH = resolve(ROOT_DIR, "docs/ai/evaluation/evaluation-plan-v2.json");
 
-const EXPECTED_BASE_UNIT_COUNT = 25;
+const EXPECTED_BASE_UNIT_COUNT = 41;
 const EXPECTED_PILOT_UNIT_COUNT = 9;
 
 export interface EvaluationManifestStageRequestCap {
@@ -293,7 +293,7 @@ function assertManifestInvariants(manifest: EvaluationManifest): EvaluationManif
     throw new Error(`representative pilot must contain ${EXPECTED_PILOT_UNIT_COUNT} unique units`);
   }
   if (pilotIds.some((unitId) => !unitIds.includes(unitId))) {
-    throw new Error("representative pilot contains a unit outside the 25-unit base manifest");
+    throw new Error(`representative pilot contains a unit outside the ${EXPECTED_BASE_UNIT_COUNT}-unit base manifest`);
   }
   const pilotPairs = pilotIds.map((unitId) => {
     const unit = manifest.baseUnits.find((candidate) => candidate.unitId === unitId)?.unit;

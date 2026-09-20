@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import contracts from "../docs/ai/apiyi/model-contracts.json";
 import {
   GARMENT_PROMPT_PRESETS,
   GARMENT_PROMPT_VARIANTS,
+  type PromptFamilyId,
   type PromptVariant,
 } from "../src/lib/garmentPromptPresets";
 import {
@@ -14,11 +14,20 @@ import {
   getImageModelContract,
 } from "../src/types/imageModels";
 import {
+  TEXT_MODEL_IDS,
+  type TextModelId,
+  getTextModelContract,
+} from "../src/types/textModels";
+import {
+  VIDEO_MODEL_IDS,
+  type VideoModelId,
+  getVideoModelContract,
+} from "../src/types/videoModels";
+import {
   NODE_SPECS,
-  allowedOperationModesForNode,
-  type ImageOperationMode,
   type NodeKind,
 } from "../src/types/workflow";
+import type { ImageOperationMode } from "../src/types/imageOperations";
 import {
   getModelParameterProfile,
   type ModelParameterProfile,
@@ -26,19 +35,53 @@ import {
 
 const OUTPUT_PATH = fileURLToPath(new URL("../docs/ai/evaluation/node-prompt-parameter-matrix-v1.json", import.meta.url));
 
-const MATRIX_NODE_KINDS = [
-  "sketch-to-render",
-  "ai-modify",
-  "mask-redraw",
-  "fabric-recolor",
+/**
+ * R-68 裁定（2026-09-20）：三节点重构后矩阵主轴为 familyId × modelId（域内模型全集），
+ * mode 由变体携带；nodeKind 降为派生属性（族 → nodeKind 唯一映射）。
+ * 契约锚点：docs/design/2026-09-18-three-node-model/contracts/test-sync-inventory.md §1.A
+ * 「矩阵按 (变体 × 模型) 重生成」。
+ */
+const MATRIX_IMAGE_FAMILIES = [
+  "fashion-lookbook",
+  "commerce-hero",
+  "design-sheet",
   "upscale",
   "print-extract",
   "print-mutate",
-] as const satisfies readonly NodeKind[];
+  "fabric-recolor",
+  "mask-local-edit",
+] as const satisfies readonly PromptFamilyId[];
+const MATRIX_TEXT_FAMILIES = ["prompt-polish", "prompt-generate"] as const satisfies readonly PromptFamilyId[];
+const MATRIX_VIDEO_FAMILIES = ["video-animate"] as const satisfies readonly PromptFamilyId[];
 
-type MatrixNodeKind = (typeof MATRIX_NODE_KINDS)[number];
+type MatrixFamilyId = (typeof MATRIX_IMAGE_FAMILIES)[number] | (typeof MATRIX_TEXT_FAMILIES)[number] | (typeof MATRIX_VIDEO_FAMILIES)[number];
+type MatrixModelId = ImageModelId | TextModelId | VideoModelId;
 type MatrixSupportStatus = "unverified" | "unsupported";
 type WireFormat = "application/json" | "multipart/form-data";
+
+const FAMILY_NODE_KIND: Record<MatrixFamilyId, NodeKind> = {
+  "fashion-lookbook": "image",
+  "commerce-hero": "image",
+  "design-sheet": "image",
+  upscale: "image",
+  "print-extract": "image",
+  "print-mutate": "image",
+  "fabric-recolor": "image",
+  "mask-local-edit": "image",
+  "prompt-polish": "text",
+  "prompt-generate": "text",
+  "video-animate": "video",
+};
+
+type PromptReviewChecklistItem =
+  | "subject-task"
+  | "composition"
+  | "style-material"
+  | "text-label"
+  | "aspect-output"
+  | "negative-constraints"
+  | "preservation"
+  | "output-contract";
 
 interface PromptReviewEntry {
   promptVariantId: string;
@@ -48,14 +91,33 @@ interface PromptReviewEntry {
   locale: PromptVariant["promptLocale"];
   promptSha256: `sha256:${string}`;
   templateName: string;
-  checklist: readonly [
-    "subject-task",
-    "composition",
-    "style-material",
-    "text-label",
-    "aspect-output",
-    "negative-constraints",
-  ];
+  /**
+   * 实际执行过内容断言的审查维度（R-68：逐字迁移的四功能族与 text/video 域提示词
+   * 不是六维图像提示词，checklist 只登记测试真实断言过的维度，不得虚报）。
+   */
+  checklist: readonly PromptReviewChecklistItem[];
+}
+
+const FULL_IMAGE_CHECKLIST = [
+  "subject-task",
+  "composition",
+  "style-material",
+  "text-label",
+  "aspect-output",
+  "negative-constraints",
+] as const satisfies readonly PromptReviewChecklistItem[];
+const FUNCTION_FAMILY_CHECKLIST = ["subject-task", "preservation"] as const satisfies readonly PromptReviewChecklistItem[];
+const TEXT_CHECKLIST = ["subject-task", "output-contract", "negative-constraints"] as const satisfies readonly PromptReviewChecklistItem[];
+const VIDEO_CHECKLIST = ["subject-task", "preservation", "negative-constraints"] as const satisfies readonly PromptReviewChecklistItem[];
+
+function checklistFor(variant: PromptVariant): readonly PromptReviewChecklistItem[] {
+  if (variant.nodeKind === "text") return TEXT_CHECKLIST;
+  if (variant.nodeKind === "video") return VIDEO_CHECKLIST;
+  if (variant.familyId === "upscale" || variant.familyId === "print-extract"
+    || variant.familyId === "print-mutate" || variant.familyId === "fabric-recolor") {
+    return FUNCTION_FAMILY_CHECKLIST;
+  }
+  return FULL_IMAGE_CHECKLIST;
 }
 
 interface ParameterProfileEntry {
@@ -69,8 +131,8 @@ interface ParameterProfileEntry {
 }
 
 interface ProviderRequestEntry {
-  mode: ImageOperationMode;
-  endpoint: { method: "POST"; path: string; contentType: WireFormat };
+  mode: PromptVariant["mode"];
+  endpoint: { method: "POST"; path: string; contentType: WireFormat | string };
   timeoutMs: number;
   requiredFields: readonly string[];
   omittedFields: readonly string[];
@@ -87,14 +149,16 @@ interface ProviderRequestEntry {
     handling: string;
     urlTtlSeconds?: number;
     recordsActualProviderSize?: boolean;
+    asyncTask?: { pollPathTemplate: string };
   };
 }
 
 export interface NodePromptParameterMatrixEntry {
-  nodeKind: MatrixNodeKind;
+  familyId: MatrixFamilyId;
+  nodeKind: NodeKind;
   nodeTitle: string;
-  modelId: ImageModelId;
-  operationModes: readonly ImageOperationMode[];
+  modelId: MatrixModelId;
+  operationModes: readonly PromptVariant["mode"][];
   supportStatus: MatrixSupportStatus;
   productPolicy: {
     status: "supported" | "unsupported";
@@ -111,7 +175,7 @@ export interface NodePromptParameterMatrixEntry {
 }
 
 export interface NodePromptParameterMatrix {
-  schemaVersion: 1;
+  schemaVersion: 2;
   version: "node-prompt-parameter-matrix-v1";
   generatedAt: string;
   evidenceStatus: "offline-contract-review-only";
@@ -119,14 +183,24 @@ export interface NodePromptParameterMatrix {
   sourceContracts: {
     modelCatalogReviewedExportSha256: string | null;
     modelCatalogReviewedRawExportSha256: string | null;
-    modelContractIds: readonly ImageModelId[];
+    modelContractIds: {
+      image: readonly ImageModelId[];
+      text: readonly TextModelId[];
+      video: readonly VideoModelId[];
+    };
   };
   scope: {
-    nodeKinds: readonly MatrixNodeKind[];
-    modelIds: readonly ImageModelId[];
+    familyIds: readonly MatrixFamilyId[];
+    nodeKinds: readonly NodeKind[];
+    modelIds: {
+      image: readonly ImageModelId[];
+      text: readonly TextModelId[];
+      video: readonly VideoModelId[];
+    };
     entryCount: number;
     supportedEntryCount: number;
     unsupportedEntryCount: number;
+    variantCount: number;
     unsupportedNodesRemainFailClosed: true;
     noProviderCallsPerformed: true;
     imageGenerationOrEditCalls: 0;
@@ -156,8 +230,8 @@ function promptReview(variant: PromptVariant): PromptReviewEntry {
       nodeKind: variant.nodeKind,
       locale: variant.promptLocale,
       promptSha256: sha256(variant.fullPrompt),
-      templateName: "GPT Image 2 mask-local-edit contract",
-      checklist: ["subject-task", "composition", "style-material", "text-label", "aspect-output", "negative-constraints"],
+      templateName: variant.familyId === "mask-local-edit" ? "GPT Image 2 mask-local-edit contract" : `${variant.familyId} contract`,
+      checklist: checklistFor(variant),
     };
   }
   return {
@@ -168,7 +242,7 @@ function promptReview(variant: PromptVariant): PromptReviewEntry {
     locale: variant.promptLocale,
     promptSha256: sha256(variant.fullPrompt),
     templateName: preset.templateName,
-    checklist: ["subject-task", "composition", "style-material", "text-label", "aspect-output", "negative-constraints"],
+    checklist: checklistFor(variant),
   };
 }
 
@@ -342,77 +416,147 @@ function maskProviderRequest(): ProviderRequestEntry {
   };
 }
 
-function unsupportedReason(nodeKind: MatrixNodeKind, modelId: ImageModelId): string {
-  if (nodeKind === "mask-redraw" && modelId !== "gpt-image-2.5-sunburst") {
+/** text 域请求形状：runtime.md §1b 同步 chat completions，messages = system(variant.fullPrompt) + user(input)。 */
+function textProviderRequest(modelId: TextModelId, mode: PromptVariant["mode"]): ProviderRequestEntry {
+  const contract = getTextModelContract(modelId);
+  return {
+    mode,
+    endpoint: { method: "POST", path: contract.endpoint.path, contentType: contract.endpoint.contentType },
+    timeoutMs: contract.timeoutMs,
+    requiredFields: [
+      "model",
+      "messages[0].role=system",
+      "messages[0].content=variant.fullPrompt",
+      "messages[1].role=user",
+      "messages[1].content=上游 text 正文",
+    ],
+    omittedFields: [],
+    forbiddenFields: [],
+    referenceInputs: {
+      userMax: 0,
+      totalMax: 0,
+      encoding: "none",
+      orderSemantics: "text 节点无图片参考输入（inputs.image=0）",
+    },
+    output: {
+      fields: ["choices[0].message.content"],
+      maxImages: 0,
+      handling: "同步 chat completions；产出写回节点 outputText，不覆盖 text",
+    },
+  };
+}
+
+/** video 域请求形状：runtime.md §2 异步任务 submit + 轮询；首帧 = 唯一 image 入边。 */
+function videoProviderRequest(modelId: VideoModelId, mode: PromptVariant["mode"]): ProviderRequestEntry {
+  const contract = getVideoModelContract(modelId);
+  return {
+    mode,
+    endpoint: { method: "POST", path: contract.endpoint.submitPath, contentType: contract.endpoint.contentType },
+    timeoutMs: contract.timeoutMs,
+    requiredFields: ["model", "prompt", "image (首帧)"],
+    omittedFields: [],
+    forbiddenFields: [],
+    referenceInputs: {
+      userMax: 1,
+      totalMax: 1,
+      encoding: "首帧图片（唯一 image 入边）",
+      orderSemantics: "首帧 = 唯一 image 入边；text 上游承载正文",
+    },
+    output: {
+      fields: ["taskId", "videoUrl"],
+      maxImages: 0,
+      handling: "异步任务 submit + 轮询；一次任务产出一个 MP4，服务端落地",
+      asyncTask: { pollPathTemplate: contract.endpoint.pollPathTemplate },
+    },
+  };
+}
+
+function unsupportedReason(familyId: MatrixFamilyId, modelId: MatrixModelId): string {
+  if (familyId === "mask-local-edit" && modelId !== "gpt-image-2.5-sunburst") {
     return "局部蒙版专轨当前只支持 GPT Image 2.5 Sunburst；该模型不得接收 mask-edit 请求。";
   }
-  if (nodeKind !== "mask-redraw" && modelId === "gpt-image-2.5-sunburst") {
-    return "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-redraw × mask-edit，不得用于普通生成或普通编辑节点。";
+  if (familyId !== "mask-local-edit" && modelId === "gpt-image-2.5-sunburst") {
+    return "GPT Image 2.5 Sunburst 首版产品策略仅允许 mask-local-edit × mask-edit，不得用于普通生成或普通编辑节点。";
   }
-  if (["fabric-recolor", "upscale", "print-extract", "print-mutate"].includes(nodeKind)) {
-    return `首版产品政策暂不支持「${NODE_SPECS[nodeKind].title}」节点：该节点尚无逐模型独立提示词、参数档案和真实评估证据。`;
-  }
-  return "该节点×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、节点或模式。";
+  return "该功能族×模型组合没有独立提示词和参数档案，系统不会静默回退到其他模型、功能族或模式。";
 }
 
-function variantsFor(nodeKind: MatrixNodeKind, modelId: ImageModelId): PromptVariant[] {
-  return GARMENT_PROMPT_VARIANTS.filter((variant) => variant.nodeKind === nodeKind && variant.modelId === modelId);
+function variantsFor(familyId: MatrixFamilyId, modelId: MatrixModelId): PromptVariant[] {
+  return GARMENT_PROMPT_VARIANTS.filter((variant) => variant.familyId === familyId && variant.modelId === modelId);
 }
 
-function profilesFor(nodeKind: MatrixNodeKind, modelId: ImageModelId): ParameterProfileEntry[] {
-  return variantsFor(nodeKind, modelId).map((variant) => parameterProfileEntry(variant.parameterProfileId));
+function profilesFor(nodeKind: NodeKind, variants: readonly PromptVariant[]): ParameterProfileEntry[] {
+  // R-68 裁定：参数档案物化 store（MODEL_PARAMETER_PROFILES）仅覆盖 image 域；
+  // text / video 变体声明的 parameterProfileId 保留在 parameterProfileIds，物化档案为空数组。
+  if (nodeKind !== "image") return [];
+  return variants.map((variant) => parameterProfileEntry(variant.parameterProfileId));
 }
 
-function entry(nodeKind: MatrixNodeKind, modelId: ImageModelId): NodePromptParameterMatrixEntry {
-  const operationModes = allowedOperationModesForNode(nodeKind);
-  const variants = variantsFor(nodeKind, modelId);
-  const profiles = profilesFor(nodeKind, modelId);
+function providerRequestsFor(entry: { familyId: MatrixFamilyId; nodeKind: NodeKind; modelId: MatrixModelId; variants: readonly PromptVariant[] }): ProviderRequestEntry[] {
+  const { familyId, nodeKind, modelId, variants } = entry;
+  if (variants.length === 0) return [];
+  const modes = [...new Set(variants.map((variant) => variant.mode))];
+  if (nodeKind === "text") return modes.map((mode) => textProviderRequest(modelId as TextModelId, mode));
+  if (nodeKind === "video") return modes.map((mode) => videoProviderRequest(modelId as VideoModelId, mode));
+  if (familyId === "mask-local-edit" && modelId === "gpt-image-2.5-sunburst") return [maskProviderRequest()];
+  return standardProviderRequests(modelId as Exclude<ImageModelId, "gpt-image-2.5-sunburst">, modes as readonly ImageOperationMode[]);
+}
+
+function matrixEntry(familyId: MatrixFamilyId, modelId: MatrixModelId): NodePromptParameterMatrixEntry {
+  const nodeKind = FAMILY_NODE_KIND[familyId];
+  const variants = variantsFor(familyId, modelId);
+  const profiles = profilesFor(nodeKind, variants);
   const supported = variants.length > 0;
-  const providerRequests = nodeKind === "mask-redraw" && modelId === "gpt-image-2.5-sunburst"
-    ? [maskProviderRequest()]
-    : supported ? standardProviderRequests(modelId as Exclude<ImageModelId, "gpt-image-2.5-sunburst">, operationModes) : [];
+  const providerRequests = providerRequestsFor({ familyId, nodeKind, modelId, variants });
   return {
+    familyId,
     nodeKind,
     nodeTitle: NODE_SPECS[nodeKind].title,
     modelId,
-    operationModes,
+    operationModes: [...new Set(variants.map((variant) => variant.mode))],
     supportStatus: supported ? "unverified" : "unsupported",
     productPolicy: supported
       ? { status: "supported" }
-      : { status: "unsupported", reason: unsupportedReason(nodeKind, modelId) },
+      : { status: "unsupported", reason: unsupportedReason(familyId, modelId) },
     promptVariantId: variants.length === 1 ? variants[0]!.variantId : null,
     promptVariantIds: variants.map((variant) => variant.variantId),
     promptReview: variants.map(promptReview),
-    parameterProfileId: profiles.length === 1 ? profiles[0]!.parameterProfileId : null,
-    parameterProfileIds: profiles.map((profile) => profile.parameterProfileId),
+    parameterProfileId: variants.length === 1 ? variants[0]!.parameterProfileId : null,
+    parameterProfileIds: variants.map((variant) => variant.parameterProfileId),
     parameterProfiles: profiles,
     providerRequests,
     failClosedReason: supported
       ? "该组合有完整离线契约，但当前提示词与模型证据状态仍为 unverified；未有受审真实评估发布快照时不得运行。"
-      : unsupportedReason(nodeKind, modelId),
+      : unsupportedReason(familyId, modelId),
   };
 }
 
 export function createExpectedNodePromptParameterMatrix(): NodePromptParameterMatrix {
-  const entries = MATRIX_NODE_KINDS.flatMap((nodeKind) => IMAGE_MODEL_IDS.map((modelId) => entry(nodeKind, modelId)));
+  const imageEntries = MATRIX_IMAGE_FAMILIES.flatMap((familyId) => IMAGE_MODEL_IDS.map((modelId) => matrixEntry(familyId, modelId)));
+  const textEntries = MATRIX_TEXT_FAMILIES.flatMap((familyId) => TEXT_MODEL_IDS.map((modelId) => matrixEntry(familyId, modelId)));
+  const videoEntries = MATRIX_VIDEO_FAMILIES.flatMap((familyId) => VIDEO_MODEL_IDS.map((modelId) => matrixEntry(familyId, modelId)));
+  const entries = [...imageEntries, ...textEntries, ...videoEntries];
   const baseline = getImageModelContract(IMAGE_MODEL_IDS[0]).reviewedModelCatalogBaseline;
+  const nodeKinds = [...new Set(entries.map((entry) => entry.nodeKind))];
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     version: "node-prompt-parameter-matrix-v1",
-    generatedAt: "2026-09-04",
+    generatedAt: "2026-09-20",
     evidenceStatus: "offline-contract-review-only",
     sourceSkills: ["awesome-gpt-image-2", "apiyi"],
     sourceContracts: {
       modelCatalogReviewedExportSha256: baseline.reviewedExportSha256,
       modelCatalogReviewedRawExportSha256: baseline.reviewedRawExportSha256,
-      modelContractIds: IMAGE_MODEL_IDS,
+      modelContractIds: { image: IMAGE_MODEL_IDS, text: TEXT_MODEL_IDS, video: VIDEO_MODEL_IDS },
     },
     scope: {
-      nodeKinds: MATRIX_NODE_KINDS,
-      modelIds: IMAGE_MODEL_IDS,
+      familyIds: [...MATRIX_IMAGE_FAMILIES, ...MATRIX_TEXT_FAMILIES, ...MATRIX_VIDEO_FAMILIES],
+      nodeKinds,
+      modelIds: { image: IMAGE_MODEL_IDS, text: TEXT_MODEL_IDS, video: VIDEO_MODEL_IDS },
       entryCount: entries.length,
       supportedEntryCount: entries.filter((candidate) => candidate.supportStatus === "unverified").length,
       unsupportedEntryCount: entries.filter((candidate) => candidate.supportStatus === "unsupported").length,
+      variantCount: entries.reduce((total, candidate) => total + candidate.promptVariantIds.length, 0),
       unsupportedNodesRemainFailClosed: true,
       noProviderCallsPerformed: true,
       imageGenerationOrEditCalls: 0,
