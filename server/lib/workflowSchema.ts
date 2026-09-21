@@ -489,15 +489,17 @@ function validateV8Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflow
     }
   }
 
-  // C7：结果节点的 sourceGeneratorId 必须命中同文档的生成节点。
+  // C7：结果节点的 sourceGeneratorId 若命中同文档某节点，该节点必须是生成节点
+  // （伪造/损坏 provenance 硬闸）；悬空引用（生成节点已删）放行——
+  // runId 才是账本键（AGENTS.md §4），sourceGeneratorId 仅是便利指针。
   const generatorIds = new Set(
     nodes.filter((node) => isGeneratorNodeKind(node.type)).map((node) => node.id),
   );
   for (const node of nodes) {
     if (!isResultNodeKind(node.type)) continue;
     const source = (node.data as { sourceGeneratorId?: unknown }).sourceGeneratorId;
-    if (typeof source !== "string" || !generatorIds.has(source)) {
-      fail("flow.nodes", `结果节点 ${node.id} 的 sourceGeneratorId 必须命中同文档的生成节点`);
+    if (typeof source === "string" && nodeIds.has(source) && !generatorIds.has(source)) {
+      fail("flow.nodes", `结果节点 ${node.id} 的 sourceGeneratorId 指向的节点不是生成节点`);
     }
   }
 

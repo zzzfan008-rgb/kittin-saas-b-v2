@@ -142,11 +142,16 @@ function main() {
     );
   });
 
-  ok("C7：result-image sourceGeneratorId 未命中生成节点被拒绝", () => {
+  ok("C7：result-image sourceGeneratorId 命中非生成节点被拒绝", () => {
     assert.throws(
-      () => validateAndMigrateFlow(flow([textNode("t1"), imageGeneratorNode("g1"), resultImageNode("r1", "missing")], [promptEdge("e1", "t1", "g1")])),
-      (e) => e instanceof WorkflowValidationError && /sourceGeneratorId 必须命中/.test(e.message),
+      () => validateAndMigrateFlow(flow([textNode("t1"), imageGeneratorNode("g1"), resultImageNode("r1", "t1")], [promptEdge("e1", "t1", "g1")])),
+      (e) => e instanceof WorkflowValidationError && /指向的节点不是生成节点/.test(e.message),
     );
+  });
+
+  ok("C7：result-image sourceGeneratorId 不命中任何节点（生成节点已删）放行", () => {
+    const result = validateAndMigrateFlow(flow([textNode("t1"), imageGeneratorNode("g1"), resultImageNode("r1", "missing")], [promptEdge("e1", "t1", "g1")]));
+    assert.equal(result.nodes.length, 3);
   });
 
   ok("边 handle：prompt 入边只能来自 text 节点", () => {
