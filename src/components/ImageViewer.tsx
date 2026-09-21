@@ -3,6 +3,8 @@ import { useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
+import { saveImageAsAsset } from "@/lib/assetSave";
+import { Checkbox } from "@/components/ui/checkbox";
 import { nodeSpecForKind } from "@/types/workflow";
 
 const MIN_SCALE = 1;
@@ -65,12 +67,15 @@ export function ImageViewer() {
   const unsupportedKind = record !== undefined && !nodeSpecForKind(record.kind);
   const [scale, setScale] = useState(1);
   const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  /** 勾选后保存到数字模特库（category="model"），否则收藏为参考素材。 */
+  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // 每次打开新图时复位缩放
+  // 每次打开新图时复位缩放与保存目标
   useEffect(() => {
     setScale(1);
     setAssetState("idle");
+    setSaveToModelLibrary(false);
   }, [viewer?.url]);
 
   // 滚轮缩放（原生监听，preventDefault 阻止页面滚动）
@@ -95,16 +100,12 @@ export function ImageViewer() {
   const saveAsAsset = async () => {
     setAssetState("saving");
     try {
-      const response = await fetch("/api/assets", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
-          category: "reference",
-          image: viewer.url,
-          sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
-        }),
+      await saveImageAsAsset({
+        name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
+        category: saveToModelLibrary ? "model" : "reference",
+        image: viewer.url,
+        sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setAssetState("saved");
     } catch {
       setAssetState("error");
@@ -180,9 +181,22 @@ export function ImageViewer() {
         )}
         {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[var(--gc-border)] p-3 text-[10px] text-[var(--gc-text-muted)]"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
         {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-[11px] text-red-300">{record.error}</div>}
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <label className="mr-auto flex items-center gap-2 text-[11px] text-[var(--gc-text)]">
+            <Checkbox
+              aria-label="存入数字模特库"
+              checked={saveToModelLibrary}
+              onCheckedChange={(checked) => {
+                setSaveToModelLibrary(checked === true);
+                // 保存目标变了，允许重新保存到另一个库
+                setAssetState("idle");
+              }}
+              className="border-[var(--gc-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
+            />
+            <span>存入数字模特库</span>
+          </label>
           <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-[11px] font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
-          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:opacity-60">{assetState === "saving" ? "收藏中…" : assetState === "saved" ? "已收藏" : assetState === "error" ? "收藏失败，重试" : "收藏为资产"}</button>
+          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-[11px] text-[var(--gc-text)] disabled:opacity-60">{assetState === "saving" ? "保存中…" : assetState === "saved" ? "已保存" : assetState === "error" ? "保存失败，重试" : saveToModelLibrary ? "存入数字模特库" : "收藏为资产"}</button>
           {record && (
             <button
               type="button"

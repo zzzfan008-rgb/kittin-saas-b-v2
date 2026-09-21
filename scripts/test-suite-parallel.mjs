@@ -53,6 +53,7 @@ const TEST_FILES = [
   "tests/theme-contract.test.ts",
   "tests/generation-safety.test.ts",
   "tests/workbench-shell.test.ts",
+  "tests/asset-library-model.test.ts",
   "tests/apiyi-docs.test.ts",
   "tests/r48-version-gate.test.ts",
   "tests/model-parameter-profiles.test.ts",

@@ -129,7 +129,7 @@ function RailTool({
       return;
     }
     if (!hasMenu) {
-      // 无菜单工具入口（AI 画板 / 色彩工具）：功能映射待定义
+      // 无菜单工具入口（AI 画板）：功能映射待定义
       return;
     }
     setOpen((v) => !v);
@@ -289,7 +289,7 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
         >
           {RAIL_ENTRIES.map((entry, index) => (
             <div key={entry.id} className="contents">
-              {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4 | 6) && (
+              {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4 | 5) && (
                 <span role="separator" className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]" />
               )}
               <RailTool

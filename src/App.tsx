@@ -40,6 +40,7 @@ import {
   OPEN_COMPARE_EVENT,
   type AssetPickerRequest,
 } from "@/lib/overlayEvents";
+import { assetPickerCategoryForNode } from "@/lib/workflowMenuMapping";
 import { requestCanvasZoom } from "@/lib/keyboardShortcuts";
 
 const LazyCompareOverlay = lazy(() => import("@/components/CompareOverlay").then((module) => ({
@@ -410,6 +411,7 @@ function Workspace() {
         <Suspense fallback={<OverlayLoadingStatus label="正在打开素材库…" />}>
           <LazyAssetPickerOverlay
             request={assetPickerRequest}
+            initialCategory={assetPickerCategoryForNode(assetPickerRequest.nodeId)}
             onRequestChange={setAssetPickerRequest}
           />
         </Suspense>
