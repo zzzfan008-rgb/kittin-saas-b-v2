@@ -1,10 +1,16 @@
 import type { NodeKind } from "@/types/workflow";
 
-/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色，值定义在 index.css §5 --gc-kind-*） */
+/** 节点类型 → 微缩图配色（与画布气质一致的低饱和色，值定义在 index.css §5 --gc-kind-*）。
+ *  v8（三层七节点）：生成层 / 结果层按产物媒体族沿用 image / video 色调，
+ *  待设计系统给出分 kind 的 --gc-kind-* token 后再细分，组件不新造颜色。 */
 const KIND_COLOR: Record<NodeKind, string> = {
   text: "var(--gc-kind-text)",
   image: "var(--gc-kind-image)",
   video: "var(--gc-kind-video)",
+  "image-generator": "var(--gc-kind-image)",
+  "video-generator": "var(--gc-kind-video)",
+  "result-image": "var(--gc-kind-image)",
+  "result-video": "var(--gc-kind-video)",
 };
 
 interface MiniNode {
@@ -34,8 +40,8 @@ export function WorkflowMini({
     return <div className={className} style={{ background: "var(--gc-control)" }} />;
   }
 
-  // 节点在原画布上的包围盒
-  const NODE_W = 280;
+  // 节点在原画布上的包围盒（卡片宽与 index.css --gc-node-width 保持同步）
+  const NODE_W = 256;
   const NODE_H = 120;
   const xs = nodes.map((n) => n.position.x);
   const ys = nodes.map((n) => n.position.y);
@@ -84,7 +90,7 @@ export function WorkflowMini({
         );
       })}
       {nodes.map((n) => {
-        const kind = (n.type ?? "image-input") as NodeKind;
+        const kind = (n.type ?? "image") as NodeKind;
         const c = center.get(n.id)!;
         return (
           <rect

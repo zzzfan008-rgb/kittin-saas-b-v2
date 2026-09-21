@@ -69,13 +69,20 @@ test("结果查看器（生成记录详情）渲染分发不再直接下标查�
   assert.match(inspector, /UnsupportedNodeKindNotice/);
 });
 
-test("悬浮功能窗口与连线校验的未知 kind 下标查表也已收敛到稳健查表", () => {
-  const portal = readFileSync(
-    new URL("../src/components/nodes/NodeInspectorWindowPortal.tsx", import.meta.url),
+test("节点工具条 / 内联面板与连线校验的未知 kind 下标查表也已收敛到稳健查表", () => {
+  // v8：承载功能目录的 v7 悬浮窗口已退役，同一不变式改在新表面上核查。
+  const toolbar = readFileSync(
+    new URL("../src/components/nodes/NodeToolbar.tsx", import.meta.url),
     "utf8",
   );
-  assert.ok(!portal.includes("NODE_SPECS[data.kind]"), "悬浮窗口仍直接下标查表");
-  assert.match(portal, /nodeTitleForKind\(data\.kind\)/);
+  assert.ok(!toolbar.includes("NODE_SPECS["), "节点工具条仍直接下标查表");
+  assert.match(toolbar, /nodeTitleForKind\(kind\)/);
+
+  const panel = readFileSync(
+    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.ok(!panel.includes("NODE_SPECS["), "生成节点内联面板仍直接下标查表");
 
   const store = readFileSync(
     new URL("../src/store/flowStore.ts", import.meta.url),
