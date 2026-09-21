@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import {
   selectActiveDocumentTarget,
+  selectActiveProjectName,
   selectActiveReadOnly,
   selectNodeInputImages,
   useFlowStore,
@@ -10,6 +11,8 @@ import { useShallow } from "zustand/react/shallow";
 import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
+import { assetNameFromUpload, saveImageToModelLibrary } from "@/lib/assetSave";
+import { Checkbox } from "@/components/ui/checkbox";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
@@ -22,6 +25,8 @@ import { duplicateNode } from "./nodeDuplicate";
  * 只做上传 / 展示 / 作为参考图来源，**不含**模型、画幅、数量、蒙版与运行按钮；
  * 全部生成语义归 image-generator（生成层）。
  * 工具条（plan.md §3.2）：[裁剪] [抠图] [复制] [替换]。
+ * 上传入口可勾选「存入数字模特库」（asset-library-model.md §5）：勾选后本次上传的图片
+ * 同时以 category="model" 存入素材库；勾选状态是节点本地 UI 状态，不进入文档数据。
  */
 
 interface NormalizedUploadResponse {
@@ -65,6 +70,11 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  /** 勾选后本次上传的图片同时存入素材库「数字模特」分类（category="model"）。 */
+  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
+  /** 入库的三态：idle 未入库 / saving 入库中 / saved 已入库 / error 入库失败（上传本身仍成功）。 */
+  const [libraryState, setLibraryState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [libraryError, setLibraryError] = useState<string | null>(null);
 
   // 作为参考图来源时的序号（派生视图，永不持久化）。
   const referenceCount = useFlowStore(
@@ -72,6 +82,31 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
       const document = s.tabs.find((tab) => tab.id === s.activeTabId);
       return document ? selectNodeInputImages(document, id).length : 0;
     }),
+  );
+
+  /**
+   * 入库到数字模特库：与上传解耦——入库失败只标记入库状态，
+   * 不回写节点 status/error（图片已经上传成功，不能被辅助动作覆盖成失败）。
+   */
+  const storeToModelLibrary = useCallback(
+    async (image: string, fileName: string, requestId: number) => {
+      setLibraryState("saving");
+      setLibraryError(null);
+      try {
+        await saveImageToModelLibrary({
+          name: assetNameFromUpload(fileName, data.label),
+          image,
+          sourceNote: `来自项目「${selectActiveProjectName(useFlowStore.getState())}」的图片上传`,
+        });
+        if (requestId !== uploadRequestRef.current) return;
+        setLibraryState("saved");
+      } catch (err) {
+        if (requestId !== uploadRequestRef.current) return;
+        setLibraryError(err instanceof Error ? err.message : String(err));
+        setLibraryState("error");
+      }
+    },
+    [data.label],
   );
 
   const handleFile = useCallback(
@@ -85,6 +120,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         if (requestId !== uploadRequestRef.current) return;
         // 上传位语义：覆盖式写入 outputImages。
         updateNodeDataInTab(target, id, { outputImages: [upload.url], status: "success", error: undefined });
+        if (saveToModelLibrary) void storeToModelLibrary(upload.url, file.name, requestId);
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -93,7 +129,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         if (requestId === uploadRequestRef.current) setUploading(false);
       }
     },
-    [id, readOnly, updateNodeDataInTab],
+    [id, readOnly, saveToModelLibrary, storeToModelLibrary, updateNodeDataInTab],
   );
 
   // Ctrl+V 粘贴（节点被选中时生效）
@@ -121,19 +157,65 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   }, [id]);
 
   const hasUpload = data.outputImages.length > 0;
-  const fileInput = (
+  /**
+   * 节点内的真实文件选择器（视觉隐藏，由点击槽位 / 工具条「替换」触发）。
+   * slot：空槽位时盖在最上层，同时接管点击、拖放与 Tab 停靠。
+   * replace：已有图片时退到缩略图下方，只作「替换」的程序化入口——
+   *          不抢占缩略图的单击看大图，也不新增不可见的 Tab 停靠点。
+   */
+  const renderFileInput = (variant: "slot" | "replace") => (
     <input
       type="file"
       accept="image/*"
       multiple={false}
       disabled={readOnly}
+      tabIndex={variant === "replace" ? -1 : undefined}
       aria-label={hasUpload ? "重新上传图片" : "上传图片"}
-      className="nodrag nopan absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+      className={`nodrag nopan absolute inset-0 h-full w-full cursor-pointer opacity-0 ${
+        variant === "replace" ? "z-0" : "z-10"
+      }`}
       onChange={(event) => {
         void handleFile(event.target.files?.[0]);
         event.target.value = "";
       }}
     />
+  );
+
+  /** 上传入口的入库选项（asset-library-model.md §5）：控制本次上传是否同时进数字模特库。 */
+  const modelLibraryOption = (
+    <div className="nodrag nopan flex items-center justify-between gap-2 text-[11px] text-[var(--gc-node-muted)]">
+      <label className="flex items-center gap-2">
+        <Checkbox
+          aria-label="存入数字模特库"
+          checked={saveToModelLibrary}
+          disabled={readOnly}
+          onCheckedChange={(checked) => {
+            setSaveToModelLibrary(checked === true);
+            // 目标库变了，允许对下一张上传图重新入库
+            setLibraryState("idle");
+            setLibraryError(null);
+          }}
+          className="border-[var(--gc-node-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
+        />
+        <span>上传时存入数字模特库</span>
+      </label>
+      {libraryState !== "idle" && (
+        <span
+          role="status"
+          aria-live="polite"
+          title={libraryError ?? undefined}
+          className={
+            libraryState === "error"
+              ? "text-[var(--gc-warn-text)]"
+              : libraryState === "saved"
+                ? "text-gold"
+                : undefined
+          }
+        >
+          {libraryState === "saving" ? "存入中…" : libraryState === "saved" ? "已存入" : "存入失败"}
+        </span>
+      )}
+    </div>
   );
 
   return (
@@ -180,7 +262,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           <div className="nodrag relative overflow-hidden rounded-[10px] border border-[var(--gc-node-border)]">
             <button
               type="button"
-              className="block w-full cursor-zoom-in"
+              className="relative z-10 block w-full cursor-zoom-in"
               title="单击查看大图"
               onClick={() => openViewer({ url: data.outputImages[0], title: data.label })}
             >
@@ -192,6 +274,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 className="max-h-40 w-full bg-[var(--gc-node-inner)] object-contain"
               />
             </button>
+            {/* 选择器排在缩略图之后：z-0 让缩略图保持可点，DOM 顺序让焦点落地仍先命中缩略图按钮。 */}
+            {renderFileInput("replace")}
             <OrdinalBadgeSlot nodeId={id} />
           </div>
         ) : (
@@ -212,7 +296,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
             }`}
           >
-            {fileInput}
+            {renderFileInput("slot")}
             <span className="pointer-events-none font-mono text-[10px] tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
@@ -221,6 +305,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             </span>
           </div>
         )}
+        {modelLibraryOption}
         {hasUpload && (
           <button
             type="button"

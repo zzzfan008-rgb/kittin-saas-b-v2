@@ -5,18 +5,20 @@ import {
   assetPickerCategoryForNode,
   workflowTemplateIdForMenuItem,
 } from "../src/lib/workflowMenuMapping";
-import { assetSavePayload } from "../src/lib/assetSave";
+import { assetNameFromUpload, assetSavePayload, saveImageToModelLibrary } from "../src/lib/assetSave";
 import { RAIL_ENTRIES, RAIL_SEPARATOR_BEFORE } from "../src/components/workbench/railConfig";
 
 /**
  * R-88：数字模特库前端接线 + 色彩工具入口移除。
- * 契约：docs/design/2026-09-19-workbench-entry-wiring/asset-library-model.md §5/§6、
+ * R-90：上传入口「存入数字模特库」勾选（ImageNode）。
+ * 契约：docs/design/2026-09-19-workbench-entry-wiring/asset-library-model.md §5/§7、
  *       docs/design/2026-09-21-five-node-model/contracts/template-format.md §2/§3/§4。
  */
 
 const read = (path: string) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const assetPickerSource = read("src/components/AssetPickerOverlay.tsx");
 const imageViewerSource = read("src/components/ImageViewer.tsx");
+const imageNodeSource = read("src/components/nodes/ImageNode.tsx");
 const railConfigSource = read("src/components/workbench/railConfig.tsx");
 const workflowTypesSource = read("src/types/workflow.ts");
 const appSource = read("src/App.tsx");
@@ -121,6 +123,81 @@ assert.equal(
   "空白来源说明不得进入请求体",
 );
 
+// ---------- 6b. 上传入口（ImageNode）：勾选后上传图同时进数字模特库 ----------
+assert.match(imageNodeSource, /存入数字模特库/, "图片节点的上传入口必须有「存入数字模特库」选项");
+assert.match(
+  imageNodeSource,
+  /aria-label="存入数字模特库"/,
+  "勾选控件必须有可访问名称",
+);
+assert.match(
+  imageNodeSource,
+  /from "@\/components\/ui\/checkbox"/,
+  "勾选控件必须复用本地 shadcn Checkbox",
+);
+assert.match(
+  imageNodeSource,
+  /if \(saveToModelLibrary\) void storeToModelLibrary\(upload\.url, file\.name, requestId\)/,
+  "入库必须在本张图上传成功之后触发，并带上文件名与请求号",
+);
+assert.match(imageNodeSource, /saveImageToModelLibrary\(/, "入库必须走分类单一事实源 saveImageToModelLibrary");
+assert.deepEqual(
+  (imageNodeSource.match(/renderFileInput\("/g) ?? []).length,
+  2,
+  "文件选择器必须在「空槽位」与「已有图片」两种形态下都存在（否则工具条「替换」是死按钮）",
+);
+assert.match(
+  imageNodeSource,
+  /tabIndex=\{variant === "replace" \? -1 : undefined\}/,
+  "已有图片时隐藏选择器不得新增不可见的 Tab 停靠点",
+);
+
+// 入库三态必须可见，且入库失败不得污染已成功的上传结果。
+const librarySaveSource = imageNodeSource.slice(
+  imageNodeSource.indexOf("const storeToModelLibrary = useCallback("),
+  imageNodeSource.indexOf("const handleFile = useCallback("),
+);
+assert.ok(librarySaveSource.length > 0, "必须存在独立的入库函数");
+assert.match(librarySaveSource, /setLibraryState\("saving"\)/, "入库中必须可见");
+assert.match(librarySaveSource, /setLibraryState\("saved"\)/, "入库成功必须可见");
+assert.match(librarySaveSource, /setLibraryState\("error"\)/, "入库失败必须落到失败态");
+assert.doesNotMatch(
+  librarySaveSource,
+  /updateNodeDataInTab/,
+  "入库失败不得把已经成功的上传改写成节点失败态",
+);
+assert.match(imageNodeSource, /role="status"/, "入库状态必须通过 status 语义暴露给读屏");
+
+// 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
+assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");
+assert.equal(assetNameFromUpload("/Users/me/来图/模特 2 .JPG"), "模特 2");
+assert.equal(assetNameFromUpload("   ", "图片节点"), "图片节点", "文件名不可用时回退到节点标题");
+assert.equal(assetNameFromUpload("", "  "), "上传图片", "全都不可用时回退到默认名，不得提交空名称");
+assert.equal(
+  assetNameFromUpload(`${"ä".repeat(300)}.png`).length,
+  60,
+  "自动名称必须截断（服务端限制 200 字符）",
+);
+
+const assetPosts: Array<{ url: string; init: RequestInit }> = [];
+await saveImageToModelLibrary({ name: "模特-1", image: "/api/files/a.png" }, async (url, init) => {
+  assetPosts.push({ url, init });
+  return { ok: true, status: 201 };
+});
+assert.equal(assetPosts.length, 1);
+assert.equal(assetPosts[0]!.url, "/api/assets");
+assert.equal(assetPosts[0]!.init.method, "POST");
+assert.deepEqual(
+  JSON.parse(String(assetPosts[0]!.init.body)),
+  { name: "模特-1", category: "model", image: "/api/files/a.png" },
+  "存入数字模特库必须提交 category=model",
+);
+await assert.rejects(
+  () => saveImageToModelLibrary({ name: "模特-1", image: "/api/files/a.png" }, async () => ({ ok: false, status: 400 })),
+  /HTTP 400/,
+  "入库失败必须抛出可展示的错误（由调用方落到失败态）",
+);
+
 // ---------- 7. 色彩工具入口已从 Rail 移除（只保留文本节点内） ----------
 assert.equal(
   RAIL_ENTRIES.some((entry) => entry.id === "color-tools"),
@@ -142,4 +219,4 @@ assert.ok(
   "分隔线索引不得越界",
 );
 
-console.log("数字模特库前端接线 + 色彩工具入口移除 契约测试通过");
+console.log("数字模特库前端接线（查看器 + 上传入口）+ 色彩工具入口移除 契约测试通过");
