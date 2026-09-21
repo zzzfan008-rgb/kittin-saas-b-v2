@@ -3,10 +3,10 @@
  * 运行队列与事件持久化已迁移到 runQueue/（PostgreSQL 持久队列）；本文件只保留
  * executeStep 及其纯执行辅助函数（参考图解析、Provider 请求、后处理）。
  *
- * v7 三基础节点模型（R-53）：executeStep 收敛为 text / image / video 三分支。
- * - text：同步 chat completions（Q1=B），结果写 outputText（runtime.md §1b）。
- * - image：统一生成路径，operationMode 由提示词变体携带，蒙版由 needsMask 驱动。
- * - video：异步任务路径（submit + poll），Provider 实现归 P2-e。
+ * v8 五节点模型：只有生成节点可运行（runtime.md §1）。
+ * - image-generator：统一生成路径，operationMode 由提示词变体携带，蒙版由 needsMask 驱动。
+ * - video-generator：异步任务路径（submit + poll），Provider 实现归 videoProvider。
+ * - text / image / video / result-image / result-video：不可执行，executeStep 直接 throw。
  */
 import { createHash } from "node:crypto";
 import {
@@ -27,7 +27,6 @@ import {
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
 import { generateExactImages } from "../providers/exact";
-import { getTextProvider, type TextProvider } from "../providers/textProvider";
 import { getVideoProvider, type VideoGenRequest, type VideoProvider } from "../providers/videoProvider";
 import { normalizeImageRef } from "../lib/fileStore";
 import {
@@ -44,7 +43,6 @@ import {
   modelMaxReferenceImages,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
-import { DEFAULT_TEXT_MODEL_ID, isTextModelId, type TextModelOptions } from "../../src/types/textModels";
 import { DEFAULT_VIDEO_MODEL_ID, isVideoModelId, type VideoModelOptions } from "../../src/types/videoModels";
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import { compositeMaskedEdit, prepareMaskForGeneration, resolveMaskFeatherRadius } from "../lib/maskProcessing";
@@ -87,7 +85,6 @@ export interface StepResult {
 }
 
 export type ProviderResolver = (id: string) => AIProvider;
-export type TextProviderResolver = (id: string) => TextProvider;
 export type VideoProviderResolver = (id: string) => VideoProvider;
 
 export interface ExecuteStepOptions {
@@ -115,8 +112,6 @@ export interface ExecuteStepOptions {
     providerOutputSizes?: Array<string | null>;
     providerRequestId?: string;
   }) => Promise<string[]>;
-  /** text 节点 Provider 解析器（测试注入用）；缺省走 getTextProvider。 */
-  resolveTextProvider?: TextProviderResolver;
   /** video 节点 Provider 解析器（测试注入用）；缺省走 getVideoProvider。 */
   resolveVideoProvider?: VideoProviderResolver;
   /** video 异步任务提交成功后的回调（持久化 taskId 并标记 attempt_started，幂等护栏）。 */
@@ -211,49 +206,6 @@ export async function resolveReferenceInputs(
       ...(source.sourceNodeId ? { sourceNodeId: source.sourceNodeId } : {}),
     };
   });
-}
-
-async function executeTextStep(
-  step: NodeExecution,
-  resolveTextProvider: TextProviderResolver,
-): Promise<StepResult> {
-  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
-  if (!promptVariantId) {
-    throw new Error("先在悬浮窗口选择功能");
-  }
-  const modelId = isTextModelId(step.params.modelId) ? step.params.modelId : DEFAULT_TEXT_MODEL_ID;
-  // runtime.md §1b 第 1 步：上游 text 正文（按边顺序，一律取已采纳 data.text）+ 自身正文。
-  const ownText = typeof step.params.text === "string" ? step.params.text : "";
-  const input = [...inputTextsOf(step), ownText].filter((text) => text.trim() !== "").join("\n\n");
-  if (!input.trim()) {
-    throw new Error("文本节点没有可发送的提示词");
-  }
-  const provider = resolveTextProvider(modelId);
-  const result = await provider.complete({
-    input,
-    promptVariantId,
-    modelId,
-    modelOptions: step.params.modelOptions as TextModelOptions | undefined,
-    ...(typeof step.params.contractHash === "string"
-      ? { contractHash: step.params.contractHash as `sha256:${string}` }
-      : {}),
-    ...(typeof step.params.evaluationVersion === "string"
-      ? { evaluationVersion: step.params.evaluationVersion }
-      : {}),
-  });
-  if (result.status === "failed") {
-    throw new Error(result.error);
-  }
-  const truncated = result.text.length > MAX_TEXT_LENGTH;
-  const outputText = truncated ? result.text.slice(0, MAX_TEXT_LENGTH) : result.text;
-  return {
-    images: [],
-    outputText,
-    lastRunInput: input,
-    truncated,
-    model: modelId,
-    providerRequests: 1,
-  };
 }
 
 async function executeImageGeneratorStep(
