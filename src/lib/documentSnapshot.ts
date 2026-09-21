@@ -141,10 +141,6 @@ interface EdgeLike {
   data?: unknown;
 }
 
-/** 迁移后的项目首次打开时的一次性 UI 提示文案（migration.md §7；提示属 UI 层，不进文档）。 */
-export const DOCUMENT_MIGRATION_NOTICE =
-  "项目已升级到新节点模型。原有素材与结果完整保留；如需再次生成，请为其添加生成节点。";
-
 /** 未知/更高版本、以及 v6 及以下的旧格式（fail-closed，绝不做猜测性转换）。 */
 export class DocumentFlowVersionError extends Error {
   constructor(message: string) {
