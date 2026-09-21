@@ -344,8 +344,12 @@ export interface Asset {
   scope?: "global" | "private" | "shared";
   canManage?: boolean;
   name: string;
-  /** 素材类型：print=印花 / fabric=面料 / reference=参考图 */
-  category: "print" | "fabric" | "reference";
+  /**
+   * 素材类型：print=印花 / fabric=面料 / reference=参考图 / model=数字模特。
+   * 服务端镜像清单见 `server/routes/assets.ts` 的 `CATEGORIES` 与
+   * `server/lib/database.ts` 的 CHECK 约束（R-86）。
+   */
+  category: "print" | "fabric" | "reference" | "model";
   /** 图片 URL（/api/files/xxx） */
   image: string;
   /** 列表/画布预览使用的轻量缩略图；执行节点时仍使用 image 原图。 */
