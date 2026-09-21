@@ -12,6 +12,7 @@ import {
   isImageSourceKind,
   isInputNodeKind,
   isResultNodeKind,
+  misdirectedResultSourceNodeIds,
   missingTextUpstreamNodeIds,
   nodeSpecForKind,
   textNodesOverGeneratorLimit,
@@ -565,6 +566,7 @@ export type DocumentGraphIssueCode =
   | "forbidden-reference-edge"
   | "text-over-generator-limit"
   | "missing-text-upstream"
+  | "misdirected-result-source"
   | "dangling-result-source"
   | "video-generator-aspect-ratio"
   | "generator-missing-binding";
@@ -579,12 +581,19 @@ export interface DocumentGraphIssue {
 
 /**
  * 文档图不变量回归网。两档严重度：
- * - error：结构上不可能由合法 UI 产生，读取时 fail-closed（非法边 / 禁止的 reference 边 / INV-2）
+ * - error：结构上不可能由合法 UI 产生，读取时 fail-closed
+ *   （非法边 / 禁止的 reference 边 / INV-2 / C7 情形 (a) 的伪指溯源）
  * - warning：**不阻断**文档打开或保存，只报告事实，交由运行准入或 UI 提示处理
  *   · missing-text-upstream：runtime.md §5 允许生成节点上游全断（「待接线」），D10 禁止自我销毁
- *   · dangling-result-source：data-model.md §5.1（删除生成节点不删 result 节点）与 C7 冲突，
- *     不在此处 fail-closed（已上交 architect 裁定），由服务端 schema 与运行准入兜底
+ *   · dangling-result-source：C7 情形 (b)（data-model.md §7，R-90 两档语义）——生成节点已被用户
+ *     删除，悬空引用合法（§5.1「删除生成节点不删 result 节点」），溯源走 runId，故不在此 fail-closed
  *   · generator-missing-binding：用户可能先建生成节点再选功能（C4 的运行期语义）
+ *
+ * C7 两档互斥（命中非生成节点 → error；不命中任何节点 → warning），由
+ * `misdirectedResultSourceNodeIds` / `danglingResultNodeIds` 两个谓词分别承担，
+ * 每个违例只报告一次。
+ * 禁则（R-90）：不得为了消除 dangling-result-source 而在删除生成节点时联动删除 result 节点
+ * ——那会破 AGENTS.md §3 与 §5.1 的 R2 红线；C7 也不得全线降级为 warning。
  */
 export function documentGraphIssues(snapshot: Pick<DocumentSnapshot, "nodes" | "edges">): DocumentGraphIssue[] {
   const graphNodes = snapshot.nodes.map((node) => ({ id: node.id, data: node.data as WorkflowNodeData }));
@@ -629,12 +638,22 @@ export function documentGraphIssues(snapshot: Pick<DocumentSnapshot, "nodes" | "
       message: `生成节点 ${nodeId} 还没有提示词上游（待接线，不阻断保存）`,
     });
   }
+  // C7 情形 (a)：命中同文档节点但不是生成节点 → 伪造 provenance，读取 fail-closed（R-90）。
+  for (const nodeId of misdirectedResultSourceNodeIds(graphNodes)) {
+    issues.push({
+      code: "misdirected-result-source",
+      severity: "error",
+      nodeId,
+      message: `结果节点 ${nodeId} 的 sourceGeneratorId 指向的节点不是生成节点（伪造/损坏溯源）`,
+    });
+  }
+  // C7 情形 (b)：不命中任何节点（生成节点已被删除）→ 悬空引用合法，只报告不阻断（R-90 / §5.1）。
   for (const nodeId of danglingResultNodeIds(graphNodes)) {
     issues.push({
       code: "dangling-result-source",
       severity: "warning",
       nodeId,
-      message: `结果节点 ${nodeId} 的来源生成节点已不存在（结果保留，溯源待复核）`,
+      message: `结果节点 ${nodeId} 的来源生成节点已不存在（结果保留，溯源走 runId）`,
     });
   }
   for (const node of snapshot.nodes) {
