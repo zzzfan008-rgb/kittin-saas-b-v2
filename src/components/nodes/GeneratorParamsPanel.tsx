@@ -262,6 +262,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const mediaKind = MEDIA_KIND[data.kind as GeneratorNodeKind];
   const readOnly = useFlowStore(selectActiveReadOnly);
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
+  const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
   const runNode = useFlowStore((s) => s.runNode);
   const running = isNodeRunActive(data.status);
   const disabled = readOnly || running;
@@ -643,7 +644,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
                     ) {
                       throw new Error("原图已变化，旧蒙版未覆盖当前节点，请基于新原图重新绘制");
                     }
-                    updateNodeData(nodeId, { mask: url, maskSourceRef: maskSource, error: undefined });
+                    updateNodeDataInTab(target, nodeId, { mask: url, maskSourceRef: maskSource, error: undefined });
                   },
                   close: () => setEditingMask(false),
                 },
