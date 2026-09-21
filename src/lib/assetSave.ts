@@ -33,6 +33,23 @@ type AssetSaveRequest = (
   init: RequestInit,
 ) => Promise<Pick<Response, "ok" | "status">>;
 
+/** 上传文件名不可用时的素材名兜底（服务端要求 name 非空且 ≤ 200 字符）。 */
+export const DEFAULT_UPLOAD_ASSET_NAME = "上传图片";
+/** 自动生成的素材名上限：留足显示宽度，又远低于服务端 200 字符限制。 */
+export const MAX_UPLOAD_ASSET_NAME_LENGTH = 60;
+
+/**
+ * 上传文件 → 素材名称：优先使用文件名（去目录、去扩展名、压缩空白）。
+ * 数字模特库靠名称辨识，因此不用「素材-日期」这类占位名；
+ * 文件名不可用时回退到节点标题，再回退到默认名（绝不提交空名称）。
+ */
+export function assetNameFromUpload(fileName: string, fallback?: string): string {
+  const base = fileName.split(/[\\/]/).pop() ?? "";
+  const fromFile = base.replace(/\.[^.]*$/, "").replace(/\s+/g, " ").trim();
+  const name = fromFile || fallback?.replace(/\s+/g, " ").trim() || DEFAULT_UPLOAD_ASSET_NAME;
+  return name.slice(0, MAX_UPLOAD_ASSET_NAME_LENGTH);
+}
+
 /** 把一张图片存为素材；失败抛出可展示的错误。 */
 export async function saveImageAsAsset(
   input: SaveImageAssetInput,
@@ -44,4 +61,15 @@ export async function saveImageAsAsset(
     body: JSON.stringify(assetSavePayload(input)),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
+}
+
+/**
+ * 「存入数字模特库」的唯一入口：分类固定为 "model"，调用方只给名称 / 图片 / 来源说明。
+ * 画布上传入口（ImageNode）与图片查看器共用此处，避免各自硬编码分类字符串。
+ */
+export async function saveImageToModelLibrary(
+  input: { name: string; image: string; sourceNote?: string },
+  request: AssetSaveRequest = fetch,
+): Promise<void> {
+  await saveImageAsAsset({ ...input, category: "model" }, request);
 }
