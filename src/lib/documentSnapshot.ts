@@ -34,6 +34,7 @@ import {
  *    带产物字段（C3），结果节点必须带溯源键（C5）——「拒绝非法入文档」由结构本身保证，
  *    而不是靠事后校验。
  * 2. 读取（持久化 flow → v8 文档）：版本闸 + v7→v8 惰性迁移（打开即迁，不拒绝旧项目）。
+ *    打开路径的消费入口是 `readFlowDocumentForOpen`（store 的 openFlowTab / loadFlow / 初始草稿）。
  * 3. 校验（文档图不变量）：plan.md §2 连线规则 + data-model.md §7 C1-C7 的前端侧回归网。
  */
 
@@ -787,6 +788,13 @@ export interface DocumentReadResult {
   migrated: boolean;
 }
 
+export interface DocumentOpenResult {
+  /** 可直接载入页签 / 交给落盘闸的 v8 文档（运行态统一 idle）。 */
+  flow: PersistedWorkflow;
+  /** true 表示这是 v7 文档的惰性迁移结果（写回发生在用户保存时）。 */
+  migrated: boolean;
+}
+
 /**
  * 持久化 flow → v8 文档快照。读取路径的单一入口：
  * 版本闸 → 迁移 → 投影（字段边界）→ 结构不变量（错误档 fail-closed）。
@@ -801,6 +809,19 @@ export function readDocumentSnapshotFromFlow(value: unknown): DocumentReadResult
   const errors = documentGraphErrors(snapshot);
   if (errors.length > 0) throw new DocumentGraphError(errors);
   return { snapshot, migrated };
+}
+
+/**
+ * 打开路径的单一读取入口（store 侧消费）：版本闸 → 迁移 → 投影 → 结构不变量 → 落盘闸，
+ * 产出可直接载入页签的 v8 文档（节点都带 `status: "idle"`）。
+ *
+ * 为什么不再各自 `normalizeFlowForDocumentRead`：那条路径只看节点形状，**看不到 schemaVersion**，
+ * 于是「v9 文档被读入后被保存成 v8」这种不可回滚的降级无法被发现。任何来自服务端的
+ * 项目 / 初始草稿 / 模板 flow 都必须经由这里进入文档层（architect R-89 P1-3）。
+ */
+export function readFlowDocumentForOpen(value: unknown): DocumentOpenResult {
+  const { snapshot, migrated } = readDocumentSnapshotFromFlow(value);
+  return { flow: documentSnapshotToPersistedWorkflow(snapshot), migrated };
 }
 
 /**

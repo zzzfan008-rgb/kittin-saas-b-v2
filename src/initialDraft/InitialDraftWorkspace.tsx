@@ -341,8 +341,8 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
         useFlowStore.getState().openFlowTab({
           projectId: detail.id,
           projectName: detail.name,
-          nodes: detail.flow.nodes as never,
-          edges: detail.flow.edges as never,
+          // R-91：持久化 flow 交给文档层读取（版本闸 + v7→v8 惰性迁移）。
+          flow: detail.flow,
           readOnly: detail.readOnly ?? false,
         });
         setGateState("ready");
