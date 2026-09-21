@@ -89,7 +89,8 @@ function extractOutputVideos(data: WorkflowNodeData): string[] {
 在现有 `RunEvent` 联合中新增：
 
 ```ts
-| (RunEventMeta & {
+| {
+    seq?: number;
     type: "result-node-created";
     /** 前端据此实例化 result 节点 */
     resultNodeId: string;
@@ -100,8 +101,16 @@ function extractOutputVideos(data: WorkflowNodeData): string[] {
     /** 产物引用（/api/files/xxx） */
     urls: string[];
     outputSizes?: Array<string | null>;
-  })
+  }
 ```
+
+**为何不是 `RunEventMeta & {...}`（R-90 裁定，收窄以匹配实际线格式）**
+
+服务端只发上述字段：`appendRunEvent`（`server/engine/runQueue/events.ts`）仅注入 `seq`，
+`createdAt` 落 DB 列、不进 payload；发射点 `runQueue/lifecycle.ts` 的 `result-node-created`
+不内联任何 meta。`finishedAt` / `model` / `prompts` 等由紧随其后的 `node-status(success)`
+事件携带，收窄不丢信息。写成 `RunEventMeta &` 会让生产者在这条事件上发 `prompts`/`failures`
+仍通过类型检查，而线上既无消费者也无校验——契约承诺多于线路实际携带。
 
 ### 3.2 事件时序
 
