@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
   COALESCED_TEXT_EDIT_IDLE_MS,
+  applyResultNodeCreatedEventToTab,
   applyRunEventToTab,
   flushActiveTextEdit,
   selectActiveDocument,
@@ -26,23 +27,18 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
   }
 }
 
-function aiNode(id = "coalesced-text-node"): FlowNode {
+function textNode(id = "coalesced-text-node"): FlowNode {
+  // v8：提示词正文住在 text 节点上（生成节点由上游 text 供词），所以连续文本编辑
+  // 的宿主就是 text 节点的 `text` 字段。
   return {
     id,
-    type: "image",
+    type: "text",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
+      kind: "text",
       label: "连续文本节点",
       status: "idle",
-      prompt: "初始提示词",
-      aspectRatio: "1:1",
-      batchSize: 1,
-      outputImages: [],
-      modelId: "gpt-image-2.5-flare-vip",
-      modelOptions: { size: "auto" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
+      text: "初始提示词",
     },
   };
 }
@@ -59,7 +55,7 @@ function activeTarget(): DocumentTarget {
 
 function prompt(): string {
   const data = activeDocument().nodes[0].data;
-  return data.kind === "image" ? data.prompt : "";
+  return data.kind === "text" ? data.text : "";
 }
 
 function resetDocument(id = "coalesced-text-node") {
@@ -67,7 +63,7 @@ function resetDocument(id = "coalesced-text-node") {
   useFlowStore.getState().loadFlow({
     projectId: `coalesced-project-${id}`,
     projectName: "连续文本测试",
-    nodes: [aiNode(id)],
+    nodes: [textNode(id)],
     edges: [],
   });
   useFlowStore.temporal.getState().clear();
@@ -79,12 +75,12 @@ await test("一个输入 burst 实时更新，但只提交一次 history/revisio
   resetDocument("single-burst");
   const beforeRevision = activeDocument().revision;
   let token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "single-burst", field: "prompt" },
+    { kind: "node-data", nodeId: "single-burst", field: "text" },
     "第",
   );
   assert.ok(token);
   token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "single-burst", field: "prompt" },
+    { kind: "node-data", nodeId: "single-burst", field: "text" },
     "第一版完整提示词",
     token,
   );
@@ -106,7 +102,7 @@ await test("一个输入 burst 实时更新，但只提交一次 history/revisio
 
 await test("800ms 空闲自动收口，下一次输入形成独立撤销步", async () => {
   resetDocument("idle-boundary");
-  const descriptor = { kind: "node-data", nodeId: "idle-boundary", field: "prompt" } as const;
+  const descriptor = { kind: "node-data", nodeId: "idle-boundary", field: "text" } as const;
   const token = updateCoalescedTextEdit(descriptor, "第一次 burst");
   assert.ok(token);
   await new Promise((resolve) => setTimeout(resolve, COALESCED_TEXT_EDIT_IDLE_MS + 40));
@@ -123,7 +119,7 @@ await test("800ms 空闲自动收口，下一次输入形成独立撤销步", as
 
 await test("IME 组合输入期间不会被空闲计时器中途提交", async () => {
   resetDocument("ime-boundary");
-  const descriptor = { kind: "node-data", nodeId: "ime-boundary", field: "prompt" } as const;
+  const descriptor = { kind: "node-data", nodeId: "ime-boundary", field: "text" } as const;
   const token = updateCoalescedTextEdit(descriptor, "衣", null, { composing: true });
   assert.ok(token);
   await new Promise((resolve) => setTimeout(resolve, COALESCED_TEXT_EDIT_IDLE_MS + 40));
@@ -159,7 +155,7 @@ await test("标签切换先提交源标签文本，旧 token 不能写入新项�
   resetDocument("tab-source");
   const sourceTabId = useFlowStore.getState().activeTabId;
   const token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "tab-source", field: "prompt" },
+    { kind: "node-data", nodeId: "tab-source", field: "text" },
     "切换前必须保留",
   );
   assert.ok(token);
@@ -176,25 +172,43 @@ await test("标签切换先提交源标签文本，旧 token 不能写入新项�
   assert.equal(activeDocument().projectName, newProjectName);
 });
 
-await test("异步成功回写前先提交文本，撤销顺序保持为 success→text", () => {
+await test("运行态回写不进入撤销历史，产物经结果节点落地（v8）", () => {
   resetDocument("async-success-order");
   const token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "async-success-order", field: "prompt" },
+    { kind: "node-data", nodeId: "async-success-order", field: "text" },
     "运行前最终提示词",
   );
   assert.ok(token);
+  assert.equal(flushActiveTextEdit(token), true);
   applyRunEventToTab(activeTarget(), "async-success-order", {
     type: "node-status",
     nodeId: "async-success-order",
     status: "success",
     images: ["/api/files/success.png"],
   });
-  assert.equal(useFlowStore.temporal.getState().pastStates.length, 2);
-  assert.deepEqual(activeDocument().nodes[0].data.outputImages, ["/api/files/success.png"]);
-
-  useFlowStore.getState().undo();
+  // v8（runtime.md §1/§3）：node-status 只回写运行态，既不提交文档也不产生撤销步。
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 1, "运行态回写不得进入撤销历史");
   assert.equal(prompt(), "运行前最终提示词");
-  assert.deepEqual(activeDocument().nodes[0].data.outputImages, []);
+  assert.equal(activeDocument().nodes[0].data.status, "success");
+
+  assert.equal(
+    applyResultNodeCreatedEventToTab(activeTarget(), {
+      type: "result-node-created",
+      resultNodeId: "async-success-result",
+      sourceGeneratorId: "async-success-order",
+      runId: "run-async",
+      mediaKind: "image",
+      urls: ["/api/files/success.png"],
+    }),
+    true,
+  );
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 2, "结果节点落地是一次文档变更");
+  useFlowStore.getState().undo();
+  assert.equal(
+    activeDocument().nodes.filter((node) => node.data.kind === "result-image").length,
+    0,
+    "撤销先回退结果节点",
+  );
   useFlowStore.getState().undo();
   assert.equal(prompt(), "初始提示词");
 });
@@ -207,14 +221,14 @@ await test("后台页签 success 不会拆分前台页签的输入或 IME 事务
   useFlowStore.getState().loadFlow({
     projectId: "coalesced-project-foreground-edit",
     projectName: "前台连续输入",
-    nodes: [aiNode("foreground-edit")],
+    nodes: [textNode("foreground-edit")],
     edges: [],
   });
   useFlowStore.temporal.getState().clear();
 
   const foregroundBeforeRevision = activeDocument().revision;
   const token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "foreground-edit", field: "prompt" },
+    { kind: "node-data", nodeId: "foreground-edit", field: "text" },
     "衣身",
     null,
     { composing: true },
@@ -232,13 +246,36 @@ await test("后台页签 success 不会拆分前台页签的输入或 IME 事务
   assert.equal(activeDocument().revision, foregroundBeforeRevision);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
   const backgroundTab = useFlowStore.getState().tabs.find((tab) => tab.id === backgroundTabId);
+  assert.equal(
+    backgroundTab?.nodes.filter((node) => node.data.kind === "result-image").length,
+    0,
+    "运行态回写不产生结果节点",
+  );
+  // v8：后台产物经结果节点事件落地，仍不影响前台正在组合的文本事务。
+  assert.equal(
+    applyResultNodeCreatedEventToTab(backgroundTarget, {
+      type: "result-node-created",
+      resultNodeId: "background-success-result",
+      sourceGeneratorId: "background-success",
+      runId: "run-background",
+      mediaKind: "image",
+      urls: ["/api/files/background-success.png"],
+    }),
+    true,
+  );
+  assert.equal(prompt(), "衣身", "后台结果落地不得打断前台组合输入");
+  assert.equal(activeDocument().revision, foregroundBeforeRevision, "前台文档 revision 不受后台页签影响");
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  const backgroundTabAfterResult = useFlowStore.getState().tabs.find((tab) => tab.id === backgroundTabId);
   assert.deepEqual(
-    backgroundTab?.nodes[0].data.outputImages,
+    backgroundTabAfterResult?.nodes
+      .filter((node) => node.data.kind === "result-image")
+      .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : [])),
     ["/api/files/background-success.png"],
   );
 
   const finalToken = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "foreground-edit", field: "prompt" },
+    { kind: "node-data", nodeId: "foreground-edit", field: "text" },
     "衣身保持不变",
     token,
     { composing: true },
@@ -257,14 +294,14 @@ await test("同页签换项目后迟到的旧 success 不会提交新文档 IME 
   useFlowStore.getState().loadFlow({
     projectId: "coalesced-project-reused-tab",
     projectName: "同页签新项目",
-    nodes: [aiNode("reused-tab-edit")],
+    nodes: [textNode("reused-tab-edit")],
     edges: [],
   });
   useFlowStore.temporal.getState().clear();
 
   const beforeRevision = activeDocument().revision;
   const token = updateCoalescedTextEdit(
-    { kind: "node-data", nodeId: "reused-tab-edit", field: "prompt" },
+    { kind: "node-data", nodeId: "reused-tab-edit", field: "text" },
     "新项目正在组合",
     null,
     { composing: true },
@@ -280,7 +317,11 @@ await test("同页签换项目后迟到的旧 success 不会提交新文档 IME 
   assert.equal(prompt(), "新项目正在组合");
   assert.equal(activeDocument().revision, beforeRevision);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
-  assert.equal(activeDocument().nodes[0].data.outputImages.length, 0);
+  assert.equal(
+    activeDocument().nodes.filter((node) => node.data.kind === "result-image").length,
+    0,
+    "迟到的旧 success 不得在新文档里留下产物",
+  );
 
   assert.equal(setCoalescedTextEditComposing(token, false), true);
   assert.equal(flushActiveTextEdit(token), true);

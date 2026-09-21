@@ -4,29 +4,42 @@ import {
 } from "@/store/flowStore";
 import type { Asset } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
-import type { AssetPickerRequest } from "@/lib/overlayEvents";
+import type { AssetPickerCategory, AssetPickerRequest } from "@/lib/overlayEvents";
 
 const CATEGORY_TABS = [
   ["all", "全部"],
   ["print", "印花"],
   ["fabric", "面料"],
   ["reference", "参考"],
+  ["model", "数字模特"],
 ] as const;
 
 type CategoryFilter = (typeof CATEGORY_TABS)[number][0];
 
 const PAGE_SIZE = 20;
 
+const EMPTY_HINT: Record<CategoryFilter, string> = {
+  all: "暂无素材，可在印花提取节点中「存为素材」",
+  print: "暂无印花素材，可在印花提取节点中「存为素材」",
+  fabric: "暂无面料素材",
+  reference: "暂无参考素材，可在图片查看器中「收藏为资产」",
+  model: "暂无数字模特，可在图片查看器中「存入数字模特库」",
+};
+
 /** 素材库选择浮层：按分类筛选 + 名称搜索，选中后写回目标图片上传节点 */
 export function AssetPickerOverlay({
   request,
+  initialCategory,
   onRequestChange,
 }: {
   request: AssetPickerRequest;
+  /** 打开时预选的分类（缺省读 request.initialCategory，再缺省「全部」）。 */
+  initialCategory?: AssetPickerCategory;
   onRequestChange: (request: AssetPickerRequest | null) => void;
 }) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
-  const [category, setCategory] = useState<CategoryFilter>("all");
+  const resolvedInitialCategory = request.initialCategory ?? initialCategory ?? "all";
+  const [category, setCategory] = useState<CategoryFilter>(resolvedInitialCategory);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -34,6 +47,11 @@ export function AssetPickerOverlay({
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+
+  // 同一个浮层实例被指向另一个节点时，预选分类跟随新请求；用户手动切换不被覆盖。
+  useEffect(() => {
+    setCategory((current) => (current === resolvedInitialCategory ? current : resolvedInitialCategory));
+  }, [resolvedInitialCategory]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -78,8 +96,10 @@ export function AssetPickerOverlay({
   }, [request, load]);
 
   const pick = (asset: Asset) => {
+    // v8：图片输入节点以 outputImages 承载上传图（R8 上传位语义），
+    // 选择素材等同一次上传；不再写 v7 的 imageUrl 字段。
     updateNodeDataInTab(request.target, request.nodeId, {
-      imageUrl: asset.image,
+      outputImages: [asset.image],
       status: "success",
       error: undefined,
     });
@@ -150,7 +170,7 @@ export function AssetPickerOverlay({
           )}
           {!error && !loading && assets.length === 0 && (
             <p className="py-6 text-center text-[11px] text-neutral-600">
-              {debouncedSearch ? "没有匹配的素材" : "暂无素材，可在印花提取节点中「存为素材」"}
+              {debouncedSearch ? "没有匹配的素材" : EMPTY_HINT[category]}
             </p>
           )}
           {assets.length > 0 && (

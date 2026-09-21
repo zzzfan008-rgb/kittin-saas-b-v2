@@ -236,6 +236,7 @@ Object.assign(globalThis, {
 });
 
 const {
+  applyResultNodeCreatedEventToTab,
   applyRunEventToRecentResults,
   applyRunEventToTab,
   beginHistoryTransaction,
@@ -460,8 +461,12 @@ assert.deepEqual(migrated.tabs[0].edges.map((edge) => edge.id), ["valid-edge"]);
 const migratedAi = migrated.tabs[0].nodes[0].data;
 assert.equal(migratedAi.kind, "image");
 if (migratedAi.kind !== "image") throw new Error("unexpected node kind");
-assert.equal(migratedAi.aspectRatio, "3:4");
-assert.equal(migratedAi.batchSize, 1);
+// v8（C2）：输入层节点不再自描述生成字段——旧会话里的 prompt/aspectRatio/batchSize/modelId
+// 一律不恢复；只有输出图（素材/历史产物）保留。
+assert.equal(migratedAi.aspectRatio, undefined);
+assert.equal(migratedAi.batchSize, undefined);
+assert.equal((migratedAi as { prompt?: unknown }).prompt, undefined);
+assert.equal((migratedAi as { modelId?: unknown }).modelId, undefined);
 assert.deepEqual(migratedAi.outputImages, []);
 assert.equal(migrated.tabs[0].saveState, "idle");
 assert.equal(migrated.tabs[0].dirty, true);
@@ -489,16 +494,15 @@ const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
     projectName: "通用模型恢复",
     nodes: generalModelPairs.map((pair, index) => ({
       id: `model-pair-${index}`,
-      type: "image",
+      type: "image-generator",
       position: { x: index * 80, y: 0 },
       data: {
-        kind: "image",
+        kind: "image-generator",
         label: pair.modelId,
         status: "idle",
-        prompt: "保留模型参数",
+        promptVariantId: `fashion-lookbook.${pair.modelId}.edit.v1`,
         aspectRatio: pair.aspectRatio,
         batchSize: 1,
-        outputImages: [],
         modelId: pair.modelId,
         modelOptions: pair.modelOptions,
       },
@@ -523,16 +527,14 @@ const retiredModelSession = normalizeTabSessionValue({
     projectName: "退役模型会话",
     nodes: [{
       id: "retired-model-node",
-      type: "image",
+      type: "image-generator",
       position: { x: 0, y: 0 },
       data: {
-        kind: "image",
+        kind: "image-generator",
         label: "历史 Grok 节点",
         status: "idle",
-        prompt: "旧提示词",
         aspectRatio: "4:3",
         batchSize: 1,
-        outputImages: [],
         modelId: "grok-imagine-image",
         modelOptions: { aspectRatio: "4:3", resolution: "1k" },
         operationMode: "edit",
@@ -545,8 +547,8 @@ const retiredModelSession = normalizeTabSessionValue({
 });
 assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
-assert.equal(retiredModelData.kind, "image");
-if (retiredModelData.kind !== "image") throw new Error("unexpected retired node kind");
+assert.equal(retiredModelData.kind, "image-generator");
+if (retiredModelData.kind !== "image-generator") throw new Error("unexpected retired node kind");
 assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
 assert.equal(retiredModelData.retiredModelId, undefined);
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, undefined);
@@ -754,17 +756,17 @@ useFlowStore.getState().openFlowTab({
     },
   }, {
     id: "quota-mask",
-    type: "image",
+    type: "image-generator",
     position: { x: 300, y: 0 },
     data: {
-      kind: "image", label: "局部重绘", status: "idle", prompt: "改色",
+      kind: "image-generator", label: "局部重绘", status: "idle",
+      promptVariantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
       modelId: "gpt-image-2.5-sunburst", modelOptions: {},
       aspectRatio: "3:4", batchSize: 1,
-      outputImages: [],
       mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
   }],
-  edges: [{ id: "quota-edge", source: "quota-source", target: "quota-mask" }],
+  edges: [{ id: "quota-edge", source: "quota-source", target: "quota-mask", targetHandle: "reference" }],
 });
 const quotaTabId = useFlowStore.getState().activeTabId;
 const preservedTab = useFlowStore.getState().tabs.find((tab) => tab.id !== quotaTabId);
@@ -929,26 +931,22 @@ useFlowStore.getState().loadFlow({
   projectName: "无位移成功项目",
   nodes: [{
     id: "drag-session-no-move-node",
-    type: "image",
+    type: "image-generator",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
-      label: "无位移生成节点",
+      kind: "image-generator",
+      label: "生成节点",
       status: "idle",
-      prompt: "生成成功",
-      aspectRatio: "1:1",
-      batchSize: 1,
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-      outputImages: ["/api/files/before-no-move.png"],
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
   }],
   edges: [],
 });
 const noMoveTabId = useFlowStore.getState().activeTabId;
-const durableBeforeNoMoveSuccess = persistedSessionJson();
 const writesBeforeNoMoveSuccess = sessionWrites;
 const noMoveTransaction = beginHistoryTransaction("session-no-move-success");
 applyRunEventToTab(documentTargetForTab(noMoveTabId), "drag-session-no-move-node", {
@@ -957,39 +955,76 @@ applyRunEventToTab(documentTargetForTab(noMoveTabId), "drag-session-no-move-node
   status: "success",
   images: ["/api/files/no-move-success.png"],
 });
-assert.equal(sessionWrites, writesBeforeNoMoveSuccess, "无位移事务中的 success 必须延迟落盘");
-assert.equal(persistedSessionJson(), durableBeforeNoMoveSuccess);
 assert.equal(endHistoryTransaction(noMoveTransaction), false);
-const durableAfterNoMoveSuccess = persistedSession();
-const noMoveSuccessTab = durableAfterNoMoveSuccess.tabs.find(
+// v8（runtime.md §1/§3）：node-status 只回写运行态，产物归结果节点——成功事件不再提交文档。
+const noMoveTab = useFlowStore.getState().tabs.find(
   (tab) => tab.projectId === "drag-session-no-move-success",
 );
-assert.deepEqual(
-  noMoveSuccessTab?.nodes.find((node) => node.id === "drag-session-no-move-node")?.data.outputImages,
-  ["/api/files/no-move-success.png"],
+assert.equal(
+  noMoveTab?.nodes.find((node) => node.id === "drag-session-no-move-node")?.data.status,
+  "success",
+  "生成节点的运行态必须即时可见",
 );
-assert.equal(noMoveSuccessTab?.revision, 1);
-assert.equal(noMoveSuccessTab?.dirty, true);
+assert.equal(noMoveTab?.revision, 0, "运行态回写不得提交文档 revision");
+assert.equal(noMoveTab?.dirty, false, "运行态回写不得把文档标记为已修改");
+assert.equal(sessionWrites, writesBeforeNoMoveSuccess, "运行态回写不得触发会话落盘");
+
+// 产物经 `result-node-created` 落地：这一步才写文档（revision/dirty 与结果节点）。
+assert.equal(
+  applyResultNodeCreatedEventToTab(documentTargetForTab(noMoveTabId), {
+    type: "result-node-created",
+    resultNodeId: "no-move-result",
+    sourceGeneratorId: "drag-session-no-move-node",
+    runId: "run-no-move",
+    mediaKind: "image",
+    urls: ["/api/files/no-move-success.png"],
+    outputSizes: ["2048x2048"],
+  }),
+  true,
+);
+flushTabSessionPersistence();
+const durableAfterNoMoveResult = persistedSession();
+const noMoveResultTab = durableAfterNoMoveResult.tabs.find(
+  (tab) => tab.projectId === "drag-session-no-move-success",
+);
+assert.equal(noMoveResultTab?.revision, 1);
+assert.equal(noMoveResultTab?.dirty, true);
+const noMoveResultNode = noMoveResultTab?.nodes.find((node) => node.id === "no-move-result");
+assert.deepEqual(noMoveResultNode?.position, { x: 380, y: 0 }, "结果节点落在生成节点右侧 380px");
+assert.deepEqual(noMoveResultNode?.data.images, ["/api/files/no-move-success.png"]);
+assert.deepEqual(noMoveResultNode?.data.outputSizes, ["2048x2048"]);
+assert.equal(noMoveResultNode?.data.sourceGeneratorId, "drag-session-no-move-node");
+assert.equal(noMoveResultNode?.data.runId, "run-no-move");
+// 幂等：重放同一事件不得再创建第二个结果节点，也不得再次改动文档。
+assert.equal(
+  applyResultNodeCreatedEventToTab(documentTargetForTab(noMoveTabId), {
+    type: "result-node-created",
+    resultNodeId: "no-move-result",
+    sourceGeneratorId: "drag-session-no-move-node",
+    runId: "run-no-move",
+    mediaKind: "image",
+    urls: ["/api/files/no-move-success.png"],
+  }),
+  false,
+  "重放的结果节点事件必须幂等",
+);
 
 useFlowStore.getState().loadFlow({
   projectId: "drag-session-net-zero-success",
   projectName: "净零位移成功项目",
   nodes: [{
     id: "drag-session-net-zero-node",
-    type: "image",
+    type: "image-generator",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label: "净零位移生成节点",
       status: "idle",
-      prompt: "生成成功",
-      aspectRatio: "1:1",
-      batchSize: 1,
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-      outputImages: ["/api/files/before-net-zero.png"],
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
   }],
   edges: [],
@@ -1027,10 +1062,14 @@ const durableNetZeroNode = netZeroSuccessTab?.nodes.find(
   (node) => node.id === "drag-session-net-zero-node",
 );
 assert.deepEqual(durableNetZeroNode?.position, { x: 0, y: 0 });
-assert.deepEqual(durableNetZeroNode?.data.outputImages, ["/api/files/net-zero-success.png"]);
-assert.equal(netZeroSuccessTab?.revision, 1);
-assert.equal(netZeroSuccessTab?.dirty, true);
-console.log("  ✓ 无位移与净零位移事务结束后补写期间完成的 success 输出");
+assert.equal(
+  durableNetZeroNode?.data.status,
+  "idle",
+  "运行态是瞬态：不落会话缓存，刷新后由服务器历史确认",
+);
+assert.equal(netZeroSuccessTab?.revision, 0, "净零位移 + 运行态不构成文档变更");
+assert.equal(netZeroSuccessTab?.dirty, false);
+console.log("  ✓ 无位移与净零位移事务：success 事件只改运行态，产物经结果节点事件提交文档");
 
 useFlowStore.getState().loadFlow({
   projectId: "drag-session-project",
@@ -1078,7 +1117,7 @@ console.log("  ✓ 拖拽中间帧不落 session，提交原子持久化，切�
 
 const unsafeDocumentNode = {
   id: "pure-boundary-node",
-  type: "image",
+  type: "image-generator",
   position: { x: 120, y: 48 },
   selected: true,
   dragging: true,
@@ -1087,17 +1126,14 @@ const unsafeDocumentNode = {
   height: 180,
   unknownNodeShell: "不得持久化",
   data: {
-    kind: "image",
+    kind: "image-generator",
     label: "纯文档边界",
     status: "error",
     error: "旧运行错误不得持久化",
-    prompt: buildGarmentPrompt(boundaryVariant.variantId, "保留衣身，只修改领型"),
     aspectRatio: boundaryParameters.aspectRatio,
     batchSize: boundaryParameters.batchSize,
-    outputImages: ["/api/files/pure-boundary-before.png"],
     modelId: "gpt-image-2.5-flare-vip",
     modelOptions: boundaryParameters.modelOptions,
-    operationMode: "generate",
     promptVariantId: boundaryVariant.variantId,
     promptFamilyId: boundaryVariant.familyId,
     parameterProfileId: boundaryVariant.parameterProfileId,
@@ -1105,14 +1141,25 @@ const unsafeDocumentNode = {
     evaluationVersion: boundaryVariant.evaluationVersion,
     postprocessVersion: boundaryProfile.postprocess.version,
     unknownData: "不得持久化",
+    // v7 遗留：image 节点曾自描述的正文/产物/模式，v8 不得进入文档（C2/C3）。
+    prompt: buildGarmentPrompt(boundaryVariant.variantId, "保留衣身，只修改领型"),
+    outputImages: ["/api/files/pure-boundary-before.png"],
+    operationMode: "generate",
   },
+} as import("../src/store/flowStore").FlowNode;
+// v8：正文由 text 节点提供（生成节点由上游 text 供词），提示词边只允许 text → generator。
+const boundaryTextNode = {
+  id: "pure-boundary-text",
+  type: "text",
+  position: { x: -260, y: 48 },
+  data: { kind: "text", label: "提示词", status: "idle", text: "保留衣身，只修改领型" },
 } as import("../src/store/flowStore").FlowNode;
 const unsafeDocumentEdge = {
   id: "pure-boundary-edge",
-  source: "pure-boundary-node",
-  target: "pure-boundary-result",
-  sourceHandle: "output",
-  targetHandle: "input",
+  source: "pure-boundary-text",
+  target: "pure-boundary-node",
+  sourceHandle: null,
+  targetHandle: "prompt",
   selected: true,
   unknownEdgeShell: "不得持久化",
 };
@@ -1124,17 +1171,14 @@ const boundaryResultNode = {
     kind: "image",
     label: "纯文档边界结果",
     status: "idle",
-    aspectRatio: "3:4",
-    batchSize: 1,
     outputImages: [],
   },
 } as import("../src/store/flowStore").FlowNode;
 useFlowStore.getState().openFlowTab({
   projectId: "pure-boundary-project",
   projectName: "纯文档边界项目",
-  // boundaryResultNode 是从未选择模型的 image 节点（v7 modelId 可选，见
-  // data-model.md §3）：会话恢复不得替它补默认模型（R-67 A2）。
-  nodes: [unsafeDocumentNode, boundaryResultNode],
+  // boundaryResultNode 是纯输入 image 节点：v8 输入层不带任何生成字段。
+  nodes: [boundaryTextNode, unsafeDocumentNode, boundaryResultNode],
   edges: [unsafeDocumentEdge],
 });
 useFlowStore.getState().setSelectedNodeId(unsafeDocumentNode.id);
@@ -1193,13 +1237,23 @@ const sessionWorkflow = {
 assert.deepEqual(templatePayload.flow, projectPayload.flow);
 assert.deepEqual(runWorkflow, projectPayload.flow);
 assert.deepEqual(sessionWorkflow, projectPayload.flow);
-const persistedBoundaryNode = projectPayload.flow.nodes[0] as Record<string, unknown>;
+const persistedBoundaryNode = projectPayload.flow.nodes.find(
+  (node) => (node as { id?: string }).id === "pure-boundary-node",
+) as Record<string, unknown>;
 const persistedBoundaryData = persistedBoundaryNode.data as Record<string, unknown>;
 assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "position", "type"]);
 assert.equal(persistedBoundaryData.status, "idle");
 assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
-const persistedBoundaryResult = projectPayload.flow.nodes[1] as Record<string, unknown>;
+// v8：生成层不带产物/正文/模式；功能绑定与模型参数完整保留。
+assert.equal("outputImages" in persistedBoundaryData, false, "生成节点不得携带产物字段（C3）");
+assert.equal("prompt" in persistedBoundaryData, false, "v8 正文只存在于 text 节点");
+assert.equal("operationMode" in persistedBoundaryData, false);
+assert.equal(persistedBoundaryData.promptVariantId, boundaryVariant.variantId);
+assert.deepEqual(persistedBoundaryData.modelOptions, boundaryParameters.modelOptions);
+const persistedBoundaryResult = projectPayload.flow.nodes.find(
+  (node) => (node as { id?: string }).id === "pure-boundary-result",
+) as Record<string, unknown>;
 const persistedBoundaryResultData = persistedBoundaryResult.data as Record<string, unknown>;
 assert.equal("modelId" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelId");
 assert.equal("modelOptions" in persistedBoundaryResultData, false, "纯输入 image 节点不应带 modelOptions");
@@ -1351,20 +1405,17 @@ useFlowStore.getState().openFlowTab({
   projectName: "后台持久化项目",
   nodes: [{
     id: "background-session-node",
-    type: "image",
+    type: "image-generator",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label: "后台生成节点",
       status: "idle",
-      prompt: "后台成功",
-      aspectRatio: "1:1",
-      batchSize: 1,
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "2048x2048" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
-      outputImages: ["/api/files/background-before.png"],
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
   }],
   edges: [],
@@ -1399,7 +1450,19 @@ applyRunEventToTab(backgroundTarget, "background-session-node", {
   status: "success",
   images: ["/api/files/background-success.png"],
 });
-assert.equal(sessionWrites, writesAfterTransactionBaseline, "事务中后台 success 先保持 pending");
+// v8：产物由结果节点事件落地（后台页签的稳定文档变更）。
+assert.equal(
+  applyResultNodeCreatedEventToTab(backgroundTarget, {
+    type: "result-node-created",
+    resultNodeId: "background-success-result",
+    sourceGeneratorId: "background-session-node",
+    runId: "run-background",
+    mediaKind: "image",
+    urls: ["/api/files/background-success.png"],
+  }),
+  true,
+);
+assert.equal(sessionWrites, writesAfterTransactionBaseline, "事务中后台文档变更先保持 pending");
 assert.equal(flushTabSessionPersistence(), true);
 const transactionLifecycleSnapshot = persistedSession();
 assert.deepEqual(
@@ -1413,10 +1476,10 @@ assert.deepEqual(
 assert.deepEqual(
   transactionLifecycleSnapshot.tabs
     .find((tab) => tab.id === backgroundTabId)
-    ?.nodes.find((node) => node.id === "background-session-node")
-    ?.data.outputImages,
+    ?.nodes.filter((node) => node.type === "result-image" || node.id === "background-success-result")
+    .flatMap((node) => node.data.kind === "result-image" ? node.data.images : []),
   ["/api/files/background-success.png"],
-  "生命周期 flush 必须保存事务期间其他页签的稳定 success",
+  "生命周期 flush 必须保存事务期间其他页签的稳定结果节点",
 );
 useFlowStore.getState().onNodesChange([{
   id: unsafeDocumentNode.id,

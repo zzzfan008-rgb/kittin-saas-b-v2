@@ -1,34 +1,33 @@
 import {
   WORKFLOW_SCHEMA_VERSION,
-  NODE_SPECS,
+  BATCH_SIZES,
   type NodeKind,
   type PersistedWorkflow,
   type PersistedWorkflowEdge,
   type PersistedWorkflowNode,
   type WorkflowNodeData,
-  BATCH_SIZES,
+  isGeneratorNodeKind,
+  isInputNodeKind,
+  isResultNodeKind,
 } from "../../src/types/workflow";
-import {
-  createDocumentSnapshot,
-  documentSnapshotToPersistedWorkflow,
-} from "../../src/lib/documentSnapshot";
 import { isLocalImageReference, validateImageDataUrl } from "./imageValidation";
 import {
   MASK_REDRAW_MODEL_ID,
   getImageModelContract,
+  isImageModelId,
 } from "../../src/types/imageModels";
+import { isVideoModelId } from "../../src/types/videoModels";
 
-// v7：旧 9 值 kind 的迁移 helper（retiredModelIdForMigration /
-// migratedModelFields / migratedOperationFields / migrateNodeData /
-// validateModelSelection）随 R7 无迁移裁定整体退役删除。
-// 旧 validateData 的九分支由下方 validateDataV7 取代（三值 kind）。
-const NODE_KINDS: readonly NodeKind[] = ["text", "image", "video"];
+const NODE_KINDS: readonly NodeKind[] = [
+  "text", "image", "video", "image-generator", "video-generator", "result-image", "result-video",
+];
 const STATUSES = [
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
 ] as const;
 const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
-const IMAGE_SIZES = ["2K", "4K"] as const;
+/** v8 视频生成节点只实现首帧任务（T4），画幅必须 "adaptive"（data-model.md C6）。 */
+const VIDEO_ASPECT_RATIO = "adaptive" as const;
 export const MAX_WORKFLOW_NODES = 500;
 const MAX_EDGES = 2_000;
 const MAX_TEXT_LENGTH = 20_000;
@@ -40,6 +39,16 @@ const MASK_DATA_URL_CONTRACT = (() => {
   if (!contract) throw new Error(`${MASK_REDRAW_MODEL_ID} 缺少蒙版契约`);
   return contract;
 })();
+
+/**
+ * C2：输入节点不得携带生成语义字段（data-model.md §3「输入节点不承载任何生成语义」）。
+ * 机检范围取 data-model.md §7 C2 明确列出的三字段，外加其余生成字段以 fail-closed。
+ */
+const GENERATION_FIELDS = [
+  "modelId", "promptVariantId", "modelOptions", "promptFamilyId", "parameterProfileId",
+  "contractHash", "evaluationVersion", "postprocessVersion", "aspectRatio", "batchSize",
+  "mask", "maskSourceRef", "featherRadius",
+] as const;
 
 export class WorkflowValidationError extends Error {
   constructor(message: string) {
@@ -68,6 +77,14 @@ function stringValue(value: unknown, path: string, opts?: { nonEmpty?: boolean }
 
 function optionalString(value: unknown, path: string): string | undefined {
   return value === undefined ? undefined : stringValue(value, path);
+}
+
+function optionalContractHash(value: unknown, path: string): `sha256:${string}` | undefined {
+  const contractHash = optionalString(value, path);
+  if (contractHash !== undefined && !/^sha256:[a-f0-9]{64}$/.test(contractHash)) {
+    fail(path, "must be a sha256: prefixed lowercase SHA-256");
+  }
+  return contractHash as `sha256:${string}` | undefined;
 }
 
 interface ImageReferenceOptions {
@@ -142,13 +159,15 @@ function imageReferenceArray(value: unknown, path: string, max = MAX_IMAGE_REFS)
   return value.map((item, index) => imageReference(item, `${path}[${index}]`));
 }
 
-// v7：旧 9 值 kind 的迁移 helper（retiredModelIdForMigration 已无引用，
-// migratedModelFields / migratedOperationFields / migrateNodeData /
-// validateModelSelection）随 R7 无迁移裁定整体退役删除。
-// 旧 validateData 的九分支由下方 validateDataV7 取代（三值 kind）。
+function optionalNullableStringArray(value: unknown, path: string): Array<string | null> | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) fail(path, "must be an array");
+  return value.map((item, index) => (
+    item === null ? null : stringValue(item, `${path}[${index}]`, { nonEmpty: true })
+  ));
+}
 
 function validateModelOptionsShape(rawValue: unknown, path: string): void {
-  // R5：自由 key-value；仅校验形状（对象 + 标量值），取值 warning 归运行侧。
   if (rawValue === undefined) return;
   if (typeof rawValue !== "object" || rawValue === null || Array.isArray(rawValue)) {
     fail(`${path}.modelOptions`, "must be an object");
@@ -165,13 +184,17 @@ function validateModelOptionsShape(rawValue: unknown, path: string): void {
   }
 }
 
+function assertNoGenerationFields(raw: Record<string, unknown>, path: string): void {
+  for (const field of GENERATION_FIELDS) {
+    if (raw[field] !== undefined) fail(`${path}.${field}`, "输入节点不得携带生成语义字段");
+  }
+}
+
 /**
- * v7 三值 kind 的节点数据校验（R-48 P2-a 首版；契约 data-model.md §3）。
- * 字段级深校验（蒙版引用校验、评估绑定哈希格式、maskSourceRef 联动）与
- * INV-1 图级规则在 P2-b 补全；本版先立结构骨架：kind/label/status/error +
- * 各 kind 的必填形状。
+ * v8 七值 kind 的节点数据校验（data-model.md §7 C1-C6）。
+ * 返回归一化后的干净节点数据（只保留契约已知字段），替代 documentSnapshot 的字段收敛。
  */
-function validateDataV7(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
+function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
   const input = record(rawValue, path);
   // 运行中与失败状态不能跨保存/模板持久化；成功结果本身可以保留。
   const runtimeStatus = input.status;
@@ -180,56 +203,167 @@ function validateDataV7(kind: NodeKind, rawValue: unknown, path: string): Workfl
       ? { ...input, status: "idle", error: undefined }
       : input;
   if (raw.kind !== kind) fail(`${path}.kind`, `must equal node type ${kind}`);
-  stringValue(raw.label, `${path}.label`, { nonEmpty: true });
+  const label = stringValue(raw.label, `${path}.label`, { nonEmpty: true });
   oneOf(raw.status, STATUSES, `${path}.status`);
-  optionalString(raw.error, `${path}.error`);
-  for (const field of [
-    "promptVariantId",
-    "promptFamilyId",
-    "parameterProfileId",
-    "evaluationVersion",
-    "postprocessVersion",
-  ]) {
-    optionalString(raw[field], `${path}.${field}`);
-  }
-  const contractHash = optionalString(raw.contractHash, `${path}.contractHash`);
-  if (contractHash !== undefined && !/^sha256:[a-f0-9]{64}$/.test(contractHash)) {
-    fail(`${path}.contractHash`, "must be a sha256: prefixed lowercase SHA-256");
-  }
-  validateModelOptionsShape(raw.modelOptions, path);
-  if (raw.featherRadius !== undefined) {
-    const radius = finiteNumber(raw.featherRadius, `${path}.featherRadius`);
-    if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
-  }
+  const status = raw.status as WorkflowNodeData["status"];
+  const error = optionalString(raw.error, `${path}.error`);
+  const withError = (fields: Record<string, unknown>): Record<string, unknown> => (
+    error !== undefined ? { ...fields, error } : fields
+  );
 
   switch (kind) {
-    case "text":
-      stringValue(raw.text, `${path}.text`);
-      optionalString(raw.outputText, `${path}.outputText`);
-      optionalString(raw.lastRunInput, `${path}.lastRunInput`);
-      break;
-    case "image":
-      oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
-      oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
-      imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      optionalMaskReference(raw.mask, `${path}.mask`);
-      optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
-      break;
-    case "video":
-      // 视频引用校验（/api/files/*.mp4）归 P2-e；此处先做形状校验。
-      if (raw.outputVideos !== undefined && !Array.isArray(raw.outputVideos)) {
-        fail(`${path}.outputVideos`, "must be an array");
+    case "text": {
+      assertNoGenerationFields(raw, path);
+      const text = stringValue(raw.text, `${path}.text`);
+      return { kind, label, status, text, ...withError({}) } as WorkflowNodeData;
+    }
+    case "image": {
+      assertNoGenerationFields(raw, path);
+      const outputImages = imageReferenceArray(raw.outputImages, `${path}.outputImages`);
+      return { kind, label, status, outputImages, ...withError({}) } as WorkflowNodeData;
+    }
+    case "video": {
+      assertNoGenerationFields(raw, path);
+      const outputVideos = stringArray(raw.outputVideos, `${path}.outputVideos`);
+      return { kind, label, status, outputVideos, ...withError({}) } as WorkflowNodeData;
+    }
+    case "image-generator": {
+      if (raw.outputImages !== undefined) {
+        fail(`${path}.outputImages`, "生成节点不得承载产物（产物归结果节点）");
       }
-      if (Array.isArray(raw.outputVideos)) {
-        (raw.outputVideos as unknown[]).forEach((item, index) => {
-          if (typeof item !== "string" || !item.trim()) {
-            fail(`${path}.outputVideos[${index}]`, "must be a non-empty string");
-          }
-        });
+      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`, { nonEmpty: true });
+      const modelId = raw.modelId;
+      if (!isImageModelId(modelId)) {
+        fail(`${path}.modelId`, "必须选择一个受支持的图片生成模型");
       }
-      break;
+      const promptFamilyId = optionalString(raw.promptFamilyId, `${path}.promptFamilyId`);
+      const parameterProfileId = optionalString(raw.parameterProfileId, `${path}.parameterProfileId`);
+      const contractHash = optionalContractHash(raw.contractHash, `${path}.contractHash`);
+      const evaluationVersion = optionalString(raw.evaluationVersion, `${path}.evaluationVersion`);
+      const postprocessVersion = optionalString(raw.postprocessVersion, `${path}.postprocessVersion`);
+      validateModelOptionsShape(raw.modelOptions, path);
+      const aspectRatio = oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
+      const batchSize = oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
+      const mask = optionalMaskReference(raw.mask, `${path}.mask`);
+      const maskSourceRef = optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
+      let featherRadius: number | undefined;
+      if (raw.featherRadius !== undefined) {
+        const radius = finiteNumber(raw.featherRadius, `${path}.featherRadius`);
+        if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
+        featherRadius = radius;
+      }
+      return {
+        kind,
+        label,
+        status,
+        promptVariantId,
+        modelId,
+        ...(promptFamilyId !== undefined ? { promptFamilyId } : {}),
+        ...(parameterProfileId !== undefined ? { parameterProfileId } : {}),
+        ...(contractHash !== undefined ? { contractHash } : {}),
+        ...(evaluationVersion !== undefined ? { evaluationVersion } : {}),
+        ...(postprocessVersion !== undefined ? { postprocessVersion } : {}),
+        ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
+        aspectRatio,
+        batchSize,
+        ...(mask !== undefined ? { mask } : {}),
+        ...(maskSourceRef !== undefined ? { maskSourceRef } : {}),
+        ...(featherRadius !== undefined ? { featherRadius } : {}),
+        ...withError({}),
+      } as WorkflowNodeData;
+    }
+    case "video-generator": {
+      if (raw.outputVideos !== undefined) {
+        fail(`${path}.outputVideos`, "生成节点不得承载产物（产物归结果节点）");
+      }
+      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`, { nonEmpty: true });
+      const modelId = raw.modelId;
+      if (!isVideoModelId(modelId)) {
+        fail(`${path}.modelId`, "必须选择一个受支持的视频生成模型");
+      }
+      const contractHash = optionalContractHash(raw.contractHash, `${path}.contractHash`);
+      const evaluationVersion = optionalString(raw.evaluationVersion, `${path}.evaluationVersion`);
+      validateModelOptionsShape(raw.modelOptions, path);
+      const aspectRatio = oneOf(raw.aspectRatio, [VIDEO_ASPECT_RATIO], `${path}.aspectRatio`);
+      return {
+        kind,
+        label,
+        status,
+        promptVariantId,
+        modelId,
+        ...(contractHash !== undefined ? { contractHash } : {}),
+        ...(evaluationVersion !== undefined ? { evaluationVersion } : {}),
+        ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
+        aspectRatio,
+        ...withError({}),
+      } as WorkflowNodeData;
+    }
+    case "result-image": {
+      const images = imageReferenceArray(raw.images, `${path}.images`);
+      const sourceGeneratorId = stringValue(raw.sourceGeneratorId, `${path}.sourceGeneratorId`, { nonEmpty: true });
+      const runId = stringValue(raw.runId, `${path}.runId`, { nonEmpty: true });
+      const thumbnail = optionalImageReference(raw.thumbnail, `${path}.thumbnail`);
+      const outputSizes = optionalNullableStringArray(raw.outputSizes, `${path}.outputSizes`);
+      let selectedIndex: number | undefined;
+      if (raw.selectedIndex !== undefined) {
+        const index = finiteNumber(raw.selectedIndex, `${path}.selectedIndex`);
+        if (!Number.isInteger(index) || index < 0) fail(`${path}.selectedIndex`, "must be a non-negative integer");
+        selectedIndex = index;
+      }
+      return {
+        kind,
+        label,
+        status,
+        images,
+        sourceGeneratorId,
+        runId,
+        ...(thumbnail !== undefined ? { thumbnail } : {}),
+        ...(outputSizes !== undefined ? { outputSizes } : {}),
+        ...(selectedIndex !== undefined ? { selectedIndex } : {}),
+        ...withError({}),
+      } as WorkflowNodeData;
+    }
+    case "result-video": {
+      const videos = stringArray(raw.videos, `${path}.videos`);
+      const sourceGeneratorId = stringValue(raw.sourceGeneratorId, `${path}.sourceGeneratorId`, { nonEmpty: true });
+      const runId = stringValue(raw.runId, `${path}.runId`, { nonEmpty: true });
+      let selectedIndex: number | undefined;
+      if (raw.selectedIndex !== undefined) {
+        const index = finiteNumber(raw.selectedIndex, `${path}.selectedIndex`);
+        if (!Number.isInteger(index) || index < 0) fail(`${path}.selectedIndex`, "must be a non-negative integer");
+        selectedIndex = index;
+      }
+      return {
+        kind,
+        label,
+        status,
+        videos,
+        sourceGeneratorId,
+        runId,
+        ...(selectedIndex !== undefined ? { selectedIndex } : {}),
+        ...withError({}),
+      } as WorkflowNodeData;
+    }
   }
-  return raw as unknown as WorkflowNodeData;
+}
+
+/** v7 节点迁移：保留内容、剥离全部生成字段（migration.md §2）。 */
+function migrateV7NodeData(
+  kind: "text" | "image" | "video",
+  rawValue: unknown,
+  path: string,
+): WorkflowNodeData {
+  const input = record(rawValue, path);
+  const label = stringValue(input.label, `${path}.label`, { nonEmpty: true });
+  const status = input.status === "idle" || input.status === "success" ? input.status : "idle";
+  switch (kind) {
+    case "text":
+      return { kind, label, status, text: stringValue(input.text, `${path}.text`) };
+    case "image":
+      return { kind, label, status, outputImages: imageReferenceArray(input.outputImages, `${path}.outputImages`) };
+    case "video":
+      return { kind, label, status, outputVideos: stringArray(input.outputVideos, `${path}.outputVideos`) };
+  }
 }
 
 function validateNode(value: unknown, index: number): PersistedWorkflowNode {
@@ -241,9 +375,13 @@ function validateNode(value: unknown, index: number): PersistedWorkflowNode {
   const position = record(raw.position, `${path}.position`);
   finiteNumber(position.x, `${path}.position.x`);
   finiteNumber(position.y, `${path}.position.y`);
-  const initialData = record(raw.data, `${path}.data`);
-  const data = validateDataV7(type, initialData, `${path}.data`);
-  return { ...raw, id, type, position: { ...position, x: position.x as number, y: position.y as number }, data } as PersistedWorkflowNode;
+  const data = validateDataV8(type, raw.data, `${path}.data`);
+  return {
+    id,
+    type,
+    position: { x: position.x as number, y: position.y as number },
+    data,
+  };
 }
 
 function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
@@ -255,40 +393,23 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   if (!SAFE_ID.test(id)) fail(`${path}.id`, "must contain only letters, digits, underscore or hyphen");
   if (!SAFE_ID.test(source)) fail(`${path}.source`, "must be a valid node id");
   if (!SAFE_ID.test(target)) fail(`${path}.target`, "must be a valid node id");
-  if (raw.sourceHandle !== undefined && raw.sourceHandle !== null) stringValue(raw.sourceHandle, `${path}.sourceHandle`);
-  if (raw.targetHandle !== undefined && raw.targetHandle !== null) stringValue(raw.targetHandle, `${path}.targetHandle`);
-  // 角色字段已废弃：边 data 存在即忽略，不报错、不写回。
+  const sourceHandle = raw.sourceHandle !== undefined && raw.sourceHandle !== null
+    ? stringValue(raw.sourceHandle, `${path}.sourceHandle`)
+    : undefined;
+  const targetHandle = raw.targetHandle !== undefined && raw.targetHandle !== null
+    ? stringValue(raw.targetHandle, `${path}.targetHandle`)
+    : undefined;
   const data = typeof raw.data === "object" && raw.data !== null && !Array.isArray(raw.data)
     ? raw.data as Record<string, unknown>
     : {};
-  return { ...raw, id, source, target, data } as PersistedWorkflowEdge;
+  const result: PersistedWorkflowEdge = { id, source, target, data };
+  if (sourceHandle !== undefined) result.sourceHandle = sourceHandle;
+  if (targetHandle !== undefined) result.targetHandle = targetHandle;
+  return result;
 }
 
-/**
- * Validate untrusted JSON. Schema v7（三基础节点模型）：
- * v6 及以下（含无版本）一律 WorkflowValidationError，不做迁移（R7；契约 data-model.md §2）。
- * 节点级 v7 数据校验与 INV-1 图级规则的重写归 P2-b。
- */
-export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
-  const raw = record(value, "flow");
-  const version = raw.schemaVersion;
-  const versionNumber = typeof version === "number" ? version : undefined;
-  if (versionNumber === undefined || versionNumber < WORKFLOW_SCHEMA_VERSION) {
-    // 拒绝文案固定（契约 data-model.md §2）；无版本按 v0 呈现。
-    fail("flow.schemaVersion", `该项目为旧版本格式（v${versionNumber ?? 0}），已在三节点重构中清理，请新建项目`);
-  }
-  if (versionNumber !== WORKFLOW_SCHEMA_VERSION) {
-    fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
-  }
-  if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
-  if (!Array.isArray(raw.edges)) fail("flow.edges", "must be an array");
-  if (raw.nodes.length > MAX_WORKFLOW_NODES) {
-    fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
-  }
-  if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
-
-  const nodes = raw.nodes.map((node, index) => validateNode(node, index));
-  const edges = raw.edges.map((edge, index) => validateEdge(edge, index));
+/** v8 图级校验：边 handle 类型 + INV-1/INV-2/INV-3 + C7（data-model.md §7 / runtime.md §2.1）。 */
+function validateV8Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflowEdge[]): PersistedWorkflow {
   const nodeIds = new Set<string>();
   for (const node of nodes) {
     if (nodeIds.has(node.id)) fail("flow.nodes", `duplicate node id: ${node.id}`);
@@ -301,52 +422,143 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
     if (!nodeIds.has(edge.source)) fail("flow.edges", `edge ${edge.id} source not found: ${edge.source}`);
     if (!nodeIds.has(edge.target)) fail("flow.edges", `edge ${edge.id} target not found: ${edge.target}`);
   }
-  const nodeKindById = new Map(nodes.map((node) => [node.id, node.type]));
-  // 边类型校验（graph-invariants.md §2）：targetHandle 区分 text 边 / image 边；
-  // 未知 handle（含旧 fabric / garment）一律拒绝。
+  const kindById = new Map(nodes.map((node) => [node.id, node.type]));
+
+  // 边 handle 校验（runtime.md §2.1 + T4）：
+  // - prompt：text → *-generator
+  // - reference：image/result-image → image-generator（video→video-generator 与 result-video→video-generator 本版禁止）
+  // - first-frame：image/result-image → video-generator
+  // 生成节点不作为任何边的源；结果节点不作为任何边的目标（溯源走 sourceGeneratorId）。
   for (const edge of edges) {
-    const sourceKind = nodeKindById.get(edge.source)!;
-    const targetKind = nodeKindById.get(edge.target)!;
+    const sourceKind = kindById.get(edge.source)!;
+    const targetKind = kindById.get(edge.target)!;
     const handle = edge.targetHandle ?? "";
     if (handle === "prompt") {
       if (sourceKind !== "text") {
         fail("flow.edges", `edge ${edge.id} 的 prompt 入边只能来自 text 节点`);
       }
-    } else if (handle === "reference" || handle === "") {
-      if (targetKind === "text") {
-        fail("flow.edges", `edge ${edge.id} 不能指向 text 节点（text 节点没有图片入边）`);
+      if (!isGeneratorNodeKind(targetKind)) {
+        fail("flow.edges", `edge ${edge.id} 的 prompt 入边只能指向生成节点`);
       }
-      if (sourceKind !== "image") {
-        fail("flow.edges", `edge ${edge.id} 的 reference 入边只能来自 image 节点`);
+    } else if (handle === "reference") {
+      if (targetKind !== "image-generator") {
+        fail("flow.edges", `edge ${edge.id} 的 reference 入边只能指向 image-generator 节点`);
+      }
+      if (sourceKind !== "image" && sourceKind !== "result-image") {
+        fail("flow.edges", `edge ${edge.id} 的 reference 入边只能来自 image/result-image 节点`);
+      }
+    } else if (handle === "first-frame") {
+      if (targetKind !== "video-generator") {
+        fail("flow.edges", `edge ${edge.id} 的 first-frame 入边只能指向 video-generator 节点`);
+      }
+      if (sourceKind !== "image" && sourceKind !== "result-image") {
+        fail("flow.edges", `edge ${edge.id} 的 first-frame 入边只能来自 image/result-image 节点`);
       }
     } else {
       fail("flow.edges", `edge ${edge.id} 使用了未知的 targetHandle: ${String(handle)}`);
     }
   }
-  // INV-1（graph-invariants.md §1）：每个 image/video 节点必须有 ≥1 条 text→该节点的入边。
+
+  // INV-1：每个生成节点必须有 ≥1 条 text→该节点的 prompt 入边。
   for (const node of nodes) {
-    if (node.type === "text") continue;
-    const hasTextUpstream = edges.some((edge) => edge.target === node.id && edge.targetHandle === "prompt");
-    if (!hasTextUpstream) {
+    if (!isGeneratorNodeKind(node.type)) continue;
+    const hasPrompt = edges.some((edge) => edge.target === node.id && edge.targetHandle === "prompt");
+    if (!hasPrompt) {
       fail("flow.nodes", `「${node.data.label}」需要至少一个上游文本节点提供提示词`);
     }
   }
-  // 入边限位（graph-invariants.md §2）：text 边 / image 边分开计数。
-  for (const node of nodes) {
-    const spec = NODE_SPECS[node.type];
-    const incoming = edges.filter((edge) => edge.target === node.id);
-    const textIncoming = incoming.filter((edge) => edge.targetHandle === "prompt").length;
-    const imageIncoming = incoming.length - textIncoming;
-    if (textIncoming > spec.inputs.text || imageIncoming > spec.inputs.image) {
-      fail(
-        "flow.edges",
-        `node ${node.id} accepts at most ${spec.inputs.text} text and ${spec.inputs.image} image incoming connections`,
-      );
+
+  // INV-2：单个 text 节点最多连接 1 个生成节点（runtime.md §2.1）。
+  const generatorTargetsByText = new Map<string, number>();
+  for (const edge of edges) {
+    if (edge.targetHandle !== "prompt") continue;
+    if (kindById.get(edge.source) !== "text") continue;
+    if (!isGeneratorNodeKind(kindById.get(edge.target))) continue;
+    generatorTargetsByText.set(edge.source, (generatorTargetsByText.get(edge.source) ?? 0) + 1);
+  }
+  for (const [textId, count] of generatorTargetsByText) {
+    if (count > 1) fail("flow.edges", `text 节点 ${textId} 只能连接 1 个生成节点`);
+  }
+
+  // INV-3：输入节点之间不得互连（已由 handle 校验隐含，此处显式兜底）。
+  for (const edge of edges) {
+    const sourceKind = kindById.get(edge.source)!;
+    const targetKind = kindById.get(edge.target)!;
+    if (isInputNodeKind(sourceKind) && isInputNodeKind(targetKind)) {
+      fail("flow.edges", `edge ${edge.id} 输入节点之间不得互连`);
     }
   }
-  return documentSnapshotToPersistedWorkflow(createDocumentSnapshot({
-    projectName: "",
-    nodes,
-    edges,
-  }));
+
+  // C7：结果节点的 sourceGeneratorId 若命中同文档某节点，该节点必须是生成节点
+  // （伪造/损坏 provenance 硬闸）；悬空引用（生成节点已删）放行——
+  // runId 才是账本键（AGENTS.md §4），sourceGeneratorId 仅是便利指针。
+  const generatorIds = new Set(
+    nodes.filter((node) => isGeneratorNodeKind(node.type)).map((node) => node.id),
+  );
+  for (const node of nodes) {
+    if (!isResultNodeKind(node.type)) continue;
+    const source = (node.data as { sourceGeneratorId?: unknown }).sourceGeneratorId;
+    if (typeof source === "string" && nodeIds.has(source) && !generatorIds.has(source)) {
+      fail("flow.nodes", `结果节点 ${node.id} 的 sourceGeneratorId 指向的节点不是生成节点`);
+    }
+  }
+
+  return { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes, edges };
+}
+
+/**
+ * Validate untrusted JSON（schema v8，三层七节点模型）。
+ * - schemaVersion === 8 → 直接校验（C1-C7）。
+ * - schemaVersion === 7 → 惰性迁移：保留输入节点内容、剥离生成字段、丢弃全部边（migration.md）。
+ * - schemaVersion < 7（含 undefined/0）→ 拒绝（v7 已确立「v6 及以下一律拒绝」，v8 沿用该边界）。
+ * - schemaVersion > 8 → 拒绝（未知的更高版本，fail-closed）。
+ */
+export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
+  const raw = record(value, "flow");
+  const version = raw.schemaVersion;
+  const versionNumber = typeof version === "number" ? version : undefined;
+
+  if (versionNumber !== undefined && versionNumber > WORKFLOW_SCHEMA_VERSION) {
+    fail("flow.schemaVersion", `unsupported version ${String(version)}; current version is ${WORKFLOW_SCHEMA_VERSION}`);
+  }
+  if (versionNumber === undefined || versionNumber < 7) {
+    // 拒绝文案固定（migration.md §8）；无版本按 v0 呈现。
+    fail("flow.schemaVersion", `该项目为旧版本格式（v${versionNumber ?? 0}），已在三节点重构中清理，请新建项目`);
+  }
+
+  if (versionNumber === 7) {
+    if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
+    if (raw.nodes.length > MAX_WORKFLOW_NODES) {
+      fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
+    }
+    // v7 → v8：只保留节点、剥离生成字段；丢弃全部边（migration.md §3 M4）。
+    const nodes: PersistedWorkflowNode[] = raw.nodes.map((node, index) => {
+      const path = `flow.nodes[${index}]`;
+      const n = record(node, path);
+      const id = stringValue(n.id, `${path}.id`, { nonEmpty: true });
+      if (!SAFE_ID.test(id)) fail(`${path}.id`, "must contain only letters, digits, underscore or hyphen");
+      const type = oneOf(n.type, ["text", "image", "video"] as const, `${path}.type`);
+      const position = record(n.position, `${path}.position`);
+      finiteNumber(position.x, `${path}.position.x`);
+      finiteNumber(position.y, `${path}.position.y`);
+      return {
+        id,
+        type,
+        position: { x: position.x as number, y: position.y as number },
+        data: migrateV7NodeData(type, n.data, `${path}.data`),
+      };
+    });
+    return validateV8Flow(nodes, []);
+  }
+
+  // versionNumber === 8：直接校验。
+  if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
+  if (!Array.isArray(raw.edges)) fail("flow.edges", "must be an array");
+  if (raw.nodes.length > MAX_WORKFLOW_NODES) {
+    fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
+  }
+  if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
+  const nodes = raw.nodes.map((node, index) => validateNode(node, index));
+  const edges = raw.edges.map((edge, index) => validateEdge(edge, index));
+  return validateV8Flow(nodes, edges);
 }

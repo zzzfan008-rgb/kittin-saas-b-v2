@@ -1,13 +1,15 @@
 /**
- * 左侧悬浮工具栏配置：6 个主入口 + 4 个工作流弹出菜单。
+ * 左侧悬浮工具栏配置：4 个带菜单的入口（「添加」+ 3 个工作流）
+ * + AI 画板 + 「属性 / 结果」面板入口。
  *
- * 菜单项动作（workflow action）与节点模板的映射尚未定义——
- * 当前统一由 WorkbenchShell 回落到打开节点库面板（用户可在其中选择具体节点）。
- * 后续映射表应由产品/架构确认后接入 onSelect，不在本文件硬编码。
+ * 色彩工具入口已按 `docs/design/2026-09-19-workbench-entry-wiring/plan.md` §0.3 / §3
+ * 从 Rail 移除，只保留在文本节点内（v8 落在 text 节点工具条，见
+ * `docs/design/2026-09-21-five-node-model/plan.md` §5）。
+ *
+ * 菜单项动作（workflow action）与内置模板的映射在 `src/lib/workflowMenuMapping.ts`。
  */
 import type { ReactNode } from "react";
 import {
-  DropletIcon,
   PaletteIcon,
   PlusIcon,
   ScissorsIcon,
@@ -113,11 +115,6 @@ export const RAIL_ENTRIES: RailEntry[] = [
     icon: <PaletteIcon aria-hidden="true" />,
   },
   {
-    id: "color-tools",
-    label: "色彩工具",
-    icon: <DropletIcon aria-hidden="true" />,
-  },
-  {
     id: "inspector",
     label: "属性 / 结果",
     panel: "inspector",
@@ -132,8 +129,8 @@ export const RAIL_ENTRIES: RailEntry[] = [
   },
 ];
 
-/** 分隔线插入位置：索引前插入（「添加」之后 / 视频生成之后 / 各工具组之后） */
-export const RAIL_SEPARATOR_BEFORE = [1, 4, 6] as const;
+/** 分隔线插入位置：索引前插入（「添加」之后 / 视频生成之后 / 工具组之后） */
+export const RAIL_SEPARATOR_BEFORE = [1, 4, 5] as const;
 
 /** 无菜单入口的占位动作用图标（Sparkles 表示功能待接入） */
 export const RAIL_PENDING_ICON = <SparklesIcon aria-hidden="true" />;

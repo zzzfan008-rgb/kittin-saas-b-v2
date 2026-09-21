@@ -144,7 +144,7 @@ function boundQueueParams(
 function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecution {
   return {
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [],
     upstream,
     params: boundQueueParams("生成服装效果图"),
@@ -180,7 +180,7 @@ function runnerPromptForGenerateStep(step: NodeExecution): string {
 function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
   return {
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -210,7 +210,7 @@ function runtimeEditContext(nodeId: string): GenerationRecordContext {
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "image",
+    kind: "image-generator",
     prompt: "保持服装结构并优化商业棚拍光线",
     requestedCount: 1,
   };
@@ -221,7 +221,7 @@ function context(nodeId: string): GenerationRecordContext {
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "image",
+    kind: "image-generator",
     prompt: "生成服装效果图",
     requestedCount: 1,
   };
@@ -537,7 +537,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
   const nodeId = `worker-remote-mask-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -570,7 +570,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "image",
+      kind: "image-generator",
       prompt: "仅修改蒙版区域的拉链颜色",
       requestedCount: 1,
     },
@@ -683,7 +683,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
   const nodeId = `worker-mask-guide-order-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -716,7 +716,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "image",
+      kind: "image-generator",
       prompt: "仅修改蒙版区域的拉链颜色",
       requestedCount: 1,
     },
@@ -919,7 +919,7 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
   const nodeId = `evaluation-mask-runtime-profile-${++sequence}`;
   const maskStep: NodeExecution = {
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [PNG_DATA_URL],
     inputReferences: [{
       imageRef: PNG_DATA_URL,
@@ -963,7 +963,7 @@ await test("蒙版评估最终准入不重复计入系统 guide，证据固定�
       userId: owner.id,
       nodeId,
       nodeLabel: nodeId,
-      kind: "image",
+      kind: "image-generator",
       prompt: "仅将蒙版区域改为银色拉链",
       requestedCount: 1,
     },
@@ -1617,7 +1617,7 @@ await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前�
   const plan: ExecutionPlan = {
     steps: [{
       nodeId,
-      kind: "image",
+      kind: "image-generator",
       inputImages: [],
       params: boundQueueParams("生成两张服装效果图", { batchSize: 2 }),
     }],
@@ -1626,7 +1626,7 @@ await test("入队后参数偏离受审档案时 Worker 在首次 Provider 前�
     userId: owner.id,
     nodeId,
     nodeLabel: nodeId,
-    kind: "image",
+    kind: "image-generator",
     prompt: "生成两张服装效果图",
     requestedCount: 2,
   });
@@ -1656,7 +1656,7 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
   const targetNodeId = `mapping-result-${testId}`;
   const generationStep = (nodeId: string, prompt: string): NodeExecution => ({
     nodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [],
     params: boundQueueParams(prompt),
   });
@@ -1666,7 +1666,7 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
   // 入队时的画布快照，Worker 以本次 run 的实际产出在 Provider 边界替换。
   const editStep: NodeExecution = {
     nodeId: targetNodeId,
-    kind: "image",
+    kind: "image-generator",
     inputImages: [PNG_DATA_URL, PNG_DATA_URL],
     inputReferences: [
       { imageRef: PNG_DATA_URL, order: 0, sourceNodeId: firstNodeId },
@@ -1707,7 +1707,7 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
     userId: owner.id,
     nodeId: targetNodeId,
     nodeLabel: targetNodeId,
-    kind: "image",
+    kind: "image-generator",
     requestedCount: 1,
   });
   for (let jobIndex = 0; jobIndex < 3; jobIndex += 1) {
@@ -2136,7 +2136,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       body: JSON.stringify({
         clientRequestId: "direct-mask-request",
         modelId: "gpt-image-2.5-sunburst",
-        kind: "image",
+        kind: "image-generator",
         nodeId: "direct-mask-test",
         request: {
           // v7 直连路径：request.prompt 是纯用户正文（runner 回退 params.prompt
@@ -2170,7 +2170,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     );
     assert.ok(stored);
     const queuedStep = JSON.parse(stored.step_json) as NodeExecution;
-    assert.equal(queuedStep.kind, "image");
+    assert.equal(queuedStep.kind, "image-generator");
     assert.deepEqual(queuedStep.inputImages, [PNG_DATA_URL]);
     assert.equal(queuedStep.params.maskSourceRef, PNG_DATA_URL);
     assert.equal(queuedStep.params.maskMode, undefined);
@@ -2188,7 +2188,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       body: JSON.stringify({
         clientRequestId: "direct-mask-over-limit",
         modelId: "gpt-image-2.5-sunburst",
-        kind: "image",
+        kind: "image-generator",
         nodeId: "direct-mask-over-limit",
         request: {
           prompt: "局部修改",

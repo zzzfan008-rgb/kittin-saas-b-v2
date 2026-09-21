@@ -141,15 +141,15 @@ function flow(images: string[] = []) {
 
 function generationFlow(prompt: string) {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     nodes: [
       promptTextNode(prompt),
       {
         id: "generate",
-        type: "image",
+        type: "image-generator",
         position: { x: 320, y: 0 },
         data: {
-          kind: "image",
+          kind: "image-generator",
           label: "生成效果图",
           status: "idle",
           modelId: "gemini-3.1-flash-image",
@@ -162,7 +162,6 @@ function generationFlow(prompt: string) {
           postprocessVersion: generationProfile.postprocess.version,
           aspectRatio: generationParameters.aspectRatio,
           batchSize: 1,
-          outputImages: [],
         },
       },
     ],
@@ -172,7 +171,7 @@ function generationFlow(prompt: string) {
 
 function editFlow(imageUrl: string) {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     nodes: [
       promptTextNode("改成短袖"),
       {
@@ -183,17 +182,15 @@ function editFlow(imageUrl: string) {
           kind: "image",
           label: "原图",
           status: "idle",
-          aspectRatio: "1:1",
-          batchSize: 1,
           outputImages: [imageUrl],
         },
       },
       {
         id: "edit",
-        type: "image",
+        type: "image-generator",
         position: { x: 640, y: 0 },
         data: {
-          kind: "image",
+          kind: "image-generator",
           label: "改款",
           status: "idle",
           modelId: "gpt-image-2.5-flare-vip",
@@ -206,14 +203,12 @@ function editFlow(imageUrl: string) {
           postprocessVersion: editProfile.postprocess.version,
           aspectRatio: editParameters.aspectRatio,
           batchSize: 1,
-          outputImages: [],
         },
       },
     ],
     edges: [
-      promptEdge("prompt-source", "source"),
       promptEdge("prompt-edit", "edit"),
-      { id: "source-edit", source: "source", target: "edit", data: {} },
+      { id: "source-edit", source: "source", target: "edit", targetHandle: "reference", data: {} },
     ],
   };
 }
@@ -222,21 +217,20 @@ function independentEditFlow(firstImageUrl: string, secondImageUrl: string) {
   const first = editFlow(firstImageUrl);
   const second = editFlow(secondImageUrl);
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     nodes: [
-      first.nodes[0],
+      { ...first.nodes[0], id: "prompt-a" },
       { ...first.nodes[1], id: "source-a" },
       { ...first.nodes[2], id: "edit-a" },
+      { ...second.nodes[0], id: "prompt-b" },
       { ...second.nodes[1], id: "source-b" },
       { ...second.nodes[2], id: "edit-b" },
     ],
     edges: [
-      { ...first.edges[0], id: "prompt-source-a", target: "source-a" },
-      { ...first.edges[1], id: "prompt-edit-a", target: "edit-a" },
-      { ...first.edges[2], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
-      { ...second.edges[0], id: "prompt-source-b", target: "source-b" },
-      { ...second.edges[1], id: "prompt-edit-b", target: "edit-b" },
-      { ...second.edges[2], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
+      { ...first.edges[0], id: "prompt-a-edit-a", source: "prompt-a", target: "edit-a" },
+      { ...first.edges[1], id: "source-a-edit-a", source: "source-a", target: "edit-a" },
+      { ...second.edges[0], id: "prompt-b-edit-b", source: "prompt-b", target: "edit-b" },
+      { ...second.edges[1], id: "source-b-edit-b", source: "source-b", target: "edit-b" },
     ],
   };
 }
@@ -249,15 +243,15 @@ function branchedEditFlow(imageUrl: string) {
     id: "edit-b",
     position: { x: 640, y: 240 },
   };
+  const secondPrompt = { ...base.nodes[0], id: "prompt-b", position: { x: 0, y: 240 } };
   return {
-    schemaVersion: 7,
-    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
+    schemaVersion: 8,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondPrompt, secondEdit],
     edges: [
-      { ...base.edges[0], id: "prompt-source", target: "source" },
-      { ...base.edges[1], id: "prompt-edit-a", target: "edit-a" },
-      { ...base.edges[2], id: "source-edit-a", source: "source", target: "edit-a" },
-      { ...base.edges[1], id: "prompt-edit-b", target: "edit-b" },
-      { ...base.edges[2], id: "source-edit-b", source: "source", target: "edit-b" },
+      { ...base.edges[0], id: "prompt-edit-a", target: "edit-a" },
+      { ...base.edges[1], id: "source-edit-a", source: "source", target: "edit-a" },
+      { ...base.edges[0], id: "prompt-edit-b", source: "prompt-b", target: "edit-b" },
+      { ...base.edges[1], id: "source-edit-b", source: "source", target: "edit-b" },
     ],
   };
 }
@@ -267,23 +261,32 @@ function chainedEditFlow(sourceImageUrl: string, savedFirstOutput: string) {
   const firstEdit = {
     ...base.nodes[2],
     id: "edit-first",
-    data: { ...base.nodes[2].data, outputImages: [savedFirstOutput] },
   };
+  const resultOfFirst = {
+    id: "result-first",
+    type: "result-image",
+    position: { x: 960, y: 0 },
+    data: {
+      kind: "result-image", label: "第一次结果", status: "idle",
+      images: [savedFirstOutput],
+      sourceGeneratorId: "edit-first",
+      runId: "chained-run",
+    },
+  };
+  const secondPrompt = { ...base.nodes[0], id: "prompt-b" };
   const secondEdit = {
     ...base.nodes[2],
     id: "edit-second",
-    position: { x: 960, y: 0 },
-    data: { ...base.nodes[2].data, outputImages: [] },
+    position: { x: 1280, y: 0 },
   };
   return {
-    schemaVersion: 7,
-    nodes: [base.nodes[0], base.nodes[1], firstEdit, secondEdit],
+    schemaVersion: 8,
+    nodes: [base.nodes[0], base.nodes[1], firstEdit, resultOfFirst, secondPrompt, secondEdit],
     edges: [
-      { ...base.edges[0], id: "prompt-source", target: "source" },
-      { ...base.edges[1], id: "prompt-edit-first", target: "edit-first" },
-      { ...base.edges[2], id: "source-edit-first", source: "source", target: "edit-first" },
-      { ...base.edges[1], id: "prompt-edit-second", target: "edit-second" },
-      { ...base.edges[2], id: "edit-first-edit-second", source: "edit-first", target: "edit-second" },
+      { ...base.edges[0], id: "prompt-edit-first", target: "edit-first" },
+      { ...base.edges[1], id: "source-edit-first", source: "source", target: "edit-first" },
+      { id: "result-first-edit-second", source: "result-first", target: "edit-second", targetHandle: "reference", data: {} },
+      { ...base.edges[0], id: "prompt-edit-second", source: "prompt-b", target: "edit-second" },
     ],
   };
 }
@@ -377,7 +380,7 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
   return {
     clientRequestId,
     modelId: "gpt-image-2.5-flare-vip",
-    kind: "image",
+    kind: "image-generator",
     projectId,
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
@@ -582,20 +585,30 @@ await test("模板账号 journal 可在数据库回滚或提交后恢复文件�
 });
 
 await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式越权", async () => {
-  const plan = buildExecutionPlan([{
-    id: "result",
-    type: "image",
-    data: {
-      kind: "image", label: "结果", status: "idle",
-      modelId: "gpt-image-2.5-flare-vip",
-      aspectRatio: "3:4", batchSize: 1, outputImages: [],
+  const plan = buildExecutionPlan([
+    {
+      id: "prompt",
+      type: "text",
+      data: { kind: "text", label: "提示词", status: "idle", text: "授权测试" },
     },
-  }], []);
+    {
+      id: "result",
+      type: "image-generator",
+      data: {
+        kind: "image-generator", label: "结果", status: "idle",
+        promptVariantId: editVariant.variantId,
+        modelId: "gpt-image-2.5-flare-vip",
+        aspectRatio: "3:4", batchSize: 1,
+      },
+    },
+  ], [
+    { id: "prompt-edge", source: "prompt", target: "result", targetHandle: "prompt" },
+  ]);
   const run = await enqueueGenerationRun(plan, users.owner.id, {
     userId: users.owner.id,
     nodeId: "result",
     nodeLabel: "结果",
-    kind: "image",
+    kind: "image-generator",
     requestedCount: 1,
   });
 

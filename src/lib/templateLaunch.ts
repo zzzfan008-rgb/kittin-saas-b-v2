@@ -2,6 +2,7 @@ import type { Edge } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { flushSync } from "react-dom";
 import type { WorkflowTemplate, WorkflowNodeData } from "@/types/workflow";
+import { isGeneratorNodeKind } from "@/types/workflow";
 import {
   commitDocumentMutation,
   isPristineProjectTab,
@@ -11,6 +12,7 @@ import {
   type FlowNode,
 } from "@/store/flowStore";
 import { requestCanvasLanding } from "@/lib/canvasLanding";
+import { readFlowDocumentForOpen } from "@/lib/documentSnapshot";
 
 export type TemplateLaunchMode = "default" | "upload" | "text";
 
@@ -41,9 +43,10 @@ export function inferTemplateLaunchMode(
 }
 
 function isMissingParameter(data: WorkflowNodeData): boolean {
-  // v7：text 节点缺正文 / image 节点既无输出也无参考输入时视为待补参数。
+  // v8：text 缺正文 / image 输入节点缺产物 / 生成节点未选功能绑定，都视为待补参数。
   if (data.kind === "text") return !data.text.trim();
   if (data.kind === "image") return data.outputImages.length === 0;
+  if (isGeneratorNodeKind(data.kind)) return !data.promptVariantId;
   return false;
 }
 
@@ -60,12 +63,11 @@ export function templateLandingNodeId(
   return nodes.find((node) => isMissingParameter(node.data))?.id ?? nodes[0]?.id;
 }
 
-function cloneNodes(nodes: WorkflowTemplate["flow"]["nodes"]): FlowNode[] {
-  return structuredClone(nodes) as FlowNode[];
-}
-
-function cloneEdges(edges: WorkflowTemplate["flow"]["edges"]): Edge[] {
-  return structuredClone(edges) as Edge[];
+function readTemplateDocument(template: WorkflowTemplate): { nodes: FlowNode[]; edges: Edge[] } {
+  // R-91：模板 flow 同样是「含 schemaVersion 的持久化文档」，读取必须经同一版本闸 + v7→v8 惰性迁移
+  // （migration.md §4「加载模板时惰性迁移」），不得直接把 flow.nodes 交给画布。
+  const { flow } = readFlowDocumentForOpen(template.flow);
+  return { nodes: flow.nodes as unknown as FlowNode[], edges: flow.edges as unknown as Edge[] };
 }
 
 /** 从模板始终新建独立项目页签，并登记一次性 fitView/首输入焦点。 */
@@ -74,8 +76,7 @@ export function launchTemplateInNewTab(
   mode: TemplateLaunchMode = "default",
 ): { tabId: string; projectId: string; landingNodeId?: string } {
   const projectId = nanoid(10);
-  const nodes = cloneNodes(template.flow.nodes);
-  const edges = cloneEdges(template.flow.edges);
+  const { nodes, edges } = readTemplateDocument(template);
   const landingNodeId = templateLandingNodeId(nodes, mode);
   useFlowStore.getState().openFlowTab({
     projectId,
@@ -106,8 +107,7 @@ export function launchStarterTemplate(
     return launchTemplateInNewTab(template, mode);
   }
 
-  const nodes = cloneNodes(template.flow.nodes);
-  const edges = cloneEdges(template.flow.edges);
+  const { nodes, edges } = readTemplateDocument(template);
   const landingNodeId = templateLandingNodeId(nodes, mode);
   let changed = false;
   flushSync(() => {

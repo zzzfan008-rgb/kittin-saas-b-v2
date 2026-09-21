@@ -6,6 +6,7 @@ import {
   registerDragInterruptionHandlers,
 } from "../src/components/CanvasFlow";
 import {
+  applyResultNodeCreatedEventToTab,
   applyRunEventToTab,
   beginHistoryTransaction,
   endHistoryTransaction,
@@ -52,23 +53,31 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
 }
 
 function aiNode(id = "history-node"): FlowNode {
+  // v8：生成节点是唯一可运行节点；它不带 prompt/outputImages（产物归结果节点）。
   return {
     id,
-    type: "image",
+    type: "image-generator",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label: "历史事务节点",
       status: "idle",
-      prompt: "保留衣身，修改领型",
-      aspectRatio: "1:1",
-      batchSize: 1,
-      outputImages: ["/api/files/previous.png"],
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
+  };
+}
+
+/** v8：提示词正文住在 text 节点上（生成节点由上游 text 供词）。 */
+function textNode(id: string, text: string): FlowNode {
+  return {
+    id,
+    type: "text",
+    position: { x: -380, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text },
   };
 }
 
@@ -414,6 +423,18 @@ await test("切换页签会回滚尚未结束的拖拽事务", () => {
     status: "success",
     images: ["/api/files/success-before-switch.png"],
   });
+  // v8：产物在结果节点事件里落地（运行态回写不写文档）。
+  assert.equal(
+    applyResultNodeCreatedEventToTab(documentTargetForTab(firstTabId), {
+      type: "result-node-created",
+      resultNodeId: "success-before-switch-result",
+      sourceGeneratorId: nodeId,
+      runId: "run-before-switch",
+      mediaKind: "image",
+      urls: ["/api/files/success-before-switch.png"],
+    }),
+    true,
+  );
   assert.deepEqual(activeDocument().nodes[0].position, { x: 180, y: 64 });
 
   useFlowStore.getState().switchTab(secondTabId);
@@ -422,9 +443,11 @@ await test("切换页签会回滚尚未结束的拖拽事务", () => {
   assert.deepEqual(firstTab?.nodes[0].position, { x: 0, y: 0 });
   assert.notEqual(firstTab?.nodes[0].dragging, true, "切页取消后后台页签不得残留拖拽态");
   assert.deepEqual(
-    firstTab?.nodes[0].data.kind === "image" ? firstTab.nodes[0].data.outputImages : [],
+    firstTab?.nodes
+      .filter((node) => node.data.kind === "result-image")
+      .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : [])),
     ["/api/files/success-before-switch.png"],
-    "事务回滚不能丢掉期间完成的生成输出",
+    "事务回滚不能丢掉期间落地的结果节点",
   );
   assert.equal(firstTab?.revision, beforeRevision + 1);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
@@ -435,7 +458,7 @@ await test("切换页签会回滚尚未结束的拖拽事务", () => {
 
 await test("切页取消会丢弃排队的 undo/redo 命令", async () => {
   const { tabId: firstTabId, nodeId } = resetDocument(aiNode("cancelled-history-commands"));
-  useFlowStore.getState().updateNodeData(nodeId, { prompt: "保留这次修改" });
+  useFlowStore.getState().updateNodeData(nodeId, { label: "保留这次修改" });
   useFlowStore.getState().openFlowTab({
     projectId: "cancelled-history-command-target",
     projectName: "切页目标",
@@ -461,7 +484,7 @@ await test("切页取消会丢弃排队的 undo/redo 命令", async () => {
   assert.equal(endHistoryTransaction(transaction), false);
   useFlowStore.getState().switchTab(firstTabId);
   const data = activeDocument().nodes[0].data;
-  assert.equal(data.kind === "image" ? data.prompt : "", "保留这次修改");
+  assert.equal(data.kind === "image-generator" ? data.label : "", "保留这次修改");
   assert.deepEqual(activeDocument().nodes[0].position, { x: 0, y: 0 });
 });
 
@@ -632,7 +655,7 @@ await test("项目名称的撤销栈按页签隔离", () => {
   assert.equal(activeDocument().projectName, "B 原名");
 });
 
-await test("成功生成输出作为一次提交，撤销输出时保留最新运行态", () => {
+await test("结果节点落地作为一次提交，撤销结果不倒退运行态", () => {
   const { tabId, nodeId } = resetDocument();
   const beforeRevision = activeDocument().revision;
 
@@ -648,33 +671,46 @@ await test("成功生成输出作为一次提交，撤销输出时保留最新�
     images: ["/api/files/final-a.png", "/api/files/final-b.png"],
     finishedAt: 2_000,
   });
+  // v8：运行态（running/success 及其 images）不写文档，只有结果节点事件提交文档。
+  assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
+  assert.equal(activeDocument().revision, beforeRevision);
+  assert.equal(activeDocument().nodes[0].data.status, "success");
 
+  assert.equal(
+    applyResultNodeCreatedEventToTab(documentTargetForTab(tabId), {
+      type: "result-node-created",
+      resultNodeId: "final-result",
+      sourceGeneratorId: nodeId,
+      runId: "run-final",
+      mediaKind: "image",
+      urls: ["/api/files/final-a.png", "/api/files/final-b.png"],
+    }),
+    true,
+  );
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
   assert.equal(activeDocument().revision, beforeRevision + 1);
-  assert.deepEqual(
-    activeDocument().nodes[0].data.kind === "image"
-      ? activeDocument().nodes[0].data.outputImages
-      : [],
-    ["/api/files/final-a.png", "/api/files/final-b.png"],
-  );
+  const resultImages = () => activeDocument().nodes
+    .filter((node) => node.data.kind === "result-image")
+    .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : []));
+  assert.deepEqual(resultImages(), ["/api/files/final-a.png", "/api/files/final-b.png"]);
 
   useFlowStore.getState().undo();
   const undone = activeDocument().nodes[0].data;
   assert.equal(undone.status, "success", "undo 只撤销文档输出，不倒退服务端运行态");
-  assert.deepEqual(undone.kind === "image" ? undone.outputImages : [], ["/api/files/previous.png"]);
+  assert.deepEqual(resultImages(), [], "撤销回退结果节点");
 
   useFlowStore.getState().redo();
   const redone = activeDocument().nodes[0].data;
   assert.equal(redone.status, "success");
-  assert.deepEqual(
-    redone.kind === "image" ? redone.outputImages : [],
-    ["/api/files/final-a.png", "/api/files/final-b.png"],
-  );
+  assert.deepEqual(resultImages(), ["/api/files/final-a.png", "/api/files/final-b.png"]);
 });
 
-await test("拖拽期间的成功输出与位置历史彼此独立", () => {
+await test("拖拽期间落地的结果节点与位置历史彼此独立", () => {
   const { tabId, nodeId } = resetDocument(aiNode("concurrent-success"));
   const beforeRevision = activeDocument().revision;
+  const resultImages = () => activeDocument().nodes
+    .filter((node) => node.data.kind === "result-image")
+    .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : []));
   const transaction = beginHistoryTransaction("node-drag-with-success");
   useFlowStore.getState().onNodesChange([{
     id: nodeId,
@@ -688,6 +724,17 @@ await test("拖拽期间的成功输出与位置历史彼此独立", () => {
     status: "success",
     images: ["/api/files/concurrent.png"],
   });
+  assert.equal(
+    applyResultNodeCreatedEventToTab(documentTargetForTab(tabId), {
+      type: "result-node-created",
+      resultNodeId: "concurrent-result",
+      sourceGeneratorId: nodeId,
+      runId: "run-concurrent",
+      mediaKind: "image",
+      urls: ["/api/files/concurrent.png"],
+    }),
+    true,
+  );
   endHistoryTransaction(transaction);
 
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 2);
@@ -695,17 +742,15 @@ await test("拖拽期间的成功输出与位置历史彼此独立", () => {
   assert.deepEqual(activeDocument().nodes[0].position, { x: 120, y: 48 });
 
   useFlowStore.getState().undo();
-  let data = activeDocument().nodes[0].data;
   assert.deepEqual(activeDocument().nodes[0].position, { x: 0, y: 0 });
-  assert.deepEqual(data.kind === "image" ? data.outputImages : [], ["/api/files/concurrent.png"]);
+  assert.deepEqual(resultImages(), ["/api/files/concurrent.png"], "撤销位置不丢结果节点");
 
   useFlowStore.getState().undo();
-  data = activeDocument().nodes[0].data;
   assert.deepEqual(activeDocument().nodes[0].position, { x: 0, y: 0 });
-  assert.deepEqual(data.kind === "image" ? data.outputImages : [], ["/api/files/previous.png"]);
+  assert.deepEqual(resultImages(), [], "再撤销回退结果节点");
 });
 
-await test("后台页签的成功输出在切回后仍可独立撤销", () => {
+await test("后台页签落地的结果节点在切回后仍可独立撤销", () => {
   const { tabId: firstTabId, nodeId } = resetDocument(aiNode("background-success"));
   useFlowStore.getState().openFlowTab({
     projectId: "background-success-second-project",
@@ -721,12 +766,27 @@ await test("后台页签的成功输出在切回后仍可独立撤销", () => {
     status: "success",
     images: ["/api/files/background-success.png"],
   });
+  assert.equal(
+    applyResultNodeCreatedEventToTab(documentTargetForTab(firstTabId), {
+      type: "result-node-created",
+      resultNodeId: "background-success-result",
+      sourceGeneratorId: nodeId,
+      runId: "run-background",
+      mediaKind: "image",
+      urls: ["/api/files/background-success.png"],
+    }),
+    true,
+  );
   const backgroundTab = useFlowStore.getState().tabs.find((tab) => tab.id === firstTabId);
-  assert.deepEqual(
-    backgroundTab?.nodes[0].data.kind === "image"
-      ? backgroundTab.nodes[0].data.outputImages
-      : [],
-    ["/api/files/background-success.png"],
+  const backgroundResultImages = () => useFlowStore.getState().tabs
+    .find((tab) => tab.id === firstTabId)
+    ?.nodes.filter((node) => node.data.kind === "result-image")
+    .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : [])) ?? [];
+  assert.deepEqual(backgroundResultImages(), ["/api/files/background-success.png"]);
+  assert.equal(
+    backgroundTab?.nodes.find((node) => node.id === nodeId)?.data.status,
+    "success",
+    "后台页签运行态同步可见",
   );
 
   useFlowStore.getState().switchTab(firstTabId);
@@ -734,23 +794,19 @@ await test("后台页签的成功输出在切回后仍可独立撤销", () => {
   useFlowStore.getState().undo();
   const undone = activeDocument().nodes[0].data;
   assert.equal(undone.status, "success");
-  assert.deepEqual(undone.kind === "image" ? undone.outputImages : [], ["/api/files/previous.png"]);
+  assert.deepEqual(backgroundResultImages(), [], "撤销回退后台页签的结果节点");
 
   useFlowStore.getState().switchTab(secondTabId);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
   useFlowStore.getState().switchTab(firstTabId);
   assert.equal(useFlowStore.temporal.getState().futureStates.length, 1, "页签切换不能丢失 redo");
   useFlowStore.getState().redo();
-  const redone = activeDocument().nodes[0].data;
-  assert.deepEqual(
-    redone.kind === "image" ? redone.outputImages : [],
-    ["/api/files/background-success.png"],
-  );
+  assert.deepEqual(backgroundResultImages(), ["/api/files/background-success.png"]);
 });
 
 await test("每个项目页签保留独立的撤销与重做栈", () => {
   const { tabId: firstTabId, nodeId: firstNodeId } = resetDocument(aiNode("tab-history-a"));
-  useFlowStore.getState().updateNodeData(firstNodeId, { prompt: "A 的新提示词" });
+  useFlowStore.getState().updateNodeData(firstNodeId, { label: "A 的新提示词" });
   useFlowStore.getState().openFlowTab({
     projectId: "tab-history-project-b",
     projectName: "页签 B",
@@ -758,24 +814,24 @@ await test("每个项目页签保留独立的撤销与重做栈", () => {
     edges: [],
   });
   const secondTabId = useFlowStore.getState().activeTabId;
-  useFlowStore.getState().updateNodeData("tab-history-b", { prompt: "B 的新提示词" });
+  useFlowStore.getState().updateNodeData("tab-history-b", { label: "B 的新提示词" });
 
   useFlowStore.getState().switchTab(firstTabId);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
   useFlowStore.getState().undo();
   const firstData = activeDocument().nodes[0].data;
-  assert.equal(firstData.kind === "image" ? firstData.prompt : "", "保留衣身，修改领型");
+  assert.equal(firstData.kind === "image-generator" ? firstData.label : "", "历史事务节点");
 
   useFlowStore.getState().switchTab(secondTabId);
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 1);
   useFlowStore.getState().undo();
   const secondData = activeDocument().nodes[0].data;
-  assert.equal(secondData.kind === "image" ? secondData.prompt : "", "保留衣身，修改领型");
+  assert.equal(secondData.kind === "image-generator" ? secondData.label : "", "历史事务节点");
 });
 
 await test("运行态写入不清除已有 redo，成功事件重放不新增历史", () => {
   const { tabId, nodeId } = resetDocument();
-  useFlowStore.getState().updateNodeData(nodeId, { prompt: "第一次修改" });
+  useFlowStore.getState().updateNodeData(nodeId, { label: "第一次修改" });
   useFlowStore.getState().undo();
   assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
 
@@ -787,8 +843,8 @@ await test("运行态写入不清除已有 redo，成功事件重放不新增历
   assert.equal(useFlowStore.temporal.getState().futureStates.length, 1);
   useFlowStore.getState().redo();
   assert.equal(
-    activeDocument().nodes[0].data.kind === "image"
-      ? activeDocument().nodes[0].data.prompt
+    activeDocument().nodes[0].data.kind === "image-generator"
+      ? activeDocument().nodes[0].data.label
       : "",
     "第一次修改",
   );
@@ -813,14 +869,14 @@ await test("运行态写入不清除已有 redo，成功事件重放不新增历
 
 await test("zundo 公开 undo/redo 按多步顺序回放 canonical 页签", () => {
   const { nodeId } = resetDocument(aiNode("public-temporal-api"));
-  for (const prompt of ["第一步", "第二步", "第三步"]) {
-    useFlowStore.getState().updateNodeData(nodeId, { prompt });
+  for (const label of ["第一步", "第二步", "第三步"]) {
+    useFlowStore.getState().updateNodeData(nodeId, { label });
   }
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 3);
 
   useFlowStore.temporal.getState().undo(3);
   let data = activeDocument().nodes[0].data;
-  assert.equal(data.kind === "image" ? data.prompt : "", "保留衣身，修改领型");
+  assert.equal(data.kind === "image-generator" ? data.label : "", "历史事务节点");
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 0);
   assert.equal(useFlowStore.temporal.getState().futureStates.length, 3);
   assert.equal(Object.prototype.hasOwnProperty.call(useFlowStore.getState(), "projectName"), false);
@@ -829,7 +885,7 @@ await test("zundo 公开 undo/redo 按多步顺序回放 canonical 页签", () =
 
   useFlowStore.temporal.getState().redo(3);
   data = activeDocument().nodes[0].data;
-  assert.equal(data.kind === "image" ? data.prompt : "", "第三步");
+  assert.equal(data.kind === "image-generator" ? data.label : "", "第三步");
   assert.equal(useFlowStore.temporal.getState().pastStates.length, 3);
   assert.equal(useFlowStore.temporal.getState().futureStates.length, 0);
 });
@@ -842,7 +898,7 @@ await test("撤销文档不回退 React Flow 测量瞬态与服务端运行态",
     height: 160,
   };
   const { nodeId } = resetDocument(measuredNode);
-  useFlowStore.getState().updateNodeData(nodeId, { prompt: "会被撤销的提示词" });
+  useFlowStore.getState().updateNodeData(nodeId, { label: "会被撤销的提示词" });
   patchActiveDocument({
     nodes: activeDocument().nodes.map((node) => node.id === nodeId
       ? {
@@ -861,7 +917,7 @@ await test("撤销文档不回退 React Flow 测量瞬态与服务端运行态",
   assert.equal(restored.width, 480);
   assert.equal(restored.height, 320);
   assert.equal(restored.data.status, "success");
-  assert.equal(restored.data.kind === "image" ? restored.data.prompt : "", "保留衣身，修改领型");
+  assert.equal(restored.data.kind === "image-generator" ? restored.data.label : "", "历史事务节点");
 });
 
 console.log(`\n通过 ${passed} 项`);

@@ -165,8 +165,8 @@ export async function completeJobSuccess(
   finishedAt: number,
 ): Promise<void> {
   const imageUrls = persistedImages.map((image) => image.url);
-  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。video 无 image 证据链。
-  const isProviderStep = job.step.kind === "image";
+  // v8：付费图片节点判定改为 kind === "image-generator"。video-generator 无 image 证据链。
+  const isProviderStep = job.step.kind === "image-generator";
   const videoUrls = videos.filter((video) => video.startsWith("/api/files/"));
   if (videoUrls.length !== videos.length) {
     throw new Error("video outputs must be local /api/files references");
@@ -250,6 +250,21 @@ export async function completeJobSuccess(
       finishedAt,
     });
     const partialWarning = result.failures?.length ? `${result.failures.length} 个生成任务失败` : undefined;
+    // result-node-created：一轮 run 发一次，携带该 run 的全部产物（runtime.md §3.2）。
+    // 产物落结果节点，不覆写生成节点自身。resultNodeId 与 runId 一一对应，恢复补发幂等。
+    const mediaKind: "image" | "video" = job.step.kind === "video-generator" ? "video" : "image";
+    const resultUrls = mediaKind === "video" ? videoUrls : imageUrls;
+    if (resultUrls.length > 0) {
+      await appendRunEvent(client, run.id, {
+        type: "result-node-created",
+        resultNodeId: `result-${run.id}`,
+        sourceGeneratorId: job.nodeId,
+        runId: run.id,
+        mediaKind,
+        urls: resultUrls,
+        ...(result.providerOutputSizes ? { outputSizes: result.providerOutputSizes } : {}),
+      }, finishedAt);
+    }
     await appendRunEvent(client, run.id, {
       type: "node-status",
       nodeId: job.nodeId,

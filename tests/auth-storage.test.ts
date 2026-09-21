@@ -21,7 +21,7 @@ const { purgeExpiredProjects } = await import("../server/routes/projects");
 const { openAiMaskTestRecordPath } = await import("../server/lib/openaiMaskTestLifecycle");
 const { verifyPassword } = await import("../server/lib/password");
 const { enqueueGenerationRun, processNextGenerationJob } = await import("../server/engine/runQueue");
-const { buildGarmentPrompt, requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
+const { requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
 const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
 const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
 
@@ -37,7 +37,8 @@ const storageGenerateParameters = materializeModelParameterProfile(storageGenera
 
 function boundStorageGenerateParams(intent: string): Record<string, unknown> {
   return {
-    prompt: buildGarmentPrompt(storageGenerateVariant.variantId, intent),
+    // v8：用户正文沿 text 边进入 inputTexts，不再提交 buildGarmentPrompt 包装。
+    inputTexts: [intent],
     promptVariantId: storageGenerateVariant.variantId,
     promptFamilyId: storageGenerateVariant.familyId,
     parameterProfileId: storageGenerateVariant.parameterProfileId,
@@ -709,7 +710,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     {
       steps: [{
         nodeId: successNodeId,
-        kind: "image",
+        kind: "image-generator",
         inputImages: [],
         params: boundStorageGenerateParams("生成成功效果图"),
       }],
@@ -719,7 +720,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
       userId: String(admin.id),
       nodeId: successNodeId,
       nodeLabel: "AI 改款",
-      kind: "image",
+      kind: "image-generator",
       requestedCount: 1,
     },
   );
@@ -740,7 +741,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     {
       steps: [{
         nodeId: failureNodeId,
-        kind: "image",
+        kind: "image-generator",
         inputImages: [],
         params: boundStorageGenerateParams("生成失败效果图"),
       }],
@@ -750,7 +751,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
       userId: String(admin.id),
       nodeId: failureNodeId,
       nodeLabel: "AI 改款",
-      kind: "image",
+      kind: "image-generator",
       requestedCount: 1,
     },
   );

@@ -10,7 +10,7 @@ import { lockActiveOwner } from "../lib/ownerMutation";
 import type { Asset } from "../../src/types/workflow";
 
 export const assetsRouter = Router();
-const CATEGORIES: Asset["category"][] = ["print", "fabric", "reference"];
+const CATEGORIES: Array<Asset["category"] | "model"> = ["print", "fabric", "reference", "model"];
 const TRASH_DAYS = 15;
 
 interface AssetRow {

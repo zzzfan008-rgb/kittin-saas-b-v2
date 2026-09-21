@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { isImageModelId, type ImageModelId } from "../../src/types/imageModels";
-import { NODE_SPECS, type ExecutionPlan, type NodeExecution } from "../../src/types/workflow";
+import { NODE_SPECS, generationKindOf, type ExecutionPlan, type NodeExecution } from "../../src/types/workflow";
 import type { AuthUser } from "./auth";
 import {
   EVALUATION_AUTHORIZATION_ID_PATTERN,
@@ -103,8 +103,8 @@ function databaseSafeInteger(value: number | string, field: string): number {
 }
 
 function providerStep(plan: ExecutionPlan): NodeExecution {
-  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
-  const providerSteps = plan.steps.filter((step) => step.kind === "image");
+  // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
+  const providerSteps = plan.steps.filter((step) => generationKindOf(step.kind) === "image");
   if (providerSteps.length !== 1) {
     throw new EvaluationRunPolicyError("每个真实评估 case 必须且只能包含一个付费节点", 400);
   }
@@ -113,7 +113,7 @@ function providerStep(plan: ExecutionPlan): NodeExecution {
 
 function maximumProviderRequestsForStep(step: NodeExecution): number {
   // v7：一色一图 / count 分批机制删除（Q4=A）；张数一律由 batchSize 表达。
-  if (step.kind === "image") {
+  if (generationKindOf(step.kind) === "image") {
     return Math.max(1, Math.min(8, Math.floor(Number(step.params.batchSize) || 1)));
   }
   return 1;

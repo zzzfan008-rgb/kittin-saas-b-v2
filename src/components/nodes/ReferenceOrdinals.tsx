@@ -22,10 +22,14 @@ export function ReferenceOrdinalsProvider({ children }: { children: ReactNode })
   const selectedNodeIds = useFlowStore(useShallow(selectActiveSelectedNodeIds));
   const ordinals = useMemo(() => {
     // 渲染闸（§2b.2）：仅当选中的是 image/video 目标时为其入边源节点派生序号；
+    // v8（plan.md §2.1）：参考图 / 首帧入边落在生成层节点上，因此生成层同为目标；
     // 多选时取最后一个（与主选择口径一致）。
     const selectedTarget = [...selectedNodeIds].reverse().find((selectedId) => {
       const target = nodes.find((node) => node.id === selectedId);
-      return target?.data.kind === "image" || target?.data.kind === "video";
+      return target?.data.kind === "image"
+        || target?.data.kind === "video"
+        || target?.data.kind === "image-generator"
+        || target?.data.kind === "video-generator";
     }) ?? null;
     return selectReferenceOrdinals(nodes, edges, selectedTarget);
   }, [nodes, edges, selectedNodeIds]);

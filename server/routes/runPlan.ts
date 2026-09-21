@@ -10,6 +10,7 @@ import { isDeepStrictEqual } from "node:util";
 import {
   NODE_SPECS,
   WORKFLOW_SCHEMA_VERSION,
+  generationKindOf,
   type ExecutionPlan,
   type NodeExecution,
   type PersistedWorkflow,
@@ -77,8 +78,8 @@ function hasExactExecutionEdgeSemantics(
 }
 
 export function requestedCountForStep(kind: string, params: Record<string, unknown>): number {
-  // v7：image 节点按 batchSize；text/video 各 1（video 归 P2-e）。
-  if (kind !== "image") return 1;
+  // v8：image-generator 按 batchSize；video-generator 各 1。
+  if (kind !== "image-generator") return 1;
   return Math.max(1, Math.min(8, Number(params.batchSize) || 1));
 }
 
@@ -147,9 +148,9 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
     }
     references.push(...actualStaticInputs);
 
-    // 蒙版（image 节点 needsMask 变体，operationMode === "mask-edit"）追加到引用检查。
+    // 蒙版（image-generator 节点 needsMask 变体，operationMode === "mask-edit"）追加到引用检查。
     const plannedInputCount = plannedStepReferences(step).length;
-    if (step.kind === "image" && step.params.operationMode === "mask-edit" && typeof step.params.mask === "string") {
+    if (generationKindOf(step.kind) === "image" && step.params.operationMode === "mask-edit" && typeof step.params.mask === "string") {
       references.push({
         imageRef: step.params.mask,
         order: plannedInputCount,

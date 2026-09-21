@@ -22,6 +22,7 @@ import { lockActiveOwner, lockActiveOwnerMutation } from "../lib/ownerMutation";
 import { purgeExpiredUserTemplates } from "../lib/userTemplateLifecycle";
 import {
   WORKFLOW_SCHEMA_VERSION,
+  type BatchSize,
   type PersistedWorkflowEdge,
   type PersistedWorkflowNode,
   type WorkflowTemplate,
@@ -30,6 +31,10 @@ import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
 } from "../../src/types/imageModels";
+import {
+  DEFAULT_VIDEO_MODEL_ID,
+  type VideoModelOptions,
+} from "../../src/types/videoModels";
 import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
 import {
   getModelParameterProfile,
@@ -53,28 +58,41 @@ function templatePath(sub: "builtin" | "user", id: string): string {
   return path.join(templatesDir(sub), `${path.basename(id)}.json`);
 }
 
-// ---------- 内置模板（v7 三基础节点；data 默认值见 contracts/template-format.md §1）----------
+// ---------- 内置模板（v8 三层七节点：输入层 + 生成层 + 边，不含 result 节点）----------
+// 结构契约：docs/design/2026-09-21-five-node-model/contracts/template-format.md
 const BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
-// 六族功能 → 新变体清单归 P2-d 目录重写；此处先落到当前目录已注册的变体
-// （generate/edit 族），P2-d 重写目录时按 prompt-variant-schema.md §3 一一替换。
+// 变体 id 以 src/lib/garmentPromptPresets.ts（P2-d 目录）实际值为准；
+// 注册前经 getGarmentPromptVariantById 逐条解析验证（P4）。
 const GENERATE_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1";
 const EDIT_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+const VIDEO_VARIANT = "video-animate.doubao-seedance-2-5-260628.edit.v1";
+// 视频生成节点硬约束：aspectRatio 必须 "adaptive"（Seedance 首帧任务，C6/P5）。
+const VIDEO_OPTIONS = { seconds: "5", resolution: "720p", aspectRatio: "adaptive" } as const;
 
 function textNode(id: string, x: number, y: number, label: string, text: string): PersistedWorkflowNode {
   return { id, type: "text", position: { x, y }, data: { kind: "text", label, status: "idle", text } };
 }
 
-function imageNode(
+function imageNode(id: string, x: number, y: number, label: string): PersistedWorkflowNode {
+  // v8：输入节点不承载任何生成语义（无 variantId / modelId / aspectRatio / batchSize）。
+  return { id, type: "image", position: { x, y }, data: { kind: "image", label, status: "idle", outputImages: [] } };
+}
+
+interface ImageGeneratorOptions {
+  aspectRatio?: string;
+  batchSize?: BatchSize;
+}
+
+function imageGeneratorNode(
   id: string,
   x: number,
   y: number,
   label: string,
   variantId: string,
-  aspectRatio: string,
+  options: ImageGeneratorOptions = {},
 ): PersistedWorkflowNode {
-  // v7（R-78/P2-b）：变体绑定是唯一事实源。种子节点直接物化已评估参数档案
-  // （modelOptions / batchSize / 业务画幅），模板落地后无需用户再点一次目录即可
-  // 通过运行准入；档案缺失时退回合同推荐默认值，由 parameter-drift 闸门拒绝。
+  // 生成层：功能绑定 + 参数物化。变体绑定是唯一事实源，档案缺失时退回合同推荐默认值，
+  // 由 parameter-drift 闸门在运行时拒绝（沿用 v7 的物化口径）。
   const boundVariant = getGarmentPromptVariantById(variantId);
   const boundProfile = boundVariant
     ? getModelParameterProfile(boundVariant.parameterProfileId)
@@ -82,12 +100,15 @@ function imageNode(
   const materialized = boundProfile
     ? materializeModelParameterProfile(boundProfile)
     : undefined;
+  const aspectRatio = options.aspectRatio
+    ?? (materialized && materialized.aspectRatio !== "source" ? materialized.aspectRatio : "3:4");
+  const batchSize = options.batchSize ?? (materialized ? materialized.batchSize : 1);
   return {
     id,
-    type: "image",
+    type: "image-generator",
     position: { x, y },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label,
       status: "idle",
       promptVariantId: variantId,
@@ -95,155 +116,349 @@ function imageNode(
       modelOptions: materialized
         ? materialized.modelOptions
         : defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
-      aspectRatio: materialized && materialized.aspectRatio !== "source"
-        ? materialized.aspectRatio
-        : aspectRatio,
-      batchSize: materialized ? materialized.batchSize : 1,
-      outputImages: [],
+      aspectRatio,
+      batchSize,
     },
   };
 }
 
-function edge(id: string, source: string, target: string, targetHandle?: "prompt" | "reference"): PersistedWorkflowEdge {
+interface VideoGeneratorOptions {
+  aspectRatio?: string;
+  modelOptions?: VideoModelOptions;
+}
+
+function videoGeneratorNode(
+  id: string,
+  x: number,
+  y: number,
+  label: string,
+  variantId: string,
+  options: VideoGeneratorOptions = {},
+): PersistedWorkflowNode {
+  return {
+    id,
+    type: "video-generator",
+    position: { x, y },
+    data: {
+      kind: "video-generator",
+      label,
+      status: "idle",
+      promptVariantId: variantId,
+      modelId: DEFAULT_VIDEO_MODEL_ID,
+      modelOptions: options.modelOptions ?? { ...VIDEO_OPTIONS },
+      aspectRatio: options.aspectRatio ?? "adaptive",
+    },
+  };
+}
+
+function edge(id: string, source: string, target: string, targetHandle?: "prompt" | "reference" | "first-frame"): PersistedWorkflowEdge {
   return { id, source, target, ...(targetHandle ? { targetHandle } : {}), data: {} };
 }
 
-function builtinTemplates(): WorkflowTemplate[] {
+export function builtinTemplates(): WorkflowTemplate[] {
   return [
+    // ---------- AI 换装（5 个）----------
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-text-to-image",
-      name: "文生图（服装设计）",
-      description: "输入款式、面料、色彩、模特、场景与摄影要求，直接生成服装设计效果图",
+      id: "builtin-model-tryon",
+      name: "模特试穿",
+      description: "上传服装图与数字模特图，描述试穿要求，生成模特上身效果",
       builtIn: true,
       createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode(
-            "prompt-1", 0, 0, "提示词",
-            "设计一套现代都市女装：廓形利落的短款西装搭配高腰阔腿长裤，使用有细腻垂坠感的深灰羊毛混纺面料；年轻亚洲女模特全身站姿，正面略微侧身，服装结构、面料纹理和缝线细节清晰；极简浅灰摄影棚背景，柔和侧光，高级时装品牌 Lookbook 风格，写实摄影，高质感，画面干净，无文字、无水印。",
-          ),
-          imageNode("gen-1", 380, 0, "文生图", GENERATE_VARIANT, "3:4"),
-        ],
-        edges: [edge("e1", "prompt-1", "gen-1", "prompt")],
-      },
-    },
-    {
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-sketch-recolor",
-      name: "草图→换色",
-      description: "上传草图，说明配色方案，生成多配色效果图",
-      builtIn: true,
-      createdAt: BUILTIN_CREATED_AT,
-      flow: {
-        schemaVersion: WORKFLOW_SCHEMA_VERSION,
-        nodes: [
-          textNode("sketch-note", -380, -170, "草图说明", "保持草图构图、款式与主体不变"),
-          imageNode("sketch", 0, -170, "草图上传", EDIT_VARIANT, "3:4"),
-          textNode("recolor-note", 0, 190, "换色说明", "将服装颜色替换为：奶白 + 驼色，保持版型与细节不变"),
-          imageNode("recolor", 380, 0, "换色", EDIT_VARIANT, "3:4"),
+          textNode("tryon-requirement", 0, -170, "试穿要求", "【服装】上传服装图\n【数字模特】上传数字模特图\n【要求】描述试穿后的模特姿态、场景与镜头（可空）"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageNode("model", 0, 210, "数字模特"),
+          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", EDIT_VARIANT),
         ],
         edges: [
-          edge("e-sketch-prompt", "sketch-note", "sketch", "prompt"),
-          edge("e-sketch-ref", "sketch", "recolor", "reference"),
-          edge("e-recolor-prompt", "recolor-note", "recolor", "prompt"),
+          edge("e-tryon-prompt", "tryon-requirement", "tryon-gen", "prompt"),
+          edge("e-tryon-garment", "garment", "tryon-gen", "reference"),
+          edge("e-tryon-model", "model", "tryon-gen", "reference"),
         ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-sketch-upscale",
-      name: "草图→高清放大",
-      description: "上传草图，放大至超高清精修细节",
+      id: "builtin-pose",
+      name: "摆拍 Pose",
+      description: "上传服装或模特图，描述 Pose 与镜头要求，生成摆拍效果",
       builtIn: true,
       createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("upload-note", -380, 0, "上传说明", "（可空）保持原构图"),
-          imageNode("upload", 0, 0, "图片上传", EDIT_VARIANT, "3:4"),
-          textNode("upscale-note", 380, -170, "放大说明", "放大为超高清版本，增强面料纹理、走线与边缘细节，保持构图、色彩和光影不变"),
-          imageNode("upscale", 760, 0, "高清放大", EDIT_VARIANT, "3:4"),
+          textNode("pose-requirement", 0, -170, "Pose/镜头要求", "【要求】描述目标 Pose、镜头与构图"),
+          imageNode("source", 0, 20, "服装或模特图"),
+          imageGeneratorNode("pose-gen", 380, -75, "摆拍生成", EDIT_VARIANT),
         ],
         edges: [
-          edge("e-upload-prompt", "upload-note", "upload", "prompt"),
-          edge("e-upload-ref", "upload", "upscale", "reference"),
-          edge("e-upscale-prompt", "upscale-note", "upscale", "prompt"),
+          edge("e-pose-prompt", "pose-requirement", "pose-gen", "prompt"),
+          edge("e-pose-ref", "source", "pose-gen", "reference"),
         ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-text-recolor",
-      name: "文生款式→换色",
-      description: "纯提示词文生款式效果图，再按配色说明换色",
+      id: "builtin-background-swap",
+      name: "更换背景",
+      description: "上传人物或产品图，描述目标背景，生成换背景效果",
       builtIn: true,
       createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("design", 0, -170, "款式描述", "设计一款简约通勤风女装连衣裙，正面全身效果图，浅灰纯色背景"),
-          imageNode("gen", 380, -170, "文生款式", GENERATE_VARIANT, "3:4"),
-          textNode("recolor", 380, 190, "换色说明", "将连衣裙颜色替换为：藏青 + 酒红，保持版型与细节不变"),
-          imageNode("recolor-out", 760, 0, "换色", EDIT_VARIANT, "3:4"),
+          textNode("background-requirement", 0, -170, "目标背景描述", "【要求】描述目标背景"),
+          imageNode("subject", 0, 20, "人物或产品图"),
+          imageGeneratorNode("background-gen", 380, -75, "换背景生成", EDIT_VARIANT),
         ],
         edges: [
-          edge("e-design", "design", "gen", "prompt"),
-          edge("e-gen-ref", "gen", "recolor-out", "reference"),
-          edge("e-recolor", "recolor", "recolor-out", "prompt"),
+          edge("e-background-prompt", "background-requirement", "background-gen", "prompt"),
+          edge("e-background-ref", "subject", "background-gen", "reference"),
         ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-person-scene-transfer",
-      name: "人物场景迁移",
-      description: "上传图1人物与图2场景，将人物保真迁移到场景中并匹配座椅、姿态、光影与透视",
+      id: "builtin-lookbook",
+      name: "LookBook",
+      description: "上传服装图，列出风格与场景清单，生成多组 LookBook",
       builtIn: true,
       createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("subject-note", -380, -170, "人物说明", "保持人物身份、发型、体型、服装不变"),
-          imageNode("subject", 0, -170, "图1 · 人物主体", EDIT_VARIANT, "3:4"),
-          textNode("scene-note", -380, 190, "场景说明", "保持场景、椅子、构图与空间陈设不变"),
-          imageNode("scene", 0, 190, "图2 · 场景背景", EDIT_VARIANT, "3:4"),
-          textNode("transfer-note", 380, 0, "合成说明", "将图1中的同一人物完整迁移到图2的背景中，并让人物自然坐在椅子上，保持身份与场景不变"),
-          imageNode("transfer", 760, 0, "人物场景迁移", EDIT_VARIANT, "3:4"),
+          textNode("lookbook-requirement", 0, -170, "风格/场景清单", "【要求】列出风格与场景清单"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", EDIT_VARIANT, { batchSize: 2 }),
         ],
         edges: [
-          edge("e-subject-prompt", "subject-note", "subject", "prompt"),
-          edge("e-scene-prompt", "scene-note", "scene", "prompt"),
-          edge("e-subject-ref", "subject", "transfer", "reference"),
-          edge("e-scene-ref", "scene", "transfer", "reference"),
-          edge("e-transfer-prompt", "transfer-note", "transfer", "prompt"),
+          edge("e-lookbook-prompt", "lookbook-requirement", "lookbook-gen", "prompt"),
+          edge("e-lookbook-ref", "garment", "lookbook-gen", "reference"),
         ],
       },
     },
     {
       schemaVersion: WORKFLOW_SCHEMA_VERSION,
-      id: "builtin-pattern-style-transfer",
-      name: "图案风格迁移",
-      description: "保留图1的主题与构图，使用图2的材料、工艺、色彩和视觉语言重新演绎",
+      id: "builtin-digital-model",
+      name: "数字模特",
+      description: "上传服装图，描述数字模特风格，生成数字模特上身效果",
       builtIn: true,
       createdAt: BUILTIN_CREATED_AT,
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("pattern-note", -380, -170, "图案说明", "保持图案主题与构图"),
-          imageNode("pattern", 0, -170, "图1 · 原始图案", EDIT_VARIANT, "3:4"),
-          textNode("style-note", -380, 190, "风格说明", "保持风格参考材料与工艺"),
-          imageNode("style", 0, 190, "图2 · 风格参考", EDIT_VARIANT, "3:4"),
-          textNode("transfer-note", 380, 0, "迁移说明", "保留图1的主题元素与构图，重新演绎为图2的面料纹理、手工工艺、笔触、配色和质感"),
-          imageNode("transfer", 760, 0, "风格迁移", EDIT_VARIANT, "3:4"),
+          textNode("model-requirement", 0, -170, "数字模特风格要求", "【要求】描述数字模特的风格与外观要求"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageGeneratorNode("model-gen", 380, -75, "数字模特生成", EDIT_VARIANT),
         ],
         edges: [
-          edge("e-pattern-prompt", "pattern-note", "pattern", "prompt"),
-          edge("e-style-prompt", "style-note", "style", "prompt"),
-          edge("e-pattern-ref", "pattern", "transfer", "reference"),
-          edge("e-style-ref", "style", "transfer", "reference"),
-          edge("e-transfer-prompt", "transfer-note", "transfer", "prompt"),
+          edge("e-model-prompt", "model-requirement", "model-gen", "prompt"),
+          edge("e-model-ref", "garment", "model-gen", "reference"),
+        ],
+      },
+    },
+    // ---------- 服装设计（8 个）----------
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-print-extract",
+      name: "印花提取",
+      description: "上传带印花服装，描述提取要求，平铺提取印花图案",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("extract-requirement", 0, -170, "提取要求", "【要求】描述印花提取的范围与整理要求"),
+          imageNode("garment", 0, 20, "带印花服装"),
+          imageGeneratorNode("extract-gen", 380, -75, "印花提取", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-extract-prompt", "extract-requirement", "extract-gen", "prompt"),
+          edge("e-extract-ref", "garment", "extract-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-print-mutate",
+      name: "印花裂变",
+      description: "上传印花图，描述裂变方向与数量，生成风格一致的新变体",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("mutate-requirement", 0, -170, "裂变方向/数量", "【要求】描述印花裂变的方向与数量"),
+          imageNode("print", 0, 20, "印花图"),
+          imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", EDIT_VARIANT, { batchSize: 2 }),
+        ],
+        edges: [
+          edge("e-mutate-prompt", "mutate-requirement", "mutate-gen", "prompt"),
+          edge("e-mutate-ref", "print", "mutate-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-garment-recolor",
+      name: "服装换色",
+      description: "上传服装图，列出目标配色，生成换色效果",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("recolor-requirement", 0, -170, "目标配色清单", "【要求】列出目标配色"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageGeneratorNode("recolor-gen", 380, -75, "换色生成", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-recolor-prompt", "recolor-requirement", "recolor-gen", "prompt"),
+          edge("e-recolor-ref", "garment", "recolor-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-fabric-swap",
+      name: "面料更换",
+      description: "上传服装图与面料参考，描述面料说明，生成面料更换合成",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("fabric-requirement", 0, -170, "面料说明", "【要求】描述目标面料的质感与说明"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageNode("fabric", 0, 210, "面料参考"),
+          imageGeneratorNode("fabric-gen", 380, 20, "面料更换合成", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-fabric-prompt", "fabric-requirement", "fabric-gen", "prompt"),
+          edge("e-fabric-garment", "garment", "fabric-gen", "reference"),
+          edge("e-fabric-ref", "fabric", "fabric-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-sketch-to-garment",
+      name: "线稿图到服装",
+      description: "上传线稿，描述面料、色彩与风格，生成服装渲染效果",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("sketch-requirement", 0, -170, "面料/色彩/风格", "【要求】描述面料、色彩与风格"),
+          imageNode("sketch", 0, 20, "线稿"),
+          imageGeneratorNode("sketch-gen", 380, -75, "线稿渲染", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-sketch-prompt", "sketch-requirement", "sketch-gen", "prompt"),
+          edge("e-sketch-ref", "sketch", "sketch-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-ai-restyle",
+      name: "AI 改款",
+      description: "上传服装图，描述改款指令，生成改款效果",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("restyle-requirement", 0, -170, "改款指令", "【要求】描述改款方向（领型、袖长、廓形等）"),
+          imageNode("garment", 0, 20, "服装图"),
+          imageGeneratorNode("restyle-gen", 380, -75, "改款生成", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-restyle-prompt", "restyle-requirement", "restyle-gen", "prompt"),
+          edge("e-restyle-ref", "garment", "restyle-gen", "reference"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-outfit-recommend",
+      name: "穿搭推荐",
+      description: "描述场合、风格与身材，纯文生图生成穿搭推荐",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("outfit-requirement", 0, -170, "场合/风格/身材", "【要求】描述场合、风格与身材"),
+          imageGeneratorNode("outfit-gen", 380, -170, "穿搭推荐", GENERATE_VARIANT),
+        ],
+        edges: [
+          edge("e-outfit-prompt", "outfit-requirement", "outfit-gen", "prompt"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-person-to-mannequin",
+      name: "真人转人台",
+      description: "上传真人着装图，描述人台要求，生成人台展示效果",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("mannequin-requirement", 0, -170, "人台要求", "【要求】描述人台与立裁要求"),
+          imageNode("person", 0, 20, "真人着装图"),
+          imageGeneratorNode("mannequin-gen", 380, -75, "转人台生成", EDIT_VARIANT),
+        ],
+        edges: [
+          edge("e-mannequin-prompt", "mannequin-requirement", "mannequin-gen", "prompt"),
+          edge("e-mannequin-ref", "person", "mannequin-gen", "reference"),
+        ],
+      },
+    },
+    // ---------- 视频生成（2 个，本期）----------
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-video-runway",
+      name: "服装走秀",
+      description: "上传服装或模特图，描述走秀、镜头与场景，生成走秀视频",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", "【要求】描述走秀动作、镜头与场景"),
+          imageNode("source", 0, 20, "服装或模特图"),
+          videoGeneratorNode("runway-gen", 380, -75, "走秀视频", VIDEO_VARIANT),
+        ],
+        edges: [
+          edge("e-runway-prompt", "runway-requirement", "runway-gen", "prompt"),
+          edge("e-runway-first-frame", "source", "runway-gen", "first-frame"),
+        ],
+      },
+    },
+    {
+      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      id: "builtin-video-xhs",
+      name: "小红书视频",
+      description: "上传主图，描述小红书脚本，生成小红书视频",
+      builtIn: true,
+      createdAt: BUILTIN_CREATED_AT,
+      flow: {
+        schemaVersion: WORKFLOW_SCHEMA_VERSION,
+        nodes: [
+          textNode("xhs-requirement", 0, -170, "小红书脚本", "【要求】描述小红书视频脚本"),
+          imageNode("main-image", 0, 20, "主图"),
+          videoGeneratorNode("xhs-gen", 380, -75, "小红书视频", VIDEO_VARIANT),
+        ],
+        edges: [
+          edge("e-xhs-prompt", "xhs-requirement", "xhs-gen", "prompt"),
+          edge("e-xhs-first-frame", "main-image", "xhs-gen", "first-frame"),
         ],
       },
     },
@@ -261,8 +476,21 @@ function builtinTemplateIsReadable(filePath: string): boolean {
 
 /** 启动时补齐新增模板；保留可读旧版本，并用当前定义修复损坏或不兼容的内置文件。 */
 export function ensureBuiltinTemplates(): void {
-  // 旧版模板已拆分为两个明确模板；它是部署内置数据，不属于用户模板。
-  fs.rmSync(templatePath("builtin", "builtin-style-transfer"), { force: true });
+  // v8 重写后退役的 v7 内置模板文件：id 已不存在于 builtinTemplates()，结构也不兼容
+  // （旧 image 节点五合一 vs v8 输入/生成分层），必须显式删除，避免 GET /api/templates
+  // 继续返回已淘汰的旧模板。它们是部署内置数据，不属于用户模板。
+  const retiredIds = [
+    "builtin-style-transfer",
+    "builtin-text-to-image",
+    "builtin-sketch-recolor",
+    "builtin-sketch-upscale",
+    "builtin-text-recolor",
+    "builtin-person-scene-transfer",
+    "builtin-pattern-style-transfer",
+  ] as const;
+  for (const retiredId of retiredIds) {
+    fs.rmSync(templatePath("builtin", retiredId), { force: true });
+  }
   for (const tpl of builtinTemplates()) {
     const filePath = templatePath("builtin", tpl.id);
     if (!fs.existsSync(filePath) || !builtinTemplateIsReadable(filePath)) {

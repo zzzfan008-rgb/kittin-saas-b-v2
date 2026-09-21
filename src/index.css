@@ -107,6 +107,9 @@ body {
   --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
   /* ---- 状态色 8 槽位（默认=深底亮色版；浅底主题在各自 data-theme 段覆盖） ---- */
   --gc-dot-status: 10px;
+  /* ---- 节点卡几何（v8 三层七节点；plan.md §3.1/§3.2 的唯一事实源） ---- */
+  --gc-node-width: 256px;
+  --gc-node-toolbar-gap: 8px;
   --gc-status-queued: #2dd4bf;
   --gc-status-running: #60a5fa;
   --gc-status-retry: #fb923c;

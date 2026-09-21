@@ -8,6 +8,7 @@ import {
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -78,18 +79,13 @@ interface NodeFrameProps {
   selected?: boolean;
   /** 传入 nodeId 后标题支持双击改名（回车/失焦确认，Esc 取消） */
   nodeId?: string;
-  /**
-   * R-40 §2.1.1：双击节点体（非标题）打开功能设置窗口。
-   * 节点体此前无既有双击语义；处理器内部负责 stopPropagation 防止冒泡缩放。
-   */
-  onBodyDoubleClick?: (event: React.MouseEvent) => void;
-  /** 入口条（仅选中态渲染，R-40 裁定 B）；不传则不渲染。 */
-  entryBar?: ReactNode;
+  /** 节点卡正上方 8px 的工具条槽位（v8 plan.md §3.2）；由各 kind 通过 NodeToolbar 提供。 */
+  toolbar?: ReactNode;
   children: ReactNode;
 }
 
-/** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 */
-export function NodeFrame({ title, status, error, selected, nodeId, onBodyDoubleClick, entryBar, children }: NodeFrameProps) {
+/** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, children }: NodeFrameProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);
@@ -108,11 +104,13 @@ export function NodeFrame({ title, status, error, selected, nodeId, onBodyDouble
   };
 
   return (
-    <div
-      className={`gc-node-card w-[280px] rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
-        selected ? "border-gold" : "border-[var(--gc-node-border)]"
-      }`}
-    >
+    <div className="gc-node-root relative w-[var(--gc-node-width)]">
+      {toolbar}
+      <div
+        className={`gc-node-card w-full rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
+          selected ? "border-gold" : "border-[var(--gc-node-border)]"
+        }`}
+      >
       <div className="gc-node-header flex items-center gap-2 rounded-t-xl border-b border-[var(--gc-node-border)] bg-[var(--gc-node-header)] px-3 py-2">
         <StatusDot status={status} />
         {editing ? (
@@ -159,19 +157,15 @@ export function NodeFrame({ title, status, error, selected, nodeId, onBodyDouble
           </span>
         )}
       </div>
-      <div
-        className="gc-node-body space-y-3 p-3"
-        onDoubleClick={onBodyDoubleClick}
-      >
+      <div className="gc-node-body space-y-3 p-3">
         {children}
-        {/* R-40 裁定 B：入口条仅选中态渲染；未选中时节点卡上不渲染任何入口条 DOM。 */}
-        {selected && entryBar}
       </div>
       {error && (
         <div className="mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-[11px] leading-relaxed text-red-400">
           {error}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -198,12 +192,12 @@ export function RunButton({
   const newGenerationBlocked = !active && Boolean(safetyBlockReason);
   return (
     <div className="space-y-1">
-      <button
+      <Button
         type="button"
         onClick={onClick}
         disabled={active || disabled || Boolean(disabledReason) || newGenerationBlocked}
         title={newGenerationBlocked ? safetyBlockReason ?? undefined : disabledReason}
-        className={`nodrag w-full rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
+        className={`nodrag w-full px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed ${
           active ? "btn-running-breathe text-[var(--gc-warn-text)]" : "bg-gold text-[var(--gc-accent-cta-ink)] disabled:opacity-40"
         }`}
         style={active ? { backgroundColor: "var(--gc-panel-hover)" } : undefined}
@@ -215,7 +209,7 @@ export function RunButton({
             : disabledReason
               ? disabledLabel
               : label}
-      </button>
+      </Button>
       {!active && !newGenerationBlocked && disabledReason && (
         <p className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">{disabledReason}</p>
       )}

@@ -18,10 +18,20 @@ import {
 export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 import {
   NODE_SPECS,
+  BATCH_SIZES,
+  EDGE_HANDLE_FIRST_FRAME,
+  EDGE_HANDLE_PROMPT,
+  EDGE_HANDLE_REFERENCE,
+  isGeneratorNodeKind,
+  isImageSourceKind,
+  isInputNodeKind,
   isNodeRunActive,
   isNodeRunTerminal,
+  isResultNodeKind,
+  isVideoSourceKind,
   nodeSpecForKind,
   type Asset,
+  type GeneratorNodeKind,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
@@ -32,14 +42,24 @@ import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
   isImageModelId,
-  isModelAllowedForNode,
   normalizeImageModelOptions,
+  type ImageModelId,
 } from "@/types/imageModels";
+import {
+  DEFAULT_VIDEO_MODEL_ID,
+  isVideoModelId,
+  videoModelRecommendedOptions,
+  type VideoModelOptions,
+} from "@/types/videoModels";
 import { isRetiredImageModelId } from "@/types/retiredImageModels";
 import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
+  isV8ConnectionValid,
+  normalizeFlowForDocumentRead,
+  readFlowDocumentForOpen,
+  resolveTargetHandle,
 } from "@/lib/documentSnapshot";
 import {
   clearUnreferencedProjectTabSessionStorage,
@@ -64,11 +84,12 @@ import {
   normalizeRunEvent,
   requestedResultCount,
   type NodeStatusRunEvent,
+  type ResultNodeCreatedRunEvent,
   type RunEvent,
 } from "@/store/flowRunEvents";
 
 export { applyRunEventToNode, normalizeRunEvent, requestedResultCount } from "@/store/flowRunEvents";
-export type { NodeStatusRunEvent, RunEvent } from "@/store/flowRunEvents";
+export type { NodeStatusRunEvent, ResultNodeCreatedRunEvent, RunEvent } from "@/store/flowRunEvents";
 
 export type FlowNode = Node<WorkflowNodeData>;
 export type ConnectedNodeDirection = "upstream" | "downstream";
@@ -159,6 +180,52 @@ export interface CoalescedTextEditToken {
   readonly descriptorKey: string;
 }
 
+/**
+ * 打开路径的文档来源（二选一，互斥）。
+ *
+ * - `flow`：**持久化** flow（保留 `schemaVersion`）——必须走这一支，由文档层执行版本闸 +
+ *   v7→v8 惰性迁移 + 投影。
+ * - `nodes`/`edges`：调用方**已读过**的 v8 文档（模板派生、测试夹具）。
+ *
+ * 互斥是刻意的：持久化文档一旦被上游拆成 nodes/edges，schemaVersion 就丢了，
+ * 「v9 文档被读进来再存成 v8」这种不可回滚的降级再也无法被发现（architect R-89 P1-3）。
+ */
+export type FlowDocumentSource =
+  | { flow: unknown }
+  | { nodes: FlowNode[]; edges: Edge[] };
+
+export type OpenFlowDocumentOptions = FlowDocumentSource & {
+  projectId: string;
+  projectName: string;
+  markDirty?: boolean;
+  readOnly?: boolean;
+};
+
+export type LoadFlowDocumentOptions = FlowDocumentSource & {
+  projectId: string;
+  projectName: string;
+  /** 从模板新建时为 true；打开已保存项目时保持 false。 */
+  markDirty?: boolean;
+};
+
+/**
+ * 读取归一唯一入口（打开路径）：
+ * - 持久化 flow → 版本闸 + v7→v8 惰性迁移 + 投影 + 图不变量（`readFlowDocumentForOpen`）；
+ * - 已读取文档 → 只做字段投影与非法边过滤（`normalizeFlowForDocumentRead`）。
+ *
+ * 被拒绝的文档在这里抛错（fail-closed）；调用方不得在读到文档之前改动任何页签状态。
+ */
+function readFlowDocumentSource(source: FlowDocumentSource): { nodes: FlowNode[]; edges: Edge[] } {
+  if ("flow" in source) {
+    const { flow } = readFlowDocumentForOpen(source.flow);
+    return { nodes: flow.nodes as unknown as FlowNode[], edges: flow.edges as unknown as Edge[] };
+  }
+  return normalizeFlowForDocumentRead({
+    nodes: source.nodes,
+    edges: source.edges,
+  }) as { nodes: FlowNode[]; edges: Edge[] };
+}
+
 export interface FlowState {
   /** 应用内项目页签；活动文档始终是 activeTabId 对应的页签。 */
   tabs: ProjectTab[];
@@ -174,14 +241,7 @@ export interface FlowState {
 
   switchTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
-  openFlowTab: (opts: {
-    projectId: string;
-    projectName: string;
-    nodes: FlowNode[];
-    edges: Edge[];
-    markDirty?: boolean;
-    readOnly?: boolean;
-  }) => void;
+  openFlowTab: (opts: OpenFlowDocumentOptions) => void;
   createBlankTab: () => void;
   setProjectName: (name: string) => void;
   setSelectedNodeIds: (ids: string[]) => void;
@@ -229,14 +289,7 @@ export interface FlowState {
    * 替换 nodes/edges 并重置选择、对比、查看器与撤销历史。
    * 调用方决定 projectId（打开项目用原 id，模板派生用新 id）。
    */
-  loadFlow: (opts: {
-    projectId: string;
-    projectName: string;
-    nodes: FlowNode[];
-    edges: Edge[];
-    /** 从模板新建时为 true；打开已保存项目时保持 false。 */
-    markDirty?: boolean;
-  }) => void;
+  loadFlow: (opts: LoadFlowDocumentOptions) => void;
   undo: () => void;
   redo: () => void;
 }
@@ -800,13 +853,15 @@ export function addExistingNodes(nodes: FlowNode[]): string[] {
 }
 
 /**
- * 方案 C auto-text 共享兜底（必做项，R-75 §3.6）：保证每个 image/video 节点
- * 都有 ≥1 条 text→该节点的 prompt 入边（server INV-1 / graph-invariants.md §1）。
- * 若当前文档已有 text 节点则复用它，否则在目标节点左侧补一个空 text 节点；
- * 两种情况都补上 prompt 边。幂等：目标已有 prompt 入边时不重复连线。
+ * v8 上游兜底：保证**生成节点**有 ≥1 条 text→generator 的 prompt 入边（runtime.md §2.1）。
+ *
+ * v8 语义变化：输入层节点不接受任何入边（`NODE_SPECS[kind].inputs` 全 0），因此对
+ * image/video 节点调用本函数是 no-op（保留参数签名以兼容既有调用点，行为由目标节点的
+ * 实际 kind 决定，而不是由调用方传入的期望 kind 决定——fail-closed，绝不造非法边）。
+ * 幂等：目标已有 prompt 入边时不重复连线。
  */
 export function ensureTextUpstreamForNode(
-  kind: "image" | "video",
+  kind: NodeKind,
   position: { x: number; y: number },
   targetNodeId: string,
 ): void {
@@ -815,10 +870,30 @@ export function ensureTextUpstreamForNode(
   if (tab.readOnly) return;
   const target = tab.nodes.find((node) => node.id === targetNodeId);
   if (!target || target.data.kind !== kind) return;
-  if (tab.edges.some((edge) => edge.target === targetNodeId && edge.targetHandle === "prompt")) {
+  if (!isGeneratorNodeKind(target.data.kind)) return;
+  const spec = nodeSpecForKind(target.data.kind);
+  if (!spec || spec.inputs.prompt <= 0) return;
+  if (tab.edges.some((edge) => (
+    edge.target === targetNodeId && resolveTargetHandle(
+      tab.nodes.find((node) => node.id === edge.source)?.data.kind,
+      target.data.kind,
+      edge.targetHandle ?? null,
+    ) === EDGE_HANDLE_PROMPT
+  ))) {
     return;
   }
-  let textId = tab.nodes.find((node) => node.data.kind === "text")?.id;
+  // INV-2 / plan.md §207：单个 text 节点只能连 1 个生成节点，且不静默替换已有绑定。
+  // 因此复用「尚未绑定生成节点的」text 节点，否则新建一个空 text 节点（不抢占已有绑定）。
+  const textBoundToGenerator = new Set(
+    tab.edges
+      .filter((edge) => isGeneratorNodeKind(
+        tab.nodes.find((node) => node.id === edge.target)?.data.kind,
+      ))
+      .map((edge) => edge.source),
+  );
+  let textId = tab.nodes.find(
+    (node) => node.data.kind === "text" && !textBoundToGenerator.has(node.id),
+  )?.id;
   if (!textId) {
     textId = state.addNode("text", { x: position.x - 380, y: position.y }) ?? undefined;
   }
@@ -826,8 +901,8 @@ export function ensureTextUpstreamForNode(
   state.onConnect({
     source: textId,
     target: targetNodeId,
-    sourceHandle: "prompt",
-    targetHandle: "prompt",
+    sourceHandle: null,
+    targetHandle: EDGE_HANDLE_PROMPT,
   });
 }
 
@@ -1071,29 +1146,64 @@ export function markFlowDocumentChanged(partial: Pick<ProjectTab, "nodes"> | Pic
   commitDocumentMutation(partial);
 }
 
+/**
+ * v8 节点默认 data（七节点，单一事实源）。
+ * 输入层只带契约字段（无生成字段，C2）；生成层只带功能绑定 + 模型参数（无产物字段，C3）；
+ * 结果层带产物数组 + 溯源键（C5；溯源在 RunEvent 落地时填真实值）。
+ */
 function defaultNodeData(kind: NodeKind): WorkflowNodeData {
   const spec = NODE_SPECS[kind];
   const base = { label: spec.title, status: "idle" as NodeRunStatus };
   switch (kind) {
     case "text":
-      // R2：正文由文本节点承载；三项窗口配置（功能/参数/模型）初始未选。
+      // R2：正文由文本节点承载；功能/参数/模型已上移到生成节点。
       return { ...base, kind, text: "" };
     case "image":
+      return { ...base, kind, outputImages: [] };
+    case "video":
+      return { ...base, kind, outputVideos: [] };
+    case "image-generator":
+      // 功能未选（空串）表示「待接线/待选功能」，不阻断保存；运行准入会拒绝。
       return {
         ...base, kind,
-        aspectRatio: "3:4", batchSize: 1, outputImages: [],
+        promptVariantId: "",
+        aspectRatio: "3:4", batchSize: 1,
         modelId: DEFAULT_GENERATION_MODEL_ID,
         modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
       };
-    case "video":
-      // R10：视频唯一模型 doubao-seedance-2-5-260628；契约产物归 P2-e。
-      return { ...base, kind, outputVideos: [] };
+    case "video-generator":
+      // R10：视频唯一模型 doubao-seedance-2-5-260628；首帧任务画幅必须 adaptive（C6）。
+      return {
+        ...base, kind,
+        promptVariantId: "",
+        aspectRatio: "adaptive",
+        modelId: DEFAULT_VIDEO_MODEL_ID,
+        modelOptions: defaultVideoModelOptions(DEFAULT_VIDEO_MODEL_ID),
+      };
+    case "result-image":
+      return { ...base, kind, images: [], sourceGeneratorId: "", runId: "" };
+    case "result-video":
+      return { ...base, kind, videos: [], sourceGeneratorId: "", runId: "" };
   }
 }
 
-/** 从节点 data 中取它对外输出的图片（text/video 节点不产参考图）。 */
+/** 视频模型推荐参数的默认值（`videoModelRecommendedOptions` 是模型契约的事实源）。 */
+export function defaultVideoModelOptions(modelId: string): VideoModelOptions {
+  const options: VideoModelOptions = {};
+  if (!isVideoModelId(modelId)) return options;
+  for (const [key, spec] of Object.entries(videoModelRecommendedOptions(modelId))) {
+    if (spec && spec.default !== undefined) options[key] = spec.default;
+  }
+  return options;
+}
+
+/**
+ * 节点对外可供下游使用的图片（runtime.md §2 extractOutputImages）：
+ * 只有 input.image 与 result-image 产参考图；生成节点本身不承载产物。
+ */
 function nodeOutputImages(data: WorkflowNodeData): string[] {
   if (data.kind === "image") return data.outputImages ?? [];
+  if (data.kind === "result-image") return data.images ?? [];
   return [];
 }
 
@@ -1290,47 +1400,17 @@ export function projectTabHasLocalDraftChanges(tab: ProjectTab): boolean {
 }
 
 /**
- * 连接规则的唯一纯函数；React Flow 拖线和快捷建图必须共用它。
- * v7（graph-invariants.md §2）按「边类型 = targetHandle + source kind」判定：
- * - prompt 边：text → text/image/video，targetHandle="prompt"；text 节点可串联（Q1=B）。
- * - reference 边：image → image/video，targetHandle 缺省或 "reference"；image≤8 / video≤1（首帧）。
- * 违反组合（image→text、text 经 reference 边等）一律拒绝。
+ * 连线规则的唯一入口；React Flow 拖线与快捷建图必须共用它。
+ * v8（plan.md §2.1/§2.2、runtime.md §2.1）：入边按 targetHandle 分三区
+ * （prompt：text → 生成节点；reference：图片/图片结果 → 生图；first-frame：图片/图片结果 → 生视频），
+ * 生成节点与结果节点不得连出，输入节点不接受任何入边。
+ * 规则本体在 `src/lib/documentSnapshot.ts:isV8ConnectionValid`（文档层单一事实源）。
  */
 export function isDocumentConnectionValid(
   document: Pick<ProjectTab, "nodes" | "edges">,
   connection: Connection | Edge,
 ): boolean {
-  if (
-    !connection.source ||
-    !connection.target ||
-    connection.source === connection.target ||
-    !document.nodes.some((node) => node.id === connection.source)
-  ) return false;
-  const target = document.nodes.find((node) => node.id === connection.target);
-  const source = document.nodes.find((node) => node.id === connection.source);
-  if (!target || !source) return false;
-  // R-79：未知/legacy kind 的目标节点不参与连线（优雅降级，不查表抛错）。
-  const spec = nodeSpecForKind(target.data.kind);
-  if (!spec) return false;
-
-  const incoming = document.edges.filter((edge) => edge.target === connection.target);
-  // 同一 (source, targetHandle) 组合只允许一条边，防重复连线。
-  if (incoming.some(
-    (edge) => edge.source === connection.source &&
-      (edge.targetHandle ?? null) === (connection.targetHandle ?? null),
-  )) return false;
-
-  if (connection.targetHandle === "prompt") {
-    // text 边：source 必须是 text 节点（text→text 串联、text→image/video 提供正文）。
-    if (source.data.kind !== "text") return false;
-    return incoming.filter((edge) => edge.targetHandle === "prompt").length < spec.inputs.text;
-  }
-
-  // reference 边（targetHandle 缺省或 "reference"）：image 源 → image/video 目标。
-  if (connection.targetHandle !== undefined && connection.targetHandle !== null &&
-    connection.targetHandle !== "reference") return false;
-  if (source.data.kind !== "image" || target.data.kind === "text") return false;
-  return incoming.filter((edge) => edge.targetHandle !== "prompt").length < spec.inputs.image;
+  return isV8ConnectionValid(document, connection);
 }
 
 /** 连线被拒时的用户可读原因（连错线要有明确反馈，不是静默失败）。 */
@@ -1341,20 +1421,43 @@ export function documentConnectionRejection(
   if (isDocumentConnectionValid(document, connection)) return null;
   const source = document.nodes.find((node) => node.id === connection.source);
   const target = document.nodes.find((node) => node.id === connection.target);
-  if (!source || !target || connection.source === connection.target) return null;
-  if (connection.targetHandle === "prompt") {
-    if (source.data.kind !== "text") {
-      return "提示词入口只接受文本节点；图片请连接参考图入口";
+  if (!source || !target) return null;
+  if (connection.source === connection.target) return "节点不能连接到自身";
+  const sourceKind = source.data.kind;
+  const targetKind = target.data.kind;
+  if (isGeneratorNodeKind(sourceKind) || isResultNodeKind(sourceKind)) {
+    return "生成节点不能作为其它节点的输入；它的产物请通过结果节点使用";
+  }
+  if (!isInputNodeKind(sourceKind) && sourceKind !== "result-image") {
+    return "该节点不能作为连线来源";
+  }
+  const spec = nodeSpecForKind(targetKind);
+  if (!spec || !spec.acceptsInputEdges) {
+    return "该节点不接受输入连线";
+  }
+  const handle = resolveTargetHandle(sourceKind, targetKind, connection.targetHandle ?? null);
+  if (!handle) {
+    if (isVideoSourceKind(sourceKind)) {
+      return "本版视频素材不能作为生成节点的输入";
     }
-    return "该节点的文本输入已达上限";
+    return "该连线入口与节点类型不匹配";
   }
-  if (source.data.kind !== "image") {
-    return "参考图入口只接受图片节点";
+  if (handle === EDGE_HANDLE_PROMPT) {
+    if (sourceKind !== "text") return "提示词入口只接受文本节点；图片请连接参考图入口";
+    const usedByOtherGenerator = document.edges.some((edge) => (
+      edge.source === source.id &&
+      edge.target !== target.id &&
+      isGeneratorNodeKind(document.nodes.find((node) => node.id === edge.target)?.data.kind)
+    ));
+    if (usedByOtherGenerator) {
+      return "该文本节点已连接到另一个生成节点；请先断开，或用「断开并新建」";
+    }
+    return "该生成节点的提示词输入已达上限";
   }
-  if (target.data.kind === "video") {
-    return "视频节点最多接受 1 张首帧图片";
+  if (handle === EDGE_HANDLE_FIRST_FRAME) {
+    return "该生成节点最多接受 1 张首帧图片";
   }
-  return "该节点的参考图输入已达上限";
+  return "该生成节点的参考图输入已达上限";
 }
 
 function connectionWithReferenceData(
@@ -1716,6 +1819,33 @@ const TAB_SESSION_WRITE_ERROR = "本地草稿未写入浏览器，请先保存�
 const TAB_SESSION_READ_ERROR = "浏览器暂时无法读取完整草稿；为避免覆盖恢复点，本页不再写入会话缓存，请刷新后重试";
 
 const NODE_KINDS = new Set<NodeKind>(Object.keys(NODE_SPECS) as NodeKind[]);
+
+/**
+ * C2/C3：会话恢复时必须清空的生成层字段（v7 的 image/video/text 节点曾自描述这些）。
+ * 清空后按 v8 分层重新填入，使会话草稿本身就是合法 v8 文档形状。
+ */
+const SESSION_GENERATION_FIELDS = [
+  "modelId", "modelOptions", "promptVariantId", "promptFamilyId", "parameterProfileId",
+  "contractHash", "evaluationVersion", "postprocessVersion",
+  "aspectRatio", "batchSize", "mask", "maskSourceRef", "featherRadius",
+  // v7 的 image 节点曾自描述请求正文；v8 的正文只存在于 text 节点（生成节点由上游 text 供词）。
+  "prompt",
+  "outputText", "lastRunInput",
+] as const;
+
+const IMAGE_ASPECT_RATIOS: readonly string[] = ["1:1", "3:4", "4:3", "9:16", "16:9"];
+
+/** 只把「非空字符串」的可选绑定字段从会话数据搬进 v8 data（空串/脏值不写）。 */
+function copyOptionalStrings(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value) target[key] = value;
+  }
+}
 const NODE_STATUSES = new Set<NodeRunStatus>([
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
@@ -1775,58 +1905,92 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
   delete data.retiredModelId;
   delete data.modelSelectionNeedsConfirmation;
 
+  // C2：输入节点不得携带任何生成字段（v7 的 image 节点曾自描述 modelId/promptVariantId/
+  // aspectRatio/batchSize/mask/outputText…）。先统一清空生成字段，再按 v8 分层重新填入，
+  // 保证会话恢复出来的文档形状本身就是 v8（不依赖保存时的投影兜底）。
+  for (const key of SESSION_GENERATION_FIELDS) delete data[key];
+
   switch (kind) {
     case "text":
       data.text = typeof input.text === "string" ? input.text : "";
-      if (typeof input.outputText !== "string") delete data.outputText;
-      if (typeof input.lastRunInput !== "string") delete data.lastRunInput;
-      if (typeof input.promptVariantId !== "string" || !input.promptVariantId) delete data.promptVariantId;
       break;
-    case "image": {
-      const validModelId = isImageModelId(input.modelId) && isModelAllowedForNode(input.modelId, kind)
-        ? input.modelId
-        : undefined;
-      const preferredAspectRatio = typeof input.aspectRatio === "string" ? input.aspectRatio : "3:4";
-      if (validModelId) {
-        data.modelId = validModelId;
-        data.modelOptions = normalizeImageModelOptions(validModelId, input.modelOptions);
-      } else if (typeof input.modelId === "string" && input.modelId.trim()) {
-        // R-61：非空但已退役/契约外的模型 ID 视为「用户曾选过、模型已失效」，
-        // 会话恢复替换为默认模型；旧 promptVariantId 等绑定保留，运行准入拦截
-        // （对应测试「退役 Grok 会话恢复替换为默认模型」）。
-        const fallbackId = DEFAULT_GENERATION_MODEL_ID;
-        data.modelId = fallbackId;
-        data.modelOptions = normalizeImageModelOptions(fallbackId, input.modelOptions);
-      } else {
-        // 节点从未选择模型（modelId 缺省/空串/脏值）：modelId 在 v7 是可选文档字段
-        // （contracts/data-model.md §3 ImageNodeData），会话恢复不得替用户补默认模型、
-        // 改写文档形状；未选模型不可运行，由 promptRunAdmission 提示选择
-        // （contracts/runtime.md §1/§1b）。
-        delete data.modelId;
-        delete data.modelOptions;
-      }
-      data.aspectRatio = typeof input.aspectRatio === "string" && ["1:1", "3:4", "4:3", "9:16", "16:9"].includes(input.aspectRatio)
-        ? input.aspectRatio
-        : preferredAspectRatio;
-      data.batchSize = [1, 2, 4, 8].includes(Number(input.batchSize)) ? Number(input.batchSize) : 1;
+    case "image":
       data.outputImages = stringList(input.outputImages);
-      if (typeof input.mask !== "string") delete data.mask;
-      if (typeof input.maskSourceRef !== "string") delete data.maskSourceRef;
+      break;
+    case "video":
+      data.outputVideos = stringList(input.outputVideos);
+      break;
+    case "image-generator": {
+      data.promptVariantId = typeof input.promptVariantId === "string" ? input.promptVariantId : "";
+      // 生成节点的模型是必填文档字段（C4）：合法 id 保留原值，退役/契约外的非空 id 按 R-61
+      // 替换为默认模型（会话恢复策略，运行准入另行拦截），缺省则回落默认模型。
+      const modelId: string = isImageModelId(input.modelId) && !isRetiredImageModelId(input.modelId)
+        ? input.modelId
+        : DEFAULT_GENERATION_MODEL_ID;
+      data.modelId = modelId;
+      data.aspectRatio = typeof input.aspectRatio === "string" && IMAGE_ASPECT_RATIOS.includes(input.aspectRatio)
+        ? input.aspectRatio
+        : "3:4";
+      data.batchSize = BATCH_SIZES.includes(Number(input.batchSize) as (typeof BATCH_SIZES)[number])
+        ? Number(input.batchSize)
+        : 1;
+      data.modelOptions = normalizeImageModelOptions(
+        modelId as Parameters<typeof normalizeImageModelOptions>[0],
+        input.modelOptions,
+      );
+      if (typeof input.mask === "string" && input.mask) data.mask = input.mask;
+      if (typeof input.maskSourceRef === "string" && input.maskSourceRef) data.maskSourceRef = input.maskSourceRef;
       // 羽化宽度仅接受 0–64 的有限数值；缺省/非数值维持自适应羽化（不写该字段）。
-      if (
-        typeof input.featherRadius !== "number"
-        || !Number.isFinite(input.featherRadius)
-      ) {
-        delete data.featherRadius;
-      } else {
+      if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
         data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
+      }
+      copyOptionalStrings(data, input, [
+        "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion", "postprocessVersion",
+      ]);
+      break;
+    }
+    case "video-generator": {
+      data.promptVariantId = typeof input.promptVariantId === "string" ? input.promptVariantId : "";
+      data.modelId = isVideoModelId(input.modelId) ? input.modelId : DEFAULT_VIDEO_MODEL_ID;
+      // C6：首帧任务画幅必须 adaptive；会话恢复一律保守回落到 adaptive。
+      data.aspectRatio = typeof input.aspectRatio === "string" && input.aspectRatio ? input.aspectRatio : "adaptive";
+      const options: VideoModelOptions = {};
+      if (typeof input.modelOptions === "object" && input.modelOptions !== null && !Array.isArray(input.modelOptions)) {
+        for (const [key, entry] of Object.entries(input.modelOptions as Record<string, unknown>)) {
+          if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") {
+            options[key] = entry;
+          }
+        }
+      }
+      data.modelOptions = options;
+      copyOptionalStrings(data, input, [
+        "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion",
+      ]);
+      break;
+    }
+    case "result-image": {
+      data.images = stringList(input.images);
+      if (typeof input.thumbnail === "string" && input.thumbnail) data.thumbnail = input.thumbnail;
+      data.sourceGeneratorId = typeof input.sourceGeneratorId === "string" ? input.sourceGeneratorId : "";
+      data.runId = typeof input.runId === "string" ? input.runId : "";
+      const outputSizes = Array.isArray(input.outputSizes)
+        ? input.outputSizes.map((item) => (typeof item === "string" && item ? item : null))
+        : undefined;
+      if (outputSizes) data.outputSizes = outputSizes;
+      if (typeof input.selectedIndex === "number" && Number.isSafeInteger(input.selectedIndex) && input.selectedIndex >= 0) {
+        data.selectedIndex = input.selectedIndex;
       }
       break;
     }
-    case "video":
-      data.outputVideos = stringList(input.outputVideos);
-      if (typeof input.promptVariantId !== "string" || !input.promptVariantId) delete data.promptVariantId;
+    case "result-video": {
+      data.videos = stringList(input.videos);
+      data.sourceGeneratorId = typeof input.sourceGeneratorId === "string" ? input.sourceGeneratorId : "";
+      data.runId = typeof input.runId === "string" ? input.runId : "";
+      if (typeof input.selectedIndex === "number" && Number.isSafeInteger(input.selectedIndex) && input.selectedIndex >= 0) {
+        data.selectedIndex = input.selectedIndex;
+      }
       break;
+    }
   }
 
   const { dragging: _dragging, ...sessionNode } = raw;
@@ -2283,8 +2447,21 @@ function persistRecentResults(list: RecentResult[]): void {
   }
 }
 
-function recordPrompt(data: WorkflowNodeData): string | undefined {
-  if ("prompt" in data && typeof data.prompt === "string" && data.prompt.trim()) {
+/**
+ * 一次运行的提示词快照（进「最近结果」记录的展示字段）。
+ * v8：生成节点不携带 prompt，正文来自上游 text 节点（与 DAG 的 inputTexts 同源收集）。
+ */
+function recordPrompt(
+  document: Pick<ProjectTab, "nodes" | "edges">,
+  nodeId: string,
+): string | undefined {
+  const texts = promptRunInputTextsFromGraph(document.nodes, document.edges, nodeId)
+    .map((text) => text.trim())
+    .filter(Boolean);
+  if (texts.length > 0) return texts.join("\n\n");
+  // 过渡期兜底：v7 节点 data 里可能仍有 prompt 字段（迁移后会消失）。
+  const data = document.nodes.find((node) => node.id === nodeId)?.data;
+  if (data && "prompt" in data && typeof data.prompt === "string" && data.prompt.trim()) {
     return data.prompt.trim();
   }
   return undefined;
@@ -2305,6 +2482,41 @@ export function createQueuedResultCards(initial: RecentResult, count: number): R
 
 function terminalResultCardId(recordId: string, kind: "image" | "failure", index: number): string {
   return `${recordId}:terminal:${kind}:${index}`;
+}
+
+/**
+ * 把一轮 run 的产物写进「最近结果」（runtime.md §3.4：结果节点与最近结果同源于一个事件）。
+ * 只填充产物，**不改终态**——终态由 node-status 事件收口，避免把仍在运行的任务显示为成功。
+ * 幂等：重复事件写入相同值。
+ */
+export function applyResultNodeCreatedToRecentResults(
+  records: RecentResult[],
+  recordId: string,
+  event: ResultNodeCreatedRunEvent,
+): RecentResult[] {
+  const current = records.find((record) => record.id === recordId);
+  if (!current) return records;
+  const pendingPrefix = `${recordId}:pending:`;
+  return records.map((record) => {
+    if (record.id === recordId) {
+      return {
+        ...record,
+        image: event.urls[0] ?? record.image,
+        ...(event.outputSizes?.[0] ? { providerOutputSize: event.outputSizes[0] as string } : {}),
+      };
+    }
+    if (record.id.startsWith(pendingPrefix)) {
+      const index = Number.parseInt(record.id.slice(pendingPrefix.length), 10);
+      const url = Number.isSafeInteger(index) ? event.urls[index] : undefined;
+      if (!url) return record;
+      return {
+        ...record,
+        image: url,
+        ...(event.outputSizes?.[index] ? { providerOutputSize: event.outputSizes[index] as string } : {}),
+      };
+    }
+    return record;
+  });
 }
 
 /** 用一次后端事件更新点击时创建的主卡片，并为额外图片/部分失败追加卡片。 */
@@ -2350,6 +2562,21 @@ export function applyRunEventToRecentResults(
   };
   const images = event.images ?? [];
   const failures = event.failures ?? [];
+
+  // v8（runtime.md §3.1/§3.3）：产物由 `result-node-created` 单独送达，node-status(success)
+  // 只负责收口。本轮已通过结果节点事件记录过产物时，绝不能在此伪造「运行完成但未返回图片」
+  // 失败卡——那会把已经生成成功的图显示成失败。
+  if (event.status === "success" && images.length === 0) {
+    const produced = records.filter((record) => isBatchSibling(record) && record.image);
+    if (produced.length > 0) {
+      return records.map((record) => {
+        if (!isBatchSibling(record)) return record;
+        return record.image
+          ? { ...record, status: "success" as const, error: undefined, model: event.model ?? record.model, startedAt, finishedAt }
+          : { ...record, status: "error" as const, error: "运行完成但未返回图片", model: event.model ?? record.model, startedAt, finishedAt };
+      });
+    }
+  }
   const targetCount = Math.max(1, Math.min(8,
     current.requestedCount ?? Math.max(images.length + failures.length, 1),
   ));
@@ -2590,34 +2817,94 @@ function consumeRunEvents(
   });
 }
 
+/**
+ * 结果节点落位：生成节点右侧 380px 起，每多一个结果节点右移 380px（runtime.md §4）。
+ */
+export const RESULT_NODE_HORIZONTAL_GAP = 380;
+
+/**
+ * 由 `result-node-created` 实例化结果节点（runtime.md §3.1/§3.4）。
+ *
+ * - 一轮 run 一个结果节点；重复事件幂等（同 id 已存在则不重复创建）。
+ * - 位置：生成节点 x + 380 × (已有结果节点数 + 1)，y 与生成节点对齐。
+ * - C5：sourceGeneratorId / runId 来自事件（结果层溯源）。
+ * 返回 undefined 表示不创建（来源节点不存在 / 已存在同 id / 事件无产物）。
+ */
+export function createResultNodeFromRunEvent(
+  document: Pick<ProjectTab, "nodes">,
+  event: ResultNodeCreatedRunEvent,
+): FlowNode | undefined {
+  if (event.urls.length === 0) return undefined;
+  const generator = document.nodes.find((node) => node.id === event.sourceGeneratorId);
+  if (!generator) return undefined;
+  if (document.nodes.some((node) => node.id === event.resultNodeId)) return undefined;
+  const existingResultCount = document.nodes.filter((node) => (
+    (node.data.kind === "result-image" || node.data.kind === "result-video")
+    && node.data.sourceGeneratorId === event.sourceGeneratorId
+  )).length;
+  const position = {
+    x: generator.position.x + RESULT_NODE_HORIZONTAL_GAP * (1 + existingResultCount),
+    y: generator.position.y,
+  };
+  const data: WorkflowNodeData = event.mediaKind === "video"
+    ? {
+      ...defaultNodeData("result-video"),
+      status: "success",
+      videos: [...event.urls],
+      sourceGeneratorId: event.sourceGeneratorId,
+      runId: event.runId,
+    } as WorkflowNodeData
+    : {
+      ...defaultNodeData("result-image"),
+      status: "success",
+      images: [...event.urls],
+      sourceGeneratorId: event.sourceGeneratorId,
+      runId: event.runId,
+      ...(event.outputSizes ? { outputSizes: [...event.outputSizes] } : {}),
+    } as WorkflowNodeData;
+  return {
+    id: event.resultNodeId,
+    type: data.kind,
+    position,
+    data,
+  };
+}
+
+/**
+ * 把结果节点事件落到指定文档（tabId + projectId + documentEpoch 三重绑定）。
+ * 晚到的响应因此永远写不进占据同一 tab 容器的新文档。
+ */
+export function applyResultNodeCreatedEventToTab(
+  target: DocumentTarget,
+  event: ResultNodeCreatedRunEvent,
+): boolean {
+  return commitDocumentMutationForTarget(target, (tab) => {
+    const node = createResultNodeFromRunEvent(tab, event);
+    return node ? { nodes: [...tab.nodes, node] } : {};
+  });
+}
+
+/**
+ * 运行态回写：只改生成节点的 status/error。
+ *
+ * v8（runtime.md §1/§3）：产物归结果节点（由 `result-node-created` 驱动创建），
+ * 因此 node-status 事件**永不**写入文档 revision——运行态是瞬时状态
+ * （RUNTIME_NODE_DATA_KEYS = status/error），不再像 v7 那样「成功即提交文档」。
+ */
 function updateTabFromRunEvent(
   set: (partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>)) => unknown,
   target: DocumentTarget,
   nodeId: string,
   event: NodeStatusRunEvent,
 ): void {
-  const commitsOutput = event.status === "success" && event.images.length > 0;
   const updateNodes = (nodes: FlowNode[]) => nodes.map((node) =>
     node.id === nodeId ? { ...node, data: applyRunEventToNode(node.data, event) } : node,
   );
   const currentState = useFlowStore.getState();
   // A tab container can be reused for another project. Reject its old run
-  // before any durable branch can flush the replacement document's editor.
+  // before any branch can write into the replacement document.
   if (!documentForTarget(currentState, target)) return;
-  if (commitsOutput && currentState.activeTabId === target.tabId) {
-    commitDocumentMutationWithSet(set, (tab) => (
-      matchesDocumentTarget(tab, target) ? { nodes: updateNodes(tab.nodes) } : {}
-    ));
-    return;
-  }
-  const update = () => updateTabNodes(
-    set,
-    target,
-    updateNodes,
-    { markDirty: commitsOutput },
-  );
-  if (commitsOutput) update();
-  else runWithoutHistory(update);
+  runWithoutHistory(() => updateTabNodes(set, target, updateNodes));
 }
 
 function applyActiveTemporalHistory(direction: "undo" | "redo"): void {
@@ -2841,7 +3128,10 @@ export const useFlowStore = create<FlowState>()(
         }));
         restoreTemporalHistory(target.id);
       },
-      openFlowTab: ({ projectId, projectName, nodes, edges, markDirty = false, readOnly = false }) => {
+      openFlowTab: (opts) => {
+        // 读取在前（版本闸 / 迁移 / 投影）：文档被拒绝时当前页签状态保持原样（fail-closed）。
+        const { nodes, edges } = readFlowDocumentSource(opts);
+        const { projectId, projectName, markDirty = false, readOnly = false } = opts;
         flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
@@ -3044,6 +3334,9 @@ export const useFlowStore = create<FlowState>()(
       addNode: (kind, position) => {
         const tab = selectActiveDocument(get());
         if (tab.readOnly) return null;
+        // v8：结果节点由 RunEvent 驱动创建（runtime.md §3.4），不接受手动新增。
+        const spec = nodeSpecForKind(kind);
+        if (!spec || !spec.userCreatable) return null;
         const node: FlowNode = {
           id: nanoid(8),
           type: kind,
@@ -3060,6 +3353,8 @@ export const useFlowStore = create<FlowState>()(
         if (tab.readOnly) return null;
         const anchor = tab.nodes.find((node) => node.id === anchorId);
         if (!anchor) return null;
+        const spec = nodeSpecForKind(kind);
+        if (!spec || !spec.userCreatable) return null;
         const id = nanoid(8);
         const horizontalGap = 380;
         const node: FlowNode = {
@@ -3072,6 +3367,7 @@ export const useFlowStore = create<FlowState>()(
           data: defaultNodeData(kind),
         };
         const nodes = [...tab.nodes, node];
+        // targetHandle 留空由文档层按源 kind 推断（text→prompt、图片源→reference/first-frame）。
         const connection: Connection = direction === "downstream"
           ? { source: anchor.id, target: id, sourceHandle: null, targetHandle: null }
           : { source: id, target: anchor.id, sourceHandle: null, targetHandle: null };
@@ -3087,11 +3383,12 @@ export const useFlowStore = create<FlowState>()(
       },
 
       addAssetNode: (asset, position) => {
-        const state = get();
-        const tab = selectActiveDocument(state);
+        const tab = selectActiveDocument(get());
         if (tab.readOnly) return null;
         const id = nanoid(8);
-        // v7（R8）：素材以 image 节点落地，上传图直写 outputImages。
+        // v8：素材以输入层 image 节点落地，上传图直写 outputImages。
+        // 输入节点不接受任何入边（NODE_SPECS.image.inputs 全 0），所以不再自动补 text 上游
+        // 与 prompt 边——v7 的 auto-text 兜底在 v8 会产生非法边；提示词由用户连到生成节点。
         const node: FlowNode = {
           id,
           type: "image",
@@ -3103,30 +3400,8 @@ export const useFlowStore = create<FlowState>()(
             outputImages: [asset.image],
           } as WorkflowNodeData,
         };
-        // 方案 C auto-text 兜底：素材 image 节点必须与 text 上游原子加入（INV-1），
-        // 一次撤销完整移除（与历史单步语义一致）。
-        const existingText = tab.nodes.find((candidate) => candidate.data.kind === "text");
-        const textNode: FlowNode | null = existingText
-          ? null
-          : {
-            id: nanoid(8),
-            type: "text",
-            position: { x: position.x - 380, y: position.y },
-            data: defaultNodeData("text"),
-          };
-        const textId = existingText?.id ?? textNode!.id;
-        const nextNodes = textNode ? [...tab.nodes, node, textNode] : [...tab.nodes, node];
-        const connection: Connection = {
-          source: textId,
-          target: id,
-          sourceHandle: "prompt",
-          targetHandle: "prompt",
-        };
-        const nextEdges = isDocumentConnectionValid({ nodes: nextNodes, edges: tab.edges }, connection)
-          ? addEdge(connectionWithReferenceData(nextNodes, connection), tab.edges)
-          : tab.edges;
-        const selection = normalizeNodeSelection(nextNodes, [id]);
-        commitDocumentMutationWithSet(set, { ...selection, edges: nextEdges, selectedResultId: null });
+        const selection = normalizeNodeSelection([...tab.nodes, node], [id]);
+        commitDocumentMutationWithSet(set, { ...selection, selectedResultId: null });
         return id;
       },
 
@@ -3208,7 +3483,22 @@ export const useFlowStore = create<FlowState>()(
           )
         ) return;
         const kind = node.data.kind;
-        // v7：三种节点都可运行（text=润色/生成、image=生成、video=图生视频）。
+        // v8（runtime.md §1）：只有生成节点可运行。输入/结果节点不接 LLM/生图服务，
+        // fail-closed 直接拒绝，不在 action 入口之外产生任何付费调用。
+        if (!isGeneratorNodeKind(kind)) {
+          runWithoutHistory(() => updateTabNodes(set, target, (nodes) => nodes.map((candidate) => (
+            candidate.id === id
+              ? {
+                ...candidate,
+                data: {
+                  ...candidate.data,
+                  error: "该节点不是可执行节点：只有生成节点可以运行",
+                } as WorkflowNodeData,
+              }
+              : candidate
+          ))));
+          return;
+        }
         // 可运行前置检查（变体准入/R3 上游）由 evaluatePromptRunAdmission 与服务端兜底。
         const promptReferences = promptRunReferenceSnapshotsFromGraph(
           initialDocument.nodes,
@@ -3254,7 +3544,7 @@ export const useFlowStore = create<FlowState>()(
           kind,
           projectId: initialDocument.projectId,
           projectName: initialDocument.projectName,
-          prompt: recordPrompt(node.data),
+          prompt: recordPrompt(initialDocument, id),
           startedAt: localStartedAt,
           status: "queued",
           clientRequestId,
@@ -3363,6 +3653,16 @@ export const useFlowStore = create<FlowState>()(
           }
 
           await consumeRunEvents(payload.runId, id, (event) => {
+            if (event.type === "result-node-created") {
+              // v8：产物先以结果节点事件到达（runtime.md §3.1），node-status(success) 随后收口。
+              if (event.sourceGeneratorId !== id) return;
+              set((state) => recentResultsPatch(
+                state,
+                applyResultNodeCreatedToRecentResults(state.recentResults, recordId, event),
+              ));
+              applyResultNodeCreatedEventToTab(target, event);
+              return;
+            }
             if (event.type !== "node-status" || event.nodeId !== id) return;
             set((state) => recentResultsPatch(
               state,
@@ -3420,7 +3720,10 @@ export const useFlowStore = create<FlowState>()(
         applyActiveTemporalHistory("redo");
       },
 
-      loadFlow: ({ projectId, projectName, nodes, edges, markDirty = false }) => {
+      loadFlow: (opts) => {
+        // 读取在前：与 openFlowTab 共用同一条「打开即迁 + 版本闸」路径。
+        const { nodes, edges } = readFlowDocumentSource(opts);
+        const { projectId, projectName, markDirty = false } = opts;
         flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
@@ -3523,6 +3826,9 @@ export function applyServerInitialDraftToTab(
     preserveReplacedAsBackup?: { projectId: string; flow: PersistedWorkflow };
   },
 ): boolean {
+  // 读取在前：初始草稿同样来自服务端 flow，必须走同一条「版本闸 + 打开即迁」路径
+  // （否则 v7 草稿的生成字段会被当成 v8 文档保存，v9 草稿也无法被拒绝）。
+  const draftDocument = readFlowDocumentSource({ flow: draft.flow });
   flushActiveTextEdit();
   cancelHistoryTransaction();
   const state = useFlowStore.getState();
@@ -3533,14 +3839,14 @@ export function applyServerInitialDraftToTab(
     dirty ? 1 : 0,
     finiteNonNegative(options?.localDocumentRevision, draft.revision),
   );
-  const selection = normalizeNodeSelection(draft.flow.nodes as FlowNode[], []);
+  const selection = normalizeNodeSelection(draftDocument.nodes, []);
   const serverTab: ProjectTab = {
     ...source,
     projectId: draft.id,
     projectName: draft.name,
     readOnly: false,
     nodes: selection.nodes,
-    edges: draft.flow.edges as Edge[],
+    edges: draftDocument.edges,
     selectedNodeIds: selection.selectedNodeIds,
     selectedNodeId: selection.selectedNodeId,
     selectedResultId: null,
@@ -3962,6 +4268,21 @@ export function resumeRecentResults(records: RecentResult[]): void {
           );
         }
         await consumeRunEvents(runId, record.nodeId, (event) => {
+          if (event.type === "result-node-created") {
+            // 断线重连后服务端会重放事件：结果节点与最近结果都据此补齐（幂等）。
+            if (event.sourceGeneratorId !== record.nodeId) return;
+            useFlowStore.setState((state) => recentResultsPatch(
+              state,
+              applyResultNodeCreatedToRecentResults(state.recentResults, record.id, event),
+            ));
+            const resultTab = useFlowStore
+              .getState()
+              .tabs.find((candidate) => candidate.projectId === record.projectId);
+            if (resultTab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
+              applyResultNodeCreatedEventToTab(documentTarget(resultTab), event);
+            }
+            return;
+          }
           if (event.type !== "node-status" || event.nodeId !== record.nodeId) return;
           useFlowStore.setState((state) => recentResultsPatch(
             state,
@@ -4018,7 +4339,7 @@ export function applyRunEventToTab(
   updateTabFromRunEvent(useFlowStore.setState, target, nodeId, event);
 }
 
-/** 读取上游聚合图片；v7 中 result 节点已退役，保留该选择器供蒙版/参考图等输入位复用。 */
+/** 读取上游聚合图片；v8 中 result-image 节点重新承载产物，该选择器供结果/蒙版/参考图输入位复用。 */
 export function selectResultImages(state: FlowState, nodeId: string): string[] {
   const document = selectActiveDocument(state);
   const urls: string[] = [];
@@ -4047,4 +4368,49 @@ export function selectNodeInputImages(
 /** Active-tab wrapper used by React subscriptions; the leaf result stays stable. */
 export function selectActiveNodeInputImages(state: FlowState, nodeId: string): string[] {
   return selectNodeInputImages(selectActiveDocument(state), nodeId);
+}
+
+/** 生成节点当前的上游接线状态（runtime.md §5「上游全部断开 → 待接线」的派生视图）。 */
+export interface GeneratorWiringState {
+  kind: GeneratorNodeKind;
+  /** 上游全部断开：节点不销毁，UI 据此提示「待接线」而不是显示空节点。 */
+  pendingWiring: boolean;
+  /** 缺少运行必需的输入（prompt ≥ 1）；不阻断保存，只阻断运行。 */
+  missingRequiredInput: boolean;
+  promptCount: number;
+  referenceCount: number;
+  firstFrameCount: number;
+}
+
+/**
+ * 派生选择器（不落文档、不进历史）：按入边 targetHandle 分区统计生成节点的上游接线。
+ * 传入非生成节点返回 undefined（调用方据此不渲染接线提示）。
+ */
+export function selectGeneratorWiringState(
+  document: Pick<ProjectTab, "nodes" | "edges">,
+  nodeId: string,
+): GeneratorWiringState | undefined {
+  const node = document.nodes.find((candidate) => candidate.id === nodeId);
+  if (!node || !isGeneratorNodeKind(node.data.kind)) return undefined;
+  const kind = node.data.kind;
+  let promptCount = 0;
+  let referenceCount = 0;
+  let firstFrameCount = 0;
+  for (const edge of document.edges) {
+    if (edge.target !== nodeId) continue;
+    const sourceKind = document.nodes.find((candidate) => candidate.id === edge.source)?.data.kind;
+    const handle = resolveTargetHandle(sourceKind, kind, edge.targetHandle ?? null);
+    if (handle === EDGE_HANDLE_PROMPT) promptCount += 1;
+    else if (handle === EDGE_HANDLE_REFERENCE) referenceCount += 1;
+    else if (handle === EDGE_HANDLE_FIRST_FRAME) firstFrameCount += 1;
+  }
+  const spec = NODE_SPECS[kind];
+  return {
+    kind,
+    pendingWiring: promptCount === 0 && referenceCount === 0 && firstFrameCount === 0,
+    missingRequiredInput: spec.inputs.prompt > 0 && promptCount === 0,
+    promptCount,
+    referenceCount,
+    firstFrameCount,
+  };
 }

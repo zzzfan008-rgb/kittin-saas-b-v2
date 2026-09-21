@@ -331,6 +331,17 @@ export function isModelAllowedForNode(modelId: ImageModelId, nodeKind: string): 
   return nodeKind === "image";
 }
 
+/**
+ * v8 生成节点「画幅」取值域（单一事实源）：契约声明 `aspectRatios` 时以契约为准；
+ * 契约未声明时回落到 v7 归一化同源的业务画幅清单。节点组件不得自行硬编码画幅枚举。
+ */
+export const IMAGE_ASPECT_RATIO_OPTIONS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
+
+export function imageAspectRatioOptions(modelId: ImageModelId): readonly string[] {
+  const declared = getImageModelContract(modelId).aspectRatios;
+  return declared && declared.length > 0 ? declared : IMAGE_ASPECT_RATIO_OPTIONS;
+}
+
 export function modelMaxReferenceImages(modelId: ImageModelId): number {
   return Math.min(8, getImageModelContract(modelId).edit.maxReferences);
 }

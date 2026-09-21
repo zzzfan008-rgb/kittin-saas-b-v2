@@ -1,21 +1,23 @@
 import type { Page, Request } from "@playwright/test";
 import sharp from "sharp";
-import { missingTextUpstreamNodeIds, type NodeKind } from "../src/types/workflow";
+import { illegalEdgeIndexes, missingTextUpstreamNodeIds, type NodeKind } from "../src/types/workflow";
 import { expect, test } from "./fixtures";
 
 const STUB_IMAGE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n7sAAAAASUVORK5CYII=";
 
-/** 六个内置模板（server/routes/templates.ts:92-231）。 */
-const BUILTIN_TEMPLATE_COUNT = 6;
-const PATTERN_TEMPLATE_NAME = "图案风格迁移";
-/** builtin-pattern-style-transfer 的迁移节点绑定变体（templates.ts:56 EDIT_VARIANT）。 */
-const TRANSFER_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+/** v8 内置模板：15 个（server/routes/templates.ts 的 builtinTemplates()）。 */
+const BUILTIN_TEMPLATE_COUNT = 15;
+/** 金路径使用的模板：AI 换装 → 模特试穿（builtin-model-tryon）。 */
+const TEMPLATE_NAME = "模特试穿";
+const GENERATOR_NODE_ID = "tryon-gen";
+/** builtin-model-tryon 的生成节点绑定变体（templates.ts EDIT_VARIANT）。 */
+const TRYON_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
 
 interface RunPlanNode {
   id: string;
   type: string;
-  data: { kind: NodeKind; label?: string; promptVariantId?: string; text?: string };
+  data: { kind: NodeKind; label?: string; promptVariantId?: string; text?: string; images?: string[] };
 }
 
 interface RunPlanEdge {
@@ -69,6 +71,10 @@ async function openEmptyFirstScreen(page: Page): Promise<void> {
 /**
  * 只桩掉 app 自己的 durable-run 边界：付费运行必须由 UI（store.runNode）发起，
  * 这里既捕获请求体，也回放一条最小的成功事件流。没有真实 Provider 主机可被触达。
+ *
+ * v8（runtime.md §3.1）：产物由独立的 `result-node-created` 事件送达并实例化结果节点，
+ * `node-status(success)` 只收口生成节点状态——因此桩事件序列与 server/engine/runQueue/
+ * lifecycle.ts 的真实发射顺序一致（result-node-created → node-status success → done）。
  */
 async function stubRunBoundary(page: Page, runs: RunPlanBody[]): Promise<void> {
   const nodeIdByRun = new Map<string, string>();
@@ -99,6 +105,15 @@ async function stubRunBoundary(page: Page, runs: RunPlanBody[]): Promise<void> {
         { seq: 1, type: "node-status", nodeId, status: "running", startedAt: now },
         {
           seq: 2,
+          type: "result-node-created",
+          resultNodeId: `result-${runId}`,
+          sourceGeneratorId: nodeId,
+          runId,
+          mediaKind: "image",
+          urls: [STUB_IMAGE],
+        },
+        {
+          seq: 3,
           type: "node-status",
           nodeId,
           status: "success",
@@ -108,7 +123,7 @@ async function stubRunBoundary(page: Page, runs: RunPlanBody[]): Promise<void> {
           startedAt: now,
           finishedAt: now + 25,
         },
-        { seq: 3, type: "done" },
+        { seq: 4, type: "done" },
       ];
       const body = events.map((event) => `id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`).join("");
       await route.fulfill({
@@ -173,7 +188,7 @@ async function activeDocument(page: Page): Promise<ActiveDocument> {
     const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
     if (!tab) throw new Error("当前没有活动文档");
     return {
-      nodes: tab.nodes.map((node: { id: string; type?: string; data: { kind: string; label?: string; promptVariantId?: string; text?: string } }) => ({
+      nodes: tab.nodes.map((node: { id: string; type?: string; data: { kind: string; label?: string; promptVariantId?: string; text?: string; images?: string[] } }) => ({
         id: node.id,
         type: node.type ?? node.data.kind,
         data: {
@@ -181,6 +196,7 @@ async function activeDocument(page: Page): Promise<ActiveDocument> {
           label: node.data.label,
           ...(node.data.promptVariantId ? { promptVariantId: node.data.promptVariantId } : {}),
           ...(typeof node.data.text === "string" ? { text: node.data.text } : {}),
+          ...(Array.isArray(node.data.images) ? { images: node.data.images } : {}),
         },
       })),
       edges: tab.edges.map((edge: { source: string; target: string; targetHandle?: string | null }) => ({
@@ -192,11 +208,23 @@ async function activeDocument(page: Page): Promise<ActiveDocument> {
   });
 }
 
+/** 选中画布节点（工具条仅选中态渲染），以工具条出现为准，容忍页签落地首帧吞掉的一次点击。 */
+async function selectCanvasNode(node: ReturnType<Page["locator"]>): Promise<void> {
+  const header = node.locator(".gc-node-header");
+  await expect(header).toBeVisible();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (await node.locator("[data-node-toolbar]").count() > 0) return;
+    await header.click();
+    await node.page().waitForTimeout(150);
+  }
+  await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
+}
+
 test("an unverified starter stays blocked while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
-  const patternImage = await sharp({
+  const garmentImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
-  const styleImage = await sharp({
+  const modelImage = await sharp({
     create: { width: 64, height: 96, channels: 3, background: "#2f4858" },
   }).png().toBuffer();
   const runs: RunPlanBody[] = [];
@@ -220,7 +248,7 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
   expect(bootstrapRequests).toEqual([]);
 
-  // ---------- ② 项目中心：六个内置模板可启动（封面真实加载） ----------
+  // ---------- ② 项目中心：v8 的 15 个内置模板可启动（封面真实加载） ----------
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const center = page.getByRole("dialog", { name: "项目中心" });
   await expect(center).toBeVisible();
@@ -234,9 +262,9 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   const covers = builtinPanel.locator("img");
   await expect(covers).toHaveCount(BUILTIN_TEMPLATE_COUNT);
   await expect.poll(() => covers.evaluateAll((images) => images.filter((image) => (
-    image instanceof HTMLImageElement && image.currentSrc.endsWith(".webp") && image.naturalWidth > 0
+    image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
   )).length)).toBe(BUILTIN_TEMPLATE_COUNT);
-  await expect(builtinPanel.getByText(PATTERN_TEMPLATE_NAME, { exact: true })).toBeVisible();
+  await expect(builtinPanel.getByText(TEMPLATE_NAME, { exact: true })).toBeVisible();
 
   // ---------- ③ 模板落地：上传位上传两张真实图片（参考图顺序：图1 → 图2） ----------
   // 模板落地会按「上传位」语义请求 native file chooser（activateFilePicker 依赖挂载时序，
@@ -245,30 +273,32 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   page.on("filechooser", (chooser) => {
     void chooser.setFiles([]);
   });
-  await builtinPanel.getByRole("button", { name: new RegExp(`^${PATTERN_TEMPLATE_NAME}`) }).click();
-  const patternNode = page.getByTestId("rf__node-pattern");
-  const styleNode = page.getByTestId("rf__node-style");
-  const transferNode = page.getByTestId("rf__node-transfer");
-  await expect(patternNode).toBeVisible();
-  await patternNode.getByLabel("上传图片").setInputFiles({
-    name: "pattern.png",
+  await builtinPanel.getByRole("button", { name: new RegExp(`^${TEMPLATE_NAME}`) }).click();
+  const garmentNode = page.getByTestId("rf__node-garment");
+  const modelNode = page.getByTestId("rf__node-model");
+  const generatorNode = page.getByTestId(`rf__node-${GENERATOR_NODE_ID}`);
+  await expect(garmentNode).toBeVisible();
+  await garmentNode.getByLabel("上传图片").setInputFiles({
+    name: "garment.png",
     mimeType: "image/png",
-    buffer: patternImage,
+    buffer: garmentImage,
   });
-  await expect(patternNode.getByAltText("已上传图片")).toBeVisible();
-  await styleNode.getByLabel("上传图片").setInputFiles({
-    name: "style.png",
+  await expect(garmentNode.getByAltText("已上传图片")).toBeVisible();
+  await modelNode.getByLabel("上传图片").setInputFiles({
+    name: "model.png",
     mimeType: "image/png",
-    buffer: styleImage,
+    buffer: modelImage,
   });
-  await expect(styleNode.getByAltText("已上传图片")).toBeVisible();
-  await expect(page.locator(".react-flow__node")).toHaveCount(6);
-  await expect(page.locator(".react-flow__edge")).toHaveCount(5);
+  await expect(modelNode.getByAltText("已上传图片")).toBeVisible();
+  // v8 模板形状：输入层 3 个（文本 + 服装图 + 数字模特）+ 生成层 1 个，3 条边。
+  await expect(page.locator(".react-flow__node")).toHaveCount(4);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(3);
 
   // ---------- ④ 未受审变体：目录未发布 + 运行不得触达 durable-run 边界 ----------
-  await expect(transferNode).toContainText("风格迁移");
-  // 参考图顺序 = 连线顺序（v7「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
-  const availableReferenceLabels = await page.evaluate(async () => {
+  await expect(generatorNode).toContainText("试穿生成");
+  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("（未发布）");
+  // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
+  const availableReferenceLabels = await page.evaluate(async (generatorId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
     const admissionModuleUrl = "/src/hooks/usePromptRunAdmission.ts";
     const [store, admission] = await Promise.all([
@@ -278,82 +308,82 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     const state = store.useFlowStore.getState();
     const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
     if (!tab) throw new Error("当前没有活动文档");
-    return admission.promptRunBrowserReferencesFromGraph(tab.nodes, tab.edges, "transfer")
+    return admission.promptRunBrowserReferencesFromGraph(tab.nodes, tab.edges, generatorId)
       .filter((row: { available: boolean }) => row.available)
       .map((row: { sourceLabel: string }) => row.sourceLabel);
-  });
-  expect(availableReferenceLabels).toEqual(["图1 · 原始图案", "图2 · 风格参考"]);
-  await transferNode.locator(".gc-node-header").click();
-  await transferNode.getByRole("button", { name: "功能设置" }).click();
-  const inspector = page.getByRole("dialog", { name: "风格迁移 · 功能设置" });
-  await expect(inspector).toBeVisible();
-  // 窗口先以 -9999px 离屏挂载，锚定几何在 effect/ResizeObserver 里收敛；等它落到画布内再点击。
-  await expect.poll(async () => (await inspector.boundingBox())?.x ?? -9999).toBeGreaterThan(0);
-  const catalog = inspector.getByRole("region", { name: "功能（系统提示词）" });
-  await expect(catalog).toContainText("只列已发布");
-  const catalogEntries = catalog.getByRole("button");
-  const catalogCount = await catalogEntries.count();
-  expect(catalogCount).toBeGreaterThan(0);
-  for (let index = 0; index < catalogCount; index += 1) {
-    const entry = catalogEntries.nth(index);
-    await expect(entry).toContainText("未发布");
-    await expect(entry).toBeDisabled();
-    await expect(entry).toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
-  }
-  const runButton = inspector.getByRole("button", { name: "运 行" });
-  const inspectorStatus = inspector.locator("p[aria-live='polite']");
-  const nodeErrorText = async () => (await transferNode.locator(".text-red-400").allInnerTexts()).join(" | ");
-  await expect(runButton).toBeEnabled();
-  // 实测（1280×720）：窗口纵向 clamp 允许固定底部的「运 行」落到视口之外 → 鼠标点不到；
-  // 而 Enter 又被 CanvasFlow 的 document keydown 吞掉（Enter 不能激活按钮，Space 可以）。
-  // 这里用 Space 激活，测的是「运行准入」本身；几何与键盘缺陷另见卡片报告。
-  await runButton.focus();
-  await expect(runButton).toBeFocused();
-  await page.keyboard.press(" ");
-  await expect.poll(() => nodeErrorText(), {
-    message: "未受审变体被拒绝时必须在节点上给出显式原因",
-  }).not.toBe("");
+  }, GENERATOR_NODE_ID);
+  expect(availableReferenceLabels).toEqual(["服装图", "数字模特"]);
+  // 卡片内运行按钮：准入不通过 → 禁用 + 给出可读原因（未受审变体不得静默运行）。
+  const runButton = generatorNode.getByRole("button", { name: "尚不可运行" });
+  await expect(runButton).toBeDisabled();
+  await expect(runButton).toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
+  // 工具条「运行」是同一动作的另一入口；这里用它触发被拒绝的运行，并在节点上取回显式原因。
+  await selectCanvasNode(generatorNode);
+  const generatorToolbar = generatorNode.locator('[data-node-toolbar="image-generator"]');
+  await generatorToolbar.getByRole("button", { name: "运行", exact: true }).click();
+  await expect.poll(
+    async () => (await generatorNode.locator(".text-red-400").allInnerTexts()).join(" | "),
+    { message: "未受审变体被拒绝时必须在节点上给出显式原因" },
+  ).toContain("尚未完成当前契约版本的真实评估");
   expect(runs, "未受审变体不得触达付费运行边界").toHaveLength(0);
 
   // ---------- ⑤ 受审变体：从 UI 发起隔离运行并跑完整条链路 ----------
-  await installTestOnlyReviewedVariant(page, TRANSFER_VARIANT_ID);
+  await installTestOnlyReviewedVariant(page, TRYON_VARIANT_ID);
+  // 运行载荷以「发起时刻」的文档为准：受审运行随后会追加结果节点，所以先冻结文档快照。
+  const documentGraph = await activeDocument(page);
   const runResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "POST"
     && new URL(response.url()).pathname === "/api/run-plan"
   ), { timeout: 8_000 }).catch(() => null);
-  await runButton.focus();
-  await page.keyboard.press(" ");
+  await generatorToolbar.getByRole("button", { name: "运行", exact: true }).click();
   const runResponse = await runResponsePromise;
   expect(
     runResponse,
-    `受审变体必须能由 UI 发起付费运行；实际未发出 POST /api/run-plan。节点/窗口给出的原因：${await nodeErrorText()} ｜ ${await inspectorStatus.innerText()}`,
+    `受审变体必须能由 UI 发起付费运行；实际未发出 POST /api/run-plan。节点给出的原因：${
+      (await generatorNode.locator(".text-red-400").allInnerTexts()).join(" | ")
+    }`,
   ).not.toBeNull();
   expect(runResponse?.status()).toBe(202);
-  await expect(transferNode.getByLabel("状态：成功")).toBeVisible();
+  await expect(generatorNode.getByLabel("状态：成功")).toBeVisible();
 
-  // 运行载荷必须与画布文档同一形状，且满足 INV-1（image/video 有 text 上游）。
+  // 运行载荷必须与画布文档同一形状，且满足 INV-1（生成节点有 text 上游）。
   expect(runs).toHaveLength(1);
   const run = runs[0];
-  expect(run.onlyNodeId).toBe("transfer");
+  expect(run.onlyNodeId).toBe(GENERATOR_NODE_ID);
   expect(missingTextUpstreamNodeIds(run.nodes, run.edges)).toEqual([]);
-  const documentGraph = await activeDocument(page);
+  expect(illegalEdgeIndexes(run.nodes, run.edges)).toEqual([]);
   expect(run.nodes.map((node) => node.id).sort()).toEqual(documentGraph.nodes.map((node) => node.id).sort());
   expect(run.edges.map(edgeKey).sort()).toEqual(documentGraph.edges.map(edgeKey).sort());
-  expect(documentGraph.nodes.find((node) => node.id === "transfer")?.data.promptVariantId).toBe(TRANSFER_VARIANT_ID);
+  expect(documentGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.promptVariantId)
+    .toBe(TRYON_VARIANT_ID);
 
-  // ---------- ⑥ 结果面板：结果、动作、查看器、主题 token、节点库 ----------
-  await page.keyboard.press("Escape");
-  await expect(inspector).toHaveCount(0);
+  // ---------- ⑥ 结果节点：RunEvent 驱动的独立结果节点（v8 §3.4 / runtime.md §3.1） ----------
+  const resultNodeId = `result-${"e2e-golden-1"}`;
+  const resultNode = page.getByTestId(`rf__node-${resultNodeId}`);
+  await expect(resultNode).toBeVisible();
+  const resultGraph = await activeDocument(page);
+  const persistedResult = resultGraph.nodes.find((node) => node.id === resultNodeId);
+  expect(persistedResult?.data.kind).toBe("result-image");
+  expect(persistedResult?.data.images).toEqual([STUB_IMAGE]);
+  // 生成节点不再承载任何媒体（产物归结果节点），也不被结果连带写入。
+  expect(resultGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.images).toBeUndefined();
+  await selectCanvasNode(resultNode);
+  const resultToolbar = resultNode.locator('[data-node-toolbar="result-image"]');
+  await expect(resultToolbar).toHaveAttribute("aria-label", "图片结果工具栏");
+  for (const label of ["预览", "下载", "作为输入", "复制"]) {
+    await expect(resultToolbar.getByRole("button", { name: label })).toBeVisible();
+  }
+
+  // ---------- ⑦ 结果面板：结果、动作、查看器、主题 token ----------
   // v7/R-80 布局：结果面板与属性面板同住在唯一占位 Dock 内（`WorkbenchShell` 的
-  // `属性 / 结果` 入口，默认收起）。这里按真实用户路径先展开 Dock，再切到结果页签；
-  // v6 的常驻右栏 / TaskLauncher 已不存在，等价入口只剩这一条。
+  // `属性 / 结果` 入口，默认收起）。这里按真实用户路径先展开 Dock，再切到结果页签。
   const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
   await contextToggle.click();
   await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("tab", { name: "结果 / 记录" }).click();
   const results = page.getByRole("region", { name: "最近生成" });
   await expect(results).toBeVisible();
-  const resultCard = results.locator('article:has(img[alt="风格迁移"])');
+  const resultCard = results.locator('article:has(img[alt="试穿生成"])');
   await expect(resultCard).toBeVisible();
   await resultCard.hover();
   const actionBar = resultCard.locator("div.absolute.inset-x-0.bottom-0");
@@ -363,16 +393,8 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   await expect(resultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
 
   const nodesBeforeApply = await page.locator(".react-flow__node").count();
-  await resultCard.locator('button[title="设为输入"]').click();
-  await expect(page.locator(".react-flow__node")).toHaveCount(nodesBeforeApply + 1);
-  await page.getByRole("tab", { name: "结果 / 记录" }).click();
-  await expect(resultCard).toBeVisible();
-
-  await resultCard.locator('button[title="查看"]').click();
-  await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
-
+  // 媒体遮罩文字 token 的主题稳定性：必须在查看器打开前读——查看器关闭（Escape）会收起 Dock。
+  const originalTheme = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
   for (const theme of ["white", "eye", "current"] as const) {
     await page.evaluate((value) => {
       document.documentElement.setAttribute("data-theme", value);
@@ -384,11 +406,30 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     );
     expect(overlayToken).toBe("#f4f4f4");
   }
+  await page.evaluate((value) => {
+    if (value) document.documentElement.setAttribute("data-theme", value);
+  }, originalTheme);
 
+  await resultCard.locator('button[title="查看"]').click();
+  await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
+
+  // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点 ----------
+  if (await contextToggle.getAttribute("aria-expanded") !== "true") {
+    await contextToggle.click();
+  }
+  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  await expect(resultCard).toBeVisible();
+  await resultCard.locator('button[title="设为输入"]').click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(nodesBeforeApply + 1);
+
+  // ---------- ⑧ 加节点入口：左侧工具栏的「添加」工作流菜单（节点库面板已下线） ----------
   const canvasNodes = page.locator(".react-flow__node");
   const nodeCountBeforeAdd = await canvasNodes.count();
-  // v8：加节点入口是左侧工具栏的「添加」工作流菜单（节点库面板已下线）。
-  await page.getByRole("button", { name: "添加" }).hover();
+  const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
+  await rail.getByRole("button", { name: "添加", exact: true }).hover();
   const addMenu = page.getByRole("menu", { name: "添加" });
   await expect(addMenu).toBeVisible();
   await addMenu.getByRole("menuitem", { name: "文本" }).click();

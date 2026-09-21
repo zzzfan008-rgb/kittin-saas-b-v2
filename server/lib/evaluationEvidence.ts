@@ -29,6 +29,7 @@ import {
 } from "../../src/types/imageModels";
 import {
   NODE_SPECS,
+  generationKindOf,
   type ExecutionPlan,
   type ImageGenRequest,
   type NodeExecution,
@@ -268,9 +269,9 @@ export interface EvaluationCaseEvidenceRecord {
 }
 
 function requireExactProviderStep(plan: ExecutionPlan, step: NodeExecution): NodeExecution {
-  // v7：providerId 从 NodeSpec 删除；Provider-backed 判定改为 kind === "image"
+  // v8：Provider-backed 判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行
   //（评估快照的图片评估只认 image step；text/video 评估链归后续阶段）。
-  const providerSteps = plan.steps.filter((candidate) => candidate.kind === "image");
+  const providerSteps = plan.steps.filter((candidate) => generationKindOf(candidate.kind) === "image");
   if (providerSteps.length !== 1) {
     throw new Error("an evaluation runtime snapshot requires exactly one Provider-backed step");
   }
@@ -373,7 +374,7 @@ export function buildEvaluationCaseSnapshotFromRuntime(
   if (!variant) throw new Error(`unknown evaluated prompt variant: ${promptVariantId}`);
   if (
     variant.modelId !== modelId
-    || variant.nodeKind !== step.kind
+    || generationKindOf(step.kind) !== variant.nodeKind
     || variant.mode !== operationMode
     || variant.familyId !== promptFamilyId
     || variant.parameterProfileId !== parameterProfileId

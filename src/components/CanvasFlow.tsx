@@ -25,9 +25,7 @@ import {
 import { DotWaveBackground } from "./DotWaveBackground";
 import { PulseEdge } from "./edges/PulseEdge";
 import { nodeTypes } from "./nodes";
-import { NodeInspectorWindowPortal } from "./nodes/NodeInspectorWindowPortal";
 import { ReferenceOrdinalsProvider } from "./nodes/ReferenceOrdinals";
-import { useNodeInspector } from "./nodes/NodeInspectorWindow";
 import { useTheme, type ThemeId } from "@/lib/theme";
 import type { NodeKind } from "@/types/workflow";
 import {
@@ -208,8 +206,6 @@ export function CanvasFlow() {
   const setSelectedNodeIds = useFlowStore((s) => s.setSelectedNodeIds);
   const activeTabId = useFlowStore((s) => s.activeTabId);
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const openInspector = useNodeInspector((s) => s.open);
-  const inspectorAnchor = useNodeInspector((s) => s.anchorNodeId);
   // 连线被拒的明确反馈（R3：连错线要有反馈，不是静默失败）。
   const [connectionRejection, setConnectionRejection] = useState<string | null>(null);
   const { fitView, getViewport, screenToFlowPosition, setViewport } = useReactFlow();
@@ -505,40 +501,12 @@ export function CanvasFlow() {
     [],
   );
 
-  // R-40 §2.1.2：选中节点 + Enter 打开功能设置（叠加在库内置「Enter=选中」之上；
-  // 焦点在文本输入内不触发；IME 组字态不触发）。
-  // R-80 R3：焦点落在可激活元素（button / tab / link 等）上时，Enter 必须走原生
-  // 激活，document 守卫不得 preventDefault 吞掉点击/切页等原生行为。
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Enter" || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-      if (typeof event.isComposing === "boolean" ? event.isComposing : false) return;
-      const active = globalThis.document.activeElement;
-      if (
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable)
-      ) return;
-      if (isNativeActivationTarget(active)) return;
-      const state = useFlowStore.getState();
-      const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
-      if (!activeTab || activeTab.readOnly) return;
-      const selectedId = activeTab.selectedNodeIds.at(-1);
-      if (!selectedId) return;
-      const selected = activeTab.nodes.find((node) => node.id === selectedId);
-      if (!selected) return;
-      event.preventDefault();
-      openInspector(selectedId);
-    };
-    globalThis.document.addEventListener("keydown", onKeyDown);
-    return () => globalThis.document.removeEventListener("keydown", onKeyDown);
-  }, [openInspector]);
+  // v8（plan.md §3.3）：功能与参数内联在生成节点上，R-40 悬浮窗口已退役；
+  // 选中节点 + Enter 不再打开任何窗口（库内置「Enter=选中」保持不变）。
 
-  // 点击画布空白处关闭悬浮窗口（R-40 §2.3）；切页/换选中不跟随切换。
   const handlePaneClick = useCallback(() => {
     setSelectedNodeIds([]);
-    if (inspectorAnchor) useNodeInspector.getState().close();
-  }, [setSelectedNodeIds, inspectorAnchor]);
+  }, [setSelectedNodeIds]);
 
 
   const handleNodesChange = useCallback(
@@ -611,7 +579,6 @@ export function CanvasFlow() {
             {connectionRejection}
           </div>
         )}
-        <NodeInspectorWindowPortal />
       </ReferenceOrdinalsProvider>
     </div>
   );
