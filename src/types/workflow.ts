@@ -46,6 +46,26 @@ export function isResultNodeKind(kind: unknown): kind is ResultNodeKind {
   return typeof kind === "string" && (RESULT_NODE_KINDS as readonly string[]).includes(kind);
 }
 
+/**
+ * 生成节点的语义生成类别：`image-generator` → `image`、`video-generator` → `video`，
+ * 其余 kind 原样返回。
+ *
+ * v8 把「节点结构 kind」（7 值）与「生成语义 kind」（image/video/text）解耦：
+ * 提示词变体绑定、模型×节点闸（isModelAllowedForNode）、付费准入（promptRunAdmission）
+ * 仍按语义 kind 工作（variant.nodeKind === "image"|"video"|"text"），而 DAG 步骤的
+ * `step.kind` 是结构 kind（"image-generator"）。跨越这两套 kind 的调用点必须先经本函数归一。
+ */
+export function generationKindOf(kind: NodeKind): NodeKind {
+  switch (kind) {
+    case "image-generator":
+      return "image";
+    case "video-generator":
+      return "video";
+    default:
+      return kind;
+  }
+}
+
 // ---------- 节点执行状态机 ----------
 export type NodeRunStatus =
   | "idle"
@@ -595,3 +615,68 @@ export function nodeTitleForKind(kind: unknown): string {
   if (spec) return spec.title;
   return typeof kind === "string" && kind.trim() !== "" ? kind : "未知类型";
 }
+
+// ---------- 运行事件（SSE）契约 ----------
+/**
+ * RunEvent 的单一事实源（R-89 裁定）：此前 `server/engine/runner.ts` 与
+ * `src/store/flowRunEvents.ts` 各自独立声明，导致 `result-node-created` 无法共享。
+ * 现在统一在此声明：后端（runQueue/lifecycle）发射、前端（flowRunEvents）消费。
+ */
+
+export interface RunFailure {
+  prompt?: string;
+  error: string;
+}
+
+export interface RunEventMeta {
+  /** Run 内单调递增事件序号，供 SSE 重连去重。 */
+  seq?: number;
+  error?: string;
+  model?: string;
+  /** 每张成功图片对应的实际提示词；顺序与 images 一致。 */
+  prompts?: string[];
+  /** 上游声明的逐图实际输出尺寸；顺序与 images 一致。 */
+  providerOutputSizes?: Array<string | null>;
+  failures?: RunFailure[];
+  startedAt?: number;
+  finishedAt?: number;
+  /** R5 参数 warning（不阻断，前端展示）。 */
+  parameterWarnings?: string[];
+}
+
+export type RunEvent =
+  | (RunEventMeta & {
+      type: "node-status";
+      nodeId: string;
+      status: Exclude<NodeRunStatus, "success" | "error" | "idle">;
+      images?: never;
+    })
+  | (RunEventMeta & {
+      type: "node-status";
+      nodeId: string;
+      status: "success";
+      images: string[];
+      /** video 节点产出的 MP4 引用（files 表 video/mp4）；image 节点缺省。 */
+      videos?: string[];
+    })
+  | (Omit<RunEventMeta, "error"> & {
+      type: "node-status";
+      nodeId: string;
+      status: "error";
+      error: string;
+      images?: never;
+    })
+  | (RunEventMeta & {
+      /** 一轮 run 发一次，携带该 run 的全部产物；前端据此实例化 result 节点。 */
+      type: "result-node-created";
+      resultNodeId: string;
+      sourceGeneratorId: string;
+      runId: string;
+      /** "image" | "video" */
+      mediaKind: "image" | "video";
+      /** 产物引用（/api/files/xxx） */
+      urls: string[];
+      outputSizes?: Array<string | null>;
+    })
+  | { seq?: number; type: "done" }
+  | { seq?: number; type: "run-error"; nodeId?: string; error: string; finishedAt?: number };

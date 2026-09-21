@@ -13,6 +13,8 @@ import type {
   WorkflowNodeData,
 } from "../../src/types/workflow";
 import {
+  generationKindOf,
+  isGeneratorNodeKind,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   NODE_SPECS,
@@ -78,13 +80,13 @@ export function assertPromptRunAdmissions(
   options: { evaluationRun?: boolean } = {},
 ): void {
   for (const step of plan.steps) {
-    if (step.kind !== "image") continue;
+    if (step.kind !== "image-generator") continue;
     const references = (step.inputReferences ?? []).map((reference, order) => ({
       order,
       sourceNodeId: reference.sourceNodeId,
     }));
     const decision = evaluatePromptRunAdmission(
-      promptRunAdmissionInputFromParams(step.kind, step.params, references),
+      promptRunAdmissionInputFromParams(generationKindOf(step.kind), step.params, references),
       options,
     );
     if (!decision.allowed) {
@@ -96,14 +98,14 @@ export function assertPromptRunAdmissions(
 /** 运行前验证会产生费用的节点具备真实输入（runtime.md §3）。 */
 export function assertPlanInputs(plan: ExecutionPlan, _edges: FlowEdge[]): void {
   for (const step of plan.steps) {
-    // text 节点走同步链路（无参考图/模型 ID 约束由同步路由负责）；video 归 P2-e。
-    if (step.kind !== "image") continue;
+    // v8：只有 image-generator 产生付费图片；video-generator 归异步视频路径。
+    if (step.kind !== "image-generator") continue;
 
     const modelId = step.params.modelId;
     if (!isImageModelId(modelId)) {
       throw new DagError(`Node ${step.nodeId} must select an explicit supported image model`);
     }
-    if (!isModelAllowedForNode(modelId, step.kind)) {
+    if (!isModelAllowedForNode(modelId, generationKindOf(step.kind))) {
       throw new DagError(`Model ${modelId} is not allowed for node ${step.nodeId}`);
     }
 
@@ -205,82 +207,99 @@ export function buildExecutionPlan(
     throw new DagError(`Cycle detected in workflow, involved nodes: ${remaining.join(", ")}`);
   }
 
-  // 生成执行步骤：记录每个节点的上游依赖（节点 ID + 计划期快照）。
-  // 运行时由 runner 从本次 Run 的 outputs 解析真实输入；
-  // 上游不在执行范围（单节点重跑）时回退到快照。
-  const steps: NodeExecution[] = sorted.map((id) => {
-    const node = nodeMap.get(id)!;
-    const data = node.data;
+  // v8：只有生成节点是可执行步骤；输入/结果节点是数据源，不产生 job。
+  // 运行时由 runner 从本次 Run 的 outputs 解析真实输入；上游不在执行范围
+  // （单节点重跑）时回退到快照。
+  const steps: NodeExecution[] = sorted
+    .filter((id) => isGeneratorNodeKind(nodeMap.get(id)!.data.kind))
+    .map((id) => {
+      const node = nodeMap.get(id)!;
+      const data = node.data;
 
-    // 上游按 edges 数组顺序；text 节点正文沿 text 边传播（runtime.md §0）。
-    const upstream: NodeExecution["upstream"] = [];
-    const inputTexts: string[] = [];
-    for (const e of edges) {
-      if (e.target !== id) continue;
-      const srcData = nodeMap.get(e.source)!.data;
-      upstream.push({
-        nodeId: e.source,
-        images: extractOutputImages(srcData),
-      });
-      if (srcData.kind === "text") inputTexts.push(srcData.text);
-    }
+      // 上游按 edges 数组顺序；按 targetHandle 分区：prompt → text，reference/first-frame → image。
+      const upstream: NodeExecution["upstream"] = [];
+      const inputTexts: string[] = [];
+      for (const e of edges) {
+        if (e.target !== id) continue;
+        const srcData = nodeMap.get(e.source)!.data;
+        upstream.push({
+          nodeId: e.source,
+          images: extractOutputImages(srcData),
+        });
+        if (e.targetHandle === "prompt" && srcData.kind === "text") inputTexts.push(srcData.text);
+      }
 
-    const inputImages = upstream.flatMap((source) => source.images);
-    const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({
-      imageRef,
-      sourceNodeId: source.nodeId,
-    }))).map((reference, order) => ({ ...reference, order }));
-    if (inputReferences.length !== inputImages.length) {
-      throw new DagError(`Node ${id} reference role expansion does not match its input images`);
-    }
+      const inputImages = upstream.flatMap((source) => source.images);
+      const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({
+        imageRef,
+        sourceNodeId: source.nodeId,
+      }))).map((reference, order) => ({ ...reference, order }));
+      if (inputReferences.length !== inputImages.length) {
+        throw new DagError(`Node ${id} reference role expansion does not match its input images`);
+      }
 
-    return {
-      nodeId: id,
-      kind: data.kind,
-      inputImages,
-      inputReferences,
-      upstream,
-      params: { ...extractParams(data), inputTexts },
-    };
-  });
+      return {
+        nodeId: id,
+        kind: data.kind,
+        inputImages,
+        inputReferences,
+        upstream,
+        params: { ...extractParams(data), inputTexts },
+      };
+    });
 
   return { steps };
 }
 
-/** 从节点 data 提取该节点当前已知的输出图片（v7 三值 kind）。 */
+/** 从节点 data 提取该节点作为下游输入源的图片引用（runtime.md §2）。 */
 function extractOutputImages(data: WorkflowNodeData): string[] {
   switch (data.kind) {
     case "image":
       return data.outputImages;
+    case "result-image":
+      return data.images;
     case "text":
     case "video":
+    case "image-generator":
+    case "video-generator":
+    case "result-video":
       return [];
   }
 }
 
-/** 提取节点执行参数（v7 三值 kind；operationMode 由提示词变体携带）。 */
+/** 从节点 data 提取该节点作为下游输入源的视频引用（runtime.md §2；v8 暂无消费方，v2v 预留）。 */
+export function extractOutputVideos(data: WorkflowNodeData): string[] {
+  switch (data.kind) {
+    case "video":
+      return data.outputVideos;
+    case "result-video":
+      return data.videos;
+    default:
+      return [];
+  }
+}
+
+/** 提取节点执行参数（v8 七值 kind；operationMode 由提示词变体携带）。 */
 function extractParams(data: WorkflowNodeData): Record<string, unknown> {
   switch (data.kind) {
     case "text":
-      return {
-        text: data.text,
-        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
-        ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
-        ...(data.modelOptions ? { modelOptions: { ...data.modelOptions } } : {}),
-      };
-    case "image": {
+      return { text: data.text };
+    case "image":
+    case "video":
+    case "result-image":
+    case "result-video":
+      // 输入/结果节点不承载生成语义，无执行参数。
+      return {};
+    case "image-generator": {
       const modelId = data.modelId;
       if (!isImageModelId(modelId)) {
-        throw new DagError("Node data for image must select an explicit supported image model");
+        throw new DagError("Node data for image-generator must select an explicit supported image model");
       }
-      // v7 信任模型（runtime.md §1）：variant 绑定是唯一事实源，节点不自描述。
+      // v8 信任模型（runtime.md §1）：variant 绑定是唯一事实源，节点不自描述。
       // operationMode / parameterProfileId / postprocessVersion 均由已选变体推导：
       // - operationMode ← variant.mode（mode 归属反转）
       // - parameterProfileId ← variant.parameterProfileId
       // - postprocessVersion ← getModelParameterProfile(variant.parameterProfileId).postprocess.version
-      // （R-78：applyVariant 不写、也不应写这三项，避免双源漂移；此处解析落入 params，
-      //   供入队 assertPromptRunAdmissions 与认领 runQueue promptAdmission 两道 choke
-      //   point 及运行链路共用。未选变体则缺省，由准入的 missing-binding 拒绝。）
       const variant = typeof data.promptVariantId === "string"
         ? getGarmentPromptVariantById(data.promptVariantId)
         : undefined;
@@ -308,13 +327,14 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
           : {}),
       };
     }
-    case "video":
+    case "video-generator":
       return {
         ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
         ...(data.modelOptions ? { modelOptions: { ...data.modelOptions } } : {}),
         ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
         ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+        aspectRatio: data.aspectRatio,
       };
   }
 }
