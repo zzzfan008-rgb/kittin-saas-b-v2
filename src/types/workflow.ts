@@ -1,23 +1,50 @@
 /**
  * 工作流核心类型契约 —— 团队共用，改动需通知全员
- * 三基础节点模型（schema v7）：text / image / video。
- * 字段级契约唯一来源：docs/design/2026-09-18-three-node-model/contracts/data-model.md
+ * v8 三层七节点模型：
+ *   输入层 text / image / video
+ *   生成层 image-generator / video-generator
+ *   结果层 result-image / result-video
+ * 字段级契约唯一来源：docs/design/2026-09-21-five-node-model/contracts/data-model.md
  */
 import type { GenerationImageModelId, ImageModelOptions } from "./imageModels";
-import type { TextModelId, TextModelOptions } from "./textModels";
 import type { VideoModelId, VideoModelOptions } from "./videoModels";
 import type { ImageOperationMode } from "./imageOperations";
 
 export { IMAGE_OPERATION_MODE_VALUES } from "./imageOperations";
 export type { ImageOperationMode } from "./imageOperations";
 
-// ---------- 节点类型 ----------
-/**
- * 三基础节点（R1）。旧 9 值（image-input / sketch-to-render / ai-modify /
- * fabric-recolor / upscale / print-extract / print-mutate / mask-redraw /
- * result）在类型层删除，不留别名、不留运行时映射（R7 无迁移路径）。
- */
-export type NodeKind = "text" | "image" | "video";
+// ---------- 节点类型（v8：7 值）----------
+export type NodeKind =
+  | "text"
+  | "image"
+  | "video"
+  | "image-generator"
+  | "video-generator"
+  | "result-image"
+  | "result-video";
+
+/** 输入层：用户供给（提示词 / 图片 / 视频）。不承载任何生成语义，不可运行。 */
+export const INPUT_NODE_KINDS = ["text", "image", "video"] as const;
+/** 生成层：唯一的可执行单元（runtime.md §1）。 */
+export const GENERATOR_NODE_KINDS = ["image-generator", "video-generator"] as const;
+/** 结果层：产物载体。由 RunEvent 驱动创建，用户不可手动新增。 */
+export const RESULT_NODE_KINDS = ["result-image", "result-video"] as const;
+
+export type InputNodeKind = (typeof INPUT_NODE_KINDS)[number];
+export type GeneratorNodeKind = (typeof GENERATOR_NODE_KINDS)[number];
+export type ResultNodeKind = (typeof RESULT_NODE_KINDS)[number];
+
+export function isInputNodeKind(kind: unknown): kind is InputNodeKind {
+  return typeof kind === "string" && (INPUT_NODE_KINDS as readonly string[]).includes(kind);
+}
+
+export function isGeneratorNodeKind(kind: unknown): kind is GeneratorNodeKind {
+  return typeof kind === "string" && (GENERATOR_NODE_KINDS as readonly string[]).includes(kind);
+}
+
+export function isResultNodeKind(kind: unknown): kind is ResultNodeKind {
+  return typeof kind === "string" && (RESULT_NODE_KINDS as readonly string[]).includes(kind);
+}
 
 // ---------- 节点执行状态机 ----------
 export type NodeRunStatus =
@@ -70,63 +97,96 @@ export interface BaseNodeData {
   [key: string]: unknown;
 }
 
+// ===== 输入层（data-model.md §3）：无生成语义字段 =====
+
 export interface TextNodeData extends BaseNodeData {
   kind: "text";
   /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。
-   *  用户手写内容的所有权字段：运行路径（Q1=B）永不写本字段。 */
+   *  用户手写内容的所有权字段：任何运行路径都不写本字段。 */
   text: string;
-  /** Q1=B：可运行文本模型。三项窗口配置与 image/video 同构（R4）。 */
-  promptVariantId?: string;              // 文本功能变体（如"提示词润色"），走同一 promptRunAdmission
-  modelId?: TextModelId;                 // 见 textModels 契约
-  modelOptions?: TextModelOptions;       // 自由 key-value（R5），契约提供 recommendedOptions
-  /** 最近一次文本运行的输出（展示态；「采纳」是显式 UI 动作，把 outputText 复制进 text）。
-   *  长度上限同 text（MAX_TEXT_LENGTH = 20_000），Provider 返回超长时截断写回并标记
-   *  truncated（见 contracts/runtime.md §1b 超长处置）。
-   *  随文档持久化：进 DocumentSnapshot 与 flow_json，刷新/重开不丢失未采纳提案。 */
-  outputText?: string;
-  /** 最近一次运行的输入快照（上游串联 + 当时正文），用于可追溯展示；不受 20_000 限制 */
-  lastRunInput?: string;
 }
 
 export interface ImageNodeData extends BaseNodeData {
   kind: "image";
-  promptVariantId?: string;
-  promptFamilyId?: string;
-  parameterProfileId?: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
-  postprocessVersion?: string;
-  modelId?: GenerationImageModelId;
-  /** R5：自由 key-value；契约提供 recommendedOptions 元数据，UI 负责默认填充。 */
-  modelOptions?: ImageModelOptions;
-  aspectRatio: string;            // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
-  batchSize: BatchSize;           // 1 | 2 | 4 | 8，沿用
-  /** 蒙版能力：仅当 promptVariantId 对应变体声明 needsMask=true 时启用 */
-  mask?: string;                  // PNG dataURL 或 /api/files/*.png（校验沿用现有 optionalMaskReference）
-  maskSourceRef?: string;         // 必须等于第一条图片入边的当前引用，否则运行拒绝（沿用现有语义）
-  featherRadius?: number;         // 0–64
-  /** R8：输入与输出同体。上传图 = 用户直接写入 outputImages；生成结果 = 运行时写回。 */
+  /** 用户上传的图片引用（/api/files/xxx）。输入节点不写生成结果。 */
   outputImages: string[];
 }
 
 export interface VideoNodeData extends BaseNodeData {
   kind: "video";
-  promptVariantId?: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
-  modelId?: VideoModelId;
-  modelOptions?: VideoModelOptions;  // 见 videoModels（契约 data-model.md §5）
-  /** 输出视频引用（/api/files/xxx，files 表 video/mp4）。
-   *  语义：当前产物数组，非历史——一次 run 覆盖写（当前 Provider 一次任务产出一个 MP4，
-   *  长度恒 0 或 1；保留数组形状只为与未来多产物 Provider 对齐，不做多余 UI 分支）。
-   *  历史产物由 generation_runs/generation_outputs 与最近结果面板承载（与 image 同构）。 */
+  /** 用户上传的视频引用（/api/files/xxx，files 表 video/mp4）。 */
   outputVideos: string[];
 }
 
+// ===== 生成层（data-model.md §4）：无媒体展示，产物归结果节点 =====
+
+export interface ImageGeneratorNodeData extends BaseNodeData {
+  kind: "image-generator";
+  /** 功能绑定；必填（C4）。决定业务方向与提示词变体。 */
+  promptVariantId: string;
+  promptFamilyId?: string;
+  parameterProfileId?: string;
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  postprocessVersion?: string;
+  modelId: GenerationImageModelId;
+  /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
+  modelOptions?: ImageModelOptions;
+  aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
+  batchSize: BatchSize; // 1 | 2 | 4 | 8
+  /** 蒙版能力：仅当 promptVariantId 对应变体声明 needsMask=true 时启用 */
+  mask?: string;
+  maskSourceRef?: string;
+  featherRadius?: number; // 0–64
+}
+
+export interface VideoGeneratorNodeData extends BaseNodeData {
+  kind: "video-generator";
+  /** 功能绑定；必填（C4）。 */
+  promptVariantId: string;
+  contractHash?: `sha256:${string}`;
+  evaluationVersion?: string;
+  modelId: VideoModelId;
+  /** 时长走 modelOptions.seconds（与契约 recommendedOptions 同源，不设独立 duration 字段）。 */
+  modelOptions?: VideoModelOptions;
+  /** Seedance 2.5 首帧/首尾帧任务必须 "adaptive"（C6）。 */
+  aspectRatio: string;
+}
+
+// ===== 结果层（data-model.md §5）：产物 + 溯源 =====
+
+export interface ResultImageNodeData extends BaseNodeData {
+  kind: "result-image";
+  /** 该次运行的全部产物；一次运行 = 一个 result 节点（T3 裁定 A）。 */
+  images: string[];
+  thumbnail?: string;
+  /** 溯源：产生它的生成节点。必填（C5）。 */
+  sourceGeneratorId: string;
+  /** 溯源：该次运行的账本键（AGENTS.md §4 反查入口）。必填（C5）。 */
+  runId: string;
+  /** 产物尺寸，与 images 同序。 */
+  outputSizes?: Array<string | null>;
+  /** 用户确认的复用单元下标（持久化意图，非 UI 状态）。 */
+  selectedIndex?: number;
+}
+
+export interface ResultVideoNodeData extends BaseNodeData {
+  kind: "result-video";
+  /** 当前 Provider 一次任务产出一个 MP4，长度恒 0 或 1；保留数组形状与 image 同构。 */
+  videos: string[];
+  sourceGeneratorId: string;
+  runId: string;
+  selectedIndex?: number;
+}
+
+export type InputNodeData = TextNodeData | ImageNodeData | VideoNodeData;
+export type GeneratorNodeData = ImageGeneratorNodeData | VideoGeneratorNodeData;
+export type ResultNodeData = ResultImageNodeData | ResultVideoNodeData;
+
 export type WorkflowNodeData =
-  | TextNodeData
-  | ImageNodeData
-  | VideoNodeData;
+  | InputNodeData
+  | GeneratorNodeData
+  | ResultNodeData;
 
 export function isNodeRunActive(status: NodeRunStatus): boolean {
   return status === "queued" || status === "running" || status === "retry_wait" || status === "cancel_requested";
@@ -138,10 +198,11 @@ export function isNodeRunTerminal(status: NodeRunStatus): boolean {
 
 // ---------- 持久化工作流（项目 / 模板共用）----------
 /**
- * 版本 7 为三基础节点模型（R7：v6 及以下一律拒绝，不做迁移）。
- * 拒绝文案见 contracts/data-model.md §2。
+ * 版本 8 为三层七节点模型（本文件）。
+ * 版本 <= 7 的持久化数据由迁移层惰性升到 v8（migration.md）；
+ * 版本 > 8 一律拒绝（未知的更高版本，fail-closed）。
  */
-export const WORKFLOW_SCHEMA_VERSION = 7 as const;
+export const WORKFLOW_SCHEMA_VERSION = 8 as const;
 export type WorkflowSchemaVersion = typeof WORKFLOW_SCHEMA_VERSION;
 
 export interface PersistedWorkflowNode {
@@ -179,7 +240,7 @@ export interface ImageGenRequest {
   contractHash?: `sha256:${string}`;
   evaluationVersion?: string;
   postprocessVersion?: string;
-  /** 调用模式；v7 起由选中的提示词变体携带（variant.mode），节点不再自描述。 */
+  /** 调用模式；由选中的提示词变体携带（variant.mode），节点不自描述。 */
   operationMode: ImageOperationMode;
   /**
    * 新的可追溯参考图契约。Provider 按 order 转换为各自协议；
@@ -189,19 +250,18 @@ export interface ImageGenRequest {
   /**
    * @deprecated 旧客户端与迁移期的冗余数组（v7 前的 legacy 通道）。
    * 与 references 同时存在时必须逐项一致（referenceInputs.ts 校验）。
-   * P2-b 服务端重写时随旧 runner 一起清理；P2-a 仅保留类型以维持编译。
    */
   referenceImages?: string[];
   aspectRatio?: string;
   batchSize?: number;
-  /** 模型原生参数；R5 起为自由 key-value，仅产生 warning（契约 §4）。 */
+  /** 模型原生参数；自由 key-value，仅产生 warning。 */
   modelOptions?: ImageModelOptions;
   /** 局部编辑蒙版（dataURL），仅 needsMask=true 的变体 */
   mask?: string;
 }
 
 export interface ImageGenResult {
-  images: string[];          // dataURL 或可访问 URL
+  images: string[]; // dataURL 或可访问 URL
   model: string;
   usageNote?: string;
   /** 上游声明的逐图实际输出尺寸；顺序与 images 一致，未知项为 null。 */
@@ -211,7 +271,7 @@ export interface ImageGenResult {
 }
 
 export interface AIProvider {
-  readonly id: string;                 // API易模型 ID；与本地模型知识库一致
+  readonly id: string; // API易模型 ID；与本地模型知识库一致
   validate?(req: ImageGenRequest, mode: ImageOperationMode): void | Promise<void>;
   generate(req: ImageGenRequest): Promise<ImageGenResult>;
   edit(req: ImageGenRequest): Promise<ImageGenResult>;
@@ -292,13 +352,11 @@ export interface Asset {
 // PATCH  /api/assets/:id       { name? } 重命名
 // DELETE /api/assets/:id       删除素材（不删底层图片文件，允许多素材共图）
 
-// ---------- 图不变量与参考图序号（graph-invariants.md）----------
+// ---------- 图不变量（data-model.md §7 / runtime.md §2.1）----------
 /**
  * 图不变量的纯函数实现，前端唯一事实源。
- * 三处实现（画布 / schema / 运行前置）共享同一条不变量：
- *   ∀ n ∈ {image, video}: ∃ ≥1 条 text→n 的边（INV-1，targetHandle === "prompt"）。
- * 边类型判定见 graph-invariants.md §2：text 边 targetHandle="prompt"；
- * image 边 targetHandle 缺省或 "reference"；source kind 由节点表提供。
+ * 三处实现（画布 / schema / 运行前置）共享同一组不变量；
+ * 服务端等价实现见 server/lib/workflowSchema.ts。
  */
 
 export type GraphNodeLike = { id: string; data: { kind: NodeKind } };
@@ -308,15 +366,30 @@ export type GraphEdgeLike = {
   targetHandle?: string | null;
 };
 
+/** targetHandle 取值：prompt / reference / first-frame（runtime.md §2.1）。 */
+export const EDGE_HANDLE_PROMPT = "prompt";
+export const EDGE_HANDLE_REFERENCE = "reference";
+export const EDGE_HANDLE_FIRST_FRAME = "first-frame";
+
 export function isPromptEdge(edge: GraphEdgeLike): boolean {
-  return edge.targetHandle === "prompt";
+  return edge.targetHandle === EDGE_HANDLE_PROMPT;
 }
 
 export function isReferenceEdge(edge: GraphEdgeLike): boolean {
-  return edge.targetHandle !== "prompt";
+  return edge.targetHandle !== EDGE_HANDLE_PROMPT;
 }
 
-/** INV-1：每个 image/video 节点必须存在 ≥1 条来自 text 节点的 text 边。 */
+/** 可作为图片输入的源 kind：用户上传图 + 上游产物。 */
+export function isImageSourceKind(kind: NodeKind | undefined): boolean {
+  return kind === "image" || kind === "result-image";
+}
+
+/** 可作为视频输入的源 kind。 */
+export function isVideoSourceKind(kind: NodeKind | undefined): boolean {
+  return kind === "video" || kind === "result-video";
+}
+
+/** INV-1：每个生成节点必须存在 ≥1 条来自 text 节点的 prompt 边。 */
 export function missingTextUpstreamNodeIds(
   nodes: readonly GraphNodeLike[],
   edges: readonly GraphEdgeLike[],
@@ -324,19 +397,90 @@ export function missingTextUpstreamNodeIds(
   const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
   const result: string[] = [];
   for (const node of nodes) {
-    if (node.data.kind !== "image" && node.data.kind !== "video") continue;
+    if (!isGeneratorNodeKind(node.data.kind)) continue;
     const hasTextUpstream = edges.some(
-      (edge) => edge.target === node.id && isPromptEdge(edge) && kindById.get(edge.source) === "text",
+      (edge) =>
+        edge.target === node.id &&
+        isPromptEdge(edge) &&
+        kindById.get(edge.source) === "text",
     );
     if (!hasTextUpstream) result.push(node.id);
   }
   return result;
 }
 
+/** INV-2：单个 text 节点最多连接 1 个生成节点（runtime.md §2.1）。 */
+export function textNodesOverGeneratorLimit(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): string[] {
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  const countByTextId = new Map<string, number>();
+  for (const edge of edges) {
+    if (kindById.get(edge.source) !== "text") continue;
+    if (!isGeneratorNodeKind(kindById.get(edge.target))) continue;
+    countByTextId.set(edge.source, (countByTextId.get(edge.source) ?? 0) + 1);
+  }
+  return [...countByTextId.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id);
+}
+
+/** INV-3：输入节点之间不得互连（plan.md §2.2）。 */
+export function illegalEdgeIndexes(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): number[] {
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  const bad: number[] = [];
+  edges.forEach((edge, index) => {
+    const sourceKind = kindById.get(edge.source);
+    const targetKind = kindById.get(edge.target);
+    if (sourceKind === undefined || targetKind === undefined) return;
+    if (isInputNodeKind(sourceKind) && isInputNodeKind(targetKind)) bad.push(index);
+    else if (isResultNodeKind(sourceKind)) bad.push(index);
+    else if (isGeneratorNodeKind(sourceKind)) bad.push(index);
+  });
+  return bad;
+}
+
 /**
- * R-39 参考图序号（graph-invariants.md §2b）：(选中目标, 源图) 的二元派生视图。
+ * T4：本版禁止 video / result-video → video-generator 的 reference 边。
+ * schema 层拒绝，不是 UI 隐藏（runtime.md §2.1）。
+ */
+export function forbiddenReferenceEdgeIndexes(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): number[] {
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  const bad: number[] = [];
+  edges.forEach((edge, index) => {
+    if (kindById.get(edge.target) !== "video-generator") return;
+    if (!isReferenceEdge(edge)) return;
+    const sourceKind = kindById.get(edge.source);
+    if (isVideoSourceKind(sourceKind)) bad.push(index);
+  });
+  return bad;
+}
+
+/** C7：结果节点的 sourceGeneratorId 必须命中同文档的生成节点。 */
+export function danglingResultNodeIds(nodes: readonly GraphNodeLike[]): string[] {
+  const generatorIds = new Set(
+    nodes.filter((node) => isGeneratorNodeKind(node.data.kind)).map((node) => node.id),
+  );
+  const bad: string[] = [];
+  for (const node of nodes) {
+    if (!isResultNodeKind(node.data.kind)) continue;
+    const source = (node.data as { sourceGeneratorId?: unknown }).sourceGeneratorId;
+    if (typeof source !== "string" || !generatorIds.has(source)) bad.push(node.id);
+  }
+  return bad;
+}
+
+/**
+ * 参考图序号（graph-invariants）：(选中目标, 源图) 的二元派生视图。
  * 永不持久化——不写入节点 data、不进 DocumentSnapshot、不进 flow_json。
- * 只有 image 边参与编号；text 边不编号。无选中目标时返回空 Map（不渲染徽标）。
+ * 只有图片类边参与编号；text 边不编号。无选中目标时返回空 Map。
  * 选择器必须以 selectedTargetId 为输入现算，禁止缓存跨目标的映射。
  */
 export function selectReferenceOrdinals(
@@ -350,8 +494,8 @@ export function selectReferenceOrdinals(
   let nextOrdinal = 1;
   for (const edge of edges) {
     if (edge.target !== selectedTargetId || !isReferenceEdge(edge)) continue;
-    // 只给 image 源节点编号（video 源不产参考图；text 源不会出现在 reference 边上）
-    if (kindById.get(edge.source) !== "image") continue;
+    // 只给图片源节点编号（video 源不产参考图；text 源不会出现在 reference 边上）
+    if (!isImageSourceKind(kindById.get(edge.source))) continue;
     if (!ordinals.has(edge.source)) {
       ordinals.set(edge.source, nextOrdinal);
       nextOrdinal += 1;
@@ -366,31 +510,74 @@ export interface NodeSpec {
   title: string;
   /** 节点库/快捷建图展示用一句话描述；文案单一事实源在此，不在组件里散落。 */
   description: string;
-  /** 按边类型的入边数上限（graph-invariants.md §2：text 边 / image 边）；0 = 不接受该类型入边。 */
-  inputs: { text: number; image: number };
-  outputs: "text" | "images" | "video";
+  /**
+   * 按 targetHandle 分区的入边数上限（runtime.md §2.1）；0 = 不接受该 handle 的入边。
+   * firstFrame 仅 video-generator 使用（0–1）。
+   */
+  inputs: { prompt: number; reference: number; firstFrame: number };
+  outputs: "text" | "images" | "video" | "none";
+  /** runtime.md §1：只有生成节点可运行。 */
+  runnable: boolean;
+  /** 结果节点由 RunEvent 驱动创建，用户不可从节点库手动新增。 */
+  userCreatable: boolean;
+  /** 同层内是否可与其他输入节点相连（v8 一律 false）。 */
+  acceptsInputEdges: boolean;
 }
 
+const NO_INPUTS = { prompt: 0, reference: 0, firstFrame: 0 } as const;
+
 export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
-  text:  {
+  text: {
     kind: "text", title: "文本",
-    description: "写提示词正文；可串联多段，也可运行文本功能润色生成",
-    inputs: { text: 8, image: 0 }, outputs: "text",
+    description: "写提示词正文；连到生成节点决定生成内容",
+    inputs: { ...NO_INPUTS }, outputs: "text",
+    runnable: false, userCreatable: true, acceptsInputEdges: false,
   },
   image: {
     kind: "image", title: "图片",
-    description: "上传图片或选功能生成；既是输入参考图，也承载产出",
-    inputs: { text: 8, image: 8 }, outputs: "images",
+    description: "上传图片作为参考图；本身不执行生成",
+    inputs: { ...NO_INPUTS }, outputs: "images",
+    runnable: false, userCreatable: true, acceptsInputEdges: false,
   },
   video: {
     kind: "video", title: "视频",
-    description: "文字 + 首帧图片生成上身动效视频",
-    inputs: { text: 8, image: 1 }, outputs: "video",
+    description: "上传视频作为参考素材；本身不执行生成",
+    inputs: { ...NO_INPUTS }, outputs: "video",
+    runnable: false, userCreatable: true, acceptsInputEdges: false,
+  },
+  "image-generator": {
+    kind: "image-generator", title: "生图",
+    description: "选择功能与模型参数，生成图片；产物落到结果节点",
+    inputs: { prompt: MAX_REFERENCE_IMAGES, reference: MAX_REFERENCE_IMAGES, firstFrame: 0 },
+    outputs: "images",
+    runnable: true, userCreatable: true, acceptsInputEdges: false,
+  },
+  "video-generator": {
+    kind: "video-generator", title: "生视频",
+    description: "选择功能与模型参数，生成视频；产物落到结果节点",
+    inputs: { prompt: MAX_REFERENCE_IMAGES, reference: 0, firstFrame: 1 },
+    outputs: "video",
+    runnable: true, userCreatable: true, acceptsInputEdges: false,
+  },
+  "result-image": {
+    kind: "result-image", title: "图片结果",
+    description: "生成产出的图片；可预览、下载，或作为下游生成节点的输入",
+    inputs: { ...NO_INPUTS }, outputs: "images",
+    runnable: false, userCreatable: false, acceptsInputEdges: false,
+  },
+  "result-video": {
+    kind: "result-video", title: "视频结果",
+    description: "生成产出的视频；可播放、下载，或作为下游生成节点的输入",
+    inputs: { ...NO_INPUTS }, outputs: "video",
+    runnable: false, userCreatable: false, acceptsInputEdges: false,
   },
 };
 
+/** 可用于「选择基础节点后新建生成节点」的两个生成节点（用户交互入口）。 */
+export const CREATABLE_GENERATOR_KINDS = ["image-generator", "video-generator"] as const;
+
 /**
- * 未知/legacy kind 的稳健查表（R-79）。三值之外（旧档、脏数据、未来版本）返回
+ * 未知/legacy kind 的稳健查表（R-79）。七值之外（旧档、脏数据、未来版本）返回
  * undefined，调用方据此显式降级为「不支持的旧版本内容」占位，而不是抛异常白屏。
  * `NODE_SPECS` 仍是最上层事实源：本函数不新增任何标题/描述文案。
  */
