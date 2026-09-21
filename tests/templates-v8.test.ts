@@ -3,8 +3,8 @@
  *
  * 覆盖模板格式契约 docs/design/2026-09-21-five-node-model/contracts/template-format.md
  * 的可机检验收项 P1 / P3–P10。P2（逐模板过 validateAndMigrateFlow）依赖 R-85 的
- * schema v8 重写（server/lib/workflowSchema.ts 目前仍为 v7，只认 text/image/video），
- * 因此本测试在 schema 尚未升级时显式跳过 P2 并打印提示，schema 升级后自动转严。
+ * schema v8 重写（server/lib/workflowSchema.ts）。schema 已是 v8（R-85 已落地），
+ * 因此 P2 以 assert.doesNotThrow 硬断言执行；探测/跳过分支仅为历史兼容兜底。
  *
  * 运行：node node_modules/tsx/dist/cli.mjs tests/templates-v8.test.ts
  */
@@ -201,9 +201,8 @@ function main() {
     }
   });
 
-  // P2：逐模板过 validateAndMigrateFlow。依赖 R-85 的 schema v8 重写。
-  // 当前 schema 仍为 v7（只认 text/image/video），对 v8 生成节点会抛「must be one of」，
-  // 因此先探测一次；升级后自动转为硬断言。
+  // P2：逐模板过 validateAndMigrateFlow。schema 已是 v8（R-85 已落地）。
+  // 探测分支仅为历史兼容兜底；正常路径 schemaV8Ready === true，直接走硬断言。
   const first = templates[0];
   let schemaV8Ready = true;
   try {
