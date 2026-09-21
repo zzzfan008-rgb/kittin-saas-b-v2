@@ -354,7 +354,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     }
 
     const maskFlow = (mask: string, maskNodeId = "mask-node") => ({
-      schemaVersion: 7,
+      schemaVersion: 8,
       nodes: [{
         id: "prompt-node",
         type: "text",
@@ -366,25 +366,23 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 300, y: 0 },
         data: {
           kind: "image", label: "原图", status: "idle",
-          aspectRatio: "3:4", batchSize: 1,
           outputImages: [body.url],
         },
       }, {
         id: maskNodeId,
-        type: "image",
+        type: "image-generator",
         position: { x: 600, y: 0 },
         data: {
-          kind: "image", label: "局部重绘", status: "idle",
+          kind: "image-generator", label: "局部重绘", status: "idle",
+          promptVariantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
           modelId: "gpt-image-2.5-sunburst", modelOptions: {},
           aspectRatio: "3:4", batchSize: 1,
-          outputImages: [],
           mask, maskSourceRef: body.url,
         },
       }],
       edges: [
-        { id: "prompt-source", source: "prompt-node", target: "source-node", targetHandle: "prompt" },
-        { id: "prompt-mask", source: "prompt-node", target: maskNodeId, targetHandle: "prompt" },
-        { id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId },
+        { id: "prompt-mask", source: "prompt-node", target: maskNodeId, targetHandle: "prompt", data: {} },
+        { id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId, targetHandle: "reference", data: {} },
       ],
     });
     const saveMaskProject = async (
@@ -505,7 +503,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeUnavailableTargetFiles);
 
     const blankFlow = {
-      schemaVersion: 7,
+      schemaVersion: 8,
       nodes: [{
         id: "starter-prompt",
         type: "text",
@@ -517,16 +515,10 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 320, y: 0 },
         data: {
           kind: "image", label: "上传服装图", status: "idle",
-          aspectRatio: "3:4", batchSize: 1, outputImages: [],
+          outputImages: [],
         },
       }],
-      edges: [{
-        id: "starter-prompt-edge",
-        source: "starter-prompt",
-        target: "starter",
-        targetHandle: "prompt",
-        data: {},
-      }],
+      edges: [],
     };
     const initialTargetId = "mask-sync-draft";
     const targetBootstrap = await fetch(`${server.baseUrl}/api/projects/initial-draft/bootstrap`, {

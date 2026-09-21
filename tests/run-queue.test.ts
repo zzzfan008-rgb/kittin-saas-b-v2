@@ -2170,7 +2170,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
     );
     assert.ok(stored);
     const queuedStep = JSON.parse(stored.step_json) as NodeExecution;
-    assert.equal(queuedStep.kind, "image");
+    assert.equal(queuedStep.kind, "image-generator");
     assert.deepEqual(queuedStep.inputImages, [PNG_DATA_URL]);
     assert.equal(queuedStep.params.maskSourceRef, PNG_DATA_URL);
     assert.equal(queuedStep.params.maskMode, undefined);

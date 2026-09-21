@@ -8,7 +8,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS, generationKindOf } from "../../../src/types/workflow";
 import { validateImageDataUrl } from "../../lib/imageValidation";
 import {
   evaluatePromptRunAdmission,
@@ -20,8 +20,8 @@ export function evaluateClaimedJobPromptAdmission(
   job: ClaimedJob,
   runtimeUserReferences?: readonly PromptRunReferenceSnapshot[],
 ): { allowed: boolean; reason: string } {
-  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
-  if (job.step.kind !== "image") {
+  // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
+  if (generationKindOf(job.step.kind) !== "image") {
     return { allowed: true, reason: "非付费节点不调用 Provider。" };
   }
   const hasEvaluationPolicy = (
