@@ -5,6 +5,7 @@
  */
 import { Router } from "express";
 import {
+  generationKindOf,
   MASK_PIPELINE_VERSION,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
@@ -50,7 +51,7 @@ import {
 
 export const generateRouter = Router();
 
-export type DirectGenerateKind = "image";
+export type DirectGenerateKind = "image-generator";
 
 export type DirectGenerateValidation =
   | { ok: true; kind?: DirectGenerateKind }
@@ -100,7 +101,7 @@ function directMaskReferenceError(value: string): string | undefined {
 }
 
 function isDirectGenerateKind(value: unknown): value is DirectGenerateKind {
-  return value === "image";
+  return value === "image-generator";
 }
 
 /** Validate the node contract before starting or recording a direct generation. */
@@ -202,7 +203,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
       return;
     }
   }
-  if (!isModelAllowedForNode(modelId, resolvedKind)) {
+  if (!isModelAllowedForNode(modelId, generationKindOf(resolvedKind))) {
     res.status(400).json({ error: `${modelId} is not allowed for ${resolvedKind}` });
     return;
   }
@@ -292,7 +293,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
   };
   try {
     const admission = evaluatePromptRunAdmission(
-      promptRunAdmissionInputFromParams(resolvedKind, basePlan.steps[0].params, admissionReferences),
+      promptRunAdmissionInputFromParams(generationKindOf(resolvedKind), basePlan.steps[0].params, admissionReferences),
       { evaluationRun: false },
     );
     if (!admission.allowed) {

@@ -28,7 +28,7 @@ clientPrototype.query = function patchedQuery(this: pg.Client, ...args: unknown[
 };
 
 function resultStep(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecution {
-  return { nodeId, kind: "image", inputImages: [], upstream, params: {} };
+  return { nodeId, kind: "image-generator", inputImages: [], upstream, params: {} };
 }
 
 function durationMs(started: bigint): number {
@@ -78,7 +78,7 @@ try {
       userId: owner.id,
       nodeId: nodeIds.at(-1)!,
       nodeLabel: `Performance ${runIndex}`,
-      kind: "image",
+      kind: "image-generator",
       requestedCount: 1,
     };
     const run = await queue.enqueueGenerationRun({ steps } satisfies ExecutionPlan, owner.id, context);

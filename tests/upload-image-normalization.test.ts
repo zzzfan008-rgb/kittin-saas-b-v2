@@ -741,7 +741,7 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
   });
   const step: NodeExecution = {
     nodeId: "normalization-gate",
-    kind: "image",
+    kind: "image-generator",
     inputImages: [`/api/files/${legacyId}`],
     params: {
       prompt: "提取主图案",

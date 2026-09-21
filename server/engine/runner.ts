@@ -10,6 +10,7 @@
  */
 import { createHash } from "node:crypto";
 import {
+  generationKindOf,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
   type AIProvider,
@@ -19,6 +20,9 @@ import {
   type NodeRunStatus,
   type ReferenceImageInput,
   type ReferenceImageSource,
+  type RunEvent,
+  type RunEventMeta,
+  type RunFailure,
 } from "../../src/types/workflow";
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
@@ -57,51 +61,7 @@ export const VIDEO_POLL_INITIAL_DELAY_MS = 20_000;
 export const VIDEO_POLL_INTERVAL_MS = 20_000;
 export const VIDEO_POLL_TIMEOUT_MS = 15 * 60_000;
 
-export interface RunFailure {
-  prompt?: string;
-  error: string;
-}
-
-interface RunEventMeta {
-  /** Run 内单调递增事件序号，供 SSE 重连去重。 */
-  seq?: number;
-  error?: string;
-  model?: string;
-  /** 每张成功图片对应的实际提示词；顺序与 images 一致。 */
-  prompts?: string[];
-  /** 上游声明的逐图实际输出尺寸；顺序与 images 一致。 */
-  providerOutputSizes?: Array<string | null>;
-  failures?: RunFailure[];
-  startedAt?: number;
-  finishedAt?: number;
-  /** R5 参数 warning（不阻断，前端展示）。 */
-  parameterWarnings?: string[];
-}
-
-export type RunEvent =
-  | (RunEventMeta & {
-      type: "node-status";
-      nodeId: string;
-      status: Exclude<NodeRunStatus, "success" | "error" | "idle">;
-      images?: never;
-    })
-  | (RunEventMeta & {
-      type: "node-status";
-      nodeId: string;
-      status: "success";
-      images: string[];
-      /** video 节点产出的 MP4 引用（files 表 video/mp4）；image 节点缺省。 */
-      videos?: string[];
-    })
-  | (Omit<RunEventMeta, "error"> & {
-      type: "node-status";
-      nodeId: string;
-      status: "error";
-      error: string;
-      images?: never;
-    })
-  | { seq?: number; type: "done" }
-  | { seq?: number; type: "run-error"; nodeId?: string; error: string; finishedAt?: number };
+export type { RunEvent, RunFailure, RunEventMeta } from "../../src/types/workflow";
 
 export interface StepResult {
   images: string[];
@@ -223,7 +183,7 @@ function assertNoRemoteWorkerReferenceValues(values: readonly unknown[]): void {
 function assertNoRemoteWorkerReferences(step: NodeExecution, inputImages: readonly string[]): void {
   assertNoRemoteWorkerReferenceValues([
     ...inputImages,
-    step.kind === "image" && typeof step.params.mask === "string" ? step.params.mask : undefined,
+    step.kind === "image-generator" && typeof step.params.mask === "string" ? step.params.mask : undefined,
   ]);
 }
 
@@ -296,7 +256,7 @@ async function executeTextStep(
   };
 }
 
-async function executeImageStep(
+async function executeImageGeneratorStep(
   step: NodeExecution,
   inputImages: string[],
   resolveProvider: ProviderResolver,
@@ -306,7 +266,7 @@ async function executeImageStep(
   if (!isImageModelId(modelId)) {
     throw new Error(`Node ${step.nodeId} must select an explicit supported image model`);
   }
-  if (!isModelAllowedForNode(modelId, step.kind)) {
+  if (!isModelAllowedForNode(modelId, generationKindOf(step.kind))) {
     throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
   }
   const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
@@ -427,7 +387,7 @@ async function executeImageStep(
   };
 }
 
-async function executeVideoStep(
+async function executeVideoGeneratorStep(
   step: NodeExecution,
   inputImages: string[],
   resolveVideoProvider: VideoProviderResolver,
@@ -515,12 +475,16 @@ export async function executeStep(
   // unresolved user input references and never changes output URL handling.
   assertNoRemoteWorkerReferences(step, inputImages);
   switch (step.kind) {
+    case "image-generator":
+      return executeImageGeneratorStep(step, inputImages, resolveProvider, options);
+    case "video-generator":
+      return executeVideoGeneratorStep(step, inputImages, options.resolveVideoProvider ?? getVideoProvider, options);
     case "text":
-      return executeTextStep(step, options.resolveTextProvider ?? getTextProvider);
     case "image":
-      return executeImageStep(step, inputImages, resolveProvider, options);
     case "video":
-      return executeVideoStep(step, inputImages, options.resolveVideoProvider ?? getVideoProvider, options);
+    case "result-image":
+    case "result-video":
+      throw new Error(`Node ${step.nodeId} 不是可执行节点类型`);
   }
 }
 

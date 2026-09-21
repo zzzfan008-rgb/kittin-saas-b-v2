@@ -57,7 +57,7 @@ function installFetchMock(
 function videoStep(overrides: Partial<NodeExecution["params"]> = {}): NodeExecution {
   return {
     nodeId: "video-1",
-    kind: "video",
+    kind: "video-generator",
     inputImages: [],
     params: {
       promptVariantId: GARMENT_PROMPT_VARIANTS[0].variantId,

@@ -155,14 +155,14 @@ await test("内容安全拒绝是确定失败，不会为同一输入重复付�
   assert.equal(calls, 1);
 });
 
-await test("image 节点缺省 batchSize 与实际默认 1 张一致", async () => {
-  assert.equal(requestedCountForStep("image", {}), 1);
-  assert.equal(requestedCountForStep("image", { batchSize: 4 }), 4);
+await test("image-generator 缺省 batchSize 与实际默认 1 张一致", async () => {
+  assert.equal(requestedCountForStep("image-generator", {}), 1);
+  assert.equal(requestedCountForStep("image-generator", { batchSize: 4 }), 4);
 });
 
 await test("直连与 DAG 的 AI 批量生成统一限制为最多 8 张", async () => {
-  assert.equal(requestedCountForStep("image", { batchSize: 8 }), 8);
-  assert.equal(requestedCountForStep("image", { batchSize: 99 }), 8);
+  assert.equal(requestedCountForStep("image-generator", { batchSize: 8 }), 8);
+  assert.equal(requestedCountForStep("image-generator", { batchSize: 99 }), 8);
 });
 
 await test("部分成功保留图片并明确记录 N/M", async () => {
@@ -282,19 +282,19 @@ await test("runner 不再对图像输出做本地尺寸后处理（画幅由 Pro
 
 await test("直接生成接口校验操作模式、参考图与节点种类", async () => {
   assert.deepEqual(
-    validateDirectGenerateRequest("image", {
+    validateDirectGenerateRequest("image-generator", {
       prompt: "效果图",
       operationMode: "generate",
     }),
-    { ok: true, kind: "image" },
+    { ok: true, kind: "image-generator" },
   );
   assert.deepEqual(
-    validateDirectGenerateRequest("image", {
+    validateDirectGenerateRequest("image-generator", {
       prompt: "放大",
       operationMode: "edit",
       referenceImages: ["data:image/png;base64,AA=="],
     }),
-    { ok: true, kind: "image" },
+    { ok: true, kind: "image-generator" },
   );
   assert.deepEqual(
     validateDirectGenerateRequest(undefined, {
@@ -308,7 +308,7 @@ await test("直接生成接口校验操作模式、参考图与节点种类", as
     operationMode: "generate",
   }), { ok: false, error: "kind must identify a supported AI node" });
   assert.deepEqual(
-    validateDirectGenerateRequest("image", {
+    validateDirectGenerateRequest("image-generator", {
       prompt: "generate 不能带参考图",
       operationMode: "generate",
       referenceImages: ["data:image/png;base64,AA=="],
@@ -316,7 +316,7 @@ await test("直接生成接口校验操作模式、参考图与节点种类", as
     { ok: false, error: "generate mode cannot contain reference images" },
   );
   assert.deepEqual(
-    validateDirectGenerateRequest("image", {
+    validateDirectGenerateRequest("image-generator", {
       prompt: "edit 缺参考图",
       operationMode: "edit",
     }),
@@ -329,7 +329,7 @@ await test("直接生成接口不再做本地比例/放大后处理", async () =
   const untouchedPortrait = [portrait];
   assert.strictEqual(
     await postProcessDirectGenerateImages(
-      "image",
+      "image-generator",
       { prompt: "效果图", operationMode: "generate", aspectRatio: "9:16" },
       untouchedPortrait,
     ),
@@ -340,7 +340,7 @@ await test("直接生成接口不再做本地比例/放大后处理", async () =
   const untouchedLandscape = [landscape];
   assert.strictEqual(
     await postProcessDirectGenerateImages(
-      "image",
+      "image-generator",
       {
         prompt: "改款",
         operationMode: "edit",
@@ -353,7 +353,7 @@ await test("直接生成接口不再做本地比例/放大后处理", async () =
   );
   assert.strictEqual(
     await postProcessDirectGenerateImages(
-      "image",
+      "image-generator",
       {
         prompt: "高清放大",
         operationMode: "edit",
@@ -366,7 +366,7 @@ await test("直接生成接口不再做本地比例/放大后处理", async () =
   );
 
   assert.strictEqual(
-    await postProcessDirectGenerateImages("image", {
+    await postProcessDirectGenerateImages("image-generator", {
       prompt: "换色",
       operationMode: "edit",
       referenceImages: ["data:image/png;base64,AA=="],
