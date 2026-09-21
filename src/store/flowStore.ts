@@ -58,6 +58,7 @@ import {
   documentSnapshotToPersistedWorkflow,
   isV8ConnectionValid,
   normalizeFlowForDocumentRead,
+  readFlowDocumentForOpen,
   resolveTargetHandle,
 } from "@/lib/documentSnapshot";
 import {
@@ -179,6 +180,52 @@ export interface CoalescedTextEditToken {
   readonly descriptorKey: string;
 }
 
+/**
+ * 打开路径的文档来源（二选一，互斥）。
+ *
+ * - `flow`：**持久化** flow（保留 `schemaVersion`）——必须走这一支，由文档层执行版本闸 +
+ *   v7→v8 惰性迁移 + 投影。
+ * - `nodes`/`edges`：调用方**已读过**的 v8 文档（模板派生、测试夹具）。
+ *
+ * 互斥是刻意的：持久化文档一旦被上游拆成 nodes/edges，schemaVersion 就丢了，
+ * 「v9 文档被读进来再存成 v8」这种不可回滚的降级再也无法被发现（architect R-89 P1-3）。
+ */
+export type FlowDocumentSource =
+  | { flow: unknown }
+  | { nodes: FlowNode[]; edges: Edge[] };
+
+export type OpenFlowDocumentOptions = FlowDocumentSource & {
+  projectId: string;
+  projectName: string;
+  markDirty?: boolean;
+  readOnly?: boolean;
+};
+
+export type LoadFlowDocumentOptions = FlowDocumentSource & {
+  projectId: string;
+  projectName: string;
+  /** 从模板新建时为 true；打开已保存项目时保持 false。 */
+  markDirty?: boolean;
+};
+
+/**
+ * 读取归一唯一入口（打开路径）：
+ * - 持久化 flow → 版本闸 + v7→v8 惰性迁移 + 投影 + 图不变量（`readFlowDocumentForOpen`）；
+ * - 已读取文档 → 只做字段投影与非法边过滤（`normalizeFlowForDocumentRead`）。
+ *
+ * 被拒绝的文档在这里抛错（fail-closed）；调用方不得在读到文档之前改动任何页签状态。
+ */
+function readFlowDocumentSource(source: FlowDocumentSource): { nodes: FlowNode[]; edges: Edge[] } {
+  if ("flow" in source) {
+    const { flow } = readFlowDocumentForOpen(source.flow);
+    return { nodes: flow.nodes as unknown as FlowNode[], edges: flow.edges as unknown as Edge[] };
+  }
+  return normalizeFlowForDocumentRead({
+    nodes: source.nodes,
+    edges: source.edges,
+  }) as { nodes: FlowNode[]; edges: Edge[] };
+}
+
 export interface FlowState {
   /** 应用内项目页签；活动文档始终是 activeTabId 对应的页签。 */
   tabs: ProjectTab[];
@@ -194,14 +241,7 @@ export interface FlowState {
 
   switchTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
-  openFlowTab: (opts: {
-    projectId: string;
-    projectName: string;
-    nodes: FlowNode[];
-    edges: Edge[];
-    markDirty?: boolean;
-    readOnly?: boolean;
-  }) => void;
+  openFlowTab: (opts: OpenFlowDocumentOptions) => void;
   createBlankTab: () => void;
   setProjectName: (name: string) => void;
   setSelectedNodeIds: (ids: string[]) => void;
@@ -249,14 +289,7 @@ export interface FlowState {
    * 替换 nodes/edges 并重置选择、对比、查看器与撤销历史。
    * 调用方决定 projectId（打开项目用原 id，模板派生用新 id）。
    */
-  loadFlow: (opts: {
-    projectId: string;
-    projectName: string;
-    nodes: FlowNode[];
-    edges: Edge[];
-    /** 从模板新建时为 true；打开已保存项目时保持 false。 */
-    markDirty?: boolean;
-  }) => void;
+  loadFlow: (opts: LoadFlowDocumentOptions) => void;
   undo: () => void;
   redo: () => void;
 }
@@ -3095,16 +3128,13 @@ export const useFlowStore = create<FlowState>()(
         }));
         restoreTemporalHistory(target.id);
       },
-      openFlowTab: ({ projectId, projectName, nodes: incomingNodes, edges: incomingEdges, markDirty = false, readOnly = false }) => {
+      openFlowTab: (opts) => {
+        // 读取在前（版本闸 / 迁移 / 投影）：文档被拒绝时当前页签状态保持原样（fail-closed）。
+        const { nodes, edges } = readFlowDocumentSource(opts);
+        const { projectId, projectName, markDirty = false, readOnly = false } = opts;
         flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
-        // v8 读取归一（migration.md §3/§4：打开即迁）：节点投影为七节点文档形状
-        // （输入节点不带生成字段），v7 的 prompt/reference 边在 v8 全部非法，一并丢弃。
-        const { nodes, edges } = normalizeFlowForDocumentRead({
-          nodes: incomingNodes as unknown as FlowNode[],
-          edges: incomingEdges as unknown as Edge[],
-        }) as { nodes: FlowNode[]; edges: Edge[] };
         const applyActiveHistory = (inputNodes: FlowNode[]) => {
           const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);
           return inputNodes.map((node) => {
@@ -3690,15 +3720,13 @@ export const useFlowStore = create<FlowState>()(
         applyActiveTemporalHistory("redo");
       },
 
-      loadFlow: ({ projectId, projectName, nodes: incomingNodes, edges: incomingEdges, markDirty = false }) => {
+      loadFlow: (opts) => {
+        // 读取在前：与 openFlowTab 共用同一条「打开即迁 + 版本闸」路径。
+        const { nodes, edges } = readFlowDocumentSource(opts);
+        const { projectId, projectName, markDirty = false } = opts;
         flushActiveTextEdit();
         cancelHistoryTransaction();
         const state = get();
-        // v8 读取归一：与 openFlowTab 共用同一条「打开即迁」路径。
-        const { nodes, edges } = normalizeFlowForDocumentRead({
-          nodes: incomingNodes as unknown as FlowNode[],
-          edges: incomingEdges as unknown as Edge[],
-        }) as { nodes: FlowNode[]; edges: Edge[] };
         const activeByNode = latestActiveRecordsByNode(state.recentResults, projectId);
         const loadedNodes = nodes.map((node) => {
           const active = activeByNode.get(node.id);
@@ -3798,6 +3826,9 @@ export function applyServerInitialDraftToTab(
     preserveReplacedAsBackup?: { projectId: string; flow: PersistedWorkflow };
   },
 ): boolean {
+  // 读取在前：初始草稿同样来自服务端 flow，必须走同一条「版本闸 + 打开即迁」路径
+  // （否则 v7 草稿的生成字段会被当成 v8 文档保存，v9 草稿也无法被拒绝）。
+  const draftDocument = readFlowDocumentSource({ flow: draft.flow });
   flushActiveTextEdit();
   cancelHistoryTransaction();
   const state = useFlowStore.getState();
@@ -3808,12 +3839,6 @@ export function applyServerInitialDraftToTab(
     dirty ? 1 : 0,
     finiteNonNegative(options?.localDocumentRevision, draft.revision),
   );
-  // v8 读取归一：初始草稿同样来自服务端 flow，必须走同一条「打开即迁」路径
-  // （否则 v7 草稿的 image 节点生成字段会被投影保留成非法文档）。
-  const draftDocument = normalizeFlowForDocumentRead({
-    nodes: draft.flow.nodes as unknown as FlowNode[],
-    edges: draft.flow.edges as unknown as Edge[],
-  }) as { nodes: FlowNode[]; edges: Edge[] };
   const selection = normalizeNodeSelection(draftDocument.nodes, []);
   const serverTab: ProjectTab = {
     ...source,

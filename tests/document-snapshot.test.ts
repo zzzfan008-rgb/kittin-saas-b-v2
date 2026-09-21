@@ -9,6 +9,7 @@ import {
   migrateFlowToV8,
   normalizeFlowForDocumentRead,
   readDocumentSnapshotFromFlow,
+  readFlowDocumentForOpen,
   unprojectedDocumentFields,
 } from "../src/lib/documentSnapshot";
 import { buildGarmentPrompt, requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
@@ -470,6 +471,63 @@ const kept = normalizeFlowForDocumentRead({
 });
 assert.deepEqual(kept.droppedEdgeIds, []);
 assert.equal(kept.edges[0]?.targetHandle, "prompt", "缺省 handle 必须物化为 prompt");
+
+// ---------- 4.1 打开路径读取入口（readFlowDocumentForOpen，R-91） ----------
+
+// v7 文档：打开路径必须给出 v8 文档（可被落盘闸接受），且迁移结果零丢失。
+const openedV7 = readFlowDocumentForOpen(structuredClone(v7Flow));
+assert.equal(openedV7.migrated, true);
+assert.equal(openedV7.flow.schemaVersion, WORKFLOW_SCHEMA_VERSION);
+assert.deepEqual(openedV7.flow.edges, [], "打开路径同样丢弃 v7 边（M4）");
+assert.deepEqual(openedV7.flow.nodes.map((node) => node.type), ["text", "image", "video"], "不得凭空造生成/结果节点（M5）");
+assert.deepEqual(openedV7.flow.nodes[1].data, {
+  kind: "image",
+  label: "草图渲染",
+  outputImages: ["/api/files/kept.png"],
+  status: "idle",
+}, "M2/M8：产物逐项保留，生成字段剥离");
+const openedV7Resave = documentSnapshotToPersistedWorkflow(createDocumentSnapshot({
+  projectName: "打开后首次保存",
+  nodes: openedV7.flow.nodes,
+  edges: openedV7.flow.edges,
+}));
+assert.equal(openedV7Resave.schemaVersion, WORKFLOW_SCHEMA_VERSION, "打开结果可直接落盘为 v8");
+assert.deepEqual(
+  unprojectedDocumentFields({ ...openedV7Resave.nodes[1].data, status: undefined } as never),
+  [],
+  "落盘产物不得带契约外字段",
+);
+
+// 已迁移的 v8 文档不再迁移。
+const reopenedV8 = readFlowDocumentForOpen(openedV7.flow);
+assert.equal(reopenedV8.migrated, false);
+assert.deepEqual(reopenedV8.flow, openedV7.flow);
+
+// 版本闸：更高版本 / v6 及以下一律拒绝。
+assert.throws(
+  () => readFlowDocumentForOpen({ schemaVersion: 9, nodes: [], edges: [] }),
+  DocumentFlowVersionError,
+  "更高版本必须被拒绝",
+);
+assert.throws(
+  () => readFlowDocumentForOpen({ schemaVersion: 6, nodes: [], edges: [] }),
+  DocumentFlowVersionError,
+);
+assert.throws(() => readFlowDocumentForOpen({ nodes: [], edges: [] }), DocumentFlowVersionError);
+
+// 图不变量：打开入口同样 fail-closed。
+assert.throws(
+  () => readFlowDocumentForOpen({
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    nodes: [
+      { id: "a", type: "image", position: { x: 0, y: 0 }, data: { kind: "image", label: "a", status: "idle", outputImages: [] } },
+      { id: "b", type: "image", position: { x: 1, y: 0 }, data: { kind: "image", label: "b", status: "idle", outputImages: [] } },
+    ],
+    edges: [{ id: "e", source: "a", target: "b", targetHandle: "reference", data: {} }],
+  }),
+  DocumentGraphError,
+  "打开入口必须拒绝含非法边的 v8 文档",
+);
 
 // ---------- 5. 文档图不变量 ----------
 

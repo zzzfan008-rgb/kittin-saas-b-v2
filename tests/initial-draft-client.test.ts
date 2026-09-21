@@ -31,7 +31,8 @@ import {
   registerInitialDraftSaveBarrier,
   waitForInitialDraftSyncBeforeFormalSave,
 } from "../src/initialDraft/initialDraftRuntime";
-import { inferTemplateLaunchMode } from "../src/lib/templateLaunch";
+import { inferTemplateLaunchMode, launchTemplateInNewTab } from "../src/lib/templateLaunch";
+import { DocumentFlowVersionError, DocumentGraphError } from "../src/lib/documentSnapshot";
 import type { WorkflowTemplate } from "../src/types/workflow";
 
 function tab(overrides: Partial<ProjectTab> = {}): ProjectTab {
@@ -531,3 +532,171 @@ assert.match(templateLaunchSource, /projectTabLifecycle\(active\) !== "initial_d
 assert.match(templateLaunchSource, /commitDocumentMutation\(/);
 assert.match(templateLaunchSource, /projectId: active\.projectId/);
 console.log("  ✓ 模板落地模式（upload/text/default）与内置封面资源保持有效");
+
+// ---------- R-91：生产打开路径的版本闸 + 惰性迁移 ----------
+
+/** v7 项目文档：带生成字段与 v7 prompt 边（v8 判定非法）。 */
+function v7OpenPathFlow(): Record<string, unknown> {
+  return {
+    schemaVersion: 7,
+    nodes: [
+      {
+        id: "t-v7",
+        type: "text",
+        position: { x: 0, y: 0 },
+        data: { kind: "text", label: "提示词", status: "idle", text: "白色风衣", promptVariantId: "v7-variant", modelId: "gpt-5.3" },
+      },
+      {
+        id: "i-v7",
+        type: "image",
+        position: { x: 380, y: 0 },
+        data: {
+          kind: "image",
+          label: "草图",
+          status: "success",
+          outputImages: ["/api/files/kept.png"],
+          modelId: "gemini-3.1-flash-image",
+          aspectRatio: "3:4",
+          batchSize: 2,
+        },
+      },
+    ],
+    edges: [{ id: "e-v7", source: "t-v7", target: "i-v7", sourceHandle: "prompt", targetHandle: "prompt" }],
+  };
+}
+
+function openPathTab(overrides: Partial<ProjectTab> = {}): ProjectTab {
+  return tab({ id: "tab-open-path", projectId: "project-open-path", ...overrides });
+}
+
+function nodeDataOf(projectTab: ProjectTab, index: number): Record<string, unknown> {
+  return projectTab.nodes[index]?.data as unknown as Record<string, unknown>;
+}
+
+console.log("生产打开路径版本闸测试");
+
+const openPlaceholder = openPathTab();
+useFlowStore.setState({ tabs: [openPlaceholder], activeTabId: openPlaceholder.id, viewer: null });
+
+assert.throws(
+  () => useFlowStore.getState().openFlowTab({
+    projectId: "p-v9",
+    projectName: "更高版本项目",
+    flow: { schemaVersion: 9, nodes: [], edges: [] },
+  }),
+  DocumentFlowVersionError,
+  "schemaVersion 9 的项目必须拒绝打开",
+);
+assert.equal(
+  useFlowStore.getState().tabs.some((candidate) => candidate.projectId === "p-v9"),
+  false,
+  "被拒绝的文档不得留下页签",
+);
+assert.equal(useFlowStore.getState().tabs.length, 1);
+assert.equal(useFlowStore.getState().activeTabId, openPlaceholder.id);
+console.log("  ✓ 更高版本项目 fail-closed，且不改动现有页签");
+
+assert.throws(
+  () => useFlowStore.getState().openFlowTab({ projectId: "p-v6", projectName: "旧版本", flow: { schemaVersion: 6, nodes: [], edges: [] } }),
+  DocumentFlowVersionError,
+);
+assert.throws(
+  () => useFlowStore.getState().openFlowTab({ projectId: "p-none", projectName: "无版本", flow: { nodes: [], edges: [] } }),
+  DocumentFlowVersionError,
+);
+assert.throws(
+  () => useFlowStore.getState().openFlowTab({
+    projectId: "p-illegal-edge",
+    projectName: "非法边",
+    flow: {
+      schemaVersion: 8,
+      nodes: [
+        { id: "a", type: "image", position: { x: 0, y: 0 }, data: { kind: "image", label: "a", status: "idle", outputImages: [] } },
+        { id: "b", type: "image", position: { x: 1, y: 0 }, data: { kind: "image", label: "b", status: "idle", outputImages: [] } },
+      ],
+      edges: [{ id: "e", source: "a", target: "b", targetHandle: "reference", data: {} }],
+    },
+  }),
+  DocumentGraphError,
+);
+console.log("  ✓ v6/无版本号/非法边项目一律拒绝");
+
+useFlowStore.getState().openFlowTab({ projectId: "p-v7", projectName: "v7 项目", flow: v7OpenPathFlow() });
+const openedV7Tab = useFlowStore.getState().tabs.find((candidate) => candidate.projectId === "p-v7");
+assert.ok(openedV7Tab);
+assert.deepEqual(openedV7Tab.edges, [], "v7 的 prompt 边在 v8 非法，打开时必须丢弃");
+assert.deepEqual(openedV7Tab.nodes.map((node) => node.data.kind), ["text", "image"]);
+assert.equal(nodeDataOf(openedV7Tab, 1).modelId, undefined, "v7 生成字段必须在打开时剥离（M8）");
+assert.equal(nodeDataOf(openedV7Tab, 1).batchSize, undefined);
+assert.deepEqual(nodeDataOf(openedV7Tab, 1).outputImages, ["/api/files/kept.png"], "产物零丢失（M2）");
+assert.deepEqual(nodeDataOf(openedV7Tab, 0).text, "白色风衣");
+const savedV7Tab = persistedWorkflowForProjectTab(openedV7Tab);
+assert.equal(savedV7Tab.schemaVersion, 8, "v7 项目首次保存必须写回迁移结果");
+for (const node of savedV7Tab.nodes) {
+  assert.ok(!("modelId" in (node.data as Record<string, unknown>)), "落盘产物不得残留未迁移字段");
+}
+console.log("  ✓ v7 项目打开即惰性迁移，首次保存写回 v8");
+
+const loadPlaceholder = openPathTab({ id: "tab-load", projectId: "project-load" });
+useFlowStore.setState({ tabs: [loadPlaceholder], activeTabId: loadPlaceholder.id, viewer: null });
+useFlowStore.getState().loadFlow({ projectId: "p-v7-load", projectName: "v7 载入", flow: v7OpenPathFlow() });
+const loadedTab = selectActiveDocument(useFlowStore.getState());
+assert.equal(loadedTab.projectId, "p-v7-load");
+assert.deepEqual(loadedTab.edges, []);
+assert.equal(nodeDataOf(loadedTab, 1).modelId, undefined);
+assert.throws(
+  () => useFlowStore.getState().loadFlow({ projectId: "p-v9-load", projectName: "更高版本", flow: { schemaVersion: 9, nodes: [], edges: [] } }),
+  DocumentFlowVersionError,
+);
+console.log("  ✓ loadFlow 与 openFlowTab 共用同一读取入口");
+
+const draftPlaceholder = openPathTab({ id: "tab-draft-gate", projectId: "project-draft-gate" });
+useFlowStore.setState({ tabs: [draftPlaceholder], activeTabId: draftPlaceholder.id, viewer: null });
+assert.throws(
+  () => applyServerInitialDraftToTab(draftPlaceholder.id, {
+    ...draft({ id: "draft-v9" }),
+    flow: { schemaVersion: 9, nodes: [], edges: [] } as never,
+  }),
+  DocumentFlowVersionError,
+);
+assert.equal(selectActiveDocument(useFlowStore.getState()).projectId, "project-draft-gate", "被拒绝的草稿不得改写页签");
+assert.equal(
+  applyServerInitialDraftToTab(draftPlaceholder.id, {
+    ...draft({ id: "draft-v7" }),
+    flow: v7OpenPathFlow() as never,
+  }),
+  true,
+);
+const migratedDraftTab = selectActiveDocument(useFlowStore.getState());
+assert.equal(migratedDraftTab.projectId, "draft-v7");
+assert.deepEqual(migratedDraftTab.edges, []);
+assert.equal(nodeDataOf(migratedDraftTab, 1).modelId, undefined);
+console.log("  ✓ 初始草稿走同一版本闸（v9 拒绝、v7 打开即迁）");
+
+const templatePlaceholder = openPathTab({ id: "tab-template-gate", projectId: "project-template-gate" });
+useFlowStore.setState({ tabs: [templatePlaceholder], activeTabId: templatePlaceholder.id, viewer: null });
+const launchedV7 = launchTemplateInNewTab({
+  schemaVersion: 7,
+  id: "tpl-v7",
+  name: "v7 模板",
+  description: "",
+  createdAt: "2026-08-13T00:00:00.000Z",
+  flow: v7OpenPathFlow(),
+} as unknown as WorkflowTemplate);
+const launchedTab = useFlowStore.getState().tabs.find((candidate) => candidate.id === launchedV7.tabId);
+assert.ok(launchedTab);
+assert.equal(launchedTab.dirty, true);
+assert.deepEqual(launchedTab.edges, []);
+assert.equal(nodeDataOf(launchedTab, 1).modelId, undefined, "模板 flow 也必须经读取闸投影");
+assert.throws(
+  () => launchTemplateInNewTab({
+    schemaVersion: 9,
+    id: "tpl-v9",
+    name: "v9 模板",
+    description: "",
+    createdAt: "2026-08-13T00:00:00.000Z",
+    flow: { schemaVersion: 9, nodes: [], edges: [] },
+  } as unknown as WorkflowTemplate),
+  DocumentFlowVersionError,
+);
+console.log("  ✓ 模板 flow 走同一版本闸（v7 迁移、v9 拒绝）");
