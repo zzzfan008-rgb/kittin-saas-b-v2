@@ -14,7 +14,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { migrateLegacyData } = await import("../server/lib/legacyMigration");
 
-console.log("PostgreSQL 21 编号迁移回归测试");
+console.log("PostgreSQL 22 编号迁移回归测试");
 await initializeDatabase();
 
 const versions = await query<{ version: number; name: string }>(
@@ -42,8 +42,20 @@ assert.deepEqual(versions, [
   { version: 19, name: "immutable_evaluation_campaign_ledger" },
   { version: 20, name: "provider_request_id_evidence" },
   { version: 21, name: "video_step_output_metadata" },
+  { version: 22, name: "asset_model_category" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
+
+const assetCategoryConstraint = await queryOne<{ definition: string }>(`
+  SELECT pg_get_constraintdef(oid) AS definition
+  FROM pg_constraint
+  WHERE conname = 'assets_category_check'
+`);
+assert.match(assetCategoryConstraint?.definition ?? "", /'print'/);
+assert.match(assetCategoryConstraint?.definition ?? "", /'fabric'/);
+assert.match(assetCategoryConstraint?.definition ?? "", /'reference'/);
+assert.match(assetCategoryConstraint?.definition ?? "", /'model'/);
+console.log("  ✓ 素材 category 枚举已扩容为 print/fabric/reference/model");
 
 const tutorialReceiptColumns = await query<{ column_name: string }>(`
   SELECT column_name FROM information_schema.columns
