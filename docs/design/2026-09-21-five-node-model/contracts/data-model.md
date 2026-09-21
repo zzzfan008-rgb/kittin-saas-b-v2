@@ -13,7 +13,27 @@
 | T1 | `[功能选项]` 归属 | **在生成节点内** | 与 D6 一致；创建时一次性选定会让「改功能」变成删节点重建，违反 D10「生成节点独立持久」 |
 | T2 | 视频时长/运动参数来源 | **时长由契约动态给；"运动参数" 本版不落地** | `docs/ai/apiyi/video-model-contracts.json` 的 `recommendedOptions` 只有 `resolution/aspectRatio/seconds/seed`，**没有运动参数键**。契约无从给，前端不得硬编码枚举。运动参数等契约扩充后再加 |
 | T3 | N 张产物 = 1 个结果节点还是 N 个 | **A：1 个结果节点（内部网格）** | 见 §5.1 论证（推翻我上一轮的 B 倾向） |
-| T4 | `result-video → video-generator` 边 | **本版禁止** | runner 只实现首帧（0–1 张 image 边），放开等于允许用户连出运行时被静默忽略的边 |
+| T4 | `video` / `result-video` → `video-generator` 的 `reference` 边 | **本版禁止（两类源均禁）** | runner 只实现首帧（0–1 条 image 边），放开等于允许用户连出运行时被静默忽略的边。范围澄清：`runtime.md §2.1` 与 `NODE_SPECS["video-generator"].inputs.reference = 0` 均按「两类源双双禁止」实现；本行原仅点名 `result-video`，现扩为两类源，与实现对齐 |
+
+## 0.2 补充裁定（R-89 复核裁决，2026-09-21）
+
+| # | 问题 | 裁定 | 理由 |
+|---|------|------|------|
+| P2-3 | 多个 text 节点可否汇聚到同一生成节点 | **否，`inputs.prompt` 上限 = 1** | 一次生成的提示词来源唯一。与 plan「单一 text 只能连 1 个生成节点」构成双向 1:1，INV-1 闭环。若允许多条，拼接/定序/去重规则契约未定义，等于让 DAG 层发明语义。**附带修正**：`NODE_SPECS` 中 `prompt` 上限不得复用 `MAX_REFERENCE_IMAGES`（图片上限，量纲错配），应新增独立常量 `MAX_PROMPT_INPUTS = 1` |
+| P2-4 | `first-frame` 边是否参与参考图序号（order） | **否** | 首帧/首尾帧在 video 契约里是独立角色（`role: first_frame`），不是参考图序列的一员。order 语义（AGENTS.md §4「ordered reference-image semantics, order only」）只管参考图之间的相对顺序。**落地**：`isReferenceEdge` 不得用「非 prompt 即 reference」反向判定，须显式只认 `EDGE_HANDLE_REFERENCE`，否则 first-frame 与 null 句柄会被错算成 reference |
+
+
+### 0.1 边规则唯一事实来源
+
+**合法边 / 禁止边以 `runtime.md §2.1` 为准。** `plan.md §2.1` 的边表已作废其中两行，
+仅作历史草案：
+
+| plan.md §2.1 作废行 | 取代者 |
+|---|---|
+| `video` → `video-generator` / `reference`（原标「可选，可多条」） | T4：本版禁止 |
+| `result-video` → `video-generator` / `reference`（原标「可选」） | T4：本版禁止 |
+| `*-generator` → `result-*` / `result` 句柄（原标「系统自动创建」） | 本文件 §5：生成→结果关系建模为**结果节点字段**（`sourceGeneratorId` + `runId`），**不落边**；类型层不定义 `result` 句柄 |
+
 
 ## 1. 节点分层
 
