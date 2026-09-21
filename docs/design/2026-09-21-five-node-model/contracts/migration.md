@@ -52,8 +52,12 @@ v7 → v8 是**结构变换**，不是字段改名（见 data-model.md §3 的�
 
 `WORKFLOW_SCHEMA_VERSION = 8`。读取时：
 - `schemaVersion === 8` → 直接校验
-- `schemaVersion <= 7`（含 `undefined`/`0`）→ 走迁移
+- `schemaVersion === 7` → 走迁移
+- `schemaVersion < 7`（含 `undefined`/`0`）→ **拒绝**（沿用 v7 确立的边界：v6 及以下一律拒绝，见 §8）
 - `schemaVersion > 8` → **拒绝**（未知的更高版本，fail-closed）
+
+本表为版本闸的唯一口径（R-100 修正：原文第 2 条写作「`<= 7` 走迁移」，与 §8
+及两侧实现正面冲突；错误的只有本表文本，两侧实现一直按本表执行）。
 
 ## 5. 落盘行为
 
@@ -72,6 +76,7 @@ v7 → v8 是**结构变换**，不是字段改名（见 data-model.md §3 的�
 | M6 | 迁移结果能通过 v8 schema 校验 | 直接跑 `validateAndMigrateFlow` |
 | M7 | `schemaVersion > 8` 被拒绝 | 构造 9 → 断言抛错 |
 | M8 | 生成字段被剥离 | 断言迁移后 image 节点无 `promptVariantId` 键 |
+| M9 | 版本闸逐档：`=== 7` 迁移、`< 7`（含 `undefined`/`0`）拒绝、`> 8` 拒绝 | 既有机检：`tests/workflow-schema.test.ts:263`、`tests/document-snapshot.test.ts:430`/`:506`、`tests/r48-version-gate.test.ts:6` |
 
 M1/M2/M3 是 §3 不削弱原则在迁移层的落地断言。
 
@@ -84,6 +89,18 @@ M1/M2/M3 是 §3 不削弱原则在迁移层的落地断言。
 这是用户拍板的保守路径的固有代价。UI 应在迁移后的项目首次打开时给出**一次性提示**：
 「项目已升级到新节点模型。原有素材与结果完整保留；如需再次生成，请为其添加生成节点。」
 提示为 UI 层，不进文档。
+
+**触发与边界（R-100 裁定，口径补全；呈现形式仍由 UI 决定）**：
+
+- 触发条件 = 读取路径**确实发生了迁移**（`readFlowDocumentForOpen` 返回 `migrated === true`），
+  不由入口各自判断。当前消费方：`src/store/flowStore.ts:220`（`openFlowTab`/`loadFlow`/
+  `applyServerInitialDraftToTab` 共用 `readFlowDocumentSource`）、`src/lib/templateLaunch.ts:69`。
+- 文案常量已定稿：`DOCUMENT_MIGRATION_NOTICE`（`src/lib/documentSnapshot.ts:145`），UI 不得改写。
+- 每次「发生迁移的打开」最多提示一次，同一页签内不重复；**不持久化**「已提示」标记
+  （否则等于把 UI 状态写进文档，违反 AGENTS.md §3）。尚未保存的 v7 文档下次打开会再次迁移，
+  因此会再次提示——这是正确行为，不是重复打扰。
+- 提示不得阻断打开、不得改变迁移结果（§3 已定：边整体丢弃）。
+- 具体控件、位置与可关闭性属 UI 决策，按 AGENTS.md §2 先经用户确认（本文件不代拍）。
 
 ## 8. 不做的事
 

@@ -167,8 +167,32 @@ export interface ResultVideoNodeData extends BaseNodeData {
 2. **一次运行天然成组**。`runId` 是账本键（AGENTS.md §4），一节点对一 run 是最自然映射；
    B 下 N 个节点共享一个 runId，信息冗余，且易出现「同 run 节点被删剩一个」的悬空状态。
 3. **布局有界**。A 的位置算法只依赖一次运行，不随历史增长（见 runtime.md §4）。
-4. **逐张操作不丢失**。B 的独有能力是「单产物独立寻址」；A 用 `selectedIndex`（持久化意图）
-   + 网格单元点击（UI 状态）覆盖：`[作为输入]` 边记录 `imageIndex`，语义与 B 等价。
+4. **逐张操作：本期只保留「部分能力」（R-100 改写，原文不成立）**。B 的独有能力是
+   「单产物独立寻址」。A **当前不具备**该能力，原文「`[作为输入]` 边记录 `imageIndex`，
+   语义与 B 等价」是未落地的论证：边数据**没有** `imageIndex` 字段（全仓同名概念只存在于
+   `server/lib/evaluationEvidence*.ts` 的评估证据域，与边无关——已 grep 复核）；
+   `selectedIndex` 只在文档投影与会话缓存恢复里被透传，**没有 UI 写入方**
+   （`src/store/flowStore.ts:1980` 位于 `normalizeSessionNode`）。A 的实际复用语义是
+   **整节点输出**：一条 reference 边把该结果节点的**全部** `images` 按数组顺序传入
+   （`extractOutputImages(result-image) → data.images`，`server/engine/dag.ts:255-260`；
+   入边展开 `dag.ts:227-236`）。`selectedIndex` 保留为「用户确认的复用单元」意图字段，
+   本版无写入方，不得据此声称逐张寻址已实现。
+
+**已知限制（R-100 裁定：明示，不隐藏，也不作为本批合并的阻断项）**
+
+整节点语义在「结果张数 > 参考图上限」时无补救入口（系统不静默裁剪）：
+
+| 模式 | 上限 | 8 张结果可否整节点复用 |
+|---|---|---|
+| 非蒙版 | `min(MAX_REFERENCE_IMAGES=8, modelMaxReferenceImages)`；契约内 9 个图片模型 `edit.maxReferences` 全为 8 → **8** | 可（8 ≤ 8，与 `BATCH_SIZES` 最大值恰好相等） |
+| 蒙版（`needsMask` 变体 / `operationMode === "mask-edit"`） | `MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1 = 7`（`src/types/workflow.ts:82-84`） | **不可**：8 > 7，被 `evaluatePromptRunAdmission` 以 `reference-limit-exceeded` 拒绝 |
+
+- 拒绝点：`src/lib/promptRunAdmission.ts:441-453`（前端准入）；服务端同一把尺
+  `server/engine/dag.ts:121-129`、`server/engine/runner.ts:295-303`。
+- 用户补救：改小批次重跑，或把目标那张另存为素材后经 `image` 节点引入（多一步，但能力不丢）。
+- 「按产物逐张寻址」（边携带 `imageIndex` + 前端选择入口 + dag/runner 按 index 取图）
+  是**未排期的后续需求**，不是本期能力；它属新能力而非缺陷修复（涉及边契约、UI 与运行时
+  三方改动），需另行拍板后立项。
 
 **A 必须遵守的补充约束**（否则退化成 v7 的「结果不可追溯」）：
 
