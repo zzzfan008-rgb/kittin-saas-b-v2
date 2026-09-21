@@ -1,6 +1,6 @@
 import type { AuthUser } from "./auth";
 import type { ExecutionPlan } from "../../src/types/workflow";
-import { NODE_SPECS } from "../../src/types/workflow";
+import { NODE_SPECS, generationKindOf } from "../../src/types/workflow";
 
 export const EVALUATION_CASE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 export const EVALUATION_AUTHORIZATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
@@ -92,13 +92,13 @@ export function attachEvaluationRunPolicy(
   plan: ExecutionPlan,
   policy: EvaluationRunPolicy,
 ): ExecutionPlan {
-  // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
-  const providerSteps = plan.steps.filter((step) => step.kind === "image");
+  // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
+  const providerSteps = plan.steps.filter((step) => generationKindOf(step.kind) === "image");
   if (providerSteps.length !== 1) {
     throw new EvaluationRunPolicyError("每个真实评估 case 必须且只能包含一个付费节点", 400);
   }
   return {
-    steps: plan.steps.map((step) => step.kind === "image"
+    steps: plan.steps.map((step) => generationKindOf(step.kind) === "image"
       ? { ...step, params: { ...step.params, evaluationPolicy: policy } }
       : step),
   };

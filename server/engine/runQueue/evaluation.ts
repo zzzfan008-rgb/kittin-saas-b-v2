@@ -6,7 +6,7 @@ import type {
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { NODE_SPECS } from "../../../src/types/workflow";
+import { NODE_SPECS, generationKindOf } from "../../../src/types/workflow";
 import type { EvaluationRunPolicy } from "../../lib/evaluationRunPolicy";
 import {
   consumeEvaluationRunAuthorization,
@@ -117,8 +117,8 @@ export function planWithPersistedEvaluationPolicy(
   };
   const steps = plan.steps.map((step) => {
     const { evaluationPolicy: _untrustedPolicy, ...params } = step.params;
-    // v7：providerId 从 NodeSpec 删除；付费节点判定改为 kind === "image"。
-    if (step.kind !== "image") return { ...step, params };
+    // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
+    if (generationKindOf(step.kind) !== "image") return { ...step, params };
     providerStepCount += 1;
     return {
       ...step,
