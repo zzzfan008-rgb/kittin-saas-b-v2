@@ -20,7 +20,7 @@ import { WORKFLOW_SCHEMA_VERSION } from "../src/types/workflow";
  * 文档快照边界测试（schema v8，三层七节点）。
  *
  * 覆盖：投影字段边界（C2/C3/C5）、运行态剥离、深拷贝、wire 往返、落盘闸（未迁移即拒绝）、
- * v7→v8 惰性迁移（M1-M8）、版本闸（v6/-/v9）与文档图不变量（C6/T4/INV-2）。
+ * v7→v8 惰性迁移（M1-M8）、版本闸（v6/-/v9）与文档图不变量（C6/C7 两档/T4/INV-2）。
  */
 
 type SnapshotSource = Parameters<typeof createDocumentSnapshot>[0] & Record<string, unknown>;
@@ -586,6 +586,89 @@ const pendingIssues = documentGraphIssues(pendingSnapshot);
 assert.equal(pendingIssues.every((issue) => issue.severity === "warning"), true);
 assert.equal(pendingIssues.some((issue) => issue.code === "missing-text-upstream"), true);
 assert.doesNotThrow(() => documentSnapshotToPersistedWorkflow(pendingSnapshot), "待接线不得阻断保存");
+
+// C7 两档（architect R-90）：命中同文档**非生成节点** → error（读取 fail-closed）；
+// 不命中任何节点（生成节点已被删除）→ warning（文档仍可保存/打开，§5.1 悬空态）。
+const c7BaseNodes = [
+  { id: "img", type: "image", position: { x: 0, y: 0 }, data: { kind: "image", label: "图", status: "idle", outputImages: ["/api/files/a.png"] } },
+] as never;
+const misdirectedSnapshot = createDocumentSnapshot({
+  projectName: "C7 情形 (a)",
+  nodes: [
+    ...(c7BaseNodes as unknown[]),
+    {
+      id: "r-misdirected", type: "result-image", position: { x: 380, y: 0 },
+      data: {
+        kind: "result-image", label: "结果", status: "idle", images: ["/api/files/r.png"],
+        sourceGeneratorId: "img", runId: "run-a",
+      },
+    },
+  ] as never,
+  edges: [],
+});
+const misdirectedIssues = documentGraphIssues(misdirectedSnapshot).filter(
+  (issue) => issue.nodeId === "r-misdirected",
+);
+assert.deepEqual(
+  misdirectedIssues.map((issue) => [issue.code, issue.severity]),
+  [["misdirected-result-source", "error"]],
+  "情形 (a) 命中非生成节点必须报 error，且只报一次",
+);
+// 只报一次 = 两档互斥：同一节点不可能同时进 (a) 与 (b)。
+assert.equal(
+  documentGraphIssues(misdirectedSnapshot).some((issue) => issue.code === "dangling-result-source"),
+  false,
+  "情形 (a) 不得同时被算作悬空",
+);
+assert.throws(
+  () => readDocumentSnapshotFromFlow({
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    nodes: misdirectedSnapshot.nodes,
+    edges: misdirectedSnapshot.edges,
+  }),
+  DocumentGraphError,
+  "情形 (a) 必须让读取 fail-closed",
+);
+
+const danglingSnapshot = createDocumentSnapshot({
+  projectName: "C7 情形 (b)",
+  nodes: [
+    ...(c7BaseNodes as unknown[]),
+    {
+      id: "r-dangling", type: "result-image", position: { x: 380, y: 160 },
+      data: {
+        kind: "result-image", label: "结果", status: "idle", images: ["/api/files/r.png"],
+        sourceGeneratorId: "deleted-generator", runId: "run-b",
+      },
+    },
+  ] as never,
+  edges: [],
+});
+const danglingIssues = documentGraphIssues(danglingSnapshot).filter(
+  (issue) => issue.nodeId === "r-dangling",
+);
+assert.deepEqual(
+  danglingIssues.map((issue) => [issue.code, issue.severity]),
+  [["dangling-result-source", "warning"]],
+  "情形 (b) 悬空溯源只报 warning，且只报一次",
+);
+assert.equal(
+  documentGraphIssues(danglingSnapshot).some((issue) => issue.code === "misdirected-result-source"),
+  false,
+  "不命中任何节点不得被算作 (a)（生成节点删除是合法操作）",
+);
+assert.doesNotThrow(
+  () => readDocumentSnapshotFromFlow({
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    nodes: danglingSnapshot.nodes,
+    edges: danglingSnapshot.edges,
+  }),
+  "情形 (b) 悬空溯源不得阻断文档打开",
+);
+assert.doesNotThrow(
+  () => documentSnapshotToPersistedWorkflow(danglingSnapshot),
+  "情形 (b) 悬空溯源不得阻断文档保存",
+);
 
 // ---------- 6. v8 连线规则 ----------
 

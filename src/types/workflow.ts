@@ -501,16 +501,44 @@ export function forbiddenReferenceEdgeIndexes(
   return bad;
 }
 
-/** C7：结果节点的 sourceGeneratorId 必须命中同文档的生成节点。 */
+/**
+ * C7 情形 (b)：结果节点的 `sourceGeneratorId` 不命中同文档任何节点
+ * （生成节点已被用户删除），或溯源键本身缺失/非法。
+ *
+ * 删除生成节点不删 result 节点是合法操作（data-model.md §5.1 / R2）：悬空引用下文档**仍可保存**，
+ * 结果仍可查看、可 [作为输入]，溯源改由 `runId` → 账本解析（AGENTS.md §4）。
+ * 因此这一档只报 warning，不阻断保存/打开（architect R-90 两档语义）。
+ *
+ * 情形 (a)「命中同文档节点但 kind 非 `*-generator`」（伪造/损坏 provenance，硬闸）由
+ * `misdirectedResultSourceNodeIds` 承担。两个谓词**互斥**，其并集即 C7 的全部违例。
+ */
 export function danglingResultNodeIds(nodes: readonly GraphNodeLike[]): string[] {
-  const generatorIds = new Set(
-    nodes.filter((node) => isGeneratorNodeKind(node.data.kind)).map((node) => node.id),
-  );
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
   const bad: string[] = [];
   for (const node of nodes) {
     if (!isResultNodeKind(node.data.kind)) continue;
     const source = (node.data as { sourceGeneratorId?: unknown }).sourceGeneratorId;
-    if (typeof source !== "string" || !generatorIds.has(source)) bad.push(node.id);
+    if (typeof source !== "string" || !kindById.has(source)) bad.push(node.id);
+  }
+  return bad;
+}
+
+/**
+ * C7 情形 (a)：结果节点的 `sourceGeneratorId` **命中**同文档某节点，但该节点不是生成节点
+ * ——溯源指向错误类型的节点即伪造/损坏 provenance，是 C7 真正要防的，两侧 fail-closed
+ * （architect R-90 裁定：C7 不得全线降级为 warning）。
+ */
+export function misdirectedResultSourceNodeIds(nodes: readonly GraphNodeLike[]): string[] {
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  const bad: string[] = [];
+  for (const node of nodes) {
+    if (!isResultNodeKind(node.data.kind)) continue;
+    const source = (node.data as { sourceGeneratorId?: unknown }).sourceGeneratorId;
+    if (typeof source !== "string") continue;
+    const sourceKind = kindById.get(source);
+    // 不命中任何节点 = 情形 (b)，归 danglingResultNodeIds；两档互斥，不重复报告。
+    if (sourceKind === undefined) continue;
+    if (!isGeneratorNodeKind(sourceKind)) bad.push(node.id);
   }
   return bad;
 }
