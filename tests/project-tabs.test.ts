@@ -1678,17 +1678,31 @@ await test("React Flow 初始化尺寸不会移动节点或标记项目未保存
 });
 
 await test("打开含蒙版节点的项目时只订阅稳定的首张输入图", () => {
-  const source = fs.readFileSync(
+  // v8（R-83）：蒙版能力随生成层 UI 从 ImageNode 迁入 GeneratorParamsPanel；
+  // 输入层 ImageNode 仍以 useShallow 稳定订阅输入图，蒙版源仍是稳定订阅后的首张输入图。
+  const imageNodeSource = fs.readFileSync(
     new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
-  // v7：MaskRedrawNode 已并入 ImageNode；输入图经 useShallow 稳定订阅后只取首张作为蒙版源。
-  assert.match(source, /selectNodeInputImages\(document, id\)/);
-  assert.match(source, /const maskSource = referenceImages\[0\];/);
-  assert.doesNotMatch(source, /const sourceImages = useFlowStore/);
+  const panelSource = fs.readFileSync(
+    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(imageNodeSource, /selectNodeInputImages\(document, id\)/);
+  assert.match(panelSource, /const maskSource = useFlowStore\(\s*useShallow\(/);
+  assert.match(panelSource, /selectNodeInputImages\(document, nodeId\)\[0\]/);
+  // 反例守卫：两个订阅位都不得退化为每次渲染都新建数组的裸订阅。
+  assert.doesNotMatch(imageNodeSource, /const sourceImages = useFlowStore/);
+  assert.doesNotMatch(panelSource, /const sourceImages = useFlowStore/);
 });
 
-await test("羽化宽度经 ImageNode 透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
+await test("羽化宽度经生成层参数面板透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
+  // v8（R-83）：蒙版编辑器入口随生成层 UI 迁入 GeneratorParamsPanel；该面板只把已保存的
+  // featherRadius 透传给 MaskEditor（缺省 = 自适应），节点层不设第二处输入控件。
+  const panelSource = fs.readFileSync(
+    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
+    "utf8",
+  );
   const imageNodeSource = fs.readFileSync(
     new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
@@ -1697,9 +1711,11 @@ await test("羽化宽度经 ImageNode 透传 MaskEditor 并在 0–64 内钳制�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  // v7：旧 MaskRedrawNode 的羽化 Slider 已随三节点重构移除；节点只把已保存的
-  // featherRadius 透传给 MaskEditor（缺省 = 自适应），不设第二处输入控件。
-  assert.match(imageNodeSource, /featherRadius=\{typeof data\.featherRadius === "number" \? data\.featherRadius : undefined\}/);
+  assert.match(
+    panelSource,
+    /<MaskEditor[\s\S]*featherRadius=\{typeof \(data as ImageGeneratorNodeData\)\.featherRadius === "number"[\s\S]*: undefined\}/,
+  );
+  assert.doesNotMatch(panelSource, /<input[^>]*type="range"/);
   assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
   assert.match(editorSource, /featherRadius\?: number/);
   // 0–64 边界钳制（原 Slider 的 min/max 约束）现在由预览侧保证。
@@ -1818,9 +1834,9 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  // v7：MaskRedrawNode 已并入 ImageNode，蒙版上传 pending 与原图校验在其 onSave 闭包内。
+  // v8（R-83）：蒙版上传 pending 与原图校验随生成层 UI 迁入 GeneratorParamsPanel.onSave 闭包。
   const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
+    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
     "utf8",
   );
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -1842,8 +1858,11 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   );
   assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
   assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
-  assert.match(redrawSource, /selectNodeInputImages\(currentTab, id\)\[0\] !== maskSource/);
-  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: maskSource/);
+  assert.match(redrawSource, /selectNodeInputImages\(currentTab, nodeId\)\[0\] !== maskSource/);
+  // R-94：AGENTS.md §3 要求蒙版这类异步写入绑定发起页签的 tabId + projectId + documentEpoch。
+  // 当前 v8 实现回退为 updateNodeData(nodeId, ...)（写「提交时」的活动文档），此断言不弱化：
+  // 必须回到 updateNodeDataInTab(target, nodeId, ...)。缺陷已在本卡评论上交。
+  assert.match(redrawSource, /updateNodeDataInTab\(target, nodeId, \{ mask: url, maskSourceRef: maskSource/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);
