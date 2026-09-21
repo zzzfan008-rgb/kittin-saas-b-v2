@@ -15,18 +15,15 @@ import { inputClass, STATUS_TEXT, UnsupportedNodeKindNotice } from "../nodes/Nod
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
-import { useNodeInspector } from "../nodes/NodeInspectorWindow";
-import { Button } from "@/components/ui/button";
 
 /**
- * R-40 §2.5（裁定 A：P2-c 单批次取代）：属性编辑（功能/参数/模型/运行）已迁入
- * 悬浮窗口（NodeInspectorWindowPortal）；本面板保留生成记录视图与节点名称编辑。
+ * v8：属性编辑（功能/参数/模型/运行）内联在生成节点上（plan.md §3.3），
+ * R-40 悬浮窗口已退役；本面板保留生成记录视图与节点名称编辑。
  */
 
 function PropertySummary({ nodeId }: { nodeId: string }) {
   const node = useFlowStore((s) => selectActiveNodes(s).find((candidate) => candidate.id === nodeId));
   const readOnly = useFlowStore((s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false);
-  const openInspector = useNodeInspector((s) => s.open);
   const labelEdit = useCoalescedTextEdit(
     nodeId ? { kind: "node-data", nodeId, field: "label" } : null,
   );
@@ -53,20 +50,14 @@ function PropertySummary({ nodeId }: { nodeId: string }) {
         />
       </label>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={readOnly || !spec}
-        onClick={() => openInspector(nodeId)}
-        className="w-full"
-      >
-        打开功能设置（双击节点 / Enter）
-      </Button>
-
       <p className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
-        功能、参数与模型在节点的悬浮窗口中配置：双击节点体，选中后按 Enter，或点击节点上的「⚙ 功能」入口条。
+        v8：功能、模型与参数直接内联在生成节点卡片上（生图 / 生视频），选中节点即可配置并运行。
       </p>
+      {(node?.data.kind === "text" || node?.data.kind === "image" || node?.data.kind === "video") && (
+        <p className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
+          输入节点（文本 / 图片 / 视频）不承载生成功能：请添加生图 / 生视频节点并把输入连过去。
+        </p>
+      )}
     </div>
   );
 }

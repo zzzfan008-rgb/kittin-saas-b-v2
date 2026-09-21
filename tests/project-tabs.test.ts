@@ -1390,9 +1390,13 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
   );
 
   // v7：旧 InspectorPanel / AiModifyNode / SketchToRenderNode 的画幅入口已随三节点重构
-  // 移除；原生参数统一在 NodeInspectorWindow 的 key/value 编辑器写回，避免两处入口漂移。
-  const inspectorWindowSource = fs.readFileSync(
-    new URL("../src/components/nodes/NodeInspectorWindowPortal.tsx", import.meta.url),
+  // 移除；v8（plan.md §3.3）原生参数改由生成节点内联面板唯一写回，避免两处入口漂移。
+  const generatorPanelSource = fs.readFileSync(
+    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  const imageGeneratorNodeSource = fs.readFileSync(
+    new URL("../src/components/nodes/ImageGeneratorNode.tsx", import.meta.url),
     "utf8",
   );
   const legacyInspectorSource = fs.readFileSync(
@@ -1404,9 +1408,14 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     "utf8",
   );
   assert.match(
-    inspectorWindowSource,
-    /updateData\(node\.id, \{ modelOptions: \{ \.\.\.modelOptions, \[key\]: next \} \}\)/,
-    "Inspector 窗口必须是原生参数唯一写回入口",
+    generatorPanelSource,
+    /updateNodeData\(nodeId, \{ modelOptions: \{ \.\.\.options, \[key\]: next \} \}\)/,
+    "生成节点内联面板必须是原生参数唯一写回入口",
+  );
+  assert.match(
+    imageGeneratorNodeSource,
+    /GeneratorParamsPanel/,
+    "生图节点必须挂载内联参数面板",
   );
   assert.doesNotMatch(
     legacyInspectorSource,
@@ -1416,7 +1425,7 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
   assert.doesNotMatch(
     imageNodeSource,
     /modelOptions:\s*\{/,
-    "图片节点体不得内联编辑原生参数（统一在 Inspector 窗口）",
+    "输入节点不得内联编辑原生参数（v8：参数在生成节点内联面板）",
   );
 });
 

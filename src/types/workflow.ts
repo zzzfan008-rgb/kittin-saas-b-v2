@@ -82,6 +82,12 @@ export type NodeRunStatus =
 export const MAX_REFERENCE_IMAGES = 8;
 /** 局部修改会由服务端追加 1 张区域引导图，因此用户最多提供 7 张参考图。 */
 export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
+/**
+ * P2-3 裁定：单个生成节点的提示词来源唯一（一次生成的提示词来源唯一），
+ * 与「单一 text 节点只能连 1 个生成节点」（INV-2）构成双向 1:1。
+ * 独立常量，不复用 MAX_REFERENCE_IMAGES——那是图片上限，量纲不同。
+ */
+export const MAX_PROMPT_INPUTS = 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
 export const BATCH_SIZES = [1, 2, 4, 8] as const;
@@ -399,8 +405,13 @@ export function isPromptEdge(edge: GraphEdgeLike): boolean {
   return edge.targetHandle === EDGE_HANDLE_PROMPT;
 }
 
+/**
+ * P2-4 裁定：reference 边必须显式命中 `EDGE_HANDLE_REFERENCE`。
+ * 不得用「非 prompt 即 reference」的反向判定——否则 first-frame 边与 null 句柄
+ * 都会被错算成参考图（序号、契约上限、T4 禁用规则都跟着错）。
+ */
 export function isReferenceEdge(edge: GraphEdgeLike): boolean {
-  return edge.targetHandle !== EDGE_HANDLE_PROMPT;
+  return edge.targetHandle === EDGE_HANDLE_REFERENCE;
 }
 
 /** 可作为图片输入的源 kind：用户上传图 + 上游产物。 */
@@ -462,7 +473,10 @@ export function illegalEdgeIndexes(
     const targetKind = kindById.get(edge.target);
     if (sourceKind === undefined || targetKind === undefined) return;
     if (isInputNodeKind(sourceKind) && isInputNodeKind(targetKind)) bad.push(index);
-    else if (isResultNodeKind(sourceKind)) bad.push(index);
+    // P1-1 裁定：结果节点是合法的下游输入源（plan.md §2.1：result-image →
+    // image-generator/reference、result-image → video-generator/first-frame），
+    // 只有「结果源 → 非生成节点」才是非法边，不能一律拒绝结果源。
+    else if (isResultNodeKind(sourceKind) && !isGeneratorNodeKind(targetKind)) bad.push(index);
     else if (isGeneratorNodeKind(sourceKind)) bad.push(index);
   });
   return bad;
@@ -539,6 +553,12 @@ export interface NodeSpec {
    * firstFrame 仅 video-generator 使用（0–1）。
    */
   inputs: { prompt: number; reference: number; firstFrame: number };
+  /**
+   * 该节点**自身**可作为下游引用的产物类型（P3-1）：指节点 data 里真实存在的产物。
+   * 生成节点返回 `none`——它的产物落在系统创建的 result-* 节点上（NODE_SPECS 的
+   * description 已写明），生成节点不持有图片/视频；这与 isImageSourceKind /
+   * isVideoSourceKind 只认 image|result-image、video|result-video 保持一致。
+   */
   outputs: "text" | "images" | "video" | "none";
   /** runtime.md §1：只有生成节点可运行。 */
   runnable: boolean;
@@ -572,15 +592,15 @@ export const NODE_SPECS: Record<NodeKind, NodeSpec> = {
   "image-generator": {
     kind: "image-generator", title: "生图",
     description: "选择功能与模型参数，生成图片；产物落到结果节点",
-    inputs: { prompt: MAX_REFERENCE_IMAGES, reference: MAX_REFERENCE_IMAGES, firstFrame: 0 },
-    outputs: "images",
+    inputs: { prompt: MAX_PROMPT_INPUTS, reference: MAX_REFERENCE_IMAGES, firstFrame: 0 },
+    outputs: "none",
     runnable: true, userCreatable: true, acceptsInputEdges: false,
   },
   "video-generator": {
     kind: "video-generator", title: "生视频",
     description: "选择功能与模型参数，生成视频；产物落到结果节点",
-    inputs: { prompt: MAX_REFERENCE_IMAGES, reference: 0, firstFrame: 1 },
-    outputs: "video",
+    inputs: { prompt: MAX_PROMPT_INPUTS, reference: 0, firstFrame: 1 },
+    outputs: "none",
     runnable: true, userCreatable: true, acceptsInputEdges: false,
   },
   "result-image": {

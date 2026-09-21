@@ -134,6 +134,16 @@ export function videoModelRecommendedOptions(id: VideoModelId): Record<string, R
 }
 
 /**
+ * v8 生成节点「画幅」取值域（单一事实源）：契约 `recommendedOptions.aspectRatio.examples`
+ * （含 `adaptive`——首尾帧任务必须 adaptive）。契约缺省时返回空数组，由 UI 呈现空态，
+ * 而不是在组件里硬编码画幅枚举。
+ */
+export function videoAspectRatioOptions(modelId: VideoModelId): readonly string[] {
+  const examples = videoModelRecommendedOptions(modelId).aspectRatio?.examples;
+  return examples && examples.length > 0 ? examples.map((item) => String(item)) : [];
+}
+
+/**
  * R5：视频参数仅产生 warning，永不产生错误；调用方不得据此拒绝保存/运行。
  * - 未知 key → 「参数 {key} 不在模型 {id} 的已知参数中」
  * - 值不在契约推荐集合 → 「{key}={v} 不在推荐取值 {examples} 中」
