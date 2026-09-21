@@ -175,6 +175,9 @@ export interface ResultVideoNodeData extends BaseNodeData {
 - **重跑不覆盖**：同一生成节点重跑，**新建**一个 result 节点，旧 result 节点原样保留。
   禁则：绝不改写既有 result 节点的 `images`。这是 AGENTS.md §3「结果不得削弱」的落地约束。
 - **删除生成节点不删 result 节点，也不删 files 记录**（R2，frontend 已确认守住）。
+  删除后该 result 节点的 `sourceGeneratorId` 进入**悬空态**：文档**仍可保存**（C7 两档语义见 §7），
+  结果节点必须仍可查看、可 `[作为输入]`；溯源改由 `runId` → 账本解析。
+  禁则：不得以「删除生成节点时联动删除 result 节点」实现 C7 一致——破 AGENTS.md §3。
 - **网格单元选择是 UI 状态**，不进文档（AGENTS.md §3）；只有 `selectedIndex`（用户确认的复用意图）进文档。
 
 ## 6. 迁移状态字段
@@ -192,10 +195,24 @@ export interface ResultVideoNodeData extends BaseNodeData {
 | C4 | 生成节点必绑功能与模型 | `promptVariantId`/`modelId` 缺失即 fail |
 | C5 | 结果节点必带溯源 | `sourceGeneratorId`/`runId` 缺失即 fail |
 | C6 | video 生成节点首帧任务 `aspectRatio === "adaptive"` | 契约 JSON 校验 + schema 约束 |
-| C7 | 结果节点溯源指向存在的生成节点 | `sourceGeneratorId` 必须命中同文档 nodes 中的 `*-generator` |
+| C7 | 结果节点溯源**良构且不伪指**（两档，见下） | (a) `sourceGeneratorId` 命中同文档节点但 kind 非 `*-generator` → **error / fail**；(b) 不命中任何节点 → **warning / 放行** |
 
 C1–C7 在 `server/lib/workflowSchema.ts`（服务端拒绝非法持久化）与 `src/lib/documentSnapshot.ts`
 （前端拒绝非法入文档）两侧同时生效。
+
+**C7 两档语义（R-90 裁定，取代原「必须命中」的单一 fail）**
+
+原表述（「必须命中同文档生成节点」）与 §5.1（删除生成节点不删 result 节点）在服务端
+`validateV8Flow` 上正面冲突：用户删除生成节点后文档会被 fail-closed 拒存，即**文档不可保存**，
+且 UI 无补救入口（`onNodesChange` 直接 `applyNodeChanges`，不联动删 result）。裁定拆两档：
+
+| 情形 | 严重度 | 理由 |
+|---|---|---|
+| 命中同文档节点但 kind 非 `*-generator` | **error（两侧 fail-closed）** | 溯源指向错误类型 = 伪造/损坏 provenance，是 C7 真正要防的 |
+| 不命中任何节点（生成节点已被用户删除） | **warning（不阻断保存/打开）** | 删除是合法操作（§5.1 / R2）；`runId` 才是账本键（AGENTS.md §4），`sourceGeneratorId` 仅是便利指针，其失效不损失可追溯性 |
+
+**禁则**：不得以「删除生成节点时联动删除 result 节点」来维持 C7 一致——那会破 AGENTS.md §3
+与 §5.1 的 R2 红线。**C7 不得全线降级为 warning**：情形 (a) 仍是硬闸。
 
 ## 8. 影响面（共享契约变更）
 
