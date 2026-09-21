@@ -224,12 +224,12 @@ async function expectFlowCenter(
  * 方案 C（R-75 §2）首屏语义：进入工作台是本地空白 tab（nodes=0 && edges=0），
  * 不 bootstrap、也没有 TaskLauncher 浮层（R-76 已删除）。工作台用例断言的是「已开始
  * 项目」的画布/面板机制，因此 before 钩子用真实用户动作完成「首次实质变更」：
- * 从节点库点击添加一个图片节点 —— auto-text 兜底会补出文本节点与 prompt 边，
- * 这次落库（POST /initial-draft/bootstrap）让项目真正诞生。
+ * 从左侧悬浮工具栏的「添加」菜单新建一个图片节点 —— v8 起输入层节点不接受任何入边，
+ * v7 的 auto-text 兜底（补 text 节点 + prompt 边）已随三层模型退役，所以这次首变更恰好
+ * 落库 1 个 image 节点、0 条边（POST /initial-draft/bootstrap）让项目真正诞生。
  *
  * 已落库草稿/正式项目被启动流程恢复时画布非空，本钩子不重复建节点，保持
- * 「空态不落库、首变更才落库」的单次语义；节点库面板在结束时恢复为关闭状态，
- * 以免后续用例的「节点库」切换按钮把它反向关闭。
+ * 「空态不落库、首变更才落库」的单次语义。
  */
 async function startFirstProject(page: Page): Promise<void> {
   const nodes = page.locator(".react-flow__node");
@@ -263,9 +263,9 @@ async function startFirstProject(page: Page): Promise<void> {
     && new URL(response.url()).pathname === "/api/projects/initial-draft/bootstrap"
   ));
   await addRailNode(page, "图片");
-  // 图片节点 + auto-text 兜底补出的文本节点；两者之间一条 prompt 边。
-  await expect(nodes).toHaveCount(2);
-  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  // v8：一个输入层 image 节点，0 条边（输入节点不接受入边，无 auto-text 兜底）。
+  await expect(nodes).toHaveCount(1);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
   // 首个实质变更后空态 CTA 退场，且整段过程恰好一次 bootstrap（惰性落库）。
   await expect(emptyCta).toHaveCount(0);
   await expect.poll(() => bootstrapUrls).toHaveLength(1);
@@ -366,46 +366,123 @@ test.beforeEach(async ({ page }) => {
   await startFirstProject(page);
 });
 
-test("unverified prompt variants stay disabled with an explicit runtime reason", async ({ page }) => {
-  // 方案 C：空首屏已无 TaskLauncher 浮层，v6 的「服装提示词预设 / 确认应用」控件也已退役。
-  // 断言强度转到 v7 等价入口：节点的「功能设置」窗口。
-  // ① 图片节点（before 钩子落库的那个）：已发布目录只列未发布变体，全部禁用且给出原因。
-  const imageNodeId = await nodeIdOfKind(page, "image");
-  const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);
-  await imageNode.locator(".gc-node-header").click();
-  await imageNode.getByRole("button", { name: "选择功能" }).click();
+/**
+ * 从项目中心启动一个真实内置模板（v8 的生成节点只能由模板落地的图产生：生成 / 结果节点
+ * 不接受手动新增，「添加」菜单只暴露 text / image / video 三个输入层入口）。
+ */
+async function startBuiltinTemplate(page: Page, name: string): Promise<void> {
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+  await center.getByRole("tab", { name: "内置模板" }).click();
+  const panel = center.getByRole("tabpanel", { name: "内置模板" });
+  await panel.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+  await expect(center).toHaveCount(0);
+}
 
-  const inspector = page.getByRole("dialog", { name: "图片 · 功能设置" });
-  await expect(inspector).toBeVisible();
-  // 窗口先以 -9999px 离屏挂载，锚定几何在 effect/ResizeObserver 里收敛；等它落到画布内再量测。
-  await expect.poll(async () => (await rect(inspector)).left).toBeGreaterThan(0);
-  const catalog = inspector.getByRole("region", { name: "功能（系统提示词）" });
-  await expect(catalog).toContainText("只列已发布");
-  const variants = catalog.getByRole("button");
-  const variantCount = await variants.count();
-  expect(variantCount).toBeGreaterThan(0);
-  const inspectorRect = await rect(inspector);
-  for (let index = 0; index < variantCount; index += 1) {
-    const variant = variants.nth(index);
-    await variant.scrollIntoViewIfNeeded();
-    expectInside(await rect(variant), inspectorRect);
-    await expect(variant).toContainText("未发布");
-    await expect(variant).toBeDisabled();
-    await expect(variant).toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
+/**
+ * 选中画布节点：点击卡片标题栏。页签切换 / 模板落地后的首帧可能吞掉这一次点击，因此以
+ * 「工具条是否已渲染」为准重试，而不是盲等固定时长。
+ */
+async function selectCanvasNode(node: Locator): Promise<void> {
+  const header = node.locator(".gc-node-header");
+  await expect(header).toBeVisible();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (await node.locator("[data-node-toolbar]").count() > 0) return;
+    await header.click();
+    await node.page().waitForTimeout(150);
   }
-  const runButton = inspector.getByRole("button", { name: "运 行" });
-  await expect(runButton).toBeDisabled();
-  await expect(inspector.getByText("请先选择功能")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(inspector).toHaveCount(0);
+  await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
+}
 
-  // ② auto-text 兜底补出的文本节点：未绑定受审模型/变体时给出运行前的明确原因。
+test("generator nodes keep params inline while unverified variants stay blocked with an explicit reason", async ({ page }) => {
+  // v8：生成与参数从 v7 的悬浮「功能设置」窗口迁到生成节点卡片内联（plan.md §1.1/§3.3），
+  // 输入节点完全不承载生成语义。断言强度落在同一个产品事实上：未受审变体不得触达运行。
+  await startBuiltinTemplate(page, "模特试穿");
+  await expect(page.locator(".react-flow__node")).toHaveCount(4);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(3);
+
+  const generator = page.getByTestId("rf__node-tryon-gen");
+  await expect(generator).toBeVisible();
+  // 内联参数面板字段顺序：功能 → 模型 → 画幅 + 数量 → 模型参数（plan.md §3.3）。
+  const functionSelect = generator.getByRole("combobox", { name: "功能" });
+  await expect(functionSelect).toContainText("写实穿搭");
+  await expect(functionSelect).toContainText("（未发布）");
+  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
+  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
+  await expect(generator.getByRole("combobox", { name: "数量" })).toContainText("1");
+  const params = generator.getByRole("region", { name: "模型参数" });
+  await expect(params).toBeVisible();
+  await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
+  await expect(params.getByRole("button", { name: "+ 添加参数" })).toBeVisible();
+  await expect(
+    generator.getByText("目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。"),
+  ).toBeVisible();
+  // 目录里的未受审变体在「功能」下拉里必须不可选（v7 悬浮窗口的目录强度不变）。
+  await generator.getByRole("combobox", { name: "功能" }).click();
+  const variantOptions = page.getByRole("option");
+  await expect.poll(() => variantOptions.count()).toBeGreaterThan(0);
+  await expect.poll(() => variantOptions.evaluateAll((options) => (
+    options.filter((option) => option.getAttribute("aria-disabled") === "true").length
+  ))).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+
+  // 运行准入不通过时，卡片内运行按钮为禁用态并给出可读原因（不静默、不隐藏）。
+  // 准入按序给出首个阻断原因：这里还没上传参考图，因此先报「缺参考图」；未受审变体
+  // 那个原因在参考图就位后接管（见 golden-path 的完整链路）。
+  const runButton = generator.getByRole("button", { name: "尚不可运行" });
+  await expect(runButton).toBeDisabled();
+  await expect(runButton).toHaveAttribute("title", /edit 模式至少需要一张参考图/);
+
+  // 输入层节点不再承载任何生成入口（v7 的「选择功能」已随五合一 image 节点退役）。
+  const garment = page.getByTestId("rf__node-garment");
+  await expect(garment.getByRole("button", { name: "选择功能" })).toHaveCount(0);
+  await expect(garment.getByText("上传图片后可作为参考图来源；生成请用生图节点")).toBeVisible();
+  // v7 的悬浮「功能设置」窗口在本版本已退役。
+  await expect(page.getByRole("dialog", { name: /功能设置/ })).toHaveCount(0);
+});
+
+test("node toolbars follow the v8 per-kind contract and the color tool no longer occupies the rail", async ({ page }) => {
+  // plan.md §3.2：工具条仅选中态渲染，内容按 kind 互不雷同；R-88 把色彩工具从左侧 Rail
+  // 移入 text 节点工具条。
+  await addRailNode(page, "文本");
   const textNodeId = await nodeIdOfKind(page, "text");
   const textNode = page.locator(`.react-flow__node[data-id="${textNodeId}"]`);
-  await expect(textNode.getByRole("button", { name: "先在功能设置中选择功能" })).toBeDisabled();
-  await expect(
-    textNode.getByText("必须选择当前五模型契约中的明确模型，未知模型不会被静默替换。"),
-  ).toBeVisible();
+  await expect(textNode.locator('[data-node-toolbar="text"]')).toBeVisible();
+  await expect(textNode.getByRole("button", { name: "色彩工具" })).toBeVisible();
+  await expect(textNode.getByRole("button", { name: "复制" })).toBeVisible();
+  // 未选中节点不渲染工具条（不占 DOM）。
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);
+  await expect(imageNode.locator('[data-node-toolbar="image"]')).toHaveCount(0);
+
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  await expect(imageToolbar).toBeVisible();
+  await expect(imageToolbar).toHaveAttribute("aria-label", "图片工具栏");
+  // 未上传图片时「裁剪 / 抠图」保持可见但禁用，并给出原因（不隐藏）。
+  const crop = imageNode.getByRole("button", { name: "裁剪" });
+  await expect(crop).toBeDisabled();
+  await expect(crop).toHaveAttribute("title", /图片裁剪能力尚未接入/);
+  await expect(imageNode.getByRole("button", { name: "抠图" })).toBeDisabled();
+  await expect(imageNode.getByRole("button", { name: "复制" })).toBeEnabled();
+  await expect(imageNode.getByRole("button", { name: "替换" })).toBeEnabled();
+
+  // 色彩工具已从 Rail 移除，只保留在文本节点工具条内。
+  const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
+  await expect(rail.getByRole("button", { name: "色彩工具" })).toHaveCount(0);
+
+  // 生成节点工具条：[功能选项] [运行] [复制]（复制尚未接入 → 禁用并给出原因）。
+  await startBuiltinTemplate(page, "模特试穿");
+  const generator = page.getByTestId("rf__node-tryon-gen");
+  await selectCanvasNode(generator);
+  const generatorToolbar = generator.locator('[data-node-toolbar="image-generator"]');
+  await expect(generatorToolbar).toHaveAttribute("aria-label", "生图工具栏");
+  await expect(generatorToolbar.getByRole("button", { name: "功能选项" })).toBeEnabled();
+  await expect(generatorToolbar.getByRole("button", { name: "运行", exact: true })).toBeEnabled();
+  const generatorCopy = generatorToolbar.getByRole("button", { name: "复制" });
+  await expect(generatorCopy).toBeDisabled();
+  await expect(generatorCopy).toHaveAttribute("title", /生成 \/ 结果节点的创建尚未接入/);
 });
 
 test("project center separates built-in and user templates and keeps template actions reachable", async ({ page }, testInfo) => {
@@ -428,13 +505,13 @@ test("project center separates built-in and user templates and keeps template ac
   await expect(center).toBeVisible();
 
   await center.getByRole("tab", { name: "内置模板" }).click();
-  await expect(center.getByText("文生图（服装设计）", { exact: true })).toBeVisible();
+  await expect(center.getByText("模特试穿", { exact: true })).toBeVisible();
   await expect(center.getByText(templateName)).toHaveCount(0);
 
   await center.getByRole("tab", { name: "我的模板" }).click();
   await expect(center.getByRole("button", { name: "保存当前画布为模板" })).toBeVisible();
   await expect(center.getByText(templateName)).toBeVisible();
-  await expect(center.getByText("文生图（服装设计）")).toHaveCount(0);
+  await expect(center.getByText("模特试穿")).toHaveCount(0);
 
   await center.getByRole("button", { name: "保存当前画布为模板" }).click();
   const saveDialog = page.getByRole("dialog", { name: "存为模板" });
@@ -627,7 +704,7 @@ test("results and project center follow desktop density for cards", async ({ pag
   }
 });
 
-test("adding a library node keeps the canvas mounted and links its auto-text prompt edge", async ({ page }) => {
+test("adding a node from the rail keeps the canvas mounted and adds no implicit edges", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const canvas = page.getByRole("application", { name: "工作流画布" });
@@ -636,34 +713,36 @@ test("adding a library node keeps the canvas mounted and links its auto-text pro
   const edges = page.locator(".react-flow__edge");
   const initialNodeCount = await nodes.count();
   const initialEdgeCount = await edges.count();
+  expect(initialEdgeCount).toBe(0);
 
-  // 方案 C 的 v7 等价行为：加一个需要文本上游的节点（视频），必须保持画布挂载
-  // 并由 auto-text 兜底补齐 text→节点 的 prompt 边（复用已有文本节点，不重复造节点）。
-  // v8 起入口改为左侧悬浮工具栏的「添加」工作流菜单（节点库面板下线）。
+  // v8：「添加」菜单直接从左侧悬浮工具栏落地输入层节点（节点库面板下线），并且不再有
+  // v7 的 auto-text 兜底——输入层节点不接受任何入边，所以加节点不会带来任何边。
   const imageNodeId = await nodeIdOfKind(page, "image");
   await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
   const addButton = page.getByRole("button", { name: "添加" });
   await addButton.hover();
   const addMenu = page.getByRole("menu", { name: "添加" });
   await expect(addMenu).toBeVisible();
-  // 「添加」菜单固定暴露文本 / 图片 / 视频三个基础节点入口。
+  // 「添加」菜单固定暴露文本 / 图片 / 视频三个基础节点入口（生成 / 结果节点不可手动新增）。
   for (const label of ["文本", "图片", "视频"]) {
     await expect(addMenu.getByRole("menuitem", { name: label })).toBeVisible();
   }
   await addMenu.getByRole("menuitem", { name: "视频" }).click();
 
   await expect(nodes).toHaveCount(initialNodeCount + 1);
-  await expect(edges).toHaveCount(initialEdgeCount + 1);
+  await expect(edges).toHaveCount(initialEdgeCount);
   const graph = await activeDocumentGraph(page);
   expect(missingTextUpstreamNodeIds(graph.nodes, graph.edges)).toEqual([]);
 
   const videoNodeId = await nodeIdOfKind(page, "video");
   const videoNode = page.locator(`.react-flow__node[data-id="${videoNodeId}"]`);
-  await expect(videoNode.getByText("连接文本节点写描述；可选拉一张图片作首帧")).toBeVisible();
-  // 入口条只在选中态渲染（R-40 裁定 B）：新落地的视频节点即选中态，被覆盖的图片节点不是。
-  await expect(videoNode.getByRole("button", { name: "选择功能" })).toBeVisible();
+  await expect(videoNode.getByText("作为参考素材来源：连到生成节点的输入柄")).toBeVisible();
+  // 视频输入槽尚未接入上传能力：槽位保留并显式给出原因（不隐藏、不静默）。
+  await expect(videoNode.getByText("暂不可用：视频上传接口尚未接入")).toBeVisible();
+  // 工具条只在选中态渲染：新落地的视频节点即选中态，被覆盖的图片节点工具条退场。
+  await expect(videoNode.locator('[data-node-toolbar="video"]')).toBeVisible();
   await expect(
-    page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).getByRole("button", { name: "选择功能" }),
+    page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator('[data-node-toolbar="image"]'),
   ).toHaveCount(0);
   await expect(canvas).toBeVisible();
   expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
