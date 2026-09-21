@@ -18,7 +18,7 @@ interface ProjectSummaryBody {
   name: string;
 }
 
-const EMPTY_V7_FLOW = { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] };
+const EMPTY_V8_FLOW = { schemaVersion: WORKFLOW_SCHEMA_VERSION, nodes: [], edges: [] };
 
 test("the empty first screen stays local and only persists after the first substantial change", async ({ page }) => {
   test.slow();
@@ -88,22 +88,22 @@ test("the empty first screen stays local and only persists after the first subst
   expect(bootstrapRequests).toEqual([]);
   expect(await readDraft()).toBeNull();
 
-  // 首次实质变更（CTA 一键建图片节点 + auto-text 兜底补文本节点与 prompt 边）才落库；
-  // 之前的瞬态改名随 bootstrap 的 name 字段一并持久化。
+  // 首次实质变更（CTA 一键建输入层 image 节点）才落库；v8 起输入节点不接受入边，
+  // 所以不再补出 auto-text 文本节点与 prompt 边。之前的瞬态改名随 bootstrap 的 name 字段一并持久化。
   await cta.getByRole("button", { name: "上传图片开始" }).click();
-  await expect(nodes).toHaveCount(2);
-  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await expect(nodes).toHaveCount(1);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
   await expect(cta).toHaveCount(0);
   await expect.poll(() => bootstrapRequests.length).toBe(1);
   await expect.poll(async () => (await readDraft())?.id ?? null).not.toBeNull();
   const bootstrapped = await readDraft();
   if (!bootstrapped) throw new Error("首次实质变更没有落库");
   expect(bootstrapped.flow.schemaVersion).toBe(WORKFLOW_SCHEMA_VERSION);
-  expect(bootstrapped.flow.nodes).toHaveLength(2);
-  expect(bootstrapped.flow.edges).toHaveLength(1);
+  expect(bootstrapped.flow.nodes).toHaveLength(1);
+  expect(bootstrapped.flow.edges).toHaveLength(0);
   expect(bootstrapped.name).toBe(transientName);
 
-  // v7 上传：图片直写 image 节点输出，且不破坏 text→image 的 prompt 边（INV-1）。
+  // v8 上传：图片直写 image 节点输出，且不产生任何边。
   const uploadImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
@@ -113,7 +113,7 @@ test("the empty first screen stays local and only persists after the first subst
     buffer: uploadImage,
   });
   await expect(page.getByAltText("已上传图片")).toBeVisible();
-  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
 
   let draftSyncRequests = 0;
   await page.route("**/api/projects/initial-draft/*", async (route) => {
@@ -154,7 +154,7 @@ test("the empty first screen stays local and only persists after the first subst
 
   await page.reload();
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
-  await expect(page.locator(".react-flow__node")).toHaveCount(2);
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
   expect((await readDraft())?.id).toBe(bootstrapped.id);
 
   const secondPage = await page.context().newPage();
@@ -223,7 +223,7 @@ test("relogin opens the latest saved project instead of bootstrapping a blank pa
   const createProject = await page.request.post("/api/projects", {
     data: {
       name: projectName,
-      flow: EMPTY_V7_FLOW,
+      flow: EMPTY_V8_FLOW,
     },
   });
   expect(createProject.ok(), await createProject.text()).toBeTruthy();
