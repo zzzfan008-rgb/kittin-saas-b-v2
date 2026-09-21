@@ -640,13 +640,18 @@ export function nodeTitleForKind(kind: unknown): string {
   return typeof kind === "string" && kind.trim() !== "" ? kind : "未知类型";
 }
 
-// ---------- 运行事件（SSE）契约 ----------
+// ---------- RunEvent（跨端共享契约：单点声明）----------
 /**
- * RunEvent 的单一事实源（R-89 裁定）：此前 `server/engine/runner.ts` 与
- * `src/store/flowRunEvents.ts` 各自独立声明，导致 `result-node-created` 无法共享。
- * 现在统一在此声明：后端（runQueue/lifecycle）发射、前端（flowRunEvents）消费。
+ * RunEvent 的唯一声明处（architect R-89 裁定）。backend（server/engine/runner.ts / runQueue/lifecycle）发射、
+ * 前端（src/store/flowRunEvents.ts 投影 → src/store/flowStore.ts 消费）接收，两侧都从
+ * 本文件导入类型；**不得在各自模块里各写一份**，否则两侧漂移无人发现。
+ *
+ * v8 关键语义（runtime.md §1/§3）：
+ * - 生成节点的产物**不写回节点 data**（product 归结果节点）；`node-status(success)` 只收口运行态。
+ * - 产物通过 `result-node-created` 事件告知前端实例化结果节点（§3.1/§3.2）；前端不得本地凭空造
+ *   结果节点，否则刷新/重连会丢产物。
+ * - 失败路径与 outcome_unknown 不发 `result-node-created`；恢复后确认成功才补发。
  */
-
 export interface RunFailure {
   prompt?: string;
   error: string;
@@ -668,11 +673,11 @@ export interface RunEventMeta {
   parameterWarnings?: string[];
 }
 
-export type RunEvent =
+export type NodeStatusRunEvent =
   | (RunEventMeta & {
       type: "node-status";
       nodeId: string;
-      status: Exclude<NodeRunStatus, "success" | "error" | "idle">;
+      status: "queued" | "running" | "retry_wait" | "cancel_requested";
       images?: never;
     })
   | (RunEventMeta & {
@@ -686,21 +691,30 @@ export type RunEvent =
   | (Omit<RunEventMeta, "error"> & {
       type: "node-status";
       nodeId: string;
-      status: "error";
+      status: "error" | "outcome_unknown" | "cancelled";
       error: string;
       images?: never;
-    })
-  | (RunEventMeta & {
-      /** 一轮 run 发一次，携带该 run 的全部产物；前端据此实例化 result 节点。 */
-      type: "result-node-created";
-      resultNodeId: string;
-      sourceGeneratorId: string;
-      runId: string;
-      /** "image" | "video" */
-      mediaKind: "image" | "video";
-      /** 产物引用（/api/files/xxx） */
-      urls: string[];
-      outputSizes?: Array<string | null>;
-    })
+    });
+
+/**
+ * runtime.md §3.1：一轮 run 发一次，携带该 run 的全部产物（T3 裁定 A：一个 run = 一个结果节点）。
+ */
+export interface ResultNodeCreatedRunEvent {
+  seq?: number;
+  type: "result-node-created";
+  /** 前端据此实例化 result 节点 */
+  resultNodeId: string;
+  sourceGeneratorId: string;
+  runId: string;
+  mediaKind: "image" | "video";
+  /** 产物引用（/api/files/xxx） */
+  urls: string[];
+  /** 与 urls 同序的产物尺寸；未知项为 null */
+  outputSizes?: Array<string | null>;
+}
+
+export type RunEvent =
+  | NodeStatusRunEvent
+  | ResultNodeCreatedRunEvent
   | { seq?: number; type: "done" }
   | { seq?: number; type: "run-error"; nodeId?: string; error: string; finishedAt?: number };

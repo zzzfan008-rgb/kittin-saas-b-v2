@@ -51,8 +51,8 @@ function projectMaskRefs(flow: PersistedWorkflow): Array<{
   nodeId: string;
 }> {
   return flow.nodes.flatMap((node) => {
-    // v7：蒙版是 image 节点能力（Q4=A），仅所选变体声明 needsMask 时存在 mask 字段。
-    if (node.data.kind !== "image" || typeof node.data.mask !== "string") return [];
+    // v8：蒙版是生成节点能力（输入层节点不带蒙版，写入闸会拒绝），因此只看 image-generator。
+    if (node.data.kind !== "image-generator" || typeof node.data.mask !== "string") return [];
     const match = /^\/api\/files\/([^/?#]+\.png)$/.exec(node.data.mask);
     return match ? [{ sourceUrl: node.data.mask, fileId: match[1], nodeId: node.id }] : [];
   });
@@ -118,7 +118,8 @@ export async function copyProjectScopedMasks(input: {
     flow: {
       ...input.flow,
       nodes: input.flow.nodes.map((node) => {
-        if (node.data.kind !== "image" || typeof node.data.mask !== "string") return node;
+        // v8：蒙版只可能挂在生成节点上（与 projectMaskRefs 同一判据）。
+        if (node.data.kind !== "image-generator" || typeof node.data.mask !== "string") return node;
         const mask = replacements.get(node.data.mask);
         return mask ? { ...node, data: { ...node.data, mask } } : node;
       }),
