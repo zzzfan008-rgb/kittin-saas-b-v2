@@ -100,7 +100,7 @@ async function migrate(): Promise<void> {
       owner_id TEXT REFERENCES users(id),
       scope TEXT NOT NULL CHECK (scope IN ('global','private','shared')),
       name TEXT NOT NULL,
-      category TEXT NOT NULL CHECK (category IN ('print','fabric','reference')),
+      category TEXT NOT NULL CHECK (category IN ('print','fabric','reference','model')),
       image TEXT NOT NULL,
       source_note TEXT,
       created_at TEXT NOT NULL,
@@ -1326,6 +1326,20 @@ async function migrate(): Promise<void> {
       await client.query(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (21, $1, $2)",
         ["video_step_output_metadata", new Date().toISOString()],
+      );
+    }
+
+    // 数字模特库（R-86）：assets.category 枚举扩容，新增 'model'。
+    // 枚举扩容对既有数据无损，无需回填。
+    if (!applied.has(22)) {
+      await client.query(`
+        ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_category_check;
+        ALTER TABLE assets ADD CONSTRAINT assets_category_check
+          CHECK (category IN ('print','fabric','reference','model'));
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (22, $1, $2)",
+        ["asset_model_category", new Date().toISOString()],
       );
     }
 
