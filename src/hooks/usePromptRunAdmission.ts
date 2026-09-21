@@ -27,9 +27,13 @@ export interface PromptRunBrowserReference {
 
 function sourceImageRefs(node: PromptRunGraphNode | undefined): Array<string | undefined> {
   if (!node) return [undefined];
-  // v7：只有 image 节点产出参考图（R8 输入输出同体，outputImages 承载）。
+  // v8：可作参考来源的是输入层 image 节点（上传/历史图，outputImages）与结果节点
+  // （result-image 的 images，产物经 result-node-created 落地）。
   if (node.data.kind === "image") {
     return node.data.outputImages.length > 0 ? node.data.outputImages : [undefined];
+  }
+  if (node.data.kind === "result-image") {
+    return node.data.images.length > 0 ? node.data.images : [undefined];
   }
   return [undefined];
 }

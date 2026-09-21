@@ -69,9 +69,10 @@ export interface PromptRunGraphEdge {
 }
 
 function promptRunNodeOutputCount(data: WorkflowNodeData): number {
-  // v7 三值 kind：image 节点 outputImages 承载输出（R8 输入输出同体）；
-  // text 节点输出为正文（不产参考图）；video 节点输出视频（不产参考图）。
+  // v8（runtime.md §2 extractOutputImages）：产参考图的只有输入层 image（上传/素材）
+  // 与结果层 result-image。生成节点本身不承载产物，text/video 不产参考图。
   if (data.kind === "image") return data.outputImages.length;
+  if (data.kind === "result-image") return data.images.length;
   return 0;
 }
 
@@ -366,7 +367,13 @@ export function evaluatePromptRunCompatibility(
       reason: "必须选择当前五模型契约中的明确模型，未知模型不会被静默替换。",
     };
   }
-  if (!isModelAllowedForNode(input.modelId, input.nodeKind)) {
+  // v8（data-model.md §4）：图片模型只允许用于**生图节点**。v7 的
+  // `isModelAllowedForNode` 仍表达「只允许 image 节点」的旧语义（types/imageModels.ts:330），
+  // 在 v8 会把每一次生图运行都拦在闸内，故此处按 v8 分层判定；等类型层修订后
+  // 改为共用同一事实源（已上交 architect/R-89 立案）。
+  // 过渡期保留 v7 的 "image" 别名：本闸同时被 server/engine/dag.ts（后端先落 v8 前的 step.kind）
+  // 复用，逐字拒绝旧值会让服务端在迁移窗口内全量拒绝运行。
+  if (input.nodeKind !== "image-generator" && input.nodeKind !== "image") {
     return {
       allowed: false,
       code: "model-node-incompatible",
@@ -451,6 +458,19 @@ export function evaluatePromptRunCompatibility(
   return undefined;
 }
 
+/**
+ * v8 过渡桥：生成节点在提示词目录里仍以 v7 轴（`image` / `video`）登记
+ * （`PromptVariant.nodeKind` 属服务端目录契约；目录轴迁移未完成，见 architect R-89）。
+ * 绑定比较必须接受这组对映，否则每个 v8 生成节点都会被 fail-closed 拒绝。
+ * 目录轴迁移完成后本函数与其调用点一并删除。
+ */
+function nodeKindMatchesCatalogAxis(nodeKind: string, catalogNodeKind: string): boolean {
+  if (nodeKind === catalogNodeKind) return true;
+  if (nodeKind === "image-generator" && catalogNodeKind === "image") return true;
+  if (nodeKind === "video-generator" && catalogNodeKind === "video") return true;
+  return false;
+}
+
 /** Exact, fail-closed admission with no cross-model or parameter fallback. */
 export function evaluatePromptRunAdmission(
   input: PromptRunAdmissionInput,
@@ -465,7 +485,7 @@ export function evaluatePromptRunAdmission(
   const variant = bound;
   const bindingMatches = (
     input.modelId === variant.modelId
-    && input.nodeKind === variant.nodeKind
+    && nodeKindMatchesCatalogAxis(input.nodeKind, variant.nodeKind)
     && input.operationMode === variant.mode
     && input.promptFamilyId === variant.familyId
     && input.parameterProfileId === variant.parameterProfileId

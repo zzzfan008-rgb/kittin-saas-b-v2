@@ -241,19 +241,19 @@ const maskLocal = tab({
   projectId: "mask-source-project",
   nodes: [{
     id: "mask-node",
-    type: "image",
+    type: "image-generator",
     position: { x: 0, y: 0 },
     data: {
-      kind: "image",
+      // v8：蒙版住在生成节点上（输入层节点不带蒙版）。
+      kind: "image-generator",
       label: "局部重绘",
       status: "idle",
+      promptVariantId: "",
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
-      operationMode: "mask-edit",
-      operationModeNeedsConfirmation: false,
-      prompt: "改色",
+      aspectRatio: "3:4",
+      batchSize: 1,
       mask: "/api/files/source-mask.png",
-      outputImages: [],
     },
   }],
 });
@@ -280,8 +280,8 @@ try {
   assert.equal(maskCopyPayload?.targetProjectId, "mask-target-project");
   assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
   assert.equal(copied.targetProjectId, "mask-target-project");
-  assert.equal(copied.flow.nodes[0].data.kind, "image");
-  if (copied.flow.nodes[0].data.kind !== "image") throw new Error("unexpected node kind");
+  assert.equal(copied.flow.nodes[0].data.kind, "image-generator");
+  if (copied.flow.nodes[0].data.kind !== "image-generator") throw new Error("unexpected node kind");
   assert.equal(copied.flow.nodes[0].data.mask, "/api/files/copied-mask.png");
 } finally {
   globalThis.fetch = originalFetch;
@@ -431,7 +431,7 @@ const conflictLocal = tab({
 useFlowStore.setState({ tabs: [conflictLocal], activeTabId: conflictLocal.id, viewer: null });
 const copiedBackupFlow = {
   ...persistedWorkflowForProjectTab(conflictLocal),
-  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "image"
+  nodes: persistedWorkflowForProjectTab(conflictLocal).nodes.map((node) => node.data.kind === "image-generator"
     ? { ...node, data: { ...node.data, mask: "/api/files/backup-mask.png" } }
     : node),
 };
@@ -441,8 +441,8 @@ assert.equal(applyServerInitialDraftToTab(conflictLocal.id, draft({ id: "conflic
 const backup = useFlowStore.getState().tabs.find((candidate) => candidate.projectId === "backup-project");
 assert.ok(backup);
 assert.equal(projectTabLifecycle(backup), "local");
-assert.equal(backup.nodes[0].data.kind, "image");
-if (backup.nodes[0].data.kind !== "image") throw new Error("unexpected backup node kind");
+assert.equal(backup.nodes[0].data.kind, "image-generator");
+if (backup.nodes[0].data.kind !== "image-generator") throw new Error("unexpected backup node kind");
 assert.equal(backup.nodes[0].data.mask, "/api/files/backup-mask.png");
 console.log("  ✓ 采用云端冲突版本时，本机备份使用独立项目 ID 与复制后的蒙版");
 

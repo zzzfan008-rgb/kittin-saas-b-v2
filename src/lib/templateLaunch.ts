@@ -2,6 +2,7 @@ import type { Edge } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { flushSync } from "react-dom";
 import type { WorkflowTemplate, WorkflowNodeData } from "@/types/workflow";
+import { isGeneratorNodeKind } from "@/types/workflow";
 import {
   commitDocumentMutation,
   isPristineProjectTab,
@@ -41,9 +42,10 @@ export function inferTemplateLaunchMode(
 }
 
 function isMissingParameter(data: WorkflowNodeData): boolean {
-  // v7：text 节点缺正文 / image 节点既无输出也无参考输入时视为待补参数。
+  // v8：text 缺正文 / image 输入节点缺产物 / 生成节点未选功能绑定，都视为待补参数。
   if (data.kind === "text") return !data.text.trim();
   if (data.kind === "image") return data.outputImages.length === 0;
+  if (isGeneratorNodeKind(data.kind)) return !data.promptVariantId;
   return false;
 }
 

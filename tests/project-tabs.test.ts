@@ -3,9 +3,11 @@ import fs from "node:fs";
 import { maskRedrawReadiness } from "./lib/maskRedraw";
 import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
 import { imageModelAspectRatioPatch } from "../src/types/imageModels";
+import { resolveTargetHandle } from "../src/lib/documentSnapshot";
 import type { Edge } from "@xyflow/react";
 import {
   addExistingNodes,
+  applyResultNodeCreatedEventToTab,
   applyRunEventToTab,
   beginHistoryTransaction,
   beginMaskWork,
@@ -44,6 +46,8 @@ promotePromptVariantForTest(aiTestVariant);
 const aiTestProfile = getModelParameterProfile(aiTestVariant.parameterProfileId)!;
 const aiTestParameters = materializeModelParameterProfile(aiTestProfile);
 const AI_TEST_PROMPT = buildGarmentPrompt(aiTestVariant.variantId, "修改衣领");
+/** v8：text 节点承载的是用户正文，系统提示词由 variant.fullPrompt 在服务端内联。 */
+const AI_TEST_USER_PROMPT = "修改衣领";
 const geminiTestVariant = requireGarmentPromptVariant({
   familyId: "commerce-hero",
   modelId: "gemini-3.1-flash-image",
@@ -87,20 +91,17 @@ function imageNode(id: string, label: string): FlowNode {
 }
 
 function aiNode(id: string, label: string): FlowNode {
+  // v8：可运行的生成节点是 `image-generator`；正文由上游 text 提供，产物归结果节点。
   return {
     id,
-    type: "image",
+    type: "image-generator",
     position: { x: 320, y: 0 },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label,
-      status: "success",
-      prompt: AI_TEST_PROMPT,
+      status: "idle",
       aspectRatio: aiTestParameters.aspectRatio,
       batchSize: aiTestParameters.batchSize,
-      outputImages: ["/api/files/previous.png"],
-      operationMode: "edit",
-      operationModeNeedsConfirmation: false,
       modelId: aiTestVariant.modelId,
       modelOptions: aiTestParameters.modelOptions,
       promptVariantId: aiTestVariant.variantId,
@@ -113,25 +114,42 @@ function aiNode(id: string, label: string): FlowNode {
   };
 }
 
+/** v8：提示词正文的宿主节点（生成节点由上游 text 供词）。 */
+function textNode(id: string, text: string): FlowNode {
+  return {
+    id,
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text },
+  };
+}
+
 function runnableAiGraph(node: FlowNode): { nodes: FlowNode[]; edges: Edge[] } {
   const reference = imageNode(`${node.id}-reference`, `${node.data.label}参考图`);
   if (reference.data.kind !== "image") throw new Error("测试参考节点类型异常");
   reference.data.outputImages = [`/api/files/${node.id}-reference.png`];
+  // v8：生成节点必须有 text 上游提供正文（runtime.md §5 / INV-1），否则运行准入 fail-closed。
+  const prompt = textNode(`${node.id}-prompt`, AI_TEST_USER_PROMPT);
   return {
-    nodes: [reference, node],
-    edges: [{ id: `${node.id}-reference-edge`, source: reference.id, target: node.id }],
+    nodes: [reference, prompt, node],
+    edges: [
+      { id: `${node.id}-reference-edge`, source: reference.id, target: node.id },
+      { id: `${node.id}-prompt-edge`, source: prompt.id, target: node.id, targetHandle: "prompt" },
+    ],
   };
 }
 
 function addRunnableAiNode(node: FlowNode): void {
   const graph = runnableAiGraph(node);
   addExistingNodes(graph.nodes);
-  useFlowStore.getState().onConnect({
-    source: graph.edges[0].source,
-    target: graph.edges[0].target,
-    sourceHandle: null,
-    targetHandle: null,
-  });
+  for (const edge of graph.edges) {
+    useFlowStore.getState().onConnect({
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: null,
+      targetHandle: edge.targetHandle ?? null,
+    });
+  }
 }
 
 function moveNode(nodeId: string, x: number, dragging = true): void {
@@ -310,9 +328,21 @@ await test("后台任务可定向回写非当前页签", () => {
   );
 });
 
-await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片", () => {
+await test("A 页签后台失败不影响 B 页签且保留 A 的上一版结果", () => {
   useFlowStore.getState().switchTab(tabA);
   useFlowStore.getState().addExistingNode(aiNode("a-ai-node", "A 后台改款"));
+  // v8：产物住在结果节点上（生成节点不带 outputImages），先铺一个上一版结果节点。
+  assert.equal(
+    applyResultNodeCreatedEventToTab(documentTargetForTab(tabA), {
+      type: "result-node-created",
+      resultNodeId: "a-previous-result",
+      sourceGeneratorId: "a-ai-node",
+      runId: "run-a-previous",
+      mediaKind: "image",
+      urls: ["/api/files/previous.png"],
+    }),
+    true,
+  );
   useFlowStore.getState().switchTab(tabB);
   const beforeB = activeDocument().nodes;
 
@@ -330,8 +360,11 @@ await test("A 页签后台失败不影响 B 页签且保留 A 的上一版图片
   assert.equal(failedNode?.data.status, "error");
   assert.equal(failedNode?.data.error, "AI 网关暂不可用");
   assert.deepEqual(
-    failedNode?.data.kind === "image" ? failedNode.data.outputImages : undefined,
+    activeDocument().nodes
+      .filter((node) => node.data.kind === "result-image")
+      .flatMap((node) => (node.data.kind === "result-image" ? node.data.images : [])),
     ["/api/files/previous.png"],
+    "失败运行不得丢弃上一版结果",
   );
   useFlowStore.getState().switchTab(tabB);
 });
@@ -510,7 +543,7 @@ await test("空白项目启动器只在从未持久化的 pristine 文档中生�
 });
 
 await test("快捷建图原子新增节点与合法连线，一次撤销完整恢复", () => {
-  const anchor = imageNode("quick-anchor", "快捷上游");
+  const anchor = textNode("quick-anchor", "快捷上游提示词");
   useFlowStore.getState().openFlowTab({
     projectId: "quick-connect-project",
     projectName: "快捷建图测试",
@@ -520,7 +553,7 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   const beforeRevision = activeDocument().revision;
   const addedId = useFlowStore.getState().addConnectedNode(
     anchor.id,
-    "image",
+    "image-generator",
     "downstream",
   );
   assert.ok(addedId);
@@ -528,10 +561,29 @@ await test("快捷建图原子新增节点与合法连线，一次撤销完整�
   assert.equal(activeDocument().edges.length, 1);
   assert.equal(activeDocument().edges[0].source, anchor.id);
   assert.equal(activeDocument().edges[0].target, addedId);
-  assert.deepEqual(activeDocument().edges[0].data, {});
+  assert.deepEqual(activeDocument().edges[0].data, {}, "新连线不写入角色数据");
+  assert.equal(
+    resolveTargetHandle(
+      anchor.data.kind,
+      "image-generator",
+      activeDocument().edges[0].targetHandle ?? null,
+    ),
+    "prompt",
+    "text → generator 的连接必须落在 prompt 区",
+  );
   assert.equal(activeDocument().selectedNodeId, addedId);
   assert.equal(activeDocument().revision, beforeRevision + 1);
 
+  // v8：输入层节点不接受入边，因此「从图片节点向下游快捷建图」必须 fail-closed。
+  const inputAnchor = imageNode("quick-input-anchor", "输入图");
+  useFlowStore.getState().addExistingNode(inputAnchor);
+  assert.equal(
+    useFlowStore.getState().addConnectedNode(inputAnchor.id, "image", "downstream"),
+    null,
+    "输入节点不能作为任何边的目标",
+  );
+
+  useFlowStore.getState().undo();
   useFlowStore.getState().undo();
   assert.deepEqual(activeDocument().nodes.map((node) => node.id), [anchor.id]);
   assert.equal(activeDocument().edges.length, 0);
@@ -740,11 +792,16 @@ await test("旧上传回写与运行预检不得穿透同页签 documentEpoch", 
   referenceNode.data.outputImages = ["/api/files/garment-reference.png"];
   const sourceNode = aiNode(sharedNodeId, "旧项目节点");
   sourceNode.data.status = "idle";
+  // v8：生成节点的提示词来自上游 text 节点，缺失即 fail-closed。
+  const promptNode = textNode("same-tab-async-prompt", "修改衣领");
   useFlowStore.getState().loadFlow({
     projectId: "same-tab-async-project-a",
     projectName: "异步项目 A",
-    nodes: [referenceNode, sourceNode],
-    edges: [{ id: "same-tab-async-edge", source: referenceNode.id, target: sourceNode.id }],
+    nodes: [referenceNode, promptNode, sourceNode],
+    edges: [
+      { id: "same-tab-async-edge", source: referenceNode.id, target: sourceNode.id },
+      { id: "same-tab-async-prompt-edge", source: promptNode.id, target: sourceNode.id, targetHandle: "prompt" },
+    ],
     markDirty: true,
   });
   const staleTarget = selectActiveDocumentTarget(useFlowStore.getState());
@@ -1269,15 +1326,23 @@ await test("历史安全门从 runNode 唯一入口阻止新的付费运行", as
 await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保真", async () => {
   const generationNode = aiNode("model-invariant-ai", "Gemini 保真节点");
   generationNode.data.status = "idle";
-  if (generationNode.data.kind !== "image") throw new Error("测试生成节点类型错误");
-  generationNode.data.outputImages = [];
+  if (generationNode.data.kind !== "image-generator") throw new Error("测试生成节点类型错误");
+  const invariantPrompt = textNode("model-invariant-prompt", "保持 Gemini 精确参数");
   const invariantUpload = imageNode("model-invariant-upload", "异步上传");
   if (invariantUpload.data.kind !== "image") throw new Error("测试上传节点类型错误");
   useFlowStore.getState().openFlowTab({
     projectId: "model-invariant-project",
     projectName: "模型保真项目",
-    nodes: [invariantUpload, generationNode],
-    edges: [{ id: "model-invariant-edge", source: "model-invariant-upload", target: generationNode.id }],
+    nodes: [invariantUpload, invariantPrompt, generationNode],
+    edges: [
+      { id: "model-invariant-edge", source: "model-invariant-upload", target: generationNode.id },
+      {
+        id: "model-invariant-prompt-edge",
+        source: invariantPrompt.id,
+        target: generationNode.id,
+        targetHandle: "prompt",
+      },
+    ],
   });
   const invariantTabId = useFlowStore.getState().activeTabId;
   const expected = {
@@ -1287,7 +1352,6 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
 
   useFlowStore.getState().updateNodeData(generationNode.id, {
     ...expected,
-    prompt: buildGarmentPrompt(geminiTestVariant.variantId, "保持 Gemini 精确参数"),
     aspectRatio: geminiTestParameters.aspectRatio,
     batchSize: geminiTestParameters.batchSize,
     promptVariantId: geminiTestVariant.variantId,
@@ -1309,18 +1373,17 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
 
   useFlowStore.getState().addExistingNode({
     id: "model-invariant-mask",
-    type: "image",
+    type: "image-generator",
     position: { x: 320, y: 240 },
     data: {
-      kind: "image",
+      kind: "image-generator",
       label: "蒙版局部重绘",
       status: "idle",
-      prompt: "仅替换被选中区域",
+      promptVariantId: geminiTestVariant.variantId,
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
-      operationMode: "mask-edit",
-      operationModeNeedsConfirmation: false,
-      outputImages: [],
+      aspectRatio: "3:4",
+      batchSize: 1,
     },
   });
   useFlowStore.getState().onConnect({
@@ -1482,7 +1545,7 @@ await test("保存等待期间的编辑不会悄悄改变已点击的付费请�
 
     assert.equal(runBodies.length, 1);
     const submitted = runBodies[0].nodes.find((node) => node.id === "snapshot-run");
-    assert.equal(submitted?.data.kind, "image");
+    assert.equal(submitted?.data.kind, "image-generator");
     assert.equal(submitted?.data.label, "快照生成", "run-plan 必须提交点击时快照，不被等待期间的编辑改写");
     assert.match(
       activeDocument().nodes.find((node) => node.id === "snapshot-run")?.data.error ?? "",
@@ -1654,18 +1717,17 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
       },
       {
         id: "mask-node",
-        type: "image",
+        type: "image-generator",
         position: { x: 320, y: 0 },
         data: {
-          kind: "image",
+          kind: "image-generator",
           label: "蒙版局部重绘",
           status: "idle",
+          promptVariantId: "",
           modelId: "gpt-image-2.5-sunburst",
           modelOptions: {},
-          operationMode: "mask-edit",
-          operationModeNeedsConfirmation: false,
-          prompt: "",
-          outputImages: [],
+          aspectRatio: "3:4",
+          batchSize: 1,
         },
       },
     ],
@@ -1682,13 +1744,14 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
     maskSourceRef: source,
   });
   const savedNode = activeDocument().nodes.find((node) => node.id === "mask-node");
-  assert.equal(savedNode?.data.kind, "image");
-  if (savedNode?.data.kind !== "image") throw new Error("蒙版节点丢失");
+  assert.equal(savedNode?.data.kind, "image-generator");
+  if (savedNode?.data.kind !== "image-generator") throw new Error("蒙版节点丢失");
   const afterSave = maskRedrawReadiness({
     source,
     mask: savedNode.data.mask,
     maskSourceRef: savedNode.data.maskSourceRef,
-    prompt: savedNode.data.prompt,
+    // v8：正文由上游 text 节点提供，蒙版节点的就绪判定只关心蒙版本身。
+    prompt: "",
   });
   assert.equal(afterSave.hasCurrentMask, true);
   assert.equal(afterSave.canOpenRunAction, true, "保存蒙版后按钮不应再因提示词为空而保持 disabled");
