@@ -101,8 +101,14 @@ export type NodeKind =
 | `video` | `[复制] [替换]` |
 | `image-generator` | `[功能选项] [运行] [复制]` |
 | `video-generator` | `[功能选项] [运行] [复制]` |
-| `result-image` | `[预览] [下载] [作为输入] [复制]` |
-| `result-video` | `[播放] [下载] [作为输入] [复制]` |
+| `result-image` | `[预览] [下载] [复制]` |
+| `result-video` | `[播放] [下载] [复制]` |
+
+> **口径记录（R-103，落地 architect R-100 F3 裁定）**：本方案草案曾列出的 result 节点
+> `[作为输入]` 按钮**恒禁用，已从工具条移除**——结果作为下游输入不经按钮转化，改由
+> **输出柄直连**：从 result 节点输出柄拖线到生成节点入边句柄即可（`result-image` →
+> image-generator 的 `reference` 或 video-generator 的 `first-frame`，见 §2.1 与
+> contracts/runtime.md §2「结果节点是合法的下游输入源」）。
 
 约定：
 - 每个按钮 = 图标 + `aria-label`（hover 显示 Tooltip 文字），键盘可达、可见焦点环。
@@ -121,7 +127,7 @@ export type NodeKind =
 | 运行 | 提交本次生成 | 生成节点 |
 | 预览 / 播放 | 打开大图查看器 / 播放视频 | result 节点有产物 |
 | 下载 | 下载产物 | result 节点有产物 |
-| 作为输入 | 把该结果转为可被下游生成节点引用的输入源 | result 节点有产物 |
+| 作为输入（已移除，R-103） | **不落地此按钮**：本方案草案曾列此按钮恒禁用。结果作为下游输入不经按钮转化，改由**输出柄直连**——从 result 节点输出柄拖线到生成节点 `reference` / `first-frame` 入边句柄（runtime.md §2.1 边表），与 contracts/data-model.md §0.2 P2-4 裁定（reference 边显式 `EDGE_HANDLE_REFERENCE`）一致 | — |
 | 复制 | 复制节点（含 data，不含产物文件） | 全部 |
 
 > **待确认 T1**：`[功能选项]` 归属。你先后说过「生成节点没有功能选项」与「功能选项应该在生成模式节点内」。本文按**后者（最新表述）**落：功能选项在生成节点上。若实际意图是「生成节点无功能选项、功能在创建时一次性选定」，此列需改写。
