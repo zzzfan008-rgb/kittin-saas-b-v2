@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-21T12:59:45.465Z",
+  "baseCommit": "fca11ed30a8b15fa9c4781244dfe781810faeff3",
+  "changeFingerprintSha256": "1bb5d00e9eba2f7240e50b3007634e9aa4d78b5ca2d756134d23d5e0ee97c523",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "image generation reference image aspect ratio batch size",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/engine/runner.ts",
+    "server/lib/evaluationAuthorizationLedger.ts",
+    "server/lib/evaluationEvidence.ts",
+    "server/lib/evaluationRunPolicy.ts",
+    "server/lib/workflowSchema.ts",
+    "server/routes/generate.ts",
+    "server/routes/runPlan.ts",
+    "src/hooks/usePromptRunAdmission.ts",
+    "src/lib/promptRunAdmission.ts",
+    "src/types/imageModels.ts",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 Image Generation API - OpenAI's Latest Image API",
+      "sha256": "3ee5fbcf25449b1c23fb4479d678ac3ba075e6533b04d23e586a390589c7c80f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/overview.md",
+      "title": "Seedream Image Generation & Editing",
+      "sha256": "9c9f26bcb04af4d70873636e8eff2d3d7ce6bd24140e32695779c64153306656"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedance2/video-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedance2/video-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedance2/video-generation.md",
+      "title": "Seedance 2.0 / 2.5 Video Generation API Reference",
+      "sha256": "2934974934a5c05ad3dd5821e896d8ca5c659ee6f27c3ce43ca002348701fd5d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "f0a0e67a3becaed143f278c9b0f9321a649f5f8523e34c176f0592521e8e40c0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/sora-image-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/sora-image-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/sora-image-generation.md",
+      "title": "Sora Image Generation API",
+      "sha256": "079520d9bb9480f4d7da640edd697b8deb8e33a6e660983210f060f936d506b9"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/flux/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/flux/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/flux/overview.md",
+      "title": "FLUX Image Generation & Editing",
+      "sha256": "751fcd96d18e1507ac754012b93d3a3bb2c4930a2bec25ec127c8bbe395b3365"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-image/overview.md",
+      "title": "Nano Banana Pro Image Generation",
+      "sha256": "a2c2de0485ab71bfb08a8c5978955a5496a4297fedf1c3023888f232120d4043"
+    }
+  ],
+  "decisionSummary": "v8 五节点模型服务端落地(R-85/R-93/R-95)与前端准入/类型对齐。v7 三值 kind(text/image/video) 迁移为 v8 七值 kind(输入层 text/image/video + 生成层 image-generator/video-generator + 结果层 result-image/result-video)，WORKFLOW_SCHEMA_VERSION=8，workflowSchema.ts 重写 validateAndMigrateFlow(C1-C7 校验 + v7→v8 迁移 M1-M8)。付费/Provider 节点判定从 kind==='image' 统一改为 generationKindOf(step.kind)==='image'(image-generator→image 语义归一)，evaluationAuthorizationLedger/evaluationEvidence/evaluationRunPolicy/runPlan/generate/runner/dag 各处判定一并迁移；模型×节点闸 isModelAllowedForNode 与 promptRunAdmission 绑定按生成语义 kind 归一，promptRunAdmission 增加 nodeKindMatchesCatalogAxis 过渡桥兼容目录轴(image-generator↔image、video-generator↔video)。RunEvent/RunFailure/RunEventMeta 从 runner.ts 收敛到 workflow.ts 单点。画幅取值新增 IMAGE_ASPECT_RATIO_OPTIONS/imageAspectRatioOptions 单一事实源：契约声明 aspectRatios 时以契约为准，未声明时回落业务画幅清单 1:1/3:4/4:3/9:16/16:9。参考图来源从仅 image 节点扩展为 image + result-image。决策依据：API易图片/视频生成模型能力页(参考图 order-only、画幅、batchSize 张数)与 v8 设计契约 docs/design/2026-09-21-five-node-model/contracts/*(含 C7/§0.2 裁定)。本次改动不新增/变更任何模型 ID、Provider 端点或计费契约，仅结构 kind 迁移与准入/闸归一。",
+  "unresolvedChoices": []
+}
