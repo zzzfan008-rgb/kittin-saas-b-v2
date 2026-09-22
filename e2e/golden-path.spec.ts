@@ -405,7 +405,9 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   await resultCard.hover();
   const actionBar = resultCard.locator("div.absolute.inset-x-0.bottom-0");
   await expect(actionBar).toHaveClass(/grid-cols-2/);
-  await expect(resultCard.locator('button[title="查看"]')).toBeVisible();
+  // 2026-09-25 第 5 批（ab68c16）：卡片上的动作按钮「查看」改成「查看详情」（文本仍是「查看」，
+  // title 变为「查看详情」），点它打开「结果详情」弹窗；图片查看器改由弹窗里的大图按钮进入。
+  await expect(resultCard.locator('button[title="查看详情"]')).toBeVisible();
   await expect(resultCard.locator('button[title="加入对比"]')).toBeVisible();
   await expect(resultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
 
@@ -419,7 +421,7 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     }, theme);
     // 读 token 而非 computed color：computed color 受 hover:text-white 影响（鼠标移出后
     // :hover 要到下一帧才失效，存在竞态）；token 在三种主题下都应稳定为 #f4f4f4。
-    const overlayToken = await resultCard.locator('button[title="查看"]').evaluate(
+    const overlayToken = await resultCard.locator('button[title="查看详情"]').evaluate(
       (element) => getComputedStyle(element).getPropertyValue("--gc-media-overlay-text").trim(),
     );
     expect(overlayToken).toBe("#f4f4f4");
@@ -428,10 +430,19 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     if (value) document.documentElement.setAttribute("data-theme", value);
   }, originalTheme);
 
-  await resultCard.locator('button[title="查看"]').click();
+  // 2026-09-25 第 5 批：点「查看详情」先打开「结果详情」弹窗，图片查看器改由弹窗里的大图按钮进入。
+  await resultCard.locator('button[title="查看详情"]').click();
+  const detailDialog = page.getByRole("dialog", { name: "结果详情" });
+  await expect(detailDialog).toBeVisible();
+  await detailDialog.getByRole("button", { name: /查看 .* 大图/ }).click();
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
+  // Esc 可能只关掉查看器：确定性地收掉详情弹窗，避免后续点击被遮罩拦截（不用不自动等待的 isVisible）。
+  if (await page.getByRole("button", { name: "关闭结果详情" }).count() > 0) {
+    await page.getByRole("button", { name: "关闭结果详情" }).click();
+  }
+  await expect(detailDialog).toHaveCount(0);
 
   // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点 ----------
   // 查看器 Esc 会连同结果浮层一起收起（弹层语义），所以这里按需重开（用按钮的 ARIA 状态判断，

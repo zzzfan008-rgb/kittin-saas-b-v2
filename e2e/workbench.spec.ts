@@ -84,11 +84,6 @@ async function expectWidth(locator: Locator, width: number) {
   await expect.poll(async () => (await rect(locator)).width).toBe(width);
 }
 
-async function expectInert(locator: Locator, inert: boolean) {
-  await expect.poll(async () => locator.evaluate((element) => (element as HTMLElement).inert)).toBe(inert);
-  expect(await locator.getAttribute("inert")).toBe(inert ? "" : null);
-}
-
 function expectInside(child: Rect, parent: Rect) {
   expect(child.left).toBeGreaterThanOrEqual(parent.left - 1);
   expect(child.right).toBeLessThanOrEqual(parent.right + 1);
@@ -690,7 +685,8 @@ test("results and project center follow desktop density for cards", async ({ pag
   await expect(firstSuccessCard).toBeVisible();
   await firstSuccessCard.hover();
   const compareButton = firstSuccessCard.locator('button[title="加入对比"]');
-  const viewButton = firstSuccessCard.locator('button[title="查看"]');
+  // 2026-09-25 第 5 批（ab68c16）：「查看」改为「查看详情」→ 打开「结果详情」弹窗（图片查看器在弹窗里）。
+  const viewButton = firstSuccessCard.locator('button[title="查看详情"]');
   const downloadButton = firstSuccessCard.locator('a[title="下载"]');
   const applyButton = firstSuccessCard.locator('button[title="设为输入"]');
   await expect(compareButton).toBeVisible();
@@ -702,10 +698,38 @@ test("results and project center follow desktop density for cards", async ({ pag
   await expectInside(await rect(firstSuccessCard), resultsRect);
 
   await viewButton.click();
+  const detailDialog = page.getByRole("dialog", { name: "结果详情" });
+  await expect(detailDialog).toBeVisible();
+  await detailDialog.getByRole("button", { name: /查看 .* 大图/ }).click();
   const viewerHint = page.getByText(/滚轮缩放 100%/);
   await expect(viewerHint).toBeVisible();
+  // 遮挡实测（Playwright 的 toBeVisible 不看遮挡）：查看器顶层的那个点必须真的属于查看器，
+  // 否则说明它被「结果详情」弹窗（overlay z-[70] / content z-[71]）压住了。
+  const viewerTopmost = await page.evaluate(() => {
+    const hint = [...document.querySelectorAll("span")]
+      .find((el) => el.textContent?.includes("滚轮缩放 100%"));
+    if (!hint) return { found: false } as const;
+    const overlay = hint.closest("div.fixed") as HTMLElement | null;
+    const box = hint.getBoundingClientRect();
+    const top = document.elementFromPoint(box.left + 2, box.top + 2);
+    return {
+      found: true,
+      overlayZ: overlay ? getComputedStyle(overlay).zIndex : null,
+      topmostIsViewer: Boolean(overlay && top && overlay.contains(top)),
+      topmostTag: top ? `${top.tagName.toLowerCase()}.${(top.className || "").toString().slice(0, 40)}` : null,
+    };
+  });
+  expect(
+    viewerTopmost.found && viewerTopmost.topmostIsViewer,
+    `图片查看器必须位于最上层（实测最上层元素=${viewerTopmost.topmostTag ?? "?"}，查看器 overlay z-index=${viewerTopmost.overlayZ ?? "?"}）`,
+  ).toBe(true);
   await page.keyboard.press("Escape");
   await expect(viewerHint).toBeHidden();
+  // Esc 可能只关掉查看器：确定性地收掉详情弹窗，避免后续点击被遮罩拦截。
+  if (await page.getByRole("button", { name: "关闭结果详情" }).count() > 0) {
+    await page.getByRole("button", { name: "关闭结果详情" }).click();
+  }
+  await expect(detailDialog).toHaveCount(0);
 
   // 查看器 Esc 会连带收起结果浮层（ResultsFab 也监听 Esc），所以下一步先重开。
   await openResults();
@@ -986,28 +1010,25 @@ test("dragging a node near the canvas edge never auto-pans the viewport", async 
   ).toBe(initialTransform);
 });
 
-test("left dock and horizontal zoom controls preserve canvas identity, geometry, focus, and results", async ({ page }, testInfo) => {
+test("floating rail, zoom controls, and the results layer preserve canvas identity, geometry, and focus", async ({ page }, testInfo) => {
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Desktop viewport is required");
   const modifier = process.platform === "darwin" ? "Meta" : "Control";
 
-  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
+  // 2026-09-25 第 5 批（ab68c16）：左侧 Dock 与其「属性 / 结果」入口整体移除，
+  // 画布不再被面板推挤，恒定占满视口宽度；左侧只剩浮动工具栏，结果由右上浮层承载。
   const floatingRail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  const dock = page.locator('aside[aria-label="工作台左侧面板"]');
-  const contextPanel = page.locator("#workbench-inspector-panel");
   const canvas = page.getByRole("application", { name: "工作流画布" });
   const zoomControls = page.getByTestId("canvas-zoom-controls");
   const zoomSlider = page.getByRole("slider", { name: "画布缩放比例" });
   const zoomOutput = zoomControls.locator("output");
   const originalCanvas = await canvas.elementHandle();
   if (!originalCanvas) throw new Error("Canvas element is missing");
-  const originalTransform = await readViewportMatrix(page.locator(".react-flow__viewport"));
   const originalFlowCenter = await flowCenter(canvas);
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(dock).toHaveAttribute("aria-hidden", "true");
-  await expectInert(dock, true);
-  await expectWidth(dock, 0);
   await expect(floatingRail).toBeVisible();
+  await expect(page.locator('aside[aria-label="工作台左侧面板"]')).toHaveCount(0);
+  await expect(page.locator("#workbench-inspector-panel")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "属性 / 结果" })).toHaveCount(0);
   await expectWidth(canvas, viewport.width);
 
   const closedCanvasRect = await rect(canvas);
@@ -1049,37 +1070,21 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   await expect(shortcutMenu).toBeHidden();
   await expect(shortcutTrigger).toBeFocused();
 
-  // 属性与结果迁移到唯一左侧 Dock，不能覆盖横向缩放条或 MiniMap。
-  await contextToggle.click();
-  await expect(contextToggle).toBeFocused();
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(dock).toHaveAttribute("aria-hidden", "false");
-  await expectInert(dock, false);
-  await expect(contextPanel).toHaveAttribute("aria-hidden", "false");
-  await expectInert(contextPanel, false);
-  await expectWidth(dock, 320);
-  await expectWidth(canvas, viewport.width - 320);
-
-  const contextCanvasRect = await rect(canvas);
-  expect(Math.abs((await rect(dock)).right - contextCanvasRect.left)).toBeLessThanOrEqual(1);
-  expectInside(await rect(zoomControls), contextCanvasRect);
+  // 浮动工具栏不占布局：MiniMap 与缩放条必须仍落在画布内，画布中心不因浮层而漂移。
   const contextMinimap = page.locator(".react-flow__minimap");
   const contextMinimapRect = await rect(contextMinimap);
-  expectInside(contextMinimapRect, contextCanvasRect);
+  expectInside(contextMinimapRect, closedCanvasRect);
   // 响应式 minimap 宽度经 ResizeObserver → setState → 重渲染才收敛，须等待而非同步断言。
   await expect.poll(async () => (await rect(contextMinimap)).width)
-    .toBe(contextCanvasRect.width < 760 ? 128 : 200);
+    .toBe(closedCanvasRect.width < 760 ? 128 : 200);
   await expectFlowCenter(canvas, originalFlowCenter);
 
-  // 结果模块已迁出 Dock：Dock 里不再有页签，只剩「属性」视角；「最近生成」由画布右上角的
-  // 「结果」文字图标浮层承载（`ResultsFab`，2026-09-25 UI 修复第 5 条）。浮层是弹层语义：
-  // 收起即卸载，旧 Dock 页签时代的「两个 Panel 必须常驻挂载 + 保持滚动状态」契约已被取代。
+  // 结果模块由画布右上角「历史创作记录」浮层承载（`ResultsFab`，2026-09-25 决策）。浮层是弹层语义：
+  // 收起即卸载；旧 Dock 页签时代的「两个 Panel 必须常驻挂载 + 保持滚动状态」契约已随 Dock 移除退役。
   const resultsFab = page.getByRole("button", { name: "历史创作记录", exact: true });
   const resultsPanelHost = page.locator("#results-fab-panel");
   await expect(page.getByRole("tab", { name: "属性" })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "结果 / 记录" })).toHaveCount(0);
-  await expect(contextPanel).toBeVisible();
-  await expect(contextPanel).toHaveAttribute("aria-hidden", "false");
 
   await expect(resultsFab).toBeVisible();
   await expect(resultsFab).toHaveAttribute("aria-expanded", "false");
@@ -1091,10 +1096,9 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   const resultsRegion = resultsPanelHost.getByRole("region", { name: "最近生成" });
   await expect(resultsRegion).toContainText("运行 AI 节点后，生成结果与运行记录会汇总在这里");
 
-  // 浮层必须落在画布区内、不压左侧 Dock（Dock 展开时画布 = viewport - 320）。
+  // 浮层必须落在画布区内：右侧浮层不得越出画布边界（第 5 批后画布占满视口宽）。
   const fabPanelRect = await rect(resultsPanelHost);
   expectInside(fabPanelRect, await rect(canvas));
-  expect(fabPanelRect.left).toBeGreaterThanOrEqual((await rect(dock)).right);
 
   // 键盘路径：浮层此刻已由上面的点击打开 → Esc 收起，焦点必须留在触发按钮上（不丢焦点）；
   // 再用 Enter 从键盘打开一次，确认不是「只有鼠标能开」。
@@ -1110,44 +1114,13 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   await expect(resultsFab).toBeFocused();
   await expect(resultsFab).toHaveAttribute("aria-expanded", "false");
 
-  await contextToggle.click();
-  await expect(dock).toHaveAttribute("aria-hidden", "true");
-  await expectInert(dock, true);
-  await expectWidth(dock, 0);
-  await expectWidth(canvas, viewport.width);
-  await page.keyboard.press("Shift+Tab");
-  const contextClosedFocus = await contextPanel.evaluate((panel) => ({
-    inside: panel.contains(document.activeElement),
-    tag: document.activeElement?.tagName,
-  }));
-  expect(contextClosedFocus.inside).toBe(false);
-  expect(contextClosedFocus.tag).not.toBe("BODY");
-
-  await contextToggle.click();
-  // 弹层语义：关掉 Dock 不销毁画布侧的结果入口；结果浮层是「关闭即卸载、重开即重新挂载」，
-  // 旧契约（两个 Panel 常驻挂载 + 保滚动）已随迁移退役。
+  // 浮层收起后画布几何与中心必须与打开前一致；缩放条与 MiniMap 仍在画布内。
   await expect(page.getByRole("button", { name: "历史创作记录", exact: true })).toBeVisible();
   await expect(page.locator("#results-fab-panel")).toHaveCount(0);
 
-  // v8：左侧工具栏只有「属性 / 结果」一个面板入口；节点库面板已下线，
-  // 加节点改由「添加」工作流菜单直接完成（见上方 library-node 用例）。
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(dock).toHaveAttribute("aria-hidden", "false");
-  await expectInert(dock, false);
-  await expect(contextPanel).toHaveAttribute("aria-hidden", "false");
-  await expectInert(contextPanel, false);
-  await expectWidth(dock, 320);
-  await expectWidth(canvas, viewport.width - 320);
-  const sessionBeforeDomFocus = await page.evaluate(() => (
-    window.sessionStorage.getItem("garment-canvas-project-tabs")
-  ));
-  await contextToggle.focus();
-  await expect.poll(() => page.evaluate(() => (
-    window.sessionStorage.getItem("garment-canvas-project-tabs")
-  ))).toBe(sessionBeforeDomFocus);
-
   const canvasRect = await rect(canvas);
-  expect(Math.abs((await rect(dock)).right - canvasRect.left)).toBeLessThanOrEqual(1);
+  expect(canvasRect.left).toBe(closedCanvasRect.left);
+  expect(canvasRect.width).toBe(closedCanvasRect.width);
   expectInside(await rect(zoomControls), canvasRect);
   const minimap = page.locator(".react-flow__minimap");
   const minimapRect = await rect(minimap);
@@ -1168,7 +1141,7 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   const projectCenterRect = await rect(projectCenter);
   expect(projectCenterRect.left).toBeGreaterThanOrEqual(39);
   expect(projectCenterRect.right).toBeLessThanOrEqual(viewport.width - 39);
-  await testInfo.attach(`desktop-${viewport.width}-dock-layout-project-center`, {
+  await testInfo.attach(`desktop-${viewport.width}-workbench-layout-project-center`, {
     body: await page.screenshot(),
     contentType: "image/png",
   });
@@ -1179,20 +1152,13 @@ test("left dock and horizontal zoom controls preserve canvas identity, geometry,
   await page.mouse.move(canvasRect.left + canvasRect.width / 2, canvasRect.top + 20);
   await page.waitForTimeout(300);
 
-  await testInfo.attach(`desktop-${viewport.width}-dock-layout`, {
+  await testInfo.attach(`desktop-${viewport.width}-workbench-layout`, {
     body: await page.screenshot(),
     contentType: "image/png",
   });
 
-  await contextToggle.click();
-  await expect(contextToggle).toBeFocused();
-  await expect(dock).toHaveAttribute("aria-hidden", "true");
-  await expectInert(dock, true);
-  await expectWidth(dock, 0);
+  // 全流程跑完后画布必须仍占满视口宽：没有任何浮层把画布挤窄（第 5 批后无 Dock 推挤）。
   await expectWidth(canvas, viewport.width);
-  await page.keyboard.press("Tab");
-  expect(await contextPanel.evaluate((panel) => panel.contains(document.activeElement))).toBe(false);
-
   expect(await canvas.evaluate((current, original) => current === original, originalCanvas)).toBe(true);
   await expect.poll(
     () => readViewportMatrix(page.locator(".react-flow__viewport")),
