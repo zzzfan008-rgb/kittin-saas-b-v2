@@ -30,6 +30,10 @@ data/*.db
 data/*.db-*
 data/*.dump
 
+# External code-intelligence MCP index artifacts (not project source)
+.cgr-*
+.cgr/
+
 # OS
 .DS_Store
 Thumbs.db
