@@ -82,7 +82,7 @@ try {
     );
     assert.match(
       baseline.stdout,
-      new RegExp(`\\[desktop-${width}\\].*left dock and horizontal zoom controls preserve canvas identity`),
+      new RegExp(`\\[desktop-${width}\\].*floating rail, zoom controls, and the results layer preserve canvas identity`),
       `desktop-${width} must include the stable workbench regression`,
     );
     assert.match(
