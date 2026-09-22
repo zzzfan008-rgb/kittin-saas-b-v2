@@ -3,11 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  INITIAL_WORKBENCH_UI_STATE,
-  workbenchUiReducer,
-  type WorkbenchUiState,
-} from "../src/components/workbench/workbenchState";
-import {
   desktopShortcutPlatformFromValues,
   workbenchShortcutRows,
 } from "../src/lib/keyboardShortcuts";
@@ -30,17 +25,6 @@ console.log("新工作台外壳源码契约测试");
 
 const files = sourceFiles(workbenchRoot);
 assert.ok(files.length > 0, "缺少 src/components/workbench 外壳源码");
-
-let state: WorkbenchUiState = INITIAL_WORKBENCH_UI_STATE;
-assert.deepEqual(state, { activePanel: null });
-
-state = workbenchUiReducer(state, { type: "toggle-panel", panel: "library" });
-assert.deepEqual(state, { activePanel: "library" });
-state = workbenchUiReducer(state, { type: "toggle-panel", panel: "inspector" });
-assert.deepEqual(state, { activePanel: "inspector" });
-state = workbenchUiReducer(state, { type: "toggle-panel", panel: "inspector" });
-assert.deepEqual(state, { activePanel: null });
-console.log("  ✓ 外壳 reducer 仅允许一个左侧 Dock 面板打开，并支持再次点击收起");
 
 assert.equal(desktopShortcutPlatformFromValues("MacIntel"), "macos");
 assert.equal(desktopShortcutPlatformFromValues("Win32"), "windows");
@@ -72,10 +56,6 @@ const canvasZoomControlsSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/CanvasZoomControls.tsx"),
   "utf8",
 );
-const contextPanelSource = fs.readFileSync(
-  path.resolve(testRoot, "../src/components/panels/ContextPanel.tsx"),
-  "utf8",
-);
 const topBarSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/panels/TopBar.tsx"),
   "utf8",
@@ -91,15 +71,22 @@ const nodeFrameSource = fs.readFileSync(
 );
 const flowStoreSource = fs.readFileSync(path.resolve(testRoot, "../src/store/flowStore.ts"), "utf8");
 const runPlanRouteSource = fs.readFileSync(path.resolve(testRoot, "../server/routes/runPlan.ts"), "utf8");
-const nodeLibrarySource = fs.readFileSync(
-  path.resolve(testRoot, "../src/components/panels/NodeLibraryPanel.tsx"),
+const railConfigSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/workbench/railConfig.tsx"),
+  "utf8",
+);
+const resultDetailDialogSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/panels/ResultDetailDialog.tsx"),
+  "utf8",
+);
+const canvasNodeActionsSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/panels/canvasNodeActions.ts"),
   "utf8",
 );
 const workbenchShellRenderSource = shellSource.slice(shellSource.indexOf("export function WorkbenchShell"));
 
 assert.match(combined, /@\/components\/ui\//, "新外壳必须复用已安装的 shadcn 基础组件");
 assert.match(combined, /aria-(?:label|labelledby|expanded|controls)/, "新外壳的交互入口必须提供可感知名称或状态");
-assert.match(combined, /transition-\[width,visibility\]/, "桌面 Dock 应通过占位宽度开合，避免遮挡画布控件与结果");
 assert.doesNotMatch(shellSource, /工作台右侧工具|border-l border-\[var\(--gc-border\)\]/, "工作台不得保留右侧工具栏或右侧 Dock");
 assert.match(shellSource, /absolute left-4 top-4 z-40/, "工具栏入口应为画布左侧悬浮胶囊");
 assert.match(canvasFlowSource, /new ResizeObserver/, "Dock 改变画布尺寸时必须监听容器几何变化");
@@ -149,32 +136,18 @@ assert.equal(
   1,
   "中心画布子树必须只挂载一次，Dock 开合不得重建 React Flow",
 );
-assert.equal(
-  (workbenchShellRenderSource.match(/\{library\}/g) ?? []).length,
-  1,
-  "节点与素材 Dock 必须保持单实例挂载",
-);
-assert.equal(
-  (workbenchShellRenderSource.match(/\{inspector\}/g) ?? []).length,
-  1,
-  "属性与结果 Dock 必须保持单实例挂载",
-);
-assert.match(shellSource, /id=\{LIBRARY_PANEL_ID\}[\s\S]*?inert=\{!libraryOpen\}/);
-assert.match(shellSource, /id=\{INSPECTOR_PANEL_ID\}[\s\S]*?inert=\{!inspectorOpen\}/);
 assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|DESKTOP_QUERY|mobilePanel/);
 assert.doesNotMatch(appSource, /workspaceKey=\{activeTabId\}/);
-// 2026-09-25 UI 修复第 5 条 + 决策 1：结果/记录已迁到画布右上角「历史创作记录」文字浮层
-// （ResultsFab）；左侧 ContextPanel 只承载节点属性，不再用 Tabs 拼接结果。
-assert.match(
-  contextPanelSource,
-  /from "\.\/InspectorPanel"/,
-  "左侧上下文面板必须只承载节点属性（InspectorPanel）",
-);
-assert.doesNotMatch(
-  contextPanelSource,
-  /from "@\/components\/ui\/tabs"/,
-  "结果/记录迁到右下右上角浮层后，左侧面板不得再保留结果 Tab",
-);
+// 2026-09-25 决策：左侧 Dock（节点库 / 属性）与「属性 / 结果」入口整体移除。
+// 属性编辑内联在生成节点卡片上（双击节点标题改名），结果详情改到「历史创作记录」里弹出。
+assert.doesNotMatch(shellSource, /activePanel|LIBRARY_PANEL_ID|INSPECTOR_PANEL_ID|openPanel/, "外壳不得保留任何左侧 Dock 面板状态或容器");
+assert.doesNotMatch(shellSource, /\{library\}|\{inspector\}/, "外壳不得再挂载左侧面板插槽");
+assert.doesNotMatch(railConfigSource, /panel:/, "左侧工具栏不得保留面板入口（属性 / 结果）");
+assert.doesNotMatch(appSource, /ContextPanel|NodeLibraryPanel/, "App 不得再挂载左侧 Dock 面板");
+assert.ok(!fs.existsSync(path.resolve(testRoot, "../src/components/panels/ContextPanel.tsx")), "ContextPanel 必须随左侧 Dock 一起删除");
+assert.ok(!fs.existsSync(path.resolve(testRoot, "../src/components/panels/InspectorPanel.tsx")), "InspectorPanel 必须随属性面板一起删除");
+assert.ok(!fs.existsSync(path.resolve(testRoot, "../src/components/workbench/workbenchState.ts")), "workbenchState 必须随面板状态一起删除");
+assert.match(canvasNodeActionsSource, /export function addCanvasNode/, "「添加」菜单的节点新建动作必须保留（自 NodeLibraryPanel 迁出）");
 const resultsFabSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/panels/ResultsFab.tsx"),
   "utf8",
@@ -184,10 +157,21 @@ assert.match(
   />\s*历史创作记录\s*<\/button>/,
   "画布右上角的入口必须以「历史创作记录」文字呈现（2026-09-25 决策 1），而不是示意图标",
 );
+// 2026-09-25 决策：点单个结果弹出「结果详情」（原内联在浮层下方的运行记录块已删除）。
 assert.match(
   resultsFabSource,
+  /<ResultsPanel[\s\S]*?onOpenDetail=\{setDetailResultId\}/,
+  "历史创作记录浮层必须把「点结果」接到结果详情弹窗",
+);
+assert.match(
+  resultsFabSource,
+  /<ResultDetailDialog[\s\S]*?resultId=\{detailResultId\}/,
+  "结果详情必须由受控弹窗承载（resultId=null 即关闭）",
+);
+assert.doesNotMatch(
+  resultsFabSource,
   /<ResultRecordDetail/,
-  "历史创作记录浮层必须同时承载选中结果的运行记录详情（结果/记录合并为一个入口）",
+  "运行记录只能有一个家：浮层内联块必须删除，改由弹窗承载",
 );
 const resultsPanelSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/panels/ResultsPanel.tsx"),
@@ -198,7 +182,6 @@ assert.match(
   /grid-cols-3/,
   "结果缩略图必须以 3 个为一行呈现",
 );
-assert.match(appSource, /inspector=\{<ContextPanel/);
 assert.match(
   appSource,
   /<ResultsFab[\s\S]*?\/>/,
@@ -209,9 +192,14 @@ assert.doesNotMatch(
   /<ReactFlowProvider[\s\S]*?<ResultsPanel/,
   "Results 不应再占用中心画布底部",
 );
-assert.doesNotMatch(nodeLibrarySource, /AssetList|素材库|\/api\/assets/, "左侧节点库不得继续包含素材库页签或素材请求");
-assert.match(nodeLibrarySource, /@\/components\/ui\/button/, "节点库操作必须使用本地 shadcn Button");
-assert.match(nodeLibrarySource, /@\/components\/ui\/card/, "节点库卡片必须使用本地 shadcn Card");
+// 结果详情弹窗必须复用本地 shadcn Dialog，并保留结果能力（查看大图 / 对比 / 下载 / 设为输入）。
+assert.match(resultDetailDialogSource, /from "@\/components\/ui\/dialog"/, "结果详情必须使用本地 shadcn Dialog（居中弹窗）");
+assert.match(resultDetailDialogSource, /from "@\/lib\/resultActions"/, "结果详情必须与结果卡片共用同一套动作实现");
+assert.match(resultDetailDialogSource, /openResultViewer\(record\)/, "详情里必须能进入图片查看器（点大图，而不是打开详情时直接叠两层浮层）");
+assert.match(resultDetailDialogSource, /下载/, "结果详情不得丢失下载入口");
+assert.match(resultDetailDialogSource, /设为输入/, "结果详情不得丢失「设为输入」继续处理入口");
+assert.doesNotMatch(resultDetailDialogSource, /window\.(?:alert|confirm)\s*\(/, "结果详情不得用阻塞式浏览器弹窗反馈错误");
+assert.doesNotMatch(resultsPanelSource, /openViewer|openResultViewer\(r\)/, "结果卡片本身不再直接打开查看器，改由详情弹窗承接");
 assert.match(appSource, /LazyAssetPickerOverlay/, "节点内的素材选择浮层必须继续保留");
 assert.doesNotMatch(nodeFrameSource, /onCancel|>\s*取消\s*</, "生成按钮不得再暴露取消入口");
 assert.doesNotMatch(flowStoreSource, /cancelNodeRun|\/api\/run-plan\/.*\/cancel/, "客户端不得保留任务取消模块");

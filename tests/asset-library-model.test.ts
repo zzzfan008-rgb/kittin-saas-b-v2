@@ -205,14 +205,15 @@ assert.equal(
   "Rail 不得再保留色彩工具入口",
 );
 assert.doesNotMatch(railConfigSource, /DropletIcon/, "色彩工具图标不得残留在 rail 配置里");
+// 2026-09-25 决策：左侧「属性 / 结果」入口随左侧 Dock 一并删除，Rail 只剩 5 个工作流组。
 assert.deepEqual(
   RAIL_ENTRIES.map((entry) => entry.id),
-  ["add", "ai-tryon", "ai-design", "ai-video", "canvas", "inspector"],
+  ["add", "ai-tryon", "ai-design", "ai-video", "canvas"],
 );
 assert.deepEqual(
   [...RAIL_SEPARATOR_BEFORE],
-  [1, 4, 5],
-  "移除色彩工具后分隔线索引必须同步（添加 / 视频生成 / 工具组之前）",
+  [1, 4],
+  "移除属性/结果入口后分隔线索引必须同步（添加 / 视频生成 之前）",
 );
 assert.ok(
   RAIL_SEPARATOR_BEFORE.every((index) => index < RAIL_ENTRIES.length),

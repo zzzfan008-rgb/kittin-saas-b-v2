@@ -242,6 +242,82 @@ async function openBlankCanvasFromGuide(page: Page): Promise<void> {
 其余 `page.reload()` 点都有前置 `await expect(...)`（`auth.setup.ts:129`、
 `golden-path.spec.ts:72`、`initial-draft.spec.ts:162`、`workbench.spec.ts:637/1261`），不受影响。
 
+### 决策 5（2026-09-25 追加）：删除左侧「属性 / 结果」栏 + 结果详情改为点单个结果弹出
+
+用户原话：「1、左侧工具栏的属性/结果这个栏，删除掉，然后把结果详情页整合到，用户在历史创作记录那里点单个结果的时候再弹出」；
+四点确认：① 居中 Dialog ② 先开详情、详情里点大图再开查看器 ③ 属性面板整体删掉 ④ 不可达的节点库面板一并删。
+
+开工前实测的现状（与用户表述不同，已当面澄清）：
+- 那一栏的真身是入口 `inspector`（label「属性 / 结果」）→ 左侧 Dock(`w-64`) → `ContextPanel`
+  → `InspectorPanel view="properties"`，里面**只有属性**（节点名称输入 + 状态 + 说明），
+  没有结果页签——结果早在上一批就迁到右上角「历史创作记录」浮层了。
+- 左侧 Dock 里还挂着一个「节点库」面板，但没有任何入口能把 `activePanel` 设成 `"library"`
+  → 渲染但永远打不开（不可达 UI）。
+- 节点改名不依赖该面板：`NodeFrame.tsx:146` 双击节点标题就地改名（title「双击改名」）。
+- 点结果卡片原来做两件事：`setSelectedResultId`（让浮层下方内联运行记录出现）+ `openViewer`（直接开图片查看器）。
+
+改动清单：
+- **删** `panels/ContextPanel.tsx`、`panels/InspectorPanel.tsx`、`panels/NodeLibraryPanel.tsx`、
+  `workbench/workbenchState.ts`（面板状态 `activePanel` 一并移除；原 NodeLibraryPanel 的 `addCanvasNode`
+  与落位策略迁到 `panels/canvasNodeActions.ts`，函数更名 `canvasNodeClickPosition`）
+- **新** `panels/ResultRecordDetail.tsx`（从 InspectorPanel 拆出，成为弹窗主体）
+- **新** `panels/ResultDetailDialog.tsx`（居中本地 shadcn Dialog：大图 + 运行记录 + 查看大图/对比/下载/设为输入）
+- **新** `lib/resultActions.ts`（卡片与弹窗共用：`openResultViewer` / `continueWithResult` / `toggleResultCompare`）
+- `ResultsFab`：删除浮层内联的运行记录块；点结果 → `detailResultId` → 弹窗；
+  **弹窗打开期间浮层不关闭**（关闭弹窗回到原位与滚动位置），document 级 pointerdown/Esc 让路
+- `ResultsPanel`：新增必填 prop `onOpenDetail`；主点击与卡片上的「查看」都改为打开详情
+  （`aria-label` 保持不变，减少 e2e 选择器churn）；不再直接调 `openViewer`
+- `railConfig`：删 `inspector` 条目与 `RailEntry.panel` 字段；`RAIL_SEPARATOR_BEFORE` `[1,4,5]` → `[1,4]`
+- `WorkbenchShell`：删 Dock 容器、`LIBRARY_PANEL_ID`/`INSPECTOR_PANEL_ID`、`openPanel`、
+  `panelOpen`/`libraryOpen`/`inspectorOpen`、Dock 宽度事件（`emitDockViewportWillChange`）；props 只剩 `children`
+- `App.tsx`：`<WorkbenchShell>` 只接 `children`
+
+三态与可访问性：记录不在当前会话（切项目 / 刷新过）→ 弹窗内给明确空态文案（不是空白）；
+Esc / 右上角关闭按钮 / 点遮罩三类关闭路径；焦点由 Base UI Dialog 归还原结果卡片；
+缩略图是 `button`（Enter/Space 可开）；弹窗内焦点陷阱；运行记录无异步加载（数据来自 store），
+分页加载态仍由浮层承担。
+
+**已知遗留（有意不在本批做，建议单独一批）**：`src/lib/dockViewport.ts` 的
+`emitDockViewportWillChange` 已无调用点，`CanvasFlow` 对该事件的订阅成为死路径
+（真机窗口 resize 仍由 `ResizeObserver` 覆盖）。它压在画布 R1/R2 红线上，本批不动。
+
+**e2e 需同步（ui-qa 域）**：`workbench.spec.ts:994`（按「属性 / 结果」查询按钮）、`:1052`、
+`:1074-1089`（Dock 几何与「只剩属性视角」断言）、`:664/736`（注释与前置条件里
+「打开图片查看器会收起浮层」的语义已变：现在点结果开详情、浮层保持打开）、
+`golden-path.spec.ts:395-440`（结果流：现在要先经详情，再从详情里点大图进查看器）。
+
+**本批建议新增的覆盖（验收口径，6 条）**：
+1. 左侧工具栏不再有「属性 / 结果」按钮（`getByRole("button",{name:"属性 / 结果"}).toHaveCount(0)`）；
+2. 在「最近生成」里点一条结果 → `role=dialog`、`name=结果详情` 出现，**且浮层 `aria-expanded` 仍为 `true`**；
+3. `Esc` 关闭详情，**焦点回到那张结果卡片**（Base UI Dialog 的 `finalFocus`）；
+4. 详情里点大图（`aria-label="查看 <节点名> 大图"`）→ 图片查看器出现（不再是一步直达）；
+5. 详情保留四个动作：查看大图 / 加入对比（`aria-pressed` 正确翻转）/ 下载 / 设为输入（只读项目下禁用）；
+6. 记录不在当前会话时（切项目或刷新后）显示空态文案，而不是空白。
+
+**分支门禁红项：已修（2026-09-25 15:0x）。** 现象是 `tests/e2e-safety.test.mjs:66` 报
+`AssertionError: initial-draft relogin recovery must remain in the isolated browser regression matrix`：
+它钉的是 `playwright test --list` 里的用例标题，而 ui-qa 在 `dbae2a6` 里把
+`e2e/initial-draft.spec.ts` 的 relogin 用例更名为
+`relogin lands on the empty workspace without bootstrapping, and the saved project stays reachable`。
+`tests/**` 属前端单测域，所以由前端同步断言（不是 ui-qa 改自己的 e2e）。
+
+**修复后 `npm run check` = exit 0**：lint ✓ + build ✓ + 包体门禁 168631/210000 ✓ + `test:suite` **79/79**（53.2s）。
+
+**联动约定（避免再互相踩）**：e2e 用例标题一旦更名，`tests/e2e-safety.test.mjs` 的矩阵断言会跟着红——
+ui-qa 改名后把新标题告知前端，由前端改 `tests/`，ui-qa 不要自己动 `tests/**`。
+已知待联动项：本批删掉左侧 Dock 后，`workbench.spec.ts` 的
+`left dock and horizontal zoom controls preserve canvas identity` 大概率要改名。
+
+**测试基建观察（2026-09-25，ui-qa 发现，非本批引入，归属待定）**：测试库由
+`resolveTestDatabaseUrl` 读主仓 `.env`（全局共享），而 `acquireTestLock` 的 projectName 按 worktree 命名
+→ 两个 worktree 各自持锁却共享同一个库，互相 reset schema，出现
+`relation "sessions" does not exist` / `首次落库失败：HTTP 500` 一类假红。
+结论：**e2e 只在主树串行跑，worktree 只做只读量测**。属 `scripts/` + 测试库辅助设施，
+建议由 orchestrator 决定是否单独开卡（前端与 ui-qa 都不自行修改测试基建）。
+
+**DM 通道备注**：本轮交给 ui-qa 的两条消息（本批产品变更 + 上面的门禁红项）均 `target_busy` 失败
+（第 3、4 次失败，未送达）；因此上述口径以**本文档为准**，ui-qa 从文档读取即可。
+
 ### 本批未完成项（截至 2026-09-22 14:0x）
 
 1. **提交授权**：工作树混有 backend / designer / ui-qa 未提交改动，等用户「通过」；

@@ -1,6 +1,8 @@
 /**
- * 左侧悬浮工具栏配置：4 个带菜单的入口（「添加」+ 3 个工作流）
- * + AI 画板 + 「属性 / 结果」面板入口。
+ * 左侧悬浮工具栏配置：4 个带菜单的入口（「添加」+ 3 个工作流）+ AI 画板。
+ *
+ * 2026-09-25 决策：原先的「属性 / 结果」面板入口已删除，左侧 Dock 随之整体移除
+ * （节点属性编辑内联在生成节点卡片上，结果详情改由「历史创作记录」里点单个结果弹出）。
  *
  * 色彩工具入口已按 `docs/design/2026-09-19-workbench-entry-wiring/plan.md` §0.3 / §3
  * 从 Rail 移除，只保留在文本节点内（v8 落在 text 节点工具条，见
@@ -33,8 +35,6 @@ export interface RailEntry {
   icon: ReactNode;
   /** 有菜单的工作流；无菜单的入口点击直接触发 action */
   items?: RailMenuItem[];
-  /** 面板入口（属性/结果）：点击开合左侧 Dock，不弹菜单 */
-  panel?: "inspector";
 }
 
 const stroke = {
@@ -114,23 +114,10 @@ export const RAIL_ENTRIES: RailEntry[] = [
     label: "AI 画板",
     icon: <PaletteIcon aria-hidden="true" />,
   },
-  {
-    id: "inspector",
-    label: "属性 / 结果",
-    panel: "inspector",
-    icon: (
-      <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" {...stroke}>
-        <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h13M18 18h2" />
-        <circle cx="16" cy="6" r="2.2" />
-        <circle cx="10" cy="12" r="2.2" />
-        <circle cx="19" cy="18" r="2.2" />
-      </svg>
-    ),
-  },
 ];
 
-/** 分隔线插入位置：索引前插入（「添加」之后 / 视频生成之后 / 工具组之后） */
-export const RAIL_SEPARATOR_BEFORE = [1, 4, 5] as const;
+/** 分隔线插入位置：索引前插入（「添加」之后 / 视频生成之后） */
+export const RAIL_SEPARATOR_BEFORE = [1, 4] as const;
 
 /** 无菜单入口的占位动作用图标（Sparkles 表示功能待接入） */
 export const RAIL_PENDING_ICON = <SparklesIcon aria-hidden="true" />;

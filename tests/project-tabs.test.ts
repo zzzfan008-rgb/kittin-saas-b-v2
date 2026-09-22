@@ -471,16 +471,16 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   assert.equal(activeDocument().nodes.some((node) => node.id === addedId), false);
   assert.equal(activeDocument().selectedNodeId, null);
 
-  const librarySource = fs.readFileSync(
-    new URL("../src/components/panels/NodeLibraryPanel.tsx", import.meta.url),
+  const canvasNodeActionsSource = fs.readFileSync(
+    new URL("../src/components/panels/canvasNodeActions.ts", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(
-    librarySource,
+    canvasNodeActionsSource,
     /addAssetNode\(asset,|AssetList|\/api\/assets/,
     "独立节点库不再承担素材管理，但 Store 的原子素材节点 action 仍需保持可用",
   );
-  assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
+  assert.doesNotMatch(canvasNodeActionsSource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
 });
 
 await test("多选节点批量粘贴只产生一次文档提交与撤销记录", () => {
@@ -1489,8 +1489,8 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     new URL("../src/components/nodes/ImageGeneratorNode.tsx", import.meta.url),
     "utf8",
   );
-  const legacyInspectorSource = fs.readFileSync(
-    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+  const resultRecordDetailSource = fs.readFileSync(
+    new URL("../src/components/panels/ResultRecordDetail.tsx", import.meta.url),
     "utf8",
   );
   const imageNodeSource = fs.readFileSync(
@@ -1508,9 +1508,9 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     "生图节点必须挂载内联参数面板",
   );
   assert.doesNotMatch(
-    legacyInspectorSource,
+    resultRecordDetailSource,
     /modelOptions/,
-    "旧 InspectorPanel 不得保留第二处原生参数编辑入口",
+    "结果记录视图不得成为第二处原生参数编辑入口（属性面板已整体删除）",
   );
   assert.doesNotMatch(
     imageNodeSource,
@@ -1919,15 +1919,15 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
     "utf8",
   );
 
-  assert.match(appSource, /<WorkbenchShell[\s\S]*library=\{<NodeLibraryPanel/);
+  // 2026-09-25 决策：左侧 Dock 与「属性 / 结果」入口整体移除后，工作台外壳只接收
+  // 中心画布子树，不再有 library / inspector 两个面板插槽。
+  assert.match(appSource, /<WorkbenchShell>/);
+  assert.doesNotMatch(appSource, /library=\{<|inspector=\{</);
   assert.equal((shellSource.match(/\{children\}/g) ?? []).length, 1);
-  assert.equal((shellSource.match(/\{library\}/g) ?? []).length, 1);
-  assert.equal((shellSource.match(/\{inspector\}/g) ?? []).length, 1);
+  assert.doesNotMatch(shellSource, /\{library\}|\{inspector\}|activePanel/);
   assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|mobilePanel/);
-  assert.match(shellSource, /aria-controls=\{[^}]*INSPECTOR_PANEL_ID[^}]*\}/);
-  assert.match(shellSource, /id=\{LIBRARY_PANEL_ID\}/);
-  assert.match(shellSource, /id=\{INSPECTOR_PANEL_ID\}/);
-  assert.match(shellSource, /transition-\[width,visibility\]/);
+  // 「属性 / 结果」入口与 Dock 容器（aria-controls / 两个 panel id / Dock 宽度过渡）已整体删除。
+  assert.doesNotMatch(shellSource, /aria-controls|transition-\[width,visibility\]|w-80/);
   assert.match(topBarSource, /grid-cols-\[1fr_auto_1fr\]/);
   assert.match(topBarSource, /Coin AI - Canvas/);
   assert.match(topBarSource, /<ThemeSwitcher \/>/);
@@ -1973,12 +1973,28 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
     new URL("../src/components/panels/ResultsPanel.tsx", import.meta.url),
     "utf8",
   );
+  // 2026-09-25：卡片与「结果详情」弹窗共用同一套动作实现，避免两处漂移。
+  const resultActionsSource = fs.readFileSync(
+    new URL("../src/lib/resultActions.ts", import.meta.url),
+    "utf8",
+  );
+  const resultDetailDialogSource = fs.readFileSync(
+    new URL("../src/components/panels/ResultDetailDialog.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\}`\}/);
   assert.match(resultsPanelSource, /aria-label=\{`\$\{compareIds\.includes\(r\.id\) \? "取消" : "加入"\}对比 \$\{r\.nodeLabel\}`\}/);
   assert.match(resultsPanelSource, /href=\{r\.image\}[\s\S]*download/);
   assert.match(resultsPanelSource, /aria-label=\{`将 \$\{r\.nodeLabel\} 设为输入，继续处理`\}/);
-  assert.match(resultsPanelSource, /state\.addAssetNode\(\s*\{ name: r\.nodeLabel, image: r\.image \}/);
-  assert.match(resultsPanelSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
+  // 「设为输入」的写回与落点引导在共享模块里，卡片只负责触发。
+  assert.match(resultActionsSource, /state\.addAssetNode\(\s*\{ name: result\.nodeLabel, image: result\.image \}/);
+  assert.match(resultActionsSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
+  // 结果详情弹窗必须保留同一组结果能力（查看大图 / 对比 / 下载 / 设为输入）。
+  assert.match(resultDetailDialogSource, /from "@\/lib\/resultActions"/);
+  assert.match(resultDetailDialogSource, /openResultViewer\(record\)/);
+  assert.match(resultDetailDialogSource, /设为输入/);
+  assert.match(resultDetailDialogSource, /下载/);
+  assert.doesNotMatch(resultsPanelSource, /openViewer/, "卡片本身不再直接打开查看器，改由详情弹窗进入");
   assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
   assert.match(resultsPanelSource, /r\.status !== "success"/);
   assert.match(resultsPanelSource, /grid-cols-2/);

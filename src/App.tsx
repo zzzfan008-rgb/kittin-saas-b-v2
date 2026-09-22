@@ -19,8 +19,6 @@ import {
 import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
-import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
-import { ContextPanel } from "@/components/panels/ContextPanel";
 import { ResultsFab } from "@/components/panels/ResultsFab";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { EmptyCanvasCTA } from "@/components/EmptyCanvasCTA";
@@ -384,10 +382,7 @@ function Workspace() {
           )}
         </div>
       )}
-      <WorkbenchShell
-        library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
-        inspector={<ContextPanel className="h-full w-full" />}
-      >
+      <WorkbenchShell>
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {workspaceEmpty ? (
             <EmptyWorkspaceCTA />

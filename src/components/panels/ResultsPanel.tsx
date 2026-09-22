@@ -1,7 +1,6 @@
 import {
   selectActiveCompareIds,
   selectActiveSelectedResultId,
-  selectActiveNodes,
   useFlowStore,
 } from "@/store/flowStore";
 import { OPEN_COMPARE_EVENT } from "@/lib/overlayEvents";
@@ -9,20 +8,23 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
-import { requestCanvasLanding } from "@/lib/canvasLanding";
+import { continueWithResult } from "@/lib/resultActions";
 
 interface ResultsPanelProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  /** 点单个结果时打开「结果详情」弹窗（浮层与弹窗都由 ResultsFab 承载）。 */
+  onOpenDetail: (resultId: string) => void;
   className?: string;
 }
 
-/** 左侧上下文 Dock 中的跨项目结果与运行记录。 */
+/** 「历史创作记录」浮层里的跨项目结果列表（3 列缩略图，可继续加载）。 */
 export function ResultsPanel({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
+  onOpenDetail,
   className,
 }: ResultsPanelProps) {
   // 生成历史是跨项目的全局记录；即使项目页签未恢复，也必须能在刷新后找回。
@@ -31,7 +33,6 @@ export function ResultsPanel({
   const setSelectedResultId = useFlowStore((s) => s.setSelectedResultId);
   const compareIds = useFlowStore(selectActiveCompareIds);
   const toggleCompareId = useFlowStore((s) => s.toggleCompareId);
-  const openViewer = useFlowStore((s) => s.openViewer);
   const activeTabReadOnly = useFlowStore(
     (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
   );
@@ -39,30 +40,10 @@ export function ResultsPanel({
   const resultActionClass =
     "rounded-sm px-1 py-1 text-[11px] font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
-  const viewResult = (r: (typeof recentResults)[number]) => {
+  // 点单个结果 = 打开「结果详情」弹窗（不再直接开图片查看器；查看器由弹窗里的大图进入）。
+  const openDetail = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
-    openViewer({
-      url: r.image,
-      resultId: r.id,
-      title: r.nodeLabel,
-      prompt: r.prompt,
-      meta: `${r.model ?? ""} · ${(((r.finishedAt ?? r.startedAt) - r.startedAt) / 1000).toFixed(1)}s · ${new Date(r.finishedAt ?? r.startedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`,
-    });
-  };
-
-  const continueWithResult = (r: (typeof recentResults)[number]) => {
-    const state = useFlowStore.getState();
-    const tab = state.tabs.find((item) => item.id === state.activeTabId);
-    if (!tab || tab.readOnly) return;
-    const nodes = selectActiveNodes(state);
-    const minX = Math.min(0, ...nodes.map((node) => node.position.x));
-    const nodeId = state.addAssetNode(
-      { name: r.nodeLabel, image: r.image },
-      { x: minX - 320, y: nodes.length * 40 },
-    );
-    if (nodeId) {
-      requestCanvasLanding({ tabId: tab.id, nodeId, fitView: false });
-    }
+    onOpenDetail(r.id);
   };
 
   return (
@@ -156,7 +137,7 @@ export function ResultsPanel({
                         if (e.ctrlKey || e.metaKey) {
                           toggleCompareId(r.id);
                         } else {
-                          viewResult(r);
+                          openDetail(r);
                         }
                       }}
                       aria-label={`查看 ${r.nodeLabel}`}
@@ -180,11 +161,11 @@ export function ResultsPanel({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          viewResult(r);
+                          openDetail(r);
                         }}
                         className={resultActionClass}
                         aria-label={`查看 ${r.nodeLabel}`}
-                        title="查看"
+                        title="查看详情"
                       >
                         查看
                       </button>

@@ -1,8 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
-  useReducer,
   useRef,
   useState,
   type ReactNode,
@@ -17,12 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import {
-  INITIAL_WORKBENCH_UI_STATE,
-  workbenchUiReducer,
-} from "./workbenchState";
-import { dockWidthChange, emitDockViewportWillChange } from "@/lib/dockViewport";
-import { addCanvasNode } from "@/components/panels/NodeLibraryPanel";
+import { addCanvasNode } from "@/components/panels/canvasNodeActions";
 import {
   WORKFLOW_MENU_MAPPING,
 } from "@/lib/workflowMenuMapping";
@@ -38,12 +31,7 @@ import {
   type RailMenuItem,
 } from "./railConfig";
 
-const LIBRARY_PANEL_ID = "workbench-library-panel";
-const INSPECTOR_PANEL_ID = "workbench-inspector-panel";
-
 interface WorkbenchShellProps {
-  library: ReactNode;
-  inspector: ReactNode;
   children: ReactNode;
 }
 
@@ -102,14 +90,10 @@ function WorkflowMenu({
 function RailTool({
   entry,
   primary,
-  activePanelOpen,
-  onOpenPanel,
   onSelectItem,
 }: {
   entry: RailEntry;
   primary?: boolean;
-  activePanelOpen: boolean;
-  onOpenPanel: (panel: "library" | "inspector") => void;
   onSelectItem: (entry: RailEntry, item: RailMenuItem) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -134,10 +118,6 @@ function RailTool({
   const keepOpen = () => clearTimers();
 
   const handleClick = () => {
-    if (entry.panel) {
-      onOpenPanel(entry.panel);
-      return;
-    }
     if (!hasMenu) {
       // 无菜单工具入口（AI 画板）：功能映射待定义
       return;
@@ -150,16 +130,15 @@ function RailTool({
       type="button"
       variant="ghost"
       aria-haspopup={hasMenu ? "menu" : undefined}
-      aria-expanded={hasMenu ? open : entry.panel ? activePanelOpen : undefined}
-      aria-controls={entry.panel === "inspector" ? INSPECTOR_PANEL_ID : undefined}
+      aria-expanded={hasMenu ? open : undefined}
       aria-label={entry.label}
       onClick={handleClick}
       className={cn(
         "relative h-10 w-10 rounded-xl text-[var(--gc-text-muted)] transition-colors duration-150",
         "hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]",
         "focus-visible:outline-2 focus-visible:outline-[var(--gc-accent)] focus-visible:outline-offset-2",
-        // 二级菜单展开或面板打开时，图标保持点亮（与 hover 同色）。
-        (open || (entry.panel !== undefined && activePanelOpen)) &&
+        // 二级菜单展开时图标保持点亮（与 hover 同色）。
+        open &&
           "bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)]",
         primary &&
           "h-10 w-10 rounded-full bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)] shadow-[0_3px_10px_color-mix(in_srgb,var(--gc-accent)_35%,transparent)] hover:bg-[var(--gc-accent)]",
@@ -257,35 +236,15 @@ function HistoryRail() {
 
 /**
  * 桌面工作台保持同一棵中心内容树。左侧悬浮胶囊入口（6 工作流 + 历史组），
- * 面板开合不覆盖画布，也不重建 React Flow、节点库或 Results 业务子树。
+ * 任一入口的开合都不覆盖画布，也不重建 React Flow 或 Results 业务子树。
+ *
+ * 2026-09-25 决策：左侧 Dock（节点库 / 属性）与它的「属性 / 结果」入口已整体移除，
+ * 因此这里不再有面板状态、也不再有 Dock 宽度变化事件。
  */
-export function WorkbenchShell({ library, inspector, children }: WorkbenchShellProps) {
-  const [state, dispatch] = useReducer(workbenchUiReducer, INITIAL_WORKBENCH_UI_STATE);
+export function WorkbenchShell({ children }: WorkbenchShellProps) {
   // 用户 2026-09-25 决策 4：没有打开任何页签时（刚登录 / 关掉全部页签），
-  // 工具栏与 Dock 都不显示，画布区由 EmptyWorkspaceCTA 的「新建 / 打开」引导接管。
+  // 工具栏不显示，画布区由 EmptyWorkspaceCTA 的「新建 / 打开」引导接管。
   const workspaceEmpty = useFlowStore((s) => s.tabs.length === 0);
-  const libraryOpen = state.activePanel === "library";
-  const inspectorOpen = state.activePanel === "inspector";
-  const panelOpen = state.activePanel !== null;
-  const previousPanelOpenRef = useRef<boolean | null>(null);
-
-  useLayoutEffect(() => {
-    const previousPanelOpen = previousPanelOpenRef.current;
-    if (previousPanelOpen === null) {
-      previousPanelOpenRef.current = panelOpen;
-      return;
-    }
-    if (previousPanelOpen !== panelOpen) {
-      emitDockViewportWillChange({
-        widthDelta: dockWidthChange(previousPanelOpen, panelOpen),
-      });
-    }
-    previousPanelOpenRef.current = panelOpen;
-  }, [panelOpen]);
-
-  const openPanel = useCallback((panel: "library" | "inspector") => {
-    dispatch({ type: "toggle-panel", panel });
-  }, []);
 
   const [workflowStatus, setWorkflowStatus] = useState<{
     kind: "loading" | "pending" | "error";
@@ -355,19 +314,16 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
         {!workspaceEmpty && (
         <nav
           aria-label="工作台左侧工具"
-          className="absolute left-4 top-4 z-40 flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] transition-[left] duration-200 motion-reduce:transition-none"
-          style={{ left: panelOpen ? "21rem" : undefined }}
+          className="absolute left-4 top-4 z-40 flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] motion-reduce:transition-none"
         >
           {RAIL_ENTRIES.map((entry, index) => (
             <div key={entry.id} className="contents">
-              {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4 | 5) && (
+              {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4) && (
                 <span role="separator" className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]" />
               )}
               <RailTool
                 entry={entry}
                 primary={index === 0}
-                activePanelOpen={entry.panel === "inspector" ? inspectorOpen : false}
-                onOpenPanel={openPanel}
                 onSelectItem={handleSelectItem}
               />
             </div>
@@ -375,46 +331,6 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
           {/* 撤销/重做：固定在工具胶囊底部，与上方工具条以分隔线隔开。 */}
           <HistoryRail />
         </nav>
-        )}
-
-        {/* 左侧 Dock 面板（节点库 / 属性）：空工作区（无页签）隐藏 */}
-        {!workspaceEmpty && (
-        <aside
-          aria-label="工作台左侧面板"
-          aria-hidden={!panelOpen}
-          inert={!panelOpen}
-          className={cn(
-            "gc-panel relative z-30 flex w-0 shrink-0 overflow-hidden bg-[var(--gc-panel)] transition-[width,visibility] duration-200 motion-reduce:transition-none",
-            panelOpen ? "visible w-80 border-r border-[var(--gc-border)]" : "invisible w-0 border-r-0",
-          )}
-        >
-          <div className="relative h-full min-h-0 w-80 shrink-0">
-            <section
-              id={LIBRARY_PANEL_ID}
-              aria-label="节点库"
-              aria-hidden={!libraryOpen}
-              inert={!libraryOpen}
-              className={cn(
-                "absolute inset-0 flex min-h-0 transition-[opacity,visibility] duration-150 motion-reduce:transition-none",
-                libraryOpen ? "visible opacity-100" : "invisible opacity-0",
-              )}
-            >
-              {library}
-            </section>
-            <section
-              id={INSPECTOR_PANEL_ID}
-              aria-label="属性 / 结果"
-              aria-hidden={!inspectorOpen}
-              inert={!inspectorOpen}
-              className={cn(
-                "absolute inset-0 flex min-h-0 transition-[opacity,visibility] duration-150 motion-reduce:transition-none",
-                inspectorOpen ? "visible opacity-100" : "invisible opacity-0",
-              )}
-            >
-              {inspector}
-            </section>
-          </div>
-        </aside>
         )}
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

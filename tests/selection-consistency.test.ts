@@ -388,12 +388,13 @@ test("复制读取 canonical 多选集合，属性面板保持 primary selector"
   assert.equal(inspectorNodeId, "a", "Inspector selector 必须指向最后增选的节点");
 
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-  const inspectorSource = fs.readFileSync(
-    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+  // 属性面板随左侧 Dock 删除后，主选中节点的唯一消费者是画布节点新建动作。
+  const canvasNodeActionsSource = fs.readFileSync(
+    new URL("../src/components/panels/canvasNodeActions.ts", import.meta.url),
     "utf8",
   );
   assert.match(appSource, /selectActiveSelectedNodeIds/);
-  assert.match(inspectorSource, /useFlowStore\(selectActivePrimarySelectedNodeId\)/);
+  assert.match(canvasNodeActionsSource, /selectActivePrimarySelectedNodeId/);
   assert.doesNotMatch(appSource, /getState\(\)\.selectedNodeId/);
 });
 
