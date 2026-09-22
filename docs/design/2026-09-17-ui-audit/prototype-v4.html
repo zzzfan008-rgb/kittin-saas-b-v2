@@ -14,7 +14,7 @@
 :root, [data-theme="obsidian"] {
   --gc-canvas:#16181d; --gc-shell:#1a1c22; --gc-panel:#21242a; --gc-panel-hover:#2b2f36;
   --gc-control:#1e2126; --gc-text:#e8eaee; --gc-text-muted:#9ba1a9;
-  --gc-border:#33373f; --gc-border-strong:#454a53;
+  --gc-border:#33373f; --gc-border-strong:#454a53; --gc-edge-label-border:#6b7280;
   --gc-accent:#B7F35A; --gc-accent-ink:#131313;
   --node-card:#ffffff; --node-inner:#f2f3f5; --node-inner-hover:#e9eaee;
   --node-divider:#e4e6ea; --node-text:#1d1d1f; --node-muted:#6b7075;
@@ -31,7 +31,7 @@
 [data-theme="apple"] {
   --gc-canvas:#f5f5f7; --gc-shell:#f5f5f7; --gc-panel:rgba(255,255,255,.72);
   --gc-panel-hover:#e8e8ed; --gc-control:#ffffff; --gc-text:#1d1d1f; --gc-text-muted:#6e6e73;
-  --gc-border:rgba(0,0,0,.08); --gc-border-strong:rgba(0,0,0,.16);
+  --gc-border:rgba(0,0,0,.08); --gc-border-strong:rgba(0,0,0,.42); --gc-edge-label-border:rgba(0,0,0,.42);
   --gc-accent:#0071e3; --gc-accent-ink:#ffffff;
   --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
   --node-card:#ffffff; --node-inner:#f5f5f7; --node-inner-hover:#ececf0;
@@ -48,7 +48,7 @@
 [data-theme="eye"] {
   --gc-canvas:#E9F1EA; --gc-shell:#EDF4EE; --gc-panel:#ffffff; --gc-panel-hover:#DCE9DD;
   --gc-control:#f4f9f5; --gc-text:#123B2B; --gc-text-muted:#47685A;
-  --gc-border:#c9dccc; --gc-border-strong:#a8c2ac;
+  --gc-border:#c9dccc; --gc-border-strong:#a8c2ac; --gc-edge-label-border:rgba(0,0,0,.45);
   --gc-accent:#0B7A43; --gc-accent-ink:#ffffff;
   --gc-cta-bg:#166534; --gc-cta-ink:#ffffff;
   --node-card:#ffffff; --node-inner:#f0f6f1; --node-inner-hover:#e5efe7;
@@ -173,7 +173,7 @@ section{margin-top:80px}
 .edge-label{position:absolute;transform:translate(-50%,-50%);
   font-size:10px;font-family:var(--mono);letter-spacing:.06em;font-weight:500;
   color:var(--board-ink);background:var(--gc-panel);
-  padding:3px 8px;border-radius:980px;border:1.5px solid var(--gc-border-strong);
+  padding:3px 8px;border-radius:980px;border:1px solid var(--gc-edge-label-border);
   pointer-events:none;white-space:nowrap}
 
 [data-theme="apple"] .run.running{background:#e8f5ec;color:#166534;border:1px solid #bfe3cc}
