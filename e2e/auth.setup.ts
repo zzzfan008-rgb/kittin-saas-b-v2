@@ -125,7 +125,8 @@ setup("create an authenticated desktop session on a persisted v8 project", async
   await expect(tutorial).toBeHidden();
   await page.reload();
   await expect(tutorial).toBeHidden();
-  await expect(page.getByRole("navigation", { name: "工作台左侧工具" })).toBeVisible();
+  // 2026-09-25 登录语义（决策 4）：冷启动 0 页签 → 首屏是「空工作区」引导（无画布、无工具栏）。
+  await expect(page.getByRole("region", { name: "空工作区" })).toBeVisible();
 
   // 回到规范起点：清页面会话里的项目页签，并遮住正式项目列表，避免脏库里上一次运行的
   // 项目被启动流程恢复出来（「空态不落库」的断言前提）。
@@ -138,13 +139,15 @@ setup("create an authenticated desktop session on a persisted v8 project", async
     await route.fulfill({ json: [] });
   });
   await page.reload();
-  await expect(page.getByRole("navigation", { name: "工作台左侧工具" })).toBeVisible();
+  const emptyGuide = page.getByRole("region", { name: "空工作区" });
+  await expect(emptyGuide).toBeVisible();
 
-  // ---------- ① 空首屏：本地空 tab，登录态此时还没有任何服务端项目 ----------
+  // ---------- ① 空首屏：从空工作区新建的本地空 tab，登录态此时还没有任何服务端项目 ----------
   const canvas = page.getByRole("application", { name: "工作流画布" });
   const nodes = page.locator(".react-flow__node");
   const edges = page.locator(".react-flow__edge");
   const emptyCta = page.getByRole("region", { name: "开始创作" });
+  await emptyGuide.getByRole("button", { name: "新建项目" }).click();
   await expect(canvas).toBeVisible();
   await expect(emptyCta).toBeVisible();
   await expect(emptyCta.getByRole("button", { name: "上传图片开始" })).toBeVisible();

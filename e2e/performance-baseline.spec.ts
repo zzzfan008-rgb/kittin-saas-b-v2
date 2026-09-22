@@ -25,6 +25,10 @@ function summarize(values: readonly number[]) {
 
 test("capture 100-node desktop render latency and browser memory", async ({ page }) => {
   await page.goto("/");
+  // 2026-09-25 登录语义（决策 4）：冷启动 0 页签 → 「空工作区」引导；先建一个本地空白页签。
+  const emptyGuide = page.getByRole("region", { name: "空工作区" });
+  await expect(emptyGuide).toBeVisible();
+  await emptyGuide.getByRole("button", { name: "新建项目" }).click();
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
 
   const nodeCount = 100;
