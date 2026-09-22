@@ -36,11 +36,6 @@ import {
 } from "@/lib/canvasLanding";
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { detectDesktopShortcutPlatform } from "@/lib/keyboardShortcuts";
-import {
-  DOCK_VIEWPORT_WILL_CHANGE_EVENT,
-  shiftViewportForWidthChange,
-  type DockViewportWillChangeDetail,
-} from "@/lib/dockViewport";
 import { isNativeActivationTarget } from "@/lib/keyboardActivation";
 
 export const DND_MIME = "application/garment-node";
@@ -220,20 +215,6 @@ export function CanvasFlow() {
   const canvasSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pendingResizeDeltaRef = useRef({ width: 0, height: 0 });
   const resizeFrameRef = useRef<number | null>(null);
-  /**
-   * Dock 开合期间锚定的「画布中心世界坐标」。在 CSS 宽度过渡的若干帧内逐帧
-   * 把视口拉回该中心，对过渡帧、React Flow 内部重新同步都幂等，确保几何在
-   * 切换后确定性收敛（R-80 R2）。
-   */
-  const centerAnchorRef = useRef<{
-    x: number;
-    targetWidth: number;
-    expiresAt: number;
-    stableFrames: number;
-    /** ResizeObserver 是否已送达目标宽度；防止锚定退出后迟到的 RO 重复补偿。 */
-    observerSawTarget: boolean;
-  } | null>(null);
-  const anchorFrameRef = useRef<number | null>(null);
   const dragTransactionRef = useRef<DragHistoryTransactionRef>({
     current: null,
     startedAt: null,
@@ -288,8 +269,6 @@ export function CanvasFlow() {
 
     // 锚定存活期间（含等待 ResizeObserver 送达目标宽度的收尾阶段），宽度增量
     // 统一交给逐帧锚定循环处理，避免双重补偿；高度增量仍走常规 rAF 补偿。
-    const anchorActive = () => centerAnchorRef.current !== null;
-
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const nextSize = {
@@ -302,18 +281,7 @@ export function CanvasFlow() {
       canvasSizeRef.current = nextSize;
       if (!previousSize) return;
 
-      const suppressWidth = anchorActive();
-      if (
-        suppressWidth &&
-        centerAnchorRef.current &&
-        Math.abs(nextSize.width - centerAnchorRef.current.targetWidth) <= 1
-      ) {
-        // 目标宽度已被 ResizeObserver 观测到：迟到的宽度通知不会再重复补偿。
-        centerAnchorRef.current.observerSawTarget = true;
-      }
-      pendingResizeDeltaRef.current.width += suppressWidth
-        ? 0
-        : nextSize.width - previousSize.width;
+      pendingResizeDeltaRef.current.width += nextSize.width - previousSize.width;
       pendingResizeDeltaRef.current.height += nextSize.height - previousSize.height;
       // ResizeObserver 在绘制前触发；同步提交补偿，避免旧实现延到下一帧后正好
       // 落在后续测试/用户第一次拖拽读取视口的窗口里（R-80 R2）。
@@ -332,108 +300,15 @@ export function CanvasFlow() {
           zoom: viewport.zoom,
         });
       }
-      // panZoom 自己的 pane ResizeObserver 会先刷新 d3 extent；这里收到目标宽度后
-      // 立刻重放锚定矩阵，不能再等下一帧（Playwright/用户可能在绘制前读取视口）。
-      if (
-        suppressWidth &&
-        centerAnchorRef.current &&
-        Math.abs(nextSize.width - centerAnchorRef.current.targetWidth) <= 1
-      ) {
-        enforceAnchor();
-      }
     });
 
-    /**
-     * R-80 R2：Dock 开合当拍锁定「画布中心对应的世界坐标」，随后逐帧校验实际
-     * 视口矩阵并把 x 拉回该中心，直到容器宽度到位且矩阵连续两帧正确。只写 x
-     * （Dock 只改宽度），zoom 沿用当前矩阵；用户以中心缩放时 desiredX 与当前
-     * e 天然相等，不会与 zoomTo/panZoom 抢写。
-     */
-    const enforceAnchor = () => {
-      anchorFrameRef.current = null;
-      const anchor = centerAnchorRef.current;
-      if (!anchor) return;
-      const expired = performance.now() >= anchor.expiresAt;
-      const rectWidth = container.getBoundingClientRect().width;
-      const settled = Math.abs(rectWidth - anchor.targetWidth) <= 1;
-
-      const viewportElement = container.querySelector<HTMLElement>(".react-flow__viewport");
-      let matrixCorrect = true;
-      if (viewportElement) {
-        const matrix = new DOMMatrixReadOnly(getComputedStyle(viewportElement).transform);
-        const desiredX = rectWidth / 2 - anchor.x * matrix.a;
-        if (Math.abs(matrix.e - desiredX) > 0.5) {
-          matrixCorrect = false;
-          anchor.stableFrames = 0;
-          const viewport = getViewport();
-          applyViewport({ x: desiredX, y: viewport.y, zoom: viewport.zoom });
-        }
-      }
-
-      if (matrixCorrect && settled) anchor.stableFrames += 1;
-      // 必须等 ResizeObserver 也送达目标宽度再退出，否则迟到的 RO 会二次补偿。
-      const done = settled && anchor.stableFrames >= 2 && anchor.observerSawTarget;
-      if (!expired && !done) {
-        anchorFrameRef.current = requestAnimationFrame(enforceAnchor);
-      } else {
-        centerAnchorRef.current = null;
-      }
-    };
-
-    const onDockWillChange = (event: Event) => {
-      const detail = (event as CustomEvent<DockViewportWillChangeDetail>).detail;
-      const widthDelta = detail?.widthDelta ?? 0;
-      if (widthDelta === 0) return;
-      const rect = container.getBoundingClientRect();
-      const viewport = getViewport();
-      console.log("R80DBG5 event " + JSON.stringify({ widthDelta, width: rect.width, viewport }));
-      const shifted = shiftViewportForWidthChange(viewport, widthDelta);
-      const existing = centerAnchorRef.current;
-      const anchor = {
-        x:
-          existing && performance.now() < existing.expiresAt
-            ? existing.x
-            : (rect.width / 2 - shifted.x) / viewport.zoom,
-        targetWidth: rect.width,
-        expiresAt: performance.now() + 600,
-        stableFrames: 0,
-        observerSawTarget: false,
-      };
-      centerAnchorRef.current = anchor;
-      const applied = applyViewport(shifted);
-      // panZoom 尚未就绪（挂载首帧）时锚定循环也无法改写 DOM，交给常规补偿。
-      if (!applied) centerAnchorRef.current = null;
-      // 废弃任何按旧基线排队的常规补偿，防止与锚定循环叠加。
-      pendingResizeDeltaRef.current = { width: 0, height: 0 };
-      if (resizeFrameRef.current !== null) {
-        cancelAnimationFrame(resizeFrameRef.current);
-        resizeFrameRef.current = null;
-      }
-      if (anchorFrameRef.current !== null) cancelAnimationFrame(anchorFrameRef.current);
-      anchorFrameRef.current = requestAnimationFrame(enforceAnchor);
-    };
-    window.addEventListener(DOCK_VIEWPORT_WILL_CHANGE_EVENT, onDockWillChange);
-
     observer.observe(container);
-    const dbgProbe = window.setInterval(() => {
-      const el = document.querySelector<HTMLElement>('[role="application"][aria-label="工作流画布"]');
-      const vp = el?.querySelector<HTMLElement>(".react-flow__viewport");
-      if (!el || !vp) return;
-      const r = el.getBoundingClientRect();
-      const m = new DOMMatrixReadOnly(getComputedStyle(vp).transform);
-      console.log("R80DBG5 probe " + JSON.stringify({ w: r.width, x: m.e, z: m.a, cx: r.width / 2 - m.e }));
-    }, 100);
     return () => {
-      window.clearInterval(dbgProbe);
       observer.disconnect();
-      window.removeEventListener(DOCK_VIEWPORT_WILL_CHANGE_EVENT, onDockWillChange);
       if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-      if (anchorFrameRef.current !== null) cancelAnimationFrame(anchorFrameRef.current);
       resizeFrameRef.current = null;
-      anchorFrameRef.current = null;
       canvasSizeRef.current = null;
       pendingResizeDeltaRef.current = { width: 0, height: 0 };
-      centerAnchorRef.current = null;
     };
   }, [getViewport, setViewport, reactFlowStore]);
 
