@@ -19,6 +19,31 @@ import pg from "pg";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
+/**
+ * 解析本机 .env 路径：优先当前工作区（worktree）根目录的 .env；
+ * worktree 通常不持有私有 .env，则回退到主工作树（git common dir 的父目录）的 .env。
+ *
+ * 这样无论从主仓还是任意 worktree 起测试，读取的都是同一份本机 PostgreSQL 配置；
+ * 配合库级全局锁，跨 worktree 不会再因各自推导到同一库而互相 reset。
+ */
+function defaultDotEnvPath() {
+  const localEnv = join(repositoryRoot, ".env");
+  if (existsSync(localEnv)) return localEnv;
+  try {
+    const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      encoding: "utf8",
+      cwd: repositoryRoot,
+    });
+    if (result.status === 0) {
+      const mainWorktreeEnv = join(resolve(result.stdout.trim(), ".."), ".env");
+      if (existsSync(mainWorktreeEnv)) return mainWorktreeEnv;
+    }
+  } catch {
+    // git 不可用时退回默认路径，由后续逻辑给出明确报错
+  }
+  return localEnv;
+}
+
 const LOCAL_DATABASE_HOSTS = new Set(["127.0.0.1", "localhost"]);
 const { Client } = pg;
 
@@ -26,6 +51,25 @@ const { Client } = pg;
 export function createComposeProjectName({ cwd = process.cwd() } = {}) {
   const worktreeId = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 10);
   return `garment-canvas-test-${worktreeId}`;
+}
+
+/**
+ * 库级互斥锁名：按「主机:端口:库名」派生，与 worktree 无关。
+ *
+ * 同一台机器上，只要两个运行解析到同一个测试库，就必须竞争同一把锁——
+ * 无论它们来自主仓还是任意 worktree。不同的库各自独立，互不阻塞。
+ */
+export function createDatabaseLockName({ databaseUrl } = {}) {
+  if (!databaseUrl) throw new Error("A database URL is required for the database lock name");
+  const parsed = new URL(databaseUrl);
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+  const identity = `${parsed.hostname}:${parsed.port || "5432"}:${databaseName}`;
+  const databaseId = createHash("sha256").update(identity).digest("hex").slice(0, 16);
+  return `garment-canvas-db-${databaseId}`;
+}
+
+function sleep(ms) {
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
 function processIsActive(pid) {
@@ -38,16 +82,24 @@ function processIsActive(pid) {
   }
 }
 
-export function acquireTestLock({
+export async function acquireTestLock({
   projectName,
   pid = process.pid,
   lockRoot = tmpdir(),
   isProcessActive = processIsActive,
+  waitTimeoutMs = 0,
+  pollIntervalMs = 500,
+  sleepFn = sleep,
 } = {}) {
-  if (!projectName) throw new Error("A Compose project name is required for the test lock");
+  if (!projectName) throw new Error("A lock project name is required for the test lock");
+  if (!Number.isSafeInteger(waitTimeoutMs) || waitTimeoutMs < 0) {
+    throw new Error(`waitTimeoutMs must be a non-negative safe integer, got ${String(waitTimeoutMs)}`);
+  }
   const lockPath = join(lockRoot, `${projectName}.lock`);
+  const deadline = Date.now() + waitTimeoutMs;
+  let ownerPid;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (;;) {
     let descriptor;
     try {
       descriptor = openSync(lockPath, "wx", 0o600);
@@ -74,25 +126,30 @@ export function acquireTestLock({
       }
       if (error?.code !== "EEXIST") throw error;
 
-      let ownerPid;
       try {
         ownerPid = Number.parseInt(readFileSync(lockPath, "utf8").trim(), 10);
       } catch (readError) {
         if (readError?.code === "ENOENT") continue;
         throw readError;
       }
-      if (isProcessActive(ownerPid)) {
-        throw new Error(`Another PostgreSQL test run is active for this worktree (pid ${ownerPid})`);
+      // 持锁进程已死（崩溃残留锁）：立即接管，不等待。
+      if (!isProcessActive(ownerPid)) {
+        try {
+          unlinkSync(lockPath);
+        } catch (unlinkError) {
+          if (unlinkError?.code !== "ENOENT") throw unlinkError;
+        }
+        continue;
       }
-      try {
-        unlinkSync(lockPath);
-      } catch (unlinkError) {
-        if (unlinkError?.code !== "ENOENT") throw unlinkError;
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Another PostgreSQL test run is active for the same database (lock ${projectName}, pid ${ownerPid}); ` +
+            `waited ${waitTimeoutMs}ms`,
+        );
       }
+      await sleepFn(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
     }
   }
-
-  throw new Error(`Unable to acquire PostgreSQL test lock: ${lockPath}`);
 }
 
 /**
@@ -164,7 +221,7 @@ export function validateTestDatabaseUrl(value, source) {
  * 解析本次运行要使用的隔离测试库连接串。
  * 优先级：显式 DATABASE_URL / GARMENT_CANVAS_TEST_DATABASE_URL > .env 推导（库名追加 _test）。
  */
-export function resolveTestDatabaseUrl(env = process.env, { dotEnvPath = join(repositoryRoot, ".env") } = {}) {
+export function resolveTestDatabaseUrl(env = process.env, { dotEnvPath = defaultDotEnvPath() } = {}) {
   const explicit = (env.DATABASE_URL ?? "").trim() || (env.GARMENT_CANVAS_TEST_DATABASE_URL ?? "").trim();
   if (explicit) return validateTestDatabaseUrl(explicit, "DATABASE_URL");
 
@@ -265,10 +322,21 @@ function runFocusedTests(testFiles, env) {
   }
 }
 
+function lockWaitTimeoutMs() {
+  const raw = (process.env.TEST_DB_LOCK_WAIT_MS ?? "").trim();
+  if (!raw) return 600_000;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`TEST_DB_LOCK_WAIT_MS 必须是 >= 0 的整数，当前为 ${JSON.stringify(raw)}`);
+  }
+  return value;
+}
+
 async function main() {
   const focusedTestFiles = resolveRequestedTestFiles(process.argv.slice(2));
-  const runId = createComposeProjectName();
-  const releaseLock = acquireTestLock({ projectName: runId });
+  const databaseUrl = resolveTestDatabaseUrl();
+  const lockName = createDatabaseLockName({ databaseUrl });
+  const releaseLock = await acquireTestLock({ projectName: lockName, waitTimeoutMs: lockWaitTimeoutMs() });
   let cleanupDone = false;
 
   const cleanup = () => {
@@ -289,7 +357,6 @@ async function main() {
   process.once("SIGTERM", () => terminate("SIGTERM"));
 
   try {
-    const databaseUrl = resolveTestDatabaseUrl();
     await assertTestDatabaseReachable(databaseUrl);
     const testEnv = { ...process.env, DATABASE_URL: databaseUrl };
     if (focusedTestFiles.length > 0) runFocusedTests(focusedTestFiles, testEnv);

@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   acquireTestLock,
   createComposeProjectName,
+  createDatabaseLockName,
   resolveRequestedTestFiles,
   resolveTestDatabaseUrl,
   validateTestDatabaseUrl,
@@ -49,6 +50,19 @@ const repeat = createComposeProjectName({ cwd: "/tmp/worktree-a" });
 assert.match(first, /^garment-canvas-test-[a-f0-9]{10}$/);
 assert.equal(first, repeat, "the same worktree must reuse its isolation lock name after a crash");
 assert.notEqual(first, second, "different worktrees must use different isolation lock names");
+
+// 库级锁名：同一数据库（无论来自哪个 worktree）必须映射到同一把锁；
+// 不同数据库各自独立。锁名不携带 worktree 信息，这是本次隔离修复的核心。
+const dbA = "postgresql://u:p@127.0.0.1:5432/garment_canvas_test";
+const dbADefaultPort = "postgresql://u:p@127.0.0.1/garment_canvas_test";
+const dbB = "postgresql://u:p@127.0.0.1:5432/garment_canvas_other_test";
+const dbC = "postgresql://u:p@127.0.0.1:5433/garment_canvas_test";
+const lockOfA = createDatabaseLockName({ databaseUrl: dbA });
+assert.match(lockOfA, /^garment-canvas-db-[a-f0-9]{16}$/);
+assert.equal(lockOfA, createDatabaseLockName({ databaseUrl: dbADefaultPort }));
+assert.notEqual(lockOfA, createDatabaseLockName({ databaseUrl: dbB }), "different database names must use different locks");
+assert.notEqual(lockOfA, createDatabaseLockName({ databaseUrl: dbC }), "different ports must use different locks");
+assert.throws(() => createDatabaseLockName({}), /database URL is required/);
 
 assert.deepEqual(
   resolveRequestedTestFiles(["tests/authorization.test.ts"], { repoRoot }),
@@ -152,21 +166,29 @@ try {
 const lockRoot = join(tmpdir(), `garment-canvas-lock-test-${process.pid}`);
 mkdirSync(lockRoot, { recursive: true });
 try {
-  const release = acquireTestLock({
+  const release = await acquireTestLock({
     projectName: first,
     lockRoot,
     isProcessActive: () => true,
   });
-  assert.throws(
-    () => acquireTestLock({ projectName: first, lockRoot, isProcessActive: () => true }),
-    /Another PostgreSQL test run is active/,
-    "a second run in the same worktree must fail before touching the shared isolated database",
+  await assert.rejects(
+    () =>
+      acquireTestLock({
+        projectName: first,
+        lockRoot,
+        isProcessActive: () => true,
+        waitTimeoutMs: 10,
+        pollIntervalMs: 5,
+        sleepFn: () => Promise.resolve(),
+      }),
+    /Another PostgreSQL test run is active for the same database/,
+    "a second run against the same database must wait and then fail instead of touching the shared database",
   );
   release();
 
   const staleLock = join(lockRoot, `${first}.lock`);
   writeFileSync(staleLock, "999999\n", "utf8");
-  const releaseAfterCrash = acquireTestLock({
+  const releaseAfterCrash = await acquireTestLock({
     projectName: first,
     lockRoot,
     isProcessActive: () => false,

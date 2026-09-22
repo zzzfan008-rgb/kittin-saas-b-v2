@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import {
   acquireTestLock,
   assertTestDatabaseReachable,
-  createComposeProjectName,
+  createDatabaseLockName,
   resetTestDatabase,
   resolveTestDatabaseUrl,
 } from "./test-with-postgres.mjs";
@@ -65,8 +65,9 @@ function runPlaywrightCommand(env) {
 
 async function main() {
   const shouldBuild = !process.argv.includes("--skip-build");
-  const runId = createComposeProjectName();
-  const releaseLock = acquireTestLock({ projectName: runId });
+  const databaseUrl = resolveTestDatabaseUrl();
+  const lockName = createDatabaseLockName({ databaseUrl });
+  const releaseLock = await acquireTestLock({ projectName: lockName, waitTimeoutMs: 600_000 });
   const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-prod-smoke-"));
   let cleanupDone = false;
 
@@ -89,7 +90,6 @@ async function main() {
   process.once("SIGTERM", handleTerminate);
 
   try {
-    const databaseUrl = resolveTestDatabaseUrl();
     await assertTestDatabaseReachable(databaseUrl);
     // 生产冒烟同样依赖 INITIAL_ADMIN_* 在无用户时引导管理员，需要 pristine 数据库。
     await resetTestDatabase(databaseUrl);
