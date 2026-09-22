@@ -184,6 +184,28 @@ try {
     /Another PostgreSQL test run is active for the same database/,
     "a second run against the same database must wait and then fail instead of touching the shared database",
   );
+
+  // 锁文件存在但 PID 不可读（winner open/write 之间的跨进程窗口）：
+  // 必须 fail closed 等待，绝不允许当成死锁接管。
+  const unreadableLock = join(lockRoot, `${second}.lock`);
+  writeFileSync(unreadableLock, "\n", "utf8");
+  await assert.rejects(
+    () =>
+      acquireTestLock({
+        projectName: second,
+        lockRoot,
+        isProcessActive: () => {
+          throw new Error("isProcessActive must not be consulted for an unreadable pid");
+        },
+        waitTimeoutMs: 5,
+        pollIntervalMs: 5,
+        sleepFn: () => Promise.resolve(),
+      }),
+    /unreadable owner pid/,
+    "an unreadable owner pid must be treated as an active owner, never as a stale lock",
+  );
+  rmSync(unreadableLock, { force: true });
+
   release();
 
   const staleLock = join(lockRoot, `${first}.lock`);

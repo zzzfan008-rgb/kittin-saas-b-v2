@@ -132,6 +132,18 @@ export async function acquireTestLock({
         if (readError?.code === "ENOENT") continue;
         throw readError;
       }
+      // 锁文件已存在但 PID 尚不可读（winner 刚 open 尚未 write，存在跨进程窗口）：
+      // 绝不能当作死锁接管——等待后重试，fail closed。
+      if (!Number.isSafeInteger(ownerPid) || ownerPid <= 0) {
+        if (Date.now() >= deadline) {
+          throw new Error(
+            `Another PostgreSQL test run is starting for the same database (lock ${projectName}, unreadable owner pid); ` +
+              `waited ${waitTimeoutMs}ms`,
+          );
+        }
+        await sleepFn(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
+        continue;
+      }
       // 持锁进程已死（崩溃残留锁）：立即接管，不等待。
       if (!isProcessActive(ownerPid)) {
         try {
