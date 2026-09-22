@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-background-swap",
+  "name": "更换背景",
+  "description": "上传人物或产品图，描述目标背景，生成换背景效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "background-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "目标背景描述",
+          "status": "idle",
+          "text": "【要求】描述目标背景"
+        }
+      },
+      {
+        "id": "subject",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "人物或产品图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "background-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "换背景生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-background-prompt",
+        "source": "background-requirement",
+        "target": "background-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-background-ref",
+        "source": "subject",
+        "target": "background-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

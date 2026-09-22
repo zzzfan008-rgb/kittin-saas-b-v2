@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-print-mutate",
+  "name": "印花裂变",
+  "description": "上传印花图，描述裂变方向与数量，生成风格一致的新变体",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "mutate-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "裂变方向/数量",
+          "status": "idle",
+          "text": "【要求】描述印花裂变的方向与数量"
+        }
+      },
+      {
+        "id": "print",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "印花图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "mutate-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "印花裂变",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 2
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-mutate-prompt",
+        "source": "mutate-requirement",
+        "target": "mutate-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-mutate-ref",
+        "source": "print",
+        "target": "mutate-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

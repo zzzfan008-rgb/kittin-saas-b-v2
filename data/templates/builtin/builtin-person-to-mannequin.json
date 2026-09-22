@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-person-to-mannequin",
+  "name": "真人转人台",
+  "description": "上传真人着装图，描述人台要求，生成人台展示效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "mannequin-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "人台要求",
+          "status": "idle",
+          "text": "【要求】描述人台与立裁要求"
+        }
+      },
+      {
+        "id": "person",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "真人着装图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "mannequin-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "转人台生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-mannequin-prompt",
+        "source": "mannequin-requirement",
+        "target": "mannequin-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-mannequin-ref",
+        "source": "person",
+        "target": "mannequin-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

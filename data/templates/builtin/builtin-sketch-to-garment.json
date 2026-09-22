@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-sketch-to-garment",
+  "name": "线稿图到服装",
+  "description": "上传线稿，描述面料、色彩与风格，生成服装渲染效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "sketch-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "面料/色彩/风格",
+          "status": "idle",
+          "text": "【要求】描述面料、色彩与风格"
+        }
+      },
+      {
+        "id": "sketch",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "线稿",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "sketch-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "线稿渲染",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-sketch-prompt",
+        "source": "sketch-requirement",
+        "target": "sketch-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-sketch-ref",
+        "source": "sketch",
+        "target": "sketch-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

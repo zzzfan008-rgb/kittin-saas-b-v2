@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-video-runway",
+  "name": "服装走秀",
+  "description": "上传服装或模特图，描述走秀、镜头与场景，生成走秀视频",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "runway-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "走秀/镜头/场景",
+          "status": "idle",
+          "text": "【要求】描述走秀动作、镜头与场景"
+        }
+      },
+      {
+        "id": "source",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装或模特图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "runway-gen",
+        "type": "video-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "video-generator",
+          "label": "走秀视频",
+          "status": "idle",
+          "promptVariantId": "video-animate.doubao-seedance-2-5-260628.edit.v1",
+          "modelId": "doubao-seedance-2-5-260628",
+          "modelOptions": {
+            "seconds": "5",
+            "resolution": "720p",
+            "aspectRatio": "adaptive"
+          },
+          "aspectRatio": "adaptive"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-runway-prompt",
+        "source": "runway-requirement",
+        "target": "runway-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-runway-first-frame",
+        "source": "source",
+        "target": "runway-gen",
+        "targetHandle": "first-frame",
+        "data": {}
+      }
+    ]
+  }
+}

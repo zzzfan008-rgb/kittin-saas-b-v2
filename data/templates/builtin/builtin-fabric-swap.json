@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-fabric-swap",
+  "name": "面料更换",
+  "description": "上传服装图与面料参考，描述面料说明，生成面料更换合成",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "fabric-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "面料说明",
+          "status": "idle",
+          "text": "【要求】描述目标面料的质感与说明"
+        }
+      },
+      {
+        "id": "garment",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "fabric",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 210
+        },
+        "data": {
+          "kind": "image",
+          "label": "面料参考",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "fabric-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": 20
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "面料更换合成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-fabric-prompt",
+        "source": "fabric-requirement",
+        "target": "fabric-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-fabric-garment",
+        "source": "garment",
+        "target": "fabric-gen",
+        "targetHandle": "reference",
+        "data": {}
+      },
+      {
+        "id": "e-fabric-ref",
+        "source": "fabric",
+        "target": "fabric-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

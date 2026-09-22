@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-video-xhs",
+  "name": "小红书视频",
+  "description": "上传主图，描述小红书脚本，生成小红书视频",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "xhs-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "小红书脚本",
+          "status": "idle",
+          "text": "【要求】描述小红书视频脚本"
+        }
+      },
+      {
+        "id": "main-image",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "主图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "xhs-gen",
+        "type": "video-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "video-generator",
+          "label": "小红书视频",
+          "status": "idle",
+          "promptVariantId": "video-animate.doubao-seedance-2-5-260628.edit.v1",
+          "modelId": "doubao-seedance-2-5-260628",
+          "modelOptions": {
+            "seconds": "5",
+            "resolution": "720p",
+            "aspectRatio": "adaptive"
+          },
+          "aspectRatio": "adaptive"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-xhs-prompt",
+        "source": "xhs-requirement",
+        "target": "xhs-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-xhs-first-frame",
+        "source": "main-image",
+        "target": "xhs-gen",
+        "targetHandle": "first-frame",
+        "data": {}
+      }
+    ]
+  }
+}
