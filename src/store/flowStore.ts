@@ -132,6 +132,13 @@ export interface RecentResult {
   parameters?: Record<string, unknown>;
   referenceImages?: string[];
   referenceInputs?: Array<ReferenceImageEvidence | HistoricalReferenceEvidence>;
+  /**
+   * 仅内存态：网络错误导致状态同步中断（runId 已知时）。
+   * 不进入 SSE 事件流 / 持久化文档 / DocumentSnapshot（纯 runtime 字段）。
+   * 由 resumeRecentResults / prepareNodeRun 中 consumeRunEvents 的网络错误触发，
+   * 成功同步后清除。
+   */
+  syncStalled?: boolean;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -2760,6 +2767,17 @@ export function recentResultsPatch(
 }
 
 /**
+ * 按 id 更新单条 RecentResult（保留其余字段，用于内存态字段如 syncStalled）。
+ */
+export function recentResultsUpdateById(
+  records: RecentResult[],
+  id: string,
+  patch: Partial<RecentResult>,
+): RecentResult[] {
+  return records.map((r) => r.id === id ? { ...r, ...patch } : r);
+}
+
+/**
  * 首屏历史确认后，用服务端仍在运行的记录恢复节点；会话里没有后端 Run 的
  * queued/running 属于刷新中断的孤儿状态，必须解除，避免页签永久卡死。
  */
@@ -3730,15 +3748,42 @@ export const useFlowStore = create<FlowState>()(
         } catch (err) {
           if (!terminalRecorded) {
             const message = err instanceof Error ? err.message : String(err);
-            const status: "retry_wait" | "outcome_unknown" | "error" = knownRunId
-              ? "retry_wait"
-              : err instanceof AmbiguousRunSubmissionError ? "outcome_unknown" : "error";
-            const safeMessage = knownRunId
-              ? `运行 ${knownRunId} 已创建，但状态同步中断：${message}；请刷新页面继续同步，勿重复提交`
-              : err instanceof AmbiguousRunSubmissionError
-                ? `${message}；再次点击会使用同一请求号安全确认，请勿新建重复任务`
-                : message;
-            const event: NodeStatusRunEvent = {
+            const isNetworkError =
+              err instanceof TypeError ||                            // fetch 失败（断网/CORS）
+              err instanceof DOMException ||                         // AbortController 中止
+              (err instanceof Error && (
+                /network|fetch|ECONNREFUSED|timeout|socket/i.test(message)
+              ));
+
+            if (isNetworkError) {
+              // 网络错误 / 5xx / SSE 断连：不改写 status，本地标记 syncStalled
+              const syncStalledMessage = knownRunId
+                ? `运行 ${knownRunId} 状态同步中断：${message}；请检查网络后点击「重新同步」`
+                : `状态同步中断：${message}；请检查网络后点击「重新同步」`;
+              set((state) => recentResultsPatch(
+                state,
+                recentResultsUpdateById(state.recentResults, recordId, {
+                  syncStalled: true,
+                  error: syncStalledMessage,
+                }),
+              ));
+              updateTabFromRunEvent(set, target, id, {
+                type: "node-status",
+                nodeId: id,
+                status: initialRecord.status as "error" | "cancelled" | "outcome_unknown", // 保留当前已知状态，不触发 UI 重渲染（updateTabFromRunEvent 不改写 Record 本身）
+                error: syncStalledMessage,
+              });
+            } else {
+              // GET 404 / 恢复窗口已过 / SSE 非法终态 → 终态
+              const status: "retry_wait" | "outcome_unknown" | "error" = knownRunId
+                ? "retry_wait"
+                : err instanceof AmbiguousRunSubmissionError ? "outcome_unknown" : "error";
+              const safeMessage = knownRunId
+                ? `运行 ${knownRunId} 已创建，但状态同步中断：${message}；请刷新页面继续同步，勿重复提交`
+                : err instanceof AmbiguousRunSubmissionError
+                  ? `${message}；再次点击会使用同一请求号安全确认，请勿新建重复任务`
+                  : message;
+              const event: NodeStatusRunEvent = {
                 type: "node-status",
                 nodeId: id,
                 status,
@@ -3746,11 +3791,12 @@ export const useFlowStore = create<FlowState>()(
                 startedAt: localStartedAt,
                 ...(isNodeRunTerminal(status) ? { finishedAt: Date.now() } : {}),
               };
-            set((state) => recentResultsPatch(
-              state,
-              applyRunEventToRecentResults(state.recentResults, recordId, event),
-            ));
-            updateTabFromRunEvent(set, target, id, event);
+              set((state) => recentResultsPatch(
+                state,
+                applyRunEventToRecentResults(state.recentResults, recordId, event),
+              ));
+              updateTabFromRunEvent(set, target, id, event);
+            }
           }
         } finally {
           runPreparations.delete(preparationKey);
@@ -4373,32 +4419,74 @@ export function resumeRecentResults(records: RecentResult[]): void {
             updateTabFromRunEvent(useFlowStore.setState, documentTarget(tab), record.nodeId, event);
           }
           if (isNodeRunTerminal(event.status)) terminalRecorded = true;
+          // 同步成功后清除网络中断标记（syncStalled 是内存态，不在事件流中）
+          if (record.syncStalled) {
+            useFlowStore.setState((state) => recentResultsPatch(
+              state,
+              state.recentResults.map((r) =>
+                r.id === record.id ? { ...r, syncStalled: undefined } : r,
+              ),
+            ));
+          }
         });
       } catch (error) {
         if (terminalRecorded) return;
         const message = error instanceof Error ? error.message : String(error);
-        const recoveryMessage = `运行 ${runId} 的状态同步中断：${message}；请稍后重试同步，勿重复提交`;
-        useFlowStore.setState((state) => recentResultsPatch(
-          state,
-          applyRunEventToRecentResults(state.recentResults, record.id, {
-            type: "node-status",
-            nodeId: record.nodeId,
-            status: "retry_wait",
-            error: recoveryMessage,
-            startedAt: record.startedAt,
-          }),
-        ));
-        const tab = useFlowStore
-          .getState()
-          .tabs.find((candidate) => candidate.projectId === record.projectId);
-        if (tab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
-          updateTabFromRunEvent(useFlowStore.setState, documentTarget(tab), record.nodeId, {
-            type: "node-status",
-            nodeId: record.nodeId,
-            status: "retry_wait",
-            error: recoveryMessage,
-            startedAt: record.startedAt,
-          });
+        const isNetworkError =
+          error instanceof TypeError ||                          // fetch 失败（断网/CORS）
+          error instanceof DOMException ||                       // AbortController 中止
+          (error instanceof Error && (
+            /network|fetch|ECONNREFUSED|timeout|socket/i.test(message)
+          ));
+
+        if (isNetworkError) {
+          // 网络错误：不改写 status，本地标记 syncStalled
+          const syncStalledMessage = `运行 ${runId} 状态同步中断：${message}；请检查网络后点击「重新同步」`;
+          useFlowStore.setState((state) => recentResultsPatch(
+            state,
+            recentResultsUpdateById(state.recentResults, record.id, {
+              syncStalled: true,
+              error: syncStalledMessage,
+            }),
+          ));
+          const tab = useFlowStore
+            .getState()
+            .tabs.find((candidate) => candidate.projectId === record.projectId);
+          if (tab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
+            updateTabFromRunEvent(useFlowStore.setState, documentTarget(tab), record.nodeId, {
+              type: "node-status",
+              nodeId: record.nodeId,
+              status: record.status as "error" | "cancelled" | "outcome_unknown", // 保留当前已知状态，不触发 UI 重渲染（updateTabFromRunEvent 不改写 Record 本身）
+              error: syncStalledMessage,
+            });
+          }
+        } else {
+          // GET 404 / 恢复窗口已过 / SSE 非法终态 → 终态
+          const recoveryMessage = `运行 ${runId} 的状态同步中断：${message}；请稍后重试同步，勿重复提交`;
+          useFlowStore.setState((state) => recentResultsPatch(
+            state,
+            applyRunEventToRecentResults(state.recentResults, record.id, {
+              type: "node-status",
+              nodeId: record.nodeId,
+              status: "outcome_unknown",
+              error: recoveryMessage,
+              startedAt: record.startedAt,
+              finishedAt: Date.now(),
+            }),
+          ));
+          const tab = useFlowStore
+            .getState()
+            .tabs.find((candidate) => candidate.projectId === record.projectId);
+          if (tab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
+            updateTabFromRunEvent(useFlowStore.setState, documentTarget(tab), record.nodeId, {
+              type: "node-status",
+              nodeId: record.nodeId,
+              status: "outcome_unknown",
+              error: recoveryMessage,
+              startedAt: record.startedAt,
+              finishedAt: Date.now(),
+            });
+          }
         }
       } finally {
         // 成功、后端失败、恢复查询失败都必须释放，允许后续重试。
