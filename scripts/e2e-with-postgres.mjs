@@ -7,7 +7,9 @@ import { pathToFileURL } from "node:url";
 import {
   acquireTestLock,
   assertTestDatabaseReachable,
-  createComposeProjectName,
+  createDatabaseLockName,
+  lockRootDirectory,
+  lockWaitTimeoutMs,
   resetTestDatabase,
   resolveTestDatabaseUrl,
 } from "./test-with-postgres.mjs";
@@ -63,8 +65,13 @@ export function playwrightArgsFromCli(args) {
 }
 
 async function main() {
-  const baseRunId = createComposeProjectName();
-  const releaseLock = acquireTestLock({ projectName: baseRunId });
+  const databaseUrl = resolveTestDatabaseUrl();
+  const lockName = createDatabaseLockName({ databaseUrl });
+  const releaseLock = await acquireTestLock({
+    projectName: lockName,
+    lockRoot: lockRootDirectory(),
+    waitTimeoutMs: lockWaitTimeoutMs(),
+  });
   const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-e2e-"));
   let cleanupDone = false;
 
@@ -91,7 +98,6 @@ async function main() {
   process.once("SIGTERM", () => terminate("SIGTERM"));
 
   try {
-    const databaseUrl = resolveTestDatabaseUrl();
     await assertTestDatabaseReachable(databaseUrl);
     // E2E 通过 INITIAL_ADMIN_* 在无用户时引导管理员；原生测试库会跨运行保留状态，
     // 因此这里显式清空 schema，恢复「每次运行一个全新数据库」的语义。
