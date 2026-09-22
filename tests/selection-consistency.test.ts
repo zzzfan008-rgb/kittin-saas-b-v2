@@ -89,6 +89,9 @@ function selectedFlags(): Array<[string, boolean]> {
   return activeDocument().nodes.map((candidate) => [candidate.id, Boolean(candidate.selected)]);
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("节点与结果选择一致性测试");
 
 test("程序化单选同步 canonical IDs、primary 与 React Flow flags", () => {

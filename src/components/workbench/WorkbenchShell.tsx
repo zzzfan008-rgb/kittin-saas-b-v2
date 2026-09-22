@@ -1,11 +1,14 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useReducer,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useFlowStore } from "@/store/flowStore";
+import type { WorkflowTemplate } from "@/types/workflow";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -20,6 +23,13 @@ import {
 } from "./workbenchState";
 import { dockWidthChange, emitDockViewportWillChange } from "@/lib/dockViewport";
 import { addCanvasNode } from "@/components/panels/NodeLibraryPanel";
+import {
+  WORKFLOW_MENU_MAPPING,
+} from "@/lib/workflowMenuMapping";
+import {
+  inferTemplateLaunchMode,
+  mergeTemplateIntoActiveCanvas,
+} from "@/lib/templateLaunch";
 import {
   RAIL_ENTRIES,
   RAIL_HISTORY,
@@ -148,6 +158,9 @@ function RailTool({
         "relative h-10 w-10 rounded-xl text-[var(--gc-text-muted)] transition-colors duration-150",
         "hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]",
         "focus-visible:outline-2 focus-visible:outline-[var(--gc-accent)] focus-visible:outline-offset-2",
+        // 二级菜单展开或面板打开时，图标保持点亮（与 hover 同色）。
+        (open || (entry.panel !== undefined && activePanelOpen)) &&
+          "bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)]",
         primary &&
           "h-10 w-10 rounded-full bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)] shadow-[0_3px_10px_color-mix(in_srgb,var(--gc-accent)_35%,transparent)] hover:bg-[var(--gc-accent)]",
       )}
@@ -187,13 +200,18 @@ function RailTool({
   );
 }
 
-/** 历史组（撤销/重做） */
+/** 历史组（撤销/重做）：渲染进主工具胶囊底部，中间以分隔线隔开。 */
 function HistoryRail() {
+  const undo = useFlowStore((s) => s.undo);
+  const redo = useFlowStore((s) => s.redo);
+
   return (
-    <nav
-      aria-label="操作历史"
-      className="absolute bottom-4 left-4 z-40 flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)]"
-    >
+    <>
+      <span
+        role="separator"
+        aria-hidden="true"
+        className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]"
+      />
       {RAIL_HISTORY.map((item, i) => (
         <Tooltip key={item.id}>
           <TooltipTrigger
@@ -202,8 +220,8 @@ function HistoryRail() {
                 type="button"
                 variant="ghost"
                 aria-label={item.label}
-                disabled={i === 1}
-                className="h-10 w-10 rounded-xl text-[var(--gc-text-muted)] hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)] disabled:opacity-32 motion-reduce:transition-none"
+                onClick={i === 0 ? undo : redo}
+                className="h-10 w-10 rounded-xl text-[var(--gc-text-muted)] hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)] motion-reduce:transition-none"
               />
             }
           >
@@ -233,7 +251,7 @@ function HistoryRail() {
           <TooltipContent side="right">{item.label}</TooltipContent>
         </Tooltip>
       ))}
-    </nav>
+    </>
   );
 }
 
@@ -243,6 +261,9 @@ function HistoryRail() {
  */
 export function WorkbenchShell({ library, inspector, children }: WorkbenchShellProps) {
   const [state, dispatch] = useReducer(workbenchUiReducer, INITIAL_WORKBENCH_UI_STATE);
+  // 用户 2026-09-25 决策 4：没有打开任何页签时（刚登录 / 关掉全部页签），
+  // 工具栏与 Dock 都不显示，画布区由 EmptyWorkspaceCTA 的「新建 / 打开」引导接管。
+  const workspaceEmpty = useFlowStore((s) => s.tabs.length === 0);
   const libraryOpen = state.activePanel === "library";
   const inspectorOpen = state.activePanel === "inspector";
   const panelOpen = state.activePanel !== null;
@@ -266,22 +287,72 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
     dispatch({ type: "toggle-panel", panel });
   }, []);
 
-  // 工作流菜单项选择：基础节点直接建（「添加」菜单）；其余工作流动作映射待产品定义
+  const [workflowStatus, setWorkflowStatus] = useState<{
+    kind: "loading" | "pending" | "error";
+    message: string;
+  } | null>(null);
+  const [workflowStatusDismiss, setWorkflowStatusDismiss] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  // 工作流菜单项选择：基础节点直接建（「添加」菜单）；工作流项按映射表拉内置模板，
+  // 合并进当前活动画布（右侧扩展），不新建页签（用户 2026-09-25 决策）。
   const handleSelectItem = useCallback(
     (_entry: RailEntry, item: RailMenuItem) => {
       if (item.nodeKind) {
         addCanvasNode(item.nodeKind);
         return;
       }
-      // needsNodeContext（资产库）与其他工作流动作：映射表确认后接入
+      if (item.needsNodeContext) {
+        setWorkflowStatus({ kind: "pending", message: "先在画布上选中一个节点，再选择资产" });
+        return;
+      }
+      const binding = WORKFLOW_MENU_MAPPING[item.id];
+      if (!binding) {
+        setWorkflowStatus({ kind: "error", message: `未找到工作流「${item.label}」，请刷新后重试` });
+        return;
+      }
+      if (!binding.templateId) {
+        setWorkflowStatus({ kind: "pending", message: binding.pendingReason ?? "功能正在开发中" });
+        return;
+      }
+      const templateId = binding.templateId;
+      const label = item.label;
+      const run = async () => {
+        setWorkflowStatus({ kind: "loading", message: `正在加载「${label}」工作流…` });
+        try {
+          const response = await fetch("/api/templates");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const templates = await response.json() as WorkflowTemplate[];
+          const template = templates.find((candidate) => candidate.id === templateId);
+          if (!template) throw new Error("内置模板不存在");
+          mergeTemplateIntoActiveCanvas(template, inferTemplateLaunchMode(template));
+          setWorkflowStatus(null);
+        } catch (error) {
+          setWorkflowStatus({
+            kind: "error",
+            message: `加载「${label}」失败：${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
+      };
+      void run();
     },
     [],
   );
 
+  useEffect(() => {
+    if (!workflowStatus || workflowStatus.kind === "loading" || workflowStatusDismiss) return;
+    const timer = setTimeout(() => setWorkflowStatus(null), 5000);
+    setWorkflowStatusDismiss(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+      setWorkflowStatusDismiss(null);
+    };
+  }, [workflowStatus, workflowStatusDismiss]);
+
   return (
     <TooltipProvider delay={250}>
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {/* 悬浮主工具胶囊 */}
+        {/* 悬浮主工具胶囊：空工作区（无页签）隐藏 */}
+        {!workspaceEmpty && (
         <nav
           aria-label="工作台左侧工具"
           className="absolute left-4 top-4 z-40 flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] transition-[left] duration-200 motion-reduce:transition-none"
@@ -301,9 +372,13 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
               />
             </div>
           ))}
+          {/* 撤销/重做：固定在工具胶囊底部，与上方工具条以分隔线隔开。 */}
+          <HistoryRail />
         </nav>
+        )}
 
-        {/* 左侧 Dock 面板（节点库 / 属性结果）——保留 */}
+        {/* 左侧 Dock 面板（节点库 / 属性）：空工作区（无页签）隐藏 */}
+        {!workspaceEmpty && (
         <aside
           aria-label="工作台左侧面板"
           aria-hidden={!panelOpen}
@@ -340,14 +415,27 @@ export function WorkbenchShell({ library, inspector, children }: WorkbenchShellP
             </section>
           </div>
         </aside>
+        )}
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
             {children}
           </div>
+          {workflowStatus && (
+            <div
+              role={workflowStatus.kind === "error" ? "alert" : "status"}
+              aria-live="polite"
+              className="pointer-events-none absolute inset-x-0 top-4 z-50 flex justify-center"
+            >
+              <span className="pointer-events-auto rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-4 py-1.5 text-xs text-[var(--gc-text)] shadow-lg">
+                {workflowStatus.kind === "loading" && (
+                  <span className="mr-1 inline-block animate-spin">◌</span>
+                )}
+                {workflowStatus.message}
+              </span>
+            </div>
+          )}
         </div>
-
-        <HistoryRail />
       </div>
     </TooltipProvider>
   );

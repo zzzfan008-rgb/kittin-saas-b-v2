@@ -453,7 +453,8 @@ export function CanvasFlow() {
     let cancelled = false;
     void (async () => {
       if (intent.fitView) {
-        await fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 1, duration: 0 });
+        // 适应画布统一以目标缩放 80% 居中（第 2 条）：小内容锁 80%，大内容缩到能装下。
+        await fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 0.8, duration: 0 });
       }
       if (!cancelled) focusLandingControl(intent);
     })();
@@ -461,6 +462,16 @@ export function CanvasFlow() {
       cancelled = true;
     };
   }, [activeTabId, fitView, landingVersion, nodesInitialized]);
+
+  // 进入画布 / 打开项目 / 切换页签：自动以 80% 缩放适应并居中（第 1、2 条）。
+  // 仅当 activeTabId 变化（或以初始页签就绪）时触发一次，避免用户操作过程中反复重排。
+  const autoFitTabKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!nodesInitialized) return;
+    if (autoFitTabKeyRef.current === activeTabId) return;
+    autoFitTabKeyRef.current = activeTabId;
+    void fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 0.8, duration: 0 });
+  }, [activeTabId, fitView, nodesInitialized]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {

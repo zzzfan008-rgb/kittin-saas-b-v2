@@ -63,7 +63,7 @@ function PropertySummary({ nodeId }: { nodeId: string }) {
 }
 
 /** 「最近生成」条目对应的运行记录详情 */
-function ResultRecordDetail({ resultId }: { resultId: string }) {
+export function ResultRecordDetail({ resultId }: { resultId: string }) {
   const record = useFlowStore((s) => s.recentResults.find((r) => r.id === resultId));
   if (!record) return null;
   const spec = nodeSpecForKind(record.kind);

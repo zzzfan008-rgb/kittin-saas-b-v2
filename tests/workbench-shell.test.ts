@@ -163,17 +163,47 @@ assert.match(shellSource, /id=\{LIBRARY_PANEL_ID\}[\s\S]*?inert=\{!libraryOpen\}
 assert.match(shellSource, /id=\{INSPECTOR_PANEL_ID\}[\s\S]*?inert=\{!inspectorOpen\}/);
 assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|DESKTOP_QUERY|mobilePanel/);
 assert.doesNotMatch(appSource, /workspaceKey=\{activeTabId\}/);
+// 2026-09-25 UI 修复第 5 条 + 决策 1：结果/记录已迁到画布右上角「历史创作记录」文字浮层
+// （ResultsFab）；左侧 ContextPanel 只承载节点属性，不再用 Tabs 拼接结果。
 assert.match(
   contextPanelSource,
+  /from "\.\/InspectorPanel"/,
+  "左侧上下文面板必须只承载节点属性（InspectorPanel）",
+);
+assert.doesNotMatch(
+  contextPanelSource,
   /from "@\/components\/ui\/tabs"/,
-  "属性与结果上下文必须复用本地 shadcn Tabs",
+  "结果/记录迁到右下右上角浮层后，左侧面板不得再保留结果 Tab",
 );
-assert.equal(
-  (contextPanelSource.match(/<TabsContent[\s\S]*?keepMounted/g) ?? []).length,
-  2,
-  "属性与结果 Tab 都必须 keepMounted",
+const resultsFabSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/panels/ResultsFab.tsx"),
+  "utf8",
 );
-assert.match(appSource, /inspector=\{\([\s\S]*?<ContextPanel/);
+assert.match(
+  resultsFabSource,
+  />\s*历史创作记录\s*<\/button>/,
+  "画布右上角的入口必须以「历史创作记录」文字呈现（2026-09-25 决策 1），而不是示意图标",
+);
+assert.match(
+  resultsFabSource,
+  /<ResultRecordDetail/,
+  "历史创作记录浮层必须同时承载选中结果的运行记录详情（结果/记录合并为一个入口）",
+);
+const resultsPanelSource = fs.readFileSync(
+  path.resolve(testRoot, "../src/components/panels/ResultsPanel.tsx"),
+  "utf8",
+);
+assert.match(
+  resultsPanelSource,
+  /grid-cols-3/,
+  "结果缩略图必须以 3 个为一行呈现",
+);
+assert.match(appSource, /inspector=\{<ContextPanel/);
+assert.match(
+  appSource,
+  /<ResultsFab[\s\S]*?\/>/,
+  "右上角历史创作记录浮层必须挂载在中心画布容器内",
+);
 assert.doesNotMatch(
   appSource,
   /<ReactFlowProvider[\s\S]*?<ResultsPanel/,

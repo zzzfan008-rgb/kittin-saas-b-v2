@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import type { ProjectTab, ServerInitialDraftSnapshot } from "../src/store/flowStore";
 import {
   applyServerInitialDraftToTab,
@@ -15,7 +15,7 @@ import {
   bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
-  shouldRestoreSavedProjectOnStartup,
+  shouldStayBlankOnStartup,
 } from "../src/initialDraft/initialDraftMigration";
 import { settleInitialDraftBeforeAbandon } from "../src/initialDraft/InitialDraftWorkspace";
 import {
@@ -104,11 +104,12 @@ const serverOnly = draft();
 assert.equal(decideInitialDraftStartup(placeholder, null, serverOnly).kind, "restore-server");
 console.log("  ✓ 新标签页和重新登录会恢复同一份云端初始项目");
 
-assert.equal(shouldRestoreSavedProjectOnStartup(null, null, 1), true);
-assert.equal(shouldRestoreSavedProjectOnStartup(null, serverOnly, 1), true);
-assert.equal(shouldRestoreSavedProjectOnStartup(null, { ...serverOnly, name: "已修改草稿" }, 1), false);
-assert.equal(shouldRestoreSavedProjectOnStartup(editedLegacy, null, 1), false);
-assert.equal(shouldRestoreSavedProjectOnStartup(null, null, 0), false);
+// 决策 A：有已保存项目且没有可信本地页签时保持空白（既不自动打开项目，也不新建草稿）。
+assert.equal(shouldStayBlankOnStartup(null, null, 1), true);
+assert.equal(shouldStayBlankOnStartup(null, serverOnly, 1), true);
+assert.equal(shouldStayBlankOnStartup(null, { ...serverOnly, name: "已修改草稿" }, 1), false);
+assert.equal(shouldStayBlankOnStartup(editedLegacy, null, 1), false);
+assert.equal(shouldStayBlankOnStartup(null, null, 0), false);
 console.log("  ✓ 已有正式项目时优先恢复最近项目，未保存草稿仍优先保留");
 
 assert.equal(decideInitialDraftStartup(placeholder, editedLegacy, serverOnly).kind, "sync-local");
@@ -387,6 +388,9 @@ await waitForInitialDraftSyncBeforeFormalSave({
 assert.equal(barrierCalls, 1);
 console.log("  ✓ 正式保存会等待已注册的初始草稿同步屏障");
 
+// 决策 4（A）：冷启动不再自动创建页签——本段需要一个真实页签承接服务端草稿回写。
+useFlowStore.getState().createBlankTab();
+
 const formalDraft = draft({ revision: 5, name: "保存边界草稿" });
 const activeBeforeFormalSave = selectActiveDocument(useFlowStore.getState());
 assert.equal(applyServerInitialDraftToTab(activeBeforeFormalSave.id, formalDraft, {
@@ -466,10 +470,13 @@ const projectTabsSource = readFileSync(
   new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url),
   "utf8",
 );
-assert.match(projectTabsSource, /唯一的未保存初始项目/);
-assert.match(projectTabsSource, /再次确认放弃/);
-assert.match(projectTabsSource, /await abandon\(latestTab\.id\)/);
-console.log("  ✓ 放弃初始项目必须经过两次确认并调用专用放弃流程");
+// 2026-09-25 第 6 条：关闭页签不再有「二次确认放弃」流程——有改动先自动保存再关，
+// 空白且无改动直接关，且不弹任何确认/警告（专用放弃流程仍保留给 InitialDraftWorkspace 的冲突处理）。
+assert.match(projectTabsSource, /await state\.saveTabById\(latestTab\.id\)/);
+assert.match(projectTabsSource, /latestTab\.dirty && !pristine && !latestTab\.readOnly/);
+assert.doesNotMatch(projectTabsSource, /window\.(confirm|alert)/);
+assert.doesNotMatch(projectTabsSource, /再次确认放弃/);
+console.log("  ✓ 关闭页签先自动保存再关，且不弹二次确认");
 
 const flowStoreSource = readFileSync(
   new URL("../src/store/flowStore.ts", import.meta.url),
@@ -494,10 +501,6 @@ const templateLaunchSource = readFileSync(
   new URL("../src/lib/templateLaunch.ts", import.meta.url),
   "utf8",
 );
-const templatePresentationSource = readFileSync(
-  new URL("../src/lib/templatePresentation.ts", import.meta.url),
-  "utf8",
-);
 function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
   return {
     flow: {
@@ -516,18 +519,8 @@ function launchModeTemplate(kinds: string[]): Pick<WorkflowTemplate, "flow"> {
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["image"])), "upload");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["text"])), "text");
 assert.equal(inferTemplateLaunchMode(launchModeTemplate(["result"])), "default");
-for (const cover of [
-  "pattern-style-transfer",
-  "person-scene-transfer",
-  "sketch-recolor",
-  "sketch-upscale",
-  "text-recolor",
-  "text-to-image",
-]) {
-  assert.match(templatePresentationSource, new RegExp(`${cover}\\.webp`));
-  assert.ok(existsSync(new URL(`../public/assets/project-center/templates/${cover}.webp`, import.meta.url)));
-}
-assert.doesNotMatch(templatePresentationSource, /project-center\/templates\/[^\n]+\.png/);
+// 2026-09-25 决策 3：模板封面墙随「内置模板」Tab 一起下线
+// （BUILTIN_TEMPLATE_COVERS 已删除，public/assets/project-center/templates/*.webp 留档）。
 assert.match(templateLaunchSource, /projectTabLifecycle\(active\) !== "initial_draft"/);
 assert.match(templateLaunchSource, /commitDocumentMutation\(/);
 assert.match(templateLaunchSource, /projectId: active\.projectId/);

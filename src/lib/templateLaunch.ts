@@ -132,3 +132,93 @@ export function launchStarterTemplate(
   });
   return { tabId: active.id, projectId: active.projectId, landingNodeId };
 }
+/** 用户 2026-09-25 决策：模板工作流落在「现有已打开画布」内（右侧扩展），不做新页签。 */
+export function mergeTemplateIntoActiveCanvas(
+  template: WorkflowTemplate,
+  mode: TemplateLaunchMode = "default",
+): { tabId: string; landingNodeId?: string } {
+  const active = selectActiveDocument(useFlowStore.getState());
+  const { nodes: templateNodes, edges: templateEdges } = readTemplateDocument(template);
+
+  // 模板内节点向右离散：最右节点右侧 380px，同 Y 对齐；空画布保持模板原始坐标。
+  let offsetX = 0;
+  if (active.nodes.length > 0) {
+    const rightmostX = Math.max(
+      ...active.nodes.map((node) => node.position.x + estimatedNodeWidth(node)),
+    );
+    offsetX = rightmostX + 380 - Math.min(
+      ...templateNodes.map((node) => node.position.x),
+    );
+  }
+  const takenNodeIds = new Set(active.nodes.map((node) => node.id));
+  const movedNodes = templateNodes.map((node) => {
+    // 稳定业务 id 优先（资产选择器的预选分类按模板节点 id 映射）；与画布已有节点
+    // 撞 id 时才换名，避免把「加同一套模板两次」静默吞掉。
+    const id = takenNodeIds.has(node.id) ? `${node.id}-${nanoid(4)}` : node.id;
+    takenNodeIds.add(id);
+    return offsetX > 0
+      ? { ...node, id, position: { x: node.position.x + offsetX, y: node.position.y } }
+      : { ...node, id };
+  });
+
+  const idMap = new Map(templateNodes.map((node, index) => [node.id, movedNodes[index].id]));
+  const takenEdgeIds = new Set(active.edges.map((edge) => edge.id));
+  const movedEdges = templateEdges.map((edge) => {
+    const id = takenEdgeIds.has(edge.id) ? `${edge.id}-${nanoid(4)}` : edge.id;
+    takenEdgeIds.add(id);
+    return {
+      ...edge,
+      id,
+      source: idMap.get(edge.source) ?? edge.source,
+      target: idMap.get(edge.target) ?? edge.target,
+    };
+  });
+
+  // 落地引导指向映射后的节点 id（模板原 id 可能已撞名换掉）。
+  const landingSourceId = templateLandingNodeId(templateNodes, mode);
+  const landingNodeId = landingSourceId ? (idMap.get(landingSourceId) ?? landingSourceId) : undefined;
+
+  // 与既有节点/边/连线去重：节点按 id，边按 source+target+targetHandle。
+  const existingNodeIds = new Set(active.nodes.map((node) => node.id));
+  const existingEdgeKeys = new Set(
+    active.edges.map((edge) => `${edge.source}\u0000${edge.target}\u0000${edge.targetHandle ?? ""}`),
+  );
+  const nextNodes = [
+    ...active.nodes,
+    ...movedNodes.filter((node) => !existingNodeIds.has(node.id)),
+  ];
+  const nextEdges = [
+    ...active.edges,
+    ...movedEdges.filter((edge) => (
+      !existingEdgeKeys.has(`${edge.source}\u0000${edge.target}\u0000${edge.targetHandle ?? ""}`)
+    )),
+  ];
+
+  let changed = false;
+  flushSync(() => {
+    changed = commitDocumentMutation({
+      nodes: nextNodes,
+      edges: nextEdges,
+      selectedNodeIds: [],
+      selectedNodeId: null,
+      compareIds: [],
+    });
+  });
+  if (!changed) return { tabId: active.id, landingNodeId };
+
+  if (landingNodeId) useFlowStore.getState().setSelectedNodeIds([landingNodeId]);
+  useFlowStore.getState().closeViewer();
+  requestCanvasLanding({
+    tabId: active.id,
+    nodeId: landingNodeId,
+    fitView: true,
+    activateFilePicker: mode === "upload",
+    selectText: mode === "text",
+  });
+  return { tabId: active.id, landingNodeId };
+}
+
+/** 未知节点类型不再猜具体宽度，保守用「输入 / 生成」常见宽度估值的下界 260。 */
+function estimatedNodeWidth(node: { width?: number | null }): number {
+  return Math.max(node.width ?? 0, 260);
+}

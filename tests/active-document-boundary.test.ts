@@ -102,6 +102,9 @@ assert.doesNotMatch(
 );
 console.log("  ✓ FlowState 与源码不再包含活动文档镜像边界");
 
+// 决策 4（A）：冷启动不再自动创建页签——本文件显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 useFlowStore.getState().loadFlow({
   projectId: "selector-a",
   projectName: "Selector A",

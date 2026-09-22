@@ -58,6 +58,9 @@ assert.match(appSource, /画布仍可编辑和保存/, "历史失败必须明确
 assert.match(nodeFrameSource, /newGenerationBlocked/, "共享运行按钮必须呈现安全门禁用状态");
 assert.match(imageViewerSource, /generationSafetyBlockReason/, "图片查看器的重新生成入口必须同步安全门");
 assert.match(storeSource, /getGenerationSafetyBlockReason\(\)/, "runNode 必须二次校验安全门，不能只依赖按钮禁用");
-assert.match(projectTabsSource, /runReconciliationBlockReason/, "活动任务对账完成前页签关闭入口必须 fail-closed");
+// 2026-09-25 第 6 条：「关闭被封锁」的判断收敛成 store 单一真相 projectTabCloseBlockReason
+// （× 用它置灰 + title 说明，store 用它兜底），组件里不再各写一份；封锁时也不弹窗打断。
+assert.match(projectTabsSource, /projectTabCloseBlockReason/, "活动任务对账完成前页签关闭入口必须 fail-closed");
+assert.doesNotMatch(projectTabsSource, /window\.alert/, "关闭入口被封锁时不得弹窗（第 6 条：不提醒）");
 assert.match(storeSource, /closeTab:[\s\S]*getGenerationSafetyBlockReason\(\)/, "closeTab action 必须独立执行对账门禁");
 console.log("  ✓ 历史失败只封锁新生成，并保留工作台与二次校验契约");

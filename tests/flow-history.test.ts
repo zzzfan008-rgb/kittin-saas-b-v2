@@ -92,6 +92,9 @@ function resetDocument(node = aiNode()): { tabId: string; nodeId: string } {
   return { tabId: useFlowStore.getState().activeTabId, nodeId: node.id };
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("画布文档历史事务测试");
 // 这些用例验证已完成活动任务对账后的历史行为；冷启动关闭门禁另有契约测试。
 setGenerationSafetyBlockReason(null);

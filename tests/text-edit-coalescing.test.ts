@@ -69,6 +69,9 @@ function resetDocument(id = "coalesced-text-node") {
   useFlowStore.temporal.getState().clear();
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("连续文本编辑事务测试");
 
 await test("一个输入 burst 实时更新，但只提交一次 history/revision", () => {

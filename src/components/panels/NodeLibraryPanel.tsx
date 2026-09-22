@@ -16,13 +16,40 @@ import { requestCanvasLanding } from "@/lib/canvasLanding";
 /** v7：三种基础节点（R1）。 */
 const KIND_ORDER: NodeKind[] = ["text", "image", "video"];
 
+/**
+ * 连续点击「添加」时的落位策略（2026-09-25 UI 修复第 8 条）：
+ * 目标是节点之间保持合理间距、不重叠、布局成「每行 3 个、满则换行」的整齐网格。
+ *
+ * - 锚点 = 选中节点（若有）或最后一个节点。
+ * - 以锚点所在「水平行」（y 容差 ±40px）为目标行，新节点放到该行最右节点的右侧 380px。
+ * - 若该行已满 3 个节点，则换到下一行：x 对齐全局最小 x（首列），y = 该行 y + 360。
+ *
+ * 水平/垂直步长是定值（不依赖节点实测宽高），保证连续添加的间距稳定、可预测。
+ */
+const HORIZONTAL_GAP = 380;
+const VERTICAL_GAP = 360;
+const ROW_Y_TOLERANCE = 40;
+const NODES_PER_ROW = 3;
+
 export function nodeLibraryClickPosition(
   nodes: readonly FlowNode[],
   selectedNodeId: string | null,
 ): { x: number; y: number } {
-  const anchor = nodes.find((node) => node.id === selectedNodeId) ?? nodes.at(-1);
-  if (!anchor) return { x: 0, y: 0 };
-  return { x: anchor.position.x + 380, y: anchor.position.y };
+  if (nodes.length === 0) return { x: 0, y: 0 };
+  const anchor = nodes.find((node) => node.id === selectedNodeId) ?? nodes.at(-1)!;
+  const rowY = anchor.position.y;
+  const siblingsInRow = nodes.filter(
+    (node) => Math.abs(node.position.y - rowY) <= ROW_Y_TOLERANCE,
+  );
+  const rightmostInRow = siblingsInRow.reduce(
+    (acc, node) => (node.position.x >= acc.position.x ? node : acc),
+    anchor,
+  );
+  if (siblingsInRow.length < NODES_PER_ROW) {
+    return { x: rightmostInRow.position.x + HORIZONTAL_GAP, y: rowY };
+  }
+  const minX = nodes.reduce((acc, node) => Math.min(acc, node.position.x), anchor.position.x);
+  return { x: minX, y: rowY + VERTICAL_GAP };
 }
 
 /**
@@ -55,6 +82,9 @@ export function addCanvasNode(kind: NodeKind): void {
 }
 
 export function NodeLibraryPanel({ className }: { className?: string }) {
+  // 第 6 条：页签可以全部关掉。空工作区里没有可写入的文档，节点库改为指路而不是
+  // 留一排点了没反应的卡片（addNode 在空工作区 fail-closed 返回 null）。
+  const workspaceEmpty = useFlowStore((state) => state.tabs.length === 0);
   return (
     <aside
       className={cn(
@@ -67,12 +97,20 @@ export function NodeLibraryPanel({ className }: { className?: string }) {
           节点库
         </h2>
       </div>
-      <NodeList />
-      <div className="border-t border-[var(--gc-border)] px-3 py-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
-        点击添加 · 也可拖拽到画布
-        <br />
-        左键框选 · 中/右键平移 · Delete 删除
-      </div>
+      {workspaceEmpty ? (
+        <div className="flex flex-1 items-center justify-center p-4 text-center text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
+          先「新建项目」或「打开项目」，再从这里添加节点
+        </div>
+      ) : (
+        <>
+          <NodeList />
+          <div className="border-t border-[var(--gc-border)] px-3 py-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
+            点击添加 · 也可拖拽到画布
+            <br />
+            左键框选 · 中/右键平移 · Delete 删除
+          </div>
+        </>
+      )}
     </aside>
   );
 }

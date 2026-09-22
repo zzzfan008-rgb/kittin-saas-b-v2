@@ -96,7 +96,7 @@ export function ResultsPanel({
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {recentResults.map((r) =>
                 isNodeRunActive(r.status) ? (
                   <button
