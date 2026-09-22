@@ -84,6 +84,10 @@
   --gc-handle-dark: #61451f;
   --gc-handle-ring: rgba(154, 115, 51, 0.75);
   --gc-handle-glow: rgba(176, 138, 74, 0.78);
+  /* 节点阴影（VIS-03 D-1=A：分主题三层阴影；数值源 = prototype-v4.html §节点家族） */
+  --gc-node-shadow:    0 0 0 0.5px rgba(0,0,0,.5),  0 1px 2px rgba(0,0,0,.4),  0 4px 10px rgba(0,0,0,.36), 0 20px 44px rgba(0,0,0,.5);
+  --gc-node-shadow-lift: 0 0 0 0.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.42), 0 8px 18px rgba(0,0,0,.4), 0 28px 60px rgba(0,0,0,.56);
+  --gc-node-shadow-hover: 0 0 0 0.5px rgba(0,0,0,.5),  0 2px 6px rgba(0,0,0,.45), 0 8px 16px rgba(0,0,0,.42), 0 28px 60px rgba(0,0,0,.52);
 }
 
 /* ---- 5b. 主题：墨白（原「黑白」，accent 粉→墨，全对验证 ≥4.6:1） ---- */
@@ -115,6 +119,10 @@
   --gc-handle-dark: #7a5a1e;
   --gc-handle-ring: rgba(217, 164, 65, 0.78);
   --gc-handle-glow: rgba(217, 164, 65, 0.8);
+  /* 节点阴影（VIS-03 D-1=A：简白主题；数值源 = prototype-v4.html §节点家族） */
+  --gc-node-shadow:    0 0 0 0.5px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 8px rgba(0,0,0,.05),  0 20px 44px rgba(0,0,0,.11);
+  --gc-node-shadow-lift: 0 0 0 0.5px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.06), 0 8px 16px rgba(0,0,0,.08), 0 28px 60px rgba(0,0,0,.15);
+  --gc-node-shadow-hover: 0 0 0 0.5px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.08), 0 8px 16px rgba(0,0,0,.10), 0 28px 60px rgba(0,0,0,.18);
 }
 
 /* ---- 5c. 主题：护眼绿 v2（节点族改绿灰同族，accent 改深绿） ---- */
@@ -146,6 +154,10 @@
   --gc-handle-dark: #1c3d20;
   --gc-handle-ring: rgba(46, 93, 51, 0.78);
   --gc-handle-glow: rgba(58, 108, 64, 0.75);
+  /* 节点阴影（VIS-03 D-1=A：护眼绿主题；数值源 = prototype-v4.html §节点家族） */
+  --gc-node-shadow:    0 0 0 0.5px rgba(18,59,43,.06), 0 1px 2px rgba(18,59,43,.05), 0 4px 10px rgba(18,59,43,.06), 0 20px 44px rgba(18,59,43,.11);
+  --gc-node-shadow-lift: 0 0 0 0.5px rgba(18,59,43,.07), 0 2px 4px rgba(18,59,43,.06), 0 8px 18px rgba(18,59,43,.09), 0 28px 60px rgba(18,59,43,.16);
+  --gc-node-shadow-hover: 0 0 0 0.5px rgba(18,59,43,.08), 0 2px 5px rgba(18,59,43,.07), 0 8px 16px rgba(18,59,43,.10), 0 28px 60px rgba(18,59,43,.19);
 }
 
 /* ---- 6. 全局 reduced-motion 兜底（覆盖 keyframes 与 Tailwind 动画） ---- */
