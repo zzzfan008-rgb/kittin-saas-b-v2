@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-pose",
+  "name": "摆拍 Pose",
+  "description": "上传服装或模特图，描述 Pose 与镜头要求，生成摆拍效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "pose-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "Pose/镜头要求",
+          "status": "idle",
+          "text": "【要求】描述目标 Pose、镜头与构图"
+        }
+      },
+      {
+        "id": "source",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装或模特图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "pose-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "摆拍生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-pose-prompt",
+        "source": "pose-requirement",
+        "target": "pose-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-pose-ref",
+        "source": "source",
+        "target": "pose-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-model-tryon",
+  "name": "模特试穿",
+  "description": "上传服装图与数字模特图，描述试穿要求，生成模特上身效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "tryon-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "试穿要求",
+          "status": "idle",
+          "text": "【服装】上传服装图\n【数字模特】上传数字模特图\n【要求】描述试穿后的模特姿态、场景与镜头（可空）"
+        }
+      },
+      {
+        "id": "garment",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "model",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 210
+        },
+        "data": {
+          "kind": "image",
+          "label": "数字模特",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "tryon-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": 20
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "试穿生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-tryon-prompt",
+        "source": "tryon-requirement",
+        "target": "tryon-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-tryon-garment",
+        "source": "garment",
+        "target": "tryon-gen",
+        "targetHandle": "reference",
+        "data": {}
+      },
+      {
+        "id": "e-tryon-model",
+        "source": "model",
+        "target": "tryon-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

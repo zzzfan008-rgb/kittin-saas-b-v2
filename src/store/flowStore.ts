@@ -62,6 +62,7 @@ import {
   resolveTargetHandle,
 } from "@/lib/documentSnapshot";
 import {
+  clearProjectTabSessionStorage,
   clearUnreferencedProjectTabSessionStorage,
   PROJECT_TABS_STORAGE_KEY,
   PROJECT_TABS_STORAGE_SCHEMA_VERSION,
@@ -284,6 +285,8 @@ export interface FlowState {
   runNode: (id: string) => Promise<void>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
+  /** 保存指定页签 id（关闭页签时静默保存非脏页签或丢弃前的保存）。 */
+  saveTabById: (tabId: string) => Promise<boolean>;
   /**
    * 整组载入画布（打开项目 / 从模板新建）：
    * 替换 nodes/edges 并重置选择、对比、查看器与撤销历史。
@@ -699,6 +702,9 @@ function commitDocumentMutationWithSet(
     before: FlowTemporalState | null;
   } = { transaction: null, before: null };
   set((state) => {
+    // 空工作区（tabs=[]，用户关掉了全部页签）没有可写的文档：所有文档变更 fail-closed。
+    // 不拦的话 addNode 会返回一个并不存在的节点 id，调用方还会去选中 / 定位它。
+    if (state.tabs.length === 0) return {};
     const tab = selectActiveDocument(state);
     const patch = typeof mutation === "function" ? mutation(tab) : mutation;
     if (!documentMutationChanged(tab, patch)) {
@@ -1272,13 +1278,43 @@ function selectionIdsAfterNodeChanges(
 }
 
 /**
- * Canonical active-document boundary. A valid store always has exactly one tab
- * matching activeTabId; fail fast if an invariant violation reaches a caller.
+ * 空工作区（tabs=[]，用户关掉了全部页签）时的活动文档投影：无项目身份、无节点、无选择。
+ *
+ * 冻结 + 定长单例：选择器引用稳定，消费者读到空值而不是崩溃；也写不进任何东西——
+ * `patchDocumentTarget` 按 tabId 命中页签，空 id 永不命中。
+ */
+export const EMPTY_ACTIVE_DOCUMENT: ProjectTab = Object.freeze({
+  id: "",
+  projectId: "",
+  projectName: "",
+  // 空工作区不是「只读项目」：TopBar 不应出现只读徽标；不可写由「无页签可命中」保证。
+  readOnly: false,
+  nodes: Object.freeze([]) as unknown as FlowNode[],
+  edges: Object.freeze([]) as unknown as Edge[],
+  selectedNodeIds: Object.freeze([]) as unknown as string[],
+  selectedNodeId: null,
+  selectedResultId: null,
+  compareIds: Object.freeze([]) as unknown as string[],
+  saveState: "idle",
+  hasBeenPersisted: false,
+  revision: 0,
+  savedRevision: 0,
+  dirty: false,
+  documentEpoch: 0,
+  lifecycle: "local",
+});
+
+/**
+ * Canonical active-document boundary.
+ *
+ * 两种合法状态：命中 activeTabId 的页签；或 tabs 为空（空工作区，由 EmptyWorkspaceCTA
+ * 接管画布区）。tabs 非空而 activeTabId 落空仍是不变量损坏，fail fast。
  */
 export function selectActiveDocument(state: FlowState): ProjectTab {
   const document = state.tabs.find((tab) => tab.id === state.activeTabId);
-  if (!document) throw new Error(`Active project tab not found: ${state.activeTabId}`);
-  return document;
+  if (document) return document;
+  if (state.tabs.length === 0) return EMPTY_ACTIVE_DOCUMENT;
+  throw new Error(`Active project tab not found: ${state.activeTabId}`);
 }
 
 export function selectActiveDocumentTarget(state: FlowState): DocumentTarget {
@@ -1384,6 +1420,25 @@ export function isPristineProjectTab(tab: ProjectTab): boolean {
   return true;
 }
 
+/**
+ * 关闭页签的封锁原因（null = 可关闭）。store 与页签 UI 共用同一真相：store 用它做
+ * fail-closed 兜底，× 按钮用它置灰 + title 说明，不留「点了没反应」的静默 no-op。
+ */
+export function projectTabCloseBlockReason(
+  tab: ProjectTab,
+  generationSafetyBlockReason: string | null,
+): string | null {
+  if (tab.nodes.some((node) => isNodeRunActive(node.data.status))) {
+    return "生成任务运行中，结果要写回画布，完成后才能关闭。";
+  }
+  // 会话快照会剥掉运行态：对账完成前，看似空闲的恢复页签仍可能持有付费结果。
+  // 只有从未落库的空白页签不可能有运行，允许直接关闭。
+  if (generationSafetyBlockReason && !isPristineProjectTab(tab)) {
+    return "正在确认运行历史，为保住付费结果暂时不能关闭这个页签。";
+  }
+  return null;
+}
+
 export function projectTabLifecycle(tab: ProjectTab): ProjectLifecycle {
   if (tab.lifecycle === "initial_draft" || tab.lifecycle === "saved" || tab.lifecycle === "local") {
     return tab.lifecycle;
@@ -1483,7 +1538,7 @@ function replaceTab(tabs: ProjectTab[], tab: ProjectTab): ProjectTab[] {
   return next;
 }
 
-function documentForTab(state: FlowState, tabId: string): ProjectTab | undefined {
+export function documentForTab(state: FlowState, tabId: string): ProjectTab | undefined {
   return state.tabs.find((tab) => tab.id === tabId);
 }
 
@@ -2960,8 +3015,9 @@ export const useFlowStore = create<FlowState>()(
   temporal<FlowState, [], [], FlowTemporalState>(
     (set, get) => {
       const restored = typeof window === "undefined" ? undefined : loadTabSession();
-      const initialTab =
-        restored?.tabs.find((tab) => tab.id === restored.activeTabId) ?? newTab();
+      const restoredActiveTab =
+        restored?.tabs.find((tab) => tab.id === restored.activeTabId);
+      const initialTab = restoredActiveTab ?? newTab();
       const saveTab = async (target: DocumentTarget): Promise<SaveTabResult> => {
         const tabId = target.tabId;
         const queueKey = documentTargetKey(target);
@@ -3072,8 +3128,9 @@ export const useFlowStore = create<FlowState>()(
         }
       };
       return ({
-        tabs: restored?.tabs ?? [initialTab],
-        activeTabId: initialTab.id,
+        tabs: restored?.tabs ?? [],
+        // 冷启动（无恢复）为空工作区：activeTabId 必须为空串，不留悬挂 id。
+        activeTabId: restored?.tabs && restored.tabs.length > 0 ? initialTab.id : "",
         tabSessionPersistenceError: null,
         pendingMaskWorkCount: 0,
         // 服务端历史在登录成功后注入；不能从浏览器本地缓存恢复其他账号的记录。
@@ -3098,22 +3155,19 @@ export const useFlowStore = create<FlowState>()(
       },
       closeTab: (tabId) => {
         flushActiveTextEdit();
-        // Session snapshots intentionally strip runtime status. Until active
-        // runs reconcile, an apparently-idle restored tab may still own paid work.
-        if (getGenerationSafetyBlockReason()) return;
         const initialState = get();
         const initialClosingTab = initialState.tabs.find((tab) => tab.id === tabId);
         if (!initialClosingTab) return;
         const closingTab = initialClosingTab;
-        if (closingTab.nodes.some((node) => isNodeRunActive(node.data.status))) {
-          return;
-        }
+        // 与页签 × 的置灰判断同源：封锁时不静默吞掉点击，UI 已给出可读原因。
+        if (projectTabCloseBlockReason(closingTab, getGenerationSafetyBlockReason())) return;
         if (tabId === initialState.activeTabId) cancelHistoryTransaction();
         const state = get();
         const closingIndex = state.tabs.findIndex((tab) => tab.id === tabId);
         if (closingIndex < 0) return;
+        // 允许关掉全部页签：留空工作区（App 渲染「新建项目 / 打开项目」引导），
+        // 不再偷偷塞回一个空白页签。
         const remaining = state.tabs.filter((tab) => tab.id !== tabId);
-        if (remaining.length === 0) remaining.push(newTab());
         if (tabId !== state.activeTabId) {
           temporalHistoryByTab.delete(tabId);
           set({ tabs: remaining });
@@ -3123,10 +3177,10 @@ export const useFlowStore = create<FlowState>()(
         const target = remaining[Math.min(closingIndex, remaining.length - 1)];
         runWithoutHistory(() => set({
           tabs: remaining,
-          activeTabId: target.id,
+          activeTabId: target?.id ?? "",
           viewer: null,
         }));
-        restoreTemporalHistory(target.id);
+        if (target) restoreTemporalHistory(target.id);
       },
       openFlowTab: (opts) => {
         // 读取在前（版本闸 / 迁移 / 投影）：文档被拒绝时当前页签状态保持原样（fail-closed）。
@@ -3184,7 +3238,8 @@ export const useFlowStore = create<FlowState>()(
         cancelHistoryTransaction();
         const tab = newTab();
         const state = get();
-        stashActiveTemporalHistory(state.activeTabId);
+        // 空工作区（tabs=[]）没有可暂存的旧历史
+        if (state.tabs.length > 0) stashActiveTemporalHistory(state.activeTabId);
         runWithoutHistory(() => set({
           tabs: [...state.tabs, tab],
           activeTabId: tab.id,
@@ -3332,6 +3387,7 @@ export const useFlowStore = create<FlowState>()(
       },
 
       addNode: (kind, position) => {
+        if (get().tabs.length === 0) return null;
         const tab = selectActiveDocument(get());
         if (tab.readOnly) return null;
         // v8：结果节点由 RunEvent 驱动创建（runtime.md §3.4），不接受手动新增。
@@ -3707,6 +3763,12 @@ export const useFlowStore = create<FlowState>()(
         flushActiveTextEdit();
         const target = selectActiveDocumentTarget(get());
         return (await saveTab(target)).ok;
+      },
+
+      saveTabById: async (tabId) => {
+        const tab = get().tabs.find((candidate) => candidate.id === tabId);
+        if (!tab || tab.readOnly) return false;
+        return (await saveTab(documentTarget(tab))).ok;
       },
 
       undo: () => {
@@ -4088,6 +4150,22 @@ if (typeof window !== "undefined") {
       tabSessionPersistencePending = false;
       forceRetryPending = false;
       return false;
+    }
+    if (currentState.tabs.length === 0) {
+      // 空工作区（用户关掉了全部页签）没有可恢复的草稿：清掉残留快照并报成功。
+      // 否则会误报「本地恢复失败 · 重试」，并在离开页面时弹确认——违反第 6 条「不提醒」。
+      tabSessionPersistenceDeferred = false;
+      tabSessionPersistencePending = false;
+      forceRetryPending = false;
+      storedTabMarkers.clear();
+      attemptedTabMarkers.clear();
+      failedTabIds.clear();
+      publishPersistenceResult(
+        clearProjectTabSessionStorage(window.sessionStorage)
+          ? { ok: true }
+          : { ok: false, error: TAB_SESSION_WRITE_ERROR },
+      );
+      return true;
     }
     const transaction = activeHistoryTransaction;
     if (transaction && !allowTransactionRebase) {

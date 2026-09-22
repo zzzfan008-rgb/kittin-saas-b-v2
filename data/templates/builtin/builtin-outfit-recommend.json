@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-outfit-recommend",
+  "name": "穿搭推荐",
+  "description": "描述场合、风格与身材，纯文生图生成穿搭推荐",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "outfit-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "场合/风格/身材",
+          "status": "idle",
+          "text": "【要求】描述场合、风格与身材"
+        }
+      },
+      {
+        "id": "outfit-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -170
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "穿搭推荐",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-outfit-prompt",
+        "source": "outfit-requirement",
+        "target": "outfit-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      }
+    ]
+  }
+}

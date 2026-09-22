@@ -58,6 +58,12 @@ test("the empty first screen stays local and only persists after the first subst
 
   const canvas = page.getByRole("application", { name: "工作流画布" });
   await page.goto("/");
+  // 2026-09-25 登录语义（决策 4）：冷启动 0 页签 → 首屏是「空工作区」引导（无画布、无工具栏）；
+  // 「新建项目」才得到一个不落库的本地空白页签 —— 这本身就是本用例要锁定的事实。
+  const guide = page.getByRole("region", { name: "空工作区" });
+  await expect(guide).toBeVisible();
+  await expect(canvas).toHaveCount(0);
+  await guide.getByRole("button", { name: "新建项目" }).click();
   await expect(canvas).toBeVisible();
 
   // 空首屏：中央「上传图片开始」CTA（TaskLauncher 浮层已随 R-76 删除），画布为空。
@@ -157,12 +163,17 @@ test("the empty first screen stays local and only persists after the first subst
   await expect(page.locator(".react-flow__node")).toHaveCount(1);
   expect((await readDraft())?.id).toBe(bootstrapped.id);
 
+  // 决策 4 / 登录语义 A：新页（没有本机 tab 会话）不再自动恢复服务端草稿，而是落「空工作区」；
+  // 草稿仍以账号为单位留在服务端（下面用 API 断言），并且「打开项目」入口可用。
   const secondPage = await page.context().newPage();
   await secondPage.goto("/");
-  await expect(secondPage.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
+  const secondGuide = secondPage.getByRole("region", { name: "空工作区" });
+  await expect(secondGuide).toBeVisible();
+  await expect(secondPage.getByTitle(`${editedName} · 双击重命名`)).toHaveCount(0);
   const secondTabDraft = await secondPage.context().request.get("/api/projects/initial-draft");
   expect(secondTabDraft.ok()).toBeTruthy();
   expect(((await secondTabDraft.json()) as InitialDraftBody).draft?.id).toBe(bootstrapped.id);
+  await expect(secondGuide.getByRole("button", { name: "打开项目" })).toBeVisible();
   await secondPage.close();
 
   await page.getByRole("button", { name: /^账户菜单：/ }).click();
@@ -172,7 +183,11 @@ test("the empty first screen stays local and only persists after the first subst
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
 
+  // 同页重登 ≠ 新开页：本机 tab 会话（sessionStorage）仍在，页签照旧恢复、画布内容不丢；
+  // 而「无 tab 会话的新页」才落空工作区（上一段已断言）。草稿以账号为单位存活在服务端，
+  // 名字与内容与退出前一致 —— 这才是本用例要锁定的「不丢工作」语义。
   await expect(page.getByTitle(`${editedName} · 双击重命名`)).toBeVisible();
+  await expect(page.locator(".react-flow__node")).toHaveCount(1);
   const afterRelogin = await readDraft();
   expect(afterRelogin?.id).toBe(bootstrapped.id);
   expect(afterRelogin?.name).toBe(editedName);
@@ -196,7 +211,7 @@ test.afterEach(async ({ page }) => {
   if (login.ok()) await page.context().storageState({ path: authStatePath });
 });
 
-test("relogin opens the latest saved project instead of bootstrapping a blank page", async ({ page }) => {
+test("relogin lands on the empty workspace without bootstrapping, and the saved project stays reachable", async ({ page }) => {
   const accountId = process.env.E2E_ACCOUNT_ID;
   const password = process.env.E2E_PASSWORD;
   if (!accountId || !password) throw new Error("Missing E2E login credentials");
@@ -241,10 +256,21 @@ test("relogin opens the latest saved project instead of bootstrapping a blank pa
   await page.getByLabel("密码").fill(password);
   await page.getByRole("button", { name: "登录" }).click();
 
-  await expect(page.getByTitle(`${projectName} · 双击重命名`)).toBeVisible();
+  // 决策 4 / 登录语义 A：重登落「空工作区」，既不自动打开最近项目，也不 bootstrap 空白页。
+  const guide = page.getByRole("region", { name: "空工作区" });
+  await expect(guide).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(0);
   expect(bootstrapRequests).toHaveLength(0);
+
+  // 但项目不能因为「不自动打开」就丢：从空工作区的「打开项目」入口进项目中心把它开回来。
   const project = await page.request.get("/api/projects");
   expect(project.ok()).toBeTruthy();
   const projects = await project.json() as ProjectSummaryBody[];
   expect(projects.some((item) => item.name === projectName)).toBeTruthy();
+
+  await guide.getByRole("button", { name: "打开项目" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+  await center.getByRole("button", { name: new RegExp(`^${projectName}`) }).click();
+  await expect(page.getByTitle(`${projectName} · 双击重命名`)).toBeVisible();
 });

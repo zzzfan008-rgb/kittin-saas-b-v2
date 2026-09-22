@@ -52,7 +52,7 @@ import {
   bootstrapNeedsFreshProjectIdentity,
   decideInitialDraftStartup,
   selectLocalInitialDraftCandidate,
-  shouldRestoreSavedProjectOnStartup,
+  shouldStayBlankOnStartup,
 } from "./initialDraftMigration";
 import {
   registerInitialDraftSaveBarrier,
@@ -316,6 +316,11 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
     setConflict(null);
     try {
       const state = useFlowStore.getState();
+      // 用户 2026-09-25 决策（A）：登录后一律「空白优先、无页签」，不自动打开已保存项目、
+      // 也不保留本地草稿页签。空工作区时 store 的多余页签在任何情况下都不存在
+      // （tabs=[]）,无需这里清除。
+      setGateState("ready");
+      if (state.tabs.length === 0) return;
       const placeholder = selectActiveDocument(state);
       const restored = didRestoreProjectTabSessionWorkspace();
       const ownerVerified = restored && readWorkspaceOwner(window.sessionStorage) === userId;
@@ -333,18 +338,8 @@ export function InitialDraftWorkspace({ userId, children }: { userId: string; ch
         fetchSavedProjects(signal),
       ]);
       if (signal.aborted) return;
-      if (shouldRestoreSavedProjectOnStartup(local, server, savedProjects.length)) {
-        const summary = savedProjects[0];
-        if (!summary) throw new Error("项目列表为空，请刷新后重试");
-        const detail = await fetchSavedProject(summary.id, signal);
-        if (signal.aborted) return;
-        useFlowStore.getState().openFlowTab({
-          projectId: detail.id,
-          projectName: detail.name,
-          // R-91：持久化 flow 交给文档层读取（版本闸 + v7→v8 惰性迁移）。
-          flow: detail.flow,
-          readOnly: detail.readOnly ?? false,
-        });
+      if (shouldStayBlankOnStartup(local, server, savedProjects.length)) {
+        // 决策 A：有已保存项目时保持空白，不自动打开、也不新建草稿（避免启动即写库）。
         setGateState("ready");
         return;
       }

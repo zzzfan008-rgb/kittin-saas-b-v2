@@ -107,7 +107,7 @@ export function CanvasZoomControls() {
 
           <ZoomButton
             label="适应画布"
-            onClick={() => void fitView({ padding: 0.16, duration: 180 })}
+            onClick={() => void fitView({ padding: 0.16, minZoom: 0.35, maxZoom: 0.8, duration: 180 })}
           >
             <Maximize2Icon aria-hidden="true" />
           </ZoomButton>

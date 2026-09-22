@@ -69,6 +69,9 @@ function resetDocument(id = "coalesced-text-node") {
   useFlowStore.temporal.getState().clear();
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("连续文本编辑事务测试");
 
 await test("一个输入 burst 实时更新，但只提交一次 history/revision", () => {
@@ -330,11 +333,10 @@ await test("同页签换项目后迟到的旧 success 不会提交新文档 IME 
 });
 
 await test("页面退出、关闭页签和所有文本入口都接入统一提交边界", async () => {
-  const [app, projectTabs, topBar, inspector, nodeFrame, textEditHook] = await Promise.all([
+  const [app, projectTabs, topBar, nodeFrame, textEditHook] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/panels/ProjectTabs.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/panels/TopBar.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/nodes/NodeFrame.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/hooks/useCoalescedTextEdit.ts", import.meta.url), "utf8"),
   ]);
@@ -342,7 +344,8 @@ await test("页面退出、关闭页签和所有文本入口都接入统一提�
   assert.match(projectTabs, /flushActiveTextEdit\(\);[\s\S]*useFlowStore\.getState\(\)\.tabs\.find/);
   assert.match(projectTabs, /useCoalescedTextEdit\([\s\S]*kind: "project-name"/);
   assert.doesNotMatch(topBar, /kind: "project-name"/);
-  assert.match(inspector, /field: "label"/);
+  // 节点改名只有一个家：画布上双击节点标题（NodeFrame）；左侧属性面板已随 Dock 删除。
+  assert.match(nodeFrame, /field: "label"/);
   assert.match(nodeFrame, /labelEdit\.cancel\(\)/);
   assert.match(textEditHook, /markKeyDown\(event\.key, composing\)/);
   assert.match(textEditHook, /consumeKeyUp\(event\.key\)\) return/);

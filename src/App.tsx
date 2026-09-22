@@ -19,10 +19,10 @@ import {
 import { CanvasFlow } from "@/components/CanvasFlow";
 import { TopBar } from "@/components/panels/TopBar";
 import { ProjectTabs } from "@/components/panels/ProjectTabs";
-import { NodeLibraryPanel } from "@/components/panels/NodeLibraryPanel";
-import { ContextPanel } from "@/components/panels/ContextPanel";
+import { ResultsFab } from "@/components/panels/ResultsFab";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { EmptyCanvasCTA } from "@/components/EmptyCanvasCTA";
+import { EmptyWorkspaceCTA } from "@/components/EmptyWorkspaceCTA";
 import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
@@ -207,6 +207,8 @@ export default function App({ userId }: { userId: string }) {
 function Workspace() {
   useGlobalShortcuts();
   const activeTabId = useFlowStore((state) => state.activeTabId);
+  // 第 6 条：页签可以全部关掉 → 空工作区（引导新建 / 打开），而不是自动补一个空白页签。
+  const workspaceEmpty = useFlowStore((state) => state.tabs.length === 0);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -380,21 +382,21 @@ function Workspace() {
           )}
         </div>
       )}
-      <WorkbenchShell
-        library={<NodeLibraryPanel className="h-full w-full border-r-0" />}
-        inspector={(
-          <ContextPanel
-            hasMore={historyHasMore}
-            loadingMore={historyLoading}
-            onLoadMore={() => void loadMoreHistory()}
-          />
-        )}
-      >
+      <WorkbenchShell>
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <ReactFlowProvider key={activeTabId}>
-            <EmptyCanvasCTA />
-            <CanvasFlow />
-          </ReactFlowProvider>
+          {workspaceEmpty ? (
+            <EmptyWorkspaceCTA />
+          ) : (
+            <ReactFlowProvider key={activeTabId}>
+              <EmptyCanvasCTA />
+              <CanvasFlow />
+              <ResultsFab
+                hasMore={historyHasMore}
+                loadingMore={historyLoading}
+                onLoadMore={() => void loadMoreHistory()}
+              />
+            </ReactFlowProvider>
+          )}
         </div>
       </WorkbenchShell>
       {compareOpen && (

@@ -330,11 +330,11 @@ export interface ExecutionPlan {
 export interface WorkflowTemplate {
   schemaVersion: WorkflowSchemaVersion;
   id: string;
-  /** 用户模板所有者；内置模板不设置。服务端据此执行账号隔离。 */
+  /** 历史用户模板所有者字段（2026-09-25 起服务端不再产出用户模板，保留以兼容旧响应）。 */
   ownerId?: string;
   name: string;
   description: string;
-  /** 内置模板（随部署预置，不可删） */
+  /** 内置模板（随部署预置，只读；当前全部模板都是内置） */
   builtIn?: boolean;
   /** 缩略图（可选，/api/files/xxx） */
   thumbnail?: string;
@@ -373,9 +373,8 @@ export interface Asset {
 // GET  /api/files/:id  读取图片
 // POST /api/projects   保存项目 { id, name, flow } → { ok }
 // GET  /api/projects/:id → { id, name, flow }
-// GET    /api/templates        → WorkflowTemplate[]（内置 + 用户）
-// POST   /api/templates        { name, description, thumbnail?, flow } → { ok, id }
-// DELETE /api/templates/:id    删除用户模板（内置不可删，403）
+// GET    /api/templates        → WorkflowTemplate[]（只读：15 个内置模板）
+//                               用户模板写入路径已于 2026-09-25 决策取消（卡 t_c40ec099）
 // GET    /api/templates/:id    → WorkflowTemplate
 // GET    /api/assets           ?category=print → Asset[]（按 createdAt 倒序）
 // POST   /api/assets           { name, category, image, sourceNote? } → { ok, id }

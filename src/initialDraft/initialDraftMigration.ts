@@ -24,10 +24,11 @@ export function bootstrapNeedsFreshProjectIdentity(
 }
 
 /**
- * 没有可信本地页签时，优先恢复最近正式项目；只有空白初始草稿存在且没有正式项目时，
- * 才继续进入初始草稿。带有未保存内容的服务端草稿仍由调用方优先恢复。
+ * 用户 2026-09-25 决策 A：登录后一律「空白优先、无页签」——启动时既不自动打开最近正式项目，
+ * 也不自动新建初始草稿（草稿 bootstrap 会写库）。只有账号下一个正式项目都没有、且服务端没有
+ * 待恢复草稿时才放行后续的草稿启动流程。空工作区（tabs=[]）在调用点已经提前返回。
  */
-export function shouldRestoreSavedProjectOnStartup(
+export function shouldStayBlankOnStartup(
   local: ProjectTab | null,
   server: ServerInitialDraftSnapshot | null,
   savedProjectCount: number,

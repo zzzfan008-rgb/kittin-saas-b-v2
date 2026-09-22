@@ -67,6 +67,9 @@ function apply(event: RunEvent): RecentResult[] {
   return applyRunEventToRecentResults([queued], queued.id, event);
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("生成记录生命周期测试");
 
 test("排队卡收到运行事件后原地更新，不重复新建", () => {

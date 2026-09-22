@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-garment-recolor",
+  "name": "服装换色",
+  "description": "上传服装图，列出目标配色，生成换色效果",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "recolor-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "目标配色清单",
+          "status": "idle",
+          "text": "【要求】列出目标配色"
+        }
+      },
+      {
+        "id": "garment",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "recolor-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "换色生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-recolor-prompt",
+        "source": "recolor-requirement",
+        "target": "recolor-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-recolor-ref",
+        "source": "garment",
+        "target": "recolor-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

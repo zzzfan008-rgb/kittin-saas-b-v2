@@ -89,6 +89,9 @@ function selectedFlags(): Array<[string, boolean]> {
   return activeDocument().nodes.map((candidate) => [candidate.id, Boolean(candidate.selected)]);
 }
 
+// 决策 4（A）：冷启动不再自动创建页签；本文件的画布用例显式新建一个空白项目承接文档状态。
+useFlowStore.getState().createBlankTab();
+
 console.log("节点与结果选择一致性测试");
 
 test("程序化单选同步 canonical IDs、primary 与 React Flow flags", () => {
@@ -385,12 +388,13 @@ test("复制读取 canonical 多选集合，属性面板保持 primary selector"
   assert.equal(inspectorNodeId, "a", "Inspector selector 必须指向最后增选的节点");
 
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-  const inspectorSource = fs.readFileSync(
-    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+  // 属性面板随左侧 Dock 删除后，主选中节点的唯一消费者是画布节点新建动作。
+  const canvasNodeActionsSource = fs.readFileSync(
+    new URL("../src/components/panels/canvasNodeActions.ts", import.meta.url),
     "utf8",
   );
   assert.match(appSource, /selectActiveSelectedNodeIds/);
-  assert.match(inspectorSource, /useFlowStore\(selectActivePrimarySelectedNodeId\)/);
+  assert.match(canvasNodeActionsSource, /selectActivePrimarySelectedNodeId/);
   assert.doesNotMatch(appSource, /getState\(\)\.selectedNodeId/);
 });
 

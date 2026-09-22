@@ -63,6 +63,23 @@ export function ImageViewer() {
       : undefined
   ));
   const closeViewer = useFlowStore((s) => s.closeViewer);
+  /**
+   * 结果详情弹窗(z-71) 之上再叠查看器(z-80)。
+   * Base UI Dialog 的 Esc 处理在查看器打开时会丢给 document 级
+   * 键盘监听，由于查看器渲染在 Dialog 后，需要在这里最先响应
+   * Esc 以便「先关闭最上层」。
+   */
+  useEffect(() => {
+    if (!viewer) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeViewer();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => document.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [viewer, closeViewer]);
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();
   const unsupportedKind = record !== undefined && !nodeSpecForKind(record.kind);
   const [scale, setScale] = useState(1);
@@ -124,7 +141,7 @@ export function ImageViewer() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch bg-black/85"
+      className="fixed inset-0 z-[80] flex items-stretch bg-black/85"
       onClick={closeViewer}
     >
       <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-8">

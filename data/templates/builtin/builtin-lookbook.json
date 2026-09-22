@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 8,
+  "id": "builtin-lookbook",
+  "name": "LookBook",
+  "description": "上传服装图，列出风格与场景清单，生成多组 LookBook",
+  "builtIn": true,
+  "createdAt": "2026-08-05T00:00:00.000Z",
+  "flow": {
+    "schemaVersion": 8,
+    "nodes": [
+      {
+        "id": "lookbook-requirement",
+        "type": "text",
+        "position": {
+          "x": 0,
+          "y": -170
+        },
+        "data": {
+          "kind": "text",
+          "label": "风格/场景清单",
+          "status": "idle",
+          "text": "【要求】列出风格与场景清单"
+        }
+      },
+      {
+        "id": "garment",
+        "type": "image",
+        "position": {
+          "x": 0,
+          "y": 20
+        },
+        "data": {
+          "kind": "image",
+          "label": "服装图",
+          "status": "idle",
+          "outputImages": []
+        }
+      },
+      {
+        "id": "lookbook-gen",
+        "type": "image-generator",
+        "position": {
+          "x": 380,
+          "y": -75
+        },
+        "data": {
+          "kind": "image-generator",
+          "label": "LookBook 生成",
+          "status": "idle",
+          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "modelId": "gpt-image-2.5-flare-vip",
+          "modelOptions": {
+            "size": "1536x2048"
+          },
+          "aspectRatio": "3:4",
+          "batchSize": 2
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-lookbook-prompt",
+        "source": "lookbook-requirement",
+        "target": "lookbook-gen",
+        "targetHandle": "prompt",
+        "data": {}
+      },
+      {
+        "id": "e-lookbook-ref",
+        "source": "garment",
+        "target": "lookbook-gen",
+        "targetHandle": "reference",
+        "data": {}
+      }
+    ]
+  }
+}

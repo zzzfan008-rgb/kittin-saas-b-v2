@@ -2,15 +2,18 @@ import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from 
 import { PlusIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { OPEN_PROJECT_CENTER_EVENT } from "@/lib/overlayEvents";
 import {
   flushActiveTextEdit,
-  projectTabLifecycle,
+  projectTabCloseBlockReason,
   useFlowStore,
   type ProjectTab,
 } from "@/store/flowStore";
-import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
+import {
+  getGenerationSafetyBlockReason,
+  useGenerationSafetyBlockReason,
+} from "@/store/generationSafety";
 import { isNodeRunActive } from "@/types/workflow";
-import { useInitialDraftWorkspace } from "@/initialDraft/InitialDraftWorkspace";
 
 const loadProjectCenter = () => import("./ProjectCenter");
 const LazyProjectCenter = lazy(() => loadProjectCenter().then((module) => ({
@@ -25,10 +28,11 @@ export function ProjectTabs() {
   const tabs = useFlowStore((state) => state.tabs);
   const activeTabId = useFlowStore((state) => state.activeTabId);
   const switchTab = useFlowStore((state) => state.switchTab);
-  const closeTab = useFlowStore((state) => state.closeTab);
   const saveProject = useFlowStore((state) => state.saveProject);
   const [projectCenterOpen, setProjectCenterOpen] = useState(false);
   const [projectCenterRequested, setProjectCenterRequested] = useState(false);
+  // 生成安全门（确认运行历史）未收敛前，恢复页签的关闭仍被封锁：用同一真相把 × 置灰。
+  const generationSafetyBlockReason = useGenerationSafetyBlockReason();
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
@@ -36,8 +40,16 @@ export function ProjectTabs() {
   const projectNameEdit = useCoalescedTextEdit(
     editingTabId === activeTabId ? { kind: "project-name" } : null,
   );
-  const runReconciliationBlockReason = useGenerationSafetyBlockReason();
-  const { abandon, abandoningTabId } = useInitialDraftWorkspace();
+
+  // 空工作区引导的「打开项目」落到这里（项目中心宿主仍是页签栏）。
+  useEffect(() => {
+    const openProjectCenter = () => {
+      setProjectCenterRequested(true);
+      setProjectCenterOpen(true);
+    };
+    window.addEventListener(OPEN_PROJECT_CENTER_EVENT, openProjectCenter);
+    return () => window.removeEventListener(OPEN_PROJECT_CENTER_EVENT, openProjectCenter);
+  }, []);
 
   useEffect(() => {
     if (!editingTabId) return;
@@ -94,36 +106,16 @@ export function ProjectTabs() {
     flushActiveTextEdit();
     const latestTab = useFlowStore.getState().tabs.find((candidate) => candidate.id === tab.id);
     if (!latestTab) return;
-    const warnings: string[] = [];
-    if (runReconciliationBlockReason) {
-      window.alert(`${runReconciliationBlockReason}。为避免运行中的付费结果失去画布，暂时不能关闭项目页签。`);
-      return;
+    const state = useFlowStore.getState();
+    // 运行中的付费任务 / 未完成的历史对账都不能关（否则结果失去画布）：硬保护保留，
+    // 但不再用 alert 打断——原因常驻在 × 的 title 里，点了也不会「没反应」。
+    if (projectTabCloseBlockReason(latestTab, getGenerationSafetyBlockReason())) return;
+    const pristine = latestTab.nodes.length === 0 && latestTab.edges.length === 0;
+    // 有改动且非空白 → 先静默保存再关；空白且无改动 → 直接关；只读 → 直接关。
+    if (latestTab.dirty && !pristine && !latestTab.readOnly) {
+      await state.saveTabById(latestTab.id);
     }
-    if (hasRunningNode(latestTab)) {
-      window.alert("生成任务运行中，请等待任务完成后再关闭项目页签；结果会继续写回当前画布。");
-      return;
-    }
-    if (projectTabLifecycle(latestTab) === "initial_draft") {
-      const firstConfirmed = window.confirm(
-        `${latestTab.projectName} 是当前账号唯一的未保存初始项目。放弃后它会从工作台移除，并进入 15 天恢复期。是否继续？`,
-      );
-      if (!firstConfirmed) return;
-      const secondConfirmed = window.confirm(
-        `再次确认放弃 ${latestTab.projectName}？系统随后会创建一个全新的未保存初始项目。`,
-      );
-      if (!secondConfirmed) return;
-      const abandoned = await abandon(latestTab.id);
-      if (!abandoned) window.alert("未能放弃当前初始项目，请根据工作台提示重试。");
-      return;
-    }
-    if (latestTab.dirty) warnings.push("有未保存修改");
-    if (
-      warnings.length > 0 &&
-      !window.confirm(`${latestTab.projectName}：${warnings.join("，")}。确定关闭这个项目页签吗？`)
-    ) {
-      return;
-    }
-    closeTab(latestTab.id);
+    state.closeTab(latestTab.id);
   };
 
   return (
@@ -136,6 +128,7 @@ export function ProjectTabs() {
           const active = tab.id === activeTabId;
           const editing = active && editingTabId === tab.id;
           const running = hasRunningNode(tab);
+          const closeBlockReason = projectTabCloseBlockReason(tab, generationSafetyBlockReason);
           return (
             <div
               key={tab.id}
@@ -223,9 +216,9 @@ export function ProjectTabs() {
                   variant="ghost"
                   size="icon-xs"
                   onClick={() => void requestClose(tab)}
-                  disabled={abandoningTabId === tab.id}
                   aria-label={`关闭 ${tab.projectName}`}
-                  title="关闭页签"
+                  disabled={closeBlockReason !== null}
+                  title={closeBlockReason ?? "关闭页签"}
                   className="ml-1 size-auto rounded-sm px-1 py-0 text-[13px] font-normal leading-5 text-[var(--gc-text-muted)] hover:bg-white/5 hover:text-[var(--gc-text)] disabled:cursor-wait disabled:opacity-40"
                 >
                   ×

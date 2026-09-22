@@ -256,7 +256,7 @@ const {
   writeTabSessionSnapshot,
 } = await import("../src/store/flowStore");
 const { createTemplateRequestPayload } = await import(
-  "../src/components/panels/TemplatesDock"
+  "../src/lib/templateSerialization"
 );
 
 function activeDocument(state = useFlowStore.getState()) {

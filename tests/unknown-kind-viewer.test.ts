@@ -56,17 +56,17 @@ test("占位组件显式渲染「不支持的旧版本内容」与可读的节�
 
 test("结果查看器（生成记录详情）渲染分发不再直接下标查表未知 kind", () => {
   const inspector = readFileSync(
-    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+    new URL("../src/components/panels/ResultRecordDetail.tsx", import.meta.url),
     "utf8",
   );
   // 旧崩溃链 `NODE_SPECS[record.kind].title` / `NODE_SPECS[d.kind]` 已移除；
-  // 结果详情与属性摘要都经 nodeSpecForKind / nodeTitleForKind 稳健查表并渲染占位。
-  assert.ok(!inspector.includes("NODE_SPECS[record.kind]"), "结果详情仍直接下标查表");
-  assert.ok(!inspector.includes("NODE_SPECS[d.kind]"), "属性摘要仍直接下标查表");
+  // 结果详情经 nodeSpecForKind / nodeTitleForKind 稳健查表并渲染占位。
+  // （属性摘要 `PropertySummary` 随左侧 Dock 一起删除，这里不再有第二处下标。）
+  assert.ok(!inspector.includes("NODE_SPECS["), "结果详情仍直接下标查表");
   assert.match(inspector, /nodeTitleForKind\(record\.kind\)/);
   assert.match(inspector, /nodeSpecForKind\(record\.kind\)/);
-  assert.match(inspector, /nodeSpecForKind\(d\.kind\)/);
   assert.match(inspector, /UnsupportedNodeKindNotice/);
+  assert.doesNotMatch(inspector, /PropertySummary/, "属性摘要必须随左侧 Dock 一起删除");
 });
 
 test("节点工具条 / 内联面板与连线校验的未知 kind 下标查表也已收敛到稳健查表", () => {

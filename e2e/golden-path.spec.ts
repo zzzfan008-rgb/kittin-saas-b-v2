@@ -1,6 +1,7 @@
 import type { Page, Request } from "@playwright/test";
 import sharp from "sharp";
 import { illegalEdgeIndexes, missingTextUpstreamNodeIds, type NodeKind } from "../src/types/workflow";
+import { WORKFLOW_MENU_MAPPING } from "../src/lib/workflowMenuMapping";
 import { expect, test } from "./fixtures";
 
 const STUB_IMAGE =
@@ -65,6 +66,11 @@ async function openEmptyFirstScreen(page: Page): Promise<void> {
     await route.fulfill({ json: [] });
   });
   await page.reload();
+  // 2026-09-25 登录语义（决策 4）：冷启动 0 页签 → 「空工作区」引导（无画布、无工具栏）。
+  // 先建一个本地空白页签，才谈得上「空首屏 + 中央 CTA」。
+  const guide = page.getByRole("region", { name: "空工作区" });
+  await expect(guide).toBeVisible();
+  await guide.getByRole("button", { name: "新建项目" }).click();
   await expect(page.getByRole("application", { name: "工作流画布" })).toBeVisible();
 }
 
@@ -248,23 +254,30 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
   expect(bootstrapRequests).toEqual([]);
 
-  // ---------- ② 项目中心：v8 的 15 个内置模板可启动（封面真实加载） ----------
+  // ---------- ② 模板入口：项目中心只留「最近项目」，15 个内置模板改从左侧工作流二级菜单进入 ----------
+  // 2026-09-25 决策：入口从项目中心迁到左侧工具胶囊的二级菜单（GET /api/templates 保留 15 个内置模板）。
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const center = page.getByRole("dialog", { name: "项目中心" });
   await expect(center).toBeVisible();
-  await center.getByRole("tab", { name: "内置模板" }).click();
-  const builtinPanel = center.getByRole("tabpanel", { name: "内置模板" });
-  const templateCards = builtinPanel.getByRole("button");
-  await expect(templateCards).toHaveCount(BUILTIN_TEMPLATE_COUNT);
-  await expect.poll(() => templateCards.evaluateAll((buttons) => (
-    buttons.filter((button) => button.textContent?.includes("内置")).length
-  ))).toBe(BUILTIN_TEMPLATE_COUNT);
-  const covers = builtinPanel.locator("img");
-  await expect(covers).toHaveCount(BUILTIN_TEMPLATE_COUNT);
-  await expect.poll(() => covers.evaluateAll((images) => images.filter((image) => (
-    image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
-  )).length)).toBe(BUILTIN_TEMPLATE_COUNT);
-  await expect(builtinPanel.getByText(TEMPLATE_NAME, { exact: true })).toBeVisible();
+  await expect(center.getByText("最近项目", { exact: true })).toBeVisible();
+  await expect(center.getByRole("tab")).toHaveCount(0);
+  await center.getByRole("button", { name: "关闭项目中心" }).click();
+  await expect(center).toHaveCount(0);
+
+  // 契约：左侧二级菜单的「菜单项 → 模板」映射必须覆盖全部 15 个内置模板
+  // （首尾帧 / 视频复刻在映射里是 templateId: null 的延后项，不计入）。
+  const mappedTemplateIds = new Set(
+    Object.values(WORKFLOW_MENU_MAPPING)
+      .map((binding) => binding.templateId)
+      .filter((templateId): templateId is string => Boolean(templateId)),
+  );
+  expect(mappedTemplateIds.size).toBe(BUILTIN_TEMPLATE_COUNT);
+
+  const workflowRail = page.getByRole("navigation", { name: "工作台左侧工具" });
+  await workflowRail.getByRole("button", { name: "AI 换装工作流" }).hover();
+  const tryonMenu = page.getByRole("menu", { name: "AI 换装工作流" });
+  await expect(tryonMenu).toBeVisible();
+  await expect(tryonMenu.getByRole("menuitem", { name: TEMPLATE_NAME })).toBeVisible();
 
   // ---------- ③ 模板落地：上传位上传两张真实图片（参考图顺序：图1 → 图2） ----------
   // 模板落地会按「上传位」语义请求 native file chooser（activateFilePicker 依赖挂载时序，
@@ -273,7 +286,10 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   page.on("filechooser", (chooser) => {
     void chooser.setFiles([]);
   });
-  await builtinPanel.getByRole("button", { name: new RegExp(`^${TEMPLATE_NAME}`) }).click();
+  // 二级菜单是 hover 展开的：点之前重新 hover 一次（幂等），不依赖 §② 之后菜单还开着。
+  await workflowRail.getByRole("button", { name: "AI 换装工作流" }).hover();
+  await expect(tryonMenu).toBeVisible();
+  await tryonMenu.getByRole("menuitem", { name: TEMPLATE_NAME }).click();
   const garmentNode = page.getByTestId("rf__node-garment");
   const modelNode = page.getByTestId("rf__node-model");
   const generatorNode = page.getByTestId(`rf__node-${GENERATOR_NODE_ID}`);
@@ -375,25 +391,29 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   }
 
   // ---------- ⑦ 结果面板：结果、动作、查看器、主题 token ----------
-  // v7/R-80 布局：结果面板与属性面板同住在唯一占位 Dock 内（`WorkbenchShell` 的
-  // `属性 / 结果` 入口，默认收起）。这里按真实用户路径先展开 Dock，再切到结果页签。
-  const contextToggle = page.getByRole("button", { name: "属性 / 结果" });
-  await contextToggle.click();
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("tab", { name: "结果 / 记录" }).click();
-  const results = page.getByRole("region", { name: "最近生成" });
+  // 2026-09-25 UI 修复第 5 条：结果 / 记录迁到画布右上角的纯文字图标浮层（`ResultsFab`），
+  // 点击展开；浮层是弹层语义，收起即卸载。2026-09-25 决策：文案统一为「历史创作记录」。
+  const resultsFab = page.getByRole("button", { name: "历史创作记录", exact: true });
+  const resultsDialog = page.getByRole("dialog", { name: "历史创作记录" });
+  const results = resultsDialog.getByRole("region", { name: "最近生成" });
+  await resultsFab.click();
+  await expect(resultsFab).toHaveAttribute("aria-expanded", "true");
+  await expect(resultsDialog).toBeVisible();
   await expect(results).toBeVisible();
   const resultCard = results.locator('article:has(img[alt="试穿生成"])');
   await expect(resultCard).toBeVisible();
   await resultCard.hover();
   const actionBar = resultCard.locator("div.absolute.inset-x-0.bottom-0");
   await expect(actionBar).toHaveClass(/grid-cols-2/);
-  await expect(resultCard.locator('button[title="查看"]')).toBeVisible();
+  // 2026-09-25 第 5 批（ab68c16）：卡片上的动作按钮「查看」改成「查看详情」（文本仍是「查看」，
+  // title 变为「查看详情」），点它打开「结果详情」弹窗；图片查看器改由弹窗里的大图按钮进入。
+  await expect(resultCard.locator('button[title="查看详情"]')).toBeVisible();
   await expect(resultCard.locator('button[title="加入对比"]')).toBeVisible();
   await expect(resultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
 
   const nodesBeforeApply = await page.locator(".react-flow__node").count();
-  // 媒体遮罩文字 token 的主题稳定性：必须在查看器打开前读——查看器关闭（Escape）会收起 Dock。
+  // 媒体遮罩文字 token 的主题稳定性：必须在查看器打开前读——查看器关闭（Escape）会连同
+  // 结果浮层一起收起（`ResultsFab` 也监听 Esc），卡片随之卸载。
   const originalTheme = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
   for (const theme of ["white", "eye", "current"] as const) {
     await page.evaluate((value) => {
@@ -401,7 +421,7 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     }, theme);
     // 读 token 而非 computed color：computed color 受 hover:text-white 影响（鼠标移出后
     // :hover 要到下一帧才失效，存在竞态）；token 在三种主题下都应稳定为 #f4f4f4。
-    const overlayToken = await resultCard.locator('button[title="查看"]').evaluate(
+    const overlayToken = await resultCard.locator('button[title="查看详情"]').evaluate(
       (element) => getComputedStyle(element).getPropertyValue("--gc-media-overlay-text").trim(),
     );
     expect(overlayToken).toBe("#f4f4f4");
@@ -410,17 +430,27 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
     if (value) document.documentElement.setAttribute("data-theme", value);
   }, originalTheme);
 
-  await resultCard.locator('button[title="查看"]').click();
+  // 2026-09-25 第 5 批：点「查看详情」先打开「结果详情」弹窗，图片查看器改由弹窗里的大图按钮进入。
+  await resultCard.locator('button[title="查看详情"]').click();
+  const detailDialog = page.getByRole("dialog", { name: "结果详情" });
+  await expect(detailDialog).toBeVisible();
+  await detailDialog.getByRole("button", { name: /查看 .* 大图/ }).click();
   await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
+  // Esc 可能只关掉查看器：确定性地收掉详情弹窗，避免后续点击被遮罩拦截（不用不自动等待的 isVisible）。
+  if (await page.getByRole("button", { name: "关闭结果详情" }).count() > 0) {
+    await page.getByRole("button", { name: "关闭结果详情" }).click();
+  }
+  await expect(detailDialog).toHaveCount(0);
 
   // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点 ----------
-  if (await contextToggle.getAttribute("aria-expanded") !== "true") {
-    await contextToggle.click();
+  // 查看器 Esc 会连同结果浮层一起收起（弹层语义），所以这里按需重开（用按钮的 ARIA 状态判断，
+  // 不用不自动等待的 isVisible()）。
+  if (await resultsFab.getAttribute("aria-expanded") !== "true") {
+    await resultsFab.click();
   }
-  await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("tab", { name: "结果 / 记录" }).click();
+  await expect(resultsDialog).toBeVisible();
   await expect(resultCard).toBeVisible();
   await resultCard.locator('button[title="设为输入"]').click();
   await expect(page.locator(".react-flow__node")).toHaveCount(nodesBeforeApply + 1);

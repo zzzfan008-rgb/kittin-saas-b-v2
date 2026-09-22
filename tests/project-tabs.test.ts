@@ -7,6 +7,7 @@ import { resolveTargetHandle } from "../src/lib/documentSnapshot";
 import type { Edge } from "@xyflow/react";
 import {
   addExistingNodes,
+  EMPTY_ACTIVE_DOCUMENT,
   applyResultNodeCreatedEventToTab,
   applyRunEventToTab,
   beginHistoryTransaction,
@@ -80,6 +81,13 @@ async function test(name: string, run: () => void | Promise<void>): Promise<void
     throw error;
   }
 }
+
+// 2026-09-25 决策 4（A）：登录后没有任何打开页签——冷启动（无会话快照）tabs 为空，
+// 画布区由 EmptyWorkspaceCTA 接管；页签全部由用户显式「新建项目 / 打开项目」产生。
+const bootstrapState = useFlowStore.getState();
+assert.equal(bootstrapState.tabs.length, 0, "冷启动不得自动打开任何页签");
+assert.equal(bootstrapState.activeTabId, "", "无页签时 activeTabId 为空");
+assert.equal(selectActiveDocument(bootstrapState), EMPTY_ACTIVE_DOCUMENT, "空工作区活动文档为空投影");
 
 function imageNode(id: string, label: string): FlowNode {
   return {
@@ -181,6 +189,8 @@ console.log("项目多页签状态测试");
 // 此文件验证已完成历史对账后的运行路径；冷启动 fail-closed 由 generation-safety.test 覆盖。
 setGenerationSafetyBlockReason(null);
 
+// 决策 4（A）：冷启动无页签——本文件的画布用例显式新建一个空白项目起步。
+useFlowStore.getState().createBlankTab();
 const initial = useFlowStore.getState();
 const tabA = initial.activeTabId;
 initial.setProjectName("项目 A");
@@ -390,15 +400,32 @@ await test("运行中的页签不能关闭，避免任务结果丢失画布回�
   useFlowStore.getState().updateNodeData("b-node", { status: "idle" });
 });
 
-await test("关闭当前页签后切换到相邻页签，至少保留一个画布", () => {
+await test("关闭当前页签后切换到相邻页签；关掉最后一个页签留空工作区（第 6 条）", () => {
   useFlowStore.getState().closeTab(tabB);
   assert.equal(useFlowStore.getState().activeTabId, tabA);
   assert.equal(useFlowStore.getState().tabs.length, 1);
   useFlowStore.getState().closeTab(tabA);
+  // 第 6 条：允许关掉全部页签，不再偷偷补回一个空白页签；画布区由 EmptyWorkspaceCTA 接管。
+  assert.equal(useFlowStore.getState().tabs.length, 0);
+  assert.equal(useFlowStore.getState().activeTabId, "");
+  // 空工作区仍可安全读取：活动文档边界返回冻结空投影，而不是抛错。
+  assert.equal(selectActiveDocument(useFlowStore.getState()), EMPTY_ACTIVE_DOCUMENT);
+  assert.deepEqual(selectActiveDocumentTarget(useFlowStore.getState()), {
+    tabId: "",
+    projectId: "",
+    documentEpoch: 0,
+  });
+  assert.deepEqual(selectActiveDocument(useFlowStore.getState()).nodes, []);
+  // 空工作区里写不进任何文档变更，也不会凭空造出幽灵页签。
+  assert.equal(useFlowStore.getState().addNode("image", { x: 0, y: 0 }), null);
+  assert.equal(useFlowStore.getState().tabs.length, 0);
+  // 引导按钮「新建项目」→ createBlankTab：全新的未保存空白项目（第 4 条口径）。
+  useFlowStore.getState().createBlankTab();
   assert.equal(useFlowStore.getState().tabs.length, 1);
-  assert.ok(useFlowStore.getState().activeTabId);
-  // 方案 C：关闭最后一个页签后重建的是空白画布（nodes=[]）。
   assert.equal(activeDocument().nodes.length, 0);
+  assert.equal(activeDocument().dirty, false);
+  assert.equal(isPristineProjectTab(activeDocument()), true);
+  assert.equal(useFlowStore.getState().activeTabId, activeDocument().id);
 });
 
 await test("删除已选节点时同步清理 selectedNodeId", () => {
@@ -444,16 +471,16 @@ await test("素材节点以单一原子 action 加入，一次撤销完整移除
   assert.equal(activeDocument().nodes.some((node) => node.id === addedId), false);
   assert.equal(activeDocument().selectedNodeId, null);
 
-  const librarySource = fs.readFileSync(
-    new URL("../src/components/panels/NodeLibraryPanel.tsx", import.meta.url),
+  const canvasNodeActionsSource = fs.readFileSync(
+    new URL("../src/components/panels/canvasNodeActions.ts", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(
-    librarySource,
+    canvasNodeActionsSource,
     /addAssetNode\(asset,|AssetList|\/api\/assets/,
     "独立节点库不再承担素材管理，但 Store 的原子素材节点 action 仍需保持可用",
   );
-  assert.doesNotMatch(librarySource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
+  assert.doesNotMatch(canvasNodeActionsSource, /useFlowStore\.getState\(\)\.selectedNodeId|updateNodeData\(newId/);
 });
 
 await test("多选节点批量粘贴只产生一次文档提交与撤销记录", () => {
@@ -1462,8 +1489,8 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     new URL("../src/components/nodes/ImageGeneratorNode.tsx", import.meta.url),
     "utf8",
   );
-  const legacyInspectorSource = fs.readFileSync(
-    new URL("../src/components/panels/InspectorPanel.tsx", import.meta.url),
+  const resultRecordDetailSource = fs.readFileSync(
+    new URL("../src/components/panels/ResultRecordDetail.tsx", import.meta.url),
     "utf8",
   );
   const imageNodeSource = fs.readFileSync(
@@ -1481,9 +1508,9 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     "生图节点必须挂载内联参数面板",
   );
   assert.doesNotMatch(
-    legacyInspectorSource,
+    resultRecordDetailSource,
     /modelOptions/,
-    "旧 InspectorPanel 不得保留第二处原生参数编辑入口",
+    "结果记录视图不得成为第二处原生参数编辑入口（属性面板已整体删除）",
   );
   assert.doesNotMatch(
     imageNodeSource,
@@ -1892,15 +1919,15 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
     "utf8",
   );
 
-  assert.match(appSource, /<WorkbenchShell[\s\S]*library=\{<NodeLibraryPanel/);
+  // 2026-09-25 决策：左侧 Dock 与「属性 / 结果」入口整体移除后，工作台外壳只接收
+  // 中心画布子树，不再有 library / inspector 两个面板插槽。
+  assert.match(appSource, /<WorkbenchShell>/);
+  assert.doesNotMatch(appSource, /library=\{<|inspector=\{</);
   assert.equal((shellSource.match(/\{children\}/g) ?? []).length, 1);
-  assert.equal((shellSource.match(/\{library\}/g) ?? []).length, 1);
-  assert.equal((shellSource.match(/\{inspector\}/g) ?? []).length, 1);
+  assert.doesNotMatch(shellSource, /\{library\}|\{inspector\}|activePanel/);
   assert.doesNotMatch(shellSource, /MobileSheet|useMediaQuery|mobilePanel/);
-  assert.match(shellSource, /aria-controls=\{[^}]*INSPECTOR_PANEL_ID[^}]*\}/);
-  assert.match(shellSource, /id=\{LIBRARY_PANEL_ID\}/);
-  assert.match(shellSource, /id=\{INSPECTOR_PANEL_ID\}/);
-  assert.match(shellSource, /transition-\[width,visibility\]/);
+  // 「属性 / 结果」入口与 Dock 容器（aria-controls / 两个 panel id / Dock 宽度过渡）已整体删除。
+  assert.doesNotMatch(shellSource, /aria-controls|transition-\[width,visibility\]|w-80/);
   assert.match(topBarSource, /grid-cols-\[1fr_auto_1fr\]/);
   assert.match(topBarSource, /Coin AI - Canvas/);
   assert.match(topBarSource, /<ThemeSwitcher \/>/);
@@ -1922,35 +1949,23 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectTabsSource, /if \(!saved\) \{[\s\S]*setRenameError/);
   assert.match(projectTabsSource, /onBlur=\{\(event\) => \{[\s\S]*setEditingTabId\(null\)/);
   assert.match(projectTabsSource, /role="alert"/);
-  assert.match(projectCenterSource, /activeSection === "recent"/);
-  assert.match(projectCenterSource, /activeSection === "templates"/);
-  assert.match(projectCenterSource, /"my-templates"/);
-  assert.match(projectCenterSource, /if \(!template\.builtIn\) return false/);
-  assert.match(projectCenterSource, /if \(template\.builtIn\) return false/);
-  assert.match(projectCenterSource, /inferTemplateLaunchMode\(template\)/);
-  assert.match(projectCenterSource, /launchTemplateInNewTab\(template,\s*inferTemplateLaunchMode\(template\)\)/);
+  // 2026-09-25 决策 3：项目中心只保留「最近项目」——「内置模板」迁到左侧工作流二级菜单,
+  // 「我的模板」与「保存当前画布为模板」整体取消（模板/项目都自带自动保存）。
+  assert.match(projectCenterSource, /最近项目/);
+  assert.doesNotMatch(projectCenterSource, /内置模板|我的模板|保存当前画布为模板/);
+  assert.doesNotMatch(projectCenterSource, /<Tabs|TabsTrigger|TabsContent|inferTemplateLaunchMode|launchTemplateInNewTab/);
+  assert.doesNotMatch(projectCenterSource, /DELETE|AlertDialog|DropdownMenu|SAVE_TEMPLATE_COVER|BUILTIN_TEMPLATE_COVERS|templateProductPolicy/);
   assert.doesNotMatch(projectCenterSource, /projectDetails/);
-  assert.match(projectCenterSource, /Promise\.allSettled\(\[loadProjects\(\), loadTemplates\(\)\]\)/);
-  assert.match(projectCenterSource, /onSaved=\{\(\) => void loadTemplates\(\)\}/);
   assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
   assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
-  assert.match(projectCenterSource, /最近项目/);
-  assert.match(projectCenterSource, /内置模板/);
-  assert.match(projectCenterSource, /我的模板/);
-  assert.match(projectCenterSource, /保存当前画布为模板/);
-  assert.match(projectCenterSource, /DELETE/);
-  assert.match(projectCenterSource, /删除后无法恢复；由此模板创建的项目不会受到影响/);
-  assert.match(projectCenterSource, /<Tabs[\s\S]*<TabsTrigger[\s\S]*<Card/);
-  assert.match(projectCenterSource, /<DropdownMenu[\s\S]*<AlertDialog/);
   assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
   assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
-  assert.match(projectCenterSource, /SAVE_TEMPLATE_COVER/);
   assert.match(projectCenterSource, /PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4"/);
   assert.match(projectCenterSource, /PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-\[var\(--gc-text\)\]"/);
-  assert.ok(
-    fs.existsSync(new URL("../public/assets/project-center/save-template-cover.png", import.meta.url)),
-    "我的模板保存卡必须使用仓库内图片素材",
-  );
+  // 内置模板的落点在左侧工作流二级菜单：菜单项 → 映射表 → 合并进当前活动画布（不新建页签）。
+  assert.match(shellSource, /WORKFLOW_MENU_MAPPING/);
+  assert.match(shellSource, /mergeTemplateIntoActiveCanvas/);
+  assert.match(shellSource, /workspaceEmpty &&/);
 });
 
 await test("最近生成成功卡显式提供查看、对比、下载与设为输入动作", () => {
@@ -1958,12 +1973,28 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
     new URL("../src/components/panels/ResultsPanel.tsx", import.meta.url),
     "utf8",
   );
+  // 2026-09-25：卡片与「结果详情」弹窗共用同一套动作实现，避免两处漂移。
+  const resultActionsSource = fs.readFileSync(
+    new URL("../src/lib/resultActions.ts", import.meta.url),
+    "utf8",
+  );
+  const resultDetailDialogSource = fs.readFileSync(
+    new URL("../src/components/panels/ResultDetailDialog.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\}`\}/);
   assert.match(resultsPanelSource, /aria-label=\{`\$\{compareIds\.includes\(r\.id\) \? "取消" : "加入"\}对比 \$\{r\.nodeLabel\}`\}/);
   assert.match(resultsPanelSource, /href=\{r\.image\}[\s\S]*download/);
   assert.match(resultsPanelSource, /aria-label=\{`将 \$\{r\.nodeLabel\} 设为输入，继续处理`\}/);
-  assert.match(resultsPanelSource, /state\.addAssetNode\(\s*\{ name: r\.nodeLabel, image: r\.image \}/);
-  assert.match(resultsPanelSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
+  // 「设为输入」的写回与落点引导在共享模块里，卡片只负责触发。
+  assert.match(resultActionsSource, /state\.addAssetNode\(\s*\{ name: result\.nodeLabel, image: result\.image \}/);
+  assert.match(resultActionsSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
+  // 结果详情弹窗必须保留同一组结果能力（查看大图 / 对比 / 下载 / 设为输入）。
+  assert.match(resultDetailDialogSource, /from "@\/lib\/resultActions"/);
+  assert.match(resultDetailDialogSource, /openResultViewer\(record\)/);
+  assert.match(resultDetailDialogSource, /设为输入/);
+  assert.match(resultDetailDialogSource, /下载/);
+  assert.doesNotMatch(resultsPanelSource, /openViewer/, "卡片本身不再直接打开查看器，改由详情弹窗进入");
   assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
   assert.match(resultsPanelSource, /r\.status !== "success"/);
   assert.match(resultsPanelSource, /grid-cols-2/);

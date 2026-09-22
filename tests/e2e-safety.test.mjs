@@ -56,8 +56,9 @@ try {
     /\[golden-path\].*unverified starter stays blocked while a test-reviewed variant completes the isolated golden path/,
     "isolated golden-path project must remain in the browser regression matrix",
   );
-  // v7 起 initial-draft 拆成「空态惰性落库」与「重登录恢复」两条用例（R-77 重命名），
-  // 两条都必须留在矩阵里（原断言只钉其中一条的旧标题）。
+  // v7 起 initial-draft 拆成「空态惰性落库」与「重登录恢复」两条用例，
+  // 2026-09-25 决策 4 落地时第二条更名为「relogin lands on the empty workspace ...」，
+  // 两条都必须留在矩阵里（断言只钉标题，不钉用例内部实现）。
   assert.match(
     baseline.stdout,
     /\[initial-draft\].*empty first screen stays local and only persists after the first substantial change/,
@@ -65,7 +66,7 @@ try {
   );
   assert.match(
     baseline.stdout,
-    /\[initial-draft\].*relogin opens the latest saved project instead of bootstrapping a blank page/,
+    /\[initial-draft\].*relogin lands on the empty workspace without bootstrapping, and the saved project stays reachable/,
     "initial-draft relogin recovery must remain in the isolated browser regression matrix",
   );
   assert.match(
@@ -81,7 +82,7 @@ try {
     );
     assert.match(
       baseline.stdout,
-      new RegExp(`\\[desktop-${width}\\].*left dock and horizontal zoom controls preserve canvas identity`),
+      new RegExp(`\\[desktop-${width}\\].*floating rail, zoom controls, and the results layer preserve canvas identity`),
       `desktop-${width} must include the stable workbench regression`,
     );
     assert.match(
