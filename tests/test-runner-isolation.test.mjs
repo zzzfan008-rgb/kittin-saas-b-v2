@@ -60,6 +60,11 @@ const dbC = "postgresql://u:p@127.0.0.1:5433/garment_canvas_test";
 const lockOfA = createDatabaseLockName({ databaseUrl: dbA });
 assert.match(lockOfA, /^garment-canvas-db-[a-f0-9]{16}$/);
 assert.equal(lockOfA, createDatabaseLockName({ databaseUrl: dbADefaultPort }));
+assert.equal(
+  lockOfA,
+  createDatabaseLockName({ databaseUrl: "postgresql://u:***@localhost:5432/garment_canvas_test" }),
+  "localhost and 127.0.0.1 identify the same local PostgreSQL and must share one lock",
+);
 assert.notEqual(lockOfA, createDatabaseLockName({ databaseUrl: dbB }), "different database names must use different locks");
 assert.notEqual(lockOfA, createDatabaseLockName({ databaseUrl: dbC }), "different ports must use different locks");
 assert.throws(() => createDatabaseLockName({}), /database URL is required/);
@@ -226,14 +231,26 @@ const symlinkTestRoot = mkdtempSync(join(tmpdir(), "garment-canvas-runner-symlin
 try {
   const shimDir = join(symlinkTestRoot, "bin");
   const runnerCwd = join(symlinkTestRoot, "runner-cwd");
+  const spawnLockDir = join(symlinkTestRoot, "spawn-locks");
   const runnerSymlink = join(symlinkTestRoot, "postgres-test-runner.mjs");
   const callLog = join(symlinkTestRoot, "calls.jsonl");
   mkdirSync(shimDir);
   mkdirSync(runnerCwd);
+  mkdirSync(spawnLockDir);
   symlinkSync(process.execPath, join(shimDir, "node"));
   writeCommandShim(join(shimDir, "docker"));
   writeCommandShim(join(shimDir, process.platform === "win32" ? "npm.cmd" : "npm"));
   symlinkSync(runnerPath, runnerSymlink);
+
+  // 子 runner 与外层 npm run test 解析到同一个测试库，库级锁因此同名。
+  // 通过 TEST_DB_LOCK_DIR 把它导向独立锁目录，避免与外层持锁 runner 自死锁。
+  // 预置一把带「已死 PID」的残留锁：子 runner 只有真的使用了覆盖目录才会接管并清掉它。
+  const childDatabaseUrl = resolveTestDatabaseUrl();
+  const childLockName = createDatabaseLockName({ databaseUrl: childDatabaseUrl });
+  const deadPid = spawnSync("/usr/bin/true").pid;
+  assert.ok(deadPid, "a dead pid is required to seed the stale child lock");
+  const seededChildLock = join(spawnLockDir, `${childLockName}.lock`);
+  writeFileSync(seededChildLock, `${deadPid}\n`, "utf8");
 
   const result = spawnSync(process.execPath, [runnerSymlink], {
     cwd: runnerCwd,
@@ -243,9 +260,15 @@ try {
       PATH: `${shimDir}:${process.env.PATH ?? ""}`,
       npm_execpath: "",
       RUNNER_CALL_LOG: callLog,
+      TEST_DB_LOCK_DIR: spawnLockDir,
     },
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(
+    existsSync(seededChildLock),
+    false,
+    "the spawned runner must acquire/release its lock inside TEST_DB_LOCK_DIR (stale lock must be taken over and removed)",
+  );
 
   const calls = readFileSync(callLog, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const dockerCalls = calls.filter(({ command }) => command === "docker");

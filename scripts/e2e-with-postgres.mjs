@@ -8,6 +8,8 @@ import {
   acquireTestLock,
   assertTestDatabaseReachable,
   createDatabaseLockName,
+  lockRootDirectory,
+  lockWaitTimeoutMs,
   resetTestDatabase,
   resolveTestDatabaseUrl,
 } from "./test-with-postgres.mjs";
@@ -65,7 +67,11 @@ export function playwrightArgsFromCli(args) {
 async function main() {
   const databaseUrl = resolveTestDatabaseUrl();
   const lockName = createDatabaseLockName({ databaseUrl });
-  const releaseLock = await acquireTestLock({ projectName: lockName, waitTimeoutMs: 600_000 });
+  const releaseLock = await acquireTestLock({
+    projectName: lockName,
+    lockRoot: lockRootDirectory(),
+    waitTimeoutMs: lockWaitTimeoutMs(),
+  });
   const dataDir = mkdtempSync(join(tmpdir(), "garment-canvas-e2e-"));
   let cleanupDone = false;
 

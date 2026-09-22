@@ -63,7 +63,10 @@ export function createDatabaseLockName({ databaseUrl } = {}) {
   if (!databaseUrl) throw new Error("A database URL is required for the database lock name");
   const parsed = new URL(databaseUrl);
   const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-  const identity = `${parsed.hostname}:${parsed.port || "5432"}:${databaseName}`;
+  // localhost 与 127.0.0.1 指向同一个本机 PostgreSQL：必须归一后再派生锁，
+  // 否则显式 localhost 与 .env 推导出的 127.0.0.1 会得到两把锁，互斥失效。
+  const hostname = parsed.hostname === "localhost" ? "127.0.0.1" : parsed.hostname;
+  const identity = `${hostname}:${parsed.port || "5432"}:${databaseName}`;
   const databaseId = createHash("sha256").update(identity).digest("hex").slice(0, 16);
   return `garment-canvas-db-${databaseId}`;
 }
@@ -334,7 +337,7 @@ function runFocusedTests(testFiles, env) {
   }
 }
 
-function lockWaitTimeoutMs() {
+export function lockWaitTimeoutMs() {
   const raw = (process.env.TEST_DB_LOCK_WAIT_MS ?? "").trim();
   if (!raw) return 600_000;
   const value = Number(raw);
@@ -344,11 +347,26 @@ function lockWaitTimeoutMs() {
   return value;
 }
 
+/**
+ * 锁文件目录：默认系统 tmpdir（全机同一目录，库级锁因此全机互斥）。
+ *
+ * 仅测试基建自身（tests/test-runner-isolation.test.mjs 中被 spawn 的子 runner）
+ * 用 TEST_DB_LOCK_DIR 指向独立目录，避免与外层持锁 runner 竞争同一把库锁。
+ */
+export function lockRootDirectory() {
+  const raw = (process.env.TEST_DB_LOCK_DIR ?? "").trim();
+  return raw ? resolve(raw) : tmpdir();
+}
+
 async function main() {
   const focusedTestFiles = resolveRequestedTestFiles(process.argv.slice(2));
   const databaseUrl = resolveTestDatabaseUrl();
   const lockName = createDatabaseLockName({ databaseUrl });
-  const releaseLock = await acquireTestLock({ projectName: lockName, waitTimeoutMs: lockWaitTimeoutMs() });
+  const releaseLock = await acquireTestLock({
+    projectName: lockName,
+    lockRoot: lockRootDirectory(),
+    waitTimeoutMs: lockWaitTimeoutMs(),
+  });
   let cleanupDone = false;
 
   const cleanup = () => {
