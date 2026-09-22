@@ -32,12 +32,6 @@ const {
 } = await import("../server/routes/projects");
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
-const { templatesRouter } = await import("../server/routes/templates");
-const {
-  migrateLegacyUserTemplateOwners,
-  prepareUserTemplateAccountMutation,
-  reconcileUserTemplateAccountMutations,
-} = await import("../server/lib/userTemplateLifecycle");
 const {
   requireGarmentPromptVariant,
 } = await import("../src/lib/garmentPromptPresets");
@@ -299,28 +293,6 @@ for (const user of Object.values(users)) {
     VALUES ($1, $2, $3, $4, 'test-only', 1, $5, $5)
   `, [user.id, user.accountId, user.displayName, user.role, now]);
 }
-const legacyTemplateId = "legacy-unowned-template";
-const legacyTemplateDir = path.join(temp, "templates", "user");
-fs.mkdirSync(legacyTemplateDir, { recursive: true });
-fs.writeFileSync(path.join(legacyTemplateDir, `${legacyTemplateId}.json`), JSON.stringify({
-  schemaVersion: 1,
-  id: legacyTemplateId,
-  name: "历史无归属模板",
-  description: "升级后应归属原始管理员",
-  flow: flow(),
-  createdAt: now,
-}));
-assert.equal(await migrateLegacyUserTemplateOwners(), 1);
-const legacyTemplateOwner = await queryOne<{ id: string }>(`
-  SELECT id FROM users
-  WHERE deleted_at IS NULL
-  ORDER BY CASE WHEN role = 'admin' THEN 0 ELSE 1 END, created_at ASC, id ASC
-  LIMIT 1
-`);
-assert.equal(
-  (JSON.parse(fs.readFileSync(path.join(legacyTemplateDir, `${legacyTemplateId}.json`), "utf8")) as { ownerId?: string }).ownerId,
-  legacyTemplateOwner?.id,
-);
 const adminSession = await createSession(users.admin.id, { markExistingAsReplaced: false });
 
 const app = express();
@@ -342,7 +314,6 @@ app.use("/files", filesRouter);
 app.use("/projects", projectsRouter);
 app.use("/usage", usageRouter);
 app.use("/history", historyRouter);
-app.use("/templates", templatesRouter);
 
 const server = app.listen(0, "127.0.0.1");
 await new Promise<void>((resolve, reject) => {
@@ -415,174 +386,6 @@ function writeTestPng(id: string): void {
 }
 
 console.log("运行任务与素材引用授权回归测试");
-
-await test("用户模板按账号隔离，其他用户无法读取或删除，管理员可审计", async () => {
-  const create = async (user: keyof typeof users, name: string) => {
-    const response = await request("/templates", user, {
-      method: "POST",
-      body: JSON.stringify({ name, description: `${name} 描述`, flow: flow() }),
-    });
-    const responseText = await response.text();
-    assert.equal(response.status, 200, responseText);
-    return (JSON.parse(responseText) as { id: string }).id;
-  };
-
-  const ownerTemplateId = await create("owner", "Owner Template");
-  const otherTemplateId = await create("other", "Other Template");
-
-  const ownerList = await request("/templates", "owner");
-  assert.equal(ownerList.status, 200);
-  assert.equal(ownerList.headers.get("cache-control"), "no-store");
-  const ownerTemplates = await ownerList.json() as Array<{ id: string; ownerId?: string }>;
-  assert.equal(ownerTemplates.some((template) => template.id === ownerTemplateId), true);
-  assert.equal(ownerTemplates.some((template) => template.id === otherTemplateId), false);
-  assert.equal(ownerTemplates.find((template) => template.id === ownerTemplateId)?.ownerId, users.owner.id);
-
-  assert.equal((await request(`/templates/${ownerTemplateId}`, "other")).status, 404);
-  assert.equal((await request(`/templates/${ownerTemplateId}`, "other", { method: "DELETE" })).status, 404);
-  assert.equal((await request(`/templates/${ownerTemplateId}`, "owner")).status, 200);
-
-  const adminList = await request("/templates", "admin");
-  const adminTemplates = await adminList.json() as Array<{ id: string }>;
-  assert.equal(adminTemplates.some((template) => template.id === ownerTemplateId), true);
-  assert.equal(adminTemplates.some((template) => template.id === otherTemplateId), true);
-  assert.equal(adminTemplates.some((template) => template.id === legacyTemplateId), true);
-  assert.equal((await request(`/templates/${otherTemplateId}`, "admin", { method: "DELETE" })).status, 200);
-  assert.equal((await request(`/templates/${ownerTemplateId}`, "owner", { method: "DELETE" })).status, 200);
-  assert.equal((await request(`/templates/${legacyTemplateId}`, "admin", { method: "DELETE" })).status, 200);
-});
-
-await test("账号转移、15 天回收与到期清理同步覆盖用户模板", async () => {
-  const sourceKey = "templateLifecycleSource";
-  const targetKey = "templateLifecycleTarget";
-  const source: AuthUser = {
-    id: "template-lifecycle-source", accountId: sourceKey, displayName: "模板转出账号",
-    role: "user", mustChangePassword: false,
-  };
-  const target: AuthUser = {
-    id: "template-lifecycle-target", accountId: targetKey, displayName: "模板接收账号",
-    role: "user", mustChangePassword: false,
-  };
-  users[sourceKey] = source;
-  users[targetKey] = target;
-  await query(`
-    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
-    VALUES
-      ($1, $2, $3, 'user', 'test-only', 1, $7, $7),
-      ($4, $5, $6, 'user', 'test-only', 1, $7, $7)
-  `, [source.id, source.accountId, source.displayName, target.id, target.accountId, target.displayName, now]);
-
-  let templateId = "";
-  try {
-    const createResponse = await request("/templates", sourceKey, {
-      method: "POST",
-      body: JSON.stringify({ name: "账号生命周期模板", description: "", flow: flow() }),
-    });
-    const createBody = await createResponse.json() as { id: string };
-    assert.equal(createResponse.status, 200);
-    templateId = createBody.id;
-
-    const transfer = await request(`/auth/users/${source.id}`, "admin", {
-      method: "DELETE",
-      headers: { cookie: `${SESSION_COOKIE}=${adminSession.token}` },
-      body: JSON.stringify({ transferToUserId: target.id }),
-    });
-    assert.equal(transfer.status, 200, await transfer.text());
-    const targetTemplates = await (await request("/templates", targetKey)).json() as Array<{ id: string }>;
-    assert.equal(targetTemplates.some((template) => template.id === templateId), true);
-    const templateFile = path.join(legacyTemplateDir, `${templateId}.json`);
-    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, target.id);
-
-    const discard = await request(`/auth/users/${target.id}`, "admin", {
-      method: "DELETE",
-      headers: { cookie: `${SESSION_COOKIE}=${adminSession.token}` },
-      body: JSON.stringify({ deleteData: true }),
-    });
-    const discardBody = await discard.json() as { purgeAfter?: string };
-    assert.equal(discard.status, 200);
-    assert.ok(discardBody.purgeAfter);
-    const tombstone = JSON.parse(fs.readFileSync(templateFile, "utf8")) as {
-      deletedAt?: string;
-      purgeAfter?: string;
-    };
-    assert.ok(tombstone.deletedAt);
-    assert.equal(tombstone.purgeAfter, discardBody.purgeAfter);
-    const adminTemplates = await (await request("/templates", "admin")).json() as Array<{ id: string }>;
-    assert.equal(adminTemplates.some((template) => template.id === templateId), false);
-
-    fs.writeFileSync(templateFile, JSON.stringify({ ...tombstone, purgeAfter: "2000-01-01T00:00:00.000Z" }));
-    await request("/templates", "admin");
-    assert.equal(fs.existsSync(templateFile), false);
-  } finally {
-    if (templateId) fs.rmSync(path.join(legacyTemplateDir, `${templateId}.json`), { force: true });
-    await query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [[source.id, target.id]]);
-    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[source.id, target.id]]);
-    delete users[sourceKey];
-    delete users[targetKey];
-  }
-});
-
-await test("模板账号 journal 可在数据库回滚或提交后恢复文件状态", async () => {
-  const sourceKey = "templateJournalSource";
-  const targetKey = "templateJournalTarget";
-  const source: AuthUser = {
-    id: "template-journal-source", accountId: sourceKey, displayName: "模板 journal 源账号",
-    role: "user", mustChangePassword: false,
-  };
-  const target: AuthUser = {
-    id: "template-journal-target", accountId: targetKey, displayName: "模板 journal 目标账号",
-    role: "user", mustChangePassword: false,
-  };
-  users[sourceKey] = source;
-  users[targetKey] = target;
-  await query(`
-    INSERT INTO users (id, account_id, display_name, role, password_hash, active, created_at, updated_at)
-    VALUES
-      ($1, $2, $3, 'user', 'test-only', 1, $7, $7),
-      ($4, $5, $6, 'user', 'test-only', 1, $7, $7)
-  `, [source.id, source.accountId, source.displayName, target.id, target.accountId, target.displayName, now]);
-
-  const templateId = "template-journal-recovery";
-  const templateFile = path.join(legacyTemplateDir, `${templateId}.json`);
-  const original = {
-    schemaVersion: 3,
-    id: templateId,
-    ownerId: source.id,
-    name: "journal 恢复模板",
-    description: "",
-    flow: flow(),
-    createdAt: now,
-  };
-  try {
-    fs.writeFileSync(templateFile, JSON.stringify(original));
-    const rollbackMutation = prepareUserTemplateAccountMutation({
-      sourceOwnerId: source.id,
-      transferToOwnerId: target.id,
-      sourceDeletedAt: "2099-01-01T00:00:00.000Z",
-    });
-    rollbackMutation.apply();
-    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, target.id);
-    await reconcileUserTemplateAccountMutations();
-    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, source.id);
-
-    const commitMutation = prepareUserTemplateAccountMutation({
-      sourceOwnerId: source.id,
-      transferToOwnerId: target.id,
-      sourceDeletedAt: now,
-    });
-    commitMutation.apply();
-    await query("UPDATE users SET active = 0, deleted_at = $1 WHERE id = $2", [now, source.id]);
-    await reconcileUserTemplateAccountMutations();
-    assert.equal((JSON.parse(fs.readFileSync(templateFile, "utf8")) as { ownerId: string }).ownerId, target.id);
-    assert.equal(fs.readdirSync(path.join(temp, "templates", ".account-mutations")).filter((name) => name.endsWith(".json")).length, 0);
-  } finally {
-    fs.rmSync(templateFile, { force: true });
-    await query("DELETE FROM sessions WHERE user_id = ANY($1::text[])", [[source.id, target.id]]);
-    await query("DELETE FROM users WHERE id = ANY($1::text[])", [[source.id, target.id]]);
-    delete users[sourceKey];
-    delete users[targetKey];
-  }
-});
 
 await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式越权", async () => {
   const plan = buildExecutionPlan([

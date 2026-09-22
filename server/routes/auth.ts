@@ -17,10 +17,6 @@ import { db, query, queryOne, transaction } from "../lib/database";
 import { hashPassword, validatePassword, verifyPassword } from "../lib/password";
 import { ACTIVE_RUN_LIMIT } from "../lib/generationLimits";
 import {
-  prepareUserTemplateAccountMutation,
-  reconcileUserTemplateAccountMutations,
-} from "../lib/userTemplateLifecycle";
-import {
   prepareOpenAiMaskTestAccountMutation,
   reconcileOpenAiMaskTestAccountMutations,
 } from "../lib/openaiMaskTestLifecycle";
@@ -343,28 +339,14 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
         );
       }
     }
-    const templateMutation = prepareUserTemplateAccountMutation({
-      sourceOwnerId: req.params.id,
-      sourceDeletedAt: nowIso,
-      ...(transferToUserId
-        ? { transferToOwnerId: transferToUserId }
-        : { deletedAt: nowIso, purgeAfter }),
-    });
-    templateMutation.apply();
     await client.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
     await client.query("UPDATE users SET active = 0, deleted_at = $1, updated_at = $1 WHERE id = $2", [nowIso, req.params.id]);
     return { status: "ok" as const };
   }).catch(async (error) => {
-    await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
-      console.error("[garment-canvas] failed to reconcile user template ownership mutation", reconcileError);
-    });
     await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
       console.error("[garment-canvas] failed to reconcile OpenAI mask test ownership mutation", reconcileError);
     });
     throw error;
-  });
-  await reconcileUserTemplateAccountMutations().catch((reconcileError) => {
-    console.error("[garment-canvas] failed to finalize user template ownership mutation", reconcileError);
   });
   await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
     console.error("[garment-canvas] failed to finalize OpenAI mask test ownership mutation", reconcileError);
