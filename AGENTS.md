@@ -1,34 +1,47 @@
 <!-- code-intelligence:start -->
-# Code Intelligence — ast-grep + dependency-cruiser
+# Code Intelligence — ast-grep + dependency-cruiser + code-graph-rag
 
-本仓库的代码智能证据来自两个本地确定性工具，**不再使用 GitNexus**：
+本仓库的代码智能证据来自三个本地工具，按成本和确定性分层使用：
 
-- `ast-grep`：配置 `sgconfig.yml`，规则位于 `tools/ast-grep-rules/`。覆盖动态代码求值、
-  不安全 HTML 注入、前端 `process.env` 泄漏、静态检查压制。
-- `dependency-cruiser`：配置 `.dependency-cruiser.cjs`。覆盖循环依赖、分层边界与孤儿模块。
-  既有基线环以 `no-circular-baseline`（warn，逐路径登记豁免理由）保留；任何新模块被卷入
-  这些环会落入 `no-circular`（error）。
+| 工具 | 覆盖能力 | 何时使用 |
+|---|---|---|
+| `ast-grep`（`sgconfig.yml`，规则 `tools/ast-grep-rules/`） | 动态求值、不安全 HTML、`process.env` 泄漏、检查压制 | **gate 必跑**，确定性，毫秒级 |
+| `dependency-cruiser`（`.dependency-cruiser.cjs`） | 循环依赖、分层边界、孤儿模块 | **gate 必跑**，确定性 |
+| `code-graph-rag`（Memgraph + Qdrant，MCP `code-graph-rag`） | 符号级 callers/callees、importers、重命名、语义搜索、dangling callers | **按需查询**，改共享契约或审查时 |
 
 ## Always Do
 
-- 改动函数、类、方法、路由契约或共享类型前，先确认它在**模块级**的影响面：谁 import 了它、
-  它位于哪条依赖路径上。改动共享契约或跨层依赖时，把影响范围报告给用户。
+- 改动函数、类、方法、路由契约或共享类型前，先用对应工具确认影响面（见下方角色指引）。
+  改动共享契约或跨层依赖时，把影响范围报告给用户。
 - 提交前运行 `npm run gate:codex`。至少也要单独运行：
   `ast-grep scan --config sgconfig.yml src server scripts e2e` 与
-  `npx depcruise --config .dependency-cruiser.cjs src server scripts e2e`，
-  并确认没有新增依赖违规或结构命中。
+  `npx depcruise --config .dependency-cruiser.cjs src server scripts e2e`。
 - 新增依赖，或引入会形成新环 / 越过分层规则的 import 时，先与用户确认。
 
-## 能力边界（必须知情，不得假装拥有）
+## 符号级影响面查询（code-graph-rag）
 
-ast-grep 与 dependency-cruiser **提供不了** GitNexus 原有的符号级能力。以下做法已经不存在：
+MCP 工具名以 `mcp_code_graph_rag_` 开头。按角色使用：
 
-- 符号级 callers/callees 爆炸半径、跨文件执行流追踪、PDG 控制与数据依赖：没有任何工具支持。
-  改动的真实影响面要在测试与类型检查（`tsc --noEmit`）里被证明，而不是被声明。
-- 符号重命名：没有 call-graph 感知的 `rename`。改名必须使用编辑器的 TypeScript 语言服务，
-  或人工核对全部引用；**禁止用全局 find-and-replace 代替**。
+| 角色 | 改代码前 | 审查时 |
+|---|---|---|
+| backend / frontend | `callers` + `importers` 确认爆炸半径 | — |
+| architect | `implementors` 确认接口契约影响面 | — |
+| reviewer | — | `callers`/`callees` 验证调用链完整性；`check` 查 dangling callers 和 arity 不一致 |
+| designer / ui-qa | 不需要 | 不需要 |
 
-因此当前可依赖的证据链是：模块级依赖与结构规则（确定性）+ 类型检查 + 测试 + 门禁评审段。
+常用工具：`resolve`（名字→定义）、`definition`（取源码）、`rename`（图谱感知重命名）、
+`semantic_search`（按语义找函数）、`tests_reaching`（哪些测试覆盖某函数）。
+
+## code-graph-rag 使用边界
+
+- **图谱是索引快照**。代码改动后，先 reingest（MCP `update_repository` 工具）再查询；
+  对未 reingest 的图谱得出的结论必须标注"可能过期"。
+- **动态调用解析不了**：`eval`、字符串拼接的方法名、运行时注入的依赖不在调用链中。
+  这类影响面靠测试和 `tsc --noEmit` 证明，不靠图谱声明。
+- **类型/语义以 tsc 为准**。cgr 提供结构关系（谁调谁、谁 import 谁），
+  不提供类型正确性保证。两者结论冲突时以 `tsc --noEmit` 为准。
+- **禁止用全局 find-and-replace 做符号重命名**。用 cgr 的 `rename` 工具或
+  TypeScript 语言服务，然后跑测试验证。
 <!-- code-intelligence:end -->
 
 # Garment Canvas — Current Project Rules
@@ -155,10 +168,10 @@ a dependency change must update it in the same delivery batch.
 ## 6. Change and Verification Workflow
 
 - Inspect relevant flows and tests first. Before editing a function, class, method,
-  route contract, or shared type, establish its module-level blast radius as described
-  in the code intelligence section above — who imports it, and which dependency paths
-  reach it. Report the affected surface to the user when the change crosses a shared
-  contract or a layer boundary.
+  route contract, or shared type, establish its blast radius using the tools in the
+  code intelligence section above — module-level dependencies plus symbol-level
+  callers/importers when changing shared contracts. Report the affected surface to
+  the user when the change crosses a shared contract or a layer boundary.
 - Prefer the smallest evidence-backed patch. Do not mix UI work with unrelated
   security fixes, architecture rewrites, dependency upgrades, or formatting churn.
 - Add or update regression coverage for each behavior change. For desktop UI, assert
@@ -197,8 +210,10 @@ a dependency change must update it in the same delivery batch.
   `-m/--provider` override, so the user's configured default model is used). Code
   intelligence evidence comes from `ast-grep` structural rules plus
   `dependency-cruiser` architecture rules (`.dependency-cruiser.cjs`,
-  `sgconfig.yml`, `tools/ast-grep-rules/`); GitNexus CLI and Codex CLI are no longer
-  part of the gate. Any actionable P0-P3 finding blocks delivery. Record the exact
+  `sgconfig.yml`, `tools/ast-grep-rules/`); code-graph-rag is used on demand
+  for symbol-level blast-radius verification during review; GitNexus CLI and
+  Codex CLI are no longer part of the gate. Any actionable P0-P3 finding blocks
+  delivery. Record the exact
   base/head and the result in the PR.
 
 ## 7. Git, Review, and Release Gates
