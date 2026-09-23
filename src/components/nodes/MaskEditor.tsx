@@ -321,8 +321,8 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   return createPortal(
     <div className="fixed inset-0 z-100 flex flex-col bg-[var(--gc-shell)]">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--gc-border)] px-4">
-        <strong className="text-sm font-medium text-neutral-100">局部修改</strong>
-        <span className="text-[11px] text-neutral-500">GPT Image 2</span>
+        <strong className="text-sm font-medium text-[var(--gc-text)]">局部修改</strong>
+        <span className="text-[11px] text-[var(--gc-text-muted)]">GPT Image 2</span>
         <div className="ml-auto flex items-center gap-1.5">
           <ToolbarButton label="撤销" disabled={saving || !undoStack.length} onClick={undo} />
           <ToolbarButton label="重做" disabled={saving || !redoStack.length} onClick={redo} />
@@ -363,7 +363,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
           <ModeButton active={mode === "edit"} label="涂抹修改区" disabled={saving} onClick={() => setMode("edit")} />
           <ModeButton active={mode === "preserve"} label="恢复保留区" disabled={saving} onClick={() => setMode("preserve")} />
         </div>
-        <label className="flex min-w-56 items-center gap-2 text-[11px] text-neutral-500">
+        <label className="flex min-w-56 items-center gap-2 text-[11px] text-[var(--gc-text-muted)]">
           笔刷 {brushSize}px
           <input
             type="range" min={8} max={300} step={4} value={brushSize}
@@ -372,7 +372,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
             className="accent-gold disabled:opacity-40"
           />
         </label>
-        <span className="text-[11px] text-neutral-600">红色是修改中心，不是裁切框 · 新内容可在金色融合区内完整延展</span>
+        <span className="text-[11px] text-[var(--gc-text-muted)]">红色是修改中心，不是裁切框 · 新内容可在金色融合区内完整延展</span>
         {error && <p className="min-w-0 flex-1 truncate text-[11px] text-red-400" title={error}>{error}</p>}
         <button
           type="button"
@@ -398,7 +398,7 @@ function ToolbarButton({ label, onClick, disabled = false }: { label: string; on
 
 function ModeButton({ active, label, onClick, disabled = false }: { active: boolean; label: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`rounded-sm px-3 py-1.5 text-[11px] disabled:opacity-40 ${active ? "bg-gold text-[var(--gc-accent-cta-ink)]" : "text-neutral-400 hover:text-neutral-200"}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`rounded-sm px-3 py-1.5 text-[11px] disabled:opacity-40 ${active ? "bg-gold text-[var(--gc-accent-cta-ink)]" : "text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"}`}>
       {label}
     </button>
   );

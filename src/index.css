@@ -305,14 +305,8 @@ body {
 }
 [data-theme="white"] .bg-ink,
 [data-theme="white"] .react-flow { background-color: #f5f5f7 !important; }
-[data-theme="white"] .text-neutral-200 { color: #1d1d1f !important; }
-[data-theme="white"] .text-neutral-300 { color: #3a3a3c !important; }
-[data-theme="white"] .text-neutral-400 { color: #48484a !important; }
-[data-theme="white"] .text-neutral-500 { color: #6e6e73 !important; }
-[data-theme="white"] .text-neutral-600 { color: #86868b !important; }
 [data-theme="white"] .text-gold { color: #0071e3 !important; }
 [data-theme="white"] .bg-gold { background-color: #0071e3 !important; }
-[data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #98989d !important; }
 [data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
 [data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
 [data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
@@ -325,14 +319,8 @@ body {
 }
 [data-theme="eye"] .bg-ink,
 [data-theme="eye"] .react-flow { background-color: #E9F1EA !important; }
-[data-theme="eye"] .text-neutral-200 { color: #123B2B !important; }
-[data-theme="eye"] .text-neutral-300 { color: #2c5443 !important; }
-[data-theme="eye"] .text-neutral-400 { color: #47685A !important; }
-[data-theme="eye"] .text-neutral-500 { color: #557a68 !important; }
-[data-theme="eye"] .text-neutral-600 { color: #6d8d7c !important; }
 [data-theme="eye"] .text-gold { color: #0B7A43 !important; }
 [data-theme="eye"] .bg-gold { background-color: #0B7A43 !important; }
-[data-theme="eye"] .placeholder\:text-neutral-600::placeholder { color: #85a291 !important; }
 [data-theme="eye"] .react-flow__minimap { border-color: #c9dccc !important; }
 [data-theme="eye"] ::-webkit-scrollbar-thumb { background: #a8c2ac; }
 [data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #8fb096; }
@@ -522,22 +510,6 @@ body {
 
 [data-theme] .gc-node-body {
   color: var(--gc-node-text) !important;
-}
-
-[data-theme] .gc-node-card .text-neutral-200,
-[data-theme] .gc-node-card .text-neutral-300,
-[data-theme] .gc-node-library-card .text-neutral-200,
-[data-theme] .gc-node-library-card .text-neutral-300 {
-  color: var(--gc-node-text) !important;
-}
-
-[data-theme] .gc-node-card .text-neutral-400,
-[data-theme] .gc-node-card .text-neutral-500,
-[data-theme] .gc-node-card .text-neutral-600,
-[data-theme] .gc-node-library-card .text-neutral-400,
-[data-theme] .gc-node-library-card .text-neutral-500,
-[data-theme] .gc-node-library-card .text-neutral-600 {
-  color: var(--gc-node-muted) !important;
 }
 
 [data-theme] .gc-node-card input,

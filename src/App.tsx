@@ -357,7 +357,7 @@ function Workspace() {
   }, [historyCursor, historyHasMore, historyLoading]);
 
   return (
-    <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-neutral-200">
+    <div className="gc-app-shell relative flex h-full min-w-0 flex-col overflow-hidden bg-ink text-[var(--gc-text)]">
       <TopBar />
       <ProjectTabs />
       <InitialDraftSyncNotice />
@@ -425,7 +425,7 @@ function Workspace() {
 
 function OverlayLoadingStatus({ label }: { label: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 text-xs text-neutral-400 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 text-xs text-[var(--gc-text-muted)] backdrop-blur-xs">
       <span role="status">{label}</span>
     </div>
   );

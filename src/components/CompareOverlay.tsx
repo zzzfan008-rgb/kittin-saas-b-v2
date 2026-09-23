@@ -44,7 +44,7 @@ export function CompareOverlay({
       className="fixed inset-0 z-50 flex flex-col bg-black/85 backdrop-blur-xs"
     >
       <div className="flex items-center justify-between px-6 py-4">
-        <span className="text-xs font-medium tracking-widest text-neutral-400">
+        <span className="text-xs font-medium tracking-widest text-[var(--gc-text-muted)]">
           对比 {items.length} 张
         </span>
         <button
@@ -71,15 +71,15 @@ export function CompareOverlay({
             </div>
             <div className="shrink-0 space-y-1 border-t border-[var(--gc-border)] px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-medium text-neutral-200">
+                <span className="truncate text-xs font-medium text-[var(--gc-text)]">
                   {r.nodeLabel}
                 </span>
-                <span className="shrink-0 text-[11px] text-neutral-500">
+                <span className="shrink-0 text-[11px] text-[var(--gc-text-muted)]">
                   {formatTime(r.finishedAt ?? r.startedAt)}
                 </span>
               </div>
               {r.prompt && (
-                <p className="line-clamp-2 text-[11px] leading-relaxed text-neutral-500">
+                <p className="line-clamp-2 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
                   {r.prompt}
                 </p>
               )}
