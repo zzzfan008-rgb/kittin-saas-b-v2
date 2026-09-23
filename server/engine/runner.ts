@@ -13,6 +13,7 @@ import {
   generationKindOf,
   MAX_MASK_USER_REFERENCE_IMAGES,
   MAX_REFERENCE_IMAGES,
+  RUN_PROGRESS_PHASES,
   type AIProvider,
   type ImageGenRequest,
   type ImageOperationMode,
@@ -23,6 +24,7 @@ import {
   type RunEvent,
   type RunEventMeta,
   type RunFailure,
+  type RunProgress,
 } from "../../src/types/workflow";
 import { getProvider } from "../providers";
 import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../providers/base";
@@ -116,6 +118,11 @@ export interface ExecuteStepOptions {
   resolveVideoProvider?: VideoProviderResolver;
   /** video 异步任务提交成功后的回调（持久化 taskId 并标记 attempt_started，幂等护栏）。 */
   onVideoTaskSubmitted?: (taskId: string) => void | Promise<void>;
+  /**
+   * RUN-02（契约 §5）：子单元进度回调。Worker 侧落 node-status(running) 事件；
+   * 图片路径给真实 done/total，视频路径给 phase 心跳（无 done/total）。
+   */
+  onProgress?: (progress: RunProgress) => void | Promise<void>;
   /** 测试注入：轮询节奏覆盖（生产走 VIDEO_POLL_* 常量）。 */
   videoPollInitialDelayMs?: number;
   videoPollIntervalMs?: number;
@@ -384,6 +391,9 @@ async function executeVideoGeneratorStep(
 
   const { taskId } = await provider.submit(request);
   await options.onVideoTaskSubmitted?.(taskId);
+  // RUN-02（契约 §5）：T1 核实 Seedance 不返回百分比，视频只发 phase 心跳，
+  // 绝不编造 done/total。
+  await options.onProgress?.({ phase: RUN_PROGRESS_PHASES.videoSubmitted });
 
   const initialDelayMs = options.videoPollInitialDelayMs ?? VIDEO_POLL_INITIAL_DELAY_MS;
   const intervalMs = options.videoPollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
@@ -409,6 +419,8 @@ async function executeVideoGeneratorStep(
     if (result.status === "failed") {
       throw new Error(result.error);
     }
+    // 每个 poll tick 一条 phase 心跳（pending/running）；无百分比不假报 done/total。
+    await options.onProgress?.({ phase: RUN_PROGRESS_PHASES.videoPolling });
     await sleep(intervalMs);
   }
 }
