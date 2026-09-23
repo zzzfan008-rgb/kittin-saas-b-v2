@@ -1,15 +1,28 @@
+/**
+ * 卡 #61 色彩工具面板：chip 化改造。
+ *
+ * - 正文格式改为 {{color:#RRGGBB:名称}} 标记符。
+ * - 预设色来自 token label，自定义色匹配内置中文颜色字典。
+ * - onConfirm 改为插入 chip 字符串（由调用方写入正文）。
+ */
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  COLOR_TOKEN_RE,
+  isValidHex,
+  makeColorChipFromHex,
+  validateColorChip,
+} from "@/lib/color/colorToken";
+import { nearestColorName } from "@/lib/color/chineseColorDictionary";
 
 /**
- * v8 色彩工具面板（plan.md §5）：text 节点工具条「色彩工具」的内联面板。
+ * v8 色彩工具面板（plan.md §5 / 卡 #61）。
  *
- * 预设色板的数据源是设计 token（`docs/design/2026-09-17-ui-audit/tokens.json`），
- * 在本仓库由 `src/index.css` 的 `--gc-*` 变量接入（同一事实源）。组件不写死任何
- * 规范色值：色块在挂载时从 token 变量运行时解析，解析不到的 token 不渲染色块，
- * 而不是回落到硬编码颜色（fail-closed）。
+ * 预设色板的数据源是设计 token（`src/index.css` 的 `--gc-*` 变量）。
+ * 组件不写死任何规范色值：色块在挂载时从 token 变量运行时解析，
+ * 解析不到的 token 不渲染色块（fail-closed）。
  *
- * 确定后由调用方把 `#RRGGBB` 插入正文光标处（无光标记录时插入正文末尾）。
+ * 确定后由调用方把 `{{color:#RRGGBB:名称}}` chip 字符串插入正文。
  */
 
 interface PresetToken {
@@ -35,8 +48,11 @@ function resolveTokenHex(variable: string): string | undefined {
 }
 
 export interface ColorToolPanelProps {
-  /** 用户点「确定」；色值形如 `#RRGGBB`。 */
-  onConfirm: (hex: string) => void;
+  /**
+   * 用户点「确定」；返回 `{{color:#RRGGBB:名称}}` chip 字符串。
+   * 调用方负责将此字符串插入正文。
+   */
+  onConfirm: (chip: string) => void;
   onClose: () => void;
 }
 
@@ -50,6 +66,27 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
     [],
   );
   const [selected, setSelected] = useState<string | undefined>(() => presets[0]?.hex);
+  const [customHex, setCustomHex] = useState<string>("#000000");
+
+  /** 当前选中的 hex（优先自定义输入，其次预设选中） */
+  const currentHex = selected ?? customHex;
+
+  const handleConfirm = () => {
+    if (!currentHex) return;
+    // 自定义色：验证 hex，匹配中文名
+    if (!selected) {
+      if (!isValidHex(customHex)) return;
+      const chip = makeColorChipFromHex(customHex.toUpperCase());
+      onConfirm(chip);
+      return;
+    }
+    // 预设色：从 token label 取名
+    const preset = presets.find((p) => p.hex === selected);
+    const name = preset?.label ?? nearestColorName(selected);
+    const validated = validateColorChip(selected, name);
+    if (!validated) return;
+    onConfirm(`{{color:${validated.hex}:${validated.name}}}`);
+  };
 
   return (
     <div
@@ -59,8 +96,10 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
     >
       <div className="flex items-center justify-between text-[11px]">
         <span className="text-[var(--gc-node-muted)]">插入色值</span>
-        <span className="font-mono text-[var(--gc-node-text)]">{selected ?? "未选择"}</span>
+        <span className="font-mono text-[var(--gc-node-text)]">{currentHex ?? "未选择"}</span>
       </div>
+
+      {/* 预设色板 */}
       {presets.length === 0 ? (
         <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
           当前主题没有可用的预设色值，请用自定义取色器。
@@ -86,16 +125,42 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
           })}
         </div>
       )}
+
+      {/* 自定义取色 */}
       <label className="flex items-center gap-2 text-[11px] text-[var(--gc-node-muted)]">
-        自定义
+        <span>自定义</span>
         <input
           type="color"
           aria-label="自定义颜色"
-          value={selected ?? "#000000"}
-          onChange={(event) => setSelected(event.target.value.toUpperCase())}
+          value={customHex}
+          onChange={(event) => {
+            setCustomHex(event.target.value.toUpperCase());
+            setSelected(undefined); // 清预设选中
+          }}
           className="nodrag h-6 w-10 cursor-pointer rounded border border-[var(--gc-node-border)] bg-transparent"
         />
+        {/* 手动 hex 输入 */}
+        <input
+          type="text"
+          aria-label="手动输入 hex"
+          value={customHex}
+          maxLength={7}
+          onChange={(event) => {
+            const v = event.target.value;
+            if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setCustomHex(v);
+          }}
+          className="nodrag w-[72px] rounded border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+          placeholder="#000000"
+        />
+        {/* 字典匹配预览名 */}
+        {isValidHex(customHex) && (
+          <span className="shrink-0 truncate text-[10px] text-[var(--gc-text-muted)]">
+            {nearestColorName(customHex)}
+          </span>
+        )}
       </label>
+
+      {/* 操作按钮 */}
       <div className="flex gap-1.5">
         <Button type="button" variant="outline" size="xs" onClick={onClose} className="flex-1">
           取消
@@ -103,10 +168,8 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
         <Button
           type="button"
           size="xs"
-          disabled={!selected}
-          onClick={() => {
-            if (selected) onConfirm(selected);
-          }}
+          disabled={!currentHex || !isValidHex(currentHex)}
+          onClick={handleConfirm}
           className="flex-1"
         >
           确定

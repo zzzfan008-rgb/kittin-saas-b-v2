@@ -49,6 +49,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@excalidraw/excalidraw": "^0.18.1",
     "@xyflow/react": "^12.3.6",
     "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",

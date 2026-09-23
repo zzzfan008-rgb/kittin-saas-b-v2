@@ -104,8 +104,12 @@ export default defineConfig(({ mode }) => {
             if (/[\\/]node_modules[\\/](zustand|zundo|nanoid)[\\/]/.test(id)) {
               return "vendor-state";
             }
-            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
+            if (/[\\/]node_modules[\\/](lucide-react)[\\/]/.test(id)) {
               return "vendor-icons";
+            }
+            // Card #60: Excalidraw → 独立 lazy chunk，验收 gzip ≤ 500KB
+            if (/[\\/]node_modules[\\/]@excalidraw[\\/]/.test(id)) {
+              return "excalidraw";
             }
             return undefined;
           },
