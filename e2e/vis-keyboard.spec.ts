@@ -44,13 +44,23 @@ test("VIS-07 键盘焦点环（三主题）+ VIS-05 snapGrid 吸附", async ({ p
 
   await page.goto("/");
 
-  // API acknowledge 在全新库上未必被前端即时采纳；教程对话框若延迟弹出则直接关闭。
-  const closeTutorial = page.getByRole("button", { name: "关闭教程" });
-  const tutorialAppeared = await closeTutorial
-    .waitFor({ timeout: 2500 })
-    .then(() => true)
-    .catch(() => false);
-  if (tutorialAppeared) await closeTutorial.click();
+  // setup 已在服务端 acknowledge 教程：对话框挂载时可能短暂渲染后自动隐藏，
+  // 不能用「按钮存在即点击」（退场动画中的按钮永远等不到可点击状态）。
+  const tutorialDialog = page.getByRole("dialog", {
+    name: "欢迎使用服装设计工作台",
+  });
+  await tutorialDialog
+    .waitFor({ state: "hidden", timeout: 5000 })
+    .catch(async () => {
+      // 未 acknowledge 的会话（脏库重试）：走完教程步骤再完成。
+      const nextButton = tutorialDialog.getByRole("button", { name: "下一步" });
+      const completeButton = tutorialDialog.getByRole("button", { name: "完成教程" });
+      for (let step = 0; step < 8 && !(await completeButton.isVisible().catch(() => false)); step += 1) {
+        await nextButton.click().catch(() => {});
+      }
+      await completeButton.click({ timeout: 10_000 }).catch(() => {});
+    });
+  await expect(tutorialDialog).toBeHidden();
 
   // 草稿已清；saved projects 列表可能仍含 setup 留下的记录——决策 A：
   // 有已保存项目时启动保持空白，不自动打开。等启动两响应落定，确认处于空工作区。
