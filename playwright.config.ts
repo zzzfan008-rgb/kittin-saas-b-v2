@@ -111,6 +111,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 720 } },
     },
     {
+      name: "vis06",
+      testMatch: /vis06-tokens\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
       name: "desktop-1024",
       testMatch: /workbench\.spec\.ts/,
       dependencies: ["setup"],
