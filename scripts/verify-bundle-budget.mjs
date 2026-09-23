@@ -19,14 +19,14 @@ export const DEFAULT_SINGLE_CHUNK_BUDGET = 500_000;
  *   （用户点「AI 画板」才加载），不进首屏预算（210KB gzip 不变）。
  *   实测 4.08MB（stub 掉 @excalidraw/mermaid-to-excalidraw 后，原 4.79MB）。
  *   上限 5MB = 实测 + ~20% 余量（patch 版本升级抖动）。
- *   裁决：用户 2026-09-25 拍板 a+b 组合（per-path 豁免登记 + stub mermaid 子依赖）。
+ *   裁决：用户 2026-09-24 拍板 a+b 组合（per-path 豁免登记 + stub mermaid 子依赖）。
  */
 export const CHUNK_BUDGET_BASELINE = [
   {
     pattern: /^assets\/excalidraw-[\w-]+\.js$/,
     budgetBytes: 5_000_000,
     reason:
-      "@excalidraw/excalidraw 上游预打包库无法再拆分；lazy chunk 不进首屏预算；用户 2026-09-25 裁决 per-path 豁免",
+      "@excalidraw/excalidraw 上游预打包库无法再拆分；lazy chunk 不进首屏预算；用户 2026-09-24 裁决 per-path 豁免",
   },
 ];
 

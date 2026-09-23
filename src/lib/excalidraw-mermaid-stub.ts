@@ -4,7 +4,7 @@
  * 原包拖入 mermaid 全家桶（cynefin/katex/cytoscape/dagre，合计 ~1.4MB chunk），
  * 仅服务于 Excalidraw 内置的「Mermaid 转画布」对话框。通过 vite.config.ts 的
  * resolve.alias 把该包指向本文件，消去这些大 chunk
- * （卡 #60 包体门禁，用户 2026-09-25 拍板 a+b 组合）。
+ * （卡 #60 包体门禁，用户 2026-09-24 拍板 a+b 组合）。
  *
  * 降级行为：Excalidraw 只在用户打开「文字转图表」对话框并点转换时才调用
  * parseMermaidToExcalidraw；调用点在 Excalidraw 内部有 try/catch + setError，
