@@ -111,6 +111,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 720 } },
     },
     {
+      name: "vis06",
+      testMatch: /vis06-tokens\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
       name: "desktop-1024",
       testMatch: /workbench\.spec\.ts/,
       dependencies: ["setup"],
@@ -164,6 +174,18 @@ export default defineConfig({
       name: "initial-draft",
       testMatch: /initial-draft\.spec\.ts/,
       dependencies: ["desktop-1024", "desktop-1280", "desktop-1440", "golden-path"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
+      name: "vis01",
+      testMatch: /vis01-shots\.spec\.ts/,
+      // Reuse the setup session like desktop projects; logging in here would
+      // replace the shared e2e-admin session and fail every later project.
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: authStatePath,

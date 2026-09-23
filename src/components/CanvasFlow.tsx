@@ -183,11 +183,26 @@ export function registerDragInterruptionHandlers(
   };
 }
 
-/** 小地图配色随主题（直接引用 CSS 变量，保证三主题一致） */
+/**
+ * 小地图配色随主题（D-2）：全部引用 tokens.css（src/index.css）变量，
+ * 组件内不保留任何主题字面色——色值唯一事实源在 --gc-* token。
+ */
 const MINIMAP_COLORS: Record<ThemeId, { bg: string; node: string; mask: string }> = {
-  current: { bg: "var(--gc-canvas)", node: "var(--gc-border)", mask: "rgba(10,10,10,0.7)" },
-  white: { bg: "var(--gc-canvas)", node: "var(--gc-border)", mask: "rgba(29,29,31,0.08)" },
-  eye: { bg: "var(--gc-canvas)", node: "var(--gc-border)", mask: "rgba(48,69,43,0.15)" },
+  current: {
+    bg: "var(--gc-canvas)",
+    node: "var(--gc-minimap-node)",
+    mask: "var(--gc-canvas-mask-current)",
+  },
+  white: {
+    bg: "var(--gc-canvas)",
+    node: "var(--gc-minimap-node)",
+    mask: "var(--gc-canvas-mask-white)",
+  },
+  eye: {
+    bg: "var(--gc-canvas)",
+    node: "var(--gc-minimap-node)",
+    mask: "var(--gc-canvas-mask-eye)",
+  },
 };
 
 export function CanvasFlow() {

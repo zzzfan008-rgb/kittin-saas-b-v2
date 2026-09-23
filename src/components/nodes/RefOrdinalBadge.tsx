@@ -9,11 +9,11 @@ export function RefOrdinalBadge({ ordinal, highlighted }: { ordinal: number; hig
     <span
       aria-hidden="true"
       data-ref-ordinal={ordinal}
-      className="ref-ordinal-badge pointer-events-none absolute right-1.5 top-1.5 z-[3] flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] font-mono text-[11px] font-bold leading-none"
+      className="ref-ordinal-badge pointer-events-none absolute right-1.5 top-1.5 z-[3] flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] font-mono text-meta-en font-bold leading-none"
       style={{
-        backgroundColor: highlighted ? "var(--gc-accent)" : "rgba(0,0,0,.62)",
+        backgroundColor: highlighted ? "var(--gc-accent)" : "var(--gc-media-overlay)",
         color: highlighted ? "var(--gc-accent-cta-ink)" : "var(--gc-media-overlay-text)",
-        border: "1.5px solid #ffffff",
+        border: "1.5px solid var(--gc-node-main)",
         boxShadow: "0 1px 4px rgba(0,0,0,.35)",
       }}
     >

@@ -148,7 +148,7 @@ function OptionSelect({
 }) {
   return (
     <label className="block min-w-0 space-y-1">
-      <span className="text-[11px] text-[var(--gc-node-muted)]">{label}</span>
+      <span className="text-label text-[var(--gc-node-muted)]">{label}</span>
       <Select
         value={value}
         disabled={disabled}
@@ -156,7 +156,7 @@ function OptionSelect({
           if (typeof next === "string") onChange(next);
         }}
       >
-        <SelectTrigger aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-[11px]">
+        <SelectTrigger aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-label">
           <SelectValue placeholder={placeholder ?? "未选择"}>
             {(selected) => {
               const current = typeof selected === "string" ? selected : "";
@@ -197,7 +197,7 @@ function ParamControl({
 }) {
   return (
     <label className="flex min-h-[34px] items-center gap-2">
-      <span className="w-20 shrink-0 truncate text-[11px] text-[var(--gc-node-muted)]" title={name}>
+      <span className="w-20 shrink-0 truncate text-label text-[var(--gc-node-muted)]" title={name}>
         {paramLabel(name)}
       </span>
       {examples && examples.length > 0 ? (
@@ -212,7 +212,7 @@ function ParamControl({
             if (typeof next === "number" || typeof next === "boolean") onChange(next);
           }}
         >
-          <SelectTrigger aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-[11px]">
+          <SelectTrigger aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-label">
             <SelectValue placeholder="未设置">{(selected) => paramText(selected) || "未设置"}</SelectValue>
           </SelectTrigger>
           <SelectPortal>
@@ -239,7 +239,7 @@ function ParamControl({
             const numeric = typeof value === "number" && raw !== "" && Number.isFinite(Number(raw));
             onChange(numeric ? Number(raw) : raw);
           }}
-          className="nodrag h-7 min-w-0 flex-1 bg-[var(--gc-node-inner)] text-[11px] text-[var(--gc-node-text)]"
+          className="nodrag h-7 min-w-0 flex-1 bg-[var(--gc-node-inner)] text-label text-[var(--gc-node-text)]"
         />
       )}
     </label>
@@ -425,12 +425,12 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         }}
       />
       {variantOptions.length > 0 && variantOptions.every((option) => option.disabled) && (
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。
         </p>
       )}
       {variantRevoked && selectedVariant && (
-        <p role="alert" className="rounded-md border border-[var(--gc-status-error)]/40 px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-status-error)]">
+        <p role="alert" className="rounded-md border border-[var(--gc-status-error)]/40 px-2 py-1.5 text-label leading-relaxed text-[var(--gc-status-error)]">
           所选功能已被撤销，请重新选择；运行会被拒绝。
         </p>
       )}
@@ -462,14 +462,14 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         )}
       </div>
       {mediaKind === "video" && (
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           视频单次任务产出一个 MP4；时长与运动参数由模型契约给出（见下方模型参数）。
         </p>
       )}
 
       <section aria-label="模型参数" className="space-y-1">
         {declaredKeys.length === 0 && extraKeys.length === 0 && (
-          <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+          <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
             当前模型契约没有声明可调参数。
           </p>
         )}
@@ -511,7 +511,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           </div>
         ))}
         {warnings.map((warning) => (
-          <p key={warning} role="status" className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">
+          <p key={warning} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">
             ⚠ {warning}（仍可运行）
           </p>
         ))}
@@ -524,7 +524,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               placeholder="参数名"
               disabled={disabled}
               onChange={(event) => setDraftParam({ ...draftParam, key: event.target.value })}
-              className="nodrag h-7 min-w-0 flex-1 text-[11px]"
+              className="nodrag h-7 min-w-0 flex-1 text-label"
             />
             <Input
               value={draftParam.value}
@@ -532,7 +532,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               placeholder="值"
               disabled={disabled}
               onChange={(event) => setDraftParam({ ...draftParam, value: event.target.value })}
-              className="nodrag h-7 min-w-0 flex-1 text-[11px]"
+              className="nodrag h-7 min-w-0 flex-1 text-label"
             />
             <Button
               type="button"
@@ -568,13 +568,13 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           size="xs"
           disabled={disabled || draftParam !== null}
           onClick={() => setDraftParam({ key: "", value: "" })}
-          className="w-full text-[11px]"
+          className="w-full text-label"
         >
           + 添加参数
         </Button>
       </section>
 
-      <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+      <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
         {mediaKind === "image"
           ? `参考图 ${admission.referenceRows.length} 张 · 提示词 ${wiring.prompt} 条`
           : `提示词 ${wiring.prompt} 条 · 首帧${wiring.firstFrame > 0 ? "已接" : "未接"}`}
@@ -582,7 +582,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
       {selectedVariant?.needsMask && (
         <div className="space-y-1.5 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-2">
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-label">
             <span className="text-[var(--gc-node-muted)]">蒙版（该功能要求）</span>
             <span className="text-[var(--gc-node-muted)]">源：参考图 1</span>
           </div>
@@ -596,7 +596,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           >
             {displayMask ? "编辑蒙版" : "绘制蒙版"}
           </Button>
-          {!displayMask && <p className="text-[11px] text-[var(--gc-warn-text)]">该功能需要先涂蒙版</p>}
+          {!displayMask && <p className="text-label text-[var(--gc-warn-text)]">该功能需要先涂蒙版</p>}
         </div>
       )}
 
