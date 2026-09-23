@@ -100,7 +100,6 @@ const TEST_FILES = [
   "tests/tutorials.test.ts",
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
-  "tests/recent-results.test.ts",
   "tests/unknown-kind-viewer.test.ts",
   "tests/image-viewer-reference-evidence.test.ts",
   "tests/project-tabs-session.test.ts",
@@ -130,9 +129,6 @@ const SERIAL_TEST_FILES = new Set([
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   "tests/evaluation-review-ledger.test.ts",
-  // recent-results.test.ts 在 CI 并发时与碰库串行测试存在隐性状态依赖导致 flaky，
-  // 移至串行泳道消除竞态。
-  "tests/recent-results.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
@@ -257,10 +253,9 @@ async function main() {
     console.log(`${mark} ${result.file}`);
   };
 
-  await Promise.all([
-    drainSerial(serialTests, record),
-    drainParallel(parallelTests, limit, record),
-  ]);
+  // 串行必须先完成（schema reset），并行池只在串行全退场后才启动，消除碰库测试与并行测试的并发写冲突。
+  await drainSerial(serialTests, record);
+  await drainParallel(parallelTests, limit, record);
 
   const failed = results.filter((result) => result.exitCode !== 0);
   const elapsedMs = Date.now() - started;
