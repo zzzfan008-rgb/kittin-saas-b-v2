@@ -6,7 +6,7 @@
  *
  * 这些测试在 Node.js 环境中执行，读取源码文件并验证：
  * - 卡 #58：hover 桥、active class、粘性模式、closeTimer guard
- * - 卡 #60：DrawingCanvas 懒加载、chunk 隔离、excalidraw chunk gzip ≤ 500KB
+ * - 卡 #60：DrawingCanvas 懒加载、chunk 隔离、excalidraw lazy chunk 走 per-path 豁免 ≤5MB，首屏 210KB gzip 预算不变
  * - 卡 #61：COLOR_TOKEN_RE、字典匹配、fail-closed、ast-grep 裸 hex
  */
 import assert from "node:assert/strict";
