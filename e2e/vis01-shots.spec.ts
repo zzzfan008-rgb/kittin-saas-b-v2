@@ -77,28 +77,6 @@ const FIXTURES = [
   },
 ];
 
-async function login(page: import("@playwright/test").Page) {
-  const request = page.context().request;
-  let response = await request.post("/api/auth/login", {
-    data: { accountId: "e2e-admin", password: "E2eFinal5678" },
-  });
-  if (response.status() === 401) {
-    response = await request.post("/api/auth/login", {
-      data: { accountId: "e2e-admin", password: "E2eInitial1234" },
-    });
-    const body = await response.json() as { user?: { mustChangePassword?: boolean }; error?: string };
-    expect(response.ok(), body.error).toBeTruthy();
-    if (body.user?.mustChangePassword) {
-      const change = await request.post("/api/auth/change-password", {
-        data: { currentPassword: "E2eInitial1234", newPassword: "E2eFinal5678" },
-      });
-      expect(change.ok(), await change.text()).toBeTruthy();
-    }
-  } else {
-    expect(response.ok(), await response.text()).toBeTruthy();
-  }
-}
-
 async function dismissTutorial(page: import("@playwright/test").Page) {
   const tutorial = page.getByRole("dialog", { name: "欢迎使用服装设计工作台" });
   const info = await page.request.get("/api/tutorials/workbench-onboarding");
@@ -157,8 +135,6 @@ async function settle(locator: import("@playwright/test").Locator) {
 test.setTimeout(240_000);
 
 test("VIS-01 screenshot matrix", async ({ page }) => {
-  await login(page);
-
   // History fixtures must be in place before the app bootstraps.
   await page.route("**/api/history*", async (route) => {
     const url = new URL(route.request().url());
@@ -275,6 +251,9 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
 
 test("login page", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
+  // The vis01 project authenticates via setup storage state; clear it so the
+  // logged-out login form is what gets captured.
+  await page.context().clearCookies();
   await page.goto("/login");
   // Wait for AuthGate's /api/auth check to finish; otherwise the full-screen
   // "正在验证登录状态…" fallback can be captured (its bg matches the login bg).

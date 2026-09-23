@@ -173,8 +173,12 @@ export default defineConfig({
     {
       name: "vis01",
       testMatch: /vis01-shots\.spec\.ts/,
+      // Reuse the setup session like desktop projects; logging in here would
+      // replace the shared e2e-admin session and fail every later project.
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
+        storageState: authStatePath,
         viewport: { width: 1280, height: 720 },
       },
     },
