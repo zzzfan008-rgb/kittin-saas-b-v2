@@ -963,6 +963,8 @@ function persistReceiptArtifact(directory, { role, body, extension, batch }) {
   writeFileSync(path, body, { encoding: "utf8", flag: "wx", mode: 0o644 });
   const record = { role, path: join(RECEIPT_ARTIFACTS_DIR, fileName), sha256: digest, bytes: Buffer.byteLength(body, "utf8") };
   if (batch != null) record.batch = batch;
+  // DEBUG: inject unique marker so we can see which version ran in CI
+  record._debugRole = role;
   return record;
 }
 
