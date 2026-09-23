@@ -20,7 +20,7 @@ export function ReferenceEvidenceList({
   const normalizedEvidence = normalizeReferenceImageEvidence(evidence, images.length);
   return (
     <div className="mt-4">
-      <p className="text-label text-neutral-500">参考图 · {images.length} 张</p>
+      <p className="text-label text-[var(--gc-text-muted)]">参考图 · {images.length} 张</p>
       <div className="mt-2 grid grid-cols-4 gap-2">
         {images.map((image, index) => {
           const item = normalizedEvidence[index]!;
@@ -36,11 +36,11 @@ export function ReferenceEvidenceList({
                 decoding="async"
                 className="aspect-square w-full rounded-sm border border-[var(--gc-border)] object-cover"
               />
-              <p className="mt-1 truncate text-label text-neutral-500">
+              <p className="mt-1 truncate text-label text-[var(--gc-text-muted)]">
                 参考图 {item.order + 1} · {stateLabel}
               </p>
               {item.sourceNodeId && (
-                <p className="truncate text-label text-neutral-600">来源：{item.sourceNodeId}</p>
+                <p className="truncate text-label text-[var(--gc-text-muted)]">来源：{item.sourceNodeId}</p>
               )}
             </div>
           );
@@ -159,16 +159,16 @@ export function ImageViewer() {
           draggable={false}
         />
       </div>
-      <span className="absolute left-4 top-4 text-label text-neutral-400">
+      <span className="absolute left-4 top-4 text-label text-[var(--gc-text-muted)]">
         滚轮缩放 {Math.round(scale * 100)}%（最大 200%）· 双击复位 · Esc 关闭
       </span>
       <aside className="w-[400px] shrink-0 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)]/98 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-medium text-neutral-100">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
-            <p className="mt-1 text-label text-neutral-500">{record?.projectName ?? "当前项目"}</p>
+            <h2 className="text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
+            <p className="mt-1 text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
           </div>
-          <button type="button" onClick={closeViewer} className="text-sm text-neutral-500 hover:text-white">✕</button>
+          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">✕</button>
         </div>
         <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
           {[
@@ -178,12 +178,12 @@ export function ImageViewer() {
             ["服务请求", record?.providerRequests ?? "—"],
             ["开始时间", record?.startedAt ? new Date(record.startedAt).toLocaleString("zh-CN") : "—"],
             ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
-          ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-neutral-500">{label}</dt><dd className="text-right text-neutral-300">{value}</dd></div>)}
+          ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-[var(--gc-text-muted)]">{label}</dt><dd className="text-right text-[var(--gc-text)]">{value}</dd></div>)}
         </dl>
         {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-label text-[var(--gc-text-muted)]">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-body leading-relaxed text-[var(--gc-text)]">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">复制提示词</button></div>}
         {providerOriginals.length > 0 && (
           <div className="mt-4">
-            <p className="text-label text-neutral-500">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
+            <p className="text-label text-[var(--gc-text-muted)]">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {providerOriginals.map((image, index) => (
                 <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">

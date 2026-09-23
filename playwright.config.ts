@@ -180,5 +180,29 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
       },
     },
+    {
+      // 复用 setup 建立的会话（storageState），不再自行登录——单设备会话策略下
+      // 二次登录会触发 SESSION_REPLACED，级联打挂同账号串行套件。
+      name: "vis-keyboard",
+      testMatch: /vis-keyboard\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
+      name: "vis01",
+      testMatch: /vis01-shots\.spec\.ts/,
+      // Reuse the setup session like desktop projects; logging in here would
+      // replace the shared e2e-admin session and fail every later project.
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
   ],
 });
