@@ -73,7 +73,7 @@ function ThemeSwitcher() {
       <DropdownMenuTrigger
         type="button"
         aria-label={`切换主题，当前为${current.label}`}
-        className="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-[11px] font-medium text-[var(--gc-text)] outline-hidden transition-colors hover:border-[var(--gc-accent)] focus-visible:ring-3 focus-visible:ring-[var(--gc-accent)]/50"
+        className="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 text-label font-medium text-[var(--gc-text)] outline-hidden transition-colors hover:border-[var(--gc-accent)] focus-visible:ring-3 focus-visible:ring-[var(--gc-accent)]/50"
       >
         <PaletteIcon aria-hidden="true" className="size-3.5 text-[var(--gc-accent)]" />
         <span>{current.label}</span>
@@ -85,7 +85,7 @@ function ThemeSwitcher() {
         className="w-64 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-2 text-[var(--gc-text)] shadow-2xl shadow-black/60 ring-0"
       >
         <DropdownMenuRadioGroup value={theme} onValueChange={selectTheme} className="space-y-1">
-          <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
+          <DropdownMenuLabel className="px-2 pb-2 pt-1 text-label font-medium uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
             主题
           </DropdownMenuLabel>
           {THEMES.map((item) => (
@@ -96,10 +96,10 @@ function ThemeSwitcher() {
             >
               <ThemeMiniature theme={item.id} />
               <span className="min-w-0 flex-1">
-                <span className={`block text-[11px] font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
+                <span className={`block text-label font-medium ${theme === item.id ? "text-[var(--gc-accent)]" : "text-[var(--gc-text)]"}`}>
                   {item.label}
                 </span>
-                <span className="mt-0.5 block truncate text-[11px] text-[var(--gc-text-muted)]">{item.desc}</span>
+                <span className="mt-0.5 block truncate text-label text-[var(--gc-text-muted)]">{item.desc}</span>
               </span>
             </DropdownMenuRadioItem>
           ))}
@@ -111,9 +111,9 @@ function ThemeSwitcher() {
 
 function ShortcutRow({ label, shortcut }: WorkbenchShortcutRow) {
   return (
-    <div className="flex min-h-8 items-center justify-between gap-3 rounded-md px-2 text-[11px] text-[var(--gc-text)] hover:bg-[var(--gc-panel-hover)]">
+    <div className="flex min-h-8 items-center justify-between gap-3 rounded-md px-2 text-label text-[var(--gc-text)] hover:bg-[var(--gc-panel-hover)]">
       <span>{label}</span>
-      <DropdownMenuShortcut className="shrink-0 text-[11px] tracking-normal text-[var(--gc-text-muted)]">
+      <DropdownMenuShortcut className="shrink-0 text-label tracking-normal text-[var(--gc-text-muted)]">
         {shortcut}
       </DropdownMenuShortcut>
     </div>
@@ -151,7 +151,7 @@ function ShortcutMenu() {
         className="w-56 min-w-56 border border-[var(--gc-border)] bg-[var(--gc-panel)] p-1.5 text-[var(--gc-text)] shadow-2xl shadow-black/60 ring-0"
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2 pb-1.5 pt-1 text-[11px] font-semibold text-[var(--gc-accent)]">
+          <DropdownMenuLabel className="px-2 pb-1.5 pt-1 text-label font-semibold text-[var(--gc-accent)]">
             {platform === "macos" ? "macOS" : "Windows"}
           </DropdownMenuLabel>
           {canvasShortcuts.map((shortcut) => (
@@ -201,7 +201,7 @@ export function TopBar() {
           </Button>
         )}
         {readOnly && (
-          <span className="rounded-md border border-blue-400/40 px-2 py-1 text-[11px] text-blue-400">管理员只读</span>
+          <span className="rounded-md border border-blue-400/40 px-2 py-1 text-label text-blue-400">管理员只读</span>
         )}
         <Button
           type="button"

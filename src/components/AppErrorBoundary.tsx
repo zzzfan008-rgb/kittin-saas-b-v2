@@ -62,7 +62,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
               清除当前损坏页签并恢复
             </button>
           </div>
-          <dl className="mt-5 space-y-1 border-t border-(--gc-border) pt-4 font-mono text-[11px] text-(--gc-text-muted)">
+          <dl className="mt-5 space-y-1 border-t border-(--gc-border) pt-4 font-mono text-label text-(--gc-text-muted)">
             <div className="flex justify-between gap-4"><dt>错误编号</dt><dd>{this.state.errorId}</dd></div>
             <div className="flex justify-between gap-4"><dt>构建版本</dt><dd>{buildVersion()}</dd></div>
           </dl>

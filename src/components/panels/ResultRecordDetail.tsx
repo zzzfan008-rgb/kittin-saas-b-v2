@@ -46,7 +46,7 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-neutral-200">{record.nodeLabel}</span>
         <span
-          className={`text-[11px] ${statusColor[record.status]}`}
+          className={`text-label ${statusColor[record.status]}`}
         >
           {statusText[record.status]}
         </span>
@@ -56,7 +56,7 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       {/* 大图由外层「结果详情」弹窗承载（可点进查看器），这里不再重复渲染同一张图。 */}
 
-      <dl className="space-y-1.5 text-[11px]">
+      <dl className="space-y-1.5 text-label">
         <div className="flex justify-between">
           <dt className="text-neutral-500">节点类型</dt>
           <dd className="text-neutral-300">{nodeTitleForKind(record.kind)}</dd>
@@ -91,8 +91,8 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       {record.prompt && (
         <div className="space-y-1">
-          <span className="text-[10px] text-neutral-500">提示词</span>
-          <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-[10px] leading-relaxed text-[var(--gc-text-muted)]">
+          <span className="text-label text-neutral-500">提示词</span>
+          <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-body leading-relaxed text-[var(--gc-text-muted)]">
             {record.prompt}
           </p>
         </div>
@@ -100,8 +100,8 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       {record.error && (
         <div className="space-y-1">
-          <span className="text-[11px] text-red-400/80">错误信息</span>
-          <p className="rounded-md border border-red-900/50 bg-red-950/20 px-2 py-1.5 text-[11px] leading-relaxed text-red-300/90">
+          <span className="text-label text-red-400/80">错误信息</span>
+          <p className="rounded-md border border-red-900/50 bg-red-950/20 px-2 py-1.5 text-body leading-relaxed text-red-300/90">
             {record.error}
           </p>
         </div>
