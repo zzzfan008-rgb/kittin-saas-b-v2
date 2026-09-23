@@ -442,4 +442,30 @@ await test("本地图像处理队列最多同时执行两项并在异常后释�
   await withImageProcessingSlot(async () => undefined);
 });
 
+await test("RUN-02：逐张落袋时 onProgress 给出 done/total 且 done 单调不减", async () => {
+  let calls = 0;
+  const progressEvents: Array<{ phase?: string; done?: number; total?: number }> = [];
+  const provider: AIProvider = {
+    id: "stub",
+    async generate() {
+      calls += 1;
+      return { images: [`generated-${calls}`], model: "stub-model" };
+    },
+    async edit() { throw new Error("unexpected edit"); },
+  };
+  await generateExactImages(
+    provider,
+    { prompt: "四张", operationMode: "generate" },
+    4,
+    { onProgress: (event) => { progressEvents.push(event); } },
+  );
+  assert.equal(calls, 4);
+  assert.deepEqual(progressEvents, [
+    { phase: "image", done: 1, total: 4 },
+    { phase: "image", done: 2, total: 4 },
+    { phase: "image", done: 3, total: 4 },
+    { phase: "image", done: 4, total: 4 },
+  ]);
+});
+
 console.log(`\n通过 ${passed} 项`);

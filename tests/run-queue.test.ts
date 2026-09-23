@@ -11,7 +11,7 @@ import type { AuthenticatedRequest, AuthUser } from "../server/lib/auth";
 import type { GenerationRecordContext } from "../server/engine/runQueue";
 import type { EvaluationRunPolicy } from "../server/lib/evaluationRunPolicy";
 import type { ProviderResolver } from "../server/engine/runner";
-import type { AIProvider, ExecutionPlan, ImageGenRequest, ImageGenResult, NodeExecution } from "../src/types/workflow";
+import type { AIProvider, ExecutionPlan, ImageGenRequest, ImageGenResult, NodeExecution, NodeStatusRunEvent } from "../src/types/workflow";
 import type { ImageModelId } from "../src/types/imageModels";
 import type { EvaluationShutdownRule } from "../src/types/promptEvaluation";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
@@ -423,6 +423,73 @@ await test("入队立即返回且数据库重连后 queued 任务仍可执行并
   const cursor = allEvents[1].seq ?? 0;
   const replay = await queue.readDurableRunEvents(runId, owner.id, cursor);
   assert.deepEqual(replay?.map((event) => event.seq), allEvents.slice(2).map((event) => event.seq));
+});
+
+await test("RUN-02：batchSize=4 的 executeStep 进度 done 单调不减", async () => {
+  sequence += 1;
+  const nodeId = `progress-${sequence}`;
+  let calls = 0;
+  const fake = resolver(() => {
+    calls += 1;
+    return { images: [`generated-${calls}`], model: "gpt-image-2.5-flare-vip" };
+  });
+  const progressEvents: NodeStatusRunEvent[] = [];
+  const batchStep: NodeExecution = {
+    ...step(nodeId),
+    params: boundQueueParams("生成服装效果图", { batchSize: 4 }),
+  };
+  await executeStep(batchStep, [], fake.resolveProvider, {
+    onProgress: (progress) => {
+      progressEvents.push({ type: "node-status", nodeId, status: "running", progress });
+    },
+  });
+  assert.equal(calls, 4, "每次只回 1 张时必须逐张补足 4 张");
+  assert.deepEqual(progressEvents.map((event) => event.progress), [
+    { phase: "image", done: 1, total: 4 },
+    { phase: "image", done: 2, total: 4 },
+    { phase: "image", done: 3, total: 4 },
+    { phase: "image", done: 4, total: 4 },
+  ]);
+});
+
+await test("RUN-02：Worker 持久化 progress 事件；无 progress 的旧事件行向后兼容", async () => {
+  sequence += 1;
+  const nodeId = `progress-w-${sequence}`;
+  const run = await queue.enqueueGenerationRun({ steps: [step(nodeId)] }, owner.id, context(nodeId));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
+  const now = tick();
+  assert.equal(await queue.processNextGenerationJob("worker-progress", {
+    resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
+  }), true);
+  assert.equal(fake.calls(), 1);
+
+  const events = await queue.readDurableRunEvents(run.id, owner.id, 0);
+  assert.ok(events);
+  const progressEvents = events!.filter((event) => event.type === "node-status" && event.progress);
+  assert.equal(progressEvents.length, 1);
+  assert.deepEqual(progressEvents[0].progress, { phase: "image", done: 1, total: 1 });
+  // 无 progress 的旧形态事件仍存在且可被读取（queued/running 事件不带 progress）。
+  assert.ok(events!.some((event) => event.type === "node-status" && !event.progress));
+
+  // 直接构造改名前写入的旧事件行（无 progress 字段），读取侧必须原样兼容。
+  const seqRow = await database.queryOne<{ nextSeq: number }>(
+    "UPDATE generation_runs SET next_event_seq = next_event_seq + 1 WHERE id = $1 RETURNING next_event_seq::int AS \"nextSeq\"",
+    [run.id],
+  );
+  assert.ok(seqRow);
+  await database.query(`
+    INSERT INTO generation_run_events (run_id, seq, payload_json, created_at)
+    VALUES ($1, $2, $3, $4)
+  `, [
+    run.id,
+    seqRow!.nextSeq,
+    JSON.stringify({ type: "node-status", nodeId, status: "running", startedAt: now }),
+    now,
+  ]);
+  const legacyRead = await queue.readDurableRunEvents(run.id, owner.id, seqRow!.nextSeq - 1);
+  assert.equal(legacyRead?.length, 1);
+  assert.equal(legacyRead?.[0].type, "node-status");
+  assert.equal(legacyRead?.[0].progress, undefined);
 });
 
 await test("入队后发布状态降级时 Worker 二次准入且 Provider 零调用", async () => {
