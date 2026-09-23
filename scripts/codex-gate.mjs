@@ -954,23 +954,16 @@ const RECEIPT_ARTIFACTS_DIR = "artifacts";
 const RECEIPT_SCHEMA_VERSION = 2;
 
 function persistReceiptArtifact(directory, { role, body, extension, batch }) {
-  console.error('[DEBUG persistReceiptArtifact]', JSON.stringify({ role, batch: batch, batchType: typeof batch }));
   if (!directory) return undefined;
-  const batchRecord = batch == null ? {} : { batch };
-  console.error('[DEBUG batchRecord]', JSON.stringify(batchRecord));
   const digest = sha256(body);
   const artifactsDirectory = join(directory, RECEIPT_ARTIFACTS_DIR);
   mkdirSync(artifactsDirectory, { recursive: true, mode: 0o755 });
   const fileName = `${role}-${digest}${extension}`;
   const path = join(artifactsDirectory, fileName);
   writeFileSync(path, body, { encoding: "utf8", flag: "wx", mode: 0o644 });
-  return {
-    role,
-    ...batchRecord,
-    path: join(RECEIPT_ARTIFACTS_DIR, fileName),
-    sha256: digest,
-    bytes: Buffer.byteLength(body, "utf8"),
-  };
+  const record = { role, path: join(RECEIPT_ARTIFACTS_DIR, fileName), sha256: digest, bytes: Buffer.byteLength(body, "utf8") };
+  if (batch != null) record.batch = batch;
+  return record;
 }
 
 function persistReviewReceipt(directory, { selection, initialHead, initialSnapshot, review, reviewBatches: batches, gitNexusEvidence, reviewOnly, reviewScopeEvidence, artifactRecords }) {
