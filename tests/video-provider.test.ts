@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { NodeExecution } from "../src/types/workflow";
+import type { NodeExecution, RunProgress } from "../src/types/workflow";
 import {
   VIDEO_MODEL_IDS,
   getVideoModelContract,
@@ -21,6 +21,7 @@ import {
   deleteStoredVideo,
 } from "../server/lib/fileStore";
 import { executeStep } from "../server/engine/runner";
+import { getProvider } from "../server/providers";
 import { GARMENT_PROMPT_VARIANTS } from "../src/lib/garmentPromptPresets";
 
 let passed = 0;
@@ -227,6 +228,36 @@ async function main(): Promise<void> {
       assert.deepEqual(result.videos, ["/api/files/runner.mp4"]);
       assert.equal(result.videoDurationSec, 5);
       assert.deepEqual(submitted, ["cgt-runner-1"]);
+    });
+
+    await test("RUN-02：视频每 poll tick 发 phase 心跳且无 done/total 假值", async () => {
+      const heartbeats: RunProgress[] = [];
+      let polls = 0;
+      const provider: VideoProvider = {
+        id: "doubao-seedance-2-5-260628",
+        submit: async () => ({ taskId: "cgt-progress-1" }),
+        poll: async () => {
+          polls += 1;
+          if (polls <= 2) return { status: "running" };
+          return { status: "completed", videoFileRef: "/api/files/progress.mp4" };
+        },
+      };
+      await executeStep(videoStep(), [], getProvider, {
+        resolveVideoProvider: () => provider,
+        onProgress: (event) => { heartbeats.push(event); },
+        videoPollInitialDelayMs: 0,
+        videoPollIntervalMs: 1,
+        videoPollTimeoutMs: 1_000,
+      });
+      assert.deepEqual(heartbeats.map((event) => event.phase), [
+        "video-submitted",
+        "video-polling",
+        "video-polling",
+      ]);
+      assert.ok(
+        heartbeats.every((event) => event.done === undefined && event.total === undefined),
+        "视频无百分比能力时禁止出现 done/total 假值",
+      );
     });
 
     await test("executeStep video 失败时抛错（轮询终态 failed）", async () => {

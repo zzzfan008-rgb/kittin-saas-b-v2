@@ -1,4 +1,5 @@
-import type { AIProvider, ImageGenRequest, ImageGenResult } from "../../src/types/workflow";
+import type { AIProvider, ImageGenRequest, ImageGenResult, RunProgress } from "../../src/types/workflow";
+import { RUN_PROGRESS_PHASES } from "../../src/types/workflow";
 import { ProviderError, publicProviderErrorMessage, sanitizedProviderDiagnostic } from "./base";
 
 export interface ExactImageResult extends ImageGenResult {
@@ -32,6 +33,11 @@ export interface ExactImageOptions {
     providerOutputSizes?: Array<string | null>;
     providerRequestId?: string;
   }) => Promise<string[]>;
+  /**
+   * RUN-02（契约 §5）：每批图片真实落袋后报告 done/total。images 只增不减，
+   * 因此 done 天然单调；失败分支不调用，绝不编造计数。
+   */
+  onProgress?: (progress: RunProgress) => void | Promise<void>;
 }
 
 function logProviderFailure(provider: AIProvider, error: ProviderError, options: ExactImageOptions, attempt: number): void {
@@ -124,6 +130,11 @@ export async function generateExactImages(
     images.push(...acceptedImages);
     providerImages.push(...captured);
     providerOutputSizes.push(...acceptedSizes);
+    await options.onProgress?.({
+      phase: RUN_PROGRESS_PHASES.image,
+      done: images.length,
+      total: target,
+    });
   }
 
   if (images.length === 0) throw firstError instanceof Error ? firstError : new Error(failures[0] ?? "模型未返回图片");

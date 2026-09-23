@@ -28,6 +28,7 @@
     "test:e2e:production": "node scripts/e2e-production-smoke.mjs",
     "test:e2e:run": "playwright test",
     "gate:codex": "node scripts/codex-gate.mjs",
+    "gate:receipt:verify": "node scripts/gate-receipt-verify.mjs",
     "docs:apiyi:check": "node scripts/apiyi-docs.mjs check",
     "docs:apiyi:refresh": "node scripts/apiyi-docs.mjs refresh",
     "docs:apiyi:kb:sync": "node scripts/apiyi-kb.mjs sync",

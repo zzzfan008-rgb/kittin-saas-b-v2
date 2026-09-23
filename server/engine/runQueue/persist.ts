@@ -38,7 +38,6 @@ import { ACTIVE_RUN_LIMIT } from "../../lib/generationLimits";
 import { lockActiveOwner } from "../../lib/ownerMutation";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
