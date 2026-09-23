@@ -832,7 +832,7 @@ for (const [label, graph, expected] of [
   assert.equal(receipt.artifacts.directory, "artifacts");
   const artifactRecords = receipt.artifacts.files;
   assert.deepEqual(
-    artifactRecords.map(({ role, batch }) => ({ role, batch })),
+    artifactRecords.map(({ role, batch }) => (batch == null ? { role } : { role, batch })),
     [
       { role: "review-scope" },
       { role: "batch-scope", batch: 1 },

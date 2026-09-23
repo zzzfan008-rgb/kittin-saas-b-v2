@@ -94,7 +94,9 @@ export function verifyReceipt(receiptPath) {
       fail(errors, `${label} 未知角色：${String(file.role)}`);
     }
     // 路径必须留在 artifacts 目录内：拒绝绝对路径、.. 越界、分隔符逃逸。
-    const target = resolve(artifactsRoot, file.path);
+    // file.path 是相对回执目录的路径（形如 "artifacts/<role>-<sha>.<ext>"），
+    // 因此必须相对 receiptDir 解析；相对 artifactsRoot 会错误拼成 artifacts/artifacts/...
+    const target = resolve(receiptDir, file.path);
     if (target !== artifactsRoot && !target.startsWith(artifactsRoot + sep)) {
       fail(errors, `${label} 路径越出 artifacts 目录：${file.path}`);
       continue;
