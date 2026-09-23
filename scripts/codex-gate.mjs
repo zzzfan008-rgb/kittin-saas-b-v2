@@ -963,7 +963,7 @@ function persistReceiptArtifact(directory, { role, body, extension, batch }) {
   writeFileSync(path, body, { encoding: "utf8", flag: "wx", mode: 0o644 });
   return {
     role,
-    ...(batch != null ? { batch } : {}),
+    ...(batch !== undefined ? { batch } : {}),
     path: join(RECEIPT_ARTIFACTS_DIR, fileName),
     sha256: digest,
     bytes: Buffer.byteLength(body, "utf8"),
