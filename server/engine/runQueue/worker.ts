@@ -33,7 +33,6 @@ import {
 import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
@@ -50,11 +49,9 @@ export async function handleJobError(
   phase: EvaluationErrorPhase,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
-  const message = error instanceof CancelledBeforeProviderCall
-    ? error.message
-    : error instanceof ProviderError
-      ? publicProviderErrorMessage(error)
-      : error instanceof Error ? error.message : String(error);
+  const message = error instanceof ProviderError
+    ? publicProviderErrorMessage(error)
+    : error instanceof Error ? error.message : String(error);
   if (error instanceof ProviderError) {
     console.error("[ai-provider-worker-failure]", JSON.stringify({
       runId: job.runId, nodeId: job.nodeId, providerId: error.providerId, status: error.status ?? null,
@@ -74,10 +71,6 @@ export async function handleJobError(
       WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
     `, [job.id])).rows[0];
     if (!row || row.worker_id !== workerId) return;
-    if (error instanceof CancelledBeforeProviderCall) {
-      await terminateRun(client, row, "cancelled", message, now, phase);
-      return;
-    }
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
       await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now, phase);
       return;
