@@ -150,7 +150,8 @@ test("VIS-06: minimap / ordinal badge / scrollbar colors trace to tokens (3 them
     // 经生产代码 applyTheme 切主题（设置属性 + 持久化 + 通知 React 重渲染，
     // minimap 的 maskColor prop 才会随之更新）
     await page.evaluate(async (value) => {
-      const themeModule = await import(/* @vite-ignore */ "/src/lib/theme.ts");
+      const themeModuleUrl = "/src/lib/theme.ts";
+      const themeModule = await import(/* @vite-ignore */ themeModuleUrl);
       themeModule.applyTheme(value);
     }, theme);
     await page.waitForTimeout(200);
