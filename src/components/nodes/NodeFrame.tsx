@@ -141,7 +141,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, chi
           />
         ) : (
           <span
-            className={`truncate text-xs font-medium tracking-wide text-neutral-200 ${nodeId ? "cursor-text" : ""}`}
+            className={`truncate text-xs font-medium tracking-wide text-[var(--gc-node-text)] ${nodeId ? "cursor-text" : ""}`}
             title={nodeId ? "双击改名" : undefined}
             onDoubleClick={
               nodeId

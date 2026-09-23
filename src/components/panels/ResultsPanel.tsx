@@ -52,10 +52,10 @@ export function ResultsPanel({
       className={cn("gc-panel flex min-h-0 flex-col bg-[var(--gc-panel)]", className)}
     >
       <div className="flex min-w-0 items-center gap-2 border-b border-[var(--gc-border)] px-3 py-2">
-        <span className="text-label font-medium uppercase tracking-widest text-neutral-500">
+        <span className="text-label font-medium uppercase tracking-widest text-[var(--gc-text-muted)]">
           最近生成
         </span>
-        <span className="text-label text-neutral-600">{recentResults.length} 条</span>
+        <span className="text-label text-[var(--gc-text-muted)]">{recentResults.length} 条</span>
         <span className="ml-auto flex min-w-0 shrink-0 items-center gap-3">
           {compareIds.length >= 2 && (
             <button
@@ -73,7 +73,7 @@ export function ResultsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {recentResults.length === 0 ? (
-            <p className="py-3 text-center text-label text-neutral-600">
+            <p className="py-3 text-center text-label text-[var(--gc-text-muted)]">
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
@@ -95,7 +95,7 @@ export function ResultsPanel({
                     <span className="text-label text-gold">
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-label text-neutral-500">
+                    <span className="w-full truncate text-center text-label text-[var(--gc-text-muted)]">
                       {r.nodeLabel}
                     </span>
                   </button>
@@ -113,10 +113,10 @@ export function ResultsPanel({
                     }`}
                     title={r.error ?? STATUS_TEXT[r.status]}
                   >
-                    <span className={`text-label ${r.status === "cancelled" ? "text-neutral-500" : "text-red-400"}`}>
+                    <span className={`text-label ${r.status === "cancelled" ? "text-[var(--gc-text-muted)]" : "text-red-400"}`}>
                       {STATUS_TEXT[r.status]}
                     </span>
-                    <span className="w-full truncate text-center text-label text-neutral-500">
+                    <span className="w-full truncate text-center text-label text-[var(--gc-text-muted)]">
                       {r.nodeLabel}
                     </span>
                   </button>

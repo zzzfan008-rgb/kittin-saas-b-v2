@@ -166,10 +166,10 @@ export function AssetPickerOverlay({
             </div>
           )}
           {!error && loading && assets.length === 0 && (
-            <p className="py-6 text-center text-label text-neutral-600">加载中…</p>
+            <p className="py-6 text-center text-label text-[var(--gc-text-muted)]">加载中…</p>
           )}
           {!error && !loading && assets.length === 0 && (
-            <p className="py-6 text-center text-label text-neutral-600">
+            <p className="py-6 text-center text-label text-[var(--gc-text-muted)]">
               {debouncedSearch ? "没有匹配的素材" : EMPTY_HINT[category]}
             </p>
           )}
