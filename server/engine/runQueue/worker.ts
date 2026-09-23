@@ -33,7 +33,6 @@ import {
 import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
@@ -50,11 +49,9 @@ export async function handleJobError(
   phase: EvaluationErrorPhase,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
-  const message = error instanceof CancelledBeforeProviderCall
-    ? error.message
-    : error instanceof ProviderError
-      ? publicProviderErrorMessage(error)
-      : error instanceof Error ? error.message : String(error);
+  const message = error instanceof ProviderError
+    ? publicProviderErrorMessage(error)
+    : error instanceof Error ? error.message : String(error);
   if (error instanceof ProviderError) {
     console.error("[ai-provider-worker-failure]", JSON.stringify({
       runId: job.runId, nodeId: job.nodeId, providerId: error.providerId, status: error.status ?? null,
@@ -73,17 +70,9 @@ export async function handleJobError(
       JOIN generation_runs r ON r.id = j.run_id
       WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
     `, [job.id])).rows[0];
-    if (!row || (row.worker_id !== workerId && row.status !== "cancel_requested")) return;
-    if (error instanceof CancelledBeforeProviderCall) {
-      await terminateRun(client, row, "cancelled", message, now, phase);
-      return;
-    }
+    if (!row || row.worker_id !== workerId) return;
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
       await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now, phase);
-      return;
-    }
-    if (row.status === "cancel_requested") {
-      await terminateRun(client, row, "cancelled", "用户取消了任务，系统未继续重试", now, phase);
       return;
     }
     if (row.retry_policy === "no-retry") {
@@ -151,7 +140,7 @@ export async function processNextGenerationJob(
     const heartbeatNow = options.now?.() ?? Date.now();
     void db().query(`
       UPDATE generation_jobs SET lease_expires_at = $1, updated_at = $2
-      WHERE id = $3 AND worker_id = $4 AND status IN ('running','cancel_requested')
+      WHERE id = $3 AND worker_id = $4 AND status = 'running'
     `, [heartbeatNow + leaseMs, heartbeatNow, job.id, workerId]).catch((error) => {
       console.error("[garment-canvas] generation lease heartbeat failed", error);
     });
@@ -176,6 +165,17 @@ export async function processNextGenerationJob(
         resolveVideoProvider: options.resolveVideoProvider ?? getVideoProvider,
         onVideoTaskSubmitted: async (taskId) => {
           await markVideoTaskSubmitted(job, workerId, taskId, options.now?.() ?? Date.now(), leaseMs);
+        },
+        onProgress: async (progress) => {
+          const progressNow = options.now?.() ?? Date.now();
+          await transaction(async (client) => {
+            await appendRunEvent(client, job.runId, {
+              type: "node-status",
+              nodeId: job.nodeId,
+              status: "running",
+              progress,
+            }, progressNow);
+          });
         },
         beforeProviderCall: async (providerRequest, request) => {
           const runtimeUserReferences = runtimeUserReferenceInputs(job, request);

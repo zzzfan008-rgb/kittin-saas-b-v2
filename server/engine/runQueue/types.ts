@@ -25,8 +25,6 @@ export const DEFAULT_HEARTBEAT_MS = 10_000;
 
 export const DEFAULT_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 
-export const CANCELLED_AFTER_START_WARNING = "取消请求未能中止已经开始的上游调用，结果已按实际返回保存";
-
 export const DURABLE_RUN_EVENT_BATCH_SIZE = 500;
 
 export const CLIENT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;

@@ -684,6 +684,34 @@ export interface RunFailure {
   error: string;
 }
 
+/**
+ * RUN-02（契约 §5）：节点子单元进度。挂在 RunEventMeta.progress 上，**整体可选**——
+ * 旧前端忽略、旧后端不发均合法，无数据迁移、无 CHECK 变更。
+ *
+ * 填充规则（fail-closed）：
+ * - `done`/`total` 仅在执行器确有真实计数时填充（如图片逐张完成）；**禁止编造百分比**。
+ * - 无百分比能力时（如视频 poll，T1 核实 Seedance 不返回百分比）只发 `{ phase }` 心跳。
+ * - 同一 run 内 progress 事件的 `done` 必须单调不减；SSE 重放经 seq 去重后不得回退。
+ */
+export interface RunProgress {
+  /** 进度阶段；见 RUN_PROGRESS_PHASES。字符串开放，便于后续阶段扩展。 */
+  phase: string;
+  /** 已完成子单元数；无计数语义时省略。 */
+  done?: number;
+  /** 子单元总数；与 done 同时出现。 */
+  total?: number;
+  /** 排队位次；仅排队中由 claim/enqueue 路径发出。 */
+  queuePosition?: number;
+}
+
+/** RUN-02 内置阶段词表（phase 仍是开放字符串，不在类型层封闭）。 */
+export const RUN_PROGRESS_PHASES = {
+  image: "image",
+  videoSubmitted: "video-submitted",
+  videoPolling: "video-polling",
+  queued: "queued",
+} as const;
+
 export interface RunEventMeta {
   /** Run 内单调递增事件序号，供 SSE 重连去重。 */
   seq?: number;
@@ -698,6 +726,8 @@ export interface RunEventMeta {
   finishedAt?: number;
   /** R5 参数 warning（不阻断，前端展示）。 */
   parameterWarnings?: string[];
+  /** RUN-02（契约 §5）：子单元进度；旧事件缺省该字段，向后兼容。 */
+  progress?: RunProgress;
 }
 
 export type NodeStatusRunEvent =

@@ -272,6 +272,8 @@ async function migrate(): Promise<void> {
         ALTER TABLE generation_runs ADD COLUMN IF NOT EXISTS target_step_id TEXT;
         ALTER TABLE generation_runs ADD COLUMN IF NOT EXISTS run_type TEXT NOT NULL DEFAULT 'workflow';
         ALTER TABLE generation_runs ADD COLUMN IF NOT EXISTS updated_at BIGINT;
+        -- Deprecated U3 (contract section 1): no writer exists; column kept for
+        -- historical rows and migration-order compatibility. Do not remove.
         ALTER TABLE generation_runs ADD COLUMN IF NOT EXISTS cancel_requested_at BIGINT;
         UPDATE generation_runs SET updated_at = COALESCE(updated_at, finished_at, started_at);
         ALTER TABLE generation_runs DROP CONSTRAINT IF EXISTS generation_runs_status_check;

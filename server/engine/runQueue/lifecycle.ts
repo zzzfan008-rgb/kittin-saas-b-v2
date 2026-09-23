@@ -1,4 +1,4 @@
-import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, CANCELLED_AFTER_START_WARNING, lockRun } from "./types";
+import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, lockRun } from "./types";
 import { appendRunEvent } from "./events";
 import { persistedEvaluationPolicy, persistedEvaluationPolicyFromRow } from "./evaluation";
 import type { PoolClient } from "pg";
@@ -31,7 +31,6 @@ import {
 import type { RunEvent, StepResult } from "../runner";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
@@ -44,7 +43,6 @@ export async function finalizeSuccessfulRun(
   client: PoolClient,
   run: DurableRunRow,
   finishedAt: number,
-  cancellationWarning?: string,
 ): Promise<void> {
   const target = run.target_step_id
       ? (await client.query<{
@@ -91,7 +89,7 @@ export async function finalizeSuccessfulRun(
       VALUES ($1, $2, '', $3, 'error', $4, $5)
     `, [nanoid(12), run.id, failure.prompt ?? null, failure.error, finishedAt + images.length + index]);
   }
-  const warning = cancellationWarning ?? (failures.length ? `${failures.length} 个生成任务失败` : null);
+  const warning = failures.length ? `${failures.length} 个生成任务失败` : null;
   const model = target?.model ?? aggregate?.model ?? null;
   const providerRequests = aggregate?.provider_requests ?? 0;
   const outputCount = images.length + videos.length;
@@ -191,13 +189,12 @@ export async function completeJobSuccess(
     if (
       !locked ||
       locked.worker_id !== workerId ||
-      (locked.status !== "running" && locked.status !== "cancel_requested")
+      locked.status !== "running"
     ) {
       throw new Error("generation job lease was lost before completion");
     }
     const run = await lockRun(client, job.runId);
     if (!run) throw new Error("generation run disappeared");
-    const cancellationWarning = locked.status === "cancel_requested" ? CANCELLED_AFTER_START_WARNING : undefined;
     await client.query(`
       UPDATE generation_jobs SET status = 'succeeded', worker_id = NULL, lease_expires_at = NULL,
         updated_at = $1, last_error = NULL WHERE id = $2
@@ -214,7 +211,7 @@ export async function completeJobSuccess(
       JSON.stringify(providerImageUrls),
       JSON.stringify(referenceEvidence), JSON.stringify(result.prompts ?? []),
       JSON.stringify(result.providerOutputSizes ?? []), JSON.stringify(result.failures ?? []),
-      cancellationWarning ?? null, finishedAt, job.stepId,
+      null, finishedAt, job.stepId,
     ]);
     if (run.target_step_id === job.stepId) {
       await client.query(
@@ -275,21 +272,10 @@ export async function completeJobSuccess(
       prompts: result.prompts,
       providerOutputSizes: result.providerOutputSizes,
       failures: result.failures,
-      error: cancellationWarning ?? partialWarning,
+      error: partialWarning,
       startedAt: job.startedAt,
       finishedAt,
     }, finishedAt);
-
-    if (cancellationWarning) {
-      await client.query(`
-        UPDATE generation_jobs SET status = 'cancelled', worker_id = NULL, lease_expires_at = NULL, updated_at = $1
-        WHERE run_id = $2 AND status IN ('queued','retry_wait','cancel_requested')
-      `, [finishedAt, run.id]);
-      await client.query(`
-        UPDATE generation_run_steps SET status = 'cancelled', finished_at = $1, error = '用户取消了后续步骤'
-        WHERE run_id = $2 AND status IN ('queued','retry_wait','cancel_requested')
-      `, [finishedAt, run.id]);
-    }
 
     const active = (await client.query<{ count: number }>(`
       SELECT COUNT(*)::int AS count FROM generation_jobs
@@ -310,7 +296,7 @@ export async function completeJobSuccess(
           finishedAt,
         );
       } else if (target?.status === "succeeded" || !target) {
-        await finalizeSuccessfulRun(client, run, finishedAt, cancellationWarning);
+        await finalizeSuccessfulRun(client, run, finishedAt);
       } else {
         throw new Error(`generation target step ended as ${target.status}`);
       }
