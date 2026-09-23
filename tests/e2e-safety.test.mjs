@@ -50,7 +50,27 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 6 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 9 files/);
+  assert.match(
+    baseline.stdout,
+    /\[vis-keyboard\].*VIS-07 键盘焦点环.*VIS-05 snapGrid 吸附/,
+    "VIS-07/05 keyboard regression must stay in the browser regression matrix",
+  );
+  // VIS-07/05（本分支）、VIS-01 与 VIS-06（main 侧，PR #54/#55 合入）是三次独立的
+  // 矩阵扩充，合并后三条守卫都必须保留：矩阵文件数 6 → 9
+  // （vis-keyboard + vis01-shots + vis06-tokens）。
+  // 各分支各自把计数改成 7 或 8，git 视为同值/近值容易静默通过，故此处按合并态
+  // 真实文件数显式修正为 9，防止守卫漏掉任一批次新增的回归文件。
+  assert.match(
+    baseline.stdout,
+    /\[vis01\].*VIS-01 screenshot matrix/,
+    "VIS-01 screenshot matrix must remain in the browser regression matrix",
+  );
+  assert.match(
+    baseline.stdout,
+    /\[vis06\].*minimap \/ ordinal badge \/ scrollbar colors trace to tokens/,
+    "VIS-06 token trace regression must remain in the browser regression matrix",
+  );
   assert.match(
     baseline.stdout,
     /\[golden-path\].*unverified starter stays blocked while a test-reviewed variant completes the isolated golden path/,

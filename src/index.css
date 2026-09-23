@@ -43,6 +43,21 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /* VIS-07：focus-visible 全局兜底（tokens.css §7）。
+     :where() 零特异性——自带 outline/ring 工具类的 shadcn 控件照常覆盖，
+     未声明焦点样式的手写控件（节点内按钮、file input 等）由本规则保底。 */
+  :where(
+      button,
+      [role="button"],
+      a,
+      input,
+      select,
+      textarea,
+      summary
+    ):focus-visible {
+    outline: var(--gc-focus-ring) solid var(--gc-accent);
+  }
 }
 
 html,
@@ -113,6 +128,8 @@ body {
   --gc-font-label: 11px;
   --gc-font-meta-en: 10px;
   --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  /* ---- VIS-07：focus-visible 焦点环宽度（tokens.css §7 唯一事实源） ---- */
+  --gc-focus-ring: 2px;
   /* ---- 状态色 8 槽位（默认=深底亮色版；浅底主题在各自 data-theme 段覆盖） ---- */
   --gc-dot-status: 10px;
   /* ---- 节点卡几何（v8 三层七节点；plan.md §3.1/§3.2 的唯一事实源） ---- */
@@ -126,19 +143,23 @@ body {
   --gc-status-unknown: #a78bfa;
   --gc-status-idle: #8b9198;
   --gc-warn-text: #fbbf24;
+  /* ---- VIS-06 小地图遮罩（maskColor）：三主题分档，组件只引用变量 ---- */
+  --gc-canvas-mask-current: rgba(10, 10, 10, 0.7);
+  --gc-canvas-mask-white: rgba(29, 29, 31, 0.08);
+  --gc-canvas-mask-eye: rgba(48, 69, 43, 0.15);
 }
 
-/* ---- 深色滚动条 ---- */
+/* ---- 滚动条：thumb 取主题 --gc-border-strong，hover 向文字色微调 ---- */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: var(--gc-border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: color-mix(in srgb, var(--gc-border-strong), currentcolor 15%);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -179,7 +200,7 @@ body {
 }
 
 .react-flow__minimap {
-  border: 1px solid #262626;
+  border: 1px solid var(--gc-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -313,18 +334,9 @@ body {
 }
 [data-theme="white"] .bg-ink,
 [data-theme="white"] .react-flow { background-color: #f5f5f7 !important; }
-[data-theme="white"] .text-neutral-200 { color: #1d1d1f !important; }
-[data-theme="white"] .text-neutral-300 { color: #3a3a3c !important; }
-[data-theme="white"] .text-neutral-400 { color: #48484a !important; }
-[data-theme="white"] .text-neutral-500 { color: #6e6e73 !important; }
-[data-theme="white"] .text-neutral-600 { color: #86868b !important; }
 [data-theme="white"] .text-gold { color: #0071e3 !important; }
 [data-theme="white"] .bg-gold { background-color: #0071e3 !important; }
-[data-theme="white"] .placeholder\:text-neutral-600::placeholder { color: #98989d !important; }
 [data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
-[data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
-[data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
-[data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
 
 /* ---- 主题：护眼绿 v3（薄荷翡翠）· 工具类反查段（仅保留存活选择器） ---- */
 [data-theme="eye"] body {
@@ -333,17 +345,11 @@ body {
 }
 [data-theme="eye"] .bg-ink,
 [data-theme="eye"] .react-flow { background-color: #E9F1EA !important; }
-[data-theme="eye"] .text-neutral-200 { color: #123B2B !important; }
-[data-theme="eye"] .text-neutral-300 { color: #2c5443 !important; }
-[data-theme="eye"] .text-neutral-400 { color: #47685A !important; }
-[data-theme="eye"] .text-neutral-500 { color: #557a68 !important; }
-[data-theme="eye"] .text-neutral-600 { color: #6d8d7c !important; }
 [data-theme="eye"] .text-gold { color: #0B7A43 !important; }
 [data-theme="eye"] .bg-gold { background-color: #0B7A43 !important; }
-[data-theme="eye"] .placeholder\:text-neutral-600::placeholder { color: #85a291 !important; }
-[data-theme="eye"] .react-flow__minimap { border-color: #c9dccc !important; }
-[data-theme="eye"] ::-webkit-scrollbar-thumb { background: #a8c2ac; }
-[data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #8fb096; }
+/* VIS-01 删 placeholder:text-neutral-600 反查（src 已无使用者）；
+   VIS-06 删 eye 主题 minimap/scrollbar 硬编码（全局已 token 化为
+   var(--gc-border-strong) / var(--gc-border)）。两侧删除互不冲突，合并后均生效。 */
 
 /* ---- 节点语义主题：画布节点与节点库共用，和周边面板颜色解耦 ---- */
 :root,
@@ -376,6 +382,8 @@ body {
   --gc-handle-dark: #4a7a17;
   --gc-handle-ring: rgba(183, 243, 90, 0.75);
   --gc-handle-glow: rgba(142, 217, 78, 0.8);
+  /* 小地图节点色（D-2 裁定：= --gc-text-muted #9ba1a9，对比度 6.82:1） */
+  --gc-minimap-node: var(--gc-text-muted);
   /* 节点类型标识色（WorkflowMini 微缩图用；v7 三值） */
   --gc-kind-text: #4a90d9;
   --gc-kind-image: #B7F35A;
@@ -419,6 +427,8 @@ body {
   --gc-node-muted: #6e6e73;
   --gc-node-accent: #0071e3;
   --gc-edge: #0071e3;
+  /* 小地图节点色（D-2 裁定：rgba(0,0,0,.45)，对比度 3.30:1） */
+  --gc-minimap-node: rgba(0, 0, 0, 0.45);
   --gc-handle-highlight: #d6ecff;
   --gc-handle-mid: #66b2ff;
   --gc-handle-dark: #004a99;
@@ -459,6 +469,8 @@ body {
   --gc-node-muted: #47685A;
   --gc-node-accent: #0B7A43;
   --gc-edge: #0B7A43;
+  /* 小地图节点色（D-2 裁定：= --gc-text-muted #47685A，对比度 5.37:1） */
+  --gc-minimap-node: var(--gc-text-muted);
   --gc-handle-highlight: #d2ecdc;
   --gc-handle-mid: #3fa46a;
   --gc-handle-dark: #0a5c33;
@@ -502,6 +514,29 @@ body {
   --tw-ring-shadow: 0 0 0 calc(2px / var(--rf-zoom, 1)) var(--tw-ring-color, currentcolor);
 }
 
+/* VIS-07：画布内控件的全局兜底焦点环同样做缩放宽度补偿，
+   保证 fitView（0.5x）下环渲染宽度仍 ≈2px（WCAG 2.1 AA 非文本对比 ≥3:1）。 */
+.react-flow
+  :where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline-width: calc(var(--gc-focus-ring) / var(--rf-zoom, 1));
+}
+
+/* VIS-07：React Flow 默认对 node wrapper 的 focus outline 显式置 none
+   （@xyflow/react style.css .react-flow__node.selectable:focus-visible），
+   键盘 Tab 到节点本体时没有任何焦点指示。这里恢复可见焦点环。 */
+.react-flow .react-flow__node.selectable:focus-visible {
+  outline: calc(var(--gc-focus-ring) / var(--rf-zoom, 1)) solid var(--gc-accent);
+  outline-offset: 2px;
+  border-radius: calc(var(--gc-radius-node, 12px) + 2px);
+}
+
+/* VIS-07：RF 同样移除了 edge 的 outline；Tab 到连线时补回焦点环，
+   不仅靠连线变色单通道（WCAG 1.4.1）。 */
+.react-flow .react-flow__edge.selectable:focus-visible {
+  outline: calc(var(--gc-focus-ring) / var(--rf-zoom, 1)) solid var(--gc-accent);
+  outline-offset: 2px;
+}
+
 .react-flow__node:not(.dragging):hover .gc-node-card {
   border-color: var(--gc-node-accent) !important;
   box-shadow:
@@ -530,22 +565,6 @@ body {
 
 [data-theme] .gc-node-body {
   color: var(--gc-node-text) !important;
-}
-
-[data-theme] .gc-node-card .text-neutral-200,
-[data-theme] .gc-node-card .text-neutral-300,
-[data-theme] .gc-node-library-card .text-neutral-200,
-[data-theme] .gc-node-library-card .text-neutral-300 {
-  color: var(--gc-node-text) !important;
-}
-
-[data-theme] .gc-node-card .text-neutral-400,
-[data-theme] .gc-node-card .text-neutral-500,
-[data-theme] .gc-node-card .text-neutral-600,
-[data-theme] .gc-node-library-card .text-neutral-400,
-[data-theme] .gc-node-library-card .text-neutral-500,
-[data-theme] .gc-node-library-card .text-neutral-600 {
-  color: var(--gc-node-muted) !important;
 }
 
 [data-theme] .gc-node-card input,

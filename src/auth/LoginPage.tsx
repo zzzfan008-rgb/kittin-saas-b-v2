@@ -177,11 +177,11 @@ export function LoginPage() {
 
 export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
   return (
-    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-neutral-200">
+    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-[var(--gc-text)]">
       <section className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
         <p className="text-meta-en font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">GARMENT CANVAS</p>
         <h1 className="mt-3 text-xl font-semibold">账号已在其他设备登录</h1>
-        <p className="mt-2 text-sm leading-6 text-neutral-400">
+        <p className="mt-2 text-sm leading-6 text-[var(--gc-text-muted)]">
           为保护项目数据，本设备已退出工作区。已绑定当前账号的本机草稿会保留；使用其他账号登录时会安全清除，无法确认归属的旧缓存也不会继续加载。
         </p>
         <button
@@ -232,17 +232,17 @@ export function ChangePasswordPage() {
   };
 
   return (
-    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-neutral-200">
+    <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-[var(--gc-text)]">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
         <h1 className="text-xl font-semibold">首次登录，请修改密码</h1>
-        <p className="mt-1 text-xs text-neutral-500">新密码至少 10 位，并同时包含字母和数字。</p>
+        <p className="mt-1 text-xs text-[var(--gc-text-muted)]">新密码至少 10 位，并同时包含字母和数字。</p>
         {[
           ["当前临时密码", currentPassword, setCurrentPassword, "current-password"],
           ["新密码", newPassword, setNewPassword, "new-password"],
           ["再次输入新密码", confirm, setConfirm, "new-password"],
         ].map(([label, value, setter, auto]) => (
           <label key={label as string} className="mt-4 block space-y-1.5">
-            <span className="text-xs text-neutral-400">{label as string}</span>
+            <span className="text-xs text-[var(--gc-text-muted)]">{label as string}</span>
             <input type="password" value={value as string} onChange={(e) => (setter as (v: string) => void)(e.target.value)}
               autoComplete={auto as string} className="w-full rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] px-3 py-2.5 text-sm outline-hidden focus:border-[var(--gc-accent)]" />
           </label>

@@ -140,7 +140,7 @@ function BlockingScreen({
   clearDraftBusy: boolean;
 }) {
   return (
-    <div className="flex h-full min-w-[1024px] items-center justify-center bg-ink px-8 text-neutral-200">
+    <div className="flex h-full min-w-[1024px] items-center justify-center bg-ink px-8 text-[var(--gc-text)]">
       <div className="gc-panel w-[34rem] rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-8 text-center shadow-2xl shadow-black/50">
         {state === "loading" ? (
           <LoaderCircleIcon aria-hidden="true" className="mx-auto size-8 animate-spin text-gold" />

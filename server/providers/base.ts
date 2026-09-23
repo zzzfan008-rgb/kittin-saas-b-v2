@@ -8,6 +8,54 @@ import { fetch as undiciFetch } from "undici";
 const nativeFetch = globalThis.fetch;
 const PROVIDER_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
+// ---------- 错误归一化层：中文文案常量表 ----------
+
+/**
+ * 每个错误码对应一条中文用户提示。
+ * 兜底：生成失败请稍后重试（错误码 xxxx）
+ * 不透传英文，不泄露上游实现细节。
+ */
+/**
+ * 归一化错误码（classifyProviderMessage 返回的类别）对应的中文用户提示。
+ * 兜底格式：生成失败请稍后重试（错误码 xxxx）
+ * 不透传英文，不泄露上游实现细节。
+ */
+export const ERROR_MESSAGES = /** @satisfies Record<ProviderErrorCategory, string> */ ({
+  // ---------- 归一化类别（classifyProviderMessage 产出）----------
+  /** 限流：当前生成人数较多，请稍后再试。 */
+  rate_limited:           "当前生成人数较多，请稍后再试",
+  /** 网络/响应超时 */
+  timeout:                "AI 服务响应超时，请稍后重试",
+  /** 内容审核拒绝：提示词或参考图违规 */
+  content_refused:        "本次请求未通过 AI 安全审核，请调整提示词或参考图片后重试",
+  /** 参数非法：resolution/aspect ratio/image count 等 */
+  invalid_request:         "AI 服务暂不支持当前参数或参考图组合，请调整后重试",
+  /** 参考图问题：尺寸/格式/大小/数量不合规 */
+  reference_image_error:   "参考图无法被处理，请检查图片格式、尺寸或数量后重试",
+  /** 模型不可用：not found/unsupported/not available */
+  model_unavailable:      "当前 AI 模型不可用，请联系管理员检查模型配置",
+  /** 鉴权欠费：401 / 403 */
+  gateway_authentication:  "AI 网关鉴权失败，请联系管理员检查密钥或账号权限",
+  /** 余额不足 */
+  account_credit:          "AI 账号余额不足，请联系管理员充值后重试",
+  /** 5xx 服务端错误 */
+  gateway_unavailable:     "AI 服务暂时不可用，请稍后重试",
+  /** 网络中断 */
+  network_error:           "AI 服务连接中断，请稍后重试",
+  /** 未知兜底 */
+  unknown:                 "生成失败，请稍后重试（错误码 0000）",
+  // ---------- 响应解析层专用类别 ----------
+  /** 2xx 响应体中预期字段为空 */
+  empty_response:          "AI 服务未返回有效结果，请稍后重试",
+  /** 上游返回了不可解析或不合预期的响应体结构 */
+  invalid_response:         "AI 服务返回格式异常，请稍后重试",
+  /** 网络/解析故障导致结果状态不可知（不得自动重试） */
+  outcome_unknown:          "生成状态未知，结果可能已经生成；系统不会自动重试",
+}) as const;
+
+export type ProviderErrorCategory =
+  | keyof typeof ERROR_MESSAGES;
+
 export class ProviderError extends Error {
   constructor(
     message: string,
@@ -24,72 +72,111 @@ export class ProviderError extends Error {
   }
 }
 
-export type ProviderErrorCategory =
-  | "content_refused"
-  | "model_unavailable"
-  | "gateway_authentication"
-  | "invalid_request"
-  | "rate_limited"
-  | "timeout"
-  | "outcome_unknown"
-  | "gateway_unavailable"
-  | "empty_response"
-  | "invalid_response"
-  | "unknown";
+// ---------- 错误归一化层：模式匹配规则表 ----------
 
-function classifyProviderMessage(status: number | undefined, rawMessage: string): {
+/** 优先按 HTTP 状态码归类 */
+const STATUS_PRIORITY: Array<{ status: number; category: ProviderErrorCategory }> = [
+  { status: 401, category: "gateway_authentication" },
+  { status: 403, category: "gateway_authentication" },
+  { status: 429, category: "rate_limited" },
+];
+
+/** 兜底：4xx 归 invalid_request，5xx 归 gateway_unavailable */
+const STATUS_RANGE_FALLBACK: Array<{ min: number; max: number; category: ProviderErrorCategory }> = [
+  { min: 400, max: 499, category: "invalid_request" },
+  { min: 500, max: 599, category: "gateway_unavailable" },
+];
+
+/** 兜底未知时的格式模板（状态码嵌入） */
+const UNKNOWN_TEMPLATE = "生成失败，请稍后重试（错误码 {code}）";
+
+interface MatchRule {
+  pattern: RegExp;
   category: ProviderErrorCategory;
-  publicMessage: string;
-} {
-  const message = rawMessage
+  /** 比 status-priority 低的优先级（数字越大越靠后） */
+  priority?: number;
+}
+
+const MESSAGE_RULES: MatchRule[] = [
+  // content_refused — 最高优先级（比参数错误更具体）
+  { priority: 10, pattern: /content\s*(policy|filter)|content management policy|responsible\s*ai\s*policy\s*violation|responsibleaipolicyviolation/i, category: "content_refused" },
+  { priority: 10, pattern: /(safety system|moderation).{0,50}(block|filter|reject|refus)/i, category: "content_refused" },
+  { priority: 10, pattern: /(block|filter|reject|refus).{0,50}(safety system|moderation|content management policy)/i, category: "content_refused" },
+  { priority: 10, pattern: /内容.{0,12}(安全|审核|政策|过滤).{0,12}(拦截|过滤|拒绝|违规)|内容.{0,10}(拒绝|违规)/i, category: "content_refused" },
+  { priority: 10, pattern: /(safety|blocked|filtered|refused).{0,30}image|prompt.{0,30}(safety|blocked|filtered)/i, category: "content_refused" },
+
+  // model_unavailable
+  { priority: 20, pattern: /model.{0,40}(not found|does not exist|unsupported|not available|invalid)|unknown model|模型.{0,10}(不存在|不可用|不支持)/i, category: "model_unavailable" },
+
+  // reference_image_error — 优先于 generic 参数错误
+  { priority: 15, pattern: /reference.?image.{0,60}(invalid|unsupported|too large|not found|invalid format|size limit|dimension|must be)/i, category: "reference_image_error" },
+  { priority: 15, pattern: /(image|reference).{0,30}(must be|must not exceed|exceeds|exceed).{0,60}(size|width|height|pixel|dimension)/i, category: "reference_image_error" },
+  { priority: 15, pattern: /reference image count.{0,40}(exceed|limit|maximum|too many)/i, category: "reference_image_error" },
+  { priority: 15, pattern: /reference image.{0,40}(format|unsupported mime|file type|only supports)/i, category: "reference_image_error" },
+  { priority: 15, pattern: /FLUX 参考图|flux reference image|adapt.*reference.*fail/i, category: "reference_image_error" },
+  { priority: 15, pattern: /蒙版.{0,20}(尺寸|大小|格式|像素|alpha)/i, category: "reference_image_error" },
+
+  // invalid_request — 确定性参数错误（放在 reference_image_error 之后）
+  { priority: 30, pattern: /(invalid|unknown|unsupported|not supported|out of range).{0,60}(parameter|argument|field|resolution|aspect ratio|size|width|height|format|image count)/i, category: "invalid_request" },
+  { priority: 30, pattern: /(parameter|argument|field|resolution|aspect ratio|size|width|height|format|image count).{0,60}(invalid|unknown|unsupported|not supported|out of range|must be|only supports?)/i, category: "invalid_request" },
+  // 同时覆盖 "count/size/number exceeds/over/out of" 等倒序形式
+  { priority: 30, pattern: /(image count|size|width|height|resolution|pixels?).{0,40}(exceeds|over|out of|more than|greater than)/i, category: "invalid_request" },
+  { priority: 30, pattern: /(exceeds|over|out of|more than|greater than).{0,40}(image count|size|width|height|resolution|maximum)/i, category: "invalid_request" },
+  { priority: 30, pattern: /invalid request|bad request|malformed request/i, category: "invalid_request" },
+  // too many requests → 限流（无需状态码）
+  { priority: 5, pattern: /too many (requests?|attempts?)/i, category: "rate_limited" },
+  { priority: 25, pattern: /invalid token|expired token|missing token|unauthorized request/i, category: "gateway_authentication" },
+
+  // account_credit
+  { priority: 25, pattern: /insufficient credit|credit limit|quota exceeded|余额不足|账户.{0,10}(欠费|不足|超限)/i, category: "account_credit" },
+
+  // network_error — 优先于 unknown
+  { priority: 40, pattern: /connection.{0,30}(reset|refused|timeout)|network.{0,30}(error|fail|unreachable)|econnreset|econnrefused|etimedout/i, category: "network_error" },
+];
+
+/**
+ * 表驱动错误归一化：将 HTTP 状态码 + 上游原始消息映射为统一 category + 中文提示。
+ * 所有匹配规则均为中文用户提示；英文原始消息仅用于模式匹配，不透传给前端。
+ */
+function classifyProviderMessage(
+  status: number | undefined,
+  rawMessage: string,
+): { category: ProviderErrorCategory; publicMessage: string } {
+  // 1. HTTP 状态码优先匹配
+  const statusMatch = STATUS_PRIORITY.find((s) => s.status === status);
+  if (statusMatch) {
+    return { category: statusMatch.category, publicMessage: ERROR_MESSAGES[statusMatch.category] };
+  }
+
+  // 2. 消息文本模式匹配（按 priority 升序，即 priority 越小越先）
+  const normalized = rawMessage
     .toLowerCase()
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ");
-  if (status === 401 || status === 403) {
-    return {
-      category: "gateway_authentication",
-      publicMessage: "AI 网关鉴权失败，请联系管理员检查 API Key 或账号权限",
-    };
+
+  const sortedRules = [...MESSAGE_RULES].sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
+  for (const rule of sortedRules) {
+    if (rule.pattern.test(normalized)) {
+      return { category: rule.category, publicMessage: ERROR_MESSAGES[rule.category] };
+    }
   }
-  const contentRefused =
-    /content\s*(policy|filter)|content management policy|responsible\s*ai\s*policy\s*violation|responsibleaipolicyviolation/i.test(message) ||
-    /(safety system|moderation).{0,50}(block|filter|reject|refus)/i.test(message) ||
-    /(block|filter|reject|refus).{0,50}(safety system|moderation|content management policy)/i.test(message) ||
-    /内容.{0,12}(安全|审核|政策|过滤).{0,12}(拦截|过滤|拒绝|违规)|内容.{0,10}(拒绝|违规)/i.test(message);
-  if (contentRefused) {
-    return {
-      category: "content_refused",
-      publicMessage: "本次请求未通过 AI 安全审核，请调整提示词或参考图片后重试",
-    };
+
+  // 3. HTTP 状态码范围兜底
+  if (status !== undefined) {
+    const rangeMatch = STATUS_RANGE_FALLBACK.find(
+      (r) => status >= r.min && status <= r.max,
+    );
+    if (rangeMatch) {
+      return { category: rangeMatch.category, publicMessage: ERROR_MESSAGES[rangeMatch.category] };
+    }
   }
-  if (/model.{0,40}(not found|does not exist|unsupported|not available|invalid)|unknown model|模型.{0,10}(不存在|不可用|不支持)/i.test(message)) {
-    return {
-      category: "model_unavailable",
-      publicMessage: "当前 AI 模型不可用，请联系管理员检查模型配置",
-    };
-  }
-  const deterministicParameterError =
-    /(invalid|unknown|unsupported|not supported|out of range).{0,60}(parameter|argument|field|resolution|aspect ratio|size|width|height|format|image count)/i.test(message) ||
-    /(parameter|argument|field|resolution|aspect ratio|size|width|height|format|image count).{0,60}(invalid|unknown|unsupported|not supported|out of range|must be|only supports?)/i.test(message);
-  if (deterministicParameterError) {
-    return {
-      category: "invalid_request",
-      publicMessage: "AI 服务暂不支持当前参数或参考图组合，请调整后重试",
-    };
-  }
-  if (status === 429) {
-    return { category: "rate_limited", publicMessage: "AI 服务当前繁忙，请稍后重试" };
-  }
-  if (status !== undefined && status >= 400 && status < 500) {
-    return {
-      category: "invalid_request",
-      publicMessage: "AI 服务暂不支持当前参数或参考图组合，请调整后重试",
-    };
-  }
-  if (status !== undefined && status >= 500) {
-    return { category: "gateway_unavailable", publicMessage: "AI 服务暂时不可用，请稍后重试" };
-  }
-  return { category: "unknown", publicMessage: "AI 服务返回异常，请稍后重试" };
+
+  // 4. 兜底未知
+  const code = status !== undefined ? String(status).padStart(4, "0") : "0000";
+  return {
+    category: "unknown",
+    publicMessage: UNKNOWN_TEMPLATE.replace("{code}", code),
+  };
 }
 
 export function providerRequestIdFromResponse(response: Pick<Response, "headers">): string | undefined {
@@ -139,11 +226,13 @@ function dispatchFetch(
 }
 
 export function publicProviderErrorMessage(error: unknown): string {
-  if (error instanceof ProviderError) return error.message;
-  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-    return "AI 服务响应超时，请稍后重试";
+  if (error instanceof ProviderError) {
+    return ERROR_MESSAGES[error.category] ?? ERROR_MESSAGES.unknown;
   }
-  return "AI 服务暂时不可用，请稍后重试";
+  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+    return ERROR_MESSAGES.timeout;
+  }
+  return ERROR_MESSAGES.unknown;
 }
 
 /** 将仅供服务端使用的网关诊断压缩并脱敏，避免日志泄露 Key、URL 或图片数据。 */

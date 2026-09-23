@@ -44,7 +44,7 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-neutral-200">{record.nodeLabel}</span>
+        <span className="text-xs font-medium text-[var(--gc-text)]">{record.nodeLabel}</span>
         <span
           className={`text-label ${statusColor[record.status]}`}
         >
@@ -58,32 +58,32 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       <dl className="space-y-1.5 text-label">
         <div className="flex justify-between">
-          <dt className="text-neutral-500">节点类型</dt>
-          <dd className="text-neutral-300">{nodeTitleForKind(record.kind)}</dd>
+          <dt className="text-[var(--gc-text-muted)]">节点类型</dt>
+          <dd className="text-[var(--gc-text)]">{nodeTitleForKind(record.kind)}</dd>
         </div>
         {record.projectName && (
           <div className="flex justify-between gap-3">
-            <dt className="text-neutral-500">项目</dt>
-            <dd className="truncate text-neutral-300" title={record.projectName}>
+            <dt className="text-[var(--gc-text-muted)]">项目</dt>
+            <dd className="truncate text-[var(--gc-text)]" title={record.projectName}>
               {record.projectName}
             </dd>
           </div>
         )}
         {record.model && (
           <div className="flex justify-between">
-            <dt className="text-neutral-500">模型</dt>
-            <dd className="font-mono text-neutral-300">{record.model}</dd>
+            <dt className="text-[var(--gc-text-muted)]">模型</dt>
+            <dd className="font-mono text-[var(--gc-text)]">{record.model}</dd>
           </div>
         )}
         {record.providerOutputSize && (
           <div className="flex justify-between">
-            <dt className="text-neutral-500">上游实际尺寸</dt>
-            <dd className="font-mono text-neutral-300">{record.providerOutputSize}</dd>
+            <dt className="text-[var(--gc-text-muted)]">上游实际尺寸</dt>
+            <dd className="font-mono text-[var(--gc-text)]">{record.providerOutputSize}</dd>
           </div>
         )}
         <div className="flex justify-between">
-          <dt className="text-neutral-500">时间</dt>
-          <dd className="text-neutral-300">
+          <dt className="text-[var(--gc-text-muted)]">时间</dt>
+          <dd className="text-[var(--gc-text)]">
             {time} · {record.finishedAt ? "耗时" : "已等待"} {duration}s
           </dd>
         </div>
@@ -91,7 +91,7 @@ export function ResultRecordDetail({ resultId }: { resultId: string }) {
 
       {record.prompt && (
         <div className="space-y-1">
-          <span className="text-label text-neutral-500">提示词</span>
+          <span className="text-label text-[var(--gc-text-muted)]">提示词</span>
           <p className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1.5 text-body leading-relaxed text-[var(--gc-text-muted)]">
             {record.prompt}
           </p>
