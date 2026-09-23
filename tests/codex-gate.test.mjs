@@ -818,7 +818,8 @@ for (const [label, graph, expected] of [
   assert.equal(receiptFiles.length, 1, "外置回执目录应生成一个结构化 JSON 回执");
   assert.match(receiptFiles[0], /^codex-gate-[a-f0-9]{64}\.json$/, "回执文件命名保持原样");
   const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]), "utf8"));
-  console.error('[DEBUG] artifactRecords=', JSON.stringify(receipt.artifacts.files));
+  console.error('[DEBUG] review-scope hasBatch?', receipt.artifacts.files[0].hasOwnProperty('batch'), 'batch=',
+    receipt.artifacts.files[0].batch);
   assert.equal(receipt.schemaVersion, 2);
   assert.equal(receipt.gateDecision, "pass");
   assert.equal(receipt.exitCode, 0);
