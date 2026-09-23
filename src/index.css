@@ -43,6 +43,21 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /* VIS-07：focus-visible 全局兜底（tokens.css §7）。
+     :where() 零特异性——自带 outline/ring 工具类的 shadcn 控件照常覆盖，
+     未声明焦点样式的手写控件（节点内按钮、file input 等）由本规则保底。 */
+  :where(
+      button,
+      [role="button"],
+      a,
+      input,
+      select,
+      textarea,
+      summary
+    ):focus-visible {
+    outline: var(--gc-focus-ring) solid var(--gc-accent);
+  }
 }
 
 html,
@@ -113,6 +128,8 @@ body {
   --gc-font-label: 11px;
   --gc-font-meta-en: 10px;
   --gc-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  /* ---- VIS-07：focus-visible 焦点环宽度（tokens.css §7 唯一事实源） ---- */
+  --gc-focus-ring: 2px;
   /* ---- 状态色 8 槽位（默认=深底亮色版；浅底主题在各自 data-theme 段覆盖） ---- */
   --gc-dot-status: 10px;
   /* ---- 节点卡几何（v8 三层七节点；plan.md §3.1/§3.2 的唯一事实源） ---- */
@@ -495,6 +512,29 @@ body {
    只覆盖环宽，环色仍由各控件的 --gc-accent-deep 工具类提供（三主题 ≥3:1）。 */
 .react-flow :is(.focus-within\:ring-2:focus-within, .focus-visible\:ring-2:focus-visible) {
   --tw-ring-shadow: 0 0 0 calc(2px / var(--rf-zoom, 1)) var(--tw-ring-color, currentcolor);
+}
+
+/* VIS-07：画布内控件的全局兜底焦点环同样做缩放宽度补偿，
+   保证 fitView（0.5x）下环渲染宽度仍 ≈2px（WCAG 2.1 AA 非文本对比 ≥3:1）。 */
+.react-flow
+  :where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline-width: calc(var(--gc-focus-ring) / var(--rf-zoom, 1));
+}
+
+/* VIS-07：React Flow 默认对 node wrapper 的 focus outline 显式置 none
+   （@xyflow/react style.css .react-flow__node.selectable:focus-visible），
+   键盘 Tab 到节点本体时没有任何焦点指示。这里恢复可见焦点环。 */
+.react-flow .react-flow__node.selectable:focus-visible {
+  outline: calc(var(--gc-focus-ring) / var(--rf-zoom, 1)) solid var(--gc-accent);
+  outline-offset: 2px;
+  border-radius: calc(var(--gc-radius-node, 12px) + 2px);
+}
+
+/* VIS-07：RF 同样移除了 edge 的 outline；Tab 到连线时补回焦点环，
+   不仅靠连线变色单通道（WCAG 1.4.1）。 */
+.react-flow .react-flow__edge.selectable:focus-visible {
+  outline: calc(var(--gc-focus-ring) / var(--rf-zoom, 1)) solid var(--gc-accent);
+  outline-offset: 2px;
 }
 
 .react-flow__node:not(.dragging):hover .gc-node-card {
