@@ -15,22 +15,38 @@ interface DrawingCanvasProps {
   onClose: () => void;
 }
 
-/** Excalidraw lazy chunk 中导出的类型，代替手写 any 与注释压制。 */
-type ExcalidrawModule = typeof import("@excalidraw/excalidraw");
-type ExcalidrawComponentType = ExcalidrawModule["Excalidraw"] extends ComponentType<infer P>
-  ? ComponentType<P>
-  : never;
+/** Excalidraw 元素的最小公共接口（避免 `typeof import("@excalidraw/excalidraw")` 被 Rollup 当作静态依赖）。 */
+interface ExcalidrawElement {
+  readonly id: string;
+  readonly type: string;
+  [key: string]: unknown;
+}
 
-/** Excalidraw onChange 回调收到的元素数组（readonly，保持引用语义一致）。 */
-type ExcalidrawElementArray = Parameters<
-  NonNullable<
-    ExcalidrawModule["Excalidraw"] extends ComponentType<infer P>
-      ? P extends { onChange?: infer F }
-        ? F
-        : never
-      : never
-  >
->[0];
+/** Excalidraw onChange 回调：元素数组 + appState + files。 */
+type ExcalidrawOnChange = (
+  elements: readonly ExcalidrawElement[],
+  appState: Record<string, unknown>,
+  files: Record<string, unknown>,
+) => void;
+
+/** Excalidraw 组件的 props 子集（我们只传 theme + onChange）。 */
+interface ExcalidrawComponentProps {
+  theme?: string;
+  onChange?: ExcalidrawOnChange;
+  [key: string]: unknown;
+}
+
+type ExcalidrawComponentType = React.ComponentType<ExcalidrawComponentProps>;
+
+/** ExcalidrawModule 的运行时形状（仅 exportToBlob / Excalidraw）。 */
+interface ExcalidrawRuntimeModule {
+  Excalidraw: ExcalidrawComponentType;
+  exportToBlob?: (opts: {
+    elements: readonly ExcalidrawElement[];
+    format: string;
+    getDimensions: () => { width: number; height: number };
+  }) => Promise<Blob>;
+}
 
 /**
  * Excalidraw 全屏画板覆盖层。
@@ -40,7 +56,7 @@ type ExcalidrawElementArray = Parameters<
 export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
   const [ExcalidrawComp, setExcalidrawComp] = useState<ExcalidrawComponentType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [elements, setElements] = useState<ExcalidrawElementArray | null>(null);
+  const [elements, setElements] = useState<readonly ExcalidrawElement[] | null>(null);
   const [exporting, setExporting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const addAssetNode = useFlowStore((s) => s.addAssetNode);
@@ -70,10 +86,10 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
     if (!elements || !Array.isArray(elements) || elements.length === 0) return;
     setExporting(true);
     try {
-      const excalidrawModule: ExcalidrawModule = await import(
+      const excalidrawModule = await import(
         /* webpackChunkName: "excalidraw" */
         "@excalidraw/excalidraw"
-      );
+      ) as ExcalidrawRuntimeModule;
 
       // Use exportToBlob (v0.17+ API) or fall back to canvas capture
       let blob: Blob;
