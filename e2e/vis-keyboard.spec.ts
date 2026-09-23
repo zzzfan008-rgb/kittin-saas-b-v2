@@ -33,37 +33,15 @@ function contrast(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-async function login(page: import("@playwright/test").Page): Promise<void> {
-  const request = page.context().request;
-  let response = await request.post("/api/auth/login", {
-    data: { accountId: "e2e-admin", password: "E2eInitial1234" },
+test("VIS-07 键盘焦点环（三主题）+ VIS-05 snapGrid 吸附", async ({ page, request }) => {
+  // setup 卡把会话建立在一个已落库的 initial draft（image 节点）上。
+  // 按 initial-draft.spec.ts / auth.setup.ts 的「脏库韧性」惯例，先强制清除，
+  // 回到确定的空首屏，否则后续 bootstrap 只会原样返回 setup 的旧草稿。
+  const clearResp = await request.post("/api/projects/initial-draft/force-clear", {
+    data: { confirm: true },
   });
-  if (response.status() === 401) {
-    response = await request.post("/api/auth/login", {
-      data: { accountId: "e2e-admin", password: "E2eFinal5678" },
-    });
-  }
-  const body = (await response.json()) as {
-    error?: string;
-    user?: { mustChangePassword?: boolean };
-  };
-  expect(response.ok(), body.error ?? "login failed").toBeTruthy();
-  if (body.user?.mustChangePassword) {
-    const change = await request.post("/api/auth/change-password", {
-      data: {
-        currentPassword: "E2eInitial1234",
-        newPassword: "E2eFinal5678",
-      },
-    });
-    expect(change.ok(), await change.text()).toBeTruthy();
-  }
-  await request.post("/api/tutorials/workbench-onboarding/acknowledge", {
-    data: { outcome: "completed" },
-  });
-}
+  expect(clearResp.ok(), await clearResp.text()).toBeTruthy();
 
-test("VIS-07 键盘焦点环（三主题）+ VIS-05 snapGrid 吸附", async ({ page }) => {
-  await login(page);
   await page.goto("/");
 
   // API acknowledge 在全新库上未必被前端即时采纳；教程对话框若延迟弹出则直接关闭。
@@ -74,18 +52,49 @@ test("VIS-07 键盘焦点环（三主题）+ VIS-05 snapGrid 吸附", async ({ p
     .catch(() => false);
   if (tutorialAppeared) await closeTutorial.click();
 
-  // 冷启动 0 页签：先在「空工作区」新建一个空白项目，画布与工具栏才会出现。
-  await page.getByRole("button", { name: "新建项目" }).click();
+  // 草稿已清；saved projects 列表可能仍含 setup 留下的记录——决策 A：
+  // 有已保存项目时启动保持空白，不自动打开。等启动两响应落定，确认处于空工作区。
+  const waitForGet = (pathname: string) =>
+    page
+      .waitForResponse(
+        (r) =>
+          r.request().method() === "GET" &&
+          new URL(r.url()).pathname === pathname,
+        { timeout: 10_000 },
+      )
+      .catch(() => null);
+  await Promise.all([
+    waitForGet("/api/projects/initial-draft"),
+    waitForGet("/api/projects"),
+  ]);
+  await page
+    .getByRole("region", { name: "空工作区" })
+    .waitFor({ timeout: 8000 });
 
-  // 通过左侧悬浮工具栏「添加」菜单加入 文本/图片/视频 三节点。
+  // 确定的空工作区 → 新建空白项目。
+  await page.getByRole("button", { name: "新建项目" }).click();
+  await page.waitForTimeout(500);
   const addButton = page.getByRole("button", { name: "添加" });
-  page.on("filechooser", () => {
-    // 图片节点落地会尝试打开文件选择器；自动化中自动取消，不影响焦点验证。
-  });
-  for (const kind of ["文本", "图片", "视频"]) {
-    await addButton.click();
-    await page.getByRole("menuitem", { name: kind }).click();
-  }
+  page.on("filechooser", () => {});
+  const addMenu = page.getByRole("menu", { name: "添加" });
+
+  const addKind = async (kind: string): Promise<void> => {
+    // 每轮先移开鼠标再 hover：上一轮选中后菜单已关闭，鼠标未离开触发元素时
+    // mouseenter 不会再次触发（菜单靠 hover 计时展开）。
+    await page.mouse.move(4, 600);
+    await page.waitForTimeout(260);
+    await addButton.hover();
+    await addMenu.waitFor({ state: "visible" });
+    const item = addMenu.getByRole("menuitem", { name: kind });
+    await item.waitFor({ state: "visible" });
+    await item.evaluate((el) => (el as HTMLElement).click());
+    await page.waitForTimeout(300);
+  };
+  for (const kind of ["文本", "图片", "视频"]) await addKind(kind);
+
+  // 三节点齐全（文本节点必有 textarea）。
+  expect(await page.locator(".react-flow__node").count()).toBe(3);
+  expect(await page.locator("textarea").count()).toBe(1);
 
   // 适应画布：触发 fitView（约 0.5x 缩放），同时验证缩放下的焦点环宽度补偿。
   await page
@@ -139,8 +148,11 @@ test("VIS-07 键盘焦点环（三主题）+ VIS-05 snapGrid 吸附", async ({ p
       path: `${SHOT_DIR}/kb-focus-node-${theme.id}.png`,
     });
 
-    // 焦点节点内控件：选中节点 → 工具条出现（shadcn Button 自带 focus ring）。
-    await firstNode.click();
+    // 焦点节点内控件：选中文本节点（含 textarea）→ 工具条出现（shadcn Button 自带 ring）。
+    // 节点 DOM 顺序未必与添加顺序一致（image 会带 auto-text 兜底节点），
+    // 不能用 .react-flow__node 首个，按 textarea 定位文本节点本体。
+    const textNode = page.locator(".react-flow__node:has(textarea)").first();
+    await textNode.click();
     const innerButton = page
       .locator('.react-flow__node button[aria-label="色彩工具"]')
       .first();

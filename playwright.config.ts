@@ -171,12 +171,14 @@ export default defineConfig({
       },
     },
     {
-      // 放最后：本用例自行 API 登录，会建立新会话（单设备会话策略），
-      // 排在依赖 setup storage state 的所有用例之后，避免 SESSION_REPLACED 干扰。
+      // 复用 setup 建立的会话（storageState），不再自行登录——单设备会话策略下
+      // 二次登录会触发 SESSION_REPLACED，级联打挂同账号串行套件。
       name: "vis-keyboard",
       testMatch: /vis-keyboard\.spec\.ts/,
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
+        storageState: authStatePath,
         viewport: { width: 1280, height: 720 },
       },
     },
