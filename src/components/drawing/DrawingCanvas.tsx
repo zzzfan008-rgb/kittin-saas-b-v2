@@ -8,27 +8,29 @@
  * - 绘画内容临时态不进 DocumentSnapshot。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { JSX } from "react";
+import type { ComponentType } from "react";
 import { useFlowStore } from "@/store/flowStore";
-
-// Note: We use dynamic types below because Excalidraw's types are not always exported.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyExcalidraw = any;
-
-/** Excalidraw 主组件（lazy load 后才有值）。 */
-type ExcalidrawComponent = (props: {
-  theme?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange?: (elements: any, appState?: any, files?: any) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  excalidrawRef?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-}) => JSX.Element;
 
 interface DrawingCanvasProps {
   onClose: () => void;
 }
+
+/** Excalidraw lazy chunk 中导出的类型，代替手写 any 与注释压制。 */
+type ExcalidrawModule = typeof import("@excalidraw/excalidraw");
+type ExcalidrawComponentType = ExcalidrawModule["Excalidraw"] extends ComponentType<infer P>
+  ? ComponentType<P>
+  : never;
+
+/** Excalidraw onChange 回调收到的元素数组（readonly，保持引用语义一致）。 */
+type ExcalidrawElementArray = Parameters<
+  NonNullable<
+    ExcalidrawModule["Excalidraw"] extends ComponentType<infer P>
+      ? P extends { onChange?: infer F }
+        ? F
+        : never
+      : never
+  >
+>[0];
 
 /**
  * Excalidraw 全屏画板覆盖层。
@@ -36,10 +38,9 @@ interface DrawingCanvasProps {
  * 与 vite.config.ts manualChunk 配置保持一致。
  */
 export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
-  const [Excalidraw, setExcalidraw] = useState<ExcalidrawComponent | null>(null);
+  const [ExcalidrawComp, setExcalidrawComp] = useState<ExcalidrawComponentType | null>(null);
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [elements, setElements] = useState<any>(null);
+  const [elements, setElements] = useState<ExcalidrawElementArray | null>(null);
   const [exporting, setExporting] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const addAssetNode = useFlowStore((s) => s.addAssetNode);
@@ -53,7 +54,9 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
       "@excalidraw/excalidraw"
     )
       .then((mod) => {
-        setExcalidraw(() => mod.Excalidraw as ExcalidrawComponent);
+        setExcalidrawComp(
+          () => mod.Excalidraw as ExcalidrawComponentType,
+        );
         setLoading(false);
       })
       .catch((err) => {
@@ -67,7 +70,7 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
     if (!elements || !Array.isArray(elements) || elements.length === 0) return;
     setExporting(true);
     try {
-      const excalidrawModule: AnyExcalidraw = await import(
+      const excalidrawModule: ExcalidrawModule = await import(
         /* webpackChunkName: "excalidraw" */
         "@excalidraw/excalidraw"
       );
@@ -110,12 +113,9 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
       const data = (await res.json()) as { url: string; width?: number; height?: number };
       if (!data.url) throw new Error("服务端未返回图片 URL");
 
-      // 插入图片节点（使用 addAssetNode，与现有上传链路一致）
+      // 插入图片节点（Asset.image 是 string，与 resultActions.ts 的 continueWithResult 一致）
       addAssetNode(
-        {
-          name: "画板导出.png",
-          image: { url: data.url, width: data.width ?? 1200, height: data.height ?? 900 },
-        },
+        { name: "画板导出.png", image: data.url },
         { x: 300, y: 200 },
       );
       onClose();
@@ -172,8 +172,8 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
           <div className="flex h-full items-center justify-center text-white/60">
             加载画板中…
           </div>
-        ) : Excalidraw ? (
-          <Excalidraw
+        ) : ExcalidrawComp ? (
+          <ExcalidrawComp
             theme="dark"
             onChange={(els) => setElements(els)}
           />
