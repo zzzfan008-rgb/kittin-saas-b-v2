@@ -172,7 +172,7 @@ export function ProjectTabs() {
                     onKeyDown={handleRenameKeyDown}
                     onKeyUp={projectNameEdit.bind.onKeyUp}
                     aria-label="项目名称"
-                    className="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-[var(--gc-text)] outline-hidden"
+                    className="h-6 min-w-0 flex-1 bg-transparent text-label text-[var(--gc-text)] outline-hidden"
                   />
                   <Button
                     type="button"
@@ -190,7 +190,7 @@ export function ProjectTabs() {
                   {renameError && (
                     <span
                       role="alert"
-                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-[11px] text-red-200 shadow-lg"
+                      className="absolute left-0 top-full z-50 mt-1 whitespace-nowrap rounded-md border border-red-500/40 bg-red-950 px-2 py-1 text-label text-red-200 shadow-lg"
                     >
                       {renameError}
                     </span>
@@ -203,7 +203,7 @@ export function ProjectTabs() {
                   size="xs"
                   onClick={() => switchTab(tab.id)}
                   onDoubleClick={() => beginRename(tab)}
-                  className="h-auto min-w-0 flex-1 justify-start truncate rounded-sm px-0 py-0 text-[11px] font-normal hover:bg-transparent"
+                  className="h-auto min-w-0 flex-1 justify-start truncate rounded-sm px-0 py-0 text-label font-normal hover:bg-transparent"
                   title={tab.readOnly ? `${tab.projectName}（只读）` : `${tab.projectName} · 双击重命名`}
                 >
                   {tab.projectName}

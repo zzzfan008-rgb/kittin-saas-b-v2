@@ -132,7 +132,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             className={`${promptChipClass} resize-none`}
           />
         </label>
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           连到生成节点的 prompt 输入决定生成内容
         </p>
         {colorToolOpen && (

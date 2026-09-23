@@ -50,7 +50,12 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 6 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 7 files/);
+  assert.match(
+    baseline.stdout,
+    /\[vis06\].*minimap \/ ordinal badge \/ scrollbar colors trace to tokens/,
+    "VIS-06 token trace regression must remain in the browser regression matrix",
+  );
   assert.match(
     baseline.stdout,
     /\[golden-path\].*unverified starter stays blocked while a test-reviewed variant completes the isolated golden path/,

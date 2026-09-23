@@ -83,7 +83,7 @@ function WorkflowMenu({
           : "invisible opacity-0 -translate-x-1.5 scale-[.98] pointer-events-none",
       )}
     >
-      <h4 className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-[var(--gc-text-muted)]">
+      <h4 className="px-2.5 pb-1 pt-1.5 text-label font-semibold text-[var(--gc-text-muted)]">
         {entry.label.replace("工作流", "")}
       </h4>
       {entry.items?.map((item) => (

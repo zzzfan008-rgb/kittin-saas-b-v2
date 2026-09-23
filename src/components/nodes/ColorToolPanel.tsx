@@ -94,14 +94,14 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
       aria-label="色彩工具"
       className="nodrag nopan space-y-2 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-2"
     >
-      <div className="flex items-center justify-between text-[11px]">
+      <div className="flex items-center justify-between text-label">
         <span className="text-[var(--gc-node-muted)]">插入色值</span>
         <span className="font-mono text-[var(--gc-node-text)]">{currentHex ?? "未选择"}</span>
       </div>
 
       {/* 预设色板 */}
       {presets.length === 0 ? (
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           当前主题没有可用的预设色值，请用自定义取色器。
         </p>
       ) : (
@@ -125,8 +125,7 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
           })}
         </div>
       )}
-
-      {/* 自定义取色 */}
+{/* 自定义取色 */}
       <label className="flex items-center gap-2 text-[11px] text-[var(--gc-node-muted)]">
         <span>自定义</span>
         <input

@@ -65,7 +65,7 @@ export function LoginPage() {
           <span className="text-[15px] font-bold tracking-tight">Garment Canvas</span>
         </div>
         <div className="relative z-10 max-w-[520px]">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
+          <p className="font-mono text-meta-en uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
             COIN AI · CANVAS STUDIO
           </p>
           <h1 className="mt-4 text-[clamp(36px,4vw,52px)] font-bold leading-[1.08] tracking-[-0.03em]">
@@ -95,7 +95,7 @@ export function LoginPage() {
           className="w-full max-w-[400px] rounded-[20px] bg-[var(--gc-panel)] p-9 text-[var(--gc-text)] shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--gc-border)_60%,transparent),0_1px_2px_rgba(0,0,0,0.12),0_4px_10px_rgba(0,0,0,0.1),0_20px_44px_rgba(0,0,0,0.18)]"
         >
           <div className="mb-7">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
+            <p className="font-mono text-meta-en uppercase tracking-[0.16em] text-[var(--gc-text-muted)]">
               Designer workspace
             </p>
             <h2 className="mt-2 text-[22px] font-bold tracking-[-0.02em]">登录工作台</h2>
@@ -168,7 +168,7 @@ export function LoginPage() {
             {submitting ? "登录中…" : "登录"}
           </Button>
 
-          <p className="mt-5 text-center text-[11px] leading-5 text-[var(--gc-text-muted)]">如需重置密码，请联系管理员</p>
+          <p className="mt-5 text-center text-label leading-5 text-[var(--gc-text-muted)]">如需重置密码，请联系管理员</p>
         </form>
       </section>
     </main>
@@ -179,7 +179,7 @@ export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
   return (
     <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-neutral-200">
       <section className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
-        <p className="text-[11px] font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">GARMENT CANVAS</p>
+        <p className="text-meta-en font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">GARMENT CANVAS</p>
         <h1 className="mt-3 text-xl font-semibold">账号已在其他设备登录</h1>
         <p className="mt-2 text-sm leading-6 text-neutral-400">
           为保护项目数据，本设备已退出工作区。已绑定当前账号的本机草稿会保留；使用其他账号登录时会安全清除，无法确认归属的旧缓存也不会继续加载。
