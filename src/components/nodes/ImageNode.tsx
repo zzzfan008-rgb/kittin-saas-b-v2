@@ -183,7 +183,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
 
   /** 上传入口的入库选项（asset-library-model.md §5）：控制本次上传是否同时进数字模特库。 */
   const modelLibraryOption = (
-    <div className="nodrag nopan flex items-center justify-between gap-2 text-[11px] text-[var(--gc-node-muted)]">
+    <div className="nodrag nopan flex items-center justify-between gap-2 text-label text-[var(--gc-node-muted)]">
       <label className="flex items-center gap-2">
         <Checkbox
           aria-label="存入数字模特库"
@@ -297,10 +297,10 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             }`}
           >
             {renderFileInput("slot")}
-            <span className="pointer-events-none font-mono text-[10px] tracking-wider opacity-70">
+            <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
-            <span className="pointer-events-none text-[10px] leading-relaxed opacity-50">
+            <span className="pointer-events-none text-label leading-relaxed opacity-50">
               点击 / 拖拽 / Ctrl+V
             </span>
           </div>
@@ -311,12 +311,12 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             type="button"
             onClick={openAssetPicker}
             disabled={readOnly}
-            className="w-full rounded-md border border-[var(--gc-node-border)] py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
+            className="w-full rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
           >
             从素材库替换
           </button>
         )}
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           {hasUpload
             ? "作为参考图来源：连到生成节点的 reference 输入"
             : "上传图片后可作为参考图来源；生成请用生图节点"}

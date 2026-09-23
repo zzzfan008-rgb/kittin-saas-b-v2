@@ -228,7 +228,7 @@ export function ProjectCenter({
           <header className="flex items-center gap-6 border-b border-[var(--gc-border)] px-7 py-5">
             <div className="min-w-48">
               <DialogTitle className="text-base font-semibold text-[var(--gc-text)]">项目中心</DialogTitle>
-              <DialogDescription className="mt-1 text-[11px] text-[var(--gc-text-muted)]">
+              <DialogDescription className="mt-1 text-label text-[var(--gc-text-muted)]">
                 新建或继续最近项目
               </DialogDescription>
             </div>
@@ -260,7 +260,7 @@ export function ProjectCenter({
             </div>
 
             {visibleError && (
-              <div role="alert" className="mx-7 mt-5 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-[11px] text-red-300">
+              <div role="alert" className="mx-7 mt-5 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-body text-red-300">
                 <span>加载失败：{visibleError}</span>
                 <Button type="button" variant="outline" size="xs" onClick={() => void load()}>重试</Button>
               </div>
@@ -281,7 +281,7 @@ export function ProjectCenter({
                       </div>
                       <span className="block p-3">
                         <span className="block text-xs font-semibold text-[var(--gc-accent)]">新建项目</span>
-                        <span className="mt-1 block text-[11px] text-[var(--gc-text-muted)]">从空白服装画布开始</span>
+                        <span className="mt-1 block text-label text-[var(--gc-text-muted)]">从空白服装画布开始</span>
                       </span>
                     </button>
                   </CardFrame>
@@ -296,9 +296,9 @@ export function ProjectCenter({
                         <span className="block p-3">
                           <span className="flex items-center gap-2">
                             <span className={PROJECT_CENTER_TITLE_CLASS}>继续草稿</span>
-                            <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-[11px] text-[var(--gc-accent)]">自动保存</span>
+                            <span className="rounded border border-[var(--gc-accent)]/40 px-1.5 py-0.5 text-label text-[var(--gc-accent)]">自动保存</span>
                           </span>
-                          <span className="mt-1 block truncate text-[11px] text-[var(--gc-text-muted)]">{initialDraft.projectName}</span>
+                          <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">{initialDraft.projectName}</span>
                         </span>
                       </button>
                     </CardFrame>
@@ -317,9 +317,9 @@ export function ProjectCenter({
                           <span className="block p-3">
                             <span className="flex items-center gap-2">
                               <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
-                              {openTab && <span className="shrink-0 text-[11px] text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                              {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
                             </span>
-                            <span className="mt-1 block truncate text-[11px] text-[var(--gc-text-muted)]">
+                            <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
                               {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
                               最后编辑 {formatUpdatedAt(project.updatedAt)}
                             </span>
