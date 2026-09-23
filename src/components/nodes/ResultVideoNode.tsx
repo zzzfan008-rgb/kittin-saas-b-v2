@@ -96,18 +96,18 @@ export function ResultVideoNode({ id, data, selected }: NodeProps<Node<ResultVid
                 type="button"
                 aria-label="播放视频"
                 onClick={play}
-                className="absolute inset-0 flex items-center justify-center bg-black/30 text-[11px] font-semibold text-white"
+                className="absolute inset-0 flex items-center justify-center bg-black/30 text-label font-semibold text-white"
               >
                 ▶ 点击播放
               </button>
             )}
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-[var(--gc-node-border)] py-4 text-center text-[10px] text-[var(--gc-node-muted)]">
+          <div className="rounded-md border border-dashed border-[var(--gc-node-border)] py-4 text-center text-label text-[var(--gc-node-muted)]">
             本次运行没有产物
           </div>
         )}
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           来自：{sourceLabel ?? data.sourceGeneratorId}
           {readOnly ? "" : " · 产物文件不随生成节点删除"}
         </p>

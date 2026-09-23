@@ -76,19 +76,19 @@ export function VideoNode({ id, data, selected }: NodeProps<Node<VideoNodeData>>
                 type="button"
                 aria-label="播放视频"
                 onClick={play}
-                className="absolute inset-0 flex items-center justify-center bg-black/30 text-[11px] font-semibold text-white"
+                className="absolute inset-0 flex items-center justify-center bg-black/30 text-label font-semibold text-white"
               >
                 ▶ 点击播放
               </button>
             )}
           </div>
         ) : (
-          <div className="flex aspect-video flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-[var(--gc-node-border)] px-3 text-center text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
+          <div className="flex aspect-video flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-[var(--gc-node-border)] px-3 text-center text-label leading-relaxed text-[var(--gc-node-muted)]">
             <span className="font-mono tracking-wider opacity-70">VIDEO · 槽位</span>
             <span>{VIDEO_UPLOAD_UNAVAILABLE_REASON}</span>
           </div>
         )}
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           作为参考素材来源：连到生成节点的输入柄
         </p>
       </NodeFrame>

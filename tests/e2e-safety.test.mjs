@@ -50,11 +50,20 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 7 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 8 files/);
   assert.match(
     baseline.stdout,
     /\[vis01\].*VIS-01 screenshot matrix/,
     "VIS-01 screenshot matrix must remain in the browser regression matrix",
+  );
+  // VIS-06（main 侧，PR #54 合入）与 VIS-01（本分支）是两次独立的矩阵扩充，
+  // 合并后两条守卫都必须保留：矩阵文件数 6 → 8（vis01-shots + vis06-tokens）。
+  // 两侧各自把计数改成 7，git 视为同值不报冲突，故此处显式修正为 8，
+  // 防止守卫静默漏掉一个批次新增的回归文件。
+  assert.match(
+    baseline.stdout,
+    /\[vis06\].*minimap \/ ordinal badge \/ scrollbar colors trace to tokens/,
+    "VIS-06 token trace regression must remain in the browser regression matrix",
   );
   assert.match(
     baseline.stdout,

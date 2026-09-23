@@ -74,7 +74,7 @@ export function ResultImageNode({ id, data, selected }: NodeProps<Node<ResultIma
         }
       >
         <ImageGrid images={images} empty="本次运行没有产物" />
-        <p className="text-[11px] leading-relaxed text-[var(--gc-node-muted)]">
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           来自：{sourceLabel ?? data.sourceGeneratorId} · {images.length} 张
           {readOnly ? "" : " · 可连到生成节点的 reference 输入"}
         </p>

@@ -5,6 +5,14 @@
 @source "../index.html";
 @source "./";
 
+/* 语义字阶工具类（tokens.css §0 唯一事实源；此处只接入变量名）：
+   text-label=标签/说明 11px · text-meta-en=纯英文徽章/坐标/时间戳 10px · text-body=正文 13px */
+@theme inline {
+  --text-label: var(--gc-font-label);
+  --text-meta-en: var(--gc-font-meta-en);
+  --text-body: var(--gc-font-body);
+}
+
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafaf8;
@@ -118,19 +126,23 @@ body {
   --gc-status-unknown: #a78bfa;
   --gc-status-idle: #8b9198;
   --gc-warn-text: #fbbf24;
+  /* ---- VIS-06 小地图遮罩（maskColor）：三主题分档，组件只引用变量 ---- */
+  --gc-canvas-mask-current: rgba(10, 10, 10, 0.7);
+  --gc-canvas-mask-white: rgba(29, 29, 31, 0.08);
+  --gc-canvas-mask-eye: rgba(48, 69, 43, 0.15);
 }
 
-/* ---- 深色滚动条 ---- */
+/* ---- 滚动条：thumb 取主题 --gc-border-strong，hover 向文字色微调 ---- */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: var(--gc-border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: color-mix(in srgb, var(--gc-border-strong), currentcolor 15%);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -171,7 +183,7 @@ body {
 }
 
 .react-flow__minimap {
-  border: 1px solid #262626;
+  border: 1px solid var(--gc-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -308,9 +320,6 @@ body {
 [data-theme="white"] .text-gold { color: #0071e3 !important; }
 [data-theme="white"] .bg-gold { background-color: #0071e3 !important; }
 [data-theme="white"] .shadow-xl { box-shadow: 0 12px 28px rgba(26, 26, 26, 0.08) !important; }
-[data-theme="white"] .react-flow__minimap { border-color: #d2d2d7 !important; }
-[data-theme="white"] ::-webkit-scrollbar-thumb { background: #c7c7cc; }
-[data-theme="white"] ::-webkit-scrollbar-thumb:hover { background: #aeaeb2; }
 
 /* ---- 主题：护眼绿 v3（薄荷翡翠）· 工具类反查段（仅保留存活选择器） ---- */
 [data-theme="eye"] body {
@@ -321,9 +330,9 @@ body {
 [data-theme="eye"] .react-flow { background-color: #E9F1EA !important; }
 [data-theme="eye"] .text-gold { color: #0B7A43 !important; }
 [data-theme="eye"] .bg-gold { background-color: #0B7A43 !important; }
-[data-theme="eye"] .react-flow__minimap { border-color: #c9dccc !important; }
-[data-theme="eye"] ::-webkit-scrollbar-thumb { background: #a8c2ac; }
-[data-theme="eye"] ::-webkit-scrollbar-thumb:hover { background: #8fb096; }
+/* VIS-01 删 placeholder:text-neutral-600 反查（src 已无使用者）；
+   VIS-06 删 eye 主题 minimap/scrollbar 硬编码（全局已 token 化为
+   var(--gc-border-strong) / var(--gc-border)）。两侧删除互不冲突，合并后均生效。 */
 
 /* ---- 节点语义主题：画布节点与节点库共用，和周边面板颜色解耦 ---- */
 :root,
@@ -356,6 +365,8 @@ body {
   --gc-handle-dark: #4a7a17;
   --gc-handle-ring: rgba(183, 243, 90, 0.75);
   --gc-handle-glow: rgba(142, 217, 78, 0.8);
+  /* 小地图节点色（D-2 裁定：= --gc-text-muted #9ba1a9，对比度 6.82:1） */
+  --gc-minimap-node: var(--gc-text-muted);
   /* 节点类型标识色（WorkflowMini 微缩图用；v7 三值） */
   --gc-kind-text: #4a90d9;
   --gc-kind-image: #B7F35A;
@@ -399,6 +410,8 @@ body {
   --gc-node-muted: #6e6e73;
   --gc-node-accent: #0071e3;
   --gc-edge: #0071e3;
+  /* 小地图节点色（D-2 裁定：rgba(0,0,0,.45)，对比度 3.30:1） */
+  --gc-minimap-node: rgba(0, 0, 0, 0.45);
   --gc-handle-highlight: #d6ecff;
   --gc-handle-mid: #66b2ff;
   --gc-handle-dark: #004a99;
@@ -439,6 +452,8 @@ body {
   --gc-node-muted: #47685A;
   --gc-node-accent: #0B7A43;
   --gc-edge: #0B7A43;
+  /* 小地图节点色（D-2 裁定：= --gc-text-muted #47685A，对比度 5.37:1） */
+  --gc-minimap-node: var(--gc-text-muted);
   --gc-handle-highlight: #d2ecdc;
   --gc-handle-mid: #3fa46a;
   --gc-handle-dark: #0a5c33;

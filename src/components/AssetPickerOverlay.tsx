@@ -120,7 +120,7 @@ export function AssetPickerOverlay({
           <button
             type="button"
             onClick={() => onRequestChange(null)}
-            className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
+            className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
           >
             关闭
           </button>
@@ -133,7 +133,7 @@ export function AssetPickerOverlay({
                 key={key}
                 type="button"
                 onClick={() => setCategory(key)}
-                className={`rounded-sm border px-2 py-1 text-[11px] transition-colors ${
+                className={`rounded-sm border px-2 py-1 text-label transition-colors ${
                   category === key
                     ? "border-gold/60 text-gold"
                     : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
@@ -148,28 +148,28 @@ export function AssetPickerOverlay({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索素材名称"
-            className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-[10px] text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
+            className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
           />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
           {error && (
             <div className="py-6 text-center">
-              <p className="text-[10px] text-[var(--gc-text-muted)]">素材服务暂不可用（{error}）</p>
+              <p className="text-body text-[var(--gc-text-muted)]">素材服务暂不可用（{error}）</p>
               <button
                 type="button"
                 onClick={() => void load(0)}
-                className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
+                className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
               >
                 重试
               </button>
             </div>
           )}
           {!error && loading && assets.length === 0 && (
-            <p className="py-6 text-center text-[11px] text-[var(--gc-text-muted)]">加载中…</p>
+            <p className="py-6 text-center text-label text-[var(--gc-text-muted)]">加载中…</p>
           )}
           {!error && !loading && assets.length === 0 && (
-            <p className="py-6 text-center text-[11px] text-[var(--gc-text-muted)]">
+            <p className="py-6 text-center text-label text-[var(--gc-text-muted)]">
               {debouncedSearch ? "没有匹配的素材" : EMPTY_HINT[category]}
             </p>
           )}
@@ -190,7 +190,7 @@ export function AssetPickerOverlay({
                     decoding="async"
                     className="aspect-square w-full bg-[var(--gc-control)] object-cover"
                   />
-                  <div className="truncate px-1.5 py-1 text-[10px] text-[var(--gc-text)]">{asset.name}</div>
+                  <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">{asset.name}</div>
                 </button>
               ))}
             </div>
@@ -200,7 +200,7 @@ export function AssetPickerOverlay({
               type="button"
               onClick={() => void load(assets.length)}
               disabled={loading}
-              className="mt-2.5 w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-[10px] text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-50"
+              className="mt-2.5 w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-50"
             >
               {loading ? "加载中…" : "加载更多素材"}
             </button>

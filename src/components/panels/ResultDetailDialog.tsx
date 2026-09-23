@@ -57,7 +57,7 @@ export function ResultDetailDialog({ resultId, onOpenChange }: ResultDetailDialo
             <DialogTitle className="text-base font-semibold text-[var(--gc-text)]">
               结果详情
             </DialogTitle>
-            <DialogDescription className="mt-0.5 truncate text-[11px] text-[var(--gc-text-muted)]">
+            <DialogDescription className="mt-0.5 truncate text-label text-[var(--gc-text-muted)]">
               {record ? record.nodeLabel : "该结果已不在当前会话中"}
             </DialogDescription>
           </div>
@@ -89,7 +89,7 @@ export function ResultDetailDialog({ resultId, onOpenChange }: ResultDetailDialo
                   decoding="async"
                   className="max-h-[46vh] w-full object-contain transition-transform motion-reduce:transition-none group-hover:scale-[1.02]"
                 />
-                <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] text-white">
+                <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-label text-white">
                   查看大图
                 </span>
               </button>

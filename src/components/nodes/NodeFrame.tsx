@@ -161,7 +161,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, chi
         {children}
       </div>
       {error && (
-        <div className="mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-[11px] leading-relaxed text-red-400">
+        <div className="mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-body leading-relaxed text-red-400">
           {error}
         </div>
       )}
@@ -211,7 +211,7 @@ export function RunButton({
               : label}
       </Button>
       {!active && !newGenerationBlocked && disabledReason && (
-        <p className="text-[11px] leading-relaxed text-[var(--gc-warn-text)]">{disabledReason}</p>
+        <p className="text-label leading-relaxed text-[var(--gc-warn-text)]">{disabledReason}</p>
       )}
     </div>
   );
@@ -225,7 +225,7 @@ export function NodeProductPolicyNotice({ kind }: { kind: NodeKind }) {
     <div
       role="note"
       data-product-support="unsupported"
-      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-label leading-relaxed text-[var(--gc-text-muted)]"
     >
       <p className="font-medium tracking-wide">暂不支持</p>
       <p className="mt-0.5">{policy.reason}</p>
@@ -249,7 +249,7 @@ export function UnsupportedNodeKindNotice({
     <div
       role="note"
       data-unsupported-kind="true"
-      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]"
+      className="rounded-md border border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-label leading-relaxed text-[var(--gc-text-muted)]"
     >
       <p className="font-medium tracking-wide">不支持的旧版本内容</p>
       <p className="mt-0.5">
