@@ -50,8 +50,8 @@ export function ReferenceImageList({
       className="space-y-2 rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-soft)] p-2"
     >
       <div className="space-y-0.5">
-        <p className="text-[11px] font-medium text-[var(--gc-text)]">本次参考图</p>
-        <p className="text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
+        <p className="text-label font-medium text-[var(--gc-text)]">本次参考图</p>
+        <p className="text-label leading-relaxed text-[var(--gc-text-muted)]">
           按实际输入顺序传入；不可用时不能运行。
         </p>
       </div>
@@ -79,7 +79,7 @@ export function ReferenceImageList({
                 ) : (
                   <div
                     aria-label={`参考图 ${reference.order + 1}：${reference.sourceLabel} 不可用`}
-                    className="flex aspect-square items-center justify-center text-[11px] text-amber-400"
+                    className="flex aspect-square items-center justify-center text-label text-amber-400"
                   >
                     不可用
                   </div>
@@ -87,7 +87,7 @@ export function ReferenceImageList({
               </div>
 
               <div className="min-w-0 space-y-1">
-                <div className="flex items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2 text-label">
                   <span className="min-w-0 truncate text-[var(--gc-text)]">
                     图 {reference.order + 1} · {reference.sourceLabel}
                   </span>
@@ -139,11 +139,11 @@ export function ReferenceImageList({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-relaxed text-[var(--gc-text-muted)]">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-label leading-relaxed text-[var(--gc-text-muted)]">
                   {!reference.available && <span className="text-amber-400">不可用</span>}
                 </div>
                 {!reference.available && reference.unavailableReason && (
-                  <p id={reasonId} className="text-[11px] leading-relaxed text-amber-400">
+                  <p id={reasonId} className="text-label leading-relaxed text-amber-400">
                     {reference.unavailableReason}
                   </p>
                 )}

@@ -18,7 +18,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
 
   if (safeImages.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-[var(--gc-node-border)] py-4 text-center text-[10px] text-[var(--gc-node-muted)]">
+      <div className="rounded-md border border-dashed border-[var(--gc-node-border)] py-4 text-center text-label text-[var(--gc-node-muted)]">
         {empty}
       </div>
     );

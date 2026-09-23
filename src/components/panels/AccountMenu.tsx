@@ -55,9 +55,9 @@ export function AccountMenu() {
           type="button"
           aria-label={`账户菜单：${user.displayName}`}
           title={`账户菜单：${user.displayName}`}
-          className="flex h-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-3 py-1.5 text-[11px] text-(--gc-text-muted) outline-hidden transition-colors hover:border-(--gc-accent) focus-visible:ring-3 focus-visible:ring-(--gc-accent)/50"
+          className="flex h-8 items-center justify-center gap-2 rounded-full border border-(--gc-border) px-3 py-1.5 text-label text-(--gc-text-muted) outline-hidden transition-colors hover:border-(--gc-accent) focus-visible:ring-3 focus-visible:ring-(--gc-accent)/50"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-[11px] font-semibold text-white">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-(--gc-accent) text-label font-semibold text-white">
             {user.displayName.slice(0, 1)}
           </span>
           <span>{user.displayName}</span>
@@ -67,21 +67,21 @@ export function AccountMenu() {
           sideOffset={6}
           className="w-44 border border-(--gc-border) bg-(--gc-panel) p-1.5 text-(--gc-text) ring-0"
         >
-          <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("usage")}>
+          <DropdownMenuItem className="px-2.5 py-2 text-label" onClick={() => setPanel("usage")}>
             消耗记录
           </DropdownMenuItem>
           {user.role === "admin" && (
             <>
-              <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("users")}>
+              <DropdownMenuItem className="px-2.5 py-2 text-label" onClick={() => setPanel("users")}>
                 用户管理
               </DropdownMenuItem>
-              <DropdownMenuItem className="px-2.5 py-2 text-[11px]" onClick={() => setPanel("diagnostics")}>
+              <DropdownMenuItem className="px-2.5 py-2 text-label" onClick={() => setPanel("diagnostics")}>
                 AI 服务诊断
               </DropdownMenuItem>
             </>
           )}
           <DropdownMenuSeparator className="bg-(--gc-border)" />
-          <DropdownMenuItem variant="destructive" className="px-2.5 py-2 text-[11px]" onClick={() => void logout()}>
+          <DropdownMenuItem variant="destructive" className="px-2.5 py-2 text-label" onClick={() => void logout()}>
             退出登录
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -230,7 +230,7 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
               <button onClick={exportUsage} className="ml-auto rounded-sm bg-(--gc-accent) px-3 py-1.5 text-xs text-white">导出 CSV</button>
             </div>
             <div className="min-h-0 flex-1 overflow-auto rounded-sm border border-(--gc-border)">
-              <table className="w-full text-left text-[11px]">
+              <table className="w-full text-left text-label">
                 <thead className="sticky top-0 bg-(--gc-panel) text-(--gc-text-muted)"><tr><th className="p-2">时间</th><th>用户</th><th>模型</th><th>成功图片</th><th>请求数</th><th>耗时</th></tr></thead>
                 <tbody>{usage.map((item) => <tr key={item.id} className="border-t border-(--gc-border)"><td className="p-2">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td>{item.displayName}</td><td>{item.model ?? "—"}</td><td>{item.successfulCount}</td><td>{item.providerRequests}</td><td>{(item.durationMs / 1000).toFixed(1)}s</td></tr>)}</tbody>
               </table>
@@ -259,10 +259,10 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
                     </span>
                   </div>
                   {!provider.configured && provider.error && (
-                    <p className="mb-3 text-[11px] text-red-400">{provider.error}</p>
+                    <p className="mb-3 text-body text-red-400">{provider.error}</p>
                   )}
                   {provider.capabilities && (
-                    <p className="mb-3 text-[11px] text-(--gc-text-muted)">
+                    <p className="mb-3 text-label text-(--gc-text-muted)">
                       文生图：{provider.capabilities.supportsGeneration ? "支持" : "不支持"}
                       ；参考图编辑：{provider.capabilities.supportsEdit ? `支持，最多 ${provider.capabilities.maxReferenceImages} 张` : "不支持"}
                       ；单次最多 {provider.capabilities.maxImagesPerRequest} 张；超时 {Math.round(provider.capabilities.timeoutMs / 1000)} 秒
