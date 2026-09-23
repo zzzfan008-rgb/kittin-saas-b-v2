@@ -666,7 +666,7 @@ async function main(): Promise<void> {
             () => fetchWithRetry("https://gateway.example/v1/images/generations", () => ({}), { providerId: "test" }),
             (error: unknown) => error instanceof ProviderError &&
               error.status === status && error.category === "gateway_authentication" &&
-              error.message === "AI 网关鉴权失败，请联系管理员检查 API Key 或账号权限",
+              error.message === "AI 网关鉴权失败，请联系管理员检查密钥或账号权限",
           );
           assert.equal(calls, 1);
         }
