@@ -1405,7 +1405,7 @@ await test("明确 429 最多自动重放三次并保留四次真实请求计数
   }
   assert.equal(fake.calls(), 4);
   assert.deepEqual(await runRow(runId), {
-    status: "failed", error: "AI 服务当前繁忙，请稍后重试", provider_requests: 4, successful_count: 0,
+    status: "failed", error: "当前生成人数较多，请稍后再试", provider_requests: 4, successful_count: 0,
   });
   const job = await database.queryOne<{ retry_count: number; status: string }>(
     "SELECT retry_count, status FROM generation_jobs WHERE run_id = $1", [runId],
