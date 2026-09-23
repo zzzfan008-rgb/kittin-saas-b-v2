@@ -37,6 +37,7 @@ import {
 import { CanvasZoomControls } from "./CanvasZoomControls";
 import { detectDesktopShortcutPlatform } from "@/lib/keyboardShortcuts";
 import { isNativeActivationTarget } from "@/lib/keyboardActivation";
+import { SNAP_GRID, useGridSnapEnabled } from "@/lib/gridSnap";
 
 export const DND_MIME = "application/garment-node";
 
@@ -210,6 +211,8 @@ export function CanvasFlow() {
   const [compactMinimap, setCompactMinimap] = useState(false);
   const [theme] = useTheme();
   const minimap = MINIMAP_COLORS[theme];
+  // VIS-05：网格吸附（snapGrid 24px），默认关，纯本地 UI 状态。
+  const gridSnapEnabled = useGridSnapEnabled();
   const multiSelectionKeyCode = detectDesktopShortcutPlatform() === "macos" ? "Meta" : "Control";
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const canvasSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -435,6 +438,8 @@ export function CanvasFlow() {
           selectionOnDrag
           multiSelectionKeyCode={multiSelectionKeyCode}
           panOnDrag={[1, 2]}
+          snapToGrid={gridSnapEnabled}
+          snapGrid={SNAP_GRID}
           autoPanOnNodeDrag={false}
           defaultViewport={{ x: 100, y: 200, zoom: 1 }}
           proOptions={{ hideAttribution: true }}

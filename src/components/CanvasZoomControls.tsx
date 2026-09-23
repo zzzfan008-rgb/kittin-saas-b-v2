@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
+import { MagnetIcon, Maximize2Icon, MinusIcon, PlusIcon } from "lucide-react";
 import { Panel, useReactFlow, useViewport } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   CANVAS_ZOOM_COMMAND_EVENT,
   type CanvasZoomCommand,
 } from "@/lib/keyboardShortcuts";
+import { setGridSnapEnabled, useGridSnapEnabled } from "@/lib/gridSnap";
 
 const MIN_ZOOM_PERCENT = 50;
 const MAX_ZOOM_PERCENT = 200;
@@ -53,6 +54,8 @@ export function CanvasZoomControls() {
   const { zoom } = useViewport();
   const zoomPercent = Math.round(zoom * 100);
   const sliderValue = Math.min(MAX_ZOOM_PERCENT, Math.max(MIN_ZOOM_PERCENT, zoomPercent));
+  // VIS-05：网格吸附开关（默认关），状态持久化在 localStorage。
+  const gridSnapEnabled = useGridSnapEnabled();
 
   useEffect(() => {
     const onZoomCommand = (event: Event) => {
@@ -104,6 +107,30 @@ export function CanvasZoomControls() {
           </output>
 
           <div aria-hidden="true" className="h-5 w-px bg-[var(--gc-border)]" />
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="网格吸附"
+                  aria-pressed={gridSnapEnabled}
+                  data-testid="grid-snap-toggle"
+                  onClick={() => setGridSnapEnabled(!gridSnapEnabled)}
+                  className={
+                    gridSnapEnabled
+                      ? "bg-[color-mix(in_srgb,var(--gc-accent)_16%,transparent)] text-[var(--gc-accent)] hover:bg-[color-mix(in_srgb,var(--gc-accent)_22%,transparent)] hover:text-[var(--gc-accent)]"
+                      : "text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
+                  }
+                />
+              }
+            >
+              <MagnetIcon aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent side="top">网格吸附（24px）</TooltipContent>
+          </Tooltip>
 
           <ZoomButton
             label="适应画布"
