@@ -133,6 +133,11 @@ module.exports = {
           // 当前没有界面引用它，但它不是一个可安全删除的死代码块——UI 代码的增删
           // 需要先与用户确认（AGENTS.md §2），因此保留并在此显式登记。
           "^src/components/ui/sheet\\.tsx$",
+          // 豁免：@excalidraw/mermaid-to-excalidraw 的 Vite alias stub（卡 #60 包体门禁）。
+          // 它只被 vite.config.ts 的 resolve.alias 引用，不出现在任何 TS import 图里，
+          // depcruise 因此判它孤儿。alias 生效的产物证据在 scripts/verify-bundle-budget.mjs
+          // 的 STUBBED_CHUNK_PATTERNS（cynefin/katex/cytoscape chunk 复活即 error fail-closed）。
+          "^src/lib/excalidraw-mermaid-stub\\.ts$",
         ],
       },
       to: {},

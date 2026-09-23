@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "defaultSingleChunkBytes": 500000,
+  "exemptions": [
+    {
+      "chunkPrefix": "assets/excalidraw-",
+      "maxBytes": 5242880,
+      "reason": "Excalidraw 0.18 上游单包产物，无 tree-shaking 切分点；lazy chunk 不进首屏（首屏 210KB gzip 预算不受影响）。用户 2026-09-24 拍板 a+b 方案（per-path 豁免登记 + stub mermaid 子依赖）。",
+      "authorizedBy": "user 2026-09-24 (a+b)",
+      "reviewBy": "2026-12-31",
+      "trackingIssue": 60
+    }
+  ]
+}

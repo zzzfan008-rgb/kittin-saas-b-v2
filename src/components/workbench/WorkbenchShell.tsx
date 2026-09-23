@@ -1,4 +1,17 @@
+/**
+ * 卡 #58 修复 + 卡 #60 DrawingCanvas 集成。
+ *
+ * #58 hover 桥修复（RailTool 菜单空隙）：
+ * - 加透明 hover 桥填充按钮右缘 (40px) 到菜单左缘 (52px) 之间的 12px 物理空隙。
+ * - 点亮状态 = open ∨ menuHover（跨 hover/click 两种打开方式）。
+ * - 粘性模式下关闭计时不生效。
+ *
+ * #60 Excalidraw AI 画板集成：
+ * - RailEntry id="canvas" 触发 DrawingCanvas 覆盖层。
+ * - DrawingCanvas 作为独立 lazy chunk。
+ */
 import {
+  lazy,
   useCallback,
   useEffect,
   useRef,
@@ -16,9 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { addCanvasNode } from "@/components/panels/canvasNodeActions";
-import {
-  WORKFLOW_MENU_MAPPING,
-} from "@/lib/workflowMenuMapping";
+import { WORKFLOW_MENU_MAPPING } from "@/lib/workflowMenuMapping";
 import {
   inferTemplateLaunchMode,
   mergeTemplateIntoActiveCanvas,
@@ -31,11 +42,18 @@ import {
   type RailMenuItem,
 } from "./railConfig";
 
+/** DrawingCanvas lazy load（与 vite.config.ts manualChunk 保持一致）。 */
+const LazyDrawingCanvas = lazy(() =>
+  import("@/components/drawing/DrawingCanvas").then((m) => ({
+    default: m.DrawingCanvas,
+  })),
+);
+
 interface WorkbenchShellProps {
   children: ReactNode;
 }
 
-/** hover 弹出的工作流菜单：鼠标移入工具项自动展开、移开自动关闭 */
+/** hover 弹出的工作流菜单：鼠标移入工具项自动展开、移开自动关闭。 */
 function WorkflowMenu({
   entry,
   open,
@@ -79,24 +97,34 @@ function WorkflowMenu({
           <span className="flex h-7 w-7 flex-none items-center justify-center text-[var(--gc-text-muted)] transition-colors group-hover:text-[var(--gc-accent-cta-ink,#131313)]">
             {item.icon}
           </span>
-          <span className="flex-1 tracking-[-0.1px]">{item.label}</span>
+          <span className="flex-1 truncate">{item.label}</span>
         </button>
       ))}
     </div>
   );
 }
 
-/** 单个工具项：hover 计时展开、离开计时关闭 */
+/**
+ * 单个悬浮工具项（含菜单/无菜单）。
+ * #58 hover 桥：透明 div 填充按钮右缘到菜单左缘之间的 12px 空隙。
+ */
 function RailTool({
   entry,
   primary,
   onSelectItem,
+  onOpenTool,
 }: {
   entry: RailEntry;
   primary?: boolean;
   onSelectItem: (entry: RailEntry, item: RailMenuItem) => void;
+  /** 无菜单的工具项被点击（目前仅 id="canvas"）。 */
+  onOpenTool: (toolId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  /** 粘性模式：点击打开后关闭计时暂停 */
+  const [sticky, setSticky] = useState(false);
+  /** 鼠标是否 hover 在菜单上（阻止关闭计时） */
+  const [menuHover, setMenuHover] = useState(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasMenu = !!entry.items?.length;
@@ -105,25 +133,48 @@ function RailTool({
     if (openTimer.current) clearTimeout(openTimer.current);
     if (closeTimer.current) clearTimeout(closeTimer.current);
   };
+
   const handleEnter = () => {
     if (!hasMenu) return;
     clearTimers();
     openTimer.current = setTimeout(() => setOpen(true), 120);
   };
+
   const handleLeave = () => {
     if (!hasMenu) return;
     clearTimers();
-    closeTimer.current = setTimeout(() => setOpen(false), 200);
+    // 粘性模式下关闭计时不生效；必须 hover 进入菜单才清除计时
+    if (!sticky) {
+      closeTimer.current = setTimeout(() => setOpen(false), 200);
+    }
   };
-  const keepOpen = () => clearTimers();
+
+  const keepOpen = () => {
+    clearTimers();
+    setMenuHover(true);
+  };
+
+  const handleMenuLeave = () => {
+    setMenuHover(false);
+    // 粘性模式下离开菜单不触发关闭；仅在非粘性 hover 模式触发
+    if (!sticky) {
+      clearTimers();
+      closeTimer.current = setTimeout(() => setOpen(false), 200);
+    }
+  };
 
   const handleClick = () => {
     if (!hasMenu) {
-      // 无菜单工具入口（AI 画板）：功能映射待定义
+      // 无菜单工具入口（AI 画板）：触发 onOpenTool
+      onOpenTool(entry.id);
       return;
     }
+    setSticky((v) => !v);
     setOpen((v) => !v);
   };
+
+  // 点亮 = 展开中 或 菜单hover中（跨 hover/click 两种打开方式）
+  const isActive = open || menuHover;
 
   const button = (
     <Button
@@ -137,8 +188,8 @@ function RailTool({
         "relative h-10 w-10 rounded-xl text-[var(--gc-text-muted)] transition-colors duration-150",
         "hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]",
         "focus-visible:outline-2 focus-visible:outline-[var(--gc-accent)] focus-visible:outline-offset-2",
-        // 二级菜单展开时图标保持点亮（与 hover 同色）。
-        open &&
+        // #58: 点亮状态 = open ∨ menuHover（跨 hover/click）
+        isActive &&
           "bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)]",
         primary &&
           "h-10 w-10 rounded-full bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)] shadow-[0_3px_10px_color-mix(in_srgb,var(--gc-accent)_35%,transparent)] hover:bg-[var(--gc-accent)]",
@@ -164,33 +215,50 @@ function RailTool({
         </TooltipContent>
       </Tooltip>
       {hasMenu && (
-        <WorkflowMenu
-          entry={entry}
-          open={open}
-          onEnter={keepOpen}
-          onLeave={handleLeave}
-          onSelect={(item) => {
-            setOpen(false);
-            onSelectItem(entry, item);
-          }}
-        />
+        <>
+          {/*
+           * #58 hover 桥：填充按钮右缘 (w-10=40px) 到菜单左缘 (left-[52px]) 之间的 12px 物理空隙，
+           * 并额外延伸 4px 进入菜单区域（总计 16px），确保鼠标穿过空隙时不触发关闭计时。
+           * pointer-events: auto 使其可被 hover；透明背景不干扰视觉。
+           */}
+          <div
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-auto absolute top-0 z-30 w-4",
+              // 按钮高 10*4px=40px；居中偏移
+              "h-10",
+              // left-[40px] = 按钮右缘（40px）到菜单左缘（52px）之间的 12px 间隙
+              "left-[40px]",
+              "bg-transparent",
+            )}
+          />
+          <WorkflowMenu
+            entry={entry}
+            open={open}
+            onEnter={keepOpen}
+            onLeave={handleMenuLeave}
+            onSelect={(item) => {
+              setSticky(false);
+              setOpen(false);
+              onSelectItem(entry, item);
+            }}
+          />
+        </>
       )}
     </div>
   );
 }
 
-/** 历史组（撤销/重做）：渲染进主工具胶囊底部，中间以分隔线隔开。 */
+/** 历史组（撤销/重做）：独立悬浮胶囊。 */
 function HistoryRail() {
   const undo = useFlowStore((s) => s.undo);
   const redo = useFlowStore((s) => s.redo);
 
   return (
-    <>
-      <span
-        role="separator"
-        aria-hidden="true"
-        className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]"
-      />
+    <nav
+      aria-label="撤销与重做"
+      className="flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] motion-reduce:transition-none"
+    >
       {RAIL_HISTORY.map((item, i) => (
         <Tooltip key={item.id}>
           <TooltipTrigger
@@ -215,45 +283,41 @@ function HistoryRail() {
               aria-hidden="true"
             >
               {i === 0 ? (
-                <>
-                  <path d="M9 14 4 9l5-5" />
-                  <path d="M4 9h11a5 5 0 0 1 5 5 5 5 0 0 1-5 5H8" />
-                </>
+                // undo
+                <path d="M3 7v6h6" />
               ) : (
-                <>
-                  <path d="m15 14 5-5-5-5" />
-                  <path d="M20 9H9a5 5 0 0 0-5 5 5 5 0 0 0 5 5h7" />
-                </>
+                // redo
+                <path d="M21 7v6h-6" />
               )}
+              <path
+                d={i === 0 ? "M3 13A9 9 0 1 0 5.5 6.3" : "M21 13A9 9 0 1 1 18.5 6.3"}
+              />
             </svg>
           </TooltipTrigger>
-          <TooltipContent side="right">{item.label}</TooltipContent>
+          <TooltipContent side="right" className="z-50">
+            {item.label}
+          </TooltipContent>
         </Tooltip>
       ))}
-    </>
+    </nav>
   );
 }
 
 /**
  * 桌面工作台保持同一棵中心内容树。左侧悬浮胶囊入口（6 工作流 + 历史组），
  * 任一入口的开合都不覆盖画布，也不重建 React Flow 或 Results 业务子树。
- *
- * 2026-09-25 决策：左侧 Dock（节点库 / 属性）与它的「属性 / 结果」入口已整体移除，
- * 因此这里不再有面板状态、也不再有 Dock 宽度变化事件。
  */
 export function WorkbenchShell({ children }: WorkbenchShellProps) {
-  // 用户 2026-09-25 决策 4：没有打开任何页签时（刚登录 / 关掉全部页签），
-  // 工具栏不显示，画布区由 EmptyWorkspaceCTA 的「新建 / 打开」引导接管。
   const workspaceEmpty = useFlowStore((s) => s.tabs.length === 0);
 
+  const [drawingOpen, setDrawingOpen] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<{
     kind: "loading" | "pending" | "error";
     message: string;
   } | null>(null);
   const [workflowStatusDismiss, setWorkflowStatusDismiss] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  // 工作流菜单项选择：基础节点直接建（「添加」菜单）；工作流项按映射表拉内置模板，
-  // 合并进当前活动画布（右侧扩展），不新建页签（用户 2026-09-25 决策）。
+  // 工作流菜单项选择：基础节点直接建（「添加」菜单）；工作流项按映射表拉内置模板。
   const handleSelectItem = useCallback(
     (_entry: RailEntry, item: RailMenuItem) => {
       if (item.nodeKind) {
@@ -297,6 +361,13 @@ export function WorkbenchShell({ children }: WorkbenchShellProps) {
     [],
   );
 
+  /** 无菜单工具项被点击（目前仅 id="canvas"）。 */
+  const handleOpenTool = useCallback((toolId: string) => {
+    if (toolId === "canvas") {
+      setDrawingOpen(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!workflowStatus || workflowStatus.kind === "loading" || workflowStatusDismiss) return;
     const timer = setTimeout(() => setWorkflowStatus(null), 5000);
@@ -309,28 +380,36 @@ export function WorkbenchShell({ children }: WorkbenchShellProps) {
 
   return (
     <TooltipProvider delay={250}>
+      {/* #60: DrawingCanvas 全屏覆盖层（lazy load） */}
+      {drawingOpen && (
+        <LazyDrawingCanvas onClose={() => setDrawingOpen(false)} />
+      )}
+
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {/* 悬浮主工具胶囊：空工作区（无页签）隐藏 */}
+        {/* 悬浮工具区：空工作区（无页签）隐藏 */}
         {!workspaceEmpty && (
-        <nav
-          aria-label="工作台左侧工具"
-          className="absolute left-4 top-4 z-40 flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] motion-reduce:transition-none"
-        >
-          {RAIL_ENTRIES.map((entry, index) => (
-            <div key={entry.id} className="contents">
-              {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4) && (
-                <span role="separator" className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]" />
-              )}
-              <RailTool
-                entry={entry}
-                primary={index === 0}
-                onSelectItem={handleSelectItem}
-              />
-            </div>
-          ))}
-          {/* 撤销/重做：固定在工具胶囊底部，与上方工具条以分隔线隔开。 */}
+        <div className="absolute left-4 top-4 z-40 flex flex-col gap-2">
+          <nav
+            aria-label="工作台左侧工具"
+            className="flex flex-col items-center gap-0.5 rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] p-1.5 shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_4px_10px_rgba(0,0,0,.12),0_16px_40px_rgba(0,0,0,.16)] motion-reduce:transition-none"
+          >
+            {RAIL_ENTRIES.map((entry, index) => (
+              <div key={entry.id} className="contents">
+                {RAIL_SEPARATOR_BEFORE.includes(index as 1 | 4) && (
+                  <span role="separator" className="my-1 h-px w-[22px] bg-[var(--gc-node-border,var(--gc-border))]" />
+                )}
+                <RailTool
+                  entry={entry}
+                  primary={index === 0}
+                  onSelectItem={handleSelectItem}
+                  onOpenTool={handleOpenTool}
+                />
+              </div>
+            ))}
+          </nav>
+          {/* 撤销/重做：独立悬浮胶囊 */}
           <HistoryRail />
-        </nav>
+        </div>
         )}
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

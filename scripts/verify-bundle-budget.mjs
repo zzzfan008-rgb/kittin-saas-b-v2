@@ -7,6 +7,77 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const DEFAULT_INITIAL_GZIP_BUDGET = 210_000;
 export const DEFAULT_SINGLE_CHUNK_BUDGET = 500_000;
 
+/**
+ * 从 JSON 清单加载豁免配置，并逐条校验（fail-closed）。
+ *
+ * 清单格式见 scripts/bundle-budget-exemptions.json 及 schema。
+ * 校验失败（字段缺失/重复 prefix/日期不可解析/JSON 不可读）→ 直接抛错，门禁失败。
+ *
+ * @param {string} repoRoot
+ * @returns {{ defaultSingleChunkBytes: number, exemptions: Array }}
+ */
+export function loadExemptions(repoRoot) {
+  const exemptionsPath = path.join(repoRoot, "scripts", "bundle-budget-exemptions.json");
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(exemptionsPath, "utf8"));
+  } catch (err) {
+    throw new Error(`无法读取豁免清单 ${exemptionsPath}：${err.message}`);
+  }
+  if (!raw || typeof raw !== "object") {
+    throw new Error("豁免清单不是合法的 JSON 对象");
+  }
+  if (!Array.isArray(raw.exemptions)) {
+    throw new Error("豁免清单缺少 exemptions 数组");
+  }
+
+  const defaultSingleChunkBytes = Number(raw.defaultSingleChunkBytes) || DEFAULT_SINGLE_CHUNK_BUDGET;
+  const seen = new Set();
+  for (let i = 0; i < raw.exemptions.length; i++) {
+    const e = raw.exemptions[i];
+    const idx = `exemptions[${i}]`;
+
+    // chunkPrefix：必须非空字符串，不含 hash（prefix 而非完整文件名）
+    if (typeof e.chunkPrefix !== "string" || e.chunkPrefix.length === 0) {
+      throw new Error(`${idx}.chunkPrefix 缺失或为空`);
+    }
+    if (e.chunkPrefix.includes("-") && /-[A-Za-z0-9]{8,}\\.js$/.test(e.chunkPrefix)) {
+      throw new Error(`${idx}.chunkPrefix "${e.chunkPrefix}" 疑似含 content hash——豁免应写前缀，不能写死完整文件名`);
+    }
+
+    // maxBytes：必填，且必须 > 默认上限（豁免是提高上限，不是取消）
+    if (typeof e.maxBytes !== "number" || !Number.isFinite(e.maxBytes)) {
+      throw new Error(`${idx}.maxBytes 缺失或不是有效数字`);
+    }
+    if (e.maxBytes <= defaultSingleChunkBytes) {
+      throw new Error(
+        `${idx}.maxBytes (${e.maxBytes}) 必须大于默认单 chunk 上限 (${defaultSingleChunkBytes})——豁免是提高上限，不是取消上限`,
+      );
+    }
+
+    // reason / authorizedBy / reviewBy：必须非空
+    for (const field of ["reason", "authorizedBy", "reviewBy"]) {
+      if (typeof e[field] !== "string" || e[field].trim().length === 0) {
+        throw new Error(`${idx}.${field} 缺失或为空`);
+      }
+    }
+
+    // reviewBy：必须可解析为有效日期（ISO 8601 或 YYYY-MM-DD）
+    const parsed = Date.parse(e.reviewBy);
+    if (Number.isNaN(parsed)) {
+      throw new Error(`${idx}.reviewBy "${e.reviewBy}" 无法解析为有效日期`);
+    }
+
+    // chunkPrefix 不得重复
+    if (seen.has(e.chunkPrefix)) {
+      throw new Error(`${idx}.chunkPrefix "${e.chunkPrefix}" 重复`);
+    }
+    seen.add(e.chunkPrefix);
+  }
+
+  return { defaultSingleChunkBytes, exemptions: raw.exemptions };
+}
+
 function readManifest(distRoot) {
   const manifestPath = path.join(distRoot, ".vite", "manifest.json");
   assert.ok(fs.existsSync(manifestPath), "缺少 dist/.vite/manifest.json；请启用 Vite manifest 并先构建");
@@ -36,7 +107,15 @@ export function verifyBundleBudget({
   initialGzipBudget = DEFAULT_INITIAL_GZIP_BUDGET,
   singleChunkBudget = DEFAULT_SINGLE_CHUNK_BUDGET,
   writeReport = true,
+  exemptionsOverride = null,
 }) {
+  // 豁免清单路径基于脚本所在仓库，不依赖 distRoot 的目录位置。
+  // 测试可通过 exemptionsOverride 注入假清单（跳过文件系统依赖）。
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const { exemptions } = exemptionsOverride != null
+    ? { exemptions: exemptionsOverride }
+    : loadExemptions(repoRoot);
+
   const manifest = readManifest(distRoot);
   const initialChunks = initialChunkFiles(manifest).map((file) => fileMetrics(distRoot, file));
   const assetsRoot = path.join(distRoot, "assets");
@@ -45,9 +124,43 @@ export function verifyBundleBudget({
     .sort()
     .map((name) => fileMetrics(distRoot, `assets/${name}`));
   const initialGzipBytes = initialChunks.reduce((total, chunk) => total + chunk.gzipBytes, 0);
-  const oversizedChunks = allChunks.filter((chunk) => chunk.bytes > singleChunkBudget);
+
+  // 守卫 1：豁免 chunk 不得进入首屏依赖闭包（豁免只允许 lazy dynamic import）。
+  const exemptedInInitial = initialChunks.filter((chunk) =>
+    exemptions.some((e) => chunk.file.startsWith(e.chunkPrefix)),
+  );
+  assert.equal(
+    exemptedInInitial.length,
+    0,
+    `豁免 chunk 出现在首屏依赖闭包（豁免只允许 lazy dynamic import）：${exemptedInInitial.map((c) => c.file).join(", ")}`,
+  );
+
+  // chunk 上限判定：按 chunkPrefix 最长匹配确定上限。
+  const limitFor = (file) => {
+    const hit = exemptions
+      .filter((e) => file.startsWith(e.chunkPrefix))
+      .sort((a, b) => b.chunkPrefix.length - a.chunkPrefix.length)[0];
+    return hit ? hit.maxBytes : singleChunkBudget;
+  };
+
+  const oversizedChunks = allChunks.filter((chunk) => chunk.bytes > limitFor(chunk.file));
+  const exemptedChunks = allChunks.filter((chunk) => limitFor(chunk.file) !== singleChunkBudget);
+
+  // 守卫 2：未命中任何 chunk 的豁免条目 → 失败（防止清单腐烂）。
+  const unmatched = exemptions.filter(
+    (e) => !allChunks.some((chunk) => chunk.file.startsWith(e.chunkPrefix)),
+  );
+  if (unmatched.length > 0) {
+    const list = unmatched.map((e) => `${e.chunkPrefix}（reason: ${e.reason}）`).join("; ");
+    throw new Error(
+      `豁免清单中存在未命中任何构建产物的条目（该 chunk 可能已被 stub/移除，请删除对应条目）：${list}`,
+    );
+  }
+
   const report = {
     budgets: { initialGzipBytes: initialGzipBudget, singleChunkBytes: singleChunkBudget },
+    exemptions: exemptions.map((e) => ({ ...e })),
+    exemptedChunks,
     totals: {
       initialGzipBytes,
       initialBytes: initialChunks.reduce((total, chunk) => total + chunk.bytes, 0),
@@ -63,7 +176,7 @@ export function verifyBundleBudget({
   assert.equal(
     oversizedChunks.length,
     0,
-    `存在超过 ${singleChunkBudget} bytes 的 JS chunk：${oversizedChunks.map((chunk) => `${chunk.file} (${chunk.bytes})`).join(", ")}`,
+    `存在超过体积预算的 JS chunk：${oversizedChunks.map((c) => `${c.file} (${c.bytes} > ${limitFor(c.file)})`).join(", ")}`,
   );
   assert.ok(
     initialGzipBytes <= initialGzipBudget,
@@ -76,8 +189,11 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const report = verifyBundleBudget({ distRoot: path.join(repoRoot, "dist") });
+  const exemptNote = report.exemptedChunks.length
+    ? `；基线豁免 ${report.exemptedChunks.length} 个（${report.exemptedChunks.map((c) => `${c.file} ${c.bytes}/${report.exemptions?.find((e) => c.file.startsWith(e.chunkPrefix))?.maxBytes ?? "?"}`).join(", ")}）`
+    : "";
   console.log(
     `包体门禁通过：初始 JS gzip ${report.totals.initialGzipBytes} / ${report.budgets.initialGzipBytes} bytes；` +
-    `${report.totals.chunkCount} 个 JS chunk，单 chunk 上限 ${report.budgets.singleChunkBytes} bytes`,
+    `${report.totals.chunkCount} 个 JS chunk，单 chunk 上限 ${report.budgets.singleChunkBytes} bytes${exemptNote}`,
   );
 }

@@ -64,6 +64,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "src"),
         "@server": path.resolve(__dirname, "server"),
+        // (b) stub @excalidraw/mermaid-to-excalidraw → 消去 cynefin/katex chunk
+        // 该包仅服务于 Excalidraw 内置的「Mermaid 转画布」对话框（~1MB 含 mermaid 全家桶）。
+        "@excalidraw/mermaid-to-excalidraw": path.resolve(__dirname, "src/lib/excalidraw-mermaid-stub.ts"),
       },
     },
     define: {
@@ -91,6 +94,12 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Vite 的 __vite__preload helper（虚拟模块）必须独立成小 chunk：
+            // 否则 Rollup 可能把它 hoist 进 excalidraw 等 lazy chunk，
+            // 使 index/App 对 lazy chunk 形成静态依赖（excalidraw 被拖进首屏）。
+            if (id.includes("vite/preload-helper")) {
+              return "preload-helper";
+            }
             if (!id.includes("node_modules")) return undefined;
             if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
               return "vendor-react";
@@ -104,8 +113,15 @@ export default defineConfig(({ mode }) => {
             if (/[\\/]node_modules[\\/](zustand|zundo|nanoid)[\\/]/.test(id)) {
               return "vendor-state";
             }
-            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
+            if (/[\\/]node_modules[\\/](lucide-react)[\\/]/.test(id)) {
               return "vendor-icons";
+            }
+            // Card #60: Excalidraw → 独立 lazy chunk。
+            // excalidraw 库体积 ~4MB（含字体子集引擎 + 多语言数据），无法拆到 500KB 以下；
+            // 门禁脚本对该 chunk 做 source-id 豁免（verify-bundle-budget.mjs --exclude=excalidraw）。
+            // 手动归并是为了防止 Rollup 把它的共享依赖散入其他 chunk（如 cynefin/index）。
+            if (/[\\/]node_modules[\\/]@excalidraw[\\/]excalidraw[\\/]/.test(id)) {
+              return "excalidraw";
             }
             return undefined;
           },
