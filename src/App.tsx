@@ -366,7 +366,7 @@ function Workspace() {
           role={initialHistoryState === "error" ? "alert" : "status"}
           className="gc-panel flex min-h-9 shrink-0 items-center justify-center gap-3 border-b border-[var(--gc-border)] bg-[var(--gc-panel)] px-3 py-1.5 text-center"
         >
-          <p className={`text-[11px] ${initialHistoryState === "error" ? "text-amber-300" : "text-[var(--gc-text-muted)]"}`}>
+          <p className={`text-label ${initialHistoryState === "error" ? "text-amber-300" : "text-[var(--gc-text-muted)]"}`}>
             {initialHistoryState === "loading"
               ? "正在确认运行历史；画布仍可查看和编辑，新的生成任务暂不可用。"
               : "运行历史同步失败；画布仍可编辑和保存，为避免重复计费，新的生成任务已暂停。"}
@@ -375,7 +375,7 @@ function Workspace() {
             <button
               type="button"
               onClick={() => setInitialHistoryAttempt((value) => value + 1)}
-              className="shrink-0 rounded-sm border border-gold/60 px-2 py-1 text-[11px] text-gold hover:bg-gold/10"
+              className="shrink-0 rounded-sm border border-gold/60 px-2 py-1 text-label text-gold hover:bg-gold/10"
             >
               重试同步
             </button>

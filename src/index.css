@@ -5,6 +5,14 @@
 @source "../index.html";
 @source "./";
 
+/* 语义字阶工具类（tokens.css §0 唯一事实源；此处只接入变量名）：
+   text-label=标签/说明 11px · text-meta-en=纯英文徽章/坐标/时间戳 10px · text-body=正文 13px */
+@theme inline {
+  --text-label: var(--gc-font-label);
+  --text-meta-en: var(--gc-font-meta-en);
+  --text-body: var(--gc-font-body);
+}
+
 @theme {
   --color-ink: #0a0a0a;
   --color-paper: #fafaf8;
