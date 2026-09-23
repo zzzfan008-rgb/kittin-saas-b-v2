@@ -3,7 +3,6 @@ import { query, queryOne } from "../../lib/database";
 import type { RunEvent } from "../runner";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,

@@ -942,10 +942,34 @@ function erasedOrRewrittenArtifacts(before) {
   return drift;
 }
 
-function persistReviewReceipt(directory, { selection, initialHead, initialSnapshot, review, reviewBatches: batches, gitNexusEvidence, reviewOnly, reviewScopeEvidence }) {
+/**
+ * F6：SHA 判定制品的固化目录（相对 receipt 目录）。门禁对 scope 清单、批次 scope、
+ * 批次 packet、评审 prompt 逐一取 sha256；这些字节原先只存在于一次性 /tmp 目录，
+ * 评审结束即删除，事后无法复核。现在它们原样落进 receipt 目录的 artifacts/ 子目录，
+ * 文件名内容寻址（`<role>-<sha256>.<ext>`，flag wx 不可改写），回执用 artifacts
+ * 清单把每个逻辑角色绑定到精确字节，复核方式：重算文件 sha256 与回执记录比对
+ * （scripts/gate-receipt-verify.mjs）。
+ */
+const RECEIPT_ARTIFACTS_DIR = "artifacts";
+const RECEIPT_SCHEMA_VERSION = 2;
+
+function persistReceiptArtifact(directory, { role, body, extension, batch }) {
+  if (!directory) return undefined;
+  const digest = sha256(body);
+  const artifactsDirectory = join(directory, RECEIPT_ARTIFACTS_DIR);
+  mkdirSync(artifactsDirectory, { recursive: true, mode: 0o755 });
+  const fileName = `${role}-${digest}${extension}`;
+  const path = join(artifactsDirectory, fileName);
+  writeFileSync(path, body, { encoding: "utf8", flag: "wx", mode: 0o644 });
+  const record = { role, path: join(RECEIPT_ARTIFACTS_DIR, fileName), sha256: digest, bytes: Buffer.byteLength(body, "utf8") };
+  if (batch != null) record.batch = batch;
+  return record;
+}
+
+function persistReviewReceipt(directory, { selection, initialHead, initialSnapshot, review, reviewBatches: batches, gitNexusEvidence, reviewOnly, reviewScopeEvidence, artifactRecords }) {
   if (!directory) return undefined;
   const receipt = {
-    schemaVersion: 1,
+    schemaVersion: RECEIPT_SCHEMA_VERSION,
     capturedAt: new Date().toISOString(),
     selection,
     reviewOnly,
@@ -956,6 +980,10 @@ function persistReviewReceipt(directory, { selection, initialHead, initialSnapsh
     gitNexusEvidence,
     reviewScope: reviewScopeEvidence,
     reviewBatches: batches,
+    artifacts: {
+      directory: RECEIPT_ARTIFACTS_DIR,
+      files: artifactRecords,
+    },
     gateDecision: review.verdict === "pass" && review.findings.length === 0 && review.code_analysis.status === "pass"
       ? "pass"
       : "fail-closed",
@@ -979,7 +1007,10 @@ intentionally omits
 -m/--provider so it uses the user's configured default model. Any P0-P3 finding fails the gate.
 Code intelligence evidence comes from ast-grep + dependency-cruiser (no GitNexus, no Codex CLI).
 --review-only reruns only the model stage for gate maintenance and is not complete gate evidence.
---receipt-dir persists the structured reviewer result outside the Git worktree; it may also be set with
+--receipt-dir persists the structured reviewer result and the exact SHA-adjudicated artifact bytes
+(review scope manifest, per-batch scope/packet/prompt under artifacts/) outside the Git worktree, so
+the verdict stays byte-level re-verifiable after the temporary directory is deleted; verify with
+npm run gate:receipt:verify -- <receipt.json>. It may also be set with
 GARMENT_CANVAS_CODEX_GATE_RECEIPT_DIR. The model stage defaults to a 15-minute timeout and can be
 overridden with GARMENT_CANVAS_CODEX_REVIEW_TIMEOUT_MS (the same value bounds hermes --run-budget);
 the outer hard kill adds GARMENT_CANVAS_CODEX_REVIEW_TERMINATION_GRACE_MS (default 120000) on top, so a
@@ -1041,6 +1072,15 @@ const reviewStartedAt = process.hrtime.bigint();
 try {
   const scopeEvidence = reviewScope(selection);
   const batches = reviewBatches(scopeEvidence);
+  const receiptArtifactRecords = [];
+  {
+    const record = persistReceiptArtifact(receiptDirectory, {
+      role: "review-scope",
+      body: scopeEvidence.body,
+      extension: ".json",
+    });
+    if (record) receiptArtifactRecords.push(record);
+  }
   const reviewTarget = selection.finalEvidence
     ? `Review only the exact Git diff ${selection.baseSha}..${selection.headSha}.`
     : "Review all staged, unstaged, and untracked changes against the current HEAD.";
@@ -1081,6 +1121,20 @@ ${REVIEW_SENTINEL_OPEN}
 {"verdict": "...", "summary": "...", "findings": [], "code_analysis": {"status": "...", "evidence": "..."}}
 ${REVIEW_SENTINEL_CLOSE}`;
     writeFileSync(promptPath, prompt, "utf8");
+
+    // F6：把本批被 sha256 判定的原始字节（batch scope / packet / prompt）固化进
+    // receipt 目录；事后无需 /tmp 即可逐字节复核。
+    for (const artifact of [
+      { role: "batch-scope", body: batchScopeEvidence.body, extension: ".json" },
+      { role: "packet", body: packet.body, extension: ".json" },
+      { role: "prompt", body: prompt, extension: ".txt" },
+    ]) {
+      const record = persistReceiptArtifact(receiptDirectory, {
+        ...artifact,
+        batch: batch.index,
+      });
+      if (record) receiptArtifactRecords.push(record);
+    }
 
     let review;
     try {
@@ -1163,6 +1217,7 @@ ${REVIEW_SENTINEL_CLOSE}`;
       ...scopeEvidence.summary,
     },
     reviewOnly: cliArgs.includes("--review-only"),
+    artifactRecords: receiptArtifactRecords,
   });
   console.log(`Reviewer verdict: ${review.verdict} — ${review.summary}`);
   for (const finding of review.findings) {

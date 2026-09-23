@@ -21,7 +21,6 @@ import {
 } from "../../lib/evaluationEvidenceStore";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
@@ -64,7 +63,7 @@ export async function claimNextJob(
     const row = (await client.query<JobLockRow>(CLAIM_NEXT_JOB_SQL, [now])).rows[0];
     if (!row) return undefined;
     const run = await lockRun(client, row.run_id);
-    if (!run || isTerminalRunStatus(run.status) || run.status === "cancel_requested") return undefined;
+    if (!run || isTerminalRunStatus(run.status)) return undefined;
     await client.query(`
       UPDATE generation_jobs SET status = 'running', worker_id = $1, lease_expires_at = $2,
         attempt_started_at = NULL, updated_at = $3 WHERE id = $4
@@ -134,7 +133,6 @@ export async function markAttemptStarted(
       [job.id],
     )).rows[0];
     if (!row || row.worker_id !== workerId) throw new Error("generation job lease was lost");
-    if (row.status === "cancel_requested") throw new CancelledBeforeProviderCall();
     if (row.status !== "running") throw new Error(`generation job is ${row.status}`);
     if (row.run_type === "evaluation") {
       if (
@@ -212,7 +210,7 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
         r.evaluation_campaign_id, r.evaluation_slot_id
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
       JOIN generation_runs r ON r.id = j.run_id
-      WHERE j.status IN ('running','cancel_requested')
+      WHERE j.status = 'running'
         AND j.lease_expires_at < $1
         AND r.deleted_at IS NULL
       ORDER BY j.lease_expires_at ASC FOR UPDATE OF j SKIP LOCKED LIMIT 50
@@ -256,10 +254,6 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
           client, row, "outcome_unknown",
           outcomeUnknownMessage("Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试"), now,
         );
-        continue;
-      }
-      if (row.status === "cancel_requested") {
-        await terminateRun(client, row, "cancelled", "任务已在上游调用开始前取消", now);
         continue;
       }
       await lockRun(client, row.run_id);
