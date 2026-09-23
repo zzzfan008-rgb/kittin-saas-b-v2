@@ -107,9 +107,14 @@ export function verifyBundleBudget({
   initialGzipBudget = DEFAULT_INITIAL_GZIP_BUDGET,
   singleChunkBudget = DEFAULT_SINGLE_CHUNK_BUDGET,
   writeReport = true,
+  exemptionsOverride = null,
 }) {
-  const repoRoot = path.resolve(distRoot, "..");
-  const { exemptions } = loadExemptions(repoRoot);
+  // 豁免清单路径基于脚本所在仓库，不依赖 distRoot 的目录位置。
+  // 测试可通过 exemptionsOverride 注入假清单（跳过文件系统依赖）。
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const { exemptions } = exemptionsOverride != null
+    ? { exemptions: exemptionsOverride }
+    : loadExemptions(repoRoot);
 
   const manifest = readManifest(distRoot);
   const initialChunks = initialChunkFiles(manifest).map((file) => fileMetrics(distRoot, file));

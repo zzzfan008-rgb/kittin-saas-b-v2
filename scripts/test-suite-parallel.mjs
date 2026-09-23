@@ -111,6 +111,7 @@ const TEST_FILES = [
   "tests/project-tabs.test.ts",
   "tests/result-export.test.ts",
   "tests/evaluation-review-ledger.test.ts",
+  "tests/verify-bundle-budget.test.ts",
 ];
 
 /**

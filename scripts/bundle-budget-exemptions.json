@@ -1,5 +1,4 @@
 {
-  "$schema": "./bundle-budget-exemptions.schema.json",
   "schemaVersion": 1,
   "defaultSingleChunkBytes": 500000,
   "exemptions": [
