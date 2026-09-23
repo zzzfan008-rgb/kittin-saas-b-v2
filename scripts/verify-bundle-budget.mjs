@@ -16,7 +16,7 @@ export const DEFAULT_SINGLE_CHUNK_BUDGET = 500_000;
  * @param {string} repoRoot
  * @returns {{ defaultSingleChunkBytes: number, exemptions: Array }}
  */
-function loadExemptions(repoRoot) {
+export function loadExemptions(repoRoot) {
   const exemptionsPath = path.join(repoRoot, "scripts", "bundle-budget-exemptions.json");
   let raw;
   try {
