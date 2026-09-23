@@ -50,7 +50,12 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 6 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 7 files/);
+  assert.match(
+    baseline.stdout,
+    /\[vis-keyboard\].*VIS-07 键盘焦点环.*VIS-05 snapGrid 吸附/,
+    "VIS-07/05 keyboard regression must stay in the browser regression matrix",
+  );
   assert.match(
     baseline.stdout,
     /\[golden-path\].*unverified starter stays blocked while a test-reviewed variant completes the isolated golden path/,
