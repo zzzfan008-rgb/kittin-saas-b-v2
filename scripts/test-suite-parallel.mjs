@@ -130,6 +130,9 @@ const SERIAL_TEST_FILES = new Set([
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   "tests/evaluation-review-ledger.test.ts",
+  // recent-results.test.ts 在 CI 并发时与碰库串行测试存在隐性状态依赖导致 flaky，
+  // 移至串行泳道消除竞态。
+  "tests/recent-results.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
