@@ -11,10 +11,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const source = new URL("../scripts/codex-gate.mjs", import.meta.url);
+const receiptVerifySource = new URL("../scripts/gate-receipt-verify.mjs", import.meta.url);
 const apiyiChangeScopeSource = new URL("../docs/ai/apiyi/change-scope.json", import.meta.url);
 const fixtureRoots = new Set();
 
@@ -816,7 +818,7 @@ for (const [label, graph, expected] of [
   assert.equal(receiptFiles.length, 1, "外置回执目录应生成一个结构化 JSON 回执");
   assert.match(receiptFiles[0], /^codex-gate-[a-f0-9]{64}\.json$/, "回执文件命名保持原样");
   const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]), "utf8"));
-  assert.equal(receipt.schemaVersion, 1);
+  assert.equal(receipt.schemaVersion, 2);
   assert.equal(receipt.gateDecision, "pass");
   assert.equal(receipt.exitCode, 0);
   assert.equal(receipt.review.verdict, "pass");
@@ -825,6 +827,87 @@ for (const [label, graph, expected] of [
   assert.match(receipt.reviewBatches[0].packetSha256, /^[a-f0-9]{64}$/);
   assert.match(receipt.gitNexusEvidence, /^Changed files: 1$/m);
   assert.match(result.stdout, /Gate review receipt:/);
+
+  // F6：SHA 判定制品必须固化进 artifacts/ 子目录，且与回执记录逐字节一致。
+  assert.equal(receipt.artifacts.directory, "artifacts");
+  const artifactRecords = receipt.artifacts.files;
+  assert.deepEqual(
+    artifactRecords.map(({ role, batch }) => ({ role, batch })),
+    [
+      { role: "review-scope" },
+      { role: "batch-scope", batch: 1 },
+      { role: "packet", batch: 1 },
+      { role: "prompt", batch: 1 },
+    ],
+    "回执必须固化 review-scope 与每批 batch-scope/packet/prompt 四类制品",
+  );
+  for (const record of artifactRecords) {
+    const artifactPath = join(receiptDir, record.path);
+    assert.ok(existsSync(artifactPath), `固化制品必须存在：${record.path}`);
+    assert.match(record.path, /^artifacts\/(?:review-scope|batch-scope|packet|prompt)-[a-f0-9]{64}\.(?:json|txt)$/);
+    assert.equal(
+      createHash("sha256").update(readFileSync(artifactPath)).digest("hex"),
+      record.sha256,
+      `固化制品 sha256 必须可重算复核：${record.path}`,
+    );
+  }
+  assert.equal(
+    artifactRecords.find(({ role }) => role === "review-scope").sha256,
+    receipt.reviewScope.sha256,
+  );
+
+  // 复核脚本：干净回执必须通过。
+  const verify = command(
+    receiptDir,
+    process.execPath,
+    [receiptVerifySource.pathname, join(receiptDir, receiptFiles[0])],
+  );
+  assert.equal(verify.status, 0, `${verify.stdout}\n${verify.stderr}`);
+  assert.match(verify.stdout, /Receipt verification PASS/);
+}
+
+{
+  // F6 fail-closed：固化制品被改写后复核必须失败。
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "tampered artifact change\n");
+  const receiptDir = mkdtempSync(join(tmpdir(), "codex-gate-tamper-artifact-"));
+  fixtureRoots.add(receiptDir);
+  const gate = runGate(f, "--uncommitted", "--review-only", "--receipt-dir", receiptDir);
+  assert.equal(gate.status, 0, `${gate.stdout}\n${gate.stderr}`);
+  const receiptFile = readdirSync(receiptDir).find((name) => name.startsWith("codex-gate-"));
+  const packetArtifact = readdirSync(join(receiptDir, "artifacts"))
+    .find((name) => name.startsWith("packet-"));
+  const packetPath = join(receiptDir, "artifacts", packetArtifact);
+  writeFileSync(packetPath, `${readFileSync(packetPath, "utf8")}tampered\n`);
+  const verify = command(
+    receiptDir,
+    process.execPath,
+    [receiptVerifySource.pathname, join(receiptDir, receiptFile)],
+  );
+  assert.notEqual(verify.status, 0, "固化制品被改写必须复核失败");
+  assert.match(`${verify.stdout}${verify.stderr}`, /sha256 与固化文件不一致/);
+}
+
+{
+  // F6 fail-closed：回执自身字节被改写（文件名 SHA 对不上）必须复核失败。
+  const f = fixture();
+  writeFileSync(join(f.root, "tracked.txt"), "tampered receipt change\n");
+  const receiptDir = mkdtempSync(join(tmpdir(), "codex-gate-tamper-receipt-"));
+  fixtureRoots.add(receiptDir);
+  const gate = runGate(f, "--uncommitted", "--review-only", "--receipt-dir", receiptDir);
+  assert.equal(gate.status, 0, `${gate.stdout}\n${gate.stderr}`);
+  const receiptFile = readdirSync(receiptDir).find((name) => name.startsWith("codex-gate-"));
+  const receiptPath = join(receiptDir, receiptFile);
+  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  receipt.capturedAt = "1970-01-01T00:00:00.000Z";
+  writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  const verify = command(
+    receiptDir,
+    process.execPath,
+    [receiptVerifySource.pathname, receiptPath],
+  );
+  assert.notEqual(verify.status, 0, "回执被改写且文件名 SHA 失配必须复核失败");
+  assert.match(`${verify.stdout}${verify.stderr}`, /回执自身 sha256 与文件名不一致/);
 }
 
 {
