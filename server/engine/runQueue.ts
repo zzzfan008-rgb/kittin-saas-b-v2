@@ -11,7 +11,6 @@
 export * from "./runQueue/index";
 export {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,

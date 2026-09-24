@@ -48,13 +48,6 @@ export class EvaluationCaseConflictError extends Error {
   }
 }
 
-export class CancelledBeforeProviderCall extends Error {
-  constructor() {
-    super("任务已在上游调用开始前取消");
-    this.name = "CancelledBeforeProviderCall";
-  }
-}
-
 export function isTerminalRunStatus(status: string): boolean {
   return TERMINAL_RUN_STATUSES.has(status as DurableRunStatus) || status === "success" || status === "error";
 }
