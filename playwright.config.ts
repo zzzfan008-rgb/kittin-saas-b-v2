@@ -121,6 +121,16 @@ export default defineConfig({
       },
     },
     {
+      name: "drawing",
+      testMatch: /drawing\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
       name: "desktop-1024",
       testMatch: /workbench\.spec\.ts/,
       dependencies: ["setup"],
