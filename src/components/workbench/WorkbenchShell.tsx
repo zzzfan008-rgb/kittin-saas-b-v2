@@ -150,7 +150,12 @@ function RailTool({
     // 点击关闭后的短暂抑制期内不响应 hover 打开
     if (suppressHoverRef.current) return;
     clearTimers();
-    openTimer.current = setTimeout(() => onRequestOpen(entry.id), 120);
+    openTimer.current = setTimeout(() => {
+      // B. fire 时复检抑制标志——mousedown→focus→handleEnter 先于 click,
+      // 定时器回调必须二次确认 suppressHoverRef 仍为 false
+      if (suppressHoverRef.current) return;
+      onRequestOpen(entry.id);
+    }, 120);
   };
 
   const handleLeave = () => {
@@ -180,7 +185,9 @@ function RailTool({
       return;
     }
     if (open) {
-      // 关闭：设抑制标志防 hover 重开（#58 fix）
+      // 关闭：先取消 focus/hover 排下的 pending 定时器（#58 fix — root cause）
+      clearTimers();
+      // 设抑制标志防 hover 重开
       suppressHoverRef.current = true;
       setTimeout(() => {
         suppressHoverRef.current = false;
@@ -260,6 +267,8 @@ function RailTool({
             onLeave={handleMenuLeave}
             onSelect={(item) => {
               setSticky(false);
+              // 同型防御：取消已排程的打开定时器（focus/hover 可能先于点击）
+              clearTimers();
               suppressHoverRef.current = true;
               setTimeout(() => {
                 suppressHoverRef.current = false;
