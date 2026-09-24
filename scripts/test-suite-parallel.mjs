@@ -73,6 +73,8 @@ const TEST_FILES = [
   "tests/evaluation-authorization-ledger.test.ts",
   "tests/evaluation-campaign.test.ts",
   "tests/campaign-runner.test.ts",
+  "tests/campaign-runner-execute.test.ts",
+  "tests/campaign-runner-prepare.test.ts",
   "tests/reference-inputs.test.ts",
   "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",
@@ -132,6 +134,7 @@ const SERIAL_TEST_FILES = new Set([
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   "tests/evaluation-review-ledger.test.ts",
+  "tests/campaign-runner-prepare.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");

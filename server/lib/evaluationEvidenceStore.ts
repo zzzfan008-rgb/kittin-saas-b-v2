@@ -244,7 +244,7 @@ async function caseForRun(client: PoolClient, runId: string, policy: EvaluationR
   `, [runId, policy.caseId, policy.authorizationId, policy.campaignId, policy.slotId])).rows[0];
 }
 
-function campaignRuntimeBinding(
+export function campaignRuntimeBinding(
   runtime: EvaluationRuntimeCaseSnapshot,
 ): EvaluationCampaignSlotRuntimeBinding {
   const snapshot = runtime.snapshot;

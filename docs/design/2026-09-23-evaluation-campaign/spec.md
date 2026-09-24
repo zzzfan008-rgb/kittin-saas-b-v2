@@ -99,9 +99,27 @@ provider-probe → internal-experiment → formal-validation
   **全仓库没有任何调用方**——seal 无入口；② 没有把 authorize → run-plan → evidence → gate
   串起来的编排器。两者都能落进一个脚本，不碰任何共享契约。
 
-**新增文件（唯一新代码）**：`scripts/evaluation-campaign-runner.ts`，子命令如下。
+**新增文件**：`scripts/evaluation-campaign-runner.ts`。子命令：`prepare`、`seal`、`execute`。
 
-### 7.1 `seal` —— 封存 campaign（补 createSealedEvaluationCampaign 的缺失入口）
+### 7.1a `prepare` —— 物化 slot hash（capture，零付费，幂等）
+
+```bash
+npx tsx scripts/evaluation-campaign-runner.ts prepare \
+  --variant-id <variantId> --code-sha <git-sha> --out <slots.materialized.json>
+```
+
+- 按 §7.7 子集选择器过滤出恰好 2 个 unit（沿用 §7.7 枚举断言，禁止回退全量）。
+- 对每 unit × 每 stage × 每 slot，用 capture 模式（`executeStep` + `captureProvider` +
+  `beforeProviderCall` 抛错拦请求）调用 `buildEvaluationCaseSnapshotFromRuntime` +
+  `campaignRuntimeBinding`，产生 `resolvedPromptSha256` / `nativeParametersSha256` /
+  `referenceInputsSha256`，**全程零 Provider 调用**。
+- **`campaignRuntimeBinding` 是唯一计算函数**（`server/lib/evaluationEvidenceStore.ts:247`，
+  `export function`）：本文 §7.3 要求的 `seal` 与 `execute` 必须共用此函数，不得另写一份实现。
+- 输出 `slots.materialized.json`，含 §7.1 seal 输入所需的全部 hash 字段。
+- **幂等要求**：连跑两次，同一 slot 的 3 个 hash 必须逐字节相同（prompt 解析确定性已在
+  架构裁决中验证——全 `server/**/*prompt*` grep 命中 0 个非确定性源）。
+
+### 7.1b `seal` —— 封存 campaign（消费 prepare 物化的 slots）
 
 ```bash
 npx tsx scripts/evaluation-campaign-runner.ts seal \
@@ -122,8 +140,11 @@ npx tsx scripts/evaluation-campaign-runner.ts seal \
 - `slots.json` 每 slot：`caseId / sampleId / resolvedPromptSha256 / nativeParametersSha256 /
   referenceInputsSha256 / requestedImageCount / maxProviderRequests /
   priceMinorPerProviderRequest / budgetLimitMinor`（= `EvaluationCampaignSlotManifest`，:36-47）。
-- **hash 由 runner 从模板预置输入计算**，不得手填：运行时 `reserveEvaluationCampaignProviderRequest`
-  逐字段比对 sealed slot 与实际 Provider 请求（:537-547），任何漂移 = 硬失败，这就是 §4 机检断言的落点。
+- **hash 由 prepare 子命令产出，seal 不得另设计算分支或手填全零**：
+  `reserveEvaluationCampaignProviderRequest` 逐字段比对 sealed slot 值与执行期
+  `campaignRuntimeBinding` 输出（`evaluationCampaign.ts:537-547`），任一 hash 漂移 = 硬失败。
+  seal 侧对 `resolvedPromptSha256` / `nativeParametersSha256` / `referenceInputsSha256`
+  施加**退化断言**（regex `/^(.)\1{63}$/` 拒绝全零/全同字符）——强制消费 prepare 的真实产出。
 - `authorizationUnitKey` = `sha256:${promptEvaluationUnitKey(unit)}`（`src/lib/promptEvaluation.ts:110`），
   三个 stage 必须使用**同一个 key**（gate 链校验，`evaluationPromotion.ts:349-358`）。
 
@@ -162,6 +183,11 @@ npx tsx scripts/evaluation-campaign-runner.ts execute \
 
 **中止语义**：任何 slot outcome ≠ `succeeded` → `finalizeEvaluationCampaignSlot` 已把 campaign
 置 `stopped`（evaluationCampaign.ts:610-615）；runner 检测到 stopped 立即退出非零，**不跑后续 slot、不跑后续 stage**。
+
+**约束：seal 与 execute 必须共用 `campaignRuntimeBinding`**（`server/lib/evaluationEvidenceStore.ts:247`，
+`export function`）。seal 侧禁止另写一份 hash 计算实现——两者的 `resolvedPromptSha256` /
+`nativeParametersSha256` / `referenceInputsSha256` 必须来自同一函数，这是 reserve 逐字段比对
+（`evaluationCampaign.ts:537-547`）能通过的唯一保证。
 
 ### 7.4 score / gate / promote —— 复用现有 `evaluation-review.ts`（零新代码）
 
@@ -266,6 +292,14 @@ manifest 自身也声明 `paidCampaign.manifestIsExecutionAuthorization: false`�
 **验收（机检）**：runner 单测必须覆盖——(a) 传入 2 变体 → 枚举恰好 2 units、6 campaigns、
 Σbudget ≤ 5000；(b) 传入集合外变体 → 拒绝；(c) 过滤结果为 0 或 >2 → 拒绝；(d) Σbudget 超 5000
 → 拒绝 seal。四个用例全部断言退出码非零 + 无 DB 写入。
+
+6. **资产缺口分支（已实测关闭）**：prepare capture 后 `snapshot.references.length`：
+   - `generate.v1` — `references=[]`（生成模式无图片输入，预期结构）
+   - `edit.v1` — `references=[]`（实测 2026-09-24，run-queue.test.ts capture 模式输出）
+   → **资产缺口不存在**，prepare 无需预准备任何参考图资产。若未来模型或变体引入
+   reference-based 模式（references.length > 0），prepare 需扩展为「先上传参考图至
+   Provider 文件 API 再 capture」的异步流程；此类资产入场须由用户显式授权，
+   不得由自动化脚本隐式入库。
 
 ## 8. 风险与回滚
 
