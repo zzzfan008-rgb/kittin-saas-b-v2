@@ -216,7 +216,33 @@ export function loadManifest(path: string): LoadedManifest {
   return { baseUnits, stageRequestCaps };
 }
 
-// ---------- variant assertion ----------
+// ---------- assert tracked tree clean (pre-seal/prepare, --untracked-files=no) ----------
+// Ruling (e): seal and prepare must verify that every tracked file is clean
+// before writing any seal data to the database. This is distinct from
+// assertPaidEvaluationStartupConfig (server/config.ts) which uses plain
+// porcelain (--untracked-files=normal) and is the paid-execution guard.
+// A dirty tracked tree in seal would embed an unreproducible code identity
+// into the immutable ledger, violating AGENTS.md §4 audit requirements.
+
+import { execSync } from "node:child_process";
+
+export function assertTrackedTreeClean(repoCwd: string): void {
+  const output = execSync("git status --porcelain=v1 --untracked-files=no", {
+    cwd: repoCwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000,
+  })
+    .replace(/\r?\n$/, "")
+    .trim();
+  if (output.length > 0) {
+    throw new Error(
+      `seal/prepare requires a clean tracked Git worktree at "${repoCwd}". ` +
+        `The following tracked files are modified or staged:\n${output}\n` +
+        "Commit or stash these changes and re-run.",
+    );
+  }
+}
 
 function collectTemplateVariantIds(): Map<string, string[]> {
   const templates = builtinTemplates();
@@ -535,6 +561,7 @@ async function runPrepare(
   flags: Map<string, string | true>,
   variantIds: string[],
 ): Promise<void> {
+  assertTrackedTreeClean(ROOT_DIR);
   const codeSha = requiredFlag(flags, "code-sha");
   const campaignIdPrefix = requiredFlag(flags, "campaign-id");
   const outPath = requiredFlag(flags, "out");
@@ -675,6 +702,7 @@ async function runSeal(
   flags: Map<string, string | true>,
   variantIds: string[],
 ): Promise<void> {
+  assertTrackedTreeClean(ROOT_DIR);
   const adminId = requiredFlag(flags, "admin-id");
   const campaignIdPrefix = requiredFlag(flags, "campaign-id");
   const modelId = requiredFlag(flags, "model-id");

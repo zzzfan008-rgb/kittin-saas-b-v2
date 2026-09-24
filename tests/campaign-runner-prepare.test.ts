@@ -630,6 +630,78 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
   console.log("  ✓ (r3) slot budget = PRICE_MINOR (3), campaign total = slots x 3");
 }
 
+// ---------- (e1) assertTrackedTreeClean: clean worktree passes ----------
+{
+  const { execSync } = await import("node:child_process");
+  const { assertTrackedTreeClean } = await import("../scripts/evaluation-campaign-runner");
+
+  // Sanity: ensure the worktree really is clean (test starts clean).
+  const repo = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+  try {
+    assertTrackedTreeClean(repo);
+  } catch (error) {
+    assert.fail(`assertTrackedTreeClean on a clean worktree must not throw, got: ${String(error)}`);
+  }
+
+  passed++;
+  console.log("  ✓ (e1) assertTrackedTreeClean — clean worktree passes");
+}
+
+// ---------- (e2) assertTrackedTreeClean: tracked file dirty → must throw ----------
+{
+  const { execSync } = await import("node:child_process");
+  const { writeFileSync } = await import("node:fs");
+  const { assertTrackedTreeClean } = await import("../scripts/evaluation-campaign-runner");
+
+  const repo = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+  const probePath = path.join(repo, "tests", ".tracked-dirty-probe.ts");
+  // The file must be tracked; stage it first, then modify to make it dirty.
+  writeFileSync(probePath, "// tracked-dirty test\n");
+  execSync(`git add "${probePath}"`, { cwd: repo });
+  // Now modify it (unstaged change → dirty tracked file).
+  writeFileSync(probePath, "// tracked-dirty test (modified)\n");
+
+  let thrown = false;
+  try {
+    assertTrackedTreeClean(repo);
+  } catch {
+    thrown = true;
+  } finally {
+    // Restore clean state: reset the probe file and delete it.
+    execSync(`git checkout -- "${probePath}"`, { cwd: repo });
+    execSync(`git reset HEAD "${probePath}"`, { cwd: repo });
+    try { fs.unlinkSync(probePath); } catch { /* missing */ }
+  }
+
+  assert.ok(thrown, "assertTrackedTreeClean must throw when a tracked file is modified");
+  passed++;
+  console.log("  ✓ (e2) assertTrackedTreeClean — tracked file dirty → throws");
+}
+
+// ---------- (e3) assertTrackedTreeClean: untracked file → passes (--untracked-files=no) ----------
+{
+  const { execSync } = await import("node:child_process");
+  const { writeFileSync } = await import("node:fs");
+  const { assertTrackedTreeClean } = await import("../scripts/evaluation-campaign-runner");
+
+  const repo = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+  const probeUntracked = path.join(repo, "tests", ".untracked-probe");
+  writeFileSync(probeUntracked, "untracked\n");
+
+  let thrown = false;
+  try {
+    assertTrackedTreeClean(repo);
+  } catch {
+    thrown = true;
+  } finally {
+    try { fs.unlinkSync(probeUntracked); } catch { /* missing */ }
+  }
+
+  assert.ok(!thrown, "assertTrackedTreeClean with --untracked-files=no must NOT flag an untracked file. An untracked file is NOT a tracked modification.");
+  passed++;
+  console.log("  ✓ (e3) assertTrackedTreeClean — untracked file → passes (flag --untracked-files=no)");
+}
+
 // ---------- summary ----------
 
 console.log(`\n全部完成：${passed} 项验收测试通过`);
