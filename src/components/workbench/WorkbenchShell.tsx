@@ -5,6 +5,9 @@
  * - 加透明 hover 桥填充按钮右缘 (40px) 到菜单左缘 (52px) 之间的 12px 物理空隙。
  * - 点亮状态 = open ∨ menuHover（跨 hover/click 两种打开方式）。
  * - 粘性模式下关闭计时不生效。
+ * - 点击关闭后抑制 hover 重开（#58 fix — 约 120-150ms 后 hover 重开的根因）。
+ * - 手风琴式单开 — openMenuId 提升到 WorkbenchShell 层（Tab 遍历不再同时多开）。
+ * - Escape 键关闭当前菜单（WAI-ARIA）。
  *
  * #60 Excalidraw AI 画板集成：
  * - RailEntry id="canvas" 触发 DrawingCanvas 覆盖层。
@@ -107,26 +110,34 @@ function WorkflowMenu({
 /**
  * 单个悬浮工具项（含菜单/无菜单）。
  * #58 hover 桥：透明 div 填充按钮右缘到菜单左缘之间的 12px 空隙。
+ *
+ * open/close 状态由父组件 WorkbenchShell 通过 openMenuId 管理（手风琴式单开）。
+ * 本地管理：sticky（点击切换）、menuHover、关闭计时器、以及点击后短时抑制 hover 重开。
  */
 function RailTool({
   entry,
   primary,
+  open,
   onSelectItem,
   onOpenTool,
+  onRequestOpen,
+  onRequestClose,
 }: {
   entry: RailEntry;
   primary?: boolean;
+  open: boolean;
   onSelectItem: (entry: RailEntry, item: RailMenuItem) => void;
   /** 无菜单的工具项被点击（目前仅 id="canvas"）。 */
   onOpenTool: (toolId: string) => void;
+  onRequestOpen: (entryId: string) => void;
+  onRequestClose: (entryId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  /** 粘性模式：点击打开后关闭计时暂停 */
   const [sticky, setSticky] = useState(false);
-  /** 鼠标是否 hover 在菜单上（阻止关闭计时） */
   const [menuHover, setMenuHover] = useState(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 点击关闭后 250ms 内抑制 hover 打开（#58 fix — 防止点击关闭后被 hover 重开）。 */
+  const suppressHoverRef = useRef(false);
   const hasMenu = !!entry.items?.length;
 
   const clearTimers = () => {
@@ -136,16 +147,17 @@ function RailTool({
 
   const handleEnter = () => {
     if (!hasMenu) return;
+    // 点击关闭后的短暂抑制期内不响应 hover 打开
+    if (suppressHoverRef.current) return;
     clearTimers();
-    openTimer.current = setTimeout(() => setOpen(true), 120);
+    openTimer.current = setTimeout(() => onRequestOpen(entry.id), 120);
   };
 
   const handleLeave = () => {
     if (!hasMenu) return;
     clearTimers();
-    // 粘性模式下关闭计时不生效；必须 hover 进入菜单才清除计时
     if (!sticky) {
-      closeTimer.current = setTimeout(() => setOpen(false), 200);
+      closeTimer.current = setTimeout(() => onRequestClose(entry.id), 200);
     }
   };
 
@@ -156,21 +168,31 @@ function RailTool({
 
   const handleMenuLeave = () => {
     setMenuHover(false);
-    // 粘性模式下离开菜单不触发关闭；仅在非粘性 hover 模式触发
     if (!sticky) {
       clearTimers();
-      closeTimer.current = setTimeout(() => setOpen(false), 200);
+      closeTimer.current = setTimeout(() => onRequestClose(entry.id), 200);
     }
   };
 
   const handleClick = () => {
     if (!hasMenu) {
-      // 无菜单工具入口（AI 画板）：触发 onOpenTool
       onOpenTool(entry.id);
       return;
     }
-    setSticky((v) => !v);
-    setOpen((v) => !v);
+    if (open) {
+      // 关闭：设抑制标志防 hover 重开（#58 fix）
+      suppressHoverRef.current = true;
+      setTimeout(() => {
+        suppressHoverRef.current = false;
+      }, 250);
+      setSticky(false);
+      onRequestClose(entry.id);
+    } else {
+      // 打开：手风琴式（父级关掉其他）
+      clearTimers();
+      setSticky(true);
+      onRequestOpen(entry.id);
+    }
   };
 
   // 点亮 = 展开中 或 菜单hover中（跨 hover/click 两种打开方式）
@@ -189,8 +211,9 @@ function RailTool({
         "hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]",
         "focus-visible:outline-2 focus-visible:outline-[var(--gc-accent)] focus-visible:outline-offset-2",
         // #58: 点亮状态 = open ∨ menuHover（跨 hover/click）
+        // !important 覆盖 Button ghost variant 的 aria-expanded:bg-muted
         isActive &&
-          "bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)]",
+          "!bg-[var(--gc-accent)] !text-[var(--gc-accent-cta-ink,#131313)]",
         primary &&
           "h-10 w-10 rounded-full bg-[var(--gc-accent)] text-[var(--gc-accent-cta-ink,#131313)] shadow-[0_3px_10px_color-mix(in_srgb,var(--gc-accent)_35%,transparent)] hover:bg-[var(--gc-accent)]",
       )}
@@ -225,9 +248,7 @@ function RailTool({
             aria-hidden="true"
             className={cn(
               "pointer-events-auto absolute top-0 z-30 w-4",
-              // 按钮高 10*4px=40px；居中偏移
               "h-10",
-              // left-[40px] = 按钮右缘（40px）到菜单左缘（52px）之间的 12px 间隙
               "left-[40px]",
               "bg-transparent",
             )}
@@ -239,7 +260,11 @@ function RailTool({
             onLeave={handleMenuLeave}
             onSelect={(item) => {
               setSticky(false);
-              setOpen(false);
+              suppressHoverRef.current = true;
+              setTimeout(() => {
+                suppressHoverRef.current = false;
+              }, 250);
+              onRequestClose(entry.id);
               onSelectItem(entry, item);
             }}
           />
@@ -306,16 +331,40 @@ function HistoryRail() {
 /**
  * 桌面工作台保持同一棵中心内容树。左侧悬浮胶囊入口（6 工作流 + 历史组），
  * 任一入口的开合都不覆盖画布，也不重建 React Flow 或 Results 业务子树。
+ *
+ * openMenuId 管理：手风琴式单开（#58 fix — Tab 遍历不再同时多开），
+ * Escape 键关闭（WAI-ARIA）。
  */
 export function WorkbenchShell({ children }: WorkbenchShellProps) {
   const workspaceEmpty = useFlowStore((s) => s.tabs.length === 0);
 
   const [drawingOpen, setDrawingOpen] = useState(false);
+  /** 手风琴式：当前打开的菜单 entryId，null = 全部关闭 */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [workflowStatus, setWorkflowStatus] = useState<{
     kind: "loading" | "pending" | "error";
     message: string;
   } | null>(null);
   const [workflowStatusDismiss, setWorkflowStatusDismiss] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  // Escape 键关闭当前打开的菜单（WAI-ARIA 菜单模式）
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && openMenuId !== null) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [openMenuId]);
+
+  const handleRequestOpen = useCallback((entryId: string) => {
+    setOpenMenuId(entryId);
+  }, []);
+
+  const handleRequestClose = useCallback((entryId: string) => {
+    setOpenMenuId((prev) => (prev === entryId ? null : prev));
+  }, []);
 
   // 工作流菜单项选择：基础节点直接建（「添加」菜单）；工作流项按映射表拉内置模板。
   const handleSelectItem = useCallback(
@@ -401,8 +450,11 @@ export function WorkbenchShell({ children }: WorkbenchShellProps) {
                 <RailTool
                   entry={entry}
                   primary={index === 0}
+                  open={openMenuId === entry.id}
                   onSelectItem={handleSelectItem}
                   onOpenTool={handleOpenTool}
+                  onRequestOpen={handleRequestOpen}
+                  onRequestClose={handleRequestClose}
                 />
               </div>
             ))}
