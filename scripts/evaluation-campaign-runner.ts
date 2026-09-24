@@ -178,7 +178,7 @@ function positiveInteger(value: string, name: string): number {
 
 // ---------- manifest loading ----------
 
-function loadManifest(path: string): LoadedManifest {
+export function loadManifest(path: string): LoadedManifest {
   const raw = readFileSync(path, "utf8");
   const data = JSON.parse(raw) as Record<string, unknown>;
 
@@ -310,7 +310,7 @@ interface CampaignPlan {
   budgetLimitMinor: number;
 }
 
-function generateCampaignPlans(
+export function generateCampaignPlans(
   units: ManifestUnit[],
   caps: StageRequestCap[],
   campaignIdPrefix: string,
