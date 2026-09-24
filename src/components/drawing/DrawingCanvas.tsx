@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
+import "@excalidraw/excalidraw/index.css";
 import { useFlowStore } from "@/store/flowStore";
 
 interface DrawingCanvasProps {
