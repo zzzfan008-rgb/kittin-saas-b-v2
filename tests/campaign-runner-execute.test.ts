@@ -656,7 +656,7 @@ function makeLoopMockDeps(options: {
   console.log("  ✓ test (10): slot outcome=failed → abort with non-zero exit");
 }
 
-// ---------- test (11): submit failure (non-202) → error propagates, no polling ----------
+// ---------- test (11): submit failure (non-202, non-409) → error propagates, no polling ----------
 {
   process.env.ADMIN_SESSION_USER_ID = "admin-1";
 
@@ -678,7 +678,7 @@ function makeLoopMockDeps(options: {
     const deps = makeLoopMockDeps({
       campaignStatuses: ["ready"],
       slotRowsByQuery: [readySlotRows],
-      submitResults: [{ ok: false, message: "POST /api/run-plan failed with HTTP 409" }],
+      submitResults: [{ ok: false, message: "POST /api/run-plan failed with HTTP 400" }],
     });
 
     let error: Error | undefined;
@@ -690,7 +690,7 @@ function makeLoopMockDeps(options: {
 
     assert.ok(error, "submit failure must propagate");
     assert.ok(
-      error!.message.includes("409"),
+      error!.message.includes("400"),
       `expected HTTP failure detail, got: ${error!.message}`,
     );
     assert.equal(deps.getRunStatusCalls.length, 0, "no polling after submit failure");
@@ -701,6 +701,65 @@ function makeLoopMockDeps(options: {
   }
 
   console.log("  ✓ test (11): submit failure propagates with no polling");
+}
+
+// ---------- test (11b): submit HTTP 409 → slot-level terminal report, no raw crash ----------
+// Ruling (b): deterministic clientRequestId (= slotId) means a re-submit of the
+// same slot is rejected with 409 (unique index / case conflict / active-run
+// limit). The runner must classify it as a terminal slot outcome with a clear
+// reason — a bare unique-violation must never crash the caller.
+{
+  process.env.ADMIN_SESSION_USER_ID = "admin-1";
+
+  const readySlotRows = [{
+    slot_id: "slot-dup-1",
+    case_id: "case-dup-1",
+    sample_id: "sample-dup-1",
+    authorization_id: "auth-dup-1",
+    run_id: null,
+    status: "ready",
+    price_minor_per_provider_request: 3,
+    budget_limit_minor: 9,
+  }];
+
+  const capturedStderr: string[] = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  console.error = (msg: string) => { capturedStderr.push(msg); };
+  console.log = () => {};
+
+  try {
+    const deps = makeLoopMockDeps({
+      campaignStatuses: ["ready"],
+      slotRowsByQuery: [readySlotRows],
+      submitResults: [{ ok: false, message: "POST /api/run-plan for slot slot-dup-1 failed with HTTP 409: duplicate key value violates unique constraint" }],
+    });
+
+    let thrown: unknown;
+    try {
+      await runExecuteCore(deps, "campaign-dup", undefined, false);
+    } catch (e) {
+      thrown = e;
+    }
+
+    assert.equal(thrown, undefined, "409 duplicate must NOT throw to the caller");
+    assert.equal(process.exitCode, 1, "409 duplicate sets non-zero exit code");
+    assert.equal(deps.getRunStatusCalls.length, 0, "no polling after 409");
+
+    const report = capturedStderr.join("\n");
+    assert.ok(report.includes('"status":"terminal_failure"'), `expected terminal_failure report, got: ${report}`);
+    assert.ok(report.includes('"outcome":"failed"'), "expected outcome failed");
+    assert.ok(report.includes("slot_already_submitted_or_conflict"), "expected clear duplicate reason");
+    assert.ok(report.includes("slot-dup-1"), "report must name the slot");
+
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = 0;
+    delete process.env.ADMIN_SESSION_USER_ID;
+  }
+
+  console.log("  ✓ test (11b): submit HTTP 409 → terminal_failure report, no raw crash");
 }
 
 // ---------- test (12): success path — slot reaches succeeded, loop completes ----------

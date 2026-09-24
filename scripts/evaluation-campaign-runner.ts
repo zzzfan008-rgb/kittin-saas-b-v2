@@ -1075,7 +1075,41 @@ export async function runExecuteCore(
       // persisted authorization and binds the slot to the new run; the worker
       // performs the in-transaction budget reservation (the second hard gate)
       // and evidence ledgering. The runner never reserves directly (spec §7.3).
-      const submitted = await deps.submitEvaluationRun({ campaign: currentCampaign, slot });
+      //
+      // Retry semantics (ruling b): clientRequestId is deterministic (slotId), so
+      // re-submitting the same slot either replays the original run idempotently
+      // (same fingerprint → existing run returned) or is rejected with HTTP 409
+      // (fingerprint drift / case conflict / active-run limit). A raw
+      // unique-violation or bare 409 must never crash the caller: classify it as
+      // a slot-level terminal outcome with a clear reason, then abort the loop.
+      let submitted: { runId: string };
+      try {
+        submitted = await deps.submitEvaluationRun({ campaign: currentCampaign, slot });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Ruling (b): a deterministic clientRequestId (= slotId) means re-submitting
+        // the same slot either replays idempotently or is rejected with HTTP 409
+        // (fingerprint drift / case conflict / active-run limit / unique index).
+        // Recognize that as a slot-level terminal outcome with a clear reason —
+        // never let a bare unique-violation crash the caller. Any other failure
+        // (400/403/500/network) is a genuine submission error and still propagates.
+        if (/HTTP 409/.test(message)) {
+          console.error(
+            JSON.stringify({
+              campaignId,
+              slotId: slot.slotId,
+              status: "terminal_failure",
+              outcome: "failed",
+              reason:
+                "slot_already_submitted_or_conflict: deterministic clientRequestId collision — a run for this slot already exists (idempotent replay fingerprint mismatch, case conflict, or active-run limit). The previously submitted run is authoritative; reconcile generation_runs for this clientRequestId before any resubmit.",
+              detail: message,
+            }),
+          );
+          process.exitCode = 1;
+          return;
+        }
+        throw error;
+      }
 
       cumulativeReserved += slot.priceMinorPerProviderRequest;
 
