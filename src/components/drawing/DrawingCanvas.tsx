@@ -169,7 +169,7 @@ export function DrawingCanvas({ onClose }: DrawingCanvasProps) {
             type="button"
             disabled={!elements || (Array.isArray(elements) && elements.length === 0) || exporting}
             onClick={handleExport}
-            className="rounded bg-[var(--gc-accent)] px-3 py-1 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded bg-gold px-3 py-1 text-sm font-medium text-[var(--gc-accent-cta-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {exporting ? "导出中…" : "导出 PNG"}
           </button>
