@@ -78,25 +78,29 @@ const VALUE_FLAGS_SEAL = new Set([
   "max-provider-requests",
   "budget-limit-minor",
   "currency",
+  "slots",
 ]);
 
 const VALUE_FLAGS_EXECUTE = new Set(["campaign-id", "slot-id", "project-id", "base-url"]);
+const VALUE_FLAGS_PREPARE = new Set(["admin-id", "code-sha", "out"]);
 
 function parseFlags(argv: string[]): {
   subcommand: string;
   flags: Map<string, string | true>;
   variantIds: string[];
 } {
-  if (argv.length < 1) throw new Error("subcommand required: seal or execute");
+  if (argv.length < 1) throw new Error("subcommand required: prepare, seal, or execute");
   const subcommand = argv[0];
-  if (subcommand !== "seal" && subcommand !== "execute") {
-    throw new Error(`unknown subcommand: ${subcommand}. Expected seal or execute`);
+  if (subcommand !== "prepare" && subcommand !== "seal" && subcommand !== "execute") {
+    throw new Error(`unknown subcommand: ${subcommand}. Expected prepare, seal, or execute`);
   }
 
   const flags = new Map<string, string | true>();
   const variantIds: string[] = [];
   const valueFlags =
-    subcommand === "seal" ? VALUE_FLAGS_SEAL : VALUE_FLAGS_EXECUTE;
+    subcommand === "seal" ? VALUE_FLAGS_SEAL
+    : subcommand === "prepare" ? VALUE_FLAGS_PREPARE
+    : VALUE_FLAGS_EXECUTE;
   let i = 1;
 
   while (i < argv.length) {
@@ -122,7 +126,7 @@ function parseFlags(argv: string[]): {
       continue;
     }
 
-    if (subcommand === "seal" && inlineName === "variant-id") {
+    if ((subcommand === "seal" || subcommand === "prepare") && inlineName === "variant-id") {
       const val = inlineValue ?? argv[++i];
       if (!val || val.startsWith("--")) {
         throw new Error("--variant-id requires a value");
@@ -402,12 +406,22 @@ function dryRunReport(plans: CampaignPlan[]): void {
 
 // ---------- seal execution ----------
 
+function assertNotDegenerateHash(value: string, fieldName: string): void {
+  if (/^(.)\1{63}$/.test(value)) {
+    throw new Error(
+      `${fieldName} is a degenerate placeholder "${value[0]}...". ` +
+        `Seal refuses to bind degenerate hashes. Run "prepare" first to materialize real values.`,
+    );
+  }
+}
+
 async function sealCampaigns(
   plans: CampaignPlan[],
   adminId: string,
   codeSha: string,
   maxProviderRequests: number,
   budgetCurrency: string,
+  slotHashes?: Map<string, { resolvedPromptSha256: string; nativeParametersSha256: string; referenceInputsSha256: string }>,
 ): Promise<void> {
   const database = await import("../server/lib/database");
   try {
@@ -448,18 +462,27 @@ async function sealCampaigns(
         maxProviderRequests,
         budgetLimitMinor: plan.budgetLimitMinor,
         budgetCurrency,
-        slots: plan.slots.map((slot) => ({
-          slotId: slot.slotId,
-          caseId: `${plan.campaignId}-case`,
-          sampleId: `${slot.slotId}-sample`,
-          resolvedPromptSha256: "0".repeat(64),
-          nativeParametersSha256: "0".repeat(64),
-          referenceInputsSha256: "0".repeat(64),
-          requestedImageCount: 1,
-          maxProviderRequests,
-          priceMinorPerProviderRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
-          budgetLimitMinor: plan.budgetLimitMinor,
-        })),
+        slots: plan.slots.map((slot) => {
+          const hashes = slotHashes?.get(slot.slotId);
+          const resolvedPromptSha256 = hashes?.resolvedPromptSha256 ?? "0".repeat(64);
+          const nativeParametersSha256 = hashes?.nativeParametersSha256 ?? "0".repeat(64);
+          const referenceInputsSha256 = hashes?.referenceInputsSha256 ?? "0".repeat(64);
+          assertNotDegenerateHash(resolvedPromptSha256, `slot ${slot.slotId} resolvedPromptSha256`);
+          assertNotDegenerateHash(nativeParametersSha256, `slot ${slot.slotId} nativeParametersSha256`);
+          assertNotDegenerateHash(referenceInputsSha256, `slot ${slot.slotId} referenceInputsSha256`);
+          return {
+            slotId: slot.slotId,
+            caseId: `${plan.campaignId}-case`,
+            sampleId: `${slot.slotId}-sample`,
+            resolvedPromptSha256,
+            nativeParametersSha256,
+            referenceInputsSha256,
+            requestedImageCount: 1,
+            maxProviderRequests,
+            priceMinorPerProviderRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
+            budgetLimitMinor: plan.budgetLimitMinor,
+          };
+        }),
       };
 
       await database.transaction((client) =>
@@ -488,7 +511,162 @@ async function sealCampaigns(
   }
 }
 
-// ---------- subcommand: seal ----------
+// ---------- subcommand: prepare ----------
+
+interface MaterializedSlot {
+  slotId: string;
+  unitId: string;
+  stage: Stage;
+  sampleIndex: number;
+  resolvedPromptSha256: string;
+  nativeParametersSha256: string;
+  referenceInputsSha256: string;
+  requestedImageCount: number;
+}
+
+interface MaterializedSlots {
+  variantIds: string[];
+  codeSha: string;
+  slots: MaterializedSlot[];
+}
+
+async function runPrepare(
+  flags: Map<string, string | true>,
+  variantIds: string[],
+): Promise<void> {
+  const codeSha = requiredFlag(flags, "code-sha");
+  const outPath = requiredFlag(flags, "out");
+
+  if (variantIds.length === 0) {
+    throw new Error(`at least one --variant-id is required; expected 2: ${GENERATE_VARIANT} and ${EDIT_VARIANT}`);
+  }
+
+  assertAllTemplateVariantsInScope();
+  const manifest = loadManifest(DEFAULT_MANIFEST_PATH);
+  const filteredUnits = filterAndAssertUnits(manifest.baseUnits, variantIds);
+
+  const { requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
+  const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
+  const { attachEvaluationRunPolicy } = await import("../server/lib/evaluationRunPolicy");
+  const { executeStep } = await import("../server/engine/runner");
+  const evaluationEvidence = await import("../server/lib/evaluationEvidence");
+  const { campaignRuntimeBinding } = await import("../server/lib/evaluationEvidenceStore");
+
+  const materialized: MaterializedSlot[] = [];
+
+  for (const unit of filteredUnits) {
+    const isGenerate = unit.promptVariantId === GENERATE_VARIANT;
+
+    const variant = requireGarmentPromptVariant({
+      familyId: "fashion-lookbook",
+      modelId: "gpt-image-2.5-flare-vip",
+      nodeKind: "image",
+      mode: isGenerate ? "generate" : "edit",
+    });
+    const modelId = variant.modelId;
+    const parameterProfile = getModelParameterProfile(variant.parameterProfileId);
+    if (!parameterProfile) throw new Error(`missing parameter profile: ${variant.parameterProfileId}`);
+    const parameters = materializeModelParameterProfile(parameterProfile);
+
+    const inputTexts = isGenerate
+      ? ["生成服装效果图"]
+      : ["保持服装结构并优化商业棚拍光线"];
+
+    for (const cap of manifest.stageRequestCaps) {
+      for (let sampleIdx = 0; sampleIdx < cap.incrementalSamples; sampleIdx++) {
+        const slotId = `slot-${unit.unitId}-${cap.stageId}-${sampleIdx + 1}`;
+
+        const plan = {
+          steps: [{
+            nodeId: "capture-node",
+            kind: "image-generator",
+            inputImages: [],
+            inputReferences: [],
+            params: {
+              inputTexts,
+              promptVariantId: variant.variantId,
+              promptFamilyId: variant.familyId,
+              parameterProfileId: variant.parameterProfileId,
+              contractHash: variant.contractHash,
+              evaluationVersion: variant.evaluationVersion,
+              postprocessVersion: parameterProfile.postprocess.version,
+              operationMode: variant.mode,
+              modelId,
+              modelOptions: parameters.modelOptions,
+              aspectRatio: parameters.aspectRatio,
+              batchSize: parameters.batchSize,
+            },
+          }],
+        };
+
+        const policy = {
+          caseId: `case-${unit.unitId}`,
+          sampleId: `sample-${sampleIdx + 1}`,
+          authorizationId: `prep-auth-${slotId}`,
+          campaignId: `prep-campaign-${unit.unitId}-${cap.stageId}`,
+          slotId,
+          retryPolicy: "no-retry" as const,
+        };
+        const persistedPlan = attachEvaluationRunPolicy(plan, policy);
+        const providerStep = persistedPlan.steps.find(
+          (s: { params: Record<string, unknown> }) => s.params.evaluationPolicy !== undefined,
+        );
+        if (!providerStep) throw new Error("evaluation plan must contain one Provider step");
+
+        const captureSentinel = new Error("capture sealed materialization");
+        let capturedRequest: import("../src/types/workflow").ImageGenRequest | undefined;
+        const captureProvider = {
+          id: providerStep.params.modelId as string,
+          async generate() { throw new Error("Provider.generate must not be called during prepare capture"); },
+          async edit() { throw new Error("Provider.edit must not be called during prepare capture"); },
+        };
+
+        try {
+          await executeStep(providerStep, providerStep.inputImages, () => captureProvider, {
+            referenceSources: providerStep.inputReferences ?? [],
+            beforeProviderCall: async (
+              _providerRequest: import("../src/types/workflow").ImageGenRequest,
+              request: import("../src/types/workflow").ImageGenRequest,
+            ) => {
+              capturedRequest = request;
+              throw captureSentinel;
+            },
+          });
+        } catch (error: unknown) {
+          if (error !== captureSentinel) throw error;
+        }
+        if (!capturedRequest) throw new Error(`prepare capture did not materialize a Provider request for slot ${slotId}`);
+
+        const codeIdentity = { codeSha, postprocessDigest: "sha256:" + "0".repeat(64) };
+        const runtime = evaluationEvidence.buildEvaluationCaseSnapshotFromRuntime({
+          plan: persistedPlan,
+          step: providerStep,
+          request: capturedRequest,
+          policy,
+          codeIdentity,
+          capturedAt: new Date().toISOString(),
+        });
+        const binding = campaignRuntimeBinding(runtime);
+
+        materialized.push({
+          slotId,
+          unitId: unit.unitId,
+          stage: cap.stageId,
+          sampleIndex: sampleIdx + 1,
+          resolvedPromptSha256: binding.resolvedPromptSha256,
+          nativeParametersSha256: binding.nativeParametersSha256,
+          referenceInputsSha256: binding.referenceInputsSha256,
+          requestedImageCount: binding.requestedImageCount,
+        });
+      }
+    }
+  }
+
+  const output: MaterializedSlots = { variantIds, codeSha, slots: materialized };
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
+  console.log(JSON.stringify({ prepared: true, slots: materialized.length, out: outPath }));
+}// ---------- subcommand: seal ----------
 
 async function runSeal(
   flags: Map<string, string | true>,
@@ -534,6 +712,23 @@ async function runSeal(
   // 4. budget gate
   assertBudgetGate(plans);
 
+  // 4b. load materialized slot hashes if --slots was provided
+  let slotHashes: Map<string, { resolvedPromptSha256: string; nativeParametersSha256: string; referenceInputsSha256: string }> | undefined;
+  if (flags.has("slots")) {
+    const slotsPath = requiredFlag(flags, "slots");
+    const raw = readFileSync(slotsPath, "utf8");
+    const materialized = JSON.parse(raw) as { slots: Array<{ slotId: string; resolvedPromptSha256: string; nativeParametersSha256: string; referenceInputsSha256: string }> };
+    if (!Array.isArray(materialized.slots)) {
+      throw new Error(`--slots file "${slotsPath}" is missing a "slots" array`);
+    }
+    slotHashes = new Map(materialized.slots.map((s) => [s.slotId, {
+      resolvedPromptSha256: s.resolvedPromptSha256,
+      nativeParametersSha256: s.nativeParametersSha256,
+      referenceInputsSha256: s.referenceInputsSha256,
+    }]));
+    console.log(JSON.stringify({ loadedSlots: materialized.slots.length, from: slotsPath }));
+  }
+
   if (dryRun) {
     dryRunReport(plans);
     return;
@@ -546,6 +741,7 @@ async function runSeal(
     codeSha,
     maxProviderRequests,
     currency.toUpperCase(),
+    slotHashes,
   );
 }
 
@@ -1118,6 +1314,8 @@ async function main(): Promise<void> {
 
   if (subcommand === "seal") {
     await runSeal(flags, variantIds);
+  } else if (subcommand === "prepare") {
+    await runPrepare(flags, variantIds);
   } else {
     await runExecute(flags);
   }
