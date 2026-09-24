@@ -530,8 +530,8 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
   const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
   const filtered = manifest.baseUnits.filter(
     (u: any) =>
-      u.unit.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
-      u.unit.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
   );
   assert.strictEqual(filtered.length, 2, "expected 2 variant units");
 
@@ -574,7 +574,7 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
   const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
   const filtered = manifest.baseUnits.filter(
     (u: any) =>
-      u.unit.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
   );
   const caps = manifest.stageRequestCaps as Array<{
     stageId: string;
@@ -607,7 +607,7 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
   const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
   const filtered = manifest.baseUnits.filter(
     (u: any) =>
-      u.unit.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
   );
   const caps = manifest.stageRequestCaps as Array<{
     stageId: string;
