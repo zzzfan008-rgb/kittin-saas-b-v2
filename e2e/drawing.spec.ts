@@ -28,6 +28,21 @@ const VIEWPORTS = [
   { width: 1440, height: 900 },
 ];
 
+/**
+ * WCAG 2.x 相对亮度对比度（用实测色值自算，不依赖 class 名或设计意图）。
+ * 输入形如 "rgb(19, 19, 19)"；alpha 由调用方单独断言（叠加透明度会改变真实对比度）。
+ */
+function contrastRatio(fg: string, bg: string): number {
+  const parse = (value: string): number[] => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+  const channel = (c: number): number => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const lum = (rgb: number[]): number => 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+  const [hi, lo] = [lum(parse(fg)), lum(parse(bg))].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 async function openWorkspaceWithTab(page: Page): Promise<void> {
   const cleared = await page.request.post("/api/projects/initial-draft/force-clear", {
     data: { confirm: true },
@@ -106,6 +121,19 @@ test("[drawing] AI 画板：作画 → 导出 PNG → 画布出现可预览的�
   await page.mouse.move(Math.round(vw * 0.58), Math.round(vh * 0.7), { steps: 20 });
   await page.mouse.up();
   await expect(undo, "画完一个矩形后，Excalidraw 的撤销应可用（空场景时它是 disabled）").toBeEnabled();
+
+  // 4.5) a11y 回归锁：导出按钮对比度须达 WCAG AA 正文标准（≥4.5:1）。
+  // 量测时机刻意放在作画之后：此时按钮才 enabled（禁用态叠加 opacity-40，色值不是真实渲染色）。
+  // 本条由 ui-qa 在 1.31:1 缺陷修复后补入（PR #70 验收记录 /tmp/e2e-qa/REPORT-pr70-reverify.md）。
+  const exportCta = page.getByRole("button", { name: "导出 PNG" });
+  await expect(exportCta).toBeEnabled();
+  const ctaStyle = await exportCta.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { color: cs.color, background: cs.backgroundColor, opacity: cs.opacity };
+  });
+  expect(ctaStyle.opacity, "启用态不应叠加透明度，否则上述色值对比度不等于真实渲染对比度").toBe("1");
+  const ctaContrast = contrastRatio(ctaStyle.color, ctaStyle.background);
+  expect(ctaContrast, `导出按钮对比度须 ≥4.5:1。实测 fg=${ctaStyle.color} bg=${ctaStyle.background} → ${ctaContrast.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
 
   // 5) 导出 PNG → 上传 → 画板关闭
   const upload = page.waitForResponse((res) => res.url().includes("/api/files") && res.request().method() === "POST");
