@@ -9,7 +9,15 @@ import {
 } from "../server/lib/evaluationCampaign";
 import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaign";
 import type { ImageModelId } from "../src/types/imageModels";
+import { promptEvaluationUnitKey } from "../src/lib/promptEvaluation";
+import crypto from "node:crypto";
 import { builtinTemplates } from "../server/routes/templates";
+
+// ---------- helpers ----------
+
+function sha256(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
 
 // ---------- constants ----------
 
@@ -52,6 +60,7 @@ interface StageRequestCap {
 interface ManifestUnit {
   unitId: string;
   promptVariantId: string;
+  evaluationUnitKey: string;
 }
 
 interface LoadedManifest {
@@ -180,9 +189,13 @@ function loadManifest(path: string): LoadedManifest {
     data.baseUnits as Array<Record<string, unknown>>
   ).map((entry) => {
     const unit = entry.unit as Record<string, unknown> | undefined;
+    const unitKey = unit != null
+      ? `sha256:${sha256(promptEvaluationUnitKey(unit as unknown as Parameters<typeof promptEvaluationUnitKey>[0]))}`
+      : `sha256:${"0".repeat(64)}`;
     return {
       unitId: String(entry.unitId ?? ""),
       promptVariantId: String(unit?.promptVariantId ?? ""),
+      evaluationUnitKey: unitKey,
     };
   });
 
@@ -288,6 +301,7 @@ interface CampaignPlan {
   modelId: string;
   variantId: string;
   unitId: string;
+  evaluationUnitKey: string;
   slots: SlotPlan[];
   budgetLimitMinor: number;
 }
@@ -324,6 +338,7 @@ function generateCampaignPlans(
         modelId,
         variantId: unit.promptVariantId,
         unitId: unit.unitId,
+        evaluationUnitKey: unit.evaluationUnitKey,
         slots,
         budgetLimitMinor,
       });
@@ -428,7 +443,7 @@ async function sealCampaigns(
         ownerId: adminId,
         stage: plan.stage,
         modelId: plan.modelId as ImageModelId,
-        authorizationUnitKey: `sha256:${"0".repeat(64)}`,
+        authorizationUnitKey: plan.evaluationUnitKey as `sha256:${string}`,
         codeSha,
         maxProviderRequests,
         budgetLimitMinor: plan.budgetLimitMinor,
