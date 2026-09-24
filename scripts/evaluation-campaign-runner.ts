@@ -82,7 +82,7 @@ const VALUE_FLAGS_SEAL = new Set([
 ]);
 
 const VALUE_FLAGS_EXECUTE = new Set(["campaign-id", "slot-id", "project-id", "base-url"]);
-const VALUE_FLAGS_PREPARE = new Set(["admin-id", "code-sha", "out"]);
+const VALUE_FLAGS_PREPARE = new Set(["admin-id", "campaign-id", "code-sha", "out"]);
 
 function parseFlags(argv: string[]): {
   subcommand: string;
@@ -178,7 +178,7 @@ function positiveInteger(value: string, name: string): number {
 
 // ---------- manifest loading ----------
 
-function loadManifest(path: string): LoadedManifest {
+export function loadManifest(path: string): LoadedManifest {
   const raw = readFileSync(path, "utf8");
   const data = JSON.parse(raw) as Record<string, unknown>;
 
@@ -310,7 +310,7 @@ interface CampaignPlan {
   budgetLimitMinor: number;
 }
 
-function generateCampaignPlans(
+export function generateCampaignPlans(
   units: ManifestUnit[],
   caps: StageRequestCap[],
   campaignIdPrefix: string,
@@ -320,12 +320,13 @@ function generateCampaignPlans(
 
   for (const unit of units) {
     for (const cap of caps) {
-      const campaignId = `${campaignIdPrefix}-${unit.unitId}-${cap.stageId}`;
+      const safeUnitId = unit.unitId.replace(/\./g, "-");
+      const campaignId = `${campaignIdPrefix}-${safeUnitId}-${cap.stageId}`;
       const slots: SlotPlan[] = [];
       const sampleCount = cap.incrementalSamples * cap.maxProviderRequestsPerSample;
 
       for (let sampleIdx = 0; sampleIdx < cap.incrementalSamples; sampleIdx++) {
-        const slotId = `${campaignId}-sample-${sampleIdx + 1}`;
+        const slotId = `${campaignIdPrefix}-slot-${safeUnitId}-${cap.stageId}-${sampleIdx + 1}`;
         slots.push({
           slotId,
           unitId: unit.unitId,
@@ -459,7 +460,7 @@ async function sealCampaigns(
         modelId: plan.modelId as ImageModelId,
         authorizationUnitKey: plan.evaluationUnitKey as `sha256:${string}`,
         codeSha,
-        maxProviderRequests,
+        maxProviderRequests: plan.slots.length,
         budgetLimitMinor: plan.budgetLimitMinor,
         budgetCurrency,
         slots: plan.slots.map((slot) => {
@@ -472,15 +473,15 @@ async function sealCampaigns(
           assertNotDegenerateHash(referenceInputsSha256, `slot ${slot.slotId} referenceInputsSha256`);
           return {
             slotId: slot.slotId,
-            caseId: `${plan.campaignId}-case`,
+            caseId: `${plan.campaignId}-case-${slot.sampleIndex}`,
             sampleId: `${slot.slotId}-sample`,
             resolvedPromptSha256,
             nativeParametersSha256,
             referenceInputsSha256,
             requestedImageCount: 1,
-            maxProviderRequests,
+            maxProviderRequests: 1,
             priceMinorPerProviderRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
-            budgetLimitMinor: plan.budgetLimitMinor,
+            budgetLimitMinor: PRICE_MINOR_PER_PROVIDER_REQUEST,
           };
         }),
       };
@@ -535,6 +536,7 @@ async function runPrepare(
   variantIds: string[],
 ): Promise<void> {
   const codeSha = requiredFlag(flags, "code-sha");
+  const campaignIdPrefix = requiredFlag(flags, "campaign-id");
   const outPath = requiredFlag(flags, "out");
 
   if (variantIds.length === 0) {
@@ -574,7 +576,8 @@ async function runPrepare(
 
     for (const cap of manifest.stageRequestCaps) {
       for (let sampleIdx = 0; sampleIdx < cap.incrementalSamples; sampleIdx++) {
-        const slotId = `slot-${unit.unitId}-${cap.stageId}-${sampleIdx + 1}`;
+        const safeUnitId = unit.unitId.replace(/\./g, "-");
+        const slotId = `${campaignIdPrefix}-slot-${safeUnitId}-${cap.stageId}-${sampleIdx + 1}`;
 
         const plan = {
           steps: [{

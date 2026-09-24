@@ -29,6 +29,7 @@ const { executeStep } = await import("../server/engine/runner");
 const { requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
 const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
 const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
+const { loadManifest, generateCampaignPlans } = await import("../scripts/evaluation-campaign-runner");
 await database.initializeDatabase();
 
 // ---------- shared helpers ----------
@@ -520,6 +521,113 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
       );
     });
   });
+}
+
+// ---------- regression: runner seal defects (3 tests) ----------
+
+{
+  // (r1) campaign/slot IDs must be sanitised — no dots allowed
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u: any) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+  );
+  assert.strictEqual(filtered.length, 2, "expected 2 variant units");
+
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "regr", "gpt-image-2.5-flare-vip");
+
+  assert.strictEqual(plans.length, 6, "expected 6 campaigns (2 variants x 3 stages)");
+
+  for (const plan of plans) {
+    // campaignId must not contain dots (EVALUATION_CAMPAIGN_ID_PATTERN = ^[A-Za-z0-9_-]{1,128}$)
+    assert.ok(
+      !plan.campaignId.includes("."),
+      `campaignId contains a dot: ${plan.campaignId}`,
+    );
+    for (const slot of plan.slots) {
+      assert.ok(
+        !slot.slotId.includes("."),
+        `slotId contains a dot: ${slot.slotId}`,
+      );
+    }
+  }
+
+  // slotId must contain the campaign prefix for global uniqueness
+  assert.ok(
+    plans[0].slots[0].slotId.startsWith("regr-"),
+    `slotId must start with campaign prefix, got: ${plans[0].slots[0].slotId}`,
+  );
+
+  passed++;
+  console.log("  ✓ (r1) campaign/slot IDs sanitised — no dots, campaign prefix in slotId");
+}
+
+{
+  // (r2) multi-slot campaigns: caseIds must be unique within a campaign
+  // The internal-experiment campaign has 8 slots. Each must have a distinct caseId.
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u: any) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "regr2", "gpt-image-2.5-flare-vip");
+
+  const internalPlan = plans.find((p) => p.stage === "internal-experiment");
+  assert.ok(internalPlan != null, "internal-experiment plan must exist");
+  assert.strictEqual(internalPlan.slots.length, 8, "internal-experiment must have 8 slots");
+
+  // caseId uniqueness: each slot's caseId = ${campaignId}-case-${sampleIndex}
+  // With 8 slots (sampleIndex 1..8), all caseIds must differ.
+  const caseIds = internalPlan.slots.map((s) => `case-${s.sampleIndex}`);
+  const uniqueCaseIds = new Set(caseIds);
+  assert.strictEqual(
+    uniqueCaseIds.size,
+    internalPlan.slots.length,
+    `caseIds must be unique across ${internalPlan.slots.length} slots, got ${uniqueCaseIds.size} unique`,
+  );
+
+  passed++;
+  console.log("  ✓ (r2) caseId uniqueness — 8-slot campaign has 8 distinct caseIds");
+}
+
+{
+  // (r3) slot-level budget = PRICE_MINOR (3), not the campaign total
+  // The PRICE_MINOR_PER_PROVIDER_REQUEST constant is 3. Every slot gets 3 minor budget.
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u: any) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "regr3", "gpt-image-2.5-flare-vip");
+
+  for (const plan of plans) {
+    // campaign-level budgetLimitMinor = slots.length x PRICE_MINOR (3)
+    const expectedCampaignBudget = plan.slots.length * 3;
+    assert.strictEqual(
+      plan.budgetLimitMinor,
+      expectedCampaignBudget,
+      `campaign ${plan.campaignId}: budgetLimitMinor must = ${expectedCampaignBudget}, got ${plan.budgetLimitMinor}`,
+    );
+  }
+
+  passed++;
+  console.log("  ✓ (r3) slot budget = PRICE_MINOR (3), campaign total = slots x 3");
 }
 
 // ---------- summary ----------
