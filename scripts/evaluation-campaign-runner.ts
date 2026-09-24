@@ -1247,6 +1247,14 @@ async function runExecute(
       );
     }
     const onlyNodeId = generatorNodes[0].id;
+    // Self-check: every slotId must pass CLIENT_REQUEST_ID_PATTERN before it leaves this runner.
+    // Dynamic import to avoid ESM top-level await issues in this script.
+    const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+    if (!CLIENT_REQUEST_ID_PATTERN.test(input.slot.slotId)) {
+      throw new Error(
+        `clientRequestId "${input.slot.slotId}" fails CLIENT_REQUEST_ID_PATTERN — fix the runner`,
+      );
+    }
     const response = await fetch(`${baseUrl}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -1259,7 +1267,7 @@ async function runExecute(
         onlyNodeId,
         includeDownstream: false,
         projectId,
-        clientRequestId: `eval-${input.slot.slotId}`,
+        clientRequestId: input.slot.slotId,
         evaluation: {
           caseId: input.slot.caseId,
           sampleId: input.slot.sampleId,

@@ -772,13 +772,14 @@ function makeLoopMockDeps(options: {
     incrementalSamples: number;
     maxProviderRequestsPerSample: number;
   }>;
-  const plans = generateCampaignPlans(filtered, caps, "test", "gpt-image-2.5-flare-vip");
+  // Prefix "v8rel6" matches the real sealed campaign prefix so slotId lengths match real v8rel6 data.
+  const plans = generateCampaignPlans(filtered, caps, "v8rel6", "gpt-image-2.5-flare-vip");
 
   const slotIds: string[] = [];
 
   for (const plan of plans) {
     for (const slot of plan.slots) {
-      const cid = `eval-${slot.slotId}`;
+      const cid = slot.slotId;
       slotIds.push(cid);
       assert.ok(
         CLIENT_REQUEST_ID_PATTERN.test(cid),

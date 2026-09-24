@@ -135,6 +135,7 @@ const SERIAL_TEST_FILES = new Set([
   "tests/run-queue.test.ts",
   "tests/evaluation-review-ledger.test.ts",
   "tests/campaign-runner-prepare.test.ts",
+  "tests/campaign-runner-preflight.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
