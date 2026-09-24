@@ -74,6 +74,7 @@ const TEST_FILES = [
   "tests/evaluation-campaign.test.ts",
   "tests/campaign-runner.test.ts",
   "tests/campaign-runner-execute.test.ts",
+  "tests/campaign-runner-prepare.test.ts",
   "tests/reference-inputs.test.ts",
   "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",
