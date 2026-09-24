@@ -1219,8 +1219,6 @@ async function runExecute(
     );
   }
 
-  let runSequence = 0;
-
   const submitEvaluationRun = async (input: {
     campaign: ExecuteCampaignInfo;
     slot: ExecuteSlotInfo;
@@ -1249,7 +1247,6 @@ async function runExecute(
       );
     }
     const onlyNodeId = generatorNodes[0].id;
-    runSequence += 1;
     const response = await fetch(`${baseUrl}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -1262,7 +1259,7 @@ async function runExecute(
         onlyNodeId,
         includeDownstream: false,
         projectId,
-        clientRequestId: `eval-${input.campaign.campaignId}-${input.slot.slotId}-${runSequence}`,
+        clientRequestId: `eval-${input.slot.slotId}`,
         evaluation: {
           caseId: input.slot.caseId,
           sampleId: input.slot.sampleId,

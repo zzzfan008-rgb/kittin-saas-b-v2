@@ -754,4 +754,92 @@ function makeLoopMockDeps(options: {
   console.log("  ✓ test (12): success path — submitted slot reaches succeeded and loop completes");
 }
 
+// ---------- clientRequestId format tests ----------
+
+// Test 13: All real slotIds produce valid clientRequestIds
+{
+  const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+  const { loadManifest, generateCampaignPlans } = await import("../scripts/evaluation-campaign-runner.js");
+
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "test", "gpt-image-2.5-flare-vip");
+
+  const slotIds: string[] = [];
+
+  for (const plan of plans) {
+    for (const slot of plan.slots) {
+      const cid = `eval-${slot.slotId}`;
+      slotIds.push(cid);
+      assert.ok(
+        CLIENT_REQUEST_ID_PATTERN.test(cid),
+        `clientRequestId "${cid}" fails CLIENT_REQUEST_ID_PATTERN`,
+      );
+      assert.ok(
+        cid.length <= 128,
+        `clientRequestId "${cid}" length ${cid.length} > 128`,
+      );
+    }
+  }
+
+  assert.ok(slotIds.length > 0, "expected at least one slot");
+  const maxLen = Math.max(...slotIds.map((s) => s.length));
+  const minLen = Math.min(...slotIds.map((s) => s.length));
+  assert.ok(minLen >= 10, `unexpectedly short: ${minLen}`);
+  assert.ok(maxLen <= 128, `longest clientRequestId ${maxLen} > 128`);
+
+  console.log(`  ✓ test (13): all ${slotIds.length} slotIds produce valid clientRequestIds (len ${minLen}-${maxLen})`);
+}
+
+// Test 14: mutation — old format (with campaignId + runSequence) fails (length > 128)
+{
+  const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+  const { loadManifest, generateCampaignPlans } = await import("../scripts/evaluation-campaign-runner.js");
+
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "test-old", "gpt-image-2.5-flare-vip");
+
+  const oldClientRequestIds: string[] = [];
+  for (const plan of plans) {
+    for (const slot of plan.slots) {
+      const old = `eval-${plan.campaignId}-${slot.slotId}-1`;
+      oldClientRequestIds.push(old);
+    }
+  }
+
+  let failures = 0;
+  for (const old of oldClientRequestIds) {
+    if (!CLIENT_REQUEST_ID_PATTERN.test(old) || old.length > 128) {
+      failures += 1;
+    }
+  }
+
+  assert.equal(
+    failures,
+    oldClientRequestIds.length,
+    `expected ALL ${oldClientRequestIds.length} old-format IDs to fail, got ${failures} failures`,
+  );
+
+  console.log(`  ✓ test (14): old format clientRequestId rejected — all ${oldClientRequestIds.length} fail`);
+}
+
 console.log("campaign-runner-execute tests passed");
