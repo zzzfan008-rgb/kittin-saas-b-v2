@@ -10,7 +10,6 @@ import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/eva
 import type { ProviderResolver, VideoProviderResolver } from "../runner";
 import {
   ActiveRunLimitError,
-  CancelledBeforeProviderCall,
   EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
