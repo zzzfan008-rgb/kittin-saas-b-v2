@@ -73,6 +73,7 @@ const TEST_FILES = [
   "tests/evaluation-authorization-ledger.test.ts",
   "tests/evaluation-campaign.test.ts",
   "tests/campaign-runner.test.ts",
+  "tests/campaign-runner-execute.test.ts",
   "tests/reference-inputs.test.ts",
   "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",

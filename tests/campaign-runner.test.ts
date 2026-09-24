@@ -156,3 +156,29 @@ function commonSealArgs(): string[] {
 }
 
 console.log("evaluation campaign runner tests passed");
+
+// ---------- execute dry-run tests ----------
+
+function commonExecuteArgs(): string[] {
+  return [
+    "execute",
+    "--dry-run",
+    "--campaign-id=regression-provider-probe",
+  ];
+}
+
+// Test (e): execute dry-run requires ENABLE_PAID_EVALUATION_RUNS=false → fail-closed
+{
+  const result = run(commonExecuteArgs());
+  assert.notEqual(result.status, 0, "expected non-zero exit when ENABLE_PAID_EVALUATION_RUNS is not 'true'");
+  console.log("  ✓ test (e): execute dry-run with ENABLE_PAID_EVALUATION_RUNS unset → fail-closed (non-zero)");
+}
+
+// Test (f): execute dry-run with ENABLE_PAID_EVALUATION_RUNS=true but no DB credentials → fail
+{
+  const result = run(commonExecuteArgs(), { ENABLE_PAID_EVALUATION_RUNS: "true" });
+  assert.notEqual(result.status, 0, "expected non-zero exit without DB connection");
+  console.log("  ✓ test (f): execute dry-run with ENABLE_PAID_EVALUATION_RUNS=true, no DB → fail");
+}
+
+console.log("evaluation campaign runner ALL tests passed");
