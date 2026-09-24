@@ -1,5 +1,5 @@
 /**
- * Pre-flight integration test: POST /api/run-plan for all 33 v8rel6 slots against a
+ * Pre-flight integration test: POST /api/run-plan for all 66 v8rel6 slots against a
  * real Express server backed by the test database. This verifies every 400/403/409
  * gate that the mocked execute tests never covered (clientRequestId pattern/length,
  * project lifecycle, auth middleware, request body parsing, runQueue admission).
@@ -199,11 +199,22 @@ await database.transaction(async (client) => {
 });
 console.log(`  projects seeded: ${GEN_PROJECT_ID} (generate), ${EDIT_PROJECT_ID} (edit)`);
 
-// 4. Build 33 slot plans
+// 4. Build 66 slot plans (generate + edit, the two active evaluation variants)
 const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+const TARGET_VARIANTS = new Set([
+  "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+  "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+]);
 const filtered = manifest.baseUnits.filter(
-  (u) =>
-    u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+  (u) => TARGET_VARIANTS.has(u.promptVariantId),
+);
+// Architect mandated assertion: the filtered set must exactly cover the authorized
+// variant collection. A partial or missing set is a silent coverage gap.
+const coveredVariants = new Set(filtered.map((u) => u.promptVariantId));
+assert.deepStrictEqual(
+  coveredVariants,
+  TARGET_VARIANTS,
+  `preflight variant coverage must exactly match the authorized set. Covered: ${[...coveredVariants].join(", ")}. Expected: ${[...TARGET_VARIANTS].join(", ")}.`,
 );
 const caps = manifest.stageRequestCaps as Array<{
   stageId: string;
@@ -310,14 +321,14 @@ for (const plan of plans) {
   }
 }
 
-assert.strictEqual(allSlots.length, 33, "expected 33 slots");
+assert.strictEqual(allSlots.length, 66, "expected 66 slots (33 generate + 33 edit)");
 console.log(`  seeded: ${plans.length} campaigns, ${allSlots.length} slots with active authorizations`);
 
 // Verify authorizations exist in DB
 const authCount = await database.queryOne<{ c: string }>(
   `SELECT COUNT(*) as c FROM evaluation_run_authorizations WHERE authorization_id LIKE 'batch-62-%'`,
 );
-assert.strictEqual(Number(authCount?.c ?? 0), 33);
+assert.strictEqual(Number(authCount?.c ?? 0), 66);
 
 // 6. Start server subprocess on test DB
 const serverProc = spawn(
@@ -384,27 +395,27 @@ try {
     }
   }
 
-  console.log(`  results: ${successCount}/33 passed`);
+  console.log(`  results: ${successCount}/66 passed`);
 
   // Assertions
   assert.strictEqual(
     successCount,
-    33,
-    `expected 33/33 HTTP 202, got ${successCount}/33. Failures:\n${failures.join("\n")}`,
+    66,
+    `expected 66/66 HTTP 202, got ${successCount}/66. Failures:\n${failures.join("\n")}`,
   );
 
-  // 8. Assert generation_runs: exactly 33 rows, 33 distinct client_request_ids
+  // 8. Assert generation_runs: exactly 66 rows, 66 distinct client_request_ids
   const runCount = await database.queryOne<{ c: string }>(
     `SELECT COUNT(*) as c FROM generation_runs WHERE client_request_id LIKE '${PREFIX}%'`,
   );
-  assert.strictEqual(Number(runCount?.c ?? 0), 33, "generation_runs should have exactly 33 rows");
+  assert.strictEqual(Number(runCount?.c ?? 0), 66, "generation_runs should have exactly 66 rows");
 
   const distinctCount = await database.queryOne<{ c: string }>(
     `SELECT COUNT(DISTINCT client_request_id) as c FROM generation_runs WHERE client_request_id LIKE '${PREFIX}%'`,
   );
-  assert.strictEqual(Number(distinctCount?.c ?? 0), 33, "all 33 client_request_ids must be distinct");
+  assert.strictEqual(Number(distinctCount?.c ?? 0), 66, "all 66 client_request_ids must be distinct");
 
-  console.log("  ✓ generation_runs: 33 rows, 33 distinct client_request_ids");
+  console.log("  ✓ generation_runs: 66 rows, 66 distinct client_request_ids");
 
   // 9. EXPLICIT provider-not-called assertion (defense-in-depth)
   //    DUMMY_HASH = "a"×64 ensures reserve throws before provider is called,
@@ -448,7 +459,7 @@ try {
     );
     assert.ok(slot.slotId.length <= 128, `slotId length ${slot.slotId.length} > 128`);
   }
-  console.log("  ✓ all 33 clientRequestIds pass CLIENT_REQUEST_ID_PATTERN");
+  console.log("  ✓ all 66 clientRequestIds pass CLIENT_REQUEST_ID_PATTERN");
 
   // 10. Mutation variant 1: clientRequestId with campaignId + runSequence must be rejected
   //     (length > 128 for real slot IDs)
@@ -743,7 +754,7 @@ try {
     console.log(`  ✓ mutation: budget=72 accepted at route layer, confirmed in DB`);
   }
 
-  console.log("\n✓ campaign-runner-preflight: ALL 33 slots passed\n");
+  console.log("\n✓ campaign-runner-preflight: ALL 66 slots passed\n");
 } finally {
   serverProc.kill("SIGTERM");
   // give the subprocess a moment to exit, don't fail if it's already gone
