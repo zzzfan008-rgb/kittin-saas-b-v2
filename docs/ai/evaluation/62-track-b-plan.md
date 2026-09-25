@@ -58,7 +58,7 @@ goldenSetBriefForSlot(stage, sampleIdx)  ← 唯一共享函数，preflight/seal
 
 **可重跑**：48 条 INSERT 幂等（按 projectId 去重）+ 内含完整断言。
 
-**preflight/seal 注入点**：参考图仍然在 preflight/seal 层动态注入（image 节点的 outputImages 按 sampleIdx 查 golden-set `referenceImage`），**但只改参考图不改 text**——text 已在 flow_json 中 bake 完毕，提交 body 不做任何 text 变更。
+**运行时零注入**：text 和参考图均在夹具生成期 bake 进 flow_json。preflight/seal 提交的 body 与库内 flow 完全一致（`isDeepStrictEqual` 天然通过）。hermes 2026-09-25 实测确认：参考图 `outputImages` 同样进 `plan.steps[].inputImages/inputReferences`（dag.ts:255→227→232→244-245），与 text 输入 `plan.steps[].params.inputTexts`（dag.ts:229→247）**同闸同拒**——动态注入参考图与动态注入 text 是同一个缺陷。
 
 ### 第 3 步：promotion 加牙齿（哈希等值）
 
