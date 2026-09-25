@@ -11,11 +11,24 @@ import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaig
 import type { ImageModelId } from "../src/types/imageModels";
 import { promptEvaluationUnitKey } from "../src/lib/promptEvaluation";
 import crypto from "node:crypto";
-import { buildExecutionPlan, type FlowNode, type FlowEdge } from "../server/engine/dag";
+import { buildExecutionPlan } from "../server/engine/dag";
 import { evaluationAuthorizationTargetFromPlan } from "../server/lib/evaluationAuthorizationLedger";
 import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
-import { canonicalJson } from "../src/lib/promptEvaluationRelease";
 import { builtinTemplates } from "../server/routes/templates";
+
+// ---------- shared authorization-unit chain ----------
+// 62-envelope-authority-ruling.md §1: seal and execute MUST derive the
+// evaluationUnitKey through the SAME function chain on the SAME project flow
+// (validateAndMigrateFlow → buildExecutionPlan → evaluationAuthorizationTargetFromPlan
+// → canonicalJson → sha256). The old seal path used promptEvaluationUnitKey on the
+// static manifest unit (9 fields, JSON.stringify) which can never equal the route's
+// 12-field canonicalJson envelope. This helper is the single entry point so preflight,
+// seal, and any future caller cannot drift apart again.
+export function evaluationUnitKeyFromFlow(flowJson: unknown): `sha256:${string}` {
+  const migrated = validateAndMigrateFlow(flowJson);
+  const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
+  return evaluationAuthorizationTargetFromPlan(plan).evaluationUnitKey;
+}
 
 // ---------- helpers ----------
 
@@ -504,25 +517,22 @@ async function sealCampaigns(
     };
 
     for (const plan of plans) {
-      // compute the real authorization unit key from the project flow
-      // (not from the manifest static unit).  Ruling: 62-envelope-authority-ruling.md
-      const project = await database.queryOne<{
-        flow_json: unknown;
-      }>(
-        `SELECT flow_json, nodes, edges FROM saved_projects WHERE id = $1 AND deleted_at IS NULL`,
+      // Compute the authorization unit key through the SAME chain the route uses
+      // (62-envelope-authority-ruling.md §1). Table/column semantics mirror
+      // server/routes/runPlan.ts:209-223: `projects` table, `flow_json` is a TEXT
+      // column holding JSON, and only lifecycle='saved' projects are runnable.
+      const project = await database.queryOne<{ flow_json: string }>(
+        `SELECT flow_json FROM projects
+         WHERE id = $1 AND deleted_at IS NULL AND lifecycle = 'saved'`,
         [plan.projectId],
       );
       if (!project) {
-        throw new Error(`project ${plan.projectId} not found for campaign ${plan.campaignId}`);
+        throw new Error(
+          `saved project ${plan.projectId} not found for campaign ${plan.campaignId}; ` +
+            "seal refuses to fall back to the manifest static unit key",
+        );
       }
-      const flow = project.flow_json as Record<string, unknown>;
-      const { nodes: flowNodes, edges: flowEdges } = validateAndMigrateFlow(flow);
-      const execPlan = buildExecutionPlan(
-        flowNodes as FlowNode[],
-        (flowEdges ?? []) as FlowEdge[],
-      );
-      const target = evaluationAuthorizationTargetFromPlan(execPlan);
-      plan.evaluationUnitKey = target.evaluationUnitKey;
+      plan.evaluationUnitKey = evaluationUnitKeyFromFlow(JSON.parse(project.flow_json));
 
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,

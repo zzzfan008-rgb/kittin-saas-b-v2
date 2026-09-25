@@ -27,7 +27,7 @@ import {
   registerEvaluationRunAuthorization,
   type EvaluationAuthorizationRegistration,
 } from "../server/lib/evaluationAuthorizationLedger";
-import { loadManifest, generateCampaignPlans } from "../scripts/evaluation-campaign-runner";
+import { loadManifest, generateCampaignPlans, evaluationUnitKeyFromFlow } from "../scripts/evaluation-campaign-runner";
 import { CLIENT_REQUEST_ID_PATTERN } from "../server/engine/runQueue/types";
 
 const database = await import("../server/lib/database");
@@ -246,8 +246,17 @@ const adminUser = { id: ADMIN_ID, accountId: ADMIN_ACCOUNT_ID, displayName: "Tes
 for (const plan of plans) {
   const isGenerate = plan.campaignId.includes("generate-v1");
   const projectId = isGenerate ? GEN_PROJECT_ID : EDIT_PROJECT_ID;
+  const flow = isGenerate ? GENERATE_FLOW : EDIT_FLOW;
   const unit = filtered.find((u) => plan.campaignId.includes(u.unitId.replace(/\./g, "-")));
   if (!unit) throw new Error(`unit not found for campaign ${plan.campaignId}`);
+
+  // Seed the ledger with the SAME key the route will compute at execute time.
+  // The route reads projects.flow_json → buildExecutionPlan →
+  // evaluationAuthorizationTargetFromPlan (12-field canonicalJson envelope).
+  // The static manifest key (unit.evaluationUnitKey, 9-field JSON.stringify) can
+  // never equal it — that was the unitKey defect. Deriving the key here from the
+  // exact flow seeded into the project makes seal-key == route-key by construction.
+  const envelopeKey = evaluationUnitKeyFromFlow(flow);
 
   // ——— DUMMY_HASH IS A PAID-CALL PREVENTION MECHANISM ———
   // All 33 hashes below are "a" × 64. Reserve path compares slot.resolved_prompt_sha256
@@ -277,7 +286,7 @@ for (const plan of plans) {
       ownerId: ADMIN_ID,
       stage: plan.stage,
       modelId: "gpt-image-2.5-flare-vip",
-      authorizationUnitKey: unit.evaluationUnitKey,
+      authorizationUnitKey: envelopeKey,
       codeSha: CODE_SHA,
       maxProviderRequests: plan.slots.length,
       budgetLimitMinor: plan.slots.length * PRICE_MINOR,
@@ -295,7 +304,7 @@ for (const plan of plans) {
       scope: {
         type: "evaluation-unit",
         modelId: "gpt-image-2.5-flare-vip",
-        evaluationUnitKey: unit.evaluationUnitKey,
+        evaluationUnitKey: envelopeKey,
       },
       maxProviderRequests: 1,
       priceMinorPerProviderRequest: PRICE_MINOR,
@@ -314,7 +323,7 @@ for (const plan of plans) {
       campaignId: plan.campaignId,
       caseId: slotPlan.caseId,
       sampleId: slotPlan.sampleId,
-      unitKey: unit.evaluationUnitKey,
+      unitKey: envelopeKey,
       projectId,
       modelId: "gpt-image-2.5-flare-vip",
     });
