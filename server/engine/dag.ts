@@ -323,6 +323,10 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
               ...(variant?.familyId ? { promptFamilyId: variant.familyId } : {}),
               ...(variant?.contractHash ? { contractHash: variant.contractHash } : {}),
               ...(variant?.evaluationVersion ? { evaluationVersion: variant.evaluationVersion } : {}),
+        aspectRatio: data.aspectRatio,
+        batchSize: data.batchSize,
+        modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
+        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
         ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
         ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
