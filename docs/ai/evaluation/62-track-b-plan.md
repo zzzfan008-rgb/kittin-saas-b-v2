@@ -1,135 +1,135 @@
-# 轨道 B：EVALeditv1F flow 改造方案（修订版，回应 hermes 14:48 核验）
+# 轨道 B：EVALeditv1F 夹具改造方案（v3，absorb architect 2026-09-25 ruling）
 
-方案人：backend | 基线：HEAD=0e716a8（dirty=0、85/85绿）| 同步：hermes 核验通过
+方案人：backend | 基线：HEAD=9098f34（dirty=0、85/85 绿）| 同步：architect 裁决通过
 
 ---
 
-## 设计背景（修正）
+## 核心形态：project-per-brief
 
-**之前误读**：33 edit slot = 33 个同质 slot，全对应 golden-set ⇒ 24 张图不够。
+**否定**：在 preflight/seal slot loop 内注入 brief 到提交 body
+**采用**：每个 distinct brief 一个 evaluation project，brief **bake 进 project 的 flow_json text 节点**
 
-**正确模型**（hermes 14:48 DB 实测）：edit 侧 33 slot = 3 个 stage，与 generate 侧完全对等：
+否决原因（architect 裁决并亲验）：`runPlan.ts:223-239` 的 `isDeepStrictEqual(submittedPlan, basePlan)` 比较 `dag.ts` 的 buildExecutionPlan 结果——text 节点内容被收集到 plan.steps[].params.inputTexts（dag.ts:229→:247），提交 body 改 text → submittedPlan.inputTexts 变、basePlan 不变 → 必然不等 → 全 66 slot 被闸拒。**这道闸不许为评估放宽。**
 
-| stage | incrementalSamples | golden-set 样本 | 参考图来源 |
+### 具体形态
+
+```
+goldenSetBriefForSlot(stage, sampleIdx)  ← 唯一共享函数，preflight/seal/execute 三处同调
+  │
+  ├─ provider-probe (1 slot)  → brief[0]         → project EVALgen-brief-01 / EVALedit-brief-01
+  ├─ internal-experiment (8)  → brief[0..7]       → EVALgen-brief-01..08 / EVALedit-brief-01..08
+  └─ formal-validation (24)   → brief[0..23]      → EVALgen-brief-01..24 / EVALedit-brief-01..24
+```
+
+**48 个 project**（24 briefs × 2 variants，probe/internal 复用 formal 前缀 project）。
+已验证无 project 维度唯一约束：`evaluation_campaign_slots` + `evaluation_run_authorizations` 均无 project_id 唯一索引。
+
+### 与旧方案的关键差异
+
+| 旧（preflight 注入） | 新（project-per-brief） |
+|---|---|
+| 提交 body 改 text → 被 plan-equality 闸拒 | brief bake 进 flow_json → 库内 plan 与提交 plan **同一份 flow** → 等值通过 |
+| 2 个 project 复用，运行时改 text | 48 个 project，每个 text 不变，可哈希可验证 |
+| per-slot 注入函数在请求侧 | goldenSetBriefForSlot 在夹具生成期运行 → 项目里 flow_json 已是目标态 |
+| seal 与 execute 可能 flow 不同 → 缺陷 | seal 与 execute 用同一个 project → flow 天然相等 |
+
+---
+
+## 三步实施
+
+### 第 1 步：24 图入库 + golden-set v2 schema 扩展
+
+**入库**：走生产上传路径函数 `uploadFile`（`src/lib/fileStore.ts`），不裸 INSERT。
+理由：architect 裁决 (a)——裸 INSERT 绕过校验/命名/fileId 生成，此后 schema 变更静默不报。
+
+**golden-set v2 schema 扩展**：追加 `referenceImage: { fileId: string; sha256: string }`
+**同批校验**（裁决 9.2）：加载脚本断言「24 条 brief 每条都有可访问参考图」，挂 `evaluation:manifest:check` 同族入口，不只是文档描述。
+
+### 第 2 步：48 夹具 project 生成（确定性脚本）
+
+脚本性质：纯机械、三次跑同入同出、内置 48 个「project 数量 == 24 * 2」断言。
+
+**基础**：24 个 EVALgen-*-brief-NN project（clone U7lK9XXlq1，text 节点填 golden-set brief）
+        24 个 EVALedit-*-brief-NN project（clone s1xf4H2MGa 的形态，text 节点填 brief + image reference 节点）
+
+**文本注入**：`flow_json.nodes.find(n => n.data.kind === "text").data.text = goldenSetBriefForSlot(stage, idx)`——这是 **唯一** 写入 brief 的位置。存入数据库即 bake 完成，此后提交 body 与库内 flow 完全一致 → plan-equality 闸自然通过。
+
+**edit 侧参考图节点**：每 project 的 flow 加 image 节点 `{ type: "image", data: { kind: "image", label: "garment_full_reference", outputImages: [{fileId: "ref-file-id", ...}] } }` 加 edge `{ source: "edit-reference-image", target: "image-generator", targetHandle: "reference" }`
+
+**可重跑**：48 条 INSERT 幂等（按 projectId 去重）+ 内含完整断言。
+
+**preflight/seal 注入点**：参考图仍然在 preflight/seal 层动态注入（image 节点的 outputImages 按 sampleIdx 查 golden-set `referenceImage`），**但只改参考图不改 text**——text 已在 flow_json 中 bake 完毕，提交 body 不做任何 text 变更。
+
+### 第 3 步：promotion 加牙齿（哈希等值）
+
+现有 promotion 只查 case 名单齐全、不查内容真跑过——这正是本次事实门能存在的制度原因。
+
+**形态**：哈希等值（不是字符串比对）：
+- 每个 sealed slot 的 resolvedPromptSha256 == sha256(goldenSetBriefForSlot(stage, sampleIdx))
+- 哈希由与注入侧**同一共享函数**派生（防 promotion 里另写比对→各持一份→第 N 个缺陷）
+- **fail closed**：任一不等即拒，不得降级 warning
+- 完备断言：formal 的 24 slot 覆盖 sampleIdx 0..23 全集，缺任一即拒
+
+---
+
+## per-stage 映射
+
+| stage | slots | brief 映射 | distinct projects (×2 variants) |
 |---|---|---|---|
-| `provider-probe` | 1 | `garment-gold-01` | 最低成本探针，取首张 |
-| `internal-experiment` | 8 | `garment-gold-01..08` | 按 sampleIdx 取前 8 张 |
-| `formal-validation` | 24 | `garment-gold-01..24` | sampleIdx 0-23 → 各对应 1 张 |
+| `provider-probe` | 1 | brief[0] | 1（复用 formal 首 project） |
+| `internal-experiment` | 8 | brief[0..7]（sampleIdx 升序前缀） | 8（复用 formal 前 8 个 project） |
+| `formal-validation` | 24 | brief[0..23]（1:1 完备） | **全部 24 个** |
 
-**24 张 golden 图覆盖全部 33 edit slot**——三阶段的 `sampleIdx` 均从 0 开始、映射到同一 golden-set 同序样本。参考图可跨 stage 复用：README:72 的不得复用条款针对**证据收据**（caseEvidenceId/runId/caseId），不是输入图像资产（hermes 已核实）。
-
-### repealing 的决策点
-
-- ~~❌ 缩减 manifest edit 侧 33→24~~ — 侵犯必经 stage 门禁，违反「closed campaign containing all slots」
-- ~~❌ 9 slot 永久 BLOCKED~~ — 同因；必经 stage 不可跳过
-- ~~❌ 33 slot > 24 样本 ⇒ 图不足~~ — 误读三阶段同质；24 张 × stage 复用 = 33 slot 全覆盖
+**强制**：唯一共享函数 `goldenSetBriefForSlot(stage: string, sampleIdx: number): string`。
+内部断言 `sampleIdx ∈ [0, 24)` 越界即 throw（照 envelope「非 undefined 即 throw」原则）。
+preflight/seal/execute/promotion 四处调同一函数。
 
 ---
 
-## 方案（核心设计不变）：1 project × 1 flow × per-slot 动态注入
+## 对轨道 A 的影响（envelope/unitKey 不变，但 slot 级 hash 会变）
 
-### 决策：不改 manifest、不新建 project
-
-EVALeditv1F 保持 1 个 projectId、manifest 保持 41 条目不变。33 slot 的参考图差异由 preflight/seal 在**请求时**动态注入 flow。
-
-per-stage sample→reference-image 映射（与 generate 侧 brief 分配逻辑**完全对齐**）：
-```
-goldenSampleIdx = sampleIdx  // 每 stage 内从 0 开始取，映射同名 golden-set 样本
-referenceImage  = goldenSet.samples[goldenSampleIdx].referenceImage
-```
-三项 stage 的 sampleIdx 互不重叠（probe:0、internal:0-7、formal:0-23），但映射到同一 golden-set 数据集。
-
-### 三步实现
-
-#### 第 1 步：24 张参考图入库 + golden-set schema 扩展
-
-- **入库**：库内直接 INSERT + 文件搬移（不走 HTTP——24×8MB dataUrl 编码极低效）
-- 幂等：按 fileId 去重，重复跑不产生重复文件
-- 每张图登记 sha256，写入 golden-set 的 `referenceImage: { fileId, sha256 }` 字段
-- golden-set schema 扩展示例：
-  ```json
-  { "id": "garment-gold-01", ..., "referenceImage": { "fileId": "...", "sha256": "sha256:..." } }
-  ```
-- **同批校验更新**（裁决 9.2）：`golden-set` 加载函数校验 `referenceImage` 存在时 fileId/sha256 非空；不存在时不误读为缺图
-
-#### 第 2 步：EVALeditv1F flow 加参考图节点
-
-直接 UPDATE `projects.flow_json WHERE id = 'EVALeditv1F'`：
-
-```
-nodes:
-  + { id:"edit-reference-image", type:"image",
-      data: { kind:"image", label:"garment_full_reference",
-              outputImages:[/* placeholder */], aspectRatio:"3:4", batchSize:1 } }
-edges:
-  + { source:"edit-reference-image", target:"edit-gen", targetHandle:"reference" }
-```
-
-- `outputImages` 占位值由 `injectEditReferenceImage` 在运行时替换
-- flow 结构变更 → `evaluationUnitKey` 变化（期望行为：旧 key 无参考图 → 新 key 有参考图）
-- 三 stage 的 `authorizationUnitKey` 完全一致（参考图不进 12-field envelope，`reference_inputs_sha256` 是 slot 级独立列）——满足 README:72 要求
-
-#### 第 3 步：preflight/seal 动态注入 per-slot reference image
-
-**共享函数**（防各持一份→静默不等）：
-```ts
-function injectEditReferenceImage(
-  nodes: PersistedWorkflowNode[],
-  referenceImage: { fileId: string; sha256: string },
-): PersistedWorkflowNode[] {
-  return nodes.map(node => {
-    if (node.type === "image" && node.data?.label === "garment_full_reference") {
-      return { ...node, data: { ...node.data, outputImages: [referenceImage] } };
-    }
-    return node;
-  });
-}
-```
-
-preflight 调用：每 slot 的 HTTP request 构造 per-slot flow（`EDIT_FLOW.nodes` → `injectEditReferenceImage(...)`）。seal 同理——在 `sealCampaigns` 内计算 `evaluationAuthorizationEnvelopeFromFlow` 之前注入，杜绝「seal 算 key 用的 flow ≠ route 用的 flow」。
+- **evaluation_unit_key（12 字段）不变**：text prompt 不在 envelope 内 → unitKey 不因 brief 变更而变
+- **但**：`resolvedPromptSha256` 会变（brief 替换「【要求】描述场合、风格与身材」后 prompt 内容变了） + edit 侧 `referenceInputsSha256` 会变（加参考图后输入哈希变了）
+- **关键约束**：**prepare capture 必须在 48 夹具 project 就位后重新物化**。若用旧 flow 物化 capture、用新 project flow 提交 execute → 哈希比对不等 → seal 期被拦（缺陷）
+- **执行顺序**：48 夹具 project 生成 → 轨道 B 注入接线 → 轨道 A 的 prepare capture 在其上物化 → re-seal v8rel7
 
 ---
 
-## 三态断言更新
+## 预检断言（66 全 PASS + 完备性断言）
 
-轨道 B 完成后：edit 侧 33 slot 从 BLOCKED → PASS ⇒ **66/66 全 PASS**（不是 24 PASS + 9 BLOCKED——probe + internal + formal 三项必经 stage 全覆盖）。
+轨道 B 完成后三态预期：
+- edit 侧 33 BLOCKED(`edit-reference-missing`) → 33 PASS（归零）
+- 总计：**66/66 全 PASS**
 
-断言更新为：`successCount === 66 && blockedCount === 0`，mutator gates 四闸全过。
+新增完备性断言（全 66 slot、非抽样）：
+1. 注入后 `text == goldenSetBriefForSlot(stage, sampleIdx)`（每个 slot 的 prompt 与 golden-set brief 一致）
+2. 66 slot 覆盖的 brief 集合 == golden-set 24 条全集（formal 侧）——防有人把映射改成「只用前 8 条」
+3. 断言禁令不变：不得缩 filter、不得缩 slot 数
 
 ---
 
-## 回滚方式
+## spec 同批更新（`docs/ai/evaluation/`）
 
-- 改现有 EVALeditv1F（非新建 project）——`flow_json` UPDATE
-- 回滚：还原为两节点纯 text→image-generator 版本
-- manifest locator `projectId: "EVALeditv1F"` 不变
-- golden-set `referenceImage` 纯追加字段——不影响 generate 侧
+① §7.x 新增「brief 注入是付费执行前提」，格式：背景/决策/后果/被否决选项
+② golden-set v2 schema extension `docs/ai/evaluation/golden-set-v2.json` + validation script
 
 ---
 
 ## 依赖与风险评估
 
-| 变更 | 影响面 | 风险 |
-|---|---|---|
-| 24 图入库 | files/assets 表 | 幂等脚本 + sha256 登记 |
-| golden-set schema 扩展 | `referenceImage` 追加字段 + 同批校验 | 旧 generate 样本不受影响 |
-| EVALeditv1F flow 加参考图节点 | flow_json UPDATE | `evaluationUnitKey` 变化 → re-seal 必须 |
-| per-slot 动态注入（单函数） | preflight + seal 调用点 | 共用 `injectEditReferenceImage`，预防「各持一份」 |
-| reference_inputs_sha256 变化 | v8rel6 66 条授权作废 | 预期——re-seal v8rel7 后重新授权 |
-| 预检三态断言更新 | 33+33 → 66+0 | 轨道 B 完成后改断言 |
+| 变更 | 影响面 | 风险 | 缓解 |
+|---|---|---|---|
+| 24 图入库（uploadFile 路径） | files/assets 表 | 生产函数耦合 | 先定位 uploadFile 函数形态再调用 |
+| 48 project 生成 | projects 表 × 48 INSERT | 幂等 | 按 projectId 去重 + 确定性脚本 |
+| EVALgen/edit-v1Fi 变更 | 旧 U7lK9XXlq1/s1xf4H2MGa project | 零。**新建 project，不动旧 project** | 旧 project 保留为审计锚点 |
+| capture 重新物化 | resolvePromptSha256 变化 | 旧 capture 哈希作废 | 在 48 夹具就位后重物化 |
+| promotion 哈希等值 | promotion 逻辑 | 新加 fail-closed 闸 | shared function 防各持一份 |
 
 ---
 
-## 确认状态
+## 禁令（不变）
 
-hermes 四个决策点已回答：
-1. **入库**：库内直写 ✓
-2. **注入点**：preflight/seal 层 ✓
-3. **re-seal 时机**：等 24 图过 preflight 66/66 后 ✓
-4. **三态断言**：66/66 全 PASS ✓（本修订版已更新）
-
-## 下一步
-
-1. PR 描述修完（等 hermes 补全剩余 2 处更正）
-2. 本方案 hermes 确认后动库数据
-3. re-seal 在 preflight 66/66 全绿后执行（append-only 不可逆）
+- 不可 push 轨道 B 工作到 origin 直至轨道 A 先 push
+- 不可付费真跑
+- 不可 re-seal 直到 19 条验收全绿 + 预检 66/66 PASS
+- 零花费纪律
