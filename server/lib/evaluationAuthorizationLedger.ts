@@ -141,6 +141,31 @@ export function evaluationAuthorizationTargetFromPlan(plan: ExecutionPlan): Eval
     batchSize: step.params.batchSize,
     modelOptions: step.params.modelOptions ?? {},
   };
+
+  // Ruling 62-envelope-authority-ruling.md sec3:
+  // 12-field assertion: any undefined/null → throw immediately.
+  // Silently producing a degraded key (C degradation) is forbidden.
+  for (const [key, value] of Object.entries(unitEnvelope)) {
+    if (value === undefined || value === null) {
+      throw new EvaluationRunPolicyError(
+        `evaluation unit envelope field "${key}" is ${String(value)} — ` +
+          `all 12 fields must be present. Caused by: variant registry missing data ` +
+          `or project flow node missing upstream inputs.`,
+        400,
+      );
+    }
+  }
+
+  // Ruling 62-envelope-authority-ruling.md sec3: nodeKind must be
+  // "image-generator" in the envelope. The alias "image" is only accepted
+  // in the admission layer (promptRunAdmission.ts:376) during the R-89
+  // transition; normalising it here would create two sources of truth.
+  if (unitEnvelope.nodeKind !== "image-generator") {
+    throw new EvaluationRunPolicyError(
+      `evaluation unit envelope nodeKind must be "image-generator", got "${String(unitEnvelope.nodeKind)}"`,
+      400,
+    );
+  }
   return {
     modelId,
     promptVariantId,
