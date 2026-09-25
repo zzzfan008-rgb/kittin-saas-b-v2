@@ -429,7 +429,39 @@ function assertBudgetGate(plans: CampaignPlan[]): void {
 
 // ---------- dry-run report ----------
 
-function dryRunReport(plans: CampaignPlan[]): void {
+/**
+ * 裁决 6.2：seal 输出必须打印 evaluationVersion 当前值。
+ *
+ * 该值一律从变体注册表派生（`PromptVariant.evaluationVersion`，即 dag.ts 写入
+ * envelope 的同一字段），绝不在此处硬编码字面量——硬编码的副本会在 pending 转正时
+ * 静默失真，正好破坏「机械回答哪些账本在哪个注册表版本下封的」这个目的。
+ * 两个在册单元的版本必须一致，否则 envelope 身份本身就有歧义，直接拒绝。
+ */
+async function sealEvaluationVersion(): Promise<string> {
+  const { getGarmentPromptVariantById } = await import("../src/lib/garmentPromptPresets");
+  const versions = new Map<string, string>();
+  for (const variantId of [GENERATE_VARIANT, EDIT_VARIANT]) {
+    const variant = getGarmentPromptVariantById(variantId);
+    if (!variant) throw new Error(`variant not found in registry: ${variantId}`);
+    if (!variant.evaluationVersion) {
+      throw new Error(`variant ${variantId} has no evaluationVersion in the registry`);
+    }
+    versions.set(variant.evaluationVersion, variantId);
+  }
+  if (versions.size !== 1) {
+    throw new Error(
+      "registry evaluationVersion is not uniform across the sealed units: "
+        + [...versions].map(([v, id]) => `${id}=${v}`).join(", ")
+        + ". The envelope identity would be ambiguous; refusing to seal.",
+    );
+  }
+  return [...versions.keys()][0];
+}
+
+function dryRunReport(
+  plans: CampaignPlan[],
+  extra: Record<string, unknown> = {},
+): void {
   const totalBudget = plans.reduce((sum, p) => sum + p.budgetLimitMinor, 0);
   const totalSlots = plans.reduce((sum, p) => sum + p.slots.length, 0);
 
@@ -442,6 +474,7 @@ function dryRunReport(plans: CampaignPlan[]): void {
         totalBudgetMinor: totalBudget,
         currency: "USD",
         priceMinorPerRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
+        ...extra,
         campaigns_plan: plans.map((p) => ({
           campaignId: p.campaignId,
           stage: p.stage,
@@ -810,20 +843,31 @@ async function runSeal(
     console.log(JSON.stringify({ loadedSlots: materialized.slots.length, from: slotsPath }));
   }
 
+  // 裁决 6.2：seal 输出打印 evaluationVersion 当前值，用于 pending 转正前后 trace。
+  // dry-run 分支必须把该值折进 dryRunReport 的单一 JSON 载荷里——dry-run 的 stdout
+  // 就是一份 JSON 文档（tests/campaign-runner.test.ts:60 直接 JSON.parse(stdout)），
+  // 额外打印一行会让它变成两份文档而解析失败。
+  // dry-run 也必须在此 return：往下就是 sealCampaigns 的库内 admin 校验与封账写入，
+  // dry-run 不得触碰数据库（这是 ec28986 块重写时丢掉的早返回）。
+  const registryEvaluationVersion = await sealEvaluationVersion();
   if (dryRun) {
-  // 打印 seal 输出打印 evaluationVersion 当前值（裁决 6.2），用于 pending 转正前后 trace
-  const sealEnvelopeVersion = {
-    title: "DRY RUN - evaluationVersion registry reference",
-    evaluationVersion: "garment-eval-v3-pending",
-    note: "Pending → final 后所有已封存账本 key 静默失效（形态为 route 403）, 需机械回答哪些账本在哪个注册表版本下封的",
-  };
-  console.log(JSON.stringify(sealEnvelopeVersion));
-} else {
-  console.log(JSON.stringify({
-    evaluationVersion: "garment-eval-v3-pending",
-    note: "Seal uses current registry evaluationVersion.  Pending→final 后所有已封存账本 key 静默失效。",
-  }));
-}
+    dryRunReport(plans, {
+      evaluationVersion: registryEvaluationVersion,
+      note:
+        "Pending → final 后所有已封存账本 key 静默失效（形态为 route 403），" +
+        "需机械回答哪些账本在哪个注册表版本下封的",
+    });
+    return;
+  }
+
+  console.log(
+    JSON.stringify({
+      evaluationVersion: registryEvaluationVersion,
+      note:
+        "Seal uses current registry evaluationVersion. " +
+        "Pending→final 后所有已封存账本 key 静默失效。",
+    }),
+  );
 
   // 5. seal campaigns in DB
   await sealCampaigns(
