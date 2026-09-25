@@ -5,55 +5,49 @@
  * 验收点：
  *  1. 24 个 sample 的 referenceImage.fileId 全部非空（上传回写已完成）
  *  2. 24 个 fileId 互异（Set 大小 == 24）
- *  3. 构造 edit flow 时 image 节点 outputImages fileId == golden-set fileId
- *  4. 反例形态：fileId 错位/共用必须红（变异探针）
- *  5. 24 个 deliveredSourceSha256 非空 + 24 个 assetSha256 非空（回写完整）
+ *  3. 真实守卫 assertFileIdMatchesSample（导出自 generate-evaluation-fixtures.ts）：
+ *     正确映射必须放行 / fileId 错配必须 throw / no-op 变异探针验证
+ *  4. 数据完整性：24 个 deliveredSourceSha256 + 24 个 assetSha256 非空
  *
  * 分类：碰库（导入 database），注册进 SERIAL_TEST_FILES。
  */
 
 import assert from "node:assert/strict";
-import { describe, it, before } from "node:test";
+import { describe, it } from "node:test";
 import { loadGoldenSet, GOLDEN_SET_SIZE } from "../server/lib/goldenSet";
-import { resetPostgresTestDatabase } from "./postgresTestDatabase";
+import { assertFileIdMatchesSample } from "../server/lib/evaluationFixtureGuards";
+import type { PersistedFlow } from "../server/lib/evaluationFixtureGuards";
 
 const GOLDEN_SET = loadGoldenSet();
 
+/** 构造一个最小合法的 edit flow（仅 image 节点 + outputImages）。 */
+function makeEditFlow(fileId: string): PersistedFlow {
+  return {
+    schemaVersion: 8,
+    nodes: [
+      {
+        id: "img",
+        type: "image",
+        position: { x: 0, y: 0 },
+        data: { kind: "image", label: "test", status: "idle", outputImages: [{ fileId }] },
+      },
+    ],
+    edges: [],
+  };
+}
+
 describe("evaluation O1 fixture pairing (architect annex 2)", () => {
-  before(async () => {
-    await resetPostgresTestDatabase();
-  });
+  // O1 guard + golden-set integrity checks are pure; no DB access needed.
 
   it("golden-set has exactly 24 samples with uploaded referenceImages", () => {
     assert.strictEqual(GOLDEN_SET.samples.length, GOLDEN_SET_SIZE);
     const withFileId = GOLDEN_SET.samples.filter((s) => s.referenceImage?.fileId);
-    assert.strictEqual(
-      withFileId.length,
-      GOLDEN_SET_SIZE,
-      `expected all ${GOLDEN_SET_SIZE} samples to have referenceImage.fileId after upload, got ${withFileId.length}`,
-    );
+    assert.strictEqual(withFileId.length, GOLDEN_SET_SIZE);
   });
 
   it("all 24 fileIds are distinct", () => {
-    const fileIds = GOLDEN_SET.samples.map((s) => s.referenceImage!.fileId);
-    const unique = new Set(fileIds);
-    assert.strictEqual(
-      unique.size,
-      GOLDEN_SET_SIZE,
-      `expected ${GOLDEN_SET_SIZE} distinct fileIds, got ${unique.size}`,
-    );
-  });
-
-  it("O1 pairing: sample[i].fileId == flow outputImages[0].fileId for edit fixture", () => {
-    const samples = GOLDEN_SET.samples;
-    for (let i = 0; i < samples.length; i++) {
-      const sample = samples[i];
-      assert.ok(sample.referenceImage?.fileId, `sample[${i}] (${sample.id}) missing fileId`);
-    }
-    // 核心断言：golden-set 自身的 self-consistency — 不存在内部错位
-    // （夹具生成脚本 assertFileIdMatchesSample 是运行时强制执行，这里做数据面预检）
-    const ids = samples.map((s) => `${s.id}:${s.referenceImage!.fileId}`);
-    assert.strictEqual(new Set(ids).size, GOLDEN_SET_SIZE, "sample id+fileId pairs must be unique");
+    const fileIds = GOLDEN_SET.samples.map((s) => s.referenceImage!.fileId!);
+    assert.strictEqual(new Set(fileIds).size, GOLDEN_SET_SIZE);
   });
 
   it("all 24 deliveredSourceSha256 and assetSha256 are non-empty", () => {
@@ -61,27 +55,61 @@ describe("evaluation O1 fixture pairing (architect annex 2)", () => {
       assert.ok(
         typeof sample.referenceImage?.deliveredSourceSha256 === "string" &&
           sample.referenceImage.deliveredSourceSha256.length === 64,
-        `${sample.id}: deliveredSourceSha256 missing or invalid`,
       );
       assert.ok(
         typeof sample.referenceImage?.assetSha256 === "string" &&
           sample.referenceImage.assetSha256.length === 64,
-        `${sample.id}: assetSha256 missing or invalid`,
       );
     }
   });
 
-  it("O1 anti-vacuity: swapping fileId breaks uniqueness", () => {
-    // 变异探针：把 sample[0] 的 fileId 换成 sample[1] 的 →
-    // 两个 fileId 相同 → unique Set 大小 < 24 → 断言触发
-    const fileIds = GOLDEN_SET.samples.map((s) => s.referenceImage!.fileId);
-    const swapped = [...fileIds];
-    swapped[0] = swapped[1]; // 人为制造重复
-    const uniqueAfterSwap = new Set(swapped);
-    assert.strictEqual(
-      uniqueAfterSwap.size,
-      GOLDEN_SET_SIZE - 1, // 少一个
-      `anti-vacuity: swapping fileId[0] with fileId[1] should produce exactly ${GOLDEN_SET_SIZE - 1} unique values`,
+  // ── 真实守卫测试（import 生产函数，不是 mock / 数据副本）────
+  const samples = GOLDEN_SET.samples;
+
+  it("O1 real guard: correct fileId mapping must pass for all 24 samples", () => {
+    for (let i = 0; i < samples.length; i++) {
+      const fileId = samples[i].referenceImage!.fileId!;
+      const flow = makeEditFlow(fileId);
+      // 同一份生产守卫，正确映射必须放行（反恒真）
+      assert.doesNotThrow(
+        () => assertFileIdMatchesSample(flow, fileId, `EVALedit-brief-${String(i + 1).padStart(2, "0")}`),
+        `sample[${i}] (${samples[i].id}) correct fileId ${fileId} must pass guard`,
+      );
+    }
+  });
+
+  it("O1 real guard: mismatched fileId must throw", () => {
+    const correctFileId = samples[0].referenceImage!.fileId!;
+    const wrongFileId = samples[1].referenceImage!.fileId!;
+    assert.notStrictEqual(correctFileId, wrongFileId, "precondition: test samples must have distinct fileIds");
+    const flow = makeEditFlow(wrongFileId);
+    assert.throws(
+      () => assertFileIdMatchesSample(flow, correctFileId, "EVALedit-brief-01"),
+      /fileId.*!=.*golden-set/,
+      "O1 guard must reject mismatched fileId",
+    );
+  });
+
+  it("O1 real guard: missing image node must throw", () => {
+    const flow: PersistedFlow = { schemaVersion: 8, nodes: [], edges: [] };
+    assert.throws(
+      () => assertFileIdMatchesSample(flow, "any", "EVALedit-brief-x"),
+      /image node missing/,
+    );
+  });
+
+  it("O1 real guard: empty outputImages must throw", () => {
+    const flow: PersistedFlow = {
+      schemaVersion: 8,
+      nodes: [{
+        id: "img", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "test", status: "idle", outputImages: [] },
+      }],
+      edges: [],
+    };
+    assert.throws(
+      () => assertFileIdMatchesSample(flow, "any", "EVALedit-brief-x"),
+      /exactly 1 outputImage/,
     );
   });
 });

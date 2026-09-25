@@ -39,36 +39,16 @@ import {
   REQUIRED_SHA256,
   type GoldenSet,
 } from "../server/lib/goldenSet";
+import {
+  assertFileIdMatchesSample,
+  type PersistedFlow,
+} from "../server/lib/evaluationFixtureGuards";
 import { query, queryOne, db, closeDatabaseForTests } from "../server/lib/database";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
-// ── types ──────────────────────────────────────────────────────────────
-
-interface FlowNode {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  data: Record<string, unknown>;
-  width?: number;
-  height?: number;
-}
-
-interface FlowEdge {
-  id: string;
-  source: string;
-  target: string;
-  data?: Record<string, unknown>;
-  targetHandle?: string;
-  sourceHandle?: string;
-}
-
-interface PersistedFlow {
-  schemaVersion: number;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
+// ── types (subset used locally) ──────────────────────────────────────
 
 interface FixtureInsert {
   projectId: string;
@@ -319,26 +299,6 @@ function assertReferenceImageIntegrity(goldenSet: GoldenSet, imagesDir: string):
     );
     console.log(`  ✓ sha256 whitelist: ${sample.id} = ${diskSha.slice(0, 8)}…`);
   }
-}
-
-/** 裁决 D：edit project 的 fileId 与 sampleIdx 对应条相等（单一事实源）。 */
-function assertFileIdMatchesSample(
-  flow: PersistedFlow,
-  expectedFileId: string,
-  projectId: string,
-): void {
-  const imageNode = flow.nodes.find((n) => n.type === "image");
-  assert.ok(imageNode, `${projectId}: image node missing`);
-  const outputImages = imageNode.data.outputImages as Array<{ fileId: string }>;
-  assert.ok(
-    Array.isArray(outputImages) && outputImages.length === 1,
-    `${projectId}: expected exactly 1 outputImage`,
-  );
-  assert.strictEqual(
-    outputImages[0].fileId,
-    expectedFileId,
-    `${projectId}: outputImages fileId ${outputImages[0].fileId} != golden-set referenceImage.fileId ${expectedFileId} (ruling D)`,
-  );
 }
 
 // ── main ────────────────────────────────────────────────────────────────
