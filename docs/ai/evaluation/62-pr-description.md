@@ -18,7 +18,7 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 
 | # | 验收项 | 所在层 | 见证测试 | 变异/还原证据 |
 |---|---|---|---|---|
-| 1 | `data.promptFamilyId`/`data.contractHash`/`data.evaluationVersion` 不在 dag.ts:323-325 | engine | `tests/dag.test.ts` (见证) | 删 data.* 读取行 → 测试变红 → 恢复 → 14/14 |
+| 1 | `data.promptFamilyId`/`data.contractHash`/`data.evaluationVersion` 不在 dag.ts:323-325 | engine | `tests/dag.test.ts` (见证) | 删 data.* 读取行 → 4 条变红 → 恢复 → 14/14 |
 | 2 | 已选变体（variant registry）是 3 字段唯一权威源 | engine | `tests/dag.test.ts` (裁决2变异) | ast-grep 无 `data.` 读取残留 |
 | 3 | 12-field envelope: 任一 field `undefined`/`null` → throw；nodeKind 严格断言 `"image-generator"` | ledger | `tests/evaluation-authorization-ledger.test.ts` (registered 16) | v7 alias throw fd05ec9；fixture 修复 337876e |
 | 5 | 三态预检：33 PASS + 33 BLOCKED(`edit-reference-missing`) | preflight | `tests/campaign-runner-preflight.test.ts` | 缩 filter 不绿、真实计数 |
@@ -66,11 +66,11 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 | `promptFamilyId` | `variant.familyId` | `dag.ts:323` | **取值来源修正**（原 `data.promptFamilyId`，现从 variant registry） |
 | `contractHash` | `variant.contractHash` | `dag.ts:324` | **取值来源修正** |
 | `evaluationVersion` | `variant.evaluationVersion` | `dag.ts:325` | **取值来源修正**；同时反规范化落 `evaluation_campaigns.evaluation_version`（version 23 迁移） |
-| `operationMode` | `variant.mode` | `dag.ts:314` | mode 归属反转（v8 trust model） |
-| `parameterProfileId` | `variant.parameterProfileId` | `dag.ts:315` | |
-| `postprocessVersion` | `profile.postprocess.version` | `dag.ts:317` | |
+| `operationMode` | `variant.mode` | `dag.ts:313` | mode 归属反转（v8 trust model） |
+| `parameterProfileId` | `variant.parameterProfileId` | `dag.ts:314` | |
+| `postprocessVersion` | `profile.postprocess.version` | `dag.ts:315` | |
 | `promptVariantId` | `data.promptVariantId` | `dag.ts:329-330` | 无替代来源——变体绑定不可从注册表推导（盒内自由的代价） |
-| `modelId` | `data.modelId` | `dag.ts:311` | 模型选择不可推导 |
+| `modelId` | `data.modelId` | `dag.ts:312` | 模型选择不可推导 |
 | `aspectRatio` | `data.aspectRatio` | `dag.ts:326` | 运行时参数 |
 | `batchSize` | `data.batchSize` | `dag.ts:327` | 运行时参数 |
 | `modelOptions` | `data.modelOptions` | `dag.ts:328` | 运行时参数 |
