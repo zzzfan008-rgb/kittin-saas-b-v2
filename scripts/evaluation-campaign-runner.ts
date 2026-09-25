@@ -9,8 +9,6 @@ import {
 } from "../server/lib/evaluationCampaign";
 import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaign";
 import type { ImageModelId } from "../src/types/imageModels";
-import { promptEvaluationUnitKey } from "../src/lib/promptEvaluation";
-import crypto from "node:crypto";
 import { buildExecutionPlan } from "../server/engine/dag";
 import { evaluationAuthorizationTargetFromPlan } from "../server/lib/evaluationAuthorizationLedger";
 import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
@@ -28,12 +26,6 @@ export function evaluationUnitKeyFromFlow(flowJson: unknown): `sha256:${string}`
   const migrated = validateAndMigrateFlow(flowJson);
   const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
   return evaluationAuthorizationTargetFromPlan(plan).evaluationUnitKey;
-}
-
-// ---------- helpers ----------
-
-function sha256(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 // ---------- constants ----------
@@ -78,7 +70,10 @@ interface ManifestUnit {
   unitId: string;
   promptVariantId: string;
   projectId: string;
-  evaluationUnitKey: string;
+  // NOTE: deliberately no evaluationUnitKey. The legacy 9-field
+  // promptEvaluationUnitKey(manifest.unit) key is NOT an authorization identity
+  // and must never travel with the plan (see sealCampaigns). Carrying it here is
+  // what made the v8rel6 seal/execute divergence possible.
 }
 
 interface LoadedManifest {
@@ -228,14 +223,10 @@ export function loadManifest(path: string): LoadedManifest {
     data.baseUnits as Array<Record<string, unknown>>
   ).map((entry) => {
     const unit = entry.unit as Record<string, unknown> | undefined;
-    const unitKey = unit != null
-      ? `sha256:${sha256(promptEvaluationUnitKey(unit as unknown as Parameters<typeof promptEvaluationUnitKey>[0]))}`
-      : `sha256:${"0".repeat(64)}`;
     return {
       unitId: String(entry.unitId ?? ""),
       promptVariantId: String(unit?.promptVariantId ?? ""),
       projectId: String(unit?.projectId ?? ""),
-      evaluationUnitKey: unitKey,
     };
   });
 
@@ -368,7 +359,6 @@ interface CampaignPlan {
   variantId: string;
   unitId: string;
   projectId: string;
-  evaluationUnitKey: string;
   slots: SlotPlan[];
   budgetLimitMinor: number;
 }
@@ -407,7 +397,6 @@ export function generateCampaignPlans(
         variantId: unit.promptVariantId,
         unitId: unit.unitId,
         projectId: unit.projectId,
-        evaluationUnitKey: unit.evaluationUnitKey,
         slots,
         budgetLimitMinor,
       });
@@ -532,14 +521,20 @@ async function sealCampaigns(
             "seal refuses to fall back to the manifest static unit key",
         );
       }
-      plan.evaluationUnitKey = evaluationUnitKeyFromFlow(JSON.parse(project.flow_json));
+      // 62-envelope-authority-ruling.md §1: the sealed authorization unit key is
+      // derived ONLY from the real project flow through the shared chain
+      // (validateAndMigrateFlow → buildExecutionPlan →
+      // evaluationAuthorizationTargetFromPlan). CampaignPlan deliberately has no
+      // evaluationUnitKey field, so a manifest-derived key cannot be carried into
+      // the ledger even by accident — that footgun is what broke v8rel6.
+      const authorizationUnitKey = evaluationUnitKeyFromFlow(JSON.parse(project.flow_json));
 
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,
         stage: plan.stage,
         modelId: plan.modelId as ImageModelId,
-        authorizationUnitKey: plan.evaluationUnitKey as `sha256:${string}`,
+        authorizationUnitKey,
         codeSha,
         maxProviderRequests: plan.slots.length,
         budgetLimitMinor: plan.budgetLimitMinor,
