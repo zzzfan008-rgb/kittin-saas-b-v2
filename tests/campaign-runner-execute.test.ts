@@ -656,7 +656,7 @@ function makeLoopMockDeps(options: {
   console.log("  ✓ test (10): slot outcome=failed → abort with non-zero exit");
 }
 
-// ---------- test (11): submit failure (non-202) → error propagates, no polling ----------
+// ---------- test (11): submit failure (non-202, non-409) → error propagates, no polling ----------
 {
   process.env.ADMIN_SESSION_USER_ID = "admin-1";
 
@@ -678,7 +678,7 @@ function makeLoopMockDeps(options: {
     const deps = makeLoopMockDeps({
       campaignStatuses: ["ready"],
       slotRowsByQuery: [readySlotRows],
-      submitResults: [{ ok: false, message: "POST /api/run-plan failed with HTTP 409" }],
+      submitResults: [{ ok: false, message: "POST /api/run-plan failed with HTTP 400" }],
     });
 
     let error: Error | undefined;
@@ -690,7 +690,7 @@ function makeLoopMockDeps(options: {
 
     assert.ok(error, "submit failure must propagate");
     assert.ok(
-      error!.message.includes("409"),
+      error!.message.includes("400"),
       `expected HTTP failure detail, got: ${error!.message}`,
     );
     assert.equal(deps.getRunStatusCalls.length, 0, "no polling after submit failure");
@@ -701,6 +701,65 @@ function makeLoopMockDeps(options: {
   }
 
   console.log("  ✓ test (11): submit failure propagates with no polling");
+}
+
+// ---------- test (11b): submit HTTP 409 → slot-level terminal report, no raw crash ----------
+// Ruling (b): deterministic clientRequestId (= slotId) means a re-submit of the
+// same slot is rejected with 409 (unique index / case conflict / active-run
+// limit). The runner must classify it as a terminal slot outcome with a clear
+// reason — a bare unique-violation must never crash the caller.
+{
+  process.env.ADMIN_SESSION_USER_ID = "admin-1";
+
+  const readySlotRows = [{
+    slot_id: "slot-dup-1",
+    case_id: "case-dup-1",
+    sample_id: "sample-dup-1",
+    authorization_id: "auth-dup-1",
+    run_id: null,
+    status: "ready",
+    price_minor_per_provider_request: 3,
+    budget_limit_minor: 9,
+  }];
+
+  const capturedStderr: string[] = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  console.error = (msg: string) => { capturedStderr.push(msg); };
+  console.log = () => {};
+
+  try {
+    const deps = makeLoopMockDeps({
+      campaignStatuses: ["ready"],
+      slotRowsByQuery: [readySlotRows],
+      submitResults: [{ ok: false, message: "POST /api/run-plan for slot slot-dup-1 failed with HTTP 409: duplicate key value violates unique constraint" }],
+    });
+
+    let thrown: unknown;
+    try {
+      await runExecuteCore(deps, "campaign-dup", undefined, false);
+    } catch (e) {
+      thrown = e;
+    }
+
+    assert.equal(thrown, undefined, "409 duplicate must NOT throw to the caller");
+    assert.equal(process.exitCode, 1, "409 duplicate sets non-zero exit code");
+    assert.equal(deps.getRunStatusCalls.length, 0, "no polling after 409");
+
+    const report = capturedStderr.join("\n");
+    assert.ok(report.includes('"status":"terminal_failure"'), `expected terminal_failure report, got: ${report}`);
+    assert.ok(report.includes('"outcome":"failed"'), "expected outcome failed");
+    assert.ok(report.includes("slot_already_submitted_or_conflict"), "expected clear duplicate reason");
+    assert.ok(report.includes("slot-dup-1"), "report must name the slot");
+
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = 0;
+    delete process.env.ADMIN_SESSION_USER_ID;
+  }
+
+  console.log("  ✓ test (11b): submit HTTP 409 → terminal_failure report, no raw crash");
 }
 
 // ---------- test (12): success path — slot reaches succeeded, loop completes ----------
@@ -752,6 +811,95 @@ function makeLoopMockDeps(options: {
   }
 
   console.log("  ✓ test (12): success path — submitted slot reaches succeeded and loop completes");
+}
+
+// ---------- clientRequestId format tests ----------
+
+// Test 13: All real slotIds produce valid clientRequestIds
+{
+  const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+  const { loadManifest, generateCampaignPlans } = await import("../scripts/evaluation-campaign-runner.js");
+
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  // Prefix "v8rel6" matches the real sealed campaign prefix so slotId lengths match real v8rel6 data.
+  const plans = generateCampaignPlans(filtered, caps, "v8rel6", "gpt-image-2.5-flare-vip");
+
+  const slotIds: string[] = [];
+
+  for (const plan of plans) {
+    for (const slot of plan.slots) {
+      const cid = slot.slotId;
+      slotIds.push(cid);
+      assert.ok(
+        CLIENT_REQUEST_ID_PATTERN.test(cid),
+        `clientRequestId "${cid}" fails CLIENT_REQUEST_ID_PATTERN`,
+      );
+      assert.ok(
+        cid.length <= 128,
+        `clientRequestId "${cid}" length ${cid.length} > 128`,
+      );
+    }
+  }
+
+  assert.ok(slotIds.length > 0, "expected at least one slot");
+  const maxLen = Math.max(...slotIds.map((s) => s.length));
+  const minLen = Math.min(...slotIds.map((s) => s.length));
+  assert.ok(minLen >= 10, `unexpectedly short: ${minLen}`);
+  assert.ok(maxLen <= 128, `longest clientRequestId ${maxLen} > 128`);
+
+  console.log(`  ✓ test (13): all ${slotIds.length} slotIds produce valid clientRequestIds (len ${minLen}-${maxLen})`);
+}
+
+// Test 14: mutation — old format (with campaignId + runSequence) fails (length > 128)
+{
+  const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+  const { loadManifest, generateCampaignPlans } = await import("../scripts/evaluation-campaign-runner.js");
+
+  const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
+  const filtered = manifest.baseUnits.filter(
+    (u) =>
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1" ||
+      u.promptVariantId === "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+  );
+  const caps = manifest.stageRequestCaps as Array<{
+    stageId: string;
+    incrementalSamples: number;
+    maxProviderRequestsPerSample: number;
+  }>;
+  const plans = generateCampaignPlans(filtered, caps, "test-old", "gpt-image-2.5-flare-vip");
+
+  const oldClientRequestIds: string[] = [];
+  for (const plan of plans) {
+    for (const slot of plan.slots) {
+      const old = `eval-${plan.campaignId}-${slot.slotId}-1`;
+      oldClientRequestIds.push(old);
+    }
+  }
+
+  let failures = 0;
+  for (const old of oldClientRequestIds) {
+    if (!CLIENT_REQUEST_ID_PATTERN.test(old) || old.length > 128) {
+      failures += 1;
+    }
+  }
+
+  assert.equal(
+    failures,
+    oldClientRequestIds.length,
+    `expected ALL ${oldClientRequestIds.length} old-format IDs to fail, got ${failures} failures`,
+  );
+
+  console.log(`  ✓ test (14): old format clientRequestId rejected — all ${oldClientRequestIds.length} fail`);
 }
 
 console.log("campaign-runner-execute tests passed");

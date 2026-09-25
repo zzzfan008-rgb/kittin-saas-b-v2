@@ -268,6 +268,11 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
         modelId: stringOrEmpty(data.modelId),
         aspectRatio: generatorAspectRatio(data, "adaptive"),
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
+        // documentSnapshot reads data.contractHash / data.evaluationVersion for
+        // serialisation only. These fields do NOT participate in the authorization
+        // identity chain (see dag.ts:343-344). If video-generator gains
+        // authorization identity semantics, these snapshot fields MUST be
+        // re-derived from the variant registry like image-generator.
         ...contractHashField(data.contractHash),
         ...optionalString("evaluationVersion", typeof data.evaluationVersion === "string" ? data.evaluationVersion : undefined),
       };

@@ -56,6 +56,12 @@ export interface EvaluationCampaignManifest {
   maxProviderRequests: number;
   budgetLimitMinor: number;
   budgetCurrency: string;
+  /** 裁决 6②：envelope 12 字段输入源的 canonicalJson 原像（与算 key 同源） */
+  inputsCanonicalJson: string;
+  /** 裁决 6②：上列 sha256 指纹 */
+  inputsSha256: string;
+  /** 裁决 6②：密封时注册表的 evaluationVersion */
+  evaluationVersion: string;
   slots: readonly EvaluationCampaignSlotManifest[];
 }
 
@@ -432,13 +438,15 @@ export async function createSealedEvaluationCampaign(
     INSERT INTO evaluation_campaigns (
       campaign_id, owner_id, created_by_admin_id, stage, model_id,
       evaluation_unit_key, code_sha, max_provider_requests, budget_limit_minor,
-      budget_currency, status, manifest_sha256, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12)
+      budget_currency, status, manifest_sha256, created_at,
+      envelope_inputs_json, envelope_inputs_sha256, evaluation_version
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12, $13, $14, $15)
     ON CONFLICT (campaign_id) DO NOTHING
   `, [
     input.campaignId, input.ownerId, actor.id, input.stage, input.modelId,
     input.authorizationUnitKey, input.codeSha, input.maxProviderRequests,
     input.budgetLimitMinor, input.budgetCurrency, manifestSha256, now,
+    input.inputsCanonicalJson, input.inputsSha256, input.evaluationVersion,
   ]);
   if (inserted.rowCount !== 1) throw new Error("campaignId already exists; a sealed campaign cannot be replaced");
   for (const slot of input.slots) {

@@ -145,8 +145,8 @@ npx tsx scripts/evaluation-campaign-runner.ts seal \
   `campaignRuntimeBinding` 输出（`evaluationCampaign.ts:537-547`），任一 hash 漂移 = 硬失败。
   seal 侧对 `resolvedPromptSha256` / `nativeParametersSha256` / `referenceInputsSha256`
   施加**退化断言**（regex `/^(.)\1{63}$/` 拒绝全零/全同字符）——强制消费 prepare 的真实产出。
-- `authorizationUnitKey` = `sha256:${promptEvaluationUnitKey(unit)}`（`src/lib/promptEvaluation.ts:110`），
-  三个 stage 必须使用**同一个 key**（gate 链校验，`evaluationPromotion.ts:349-358`）。
+- `authorizationUnitKey` = `sha256:${canonicalJson(12-field-envelope)}`。其中 12 字段由 `evaluationAuthorizationTargetFromPlan` 在 `buildExecutionPlan` 输出上构建，3 字段（`promptFamilyId`/`contractHash`/`evaluationVersion`）从 variant 注册表派生而非从 flow node data 读取。同一 project 的 seal 与 execute 必须用同一条函数链（`buildExecutionPlan` → `extractParams` → `evaluationAuthorizationTargetFromPlan` → `canonicalJson` → `sha256`），否则 key 不匹配将导致 route 层 403 静默拒绝。
+  被否决的旧形态：`sha256:${promptEvaluationUnitKey(unit)}` (9-field `JSON.stringify`，`src/lib/promptEvaluation.ts:110`)。该形态在 PR #74 (2026-09-26) 中淘汰，否决理由：9 vs 12 字段集不同 + 序列化器不同（JSON.stringify vs canonicalJson）+ 字段名仅 5 个重叠 ⇒ 对任何输入输出必然不同。旧形态下 seal 与 execute 永远不可能匹配。
 
 ### 7.2 `authorize` —— per-slot 授权（复用现有 CLI，零新代码）
 

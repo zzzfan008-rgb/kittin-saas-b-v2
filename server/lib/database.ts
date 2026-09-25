@@ -1345,6 +1345,36 @@ async function migrate(): Promise<void> {
       );
     }
 
+    // 裁决 62-envelope-authority-ruling.md ruling 6②：seal 时把 envelope 12 字段
+    // 输入源的 canonicalJson 原像、sha256 指纹和当时生效的 evaluationVersion 一起
+    // 写进 evaluation_campaigns 账本。存原像而非仅存指纹是裁决 (b) 的强制约束：
+    // 仅存 sha256 只能比较不能校验——无法回答「哪个字段变了」，必须重跑三方实测
+    // 才能定位（本轮为这类差异投入了 6 个缺陷的自证时间）。存 canonicalJson 则
+    // 任何人可重算指纹核对（self-verifying，§4 self-hashed receipt）。
+    //
+    // 三列全部 nullable：v8rel6 及更早的残留行在快照列存在之前已封存，NULL 是诚
+    // 实值，语义=「此行封存于快照列存在之前」。新 seal 写入的必须非空，但这是由
+    // 测试断言保证的，不由 DB NOT NULL 约束（DB 约束会破坏残留行或需 DEFAULT 占
+    // 位伪造历史）。
+    //
+    // 不可变性：无需改 reject_evaluation_campaign_mutation 触发器——它用
+    // to_jsonb(NEW) - whitelist 减法比较，新增列自动落入不可变集合。测试断言 3
+    // 将证明该性质，以防将来触发器改成逐列显式比对而静默失保护。
+    if (!applied.has(23)) {
+      await client.query(`
+        ALTER TABLE evaluation_campaigns
+          ADD COLUMN IF NOT EXISTS envelope_inputs_json TEXT;
+        ALTER TABLE evaluation_campaigns
+          ADD COLUMN IF NOT EXISTS envelope_inputs_sha256 TEXT;
+        ALTER TABLE evaluation_campaigns
+          ADD COLUMN IF NOT EXISTS evaluation_version TEXT;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (23, $1, $2)",
+        ["envelope_inputs_snapshot_columns", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

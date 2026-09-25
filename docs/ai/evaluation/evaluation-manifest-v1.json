@@ -87,6 +87,7 @@
   "baseUnits": [
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+      "projectId": "U7lK9XXlq1",
       "unit": {
         "taskFamilyId": "fashion-lookbook",
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
@@ -118,6 +119,7 @@
     },
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+      "projectId": "EVALeditv1F",
       "unit": {
         "taskFamilyId": "fashion-lookbook",
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",

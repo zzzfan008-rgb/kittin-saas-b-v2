@@ -9,14 +9,50 @@ import {
 } from "../server/lib/evaluationCampaign";
 import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaign";
 import type { ImageModelId } from "../src/types/imageModels";
-import { promptEvaluationUnitKey } from "../src/lib/promptEvaluation";
-import crypto from "node:crypto";
+import { buildExecutionPlan } from "../server/engine/dag";
+import { evaluationAuthorizationTargetFromPlan } from "../server/lib/evaluationAuthorizationLedger";
+import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
 import { builtinTemplates } from "../server/routes/templates";
 
-// ---------- helpers ----------
+// ---------- shared authorization-unit chain ----------
+// 62-envelope-authority-ruling.md §1: seal and execute MUST derive the
+// evaluationUnitKey through the SAME function chain on the SAME project flow
+// (validateAndMigrateFlow → buildExecutionPlan → evaluationAuthorizationTargetFromPlan
+// → canonicalJson → sha256). The old seal path used promptEvaluationUnitKey on the
+// static manifest unit (9 fields, JSON.stringify) which can never equal the route's
+// 12-field canonicalJson envelope. This helper is the single entry point so preflight,
+// seal, and any future caller cannot drift apart again.
+/**
+ * 裁决 6②：和 evaluationUnitKey 同源同次计算的完整输出。
+ *
+ * evaluationAuthorizationTargetFromPlan 在一次调用中计算 12 字段
+ * canonicalJson → sha256，这里返回其中 4 个值，seal 一次取走写库。
+ * 绝对不允许密封侧再调一次派生函数——二次调用会产生「key 由输入 A
+ * 算出、快照存了 B」的漂移（与本轮 6 个缺陷同态）。
+ *
+ * 代价：每个 campaign seal 会 validateAndMigrateFlow + buildExecutionPlan 一遍，
+ * 与 route 取授权单元 key 的路径完全相同，期望不到 10ms，在密封 CLI 批量
+ * 场景中可接受。
+ */
+export function evaluationAuthorizationEnvelopeFromFlow(flowJson: unknown): {
+  authorizationUnitKey: `sha256:${string}`;
+  inputsCanonicalJson: string;
+  inputsSha256: string;
+  evaluationVersion: string;
+} {
+  const migrated = validateAndMigrateFlow(flowJson);
+  const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
+  const target = evaluationAuthorizationTargetFromPlan(plan);
+  return {
+    authorizationUnitKey: target.evaluationUnitKey,
+    inputsCanonicalJson: target.inputsCanonicalJson,
+    inputsSha256: target.inputsSha256,
+    evaluationVersion: target.evaluationVersion,
+  };
+}
 
-function sha256(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
+export function evaluationUnitKeyFromFlow(flowJson: unknown): `sha256:${string}` {
+  return evaluationAuthorizationEnvelopeFromFlow(flowJson).authorizationUnitKey;
 }
 
 // ---------- constants ----------
@@ -60,7 +96,11 @@ interface StageRequestCap {
 interface ManifestUnit {
   unitId: string;
   promptVariantId: string;
-  evaluationUnitKey: string;
+  projectId: string;
+  // NOTE: deliberately no evaluationUnitKey. The legacy 9-field
+  // promptEvaluationUnitKey(manifest.unit) key is NOT an authorization identity
+  // and must never travel with the plan (see sealCampaigns). Carrying it here is
+  // what made the v8rel6 seal/execute divergence possible.
 }
 
 interface LoadedManifest {
@@ -189,17 +229,36 @@ export function loadManifest(path: string): LoadedManifest {
     throw new Error("manifest is missing stageRequestCaps array");
   }
 
+  // Acceptance #7: manifest baseUnit definitions must not carry any key/hash
+  // fields — those belong to the ledger, not the planning document. AGENTS.md §4
+  // ("planning evidence only and never authorizes a paid call").
+  const FORBIDDEN_UNIT_KEY_RE = /(?:evaluationUnitKey|authorizationUnitKey|.*(?:Sha256|Hash))/;
+  for (const entry of data.baseUnits as Array<Record<string, unknown>>) {
+    const unit = entry.unit as Record<string, unknown> | undefined;
+    if (unit == null) continue;
+    const forbidden = Object.keys(unit).filter((k) => FORBIDDEN_UNIT_KEY_RE.test(k));
+    if (forbidden.length > 0) {
+      throw new Error(
+        `manifest baseUnit "${String(entry.unitId ?? "?")}" carries forbidden key/hash fields ` +
+          `in its unit definition: ${forbidden.join(", ")}. ` +
+          "evaluationUnitKey and hash values belong to the sealed ledger, not the planning document.",
+      );
+    }
+  }
+
   const baseUnits: ManifestUnit[] = (
     data.baseUnits as Array<Record<string, unknown>>
   ).map((entry) => {
     const unit = entry.unit as Record<string, unknown> | undefined;
-    const unitKey = unit != null
-      ? `sha256:${sha256(promptEvaluationUnitKey(unit as unknown as Parameters<typeof promptEvaluationUnitKey>[0]))}`
-      : `sha256:${"0".repeat(64)}`;
+    // projectId 是单元条目层的 locator（不在 unit 内部——unit 是闭合的 9 字段
+    // PromptEvaluationUnit，会参与身份计算）。清单里只有进入付费 campaign 的在册
+    // 单元才有 locator，所以此处允许缺省；「在册单元必须有 locator」由
+    // filterAndAssertUnits 在范围收窄到 2 个单元后 fail-closed 断言。
+    const projectId = entry.projectId;
     return {
       unitId: String(entry.unitId ?? ""),
       promptVariantId: String(unit?.promptVariantId ?? ""),
-      evaluationUnitKey: unitKey,
+      projectId: typeof projectId === "string" ? projectId : "",
     };
   });
 
@@ -216,7 +275,33 @@ export function loadManifest(path: string): LoadedManifest {
   return { baseUnits, stageRequestCaps };
 }
 
-// ---------- variant assertion ----------
+// ---------- assert tracked tree clean (pre-seal/prepare, --untracked-files=no) ----------
+// Ruling (e): seal and prepare must verify that every tracked file is clean
+// before writing any seal data to the database. This is distinct from
+// assertPaidEvaluationStartupConfig (server/config.ts) which uses plain
+// porcelain (--untracked-files=normal) and is the paid-execution guard.
+// A dirty tracked tree in seal would embed an unreproducible code identity
+// into the immutable ledger, violating AGENTS.md §4 audit requirements.
+
+import { execSync } from "node:child_process";
+
+export function assertTrackedTreeClean(repoCwd: string): void {
+  const output = execSync("git status --porcelain=v1 --untracked-files=no", {
+    cwd: repoCwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000,
+  })
+    .replace(/\r?\n$/, "")
+    .trim();
+  if (output.length > 0) {
+    throw new Error(
+      `seal/prepare requires a clean tracked Git worktree at "${repoCwd}". ` +
+        `The following tracked files are modified or staged:\n${output}\n` +
+        "Commit or stash these changes and re-run.",
+    );
+  }
+}
 
 function collectTemplateVariantIds(): Map<string, string[]> {
   const templates = builtinTemplates();
@@ -285,6 +370,15 @@ function filterAndAssertUnits(
         `unitId "${unit.unitId}" must equal promptVariantId "${unit.promptVariantId}"`,
       );
     }
+    // 在册单元必须带 project locator：seal 要用它读真实 project flow 来派生
+    // 授权 unit key（62-envelope-authority-ruling.md §1）。这里 fail-closed，
+    // 避免空 locator 一路走到 seal 才报出难以定位的 "saved project not found"。
+    if (unit.projectId.trim() === "") {
+      throw new Error(
+        `manifest baseUnit "${unit.unitId}" has no entry-level projectId locator; ` +
+          "seal needs it to load the saved project flow that derives the authorization unit key",
+      );
+    }
   }
 
   return filtered;
@@ -305,7 +399,7 @@ interface CampaignPlan {
   modelId: string;
   variantId: string;
   unitId: string;
-  evaluationUnitKey: string;
+  projectId: string;
   slots: SlotPlan[];
   budgetLimitMinor: number;
 }
@@ -343,7 +437,7 @@ export function generateCampaignPlans(
         modelId,
         variantId: unit.promptVariantId,
         unitId: unit.unitId,
-        evaluationUnitKey: unit.evaluationUnitKey,
+        projectId: unit.projectId,
         slots,
         budgetLimitMinor,
       });
@@ -376,7 +470,39 @@ function assertBudgetGate(plans: CampaignPlan[]): void {
 
 // ---------- dry-run report ----------
 
-function dryRunReport(plans: CampaignPlan[]): void {
+/**
+ * 裁决 6.2：seal 输出必须打印 evaluationVersion 当前值。
+ *
+ * 该值一律从变体注册表派生（`PromptVariant.evaluationVersion`，即 dag.ts 写入
+ * envelope 的同一字段），绝不在此处硬编码字面量——硬编码的副本会在 pending 转正时
+ * 静默失真，正好破坏「机械回答哪些账本在哪个注册表版本下封的」这个目的。
+ * 两个在册单元的版本必须一致，否则 envelope 身份本身就有歧义，直接拒绝。
+ */
+async function sealEvaluationVersion(): Promise<string> {
+  const { getGarmentPromptVariantById } = await import("../src/lib/garmentPromptPresets");
+  const versions = new Map<string, string>();
+  for (const variantId of [GENERATE_VARIANT, EDIT_VARIANT]) {
+    const variant = getGarmentPromptVariantById(variantId);
+    if (!variant) throw new Error(`variant not found in registry: ${variantId}`);
+    if (!variant.evaluationVersion) {
+      throw new Error(`variant ${variantId} has no evaluationVersion in the registry`);
+    }
+    versions.set(variant.evaluationVersion, variantId);
+  }
+  if (versions.size !== 1) {
+    throw new Error(
+      "registry evaluationVersion is not uniform across the sealed units: "
+        + [...versions].map(([v, id]) => `${id}=${v}`).join(", ")
+        + ". The envelope identity would be ambiguous; refusing to seal.",
+    );
+  }
+  return [...versions.keys()][0];
+}
+
+function dryRunReport(
+  plans: CampaignPlan[],
+  extra: Record<string, unknown> = {},
+): void {
   const totalBudget = plans.reduce((sum, p) => sum + p.budgetLimitMinor, 0);
   const totalSlots = plans.reduce((sum, p) => sum + p.slots.length, 0);
 
@@ -389,6 +515,7 @@ function dryRunReport(plans: CampaignPlan[]): void {
         totalBudgetMinor: totalBudget,
         currency: "USD",
         priceMinorPerRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
+        ...extra,
         campaigns_plan: plans.map((p) => ({
           campaignId: p.campaignId,
           stage: p.stage,
@@ -453,16 +580,42 @@ async function sealCampaigns(
     };
 
     for (const plan of plans) {
+      // Compute the authorization unit key through the SAME chain the route uses
+      // (62-envelope-authority-ruling.md §1). Table/column semantics mirror
+      // server/routes/runPlan.ts:209-223: `projects` table, `flow_json` is a TEXT
+      // column holding JSON, and only lifecycle='saved' projects are runnable.
+      const project = await database.queryOne<{ flow_json: string }>(
+        `SELECT flow_json FROM projects
+         WHERE id = $1 AND deleted_at IS NULL AND lifecycle = 'saved'`,
+        [plan.projectId],
+      );
+      if (!project) {
+        throw new Error(
+          `saved project ${plan.projectId} not found for campaign ${plan.campaignId}; ` +
+            "seal refuses to fall back to the manifest static unit key",
+        );
+      }
+      // 62-envelope-authority-ruling.md §1: the sealed authorization unit key is
+      // derived ONLY from the real project flow through the shared chain
+      // (validateAndMigrateFlow → buildExecutionPlan →
+      // evaluationAuthorizationTargetFromPlan). CampaignPlan deliberately has no
+      // evaluationUnitKey field, so a manifest-derived key cannot be carried into
+      // the ledger even by accident — that footgun is what broke v8rel6.
+      const envelope = evaluationAuthorizationEnvelopeFromFlow(JSON.parse(project.flow_json));
+
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,
         stage: plan.stage,
         modelId: plan.modelId as ImageModelId,
-        authorizationUnitKey: plan.evaluationUnitKey as `sha256:${string}`,
+        authorizationUnitKey: envelope.authorizationUnitKey,
         codeSha,
         maxProviderRequests: plan.slots.length,
         budgetLimitMinor: plan.budgetLimitMinor,
         budgetCurrency,
+        inputsCanonicalJson: envelope.inputsCanonicalJson,
+        inputsSha256: envelope.inputsSha256,
+        evaluationVersion: envelope.evaluationVersion,
         slots: plan.slots.map((slot) => {
           const hashes = slotHashes?.get(slot.slotId);
           const resolvedPromptSha256 = hashes?.resolvedPromptSha256 ?? "0".repeat(64);
@@ -535,6 +688,7 @@ async function runPrepare(
   flags: Map<string, string | true>,
   variantIds: string[],
 ): Promise<void> {
+  assertTrackedTreeClean(ROOT_DIR);
   const codeSha = requiredFlag(flags, "code-sha");
   const campaignIdPrefix = requiredFlag(flags, "campaign-id");
   const outPath = requiredFlag(flags, "out");
@@ -675,6 +829,7 @@ async function runSeal(
   flags: Map<string, string | true>,
   variantIds: string[],
 ): Promise<void> {
+  assertTrackedTreeClean(ROOT_DIR);
   const adminId = requiredFlag(flags, "admin-id");
   const campaignIdPrefix = requiredFlag(flags, "campaign-id");
   const modelId = requiredFlag(flags, "model-id");
@@ -732,10 +887,31 @@ async function runSeal(
     console.log(JSON.stringify({ loadedSlots: materialized.slots.length, from: slotsPath }));
   }
 
+  // 裁决 6.2：seal 输出打印 evaluationVersion 当前值，用于 pending 转正前后 trace。
+  // dry-run 分支必须把该值折进 dryRunReport 的单一 JSON 载荷里——dry-run 的 stdout
+  // 就是一份 JSON 文档（tests/campaign-runner.test.ts:60 直接 JSON.parse(stdout)），
+  // 额外打印一行会让它变成两份文档而解析失败。
+  // dry-run 也必须在此 return：往下就是 sealCampaigns 的库内 admin 校验与封账写入，
+  // dry-run 不得触碰数据库（这是 ec28986 块重写时丢掉的早返回）。
+  const registryEvaluationVersion = await sealEvaluationVersion();
   if (dryRun) {
-    dryRunReport(plans);
+    dryRunReport(plans, {
+      evaluationVersion: registryEvaluationVersion,
+      note:
+        "Pending → final 后所有已封存账本 key 静默失效（形态为 route 403），" +
+        "需机械回答哪些账本在哪个注册表版本下封的",
+    });
     return;
   }
+
+  console.log(
+    JSON.stringify({
+      evaluationVersion: registryEvaluationVersion,
+      note:
+        "Seal uses current registry evaluationVersion. " +
+        "Pending→final 后所有已封存账本 key 静默失效。",
+    }),
+  );
 
   // 5. seal campaigns in DB
   await sealCampaigns(
@@ -1075,7 +1251,41 @@ export async function runExecuteCore(
       // persisted authorization and binds the slot to the new run; the worker
       // performs the in-transaction budget reservation (the second hard gate)
       // and evidence ledgering. The runner never reserves directly (spec §7.3).
-      const submitted = await deps.submitEvaluationRun({ campaign: currentCampaign, slot });
+      //
+      // Retry semantics (ruling b): clientRequestId is deterministic (slotId), so
+      // re-submitting the same slot either replays the original run idempotently
+      // (same fingerprint → existing run returned) or is rejected with HTTP 409
+      // (fingerprint drift / case conflict / active-run limit). A raw
+      // unique-violation or bare 409 must never crash the caller: classify it as
+      // a slot-level terminal outcome with a clear reason, then abort the loop.
+      let submitted: { runId: string };
+      try {
+        submitted = await deps.submitEvaluationRun({ campaign: currentCampaign, slot });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Ruling (b): a deterministic clientRequestId (= slotId) means re-submitting
+        // the same slot either replays idempotently or is rejected with HTTP 409
+        // (fingerprint drift / case conflict / active-run limit / unique index).
+        // Recognize that as a slot-level terminal outcome with a clear reason —
+        // never let a bare unique-violation crash the caller. Any other failure
+        // (400/403/500/network) is a genuine submission error and still propagates.
+        if (/HTTP 409/.test(message)) {
+          console.error(
+            JSON.stringify({
+              campaignId,
+              slotId: slot.slotId,
+              status: "terminal_failure",
+              outcome: "failed",
+              reason:
+                "slot_already_submitted_or_conflict: deterministic clientRequestId collision — a run for this slot already exists (idempotent replay fingerprint mismatch, case conflict, or active-run limit). The previously submitted run is authoritative; reconcile generation_runs for this clientRequestId before any resubmit.",
+              detail: message,
+            }),
+          );
+          process.exitCode = 1;
+          return;
+        }
+        throw error;
+      }
 
       cumulativeReserved += slot.priceMinorPerProviderRequest;
 
@@ -1219,8 +1429,6 @@ async function runExecute(
     );
   }
 
-  let runSequence = 0;
-
   const submitEvaluationRun = async (input: {
     campaign: ExecuteCampaignInfo;
     slot: ExecuteSlotInfo;
@@ -1249,7 +1457,14 @@ async function runExecute(
       );
     }
     const onlyNodeId = generatorNodes[0].id;
-    runSequence += 1;
+    // Self-check: every slotId must pass CLIENT_REQUEST_ID_PATTERN before it leaves this runner.
+    // Dynamic import to avoid ESM top-level await issues in this script.
+    const { CLIENT_REQUEST_ID_PATTERN } = await import("../server/engine/runQueue/types.js");
+    if (!CLIENT_REQUEST_ID_PATTERN.test(input.slot.slotId)) {
+      throw new Error(
+        `clientRequestId "${input.slot.slotId}" fails CLIENT_REQUEST_ID_PATTERN — fix the runner`,
+      );
+    }
     const response = await fetch(`${baseUrl}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -1262,7 +1477,7 @@ async function runExecute(
         onlyNodeId,
         includeDownstream: false,
         projectId,
-        clientRequestId: `eval-${input.campaign.campaignId}-${input.slot.slotId}-${runSequence}`,
+        clientRequestId: input.slot.slotId,
         evaluation: {
           caseId: input.slot.caseId,
           sampleId: input.slot.sampleId,

@@ -46,6 +46,16 @@ export interface EvaluationAuthorizationTarget {
   promptVariantId: string;
   evaluationUnitKey: `sha256:${string}`;
   maximumProviderRequests: number;
+  /**
+   * 裁决 62-envelope-authority-ruling.md ruling 6②：envelope 输入源快照。
+   *
+   * 和 evaluationUnitKey 由**同一次函数调用**计算，不得在调用点重算。
+   * seal 必须取这个元组写库，避免「key 由输入 A 算出、快照存了 B」这种
+   * 二次计算漂移（与本轮修掉的 6 个缺陷同态）。
+   */
+  inputsCanonicalJson: string;
+  inputsSha256: string;
+  evaluationVersion: string;
 }
 
 interface AuthorizationRow {
@@ -141,11 +151,43 @@ export function evaluationAuthorizationTargetFromPlan(plan: ExecutionPlan): Eval
     batchSize: step.params.batchSize,
     modelOptions: step.params.modelOptions ?? {},
   };
+
+  // Ruling 62-envelope-authority-ruling.md sec3:
+  // 12-field assertion: any undefined/null → throw immediately.
+  // Silently producing a degraded key (C degradation) is forbidden.
+  for (const [key, value] of Object.entries(unitEnvelope)) {
+    if (value === undefined || value === null) {
+      throw new EvaluationRunPolicyError(
+        `evaluation unit envelope field "${key}" is ${String(value)} — ` +
+          `all 12 fields must be present. Caused by: variant registry missing data ` +
+          `or project flow node missing upstream inputs.`,
+        400,
+      );
+    }
+  }
+
+  // Ruling 62-envelope-authority-ruling.md sec3: nodeKind must be
+  // "image-generator" in the envelope. The alias "image" is only accepted
+  // in the admission layer (promptRunAdmission.ts:376) during the R-89
+  // transition; normalising it here would create two sources of truth.
+  if (unitEnvelope.nodeKind !== "image-generator") {
+    throw new EvaluationRunPolicyError(
+      `evaluation unit envelope nodeKind must be "image-generator", got "${String(unitEnvelope.nodeKind)}"`,
+      400,
+    );
+  }
+  // 裁决 62 ruling 6②：和 evaluationUnitKey 由同一次函数调用计算 ——
+  // 不允许调用点二次派生快照。这里用同一个 unitEnvelope、同一趟 canonicalJson。
+  const inputsCanonicalJson = canonicalJson(unitEnvelope);
+  const inputsSha256 = createHash("sha256").update(inputsCanonicalJson).digest("hex");
   return {
     modelId,
     promptVariantId,
-    evaluationUnitKey: `sha256:${createHash("sha256").update(canonicalJson(unitEnvelope)).digest("hex")}`,
+    evaluationUnitKey: `sha256:${inputsSha256}`,
     maximumProviderRequests: maximumProviderRequestsForStep(step),
+    inputsCanonicalJson,
+    inputsSha256,
+    evaluationVersion: String(unitEnvelope.evaluationVersion),
   };
 }
 
@@ -282,7 +324,16 @@ function assertAuthorizationMatches(
     throw new EvaluationRunPolicyError("真实评估只接受精确 evaluation-unit 授权", 403);
   }
   if (row.evaluation_unit_key !== target.evaluationUnitKey) {
-    throw new EvaluationRunPolicyError("真实评估授权单位与运行计划不匹配", 403);
+    // Ruling 62-envelope-authority-ruling.md acceptance 18:
+    // surface the route-computed envelope fields so a field-level diff
+    // against the sealed ledger is self-evident (no blind 403).
+    throw new EvaluationRunPolicyError(
+      `真实评估授权单位与运行计划不匹配. ` +
+        `route-computed evaluationUnitKey: ${target.evaluationUnitKey}. ` +
+        `To reconstruct the sealed envelope, compare this key with the ` +
+        `ledger's evaluation_unit_key: ${row.evaluation_unit_key}`,
+      403,
+    );
   }
   if (target.maximumProviderRequests > row.max_provider_requests) {
     throw new EvaluationRunPolicyError(

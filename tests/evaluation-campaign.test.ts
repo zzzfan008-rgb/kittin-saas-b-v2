@@ -52,7 +52,7 @@ const PRICE_MINOR = 17;
 const evaluationPlan: ExecutionPlan = {
   steps: [{
     nodeId: "evaluation-campaign-node",
-    kind: "image",
+    kind: "image-generator", // v8 NodeKind; envelope rejects the v7 alias (ruling 62 sec3)
     inputImages: [],
     inputReferences: [],
     params: {
