@@ -16,7 +16,7 @@ import {
   type FlowNode,
   type FlowEdge,
 } from "../server/engine/dag";
-import type { WorkflowNodeData } from "../src/types/workflow";
+import type { ExecutionPlan, WorkflowNodeData } from "../src/types/workflow";
 import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import {
   getModelParameterProfile,
@@ -96,6 +96,38 @@ function variantBoundImageGeneratorNode(id: string): FlowNode {
       aspectRatio: r78Materialized.aspectRatio,
       batchSize: r78Materialized.batchSize,
       modelOptions: r78Materialized.modelOptions,
+    } as WorkflowNodeData,
+  };
+}
+
+// #62 见证测试用的 gpt-image 变体（与真实 generate 侧 project 同一变体）
+const w62Variant = requireGarmentPromptVariant({
+  familyId: "fashion-lookbook",
+  modelId: "gpt-image-2.5-flare-vip",
+  nodeKind: "image",
+  mode: "generate",
+});
+const w62Profile = getModelParameterProfile(w62Variant.parameterProfileId)!;
+const w62Materialized = materializeModelParameterProfile(w62Profile);
+
+/**
+ * 真实 project flow 的 image-generator 节点形态：只携带 7 个 key
+ * （kind/label/modelId/promptVariantId/aspectRatio/batchSize/status），
+ * 3 个身份字段（promptFamilyId/contractHash/evaluationVersion）由服务端从变体注册表派生。
+ */
+function w62RealFlowImageGeneratorNode(id: string): FlowNode {
+  return {
+    id,
+    type: "image-generator",
+    data: {
+      kind: "image-generator",
+      label: "生图",
+      status: "idle",
+      modelId: w62Variant.modelId,
+      promptVariantId: w62Variant.variantId,
+      aspectRatio: w62Materialized.aspectRatio,
+      batchSize: w62Materialized.batchSize,
+      modelOptions: w62Materialized.modelOptions,
     } as WorkflowNodeData,
   };
 }
@@ -231,6 +263,84 @@ function main() {
         && error.decision.code === "missing-binding",
       "未选变体（operationMode 缺失）必须在准入层以 missing-binding 拒绝",
     );
+  });
+
+  // ---------- #62 envelope authority witnesses (62-envelope-authority-ruling.md) ----------
+
+  ok("回归见证：image-generator 步骤必须携带 promptVariantId/aspectRatio/batchSize/modelOptions + 3 个注册表派生字段", () => {
+    // feaa817 曾整块重写 extractParams 的 image-generator return，误删 4 行
+    // （aspectRatio/batchSize/modelOptions/promptVariantId）→ promptVariantId 不进
+    // step.params → 准入闸 missing-binding → generate 侧真实路径全挂。
+    // tsc 看不出（这些字段在类型里可选），只有这条断言能拦住。
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代都市女装"), w62RealFlowImageGeneratorNode("g1")],
+      [edge("t1", "g1")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(
+      g1.params.promptVariantId,
+      w62Variant.variantId,
+      "extractParams 必须把 data.promptVariantId 放进 step.params（删掉即回归）",
+    );
+    assert.equal(g1.params.aspectRatio, w62Materialized.aspectRatio);
+    assert.equal(g1.params.batchSize, w62Materialized.batchSize);
+    assert.deepStrictEqual(g1.params.modelOptions, w62Materialized.modelOptions);
+    // 3 字段来自 variant 注册表（dag.ts:323-325），不是 data.*
+    assert.equal(g1.params.promptFamilyId, w62Variant.familyId);
+    assert.equal(g1.params.contractHash, w62Variant.contractHash);
+    assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion);
+    assert.equal(g1.params.postprocessVersion, w62Profile.postprocess.version);
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan, { evaluationRun: true }));
+  });
+
+  ok("变异验收：从 step.params 删 promptVariantId → 准入必须红（missing-binding）", () => {
+    // 模拟 feaa817 的缺陷形态：extractParams 不再输出 promptVariantId。
+    // 若准入闸没有拦住，说明这道闸被弱化——必须立刻红。
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代都市女装"), w62RealFlowImageGeneratorNode("g1")],
+      [edge("t1", "g1")],
+    );
+    // 前置对照：未变异时必须通过准入，否则这条变异测试是假阳性
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan, { evaluationRun: true }));
+    const mutated: ExecutionPlan = {
+      steps: plan.steps.map((s) => ({
+        ...s,
+        params: Object.fromEntries(
+          Object.entries(s.params).filter(([k]) => k !== "promptVariantId"),
+        ),
+      })),
+    };
+    assert.throws(
+      () => assertPromptRunAdmissions(mutated, { evaluationRun: true }),
+      (error) => error instanceof PromptRunAdmissionError
+        && error.decision.allowed === false
+        && error.decision.code === "missing-binding",
+      "删除 promptVariantId 后准入必须以 missing-binding 拒绝，不得静默放行",
+    );
+  });
+
+  ok("裁决 2 见证：节点 data 上的 contractHash/evaluationVersion/promptFamilyId 不得覆盖注册表值", () => {
+    // 62-envelope-authority-ruling.md 裁决 2：dag.ts 原 :320-322 读 data.* 被删除，
+    // 不得保留为 override —— 保留等于允许用户在画布上写契约哈希改变授权身份（违反 §4）。
+    const forged: FlowNode = {
+      id: "g1",
+      type: "image-generator",
+      data: {
+        ...w62RealFlowImageGeneratorNode("g1").data,
+        // 伪造值：若 extractParams 仍读 data.*，这些会覆盖注册表值 → 授权身份被篡改
+        contractHash: "sha256:" + "f".repeat(64),
+        evaluationVersion: "forged-eval-v99",
+        promptFamilyId: "forged-family",
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan([textNode("t1", "设计一套现代都市女装"), forged], [edge("t1", "g1")]);
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.contractHash, w62Variant.contractHash, "contractHash 必须来自注册表，不得被 data.* 覆盖");
+    assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion, "evaluationVersion 必须来自注册表");
+    assert.equal(g1.params.promptFamilyId, w62Variant.familyId, "promptFamilyId 必须来自注册表");
+    assert.notEqual(g1.params.contractHash, "sha256:" + "f".repeat(64));
+    assert.notEqual(g1.params.evaluationVersion, "forged-eval-v99");
+    assert.notEqual(g1.params.promptFamilyId, "forged-family");
   });
 
   console.log(`\n通过 ${passed} 项`);
