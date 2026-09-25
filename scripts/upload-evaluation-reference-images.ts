@@ -1,16 +1,23 @@
 /**
- * 24 张参考图入库脚本（step 2，裁决 D 前置）
+ * 24 张参考图入库脚本 v3（step 2，architect 裁决 1/2/D，
+ * 62-reference-image-spec-ruling.md）
  *
- * 入库链：
- *   1. 读磁盘文件 → 算 sha256 → 三重白名单校验（goldenSet.ts）
- *   2. COPY 到 uploadsDir/ + INSERT files（绕过 normalize，保持 3584×4800 原尺寸）
- *   3. 回写 golden-set referenceImage.fileId/sha256
+ * 入库链（裁决 1：走生产同一函数，不绕过 normalize）：
+ *   1. 读磁盘交付文件 → 算 sha256 → 溯源白名单校验（deliveredSourceSha256 语义）
+ *   2. 调生产函数 saveNormalizedUploadDataUrl（server/lib/fileStore.ts:157，
+ *      与 POST /api/files 路由 server/routes/files.ts:69 同一入口）→ 拿真实 fileId
+ *   3. INSERT files 表 normalized=TRUE（对齐 files.ts:73-80 生产列集）
+ *   4. 回读：从 uploadsDir 读实际存储字节算 sha256 = assetSha256
+ *      （裁决 2：执行绑定 pin 必须入库后从实际存储回读，不得规划期手抄）
+ *   5. 回写 golden-set referenceImage.{fileId, deliveredSourceSha256, assetSha256}
+ *      （裁决 2：溯源与绑定分字段；裁决 D：golden-set 是 fileId 单一事实源）
  *
- * 幂等：按 sample.id 去重，已入库的不要重复 COPY/INSERT（只校验 sha256 一致性）。
+ * 幂等：golden-set 已有 assetSha256+fileId → 只校验回读一致，不重复入库。
+ * 补偿：files INSERT 失败 → 删除已落盘文件（对齐 files.ts:88-90 语义）。
  *
  * 用法：
- *   npx tsx scripts/upload-evaluation-reference-images.ts           # 干跑（校验 + 计划）
- *   npx tsx scripts/upload-evaluation-reference-images.ts --commit # 写入 dev 库 + 文件系统
+ *   npx tsx scripts/upload-evaluation-reference-images.ts           # dry-run（真实 normalize 预演，不落盘不写库）
+ *   npx tsx scripts/upload-evaluation-reference-images.ts --commit  # 写 dev 库 + 文件系统 + 回写 golden-set
  */
 
 import assert from "node:assert/strict";
@@ -18,9 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { nanoid } from "nanoid";
-import { config } from "../server/config";
-import { query, queryOne, db, closeDatabaseForTests } from "../server/lib/database";
+import { queryOne, db, closeDatabaseForTests } from "../server/lib/database";
 import {
   loadGoldenSet,
   GOLDEN_SET_SIZE,
@@ -28,172 +33,198 @@ import {
   REQUIRED_SHA256,
   type GoldenSample,
 } from "../server/lib/goldenSet";
+import { saveNormalizedUploadDataUrl, uploadsDir } from "../server/lib/fileStore";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const IMAGES_DIR = path.resolve(ROOT, "tmp/golden-set-images");
 const GOLDEN_SET_PATH = path.resolve(ROOT, "docs/ai/evaluation/golden-set-v1.json");
 
-// ── helpers ─────────────────────────────────────────────────────────────
-
-function sha256File(filePath: string): string {
-  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+function sha256Bytes(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
 }
 
-function uploadsDir(): string {
-  const dir = path.join(config.dataDir(), "uploads");
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-interface ImageMeta {
-  filePath: string;
-  diskSha256: string;
-  width: number;
-  height: number;
-  byteLength: number;
-}
-
-function readImageMeta(filePath: string): ImageMeta {
-  const buf = fs.readFileSync(filePath);
-  const { size } = fs.statSync(filePath);
-  // 读 JPEG 尺寸（只解析头部 SOF 段，不加载完整位图）
-  const sofa = buf.indexOf(0xff, 2);
-  let offset = sofa;
-  while (offset < Math.min(buf.length - 9, 65536)) {
-    const marker = buf[offset + 1];
-    if (marker === 0xc0 || marker === 0xc2) {
-      // SOF0 / SOF2
-      const h = buf.readUInt16BE(offset + 5);
-      const w = buf.readUInt16BE(offset + 7);
-      return {
-        filePath,
-        diskSha256: createHash("sha256").update(buf).digest("hex"),
-        width: w,
-        height: h,
-        byteLength: size,
-      };
-    }
-    const segLen = buf.readUInt16BE(offset + 2);
-    offset += 2 + segLen;
-  }
-  throw new Error(`${filePath}: could not parse JPEG dimensions`);
-}
-
-/** 裁D④ sha256 白名单校验（三重）。
- *  返回 null = 通过；返回 string = 拒绝原因。 */
-function checkImageSha256(sampleId: string, diskSha256: string): string | null {
-  if (REJECTED_SHA256.has(diskSha256)) {
-    return `REJECTED — sha256 ${diskSha256} is in the rejected list (amazon watermark / r2). ` +
-      `Replace ${sampleId}.jpg with the approved r4 version (expected: ${REQUIRED_SHA256[sampleId] ?? "not pinned"}).`;
+/** 溯源白名单校验（对交付原文件 sha256）。返回 null = 通过；string = 拒绝原因。 */
+function checkDeliveredSourceSha256(sampleId: string, sourceSha256: string): string | null {
+  if (REJECTED_SHA256.has(sourceSha256)) {
+    return `REJECTED — sha256 ${sourceSha256} is in the rejected list (known-bad hash). ` +
+      `Required for ${sampleId}: ${REQUIRED_SHA256[sampleId] ?? "not pinned"}.`;
   }
   const required = REQUIRED_SHA256[sampleId];
-  if (required !== undefined && diskSha256 !== required) {
-    return `sha256 MISMATCH for ${sampleId}: required ${required}, disk ${diskSha256}`;
+  if (required !== undefined && sourceSha256 !== required) {
+    return `deliveredSourceSha256 MISMATCH for ${sampleId}: required ${required}, disk ${sourceSha256}`;
   }
   return null;
 }
 
-// ── main ────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
   const commit = process.argv.includes("--commit");
-  console.log(`upload-evaluation-reference-images: mode=${commit ? "COMMIT" : "DRY-RUN"}`);
+  console.log(
+    `upload-evaluation-reference-images v3: mode=${commit ? "COMMIT" : "DRY-RUN"} (production normalize path)`,
+  );
 
   const goldenSet = loadGoldenSet();
   assert.strictEqual(goldenSet.samples.length, GOLDEN_SET_SIZE);
   assert.ok(fs.existsSync(IMAGES_DIR), `images dir not found: ${IMAGES_DIR}`);
 
-  // owner
   const ownerRow = await queryOne<{ id: string }>(
     "SELECT id FROM users WHERE account_id = $1 LIMIT 1",
     ["admin"],
   );
-  assert.ok(ownerRow, "admin user not found");
+  assert.ok(ownerRow !== undefined, "admin user not found in database");
   const ownerId = ownerRow.id;
+
+  if (commit) {
+    const dbNameRow = await queryOne<{ db: string }>("SELECT current_database() AS db");
+    const dbName = dbNameRow?.db ?? "";
+    assert.ok(
+      !dbName.endsWith("_test"),
+      `--commit must target the dev database, got "${dbName}" (test db)`,
+    );
+    console.log(`  target db: ${dbName} (dev, no reset)`);
+  }
 
   let uploaded = 0;
   let skipped = 0;
-  const now = new Date().toISOString();
-  const updates: Array<{ sample: GoldenSample; fileId: string; sha256: string }> = [];
+  let failed = 0;
+  const updates: Array<{
+    sample: GoldenSample;
+    fileId: string;
+    deliveredSourceSha256: string;
+    assetSha256: string;
+  }> = [];
 
-  for (let i = 0; i < goldenSet.samples.length; i++) {
-    const sample = goldenSet.samples[i];
+  for (const sample of goldenSet.samples) {
     const imgPath = path.join(IMAGES_DIR, `${sample.id}.jpg`);
-    assert.ok(fs.existsSync(imgPath), `missing image: ${imgPath}`);
+    if (!fs.existsSync(imgPath)) {
+      console.error(`  FAIL ${sample.id}: image file not found at ${imgPath}`);
+      failed += 1;
+      continue;
+    }
 
-    const meta = readImageMeta(imgPath);
-    const whitelistError = checkImageSha256(sample.id, meta.diskSha256);
+    // 1. 交付原文件溯源校验
+    const sourceBuf = fs.readFileSync(imgPath);
+    const sourceSha256 = sha256Bytes(sourceBuf);
+    const whitelistError = checkDeliveredSourceSha256(sample.id, sourceSha256);
     if (whitelistError) {
       console.error(`  FAIL ${sample.id}: ${whitelistError}`);
-      skipped += 1;
+      failed += 1;
       continue;
     }
 
-    // 幂等：已入库 → 只校验 sha256 一致
-    if (sample.referenceImage?.sha256) {
-      assert.strictEqual(
-        meta.diskSha256,
-        sample.referenceImage.sha256,
-        `${sample.id}: disk sha256 ${meta.diskSha256} != golden-set referenceImage.sha256 ${sample.referenceImage.sha256}`,
+    // 幂等：golden-set 已有 assetSha256+fileId → 只校验回读一致
+    const existing = sample.referenceImage;
+    if (existing?.assetSha256 && existing.fileId) {
+      const storedPath = path.join(uploadsDir(), existing.fileId);
+      if (fs.existsSync(storedPath)) {
+        const readBackSha256 = sha256Bytes(fs.readFileSync(storedPath));
+        if (readBackSha256 === existing.assetSha256) {
+          console.log(
+            `  SKIP ${sample.id}: already uploaded, read-back assetSha256 matches (${existing.fileId})`,
+          );
+          skipped += 1;
+          continue;
+        }
+        console.error(
+          `  FAIL ${sample.id}: stored asset sha256 drift — golden-set ${existing.assetSha256}, read-back ${readBackSha256}`,
+        );
+        failed += 1;
+        continue;
+      }
+      console.error(
+        `  FAIL ${sample.id}: golden-set claims fileId ${existing.fileId} but it is not on disk`,
       );
-      console.log(`  SKIP ${sample.id}: already has referenceImage, sha256 matches`);
-      skipped += 1;
+      failed += 1;
       continue;
     }
 
-    // 新入库
-    const ext = "jpg";
-    const fileId = `${nanoid(12)}.${ext}`;
-    const destPath = path.join(uploadsDir(), fileId);
+    const dataUrl = `data:image/jpeg;base64,${sourceBuf.toString("base64")}`;
 
-    if (commit) {
-      // ② COPY 到 uploadsDir
-      if (!fs.existsSync(destPath)) {
-        fs.copyFileSync(imgPath, destPath);
-        fs.chmodSync(destPath, 0o600);
-      }
-      // INSERT files 表
-      const res = await db().query(
-        `INSERT INTO files (id, owner_id, mime_type, width, height, byte_length, normalized, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7)
-         ON CONFLICT (id) DO NOTHING`,
-        [fileId, ownerId, "image/jpeg", meta.width, meta.height, meta.byteLength, now],
+    if (!commit) {
+      // dry-run：调真实 normalize 函数验证可入库性 + 产出元数据（不落盘不写库）
+      const { normalizeUploadImageDataUrl } = await import(
+        "../server/lib/uploadImageNormalization"
       );
-      if ((res.rowCount ?? 0) > 0) {
-        console.log(`  OK ${sample.id} → fileId=${fileId} sha256=${meta.diskSha256.slice(0, 12)}…`);
-        uploaded += 1;
-      } else {
-        console.log(`  SKIP ${sample.id}: fileId ${fileId} already exists in files table`);
-        skipped += 1;
-      }
-    } else {
+      const normalized = await normalizeUploadImageDataUrl(dataUrl);
+      const previewAssetSha256 = sha256Bytes(normalized.buffer);
       console.log(
-        `  DRY-RUN ${sample.id}: would copy → uploads/${fileId} sha256=${meta.diskSha256.slice(0, 12)}… ${meta.width}x${meta.height} ${meta.byteLength}B`,
+        `  DRY-RUN ${sample.id}: normalize ok → ${normalized.width}x${normalized.height} ` +
+          `${normalized.byteLength}B ${normalized.mimeType} ` +
+          `(preview assetSha256=${previewAssetSha256.slice(0, 12)}…, source=${sourceSha256.slice(0, 12)}…)`,
       );
       uploaded += 1;
+      continue;
     }
 
-    updates.push({ sample, fileId, sha256: meta.diskSha256 });
+    // 2. commit：生产同一函数入库（saveNormalizedUploadDataUrl = 裁决 1）
+    const saved = await saveNormalizedUploadDataUrl(dataUrl);
+    try {
+      // 3. files 表登记（对齐 files.ts:73-80 生产列集）
+      const res = await db().query(
+        `INSERT INTO files (
+           id, owner_id, source_type, mime_type, width, height, byte_length, normalized, created_at
+         ) VALUES ($1, $2, 'upload', $3, $4, $5, $6, TRUE, $7)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          saved.id,
+          ownerId,
+          saved.mimeType,
+          saved.width,
+          saved.height,
+          saved.byteLength,
+          new Date().toISOString(),
+        ],
+      );
+      assert.strictEqual(
+        res.rowCount,
+        1,
+        `files INSERT for ${saved.id} did not insert (unexpected conflict)`,
+      );
+    } catch (error) {
+      // 补偿：库失败必须删除已落盘文件（files.ts:88-90 同语义）
+      fs.rmSync(path.join(uploadsDir(), saved.id), { force: true });
+      throw error;
+    }
+
+    // 4. 回读实际存储字节 → assetSha256（裁决 2：pin 从入库产物回读）
+    const readBack = fs.readFileSync(path.join(uploadsDir(), saved.id));
+    const assetSha256 = sha256Bytes(readBack);
+    assert.strictEqual(
+      readBack.byteLength,
+      saved.byteLength,
+      `${sample.id}: read-back byteLength ${readBack.byteLength} != saved.byteLength ${saved.byteLength}`,
+    );
+
+    console.log(
+      `  OK ${sample.id} → fileId=${saved.id} ${saved.width}x${saved.height} ${saved.byteLength}B ` +
+        `assetSha256=${assetSha256.slice(0, 12)}… (read-back) source=${sourceSha256.slice(0, 12)}…`,
+    );
+    uploaded += 1;
+    updates.push({
+      sample,
+      fileId: saved.id,
+      deliveredSourceSha256: sourceSha256,
+      assetSha256,
+    });
   }
 
-  // ③ 回写 golden-set referenceImage
+  // 5. 回写 golden-set（裁决 D 单一事实源；备份先行）
   if (commit && updates.length > 0) {
-    // 先备份
     const backupPath = GOLDEN_SET_PATH.replace(".json", `-backup-${Date.now()}.json`);
     fs.copyFileSync(GOLDEN_SET_PATH, backupPath);
-    console.log(`  backup: ${backupPath}`);
-
-    for (const { sample, fileId, sha256 } of updates) {
-      sample.referenceImage = { fileId, sha256 };
+    for (const { sample, fileId, deliveredSourceSha256, assetSha256 } of updates) {
+      sample.referenceImage = { fileId, deliveredSourceSha256, assetSha256 };
     }
     fs.writeFileSync(GOLDEN_SET_PATH, JSON.stringify(goldenSet, null, 2) + "\n");
-    console.log(`  ✓ golden-set updated: ${updates.length} samples with referenceImage`);
+    console.log(
+      `  ✓ golden-set updated: ${updates.length} samples (backup: ${path.basename(backupPath)})`,
+    );
   }
 
   console.log(
-    `upload complete: ${uploaded} uploaded, ${skipped} skipped (mode=${commit ? "COMMIT" : "DRY-RUN"})`,
+    `upload complete: ${uploaded} ok, ${skipped} skipped, ${failed} failed (mode=${commit ? "COMMIT" : "DRY-RUN"})`,
   );
+  assert.strictEqual(failed, 0, `${failed} image(s) failed validation — refusing to continue`);
   await closeDatabaseForTests();
 }
 
