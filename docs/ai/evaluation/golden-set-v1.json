@@ -9,7 +9,12 @@
         "黑色蕾丝纹理",
         "高领轮廓",
         "黑白边缘"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "hXANUr0NiGpY.jpg",
+        "deliveredSourceSha256": "efe647371e98a303e78977f2ec37d19c567ac2a1181ce5a3c13e03922eeea63b",
+        "assetSha256": "2d7ca7fc1347ac5e2adfb0388d6f9e2e136c929cd5dfea2096fd791111c932dc"
+      }
     },
     {
       "id": "garment-gold-02",
@@ -18,7 +23,12 @@
         "真丝高光",
         "浅色不过曝",
         "门襟结构"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "tg-uSrbcLsRu.jpg",
+        "deliveredSourceSha256": "a8a04a41f8e9c5cdc30220c8927b88666461202d3f9af153e7a0be4ed92d9c5d",
+        "assetSha256": "beb5e82a607fdd8aee95f4986845de506e35dd3e5731d817044e8b3e9529c086"
+      }
     },
     {
       "id": "garment-gold-03",
@@ -27,7 +37,12 @@
         "羊毛纹理",
         "同色层次",
         "西装版型"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "nvp1rigeCg5y.jpg",
+        "deliveredSourceSha256": "b6946a3a4681a233d2fccc937eb421b5d2bff73681ae7d05c556e7212f118afe",
+        "assetSha256": "56808e85adf9d21e29e8f81e6d1d284ffe323acd8a911308dcd231d66f6d336f"
+      }
     },
     {
       "id": "garment-gold-04",
@@ -36,7 +51,12 @@
         "车线",
         "金属扣",
         "靛蓝色准"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "54q9uqGP-cKw.jpg",
+        "deliveredSourceSha256": "284969ba7bf1376275749465ecd81e32f45e252e448d65c646dd7700cfc751a3",
+        "assetSha256": "419129a803c140b3ce5b5efc2fedec59aacbe0511d074565240c779d02ddf491"
+      }
     },
     {
       "id": "garment-gold-05",
@@ -45,7 +65,12 @@
         "针织纹理",
         "红色溢出",
         "贴体轮廓"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "K1K3s-4aR1fw.jpg",
+        "deliveredSourceSha256": "b35a3a24026db003234d3be786d609ed182758109b6153a26f159df6c4cffc4e",
+        "assetSha256": "3cd9b84ab792dd60bc9a6f8116974c4aaa4c8b93bd7000cae3398e69a94ec2ea"
+      }
     },
     {
       "id": "garment-gold-06",
@@ -54,7 +79,12 @@
         "绒面质感",
         "叠穿边界",
         "长款垂坠"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "6j3OwspM3CB8.jpg",
+        "deliveredSourceSha256": "35d69e133b806ed85b3cc14f2101725d3381a19345e58347abda4641fcb2ebcf",
+        "assetSha256": "bc70a47e269d027f5ab1c4ae45307dfd00a992cc84a56fd17a5dc3ca00ce0534"
+      }
     },
     {
       "id": "garment-gold-07",
@@ -63,7 +93,12 @@
         "皮革反光",
         "材质区分",
         "深浅边缘"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "DLIMxT0RqrpQ.jpg",
+        "deliveredSourceSha256": "91f0cd6f47ce472337f29ce152c4f0b5811d35074a96c577f797e7ca6c57422a",
+        "assetSha256": "2cd7e03610f086bf1a06745b09765456035e43adb4dfb44e8c6d8b736af9af85"
+      }
     },
     {
       "id": "garment-gold-08",
@@ -72,7 +107,12 @@
         "小图案一致性",
         "雪纺透明层",
         "裙摆动态"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "LGTTWIfjVy6G.jpg",
+        "deliveredSourceSha256": "a00d3d7819aac5c76c8b691c208e62b54da29a976e9e613b78f4906b559816cd",
+        "assetSha256": "4d9a80a7ebc44fb16b314b4011e997513431d93d2e545d545e99be15e3f4d35b"
+      }
     },
     {
       "id": "garment-gold-09",
@@ -81,7 +121,12 @@
         "口袋数量",
         "腰带结构",
         "工装比例"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "ZkW7idC_w5ye.jpg",
+        "deliveredSourceSha256": "e0fbbf7c7413d3a8a86bd84a4a0abb5b95bd15e58991ed35e042579d610216c8",
+        "assetSha256": "1deaab890eaac1d8dd08dad0eae2e31cc0564637185a65ff0711cba3a9596641"
+      }
     },
     {
       "id": "garment-gold-10",
@@ -90,7 +135,12 @@
         "白色层次",
         "褶裥连续性",
         "袖口结构"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "XM6M1w1QiMtJ.jpg",
+        "deliveredSourceSha256": "f7b055ee37e7a666fc06b03ffbb96a5461b316c1a844b21799056357dcf0049f",
+        "assetSha256": "af95241eb8dbda140996f2e754abdffa83921465de8344eb85747ca1d879345b"
+      }
     },
     {
       "id": "garment-gold-11",
@@ -99,7 +149,12 @@
         "丝绒方向光",
         "深绿色准",
         "翻领结构"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "6dFC68pLzlPm.jpg",
+        "deliveredSourceSha256": "8fcef845d4d950b7e88aa84e546eb337189b26872ea7f67bc5be9cbda4be26ac",
+        "assetSha256": "cc9a19b837fdfb072918e2e86ee596f3c45288edc3decfce0a5e13c239aa251c"
+      }
     },
     {
       "id": "garment-gold-12",
@@ -108,7 +163,12 @@
         "亮片密度",
         "高光控制",
         "人体边缘"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "1pgBr1wPlRCW.jpg",
+        "deliveredSourceSha256": "413f0b2e696396849d2514c5abe14c75e8a183a7dfb38328e9c737f552458867",
+        "assetSha256": "bf1db5248b6e6f8a4633f85a1a2e09720f48d0ac4559c2a3db2a24267548bd12"
+      }
     },
     {
       "id": "garment-gold-13",
@@ -117,7 +177,12 @@
         "细条纹连续",
         "左右对称",
         "套装一致"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "aOfnuIy3xckv.jpg",
+        "deliveredSourceSha256": "04a9dd677ff6319c7032a1c68d8f1a893451fb52c8a980b669977f1b75ce8416",
+        "assetSha256": "3ae1f59c91aa420b0d51ea83b560be55a4138383421a0528d6262727396775af"
+      }
     },
     {
       "id": "garment-gold-14",
@@ -126,7 +191,12 @@
         "亚麻结节",
         "自然褶皱",
         "米色色准"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "UP4-UX_orb33.jpg",
+        "deliveredSourceSha256": "24f8bc03edd22294e7b6b4af80263d91e72697d456737001bb1f7a5cd7974e8b",
+        "assetSha256": "57c3001568ec81390a0c6f90cc55993c20044181c18b17bc5e538c4043755645"
+      }
     },
     {
       "id": "garment-gold-15",
@@ -135,7 +205,12 @@
         "格纹连续",
         "接缝对花",
         "两件套一致"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "Nfr2Lq6CkVsv.jpg",
+        "deliveredSourceSha256": "cdf2013fe395448091604017b198cce5b51ae0e6ea009b59f5840dc16623a311",
+        "assetSha256": "932b374819242ad5825f108fce9b71d3b69698f8a10034c302213a1e132f9bb0"
+      }
     },
     {
       "id": "garment-gold-16",
@@ -144,7 +219,12 @@
         "透明层次",
         "泡泡袖体积",
         "肤色污染"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "agd1hsbcnRQ5.jpg",
+        "deliveredSourceSha256": "45c2986d6cdbff84edb07e0377ee727fe15ed7a8793bfbc678e9a23a29264c0f",
+        "assetSha256": "9fba922f4787c708fb8594767cf9c447f7e581e0a516e863da981027827cddb8"
+      }
     },
     {
       "id": "garment-gold-17",
@@ -153,7 +233,12 @@
         "绗缝分区",
         "蓬松体积",
         "白色细节"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "7FjXogMc-Om9.jpg",
+        "deliveredSourceSha256": "e7bb275267fecb76d4ca2088d63e851f1d312cce630f057ab740436ac5446b82",
+        "assetSha256": "c86b2f8e4281499ec79ef68ba354772e96008ff009145c59dfbb4c8a9378f8c8"
+      }
     },
     {
       "id": "garment-gold-18",
@@ -162,7 +247,12 @@
         "防水面料",
         "拉链与压胶线",
         "高饱和色"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "qwsBdCIbY0B_.jpg",
+        "deliveredSourceSha256": "b07015bd03f9f03618a120525f6bdb90b25e3f968688c92f53d340cd4f4aacc7",
+        "assetSha256": "0b2bc897af9577f991e114271c3a1f172ce30e31f0aedba300a73f1945eab7de"
+      }
     },
     {
       "id": "garment-gold-19",
@@ -171,7 +261,12 @@
         "缎面与薄纱区分",
         "叠穿边界",
         "肩带完整"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "um_rV90Uoz4H.jpg",
+        "deliveredSourceSha256": "ba38ab789d552699f35abb1a74d90de84c790c8f0c88b7b81923e82705e24c8a",
+        "assetSha256": "8e8091d4145fc21bfc197d4c516f4902abcd963bf76ec8605790c12cdf89f99b"
+      }
     },
     {
       "id": "garment-gold-20",
@@ -180,7 +275,12 @@
         "不对称结构",
         "黑色暗部",
         "人体遮挡"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "EzxhcjpERiab.jpg",
+        "deliveredSourceSha256": "4f3b4a55255529b8f28aaf28578beb1af19a4febef79f0e1124a47a1f9345279",
+        "assetSha256": "039619a36589ef45420d0fbc87b4c6e2c58d698e643a06734182b61b08467d3c"
+      }
     },
     {
       "id": "garment-gold-21",
@@ -189,7 +289,12 @@
         "印花位置",
         "棉布质感",
         "纽扣数量"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "NZtXRfJRuBv4.jpg",
+        "deliveredSourceSha256": "5a877f149aacd83d56fb3f970dd4440b81d4f25c4feaf6824860c8e1ef984ecd",
+        "assetSha256": "c43e3d0361110e36c586222527ad8b8c3682d80b6a80d327f4b61e6821963e0b"
+      }
     },
     {
       "id": "garment-gold-22",
@@ -198,7 +303,12 @@
         "麂皮哑光",
         "流苏数量与方向",
         "驼色色准"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "JQd8H8MeZwwr.jpg",
+        "deliveredSourceSha256": "1485371af465ec5f8d87345d2f47e3828d9d48ea817369328fff11cc53317857",
+        "assetSha256": "15a7d53d915459d5de965f32c841d921b7a91af0003a7fb6889de64c67785a56"
+      }
     },
     {
       "id": "garment-gold-23",
@@ -207,7 +317,12 @@
         "粗花呢颗粒",
         "毛边细节",
         "套装同材质"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "YRFKJbzV4XPS.jpg",
+        "deliveredSourceSha256": "7ee750f1e8ed6b621f0fcad327ce08a98b7e56dc52c254b1efd0c6ed82390aa3",
+        "assetSha256": "e17e6d2d967a3cf5cfa877f88df87bdeb6b54e167f370c94f08cd1da02c1db33"
+      }
     },
     {
       "id": "garment-gold-24",
@@ -216,7 +331,12 @@
         "波点数量稳定",
         "白底洁净",
         "复古廓形"
-      ]
+      ],
+      "referenceImage": {
+        "fileId": "Qd1J_UShglMw.jpg",
+        "deliveredSourceSha256": "5f2a8589828c5e8cc765ead34f473d0df34ff5f7cb9a8ecf41a321199b163ca8",
+        "assetSha256": "5f84912e849fc1b040960d4f452ab4fe23fb29ca4ec257dfefb9461dab214285"
+      }
     }
   ]
 }

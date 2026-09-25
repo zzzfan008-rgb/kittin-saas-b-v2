@@ -7,6 +7,7 @@ import type { AuthUser } from "../server/lib/auth";
 import {
   createSealedEvaluationCampaign,
   computeFlowJsonSha256,
+  assertFlowJsonNotDrifted,
 } from "../server/lib/evaluationCampaign";
 import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaign";
 import type { ImageModelId } from "../src/types/imageModels";
@@ -1455,22 +1456,16 @@ async function runExecute(
         `saved project "${projectId}" not found — seal the case canvas as a saved project first`,
       );
     }
-    // 裁决 C: 执行前验证 flow_json 未被篡改——经共享函数 computeFlowJsonSha256
-    // 重算（与 seal 同一计算点），与 seal 封存值比对，不匹配立即 throw（fail-closed）。
+    // 裁决 C: 执行前验证 flow_json 未被篡改——比对逻辑在共享函数
+    // assertFlowJsonNotDrifted（与 runPlan 路由同一份，单一计算点）。
     // sealed 值为空（migration 24 之前的旧账本）同样拒绝：execute 是付费真跑前的
     // 最后闸门，无法验证 flow 完整性即不得放行。
-    const currentFlowJsonSha256 = computeFlowJsonSha256(flowRow.flow_json);
-    if (!input.campaign.flowJsonSha256) {
-      throw new Error(
-        `campaign ${input.campaign.campaignId} has no sealed flow_json_sha256 — ` +
-          "cannot verify flow integrity before paid execute (fail closed); re-seal required",
-      );
-    }
-    if (currentFlowJsonSha256 !== input.campaign.flowJsonSha256) {
-      throw new Error(
-        `flow_json_sha256 MISMATCH for project ${projectId}: sealed=${input.campaign.flowJsonSha256}, current=${currentFlowJsonSha256} — the flow has been modified since seal`,
-      );
-    }
+    assertFlowJsonNotDrifted({
+      sealedSha256: input.campaign.flowJsonSha256,
+      currentFlowJson: flowRow.flow_json,
+      campaignId: input.campaign.campaignId,
+      projectId,
+    });
     const flow = JSON.parse(flowRow.flow_json) as { nodes: unknown[]; edges: unknown[] };
     // The paid node is the single image-generator in the sealed case canvas;
     // the run-plan route independently enforces "exactly one paid node".

@@ -219,6 +219,42 @@ export function computeFlowJsonSha256(flowJson: string): `sha256:${string}` {
   return `sha256:${createHash("sha256").update(flowJson, "utf8").digest("hex")}`;
 }
 
+/**
+ * 裁决 C 共享守卫：execute 前验证 project 的 flow_json 未在 seal 后被篡改。
+ *
+ * 两端调用者（runPlan 路由 + evaluation-campaign-runner CLI）都必须经由本函数，
+ * 不得各写一份比对逻辑（本链 6 缺陷的共同形态就是「两侧各持一份 → 静默不等」）。
+ *
+ * fail-closed 语义：
+ *  - sealedSha256 为 NULL/空（migration 24 之前的旧账本、或绕过应用层直改库）→ 拒
+ *  - 重算 hash ≠ 封存值（seal 后有人改了 flow_json）→ 拒
+ *
+ * @throws 带上下文的 Error；调用方决定映射到什么状态码（路由 409 / CLI 直接崩）。
+ */
+export function assertFlowJsonNotDrifted(input: {
+  sealedSha256: string | null | undefined;
+  currentFlowJson: string;
+  campaignId: string;
+  projectId: string;
+}): void {
+  const { sealedSha256, currentFlowJson, campaignId, projectId } = input;
+  if (!sealedSha256) {
+    throw new Error(
+      `campaign ${campaignId} has no sealed flow_json_sha256 — ` +
+        `cannot verify flow integrity for project ${projectId} before paid execute ` +
+        `(fail closed); re-seal required`,
+    );
+  }
+  const current = computeFlowJsonSha256(currentFlowJson);
+  if (current !== sealedSha256) {
+    throw new Error(
+      `flow_json drift detected for project ${projectId}: ` +
+        `sealed=${sealedSha256}, current=${current} — ` +
+        `the flow has been modified since campaign ${campaignId} was sealed`,
+    );
+  }
+}
+
 function safeInteger(value: number | string, field: string, minimum = 0): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new Error(`${field} is invalid`);

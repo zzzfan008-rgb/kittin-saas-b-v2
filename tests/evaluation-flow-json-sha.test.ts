@@ -6,6 +6,14 @@
  *  2. 篡改 flow → 重算 sha256 ≠ 封存值（变异检测生效）
  *  3. computeFlowJsonSha256 确定性
  *  4. 缺失 flowJsonSha256 被 assertCampaignManifest 拒（fail-closed：缺失即拒）
+ *  5. E2E-篡改：真 seal + 真 project → UPDATE flow_json 篡改一字符 →
+ *     共享守卫 assertFlowJsonNotDrifted（runPlan 路由与 CLI execute 调用的同一份）
+ *     必须 throw /drift detected/；未篡改时同一守卫必须放行（反恒真）
+ *  6. E2E-缺失：seal 后 DISABLE 不可变触发器把列改 NULL（模拟旧账本/绕过应用层）→
+ *     共享守卫必须 throw /no sealed flow_json_sha256/
+ *
+ * 守卫删除保护：测试 5/6 直接调用 assertFlowJsonNotDrifted 本体——
+ * 若有人删掉守卫或弱化其比对，这两个测试立即红。
  *
  * 分类：碰库（SERIAL_TEST_FILES），必须注册进 scripts/test-suite-parallel.mjs。
  */
@@ -219,20 +227,32 @@ const CODE_MOCK = "a".repeat(40);
     [tamperedFlow, projectId],
   );
 
-  // 读回当前 flow_json，重算 hash
+  // 读回当前 flow_json，走**真实守卫函数**（runPlan.ts 与 runner.ts execute 路径
+  // 调用的同一份 assertFlowJsonNotDrifted）——删掉守卫或弱化比对，本测试必红。
   const proj = await database.queryOne<{ flow_json: string }>(
     `SELECT flow_json FROM projects WHERE id = $1`,
     [projectId],
   );
   assert.ok(proj, "E2E: project must still exist");
-  const currentSha = campaign.computeFlowJsonSha256(proj.flow_json);
 
-  // 核心断言：篡改后 hash 不等于 sealed 值（execute 期守卫会抛）
-  assert.notEqual(
-    currentSha,
-    sealed.flow_json_sha256,
-    "E2E-tamper: flow_json changed after seal → hash drift detected",
+  assert.throws(
+    () => campaign.assertFlowJsonNotDrifted({
+      sealedSha256: sealed.flow_json_sha256,
+      currentFlowJson: proj.flow_json,
+      campaignId: "flow-sha-e2e-tamper",
+      projectId,
+    }),
+    /drift detected/,
+    "E2E-tamper: tampered flow_json must be rejected by the shared execute guard",
   );
+
+  // 反证：未篡改时同一守卫必须放行（防恒真——守卫不是无条件 throw）
+  campaign.assertFlowJsonNotDrifted({
+    sealedSha256: sealed.flow_json_sha256,
+    currentFlowJson: flow,
+    campaignId: "flow-sha-e2e-tamper",
+    projectId,
+  });
 }
 
 // ── 测试 6（E2E-缺失）：seal 后绕过应用层把 flow_json_sha256 改 NULL → execute 应拒 ──
@@ -299,18 +319,19 @@ const CODE_MOCK = "a".repeat(40);
     "E2E-nullguard: flow_json_sha256 was forced to NULL (simulates bypass)",
   );
 
-  // execute 期守卫（runPlan.ts:251 / runner.ts:1463）遇到 NULL 必须 throw。
-  // 这里验证调用链最外层的逻辑：NULL sealed 值应被拒。
-  const execGuard = (sealedVal: string | null) => {
-    if (!sealedVal) throw new Error("campaign has no sealed flow_json_sha256 — must re-seal");
-  };
-  let nullGuardThrew = false;
-  try {
-    execGuard(after?.flow_json_sha256 ?? null);
-  } catch {
-    nullGuardThrew = true;
-  }
-  assert.ok(nullGuardThrew, "E2E-nullguard: NULL flow_json_sha256 must throw at execute guard");
+  // 走**真实守卫函数**：NULL sealed 值必须被拒（fail-closed）。
+  // runPlan.ts 路由与 runner.ts CLI execute 都调用同一份 assertFlowJsonNotDrifted，
+  // 删掉守卫或把 NULL 检查改成放行，本测试必红。
+  assert.throws(
+    () => campaign.assertFlowJsonNotDrifted({
+      sealedSha256: after?.flow_json_sha256,
+      currentFlowJson: flow,
+      campaignId: "flow-sha-e2e-nullguard",
+      projectId: "flow-sha-e2e-nullguard-proj",
+    }),
+    /no sealed flow_json_sha256/,
+    "E2E-nullguard: NULL flow_json_sha256 must throw at the shared execute guard",
+  );
 }
 
 console.log("PASS: evaluation-flow-json-sha — seal + mutation detection chain");
