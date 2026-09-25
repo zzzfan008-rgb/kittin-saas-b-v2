@@ -189,6 +189,23 @@ export function loadManifest(path: string): LoadedManifest {
     throw new Error("manifest is missing stageRequestCaps array");
   }
 
+  // Acceptance #7: manifest baseUnit definitions must not carry any key/hash
+  // fields — those belong to the ledger, not the planning document. AGENTS.md §4
+  // ("planning evidence only and never authorizes a paid call").
+  const FORBIDDEN_UNIT_KEY_RE = /(?:evaluationUnitKey|authorizationUnitKey|.*(?:Sha256|Hash))/;
+  for (const entry of data.baseUnits as Array<Record<string, unknown>>) {
+    const unit = entry.unit as Record<string, unknown> | undefined;
+    if (unit == null) continue;
+    const forbidden = Object.keys(unit).filter((k) => FORBIDDEN_UNIT_KEY_RE.test(k));
+    if (forbidden.length > 0) {
+      throw new Error(
+        `manifest baseUnit "${String(entry.unitId ?? "?")}" carries forbidden key/hash fields ` +
+          `in its unit definition: ${forbidden.join(", ")}. ` +
+          "evaluationUnitKey and hash values belong to the sealed ledger, not the planning document.",
+      );
+    }
+  }
+
   const baseUnits: ManifestUnit[] = (
     data.baseUnits as Array<Record<string, unknown>>
   ).map((entry) => {

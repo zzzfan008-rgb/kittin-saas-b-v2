@@ -109,9 +109,24 @@ const EDIT_FLOW = {
       id: `edit-text-${randomUUID().slice(0, 8)}`,
       type: "text",
       position: { x: 100, y: 0 },
-      data: { kind: "text", label: "prompt", text: "preflight test prompt" },
+      data: { kind: "text", label: "prompt", text: "preflight test prompt (edit)" },
       width: 200,
       height: 80,
+    },
+    {
+      id: `edit-ref-${randomUUID().slice(0, 8)}`,
+      type: "image-generator",
+      position: { x: -150, y: 100 },
+      data: {
+        kind: "image-generator",
+        label: "reference-source",
+        modelId: "gpt-image-2.5-flare-vip",
+        promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+        aspectRatio: "3:4",
+        batchSize: 1,
+      },
+      width: 200,
+      height: 100,
     },
   ],
   edges: [
@@ -122,10 +137,19 @@ const EDIT_FLOW = {
       sourceHandle: "text",
       targetHandle: "prompt",
     },
+    {
+      id: `edit-ref-edge-${randomUUID().slice(0, 8)}`,
+      source: "",
+      target: "",
+      sourceHandle: "output",
+      targetHandle: "reference",
+    },
   ],
 };
 EDIT_FLOW.edges[0].source = EDIT_FLOW.nodes[1].id;
 EDIT_FLOW.edges[0].target = EDIT_FLOW.nodes[0].id;
+EDIT_FLOW.edges[1].source = EDIT_FLOW.nodes[2].id;
+EDIT_FLOW.edges[1].target = EDIT_FLOW.nodes[0].id;
 
 // ---------- helpers ----------
 
