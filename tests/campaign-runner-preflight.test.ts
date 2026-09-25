@@ -124,6 +124,7 @@ const EDIT_FLOW = {
         promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
         aspectRatio: "3:4",
         batchSize: 1,
+        outputImages: ["/api/files/preflight-reference-placeholder.jpg"],
       },
       width: 200,
       height: 100,
