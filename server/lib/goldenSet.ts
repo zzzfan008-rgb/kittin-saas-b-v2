@@ -110,18 +110,18 @@ export function goldenSetBriefForSlotFromSet(
 
 /**
  * Known-bad SHA256 values that must be rejected.
- * 5f2a8589... = r2, contains amazon watermark → reject.
+ * (Currently empty — the r2 watermark concern was resolved by user ruling:
+ *  garment-gold-24 = r2 is the approved delivery version.)
  */
-export const REJECTED_SHA256 = new Set([
-  "5f2a8589828c5e8cc765ead34f473d0df34ff5f7cb9a8ecf41a321199b163ca8",
-]);
+export const REJECTED_SHA256 = new Set<string>([]);
 
 /**
  * Required SHA256 values that must match exactly.
- * 2ffde870... = r4 (garment-gold-24), final approved image for sample 24.
+ * garment-gold-24: r2 (5f2a8589…) — user-decided delivery version
+ *   (r4 = 2ffde870… is an alternate, not rejected, just not selected).
  */
 export const REQUIRED_SHA256: Record<string, string> = {
-  "garment-gold-24": "2ffde87096b7ce986d41060b78b4f4b8c4ce6662569db8b5d6070b62e39d06d2",
+  "garment-gold-24": "5f2a8589828c5e8cc765ead34f473d0df34ff5f7cb9a8ecf41a321199b163ca8",
 };
 
 /**
