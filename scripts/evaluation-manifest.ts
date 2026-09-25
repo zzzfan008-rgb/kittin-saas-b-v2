@@ -36,8 +36,32 @@ export interface EvaluationManifestStageRequestCap {
   requestsPerUnit: number;
 }
 
+/**
+ * 已封账评估单元的 project locator（裁决 5-a1）。
+ *
+ * 放在单元条目层而不是 `unit` 内部，原因有三：
+ * 1. `unit` 的类型是闭合的 `PromptEvaluationUnit`（9 个字段，无 projectId），
+ *    tests/evaluation-manifest.test.ts:42 显式断言版本向量等不得污染 unit；
+ * 2. `unit` 会被喂给 `promptEvaluationUnitKey`（legacy 9 字段身份）与封账 envelope，
+ *    把 locator 放进去就等于让规划字段参与身份计算（验收 17 禁止）；
+ * 3. seal 只需要它来定位真实 project flow（§7.7 范围过滤），与身份无关。
+ *
+ * 键是 unitId。只有进入付费 campaign 的两个在册单元需要 locator。
+ */
+const EVALUATION_PROJECT_LOCATORS: Readonly<Record<string, string>> = {
+  "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1": "U7lK9XXlq1",
+  "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1": "EVALeditv1F",
+};
+
 export interface EvaluationManifestUnit {
   unitId: string;
+  /**
+   * Locator only: the saved project whose flow the seal path reads to derive the
+   * authorization unit key. Never part of any identity/envelope computation
+   * (62-envelope-authority-ruling.md acceptance 17). Absent for units that are
+   * catalogued but not part of the paid campaign scope.
+   */
+  projectId?: string;
   unit: PromptEvaluationUnit;
   versions: PromptEvaluationVersionVector;
   businessFrame: {
@@ -184,6 +208,11 @@ function currentBaseUnits(): EvaluationManifestUnit[] {
         if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
         return [{
           unitId: variant.variantId,
+          // Locator only (acceptance 17): derived from EVALUATION_PROJECT_LOCATORS,
+          // never fed into promptEvaluationUnitKey or the seal envelope.
+          ...(EVALUATION_PROJECT_LOCATORS[variant.variantId] !== undefined
+            ? { projectId: EVALUATION_PROJECT_LOCATORS[variant.variantId] }
+            : {}),
           unit: target.unit,
           versions: target.versions,
           businessFrame: { ...profile.businessFrame },
@@ -340,28 +369,33 @@ function assertManifestInvariants(manifest: EvaluationManifest): EvaluationManif
 }
 
 export function validateEvaluationManifest(value: unknown): EvaluationManifestSummary {
-  // Ruling 62-envelope-authority-ruling.md acceptance 17:
-  // projectId is a locator field (not part of the envelope identity).
-  // It must be stripped before the manifest vs. registry comparison
-  // because the registry does not know which DB project each unit maps to.
-  const stripProjectId = (obj: unknown): unknown => {
-    if (obj === null || typeof obj !== "object") return obj;
-    if (Array.isArray(obj)) return obj.map(stripProjectId);
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (k === "projectId") continue;
-      result[k] = stripProjectId(v);
+  // Ruling 62-envelope-authority-ruling.md acceptance 17: no manifest field may
+  // participate in envelope/identity computation. The structural guarantee is
+  // that `unit` stays a pure closed PromptEvaluationUnit — it is the object fed
+  // to promptEvaluationUnitKey — while projectId lives at the entry level as a
+  // locator only. Assert that here rather than stripping it away: stripping
+  // would let a wrong or drifted projectId pass the check unnoticed, and seal
+  // loads the real project flow from it.
+  const parsed = value as EvaluationManifest;
+  for (const entry of parsed.baseUnits ?? []) {
+    if (Object.hasOwn(entry.unit ?? {}, "projectId")) {
+      throw new Error(
+        `baseUnit "${String(entry.unitId)}" carries projectId inside "unit". `
+          + "projectId is a locator and must sit at the entry level: unit is the closed "
+          + "9-field PromptEvaluationUnit fed to promptEvaluationUnitKey, so any extra "
+          + "field there would make manifest planning data participate in identity "
+          + "(ruling 62 acceptance 17).",
+      );
     }
-    return result;
-  };
+  }
   const expected = createExpectedEvaluationManifest();
-  if (!isDeepStrictEqual(stripProjectId(value), expected)) {
+  if (!isDeepStrictEqual(value, expected)) {
     throw new Error(
       "evaluation manifest does not exactly match the current prompt catalog, parameter profiles, "
-      + "version vectors, plan hash, option-A pilot selection, or request caps",
+      + "version vectors, plan hash, option-A pilot selection, request caps, or project locators",
     );
   }
-  return assertManifestInvariants(value as EvaluationManifest);
+  return assertManifestInvariants(parsed);
 }
 
 export function loadEvaluationManifest(

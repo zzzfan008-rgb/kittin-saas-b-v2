@@ -223,10 +223,15 @@ export function loadManifest(path: string): LoadedManifest {
     data.baseUnits as Array<Record<string, unknown>>
   ).map((entry) => {
     const unit = entry.unit as Record<string, unknown> | undefined;
+    // projectId 是单元条目层的 locator（不在 unit 内部——unit 是闭合的 9 字段
+    // PromptEvaluationUnit，会参与身份计算）。清单里只有进入付费 campaign 的在册
+    // 单元才有 locator，所以此处允许缺省；「在册单元必须有 locator」由
+    // filterAndAssertUnits 在范围收窄到 2 个单元后 fail-closed 断言。
+    const projectId = entry.projectId;
     return {
       unitId: String(entry.unitId ?? ""),
       promptVariantId: String(unit?.promptVariantId ?? ""),
-      projectId: String(unit?.projectId ?? ""),
+      projectId: typeof projectId === "string" ? projectId : "",
     };
   });
 
@@ -336,6 +341,15 @@ function filterAndAssertUnits(
     if (unit.unitId !== unit.promptVariantId) {
       throw new Error(
         `unitId "${unit.unitId}" must equal promptVariantId "${unit.promptVariantId}"`,
+      );
+    }
+    // 在册单元必须带 project locator：seal 要用它读真实 project flow 来派生
+    // 授权 unit key（62-envelope-authority-ruling.md §1）。这里 fail-closed，
+    // 避免空 locator 一路走到 seal 才报出难以定位的 "saved project not found"。
+    if (unit.projectId.trim() === "") {
+      throw new Error(
+        `manifest baseUnit "${unit.unitId}" has no entry-level projectId locator; ` +
+          "seal needs it to load the saved project flow that derives the authorization unit key",
       );
     }
   }
