@@ -806,9 +806,19 @@ async function runSeal(
   }
 
   if (dryRun) {
-    dryRunReport(plans);
-    return;
-  }
+  // 打印 seal 输出打印 evaluationVersion 当前值（裁决 6.2），用于 pending 转正前后 trace
+  const sealEnvelopeVersion = {
+    title: "DRY RUN - evaluationVersion registry reference",
+    evaluationVersion: "garment-eval-v3-pending",
+    note: "Pending → final 后所有已封存账本 key 静默失效（形态为 route 403）, 需机械回答哪些账本在哪个注册表版本下封的",
+  };
+  console.log(JSON.stringify(sealEnvelopeVersion));
+} else {
+  console.log(JSON.stringify({
+    evaluationVersion: "garment-eval-v3-pending",
+    note: "Seal uses current registry evaluationVersion.  Pending→final 后所有已封存账本 key 静默失效。",
+  }));
+}
 
   // 5. seal campaigns in DB
   await sealCampaigns(
