@@ -359,6 +359,8 @@ try {
 
   // 7. Pre-flight: POST /api/run-plan for all 33 slots
   let successCount = 0;
+  let blockedCount = 0;
+  const blockedErrors: string[] = [];
   const failures: string[] = [];
 
   for (const slot of allSlots) {
@@ -389,33 +391,53 @@ try {
 
     if (res.status === 202) {
       successCount += 1;
+    } else if (res.status === 400) {
+      const body = await res.text().catch(() => "");
+      blockedCount += 1;
+      blockedErrors.push(`slot ${slot.slotId}: HTTP 400 — ${body.slice(0, 200)}`);
     } else {
       const body = await res.text().catch(() => "");
       failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${body.slice(0, 200)}`);
     }
   }
 
-  console.log(`  results: ${successCount}/66 passed`);
+  console.log(`  results: ${successCount}/66 PASS, ${blockedCount}/66 BLOCKED`);
 
-  // Assertions
+  // Three-state assertion (architect ruling 4, 62-edit-admission-ruling.md):
+  // 33 generate slots → PASS (after Track A unitKey fix)
+  // 33 edit slots    → BLOCKED with edit-reference-missing (Track B pending)
+  // Total must be 66 — shrinking the filter is forbidden (it hides P0)
   assert.strictEqual(
     successCount,
-    66,
-    `expected 66/66 HTTP 202, got ${successCount}/66. Failures:\n${failures.join("\n")}`,
+    33,
+    `expected 33 PASS (generate slots), got ${successCount}. Failures:\n${failures.join("\n")}`,
+  );
+  assert.strictEqual(
+    blockedCount,
+    33,
+    `expected 33 BLOCKED (edit slots), got ${blockedCount}. Blocked:\n${blockedErrors.join("\n")}`,
+  );
+  assert.strictEqual(failures.length, 0, `unexpected non-400/202 responses:\n${failures.join("\n")}`);
+
+  // BLOCKED must all be edit-reference-missing (not some other gate)
+  const allEditReferenceMissing = blockedErrors.every((e) => e.includes("edit-reference-missing"));
+  assert.ok(
+    allEditReferenceMissing,
+    `all 33 BLOCKED must have error code edit-reference-missing. Actual:\n${blockedErrors.join("\n")}`,
   );
 
-  // 8. Assert generation_runs: exactly 66 rows, 66 distinct client_request_ids
+  // 8. Assert generation_runs: exactly 33 rows (only PASS slots enqueue; BLOCKED never reach enqueue)
   const runCount = await database.queryOne<{ c: string }>(
     `SELECT COUNT(*) as c FROM generation_runs WHERE client_request_id LIKE '${PREFIX}%'`,
   );
-  assert.strictEqual(Number(runCount?.c ?? 0), 66, "generation_runs should have exactly 66 rows");
+  assert.strictEqual(Number(runCount?.c ?? 0), 33, "generation_runs should have exactly 33 rows (generate PASS only)");
 
   const distinctCount = await database.queryOne<{ c: string }>(
     `SELECT COUNT(DISTINCT client_request_id) as c FROM generation_runs WHERE client_request_id LIKE '${PREFIX}%'`,
   );
-  assert.strictEqual(Number(distinctCount?.c ?? 0), 66, "all 66 client_request_ids must be distinct");
+  assert.strictEqual(Number(distinctCount?.c ?? 0), 33, "all 33 client_request_ids must be distinct");
 
-  console.log("  ✓ generation_runs: 66 rows, 66 distinct client_request_ids");
+  console.log("  ✓ generation_runs: 33 rows, 33 distinct client_request_ids");
 
   // 9. EXPLICIT provider-not-called assertion (defense-in-depth)
   //    DUMMY_HASH = "a"×64 ensures reserve throws before provider is called,
