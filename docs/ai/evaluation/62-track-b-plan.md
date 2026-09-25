@@ -56,9 +56,33 @@ goldenSetBriefForSlot(stage, sampleIdx)  ← 唯一共享函数，preflight/seal
 
 **edit 侧参考图节点**：每 project 的 flow 加 image 节点 `{ type: "image", data: { kind: "image", label: "garment_full_reference", outputImages: [{fileId: "ref-file-id", ...}] } }` 加 edge `{ source: "edit-reference-image", target: "image-generator", targetHandle: "reference" }`
 
+### 裁决 D：outputImages fileId 与 golden-set 同源（单一事实源）
+
+edit project 的 image 节点 `outputImages` fileId **必须是 24 图入库后的真实 fileId**（走生产上传存储层），bake 时写死进 flow_json。与 golden-set schema 扩展的 `referenceImage: {fileId, sha256}` 是**同一个 fileId**，夹具生成脚本从 golden-set 读、填进 image 节点 ⇒ 单一事实源。
+
+**断言**：每个 edit project 的 outputImages fileId ∈ golden-set 24 个 fileId 集合，且与该项目 sampleIdx 对应的那一条相等。
+
 **可重跑**：48 条 INSERT 幂等（按 projectId 去重）+ 内含完整断言。
 
-**运行时零注入**：text 和参考图均在夹具生成期 bake 进 flow_json。preflight/seal 提交的 body 与库内 flow 完全一致（`isDeepStrictEqual` 天然通过）。hermes 2026-09-25 实测确认：参考图 `outputImages` 同样进 `plan.steps[].inputImages/inputReferences`（dag.ts:255→227→232→244-245），与 text 输入 `plan.steps[].params.inputTexts`（dag.ts:229→247）**同闸同拒**——动态注入参考图与动态注入 text 是同一个缺陷。
+**运行时零注入**：text 和参考图均在夹具生成期 bake 进 flow_json。preflight/seal 提交的 body 与库内 flow 完全一致（`isDeepStrictEqual` 天然通过）。实证：修改 text 字符 → HTTP 409 被闸拒（`tests/campaign-runner-preflight.test.ts` 变异测试 15，f276ac2）。参考图 `outputImages` 同样进 `plan.steps[].inputImages/inputReferences`（dag.ts:255→227→232→244-245），与 text 输入 `plan.steps[].params.inputTexts`（dag.ts:229→247）**同闸同拒**。
+
+### 裁决 B：edges 顺序锁定（防 referenceInputsSha256 静默漂移）
+
+architect 亲验 dag.ts:222-236：`inputReferences[].order` 派生自 edges 数组遍历索引 ⇒ edges 顺序变 → order 变 → `referenceInputsSha256` 变 → 账本 hash 静默失效。己方复核 `evaluationEvidence.ts:547-572` 确认 order 在 `sha256(snapshot.references)` 输入中。
+
+**三条强制要求：**
+1. **夹具生成脚本写死 edges 顺序**（确定性构造，不得依赖 Map/Set/Object 迭代顺序），脚本内断言 edges 数组顺序与预期逐条相等
+2. **seal 期封存 flow_json sha256** ⇒ execute 期校验（见裁决 C），把「edges 不可变」变成机制保证
+3. **反恒真测试**：同一语义 flow 两种 edges 排列 → `referenceInputsSha256` 必须不同（证明 hash 对 order 敏感）
+
+### 裁决 C：flow_json_sha256 列（防跨时间漂移）
+
+plan-equality 闸只比较同一次请求的「提交 vs 库里」，不管「seal 时 vs execute 时」的跨时间漂移。裁决：新列 `flow_json_sha256 TEXT` nullable，与 envelope 三列同批 migration（version 24）：
+- seal 写入（与 envelope 快照同一次调用，单一计算点）
+- execute 重算比对，**不等即 fail closed**（不得降级 warning）
+- 不可变触发器覆盖（同 envelope 三列形态）
+- **关键变异验收**：篡改 flow_json 一个字符 → execute 必须拒
+- 注册 `TEST_FILES` + `SERIAL_TEST_FILES`
 
 ### 第 3 步：promotion 加牙齿（哈希等值）
 
