@@ -764,7 +764,42 @@ try {
     console.log(`  ✓ mutation: budget=72 accepted at route layer, confirmed in DB`);
   }
 
-  console.log("\n✓ campaign-runner-preflight: three-state verified — 33 PASS (generate, unitKey chain fixed) + 33 BLOCKED (edit-reference-missing, Track B) + 4 mutation gates\n");
+  // 15. plan-equality gate: modified text must be rejected (dag.ts:229→247→runPlan.ts:232)
+  {
+    const genSlot = allSlots.find((s) => s.projectId === GEN_PROJECT_ID);
+    assert.ok(genSlot, "at least one generate slot must exist");
+    const modifiedNodes = JSON.parse(JSON.stringify(GENERATE_FLOW.nodes));
+    const textNode = modifiedNodes.find((n: any) => n.data?.kind === "text");
+    assert.ok(textNode, "text node must exist in GENERATE_FLOW");
+    textNode.data.text = "MODIFIED TEXT — MUST DIFFER FROM STORED FLOW";
+    const res = await fetch(BASE_URL + "/api/run-plan", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "gc_session=" + session.token },
+      body: JSON.stringify({
+        nodes: modifiedNodes,
+        edges: GENERATE_FLOW.edges,
+        onlyNodeId: GENERATE_FLOW.nodes[0].id,
+        includeDownstream: false,
+        projectId: genSlot.projectId,
+        clientRequestId: PREFIX + "-mutation-text-" + randomUUID().slice(0, 8),
+        evaluation: {
+          caseId: genSlot.caseId,
+          sampleId: genSlot.sampleId,
+          authorizationId: "batch-62-" + genSlot.slotId,
+          campaignId: genSlot.campaignId,
+          slotId: genSlot.slotId,
+        },
+      }),
+    });
+    assert.strictEqual(
+      res.status,
+      409,
+      "plan-equality gate must reject modified text (expected 409, got " + res.status + ")",
+    );
+    console.log("  OK mutation: plan-equality gate rejects modified text (HTTP " + res.status + ")");
+  }
+
+  console.log(`\n✓ campaign-runner-preflight: three-state verified — 33 PASS (generate, unitKey chain fixed) + 33 BLOCKED (edit-reference-missing, Track B) + 5 mutation gates\n`);
 } finally {
   serverProc.kill("SIGTERM");
   // give the subprocess a moment to exit, don't fail if it's already gone
