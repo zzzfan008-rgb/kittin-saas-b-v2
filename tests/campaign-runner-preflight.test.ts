@@ -22,6 +22,7 @@ import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 import { createSession } from "../server/lib/auth";
 import {
   createSealedEvaluationCampaign,
+  computeFlowJsonSha256,
 } from "../server/lib/evaluationCampaign";
 import {
   registerEvaluationRunAuthorization,
@@ -291,7 +292,10 @@ for (const plan of plans) {
       maxProviderRequests: plan.slots.length,
       budgetLimitMinor: plan.slots.length * PRICE_MINOR,
       budgetCurrency: "USD",
-      flowJsonSha256: `sha256:${"f".repeat(64)}`,
+      // 裁决 C 守卫按 projects.flow_json 实算比对——必须填 seed 进库的同一字节的真实 hash
+      // （JSON.stringify(flow) 与 L188-198 的 seed 完全一致）。假 hash 会让守卫 409，
+      // 三态断言（33 PASS）全灭。付费防护在 reserve 路径的 DUMMY_HASH 失配，与此独立。
+      flowJsonSha256: computeFlowJsonSha256(JSON.stringify(flow)),
       slots: slotPlans,
     });
   });
@@ -586,7 +590,8 @@ try {
         maxProviderRequests: 1,
         budgetLimitMinor: PRICE_MINOR,
         budgetCurrency: "USD",
-        flowJsonSha256: `sha256:${"f".repeat(64)}`,
+        // 裁决 C 守卫：真实 hash（GEN_PROJECT_ID seed 的是 JSON.stringify(GENERATE_FLOW)）
+        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(GENERATE_FLOW)),
         slots: [
           {
             slotId: replaySlotId,
@@ -687,7 +692,8 @@ try {
         maxProviderRequests: 1,
         budgetLimitMinor: BIG_BUDGET,
         budgetCurrency: "USD",
-        flowJsonSha256: `sha256:${"f".repeat(64)}`,
+        // 裁决 C 守卫：真实 hash（GEN_PROJECT_ID seed 的是 JSON.stringify(GENERATE_FLOW)）
+        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(GENERATE_FLOW)),
         slots: [
           {
             slotId: bigBudgetSlotId,
