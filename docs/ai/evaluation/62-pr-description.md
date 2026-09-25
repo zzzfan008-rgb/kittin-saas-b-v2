@@ -88,6 +88,47 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 
 ---
 
+## dependency-cruiser 依赖图证据（推送前置，AGENTS.md §6）
+
+```
+NODE_PATH=./node_modules depcruise --config .dependency-cruiser.cjs \
+  --output-type json src server scripts e2e
+```
+
+| 指标 | 值 |
+|---|---|
+| 模块总数 | 251 |
+| 违规总数 | 3（全部为 `no-circular-baseline`，severity=warn，非新增） |
+| 新增违规 | 0 |
+| 既有 warning | 3（`server/config.ts` ↔ `server/lib/evaluationCampaign.ts` ↔ `server/lib/auth.ts` 循环依赖 baseline） |
+
+dag.ts 依赖面：import 路径均在 `server/engine/` + `src/types/` 内，未引入跨层依赖。
+
+---
+
+## ast-grep 全仓读取点裁定表（`data.contractHash` / `data.evaluationVersion` / `data.promptFamilyId`）
+
+**搜索命令：** `ast-grep scan --config sgconfig.yml`（gate）+ `rg "data\.(contractHash|evaluationVersion|promptFamilyId)" server/ src/`
+
+| 文件 | 行号 | 字段 | 上下文 | 裁定 |
+|---|---|---|---|---|
+| `server/engine/dag.ts` | 323-325 | `promptFamilyId` / `contractHash` / `evaluationVersion` | `image-generator` 的 `extractParams` | **已在轨道 A 修正**：从 `variant.*` 读取（非 `data.*`），envelope 权威源 ✓ |
+| `server/engine/dag.ts` | 347-348 | `contractHash` / `evaluationVersion` | `video-generator` 的 `extractParams` | **保留（display-only）**：338-343 行注释已说明「video-generator 不参与授权身份链」。不修正为 `variant.*` 的原因——video-generator 无 variant registry 条目，且 envelope 只读 image-generator 步骤 |
+| `src/lib/documentSnapshot.ts` | 271, 276-277 | `contractHash` / `evaluationVersion` | 文档快照读取，存入存档 | **保留（display/archive）**：不参与授权计算，仅用于项目恢复和展示 |
+| `tests/document-snapshot.test.ts` | 757-760, 775-778 | 全部 3 字段 | 测试断言：保存/加载快照后字段完整 | **保留（测试）**：验证快照读写完整性 |
+
+**结论：** 除 `dag.ts image-generator` 已在轨道 A 修正外，其余 3 处均为 display-only 或 test-only，不参与授权身份链。
+
+---
+
+## 本 PR 不含轨道 B
+
+- 轨道 B（golden-set brief text bake + 参考图 bake + 48 夹具 project 生成 + re-seal v8rel7）**不在本 PR 范围内**
+- 预检 66/66 全 PASS 需等轨道 B 完成后才能实现——当前为 33 PASS + 33 BLOCKED(`edit-reference-missing`)
+- 方案参考：[`docs/ai/evaluation/62-track-b-plan.md`](62-track-b-plan.md)（v3，absorb architect 2026-09-25 裁决）
+
+---
+
 ## 裁决 6 依赖记录
 
 `garment-eval-v3-pending` → 正式 = 既有账本失效。唯一补救方式：re-seal（append-only，不可逆）。seal CLI 输出已打印 `evaluationVersion` 当前值（`dryRunReport` JSON + seal stdout），以便溯源。
