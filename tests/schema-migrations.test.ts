@@ -44,6 +44,7 @@ assert.deepEqual(versions, [
   { version: 21, name: "video_step_output_metadata" },
   { version: 22, name: "asset_model_category" },
   { version: 23, name: "envelope_inputs_snapshot_columns" },
+  { version: 24, name: "flow_json_sha256_campaign_tracking" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
