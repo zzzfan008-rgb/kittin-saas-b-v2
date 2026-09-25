@@ -9,7 +9,7 @@
  *     正确映射必须放行 / fileId 错配必须 throw / no-op 变异探针验证
  *  4. 数据完整性：24 个 deliveredSourceSha256 + 24 个 assetSha256 非空
  *
- * 分类：碰库（导入 database），注册进 SERIAL_TEST_FILES。
+ * 分类：纯函数测试（不碰库），注册进 TEST_FILES 并行池。
  */
 
 import assert from "node:assert/strict";
