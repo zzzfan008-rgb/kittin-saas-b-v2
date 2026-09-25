@@ -18,10 +18,9 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 
 | # | 验收项 | 所在层 | 见证测试 | 变异/还原证据 |
 |---|---|---|---|---|
-| 1 | `data.promptFamilyId`/`data.contractHash`/`data.evaluationVersion` 不在 dag.ts:320-322 | engine | `tests/dag.test.ts` (见证) | 删除行 → 4条变红 → 恢复 → 14/14 |
+| 1 | `data.promptFamilyId`/`data.contractHash`/`data.evaluationVersion` 不在 dag.ts:323-325 | engine | `tests/dag.test.ts` (见证) | 删 data.* 读取行 → 测试变红 → 恢复 → 14/14 |
 | 2 | 已选变体（variant registry）是 3 字段唯一权威源 | engine | `tests/dag.test.ts` (裁决2变异) | ast-grep 无 `data.` 读取残留 |
-| 3 | 12-field envelope: 任一 field `undefined`/`null` → throw | ledger | `tests/evaluation-authorization-ledger.test.ts` | v7 alias `kind:"image"` → throw 3477da0 |
-| 4 | `nodeKind: "image"` 别名在 envelope 中必须 throw | ledger | `tests/evaluation-authorization-ledger.test.ts` (registered 16) | strict assertion fd05ec9 |
+| 3 | 12-field envelope: 任一 field `undefined`/`null` → throw；nodeKind 严格断言 `"image-generator"` | ledger | `tests/evaluation-authorization-ledger.test.ts` (registered 16) | v7 alias throw fd05ec9；fixture 修复 337876e |
 | 5 | 三态预检：33 PASS + 33 BLOCKED(`edit-reference-missing`) | preflight | `tests/campaign-runner-preflight.test.ts` | 缩 filter 不绿、真实计数 |
 | 6 | preflight 已移除 edit 侧合成 reference 节点（按裁决4） | preflight | `tests/campaign-runner-preflight.test.ts` | 还原 494af67 |
 | 7 | seal 使用 `projects.flow_json` 而非 `saved_projects` | seal | `tests/campaign-runner.test.ts` (dry-run) | 实测 exit 0 JSON stdout |
@@ -81,7 +80,7 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 
 ## 模式观察
 
-本轮 6+4=10 个编码缺陷中，**0% 被既有测试发现**（v8rel6 密封了 66 条授权、全量测试绿、但 unitKey 断裂在 12 个 slot 上静默相等——测试从未检查过 manifest 派生 key 与 route 期 key 是否一致）。所有缺陷均由**真实路径检查**发现（三态预检、manifest:check 比对、envelope 自校验断言）。真实路径检查比字段级断言有效性高出约一个数量级。
+本轮 6+4=10 个编码缺陷中，**0% 被既有测试发现**（v8rel6 密封了 66 条授权、全量测试绿、但 manifest 派生 key 与 route 期 envelope key 在所有 66 个 slot 上系统性地不等——测试从未检查过 manifest 派生 key 与 route 期 key 是否一致）。所有缺陷均由**真实路径检查**发现（三态预检、manifest:check 比对、envelope 自校验断言）。真实路径检查比字段级断言有效性高出约一个数量级。
 
 根本形态：【各持一份 → 静默不等】在代码中出现了 3 次：
 1. manifest static key（9 字段）≠ route envelope key（12 字段）
