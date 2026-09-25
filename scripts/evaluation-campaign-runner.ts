@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { AuthUser } from "../server/lib/auth";
 import {
   createSealedEvaluationCampaign,
+  computeFlowJsonSha256,
 } from "../server/lib/evaluationCampaign";
 import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaign";
 import type { ImageModelId } from "../src/types/imageModels";
@@ -603,6 +604,10 @@ async function sealCampaigns(
       // the ledger even by accident — that footgun is what broke v8rel6.
       const envelope = evaluationAuthorizationEnvelopeFromFlow(JSON.parse(project.flow_json));
 
+      // 裁决 C: flow_json 执行绑定 sha256，经共享函数 computeFlowJsonSha256 计算
+      //（单一计算点：seal 封存与 execute 校验都调它，不得各写一份）。
+      const flowJsonSha256 = computeFlowJsonSha256(project.flow_json);
+
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,
@@ -616,6 +621,7 @@ async function sealCampaigns(
         inputsCanonicalJson: envelope.inputsCanonicalJson,
         inputsSha256: envelope.inputsSha256,
         evaluationVersion: envelope.evaluationVersion,
+        flowJsonSha256: flowJsonSha256 as `sha256:${string}`,
         slots: plan.slots.map((slot) => {
           const hashes = slotHashes?.get(slot.slotId);
           const resolvedPromptSha256 = hashes?.resolvedPromptSha256 ?? "0".repeat(64);
@@ -944,6 +950,7 @@ export interface ExecuteCampaignInfo {
   budgetLimitMinor: number;
   reservedBudgetMinor: number;
   budgetCurrency: string;
+  flowJsonSha256?: string;
   slots: ExecuteSlotInfo[];
 }
 
@@ -1015,8 +1022,9 @@ async function loadCampaignForExecute(
     budget_limit_minor: number | string;
     reserved_budget_minor: number | string;
     budget_currency: string;
+    flow_json_sha256: string | null;
   }>(
-    `SELECT campaign_id, owner_id, status, budget_limit_minor, reserved_budget_minor, budget_currency
+    `SELECT campaign_id, owner_id, status, budget_limit_minor, reserved_budget_minor, budget_currency, flow_json_sha256
      FROM evaluation_campaigns WHERE campaign_id = $1`,
     [campaignId],
   );
@@ -1059,6 +1067,7 @@ async function loadCampaignForExecute(
     budgetLimitMinor: Number(campaign.budget_limit_minor),
     reservedBudgetMinor: Number(campaign.reserved_budget_minor),
     budgetCurrency: campaign.budget_currency,
+    flowJsonSha256: campaign.flow_json_sha256 ?? undefined,
     slots: slots.map((s) => ({
       slotId: s.slot_id,
       caseId: s.case_id,
@@ -1444,6 +1453,22 @@ async function runExecute(
     if (!flowRow) {
       throw new Error(
         `saved project "${projectId}" not found — seal the case canvas as a saved project first`,
+      );
+    }
+    // 裁决 C: 执行前验证 flow_json 未被篡改——经共享函数 computeFlowJsonSha256
+    // 重算（与 seal 同一计算点），与 seal 封存值比对，不匹配立即 throw（fail-closed）。
+    // sealed 值为空（migration 24 之前的旧账本）同样拒绝：execute 是付费真跑前的
+    // 最后闸门，无法验证 flow 完整性即不得放行。
+    const currentFlowJsonSha256 = computeFlowJsonSha256(flowRow.flow_json);
+    if (!input.campaign.flowJsonSha256) {
+      throw new Error(
+        `campaign ${input.campaign.campaignId} has no sealed flow_json_sha256 — ` +
+          "cannot verify flow integrity before paid execute (fail closed); re-seal required",
+      );
+    }
+    if (currentFlowJsonSha256 !== input.campaign.flowJsonSha256) {
+      throw new Error(
+        `flow_json_sha256 MISMATCH for project ${projectId}: sealed=${input.campaign.flowJsonSha256}, current=${currentFlowJsonSha256} — the flow has been modified since seal`,
       );
     }
     const flow = JSON.parse(flowRow.flow_json) as { nodes: unknown[]; edges: unknown[] };

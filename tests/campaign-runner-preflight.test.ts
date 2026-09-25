@@ -291,6 +291,7 @@ for (const plan of plans) {
       maxProviderRequests: plan.slots.length,
       budgetLimitMinor: plan.slots.length * PRICE_MINOR,
       budgetCurrency: "USD",
+      flowJsonSha256: `sha256:${"f".repeat(64)}`,
       slots: slotPlans,
     });
   });
@@ -585,6 +586,7 @@ try {
         maxProviderRequests: 1,
         budgetLimitMinor: PRICE_MINOR,
         budgetCurrency: "USD",
+        flowJsonSha256: `sha256:${"f".repeat(64)}`,
         slots: [
           {
             slotId: replaySlotId,
@@ -685,6 +687,7 @@ try {
         maxProviderRequests: 1,
         budgetLimitMinor: BIG_BUDGET,
         budgetCurrency: "USD",
+        flowJsonSha256: `sha256:${"f".repeat(64)}`,
         slots: [
           {
             slotId: bigBudgetSlotId,

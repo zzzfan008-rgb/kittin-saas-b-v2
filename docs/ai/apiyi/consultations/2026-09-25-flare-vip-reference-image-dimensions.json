@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-25T13:02:30.391Z",
+  "baseCommit": "f21b426ee1dafc133afb6f70656b3fed83123f8b",
+  "changeFingerprintSha256": "5b902a9c5033e18eaf6662654cded3681c306c0bd40bf6af968b8efd33bf5367",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "flare sunburst launch identical integration image compression resolution normalization reference image",
+  "affectedPaths": [
+    "scripts/evaluation-campaign-runner.ts",
+    "server/lib/evaluationCampaign.ts",
+    "server/lib/goldenSet.ts",
+    "server/routes/runPlan.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gpt-image-2-5-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/news/gpt-image-2-5-launch.md",
+      "pageLocalPath": "pages/en/news/gpt-image-2-5-launch.md",
+      "title": "GPT-image-2.5 Launches: Flare Is Faster, Sunburst Is Sharper",
+      "sha256": "16bd34abcfaa52d9ef4e58637fe786e00b848057be09e7e07107bd372c55b8b2"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/image-compression-resolution",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/image-compression-resolution.md",
+      "pageLocalPath": "pages/en/api-capabilities/image-compression-resolution.md",
+      "title": "Image Compression & Output Resolution",
+      "sha256": "b07f49c89cd62f444004d6754365f5a04e20b037bbd656ad369356023c70c284"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/gpt-image-2-5-flare-sunburst-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-09/gpt-image-2-5-flare-sunburst-launch.md",
+      "pageLocalPath": "pages/en/live/2026-09/gpt-image-2-5-flare-sunburst-launch.md",
+      "title": "gpt-image-2.5 Dual Models Live via Official Relay: flare Is Faster, sunburst Edits Better",
+      "sha256": "455ee3e173eb63b1ce4c806e7f26351d325ab79953781f8e888d976e449d465b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/gpt-image-2-5-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/news/gpt-image-2-5-launch.md",
+      "pageLocalPath": "pages/news/gpt-image-2-5-launch.md",
+      "title": "GPT-image-2.5 上线：Flare 更快、Sunburst 更准",
+      "sha256": "1b318114d600ce7c3aab2a9a14e3ddbfe4a4adb41fcbef5daab9b3b9bc8647dd"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-09/gpt-image-2-5-flare-sunburst-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-09/gpt-image-2-5-flare-sunburst-launch.md",
+      "pageLocalPath": "pages/live/2026-09/gpt-image-2-5-flare-sunburst-launch.md",
+      "title": "gpt-image-2.5 双模型官转上线：flare 更快、sunburst 编辑更强",
+      "sha256": "2b40515bd42f66b917609d9c395e7cf7c60ef7c018c0de08f217919e80d519cd"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gpt-image-2-all-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/news/gpt-image-2-all-launch.md",
+      "pageLocalPath": "pages/en/news/gpt-image-2-all-launch.md",
+      "title": "gpt-image-2-all Launch: $0.03/image GPT Reverse-Engineered Image Model",
+      "sha256": "e16d196a8fe835879862af4d7c0f1ef6b7121248066b31cabd80f50a093f2f49"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP Image Gen/Editing",
+      "sha256": "8a5c6e2e5724f0f31ffd5742b76c63bc6d6ea3535e59b792916ae36beaa9fa88"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/image-edit.md",
+      "title": "Image Edit API Reference",
+      "sha256": "89f3a46dffd9fdd2999a45d3e5ebcf30fb25311982900f9274f25e4659e2351b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2.5 / 2 Official vs Reverse",
+      "sha256": "dd2eb08079d9b32d0144a60e58bf3084ac762621e7d66bcaa3e1fa91b68e5783"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/text-to-image",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/text-to-image.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/text-to-image.md",
+      "title": "Text-to-Image API Reference",
+      "sha256": "ae976f2c2ac167964b9e9af94c91254905a1913dc858531e9be6275678c3e10b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 Image Generation API - OpenAI's Latest Image API",
+      "sha256": "3ee5fbcf25449b1c23fb4479d678ac3ba075e6533b04d23e586a390589c7c80f"
+    }
+  ],
+  "decisionSummary": "ACCEPT: flare-vip inherits the gpt-image-2 edit contract per its launch announcement (identical integration). Our normalize output 3058x4096 fits within the provider-verified 3072x4096 success record at gpt-image-2/image-edit.md line 190, and 1.40MB is far below the 50MB per-image hard limit at line 314 and within the 1.5MB recommended best-practice band at line 170. flare-vip has no dedicated edit page, so applicability is an inference from the launch announcement, not a flare-specific doc. flow_json_sha256 seal-execute guard added per ruling C.",
+  "unresolvedChoices": []
+}

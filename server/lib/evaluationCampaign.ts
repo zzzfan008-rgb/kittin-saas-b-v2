@@ -62,6 +62,9 @@ export interface EvaluationCampaignManifest {
   inputsSha256: string;
   /** 裁决 6②：密封时注册表的 evaluationVersion */
   evaluationVersion: string;
+  /** 裁决 C：seal 封存的 flow_json sha256。execute 期重算比对 fail-closed。
+   *  新 seal 必须提供（代码约束，禁止可选——缺失即拒）。 */
+  flowJsonSha256: `sha256:${string}`;
   slots: readonly EvaluationCampaignSlotManifest[];
 }
 
@@ -203,6 +206,19 @@ function sha256(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/**
+ * 裁决 C 单一计算点：flow_json 的执行绑定 sha256。
+ * seal 封存与 execute 校验都必须经由本函数（不得各写一份 hash 计算）。
+ *
+ * 哈希对象是 projects.flow_json 的原始 TEXT（不是 buildExecutionPlan 的
+ * 序列化计划）：裁决 C 的变异验收是「篡改 flow_json 一字符 → execute 拒」，
+ * 原始 TEXT 对任何单字符篡改都敏感；canonical plan JSON 会漏掉不参与 plan
+ * 的字段变更（键序、空白、plan 忽略的字段），检测面严格更弱。
+ */
+export function computeFlowJsonSha256(flowJson: string): `sha256:${string}` {
+  return `sha256:${createHash("sha256").update(flowJson, "utf8").digest("hex")}`;
+}
+
 function safeInteger(value: number | string, field: string, minimum = 0): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new Error(`${field} is invalid`);
@@ -234,6 +250,7 @@ function assertCampaignManifest(input: EvaluationCampaignManifest): void {
     throw new Error("campaign authorizationUnitKey is invalid");
   }
   if (!CODE_SHA_PATTERN.test(input.codeSha)) throw new Error("campaign codeSha is invalid");
+  if (!CONTRACT_HASH_PATTERN.test(input.flowJsonSha256)) throw new Error("campaign flowJsonSha256 is invalid");
   assertPositiveInteger(input.maxProviderRequests, "campaign maxProviderRequests");
   assertPositiveInteger(input.budgetLimitMinor, "campaign budgetLimitMinor");
   if (!CURRENCY_PATTERN.test(input.budgetCurrency)) throw new Error("campaign budgetCurrency is invalid");
@@ -439,14 +456,14 @@ export async function createSealedEvaluationCampaign(
       campaign_id, owner_id, created_by_admin_id, stage, model_id,
       evaluation_unit_key, code_sha, max_provider_requests, budget_limit_minor,
       budget_currency, status, manifest_sha256, created_at,
-      envelope_inputs_json, envelope_inputs_sha256, evaluation_version
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12, $13, $14, $15)
+      envelope_inputs_json, envelope_inputs_sha256, evaluation_version, flow_json_sha256
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12, $13, $14, $15, $16)
     ON CONFLICT (campaign_id) DO NOTHING
   `, [
     input.campaignId, input.ownerId, actor.id, input.stage, input.modelId,
     input.authorizationUnitKey, input.codeSha, input.maxProviderRequests,
     input.budgetLimitMinor, input.budgetCurrency, manifestSha256, now,
-    input.inputsCanonicalJson, input.inputsSha256, input.evaluationVersion,
+    input.inputsCanonicalJson, input.inputsSha256, input.evaluationVersion, input.flowJsonSha256,
   ]);
   if (inserted.rowCount !== 1) throw new Error("campaignId already exists; a sealed campaign cannot be replaced");
   for (const slot of input.slots) {

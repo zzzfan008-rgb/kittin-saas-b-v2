@@ -58,6 +58,7 @@ import {
   EvaluationRunPolicyError,
   parseEvaluationRunPolicy,
 } from "../lib/evaluationRunPolicy";
+import { computeFlowJsonSha256 } from "../lib/evaluationCampaign";
 
 export const runPlanRouter = Router();
 
@@ -240,6 +241,26 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       const plan = evaluationPolicy
         ? attachEvaluationRunPolicy(basePlan, evaluationPolicy)
         : basePlan;
+      // 裁决 C: evaluation run 入队前验证 flow_json 未在 seal 后被篡改
+      if (evaluationPolicy) {
+        const sealed = await client.query<{ flow_json_sha256: string | null }>(
+          `SELECT flow_json_sha256 FROM evaluation_campaigns WHERE campaign_id = $1 FOR SHARE`,
+          [evaluationPolicy.campaignId],
+        );
+        if (!sealed.rows[0]?.flow_json_sha256) {
+          throw new EvaluationRunPolicyError(
+            `flow_json integrity guard: campaign ${evaluationPolicy.campaignId} has no sealed flow_json_sha256 — must re-seal before execution (fail closed)`,
+            409,
+          );
+        }
+        const current = computeFlowJsonSha256(project.flow_json);
+        if (current !== sealed.rows[0].flow_json_sha256) {
+          throw new EvaluationRunPolicyError(
+            `flow_json drift detected for project ${projectId}: sealed=${sealed.rows[0].flow_json_sha256}, current=${current} — the flow has been modified since the campaign was sealed`,
+            409,
+          );
+        }
+      }
       const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
       const staticReferences = staticImageReferencesForPlan(plan);
       assertNoRemoteImageReferencesAtAdmission(staticReferences);
