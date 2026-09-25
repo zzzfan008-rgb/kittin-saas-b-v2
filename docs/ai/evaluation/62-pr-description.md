@@ -28,7 +28,7 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 | 9 | `CampaignPlan` 不携带 manifest-derived key | runner | `tests/campaign-runner-preflight.test.ts` (类型) | tsc 零错 |
 | 10 | preflight 播种的是真实 envelope key（非 manifest 静态 key） | preflight | `tests/campaign-runner-preflight.test.ts` (33 PASS) | 原 33×403 |
 | 11 | `dead-code` 变异块真可到达且被正确拒绝 | preflight | `tests/campaign-runner-preflight.test.ts` | replay → 409；big-budget → DB 存证 |
-| 12 | 删 `promptVariantId` → 准入红（dag.test 变异） | engine | `tests/dag.test.ts` | 临时删行→5 红→恢复→绿 |
+| 12 | 删 `promptVariantId` → 准入红（dag.test 变异） | engine | `tests/dag.test.ts` | 临时删行→4 红→恢复→绿 |
 | 13 | 残余 `grep` 的 dead `data.` 读取已清零 | global | ast-grep | 扫描 0 命中 |
 | 14 | manifest 字段不参与 envelope 计算（验收17） | manifest | `tests/evaluation-manifest.test.ts` + `tests/dag.test.ts` | projectId 在条目层、unit 闭合 9 字段 |
 | 15 | `evaluation:manifest:check` → exit 0 | manifest | `scripts/evaluation-manifest.ts` | 直接调用 |
@@ -39,23 +39,22 @@ v8rel6 密封的 66 条授权携带了由 manifest 静态数据派生的 9-field
 
 ---
 
-## 12 处 route 关卡清单（8 原有 + 4 补记）
+## 11 处 route 关卡清单（7 原有 + 4 补记）
 
-**原有 8 处：**
-1. `server/routes/runPlan.ts:167-175` — `clientRequestId` 格式约束（`CLIENT_REQUEST_ID_PATTERN`）
-2. `server/routes/runPlan.ts:192-193` — 必填检查
-3. `server/routes/runPlan.ts:198-202` — `evaluationPolicy` 解析 + onlyNodeId/includeDownstream 干校验
-4. `server/routes/runPlan.ts:226-234` — `conflict` 返回（并发入队守卫）
-5. `server/routes/runPlan.ts:239` — `assertPromptRunAdmissions`（准入门禁）
-6. `server/routes/runPlan.ts:240-241` — `attachEvaluationRunPolicy`（付费标记注入）
-7. `server/routes/runPlan.ts:256` — `clientRequestId` 入队
-8. `server/routes/runPlan.ts:270` — `"evaluation"` / `"workflow"` 路由分流
+**原有 7 处：**
+1. `server/routes/runPlan.ts:192-193` — `clientRequestId` 格式约束 + 必填检查（`CLIENT_REQUEST_ID_PATTERN`）
+2. `server/routes/runPlan.ts:198-202` — `evaluationPolicy` 解析 + onlyNodeId/includeDownstream 干校验
+3. `server/routes/runPlan.ts:226-234` — `conflict` 返回（并发入队守卫）
+4. `server/routes/runPlan.ts:239` — `assertPromptRunAdmissions`（准入门禁）
+5. `server/routes/runPlan.ts:240-241` — `attachEvaluationRunPolicy`（付费标记注入）
+6. `server/routes/runPlan.ts:256` — `clientRequestId` 入队
+7. `server/routes/runPlan.ts:270` — `"evaluation"` / `"workflow"` 路由分流
 
 **补记 4 处（promptRunAdmission.ts）：**
-9. `src/lib/promptRunAdmission.ts:474` — `assertPromptRunAdmissions`（精确 fail-closed 准入，无跨模型 fallback）
-10. `src/lib/promptRunAdmission.ts:493` — `evaluationVersion` 一致性断言（`input.evaluationVersion === variant.evaluationVersion`）
-11. `src/lib/promptRunAdmission.ts:556-561` — `evaluation-only` 准入标记拒绝（非评估 route 不得碰付费标记）
-12. `src/lib/promptRunAdmission.ts:602-628` — v8 绑定身份 5 字段（family/contract/evaluation）强制以 variant registry 为权威源
+8. `src/lib/promptRunAdmission.ts:474` — `assertPromptRunAdmissions`（精确 fail-closed 准入，无跨模型 fallback）
+9. `src/lib/promptRunAdmission.ts:493` — `evaluationVersion` 一致性断言（`input.evaluationVersion === variant.evaluationVersion`）
+10. `src/lib/promptRunAdmission.ts:556-561` — `evaluation-only` 准入标记拒绝（非评估 route 不得碰付费标记）
+11. `src/lib/promptRunAdmission.ts:602-628` — v8 绑定身份 5 字段（family/contract/evaluation）强制以 variant registry 为权威源
 
 ---
 
