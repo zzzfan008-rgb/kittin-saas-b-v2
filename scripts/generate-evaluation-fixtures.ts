@@ -309,11 +309,13 @@ function assertReferenceImageIntegrity(goldenSet: GoldenSet, imagesDir: string):
         `${sample.id}: sha256 mismatch — required ${required}, disk ${diskSha}`,
       );
     }
-    // 3. golden-set claimed value
+    // 3. golden-set claimed value: disk file = original delivery, so compare
+    //    against deliveredSourceSha256 (not assetSha256 = normalize output)
+    const claimedSourceSha256 = sample.referenceImage.deliveredSourceSha256;
     assert.strictEqual(
       diskSha,
-      sample.referenceImage.sha256,
-      `${sample.id}: disk sha256 ${diskSha} != golden-set referenceImage.sha256 ${sample.referenceImage.sha256}`,
+      claimedSourceSha256,
+      `${sample.id}: disk sha256 ${diskSha} != golden-set deliveredSourceSha256 ${claimedSourceSha256 ?? "undefined"}`,
     );
     console.log(`  ✓ sha256 whitelist: ${sample.id} = ${diskSha.slice(0, 8)}…`);
   }
