@@ -46,6 +46,16 @@ export interface EvaluationAuthorizationTarget {
   promptVariantId: string;
   evaluationUnitKey: `sha256:${string}`;
   maximumProviderRequests: number;
+  /**
+   * 裁决 62-envelope-authority-ruling.md ruling 6②：envelope 输入源快照。
+   *
+   * 和 evaluationUnitKey 由**同一次函数调用**计算，不得在调用点重算。
+   * seal 必须取这个元组写库，避免「key 由输入 A 算出、快照存了 B」这种
+   * 二次计算漂移（与本轮修掉的 6 个缺陷同态）。
+   */
+  inputsCanonicalJson: string;
+  inputsSha256: string;
+  evaluationVersion: string;
 }
 
 interface AuthorizationRow {
@@ -166,11 +176,18 @@ export function evaluationAuthorizationTargetFromPlan(plan: ExecutionPlan): Eval
       400,
     );
   }
+  // 裁决 62 ruling 6②：和 evaluationUnitKey 由同一次函数调用计算 ——
+  // 不允许调用点二次派生快照。这里用同一个 unitEnvelope、同一趟 canonicalJson。
+  const inputsCanonicalJson = canonicalJson(unitEnvelope);
+  const inputsSha256 = createHash("sha256").update(inputsCanonicalJson).digest("hex");
   return {
     modelId,
     promptVariantId,
-    evaluationUnitKey: `sha256:${createHash("sha256").update(canonicalJson(unitEnvelope)).digest("hex")}`,
+    evaluationUnitKey: `sha256:${inputsSha256}`,
     maximumProviderRequests: maximumProviderRequestsForStep(step),
+    inputsCanonicalJson,
+    inputsSha256,
+    evaluationVersion: String(unitEnvelope.evaluationVersion),
   };
 }
 

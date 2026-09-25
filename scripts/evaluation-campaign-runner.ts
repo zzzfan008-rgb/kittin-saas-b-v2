@@ -22,10 +22,37 @@ import { builtinTemplates } from "../server/routes/templates";
 // static manifest unit (9 fields, JSON.stringify) which can never equal the route's
 // 12-field canonicalJson envelope. This helper is the single entry point so preflight,
 // seal, and any future caller cannot drift apart again.
-export function evaluationUnitKeyFromFlow(flowJson: unknown): `sha256:${string}` {
+/**
+ * 裁决 6②：和 evaluationUnitKey 同源同次计算的完整输出。
+ *
+ * evaluationAuthorizationTargetFromPlan 在一次调用中计算 12 字段
+ * canonicalJson → sha256，这里返回其中 4 个值，seal 一次取走写库。
+ * 绝对不允许密封侧再调一次派生函数——二次调用会产生「key 由输入 A
+ * 算出、快照存了 B」的漂移（与本轮 6 个缺陷同态）。
+ *
+ * 代价：每个 campaign seal 会 validateAndMigrateFlow + buildExecutionPlan 一遍，
+ * 与 route 取授权单元 key 的路径完全相同，期望不到 10ms，在密封 CLI 批量
+ * 场景中可接受。
+ */
+export function evaluationAuthorizationEnvelopeFromFlow(flowJson: unknown): {
+  authorizationUnitKey: `sha256:${string}`;
+  inputsCanonicalJson: string;
+  inputsSha256: string;
+  evaluationVersion: string;
+} {
   const migrated = validateAndMigrateFlow(flowJson);
   const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
-  return evaluationAuthorizationTargetFromPlan(plan).evaluationUnitKey;
+  const target = evaluationAuthorizationTargetFromPlan(plan);
+  return {
+    authorizationUnitKey: target.evaluationUnitKey,
+    inputsCanonicalJson: target.inputsCanonicalJson,
+    inputsSha256: target.inputsSha256,
+    evaluationVersion: target.evaluationVersion,
+  };
+}
+
+export function evaluationUnitKeyFromFlow(flowJson: unknown): `sha256:${string}` {
+  return evaluationAuthorizationEnvelopeFromFlow(flowJson).authorizationUnitKey;
 }
 
 // ---------- constants ----------
@@ -574,18 +601,21 @@ async function sealCampaigns(
       // evaluationAuthorizationTargetFromPlan). CampaignPlan deliberately has no
       // evaluationUnitKey field, so a manifest-derived key cannot be carried into
       // the ledger even by accident — that footgun is what broke v8rel6.
-      const authorizationUnitKey = evaluationUnitKeyFromFlow(JSON.parse(project.flow_json));
+      const envelope = evaluationAuthorizationEnvelopeFromFlow(JSON.parse(project.flow_json));
 
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,
         stage: plan.stage,
         modelId: plan.modelId as ImageModelId,
-        authorizationUnitKey,
+        authorizationUnitKey: envelope.authorizationUnitKey,
         codeSha,
         maxProviderRequests: plan.slots.length,
         budgetLimitMinor: plan.budgetLimitMinor,
         budgetCurrency,
+        inputsCanonicalJson: envelope.inputsCanonicalJson,
+        inputsSha256: envelope.inputsSha256,
+        evaluationVersion: envelope.evaluationVersion,
         slots: plan.slots.map((slot) => {
           const hashes = slotHashes?.get(slot.slotId);
           const resolvedPromptSha256 = hashes?.resolvedPromptSha256 ?? "0".repeat(64);
