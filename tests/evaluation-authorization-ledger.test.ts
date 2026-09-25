@@ -43,7 +43,10 @@ function plan(overrides: Record<string, unknown> = {}): ExecutionPlan {
   return {
     steps: [{
       nodeId: `evaluation-node-${++sequence}`,
-      kind: "image",
+      // v8 NodeKind. The envelope deliberately rejects the deprecated v7 alias
+      // "image" (62-envelope-authority-ruling.md §3): normalising it here would
+      // create a second source of truth alongside promptRunAdmission.ts:376.
+      kind: "image-generator",
       inputImages: [],
       inputReferences: [],
       params: {
@@ -187,6 +190,102 @@ console.log("真实评估持久化授权账本测试");
   );
   console.log("  ✓ 评估单元由已准入计划稳定派生");
 }
+
+// ---------- #62 envelope authority acceptance (registered tests) ----------
+
+{
+  // 验收 16：nodeKind 严格断言。envelope 不得把 v7 别名 "image" 归一成
+  // "image-generator"——别名只允许活在准入层（promptRunAdmission.ts:376）直到 R-89。
+  // 若 envelope 也归一，就会有两处事实源。
+  const aliased: ExecutionPlan = {
+    steps: [{
+      nodeId: "envelope-alias-node",
+      kind: "image",
+      inputImages: [],
+      inputReferences: [],
+      params: {
+        modelId: "gpt-image-2.5-flare-vip",
+        operationMode: "generate",
+        promptVariantId: "fashion-lookbook-gpt-image-2.5-flare-vip-generate-v1",
+        promptFamilyId: "fashion-lookbook",
+        parameterProfileId: "gpt-image-2.5-flare-vip-lookbook-v1",
+        contractHash: `sha256:${"1".repeat(64)}`,
+        evaluationVersion: "1.0.0",
+        postprocessVersion: "fit-pad-v1",
+        aspectRatio: "1:1",
+        batchSize: 1,
+        modelOptions: { size: "2048x2048" },
+      },
+    }],
+  };
+  assert.throws(
+    () => ledger.evaluationAuthorizationTargetFromPlan(aliased),
+    /nodeKind must be "image-generator"/,
+    'envelope 必须拒绝 v7 别名 "image"，不得静默归一',
+  );
+  console.log('  ✓ 验收16：envelope 拒绝 v7 别名 nodeKind="image"（不做归一）');
+}
+
+{
+  // 验收 16 变异：12 字段任一 undefined ⇒ 立即 throw，不得静默产出退化 key。
+  // 逐个删除每一个派生字段，确认都红——这正是 "C 退化" 曾经发生却无人察觉的形态。
+  const envelopeFields = [
+    "modelId",
+    "promptVariantId",
+    "promptFamilyId",
+    "operationMode",
+    "parameterProfileId",
+    "contractHash",
+    "evaluationVersion",
+    "postprocessVersion",
+    "aspectRatio",
+    "batchSize",
+  ] as const;
+  for (const field of envelopeFields) {
+    const mutated = plan({ [field]: undefined });
+    assert.throws(
+      () => ledger.evaluationAuthorizationTargetFromPlan(mutated),
+      /must be present|缺少明确的模型/,
+      `删除 envelope 字段 "${field}" 后必须 throw，不得产出退化 key`,
+    );
+  }
+  // modelOptions 是唯一允许缺省的字段（envelope 内回退为 {}），显式确认这个例外。
+  const withoutOptions = plan();
+  delete (withoutOptions.steps[0].params as Record<string, unknown>).modelOptions;
+  assert.match(
+    ledger.evaluationAuthorizationTargetFromPlan(withoutOptions).evaluationUnitKey,
+    /^sha256:[a-f0-9]{64}$/,
+    "modelOptions 缺省回退为 {} 是 envelope 的显式例外，其余 11 字段不得缺省",
+  );
+  console.log(`  ✓ 验收16变异：${envelopeFields.length} 个 envelope 字段逐个删除均 throw`);
+}
+
+{
+  // 验收 17：manifest 字段不参与 envelope 计算。
+  // manifest 只许携带 locator（projectId）与 §7.7 范围过滤字段；身份必须由
+  // project flow 经共享函数链派生。这里证明 envelope 的输入面就是 plan.steps[0]
+  // 的 kind/params，任何 manifest 专有字段（taskFamilyId/presetId/presetVersion/
+  // parameterProfileVersion/nodeKind）即使被塞进 params 也不改变 key。
+  const base = plan();
+  const baseKey = ledger.evaluationAuthorizationTargetFromPlan(base).evaluationUnitKey;
+  const manifestOnlyFields = plan({
+    taskFamilyId: "fashion-lookbook",
+    presetId: "fashion-lookbook",
+    presetVersion: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+    parameterProfileVersion: "1.0.0",
+    nodeKind: "image",
+    unitId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+    projectId: "U7lK9XXlq1",
+  });
+  assert.equal(
+    ledger.evaluationAuthorizationTargetFromPlan(manifestOnlyFields).evaluationUnitKey,
+    baseKey,
+    "manifest 专有字段不得进入 envelope 身份计算（AGENTS.md §4：manifest 仅为规划证据）",
+  );
+  console.log("  ✓ 验收17：manifest 专有字段不改变 envelope 身份");
+}
+
+// ---------- 授权登记与一次性消费 ----------
 
 assert.throws(
   () => ledger.validateEvaluationAuthorizationRegistration(admin, {
