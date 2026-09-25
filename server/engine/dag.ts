@@ -309,17 +309,20 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
         ? getModelParameterProfile(parameterProfileId)?.postprocess.version
         : undefined;
       return {
-        modelId,
-        ...(operationMode ? { operationMode } : {}),
-        ...(parameterProfileId ? { parameterProfileId } : {}),
-        ...(postprocessVersion ? { postprocessVersion } : {}),
-        aspectRatio: data.aspectRatio,
-        batchSize: data.batchSize,
-        modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
-        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
-        ...(typeof data.promptFamilyId === "string" ? { promptFamilyId: data.promptFamilyId } : {}),
-        ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
-        ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+              modelId,
+              ...(operationMode ? { operationMode } : {}),
+              ...(parameterProfileId ? { parameterProfileId } : {}),
+              ...(postprocessVersion ? { postprocessVersion } : {}),
+              // Ruling 2026-09-26 (62-envelope-authority-ruling.md §2):
+              // variant registry is the sole authority source for these three fields
+              // (v8 trust model: "variant binding is the sole source of truth, nodes do
+              // not self-describe" — dag.ts:298). They MUST NOT be read from data.*
+              // because the real project flow_json does not carry them, and allowing an
+              // override would let the user write a contract hash into the canvas to
+              // change the authorization identity (violates AGENTS.md §4).
+              ...(variant?.familyId ? { promptFamilyId: variant.familyId } : {}),
+              ...(variant?.contractHash ? { contractHash: variant.contractHash } : {}),
+              ...(variant?.evaluationVersion ? { evaluationVersion: variant.evaluationVersion } : {}),
         ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
         ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
         ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
@@ -328,6 +331,11 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       };
     }
     case "video-generator":
+      // video-generator is currently image-only evaluation P2-e: its
+      // contractHash/evaluationVersion are NOT consumed by the authorization
+      // identity chain (evaluationAuthorizationTargetFromPlan only reads
+      // image-generator steps). These fields are display-only; they MUST NOT
+      // be re-purposed for authorization without this comment being revisited.
       return {
         ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
