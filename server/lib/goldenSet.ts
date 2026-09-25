@@ -23,8 +23,14 @@ export interface GoldenSample {
   brief: string;
   riskFocus: string[];
   referenceImage?: {
-    fileId: string;
-    sha256: string;
+    /** 溯源：生图师交付的原始文件 sha256（规划期文件，非入库产物）。 */
+    deliveredSourceSha256?: string;
+    /** 执行绑定：normalize 入库产物的实际存储 sha256（入库后从存储回读填写）。 */
+    assetSha256?: string;
+    /** 入库后分配的真实 fileId（单次写入，入库脚本回写）。 */
+    fileId?: string;
+    /** @deprecated 旧字段，迁移到 assetSha256。 */
+    sha256?: string;
   };
 }
 
@@ -136,7 +142,7 @@ export function validateReferenceImageSha256(
   // 1. reject known-bad hashes
   if (REJECTED_SHA256.has(onDiskSha256)) {
     throw new Error(
-      `${sampleId}: REFUSED — SHA256 ${onDiskSha256} is in the rejected list (amazon watermark etc.)`,
+      `${sampleId}: REFUSED — SHA256 ${onDiskSha256} is in the rejected list (known-bad hash)`,
     );
   }
 
@@ -148,12 +154,13 @@ export function validateReferenceImageSha256(
     );
   }
 
-  // 3. cross-check against golden-set referenceImage.sha256 if set
+  // 3. cross-check against golden-set referenceImage.assetSha256 if set
   const goldenSet = loadGoldenSet();
   const sample = goldenSet.samples.find((s) => s.id === sampleId);
-  if (sample?.referenceImage?.sha256 && onDiskSha256 !== sample.referenceImage.sha256) {
+  const expectedSha256 = sample?.referenceImage?.assetSha256 ?? sample?.referenceImage?.sha256;
+  if (expectedSha256 && onDiskSha256 !== expectedSha256) {
     throw new Error(
-      `${sampleId}: SHA256 drift — golden-set claims ${sample.referenceImage.sha256}, disk=${onDiskSha256}`,
+      `${sampleId}: SHA256 drift — golden-set claims ${expectedSha256}, disk=${onDiskSha256}`,
     );
   }
 
