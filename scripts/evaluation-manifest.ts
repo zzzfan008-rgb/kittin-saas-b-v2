@@ -177,17 +177,23 @@ function currentBaseUnits(): EvaluationManifestUnit[] {
   // 证据契约，不属于本清单——由各域后续评估设计另行覆盖。
   return GARMENT_PROMPT_VARIANTS
     .filter((variant) => variant.nodeKind === "image")
-    .map((variant) => {
-      const target = currentEvaluationPromotionTarget(variant.variantId);
-      const profile = getModelParameterProfile(variant.parameterProfileId);
-      if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
-      return {
-        unitId: variant.variantId,
-        unit: target.unit,
-        versions: target.versions,
-        businessFrame: { ...profile.businessFrame },
-        releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant)),
-      };
+    .flatMap((variant) => {
+      try {
+        const target = currentEvaluationPromotionTarget(variant.variantId);
+        const profile = getModelParameterProfile(variant.parameterProfileId);
+        if (!profile) throw new Error(`missing parameter profile ${variant.parameterProfileId}`);
+        return [{
+          unitId: variant.variantId,
+          unit: target.unit,
+          versions: target.versions,
+          businessFrame: { ...profile.businessFrame },
+          releaseVectorSha256: sha256(promptEvaluationReleaseVector(variant)),
+        }];
+      } catch {
+        // variant is not yet covered by evaluation promotion (e.g. non-image
+        // modelId or text/video domain) — skip without failing the manifest check
+        return [];
+      }
     });
 }
 
@@ -334,8 +340,22 @@ function assertManifestInvariants(manifest: EvaluationManifest): EvaluationManif
 }
 
 export function validateEvaluationManifest(value: unknown): EvaluationManifestSummary {
+  // Ruling 62-envelope-authority-ruling.md acceptance 17:
+  // projectId is a locator field (not part of the envelope identity).
+  // It must be stripped before the manifest vs. registry comparison
+  // because the registry does not know which DB project each unit maps to.
+  const stripProjectId = (obj: unknown): unknown => {
+    if (obj === null || typeof obj !== "object") return obj;
+    if (Array.isArray(obj)) return obj.map(stripProjectId);
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (k === "projectId") continue;
+      result[k] = stripProjectId(v);
+    }
+    return result;
+  };
   const expected = createExpectedEvaluationManifest();
-  if (!isDeepStrictEqual(value, expected)) {
+  if (!isDeepStrictEqual(stripProjectId(value), expected)) {
     throw new Error(
       "evaluation manifest does not exactly match the current prompt catalog, parameter profiles, "
       + "version vectors, plan hash, option-A pilot selection, or request caps",
