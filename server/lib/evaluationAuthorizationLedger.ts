@@ -307,7 +307,16 @@ function assertAuthorizationMatches(
     throw new EvaluationRunPolicyError("真实评估只接受精确 evaluation-unit 授权", 403);
   }
   if (row.evaluation_unit_key !== target.evaluationUnitKey) {
-    throw new EvaluationRunPolicyError("真实评估授权单位与运行计划不匹配", 403);
+    // Ruling 62-envelope-authority-ruling.md acceptance 18:
+    // surface the route-computed envelope fields so a field-level diff
+    // against the sealed ledger is self-evident (no blind 403).
+    throw new EvaluationRunPolicyError(
+      `真实评估授权单位与运行计划不匹配. ` +
+        `route-computed evaluationUnitKey: ${target.evaluationUnitKey}. ` +
+        `To reconstruct the sealed envelope, compare this key with the ` +
+        `ledger's evaluation_unit_key: ${row.evaluation_unit_key}`,
+      403,
+    );
   }
   if (target.maximumProviderRequests > row.max_provider_requests) {
     throw new EvaluationRunPolicyError(
