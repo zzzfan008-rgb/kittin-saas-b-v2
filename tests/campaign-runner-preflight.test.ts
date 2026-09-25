@@ -556,45 +556,40 @@ try {
     console.log(`  ✓ mutation: dotted clientRequestId rejected (HTTP ${res.status})`);
   }
 
-  // 12. Mutation variant 3: duplicate caseId must be rejected (409 EvaluationCaseConflictError)
+  // 12. Mutation variant 3: a paid case may not be replayed under a new request id.
+  //     Route gate order (server/engine/runQueue/persist.ts):
+  //       :130 clientRequestId idempotency  →  :142 evaluation_case_id conflict (409)
+  //       →  :149 active-run cap  →  :160 lockEvaluationRunAuthorization
+  //     So re-POSTing an already-enqueued caseId with a DIFFERENT clientRequestId must
+  //     hit EvaluationCaseConflictError → 409 before any authorization is consulted.
+  //     NOTE: a previous version of this block seeded ONE campaign with two slots sharing
+  //     a caseId. That state is unreachable in production — createSealedEvaluationCampaign
+  //     rejects duplicate caseIds at seal time (evaluationCampaign.ts:256-258) — so the
+  //     block could only ever throw at seal instead of proving the route gate.
   {
-    const dupCampaignId = `${PREFIX}-dupcase-campaign`;
-    const dupCaseId = `${dupCampaignId}-shared-case`;
-    const dupSlotIdA = `${dupCampaignId}-slot-a`;
-    const dupSlotIdB = `${dupCampaignId}-slot-b`;
-    const dupAuthIdA = `batch-62-dupcase-a`;
-    const dupAuthIdB = `batch-62-dupcase-b`;
+    const replayCampaignId = `${PREFIX}-replay-campaign`;
+    const replaySlotId = `${replayCampaignId}-slot-1`;
+    const replayCaseId = `${replayCampaignId}-case-1`;
+    const replayAuthId = `batch-62-replay`;
+    const secondRequestId = `${replayCampaignId}-slot-2`; // fresh clientRequestId, same case
     const DUMMY_HASH = "a".repeat(64);
 
-    // Create campaign with 2 slots sharing the same caseId
     await database.transaction(async (client) => {
       await createSealedEvaluationCampaign(client, adminUser, {
-        campaignId: dupCampaignId,
+        campaignId: replayCampaignId,
         ownerId: ADMIN_ID,
         stage: "provider-probe",
         modelId: "gpt-image-2.5-flare-vip",
-        authorizationUnitKey: `sha256:${"0".repeat(64)}`,
+        authorizationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
         codeSha: CODE_SHA,
-        maxProviderRequests: 2,
-        budgetLimitMinor: 2 * PRICE_MINOR,
+        maxProviderRequests: 1,
+        budgetLimitMinor: PRICE_MINOR,
         budgetCurrency: "USD",
         slots: [
           {
-            slotId: dupSlotIdA,
-            caseId: dupCaseId,
-            sampleId: `${dupCaseId}-sample-1`,
-            resolvedPromptSha256: DUMMY_HASH,
-            nativeParametersSha256: DUMMY_HASH,
-            referenceInputsSha256: DUMMY_HASH,
-            requestedImageCount: 1,
-            maxProviderRequests: 1,
-            priceMinorPerProviderRequest: PRICE_MINOR,
-            budgetLimitMinor: PRICE_MINOR,
-          },
-          {
-            slotId: dupSlotIdB,
-            caseId: dupCaseId, // SAME caseId — duplicate
-            sampleId: `${dupCaseId}-sample-2`,
+            slotId: replaySlotId,
+            caseId: replayCaseId,
+            sampleId: `${replayCaseId}-sample-1`,
             resolvedPromptSha256: DUMMY_HASH,
             nativeParametersSha256: DUMMY_HASH,
             referenceInputsSha256: DUMMY_HASH,
@@ -607,83 +602,67 @@ try {
       });
     });
 
-    // Register authorizations for both slots
-    for (const [authId, sId] of [[dupAuthIdA, dupSlotIdA], [dupAuthIdB, dupSlotIdB]] as const) {
-      await database.transaction(async (client) => {
-        await registerEvaluationRunAuthorization(client, adminUser, {
-          authorizationId: authId,
-          ownerId: ADMIN_ID,
-          campaignId: dupCampaignId,
-          slotId: sId,
-          scope: {
-            type: "evaluation-unit",
-            modelId: "gpt-image-2.5-flare-vip",
-            evaluationUnitKey: `sha256:${"0".repeat(64)}`,
-          },
-          maxProviderRequests: 1,
-          priceMinorPerProviderRequest: PRICE_MINOR,
-          budgetLimitMinor: PRICE_MINOR,
-          budgetCurrency: "USD",
-          expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
-          reason: "preflight dupcase test",
-        });
+    await database.transaction(async (client) => {
+      await registerEvaluationRunAuthorization(client, adminUser, {
+        authorizationId: replayAuthId,
+        ownerId: ADMIN_ID,
+        campaignId: replayCampaignId,
+        slotId: replaySlotId,
+        scope: {
+          type: "evaluation-unit",
+          modelId: "gpt-image-2.5-flare-vip",
+          evaluationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
+        },
+        maxProviderRequests: 1,
+        priceMinorPerProviderRequest: PRICE_MINOR,
+        budgetLimitMinor: PRICE_MINOR,
+        budgetCurrency: "USD",
+        expiresAt: Date.now() + 30 * 24 * 3600 * 1000,
+        reason: "preflight replay test",
       });
-    }
-
-    // POST first slot → 202
-    const dupRes1 = await fetch(`${BASE_URL}/api/run-plan`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: `gc_session=${session.token}`,
-      },
-      body: JSON.stringify({
-        nodes: GENERATE_FLOW.nodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
-        includeDownstream: false,
-        projectId: GEN_PROJECT_ID,
-        clientRequestId: dupSlotIdA,
-        evaluation: {
-          caseId: dupCaseId,
-          sampleId: `${dupCaseId}-sample-1`,
-          authorizationId: dupAuthIdA,
-          campaignId: dupCampaignId,
-          slotId: dupSlotIdA,
-        },
-      }),
     });
-    assert.strictEqual(dupRes1.status, 202, `first slot in dup-case campaign should be accepted, got ${dupRes1.status}`);
 
-    // POST second slot with SAME caseId → 409
-    const dupRes2 = await fetch(`${BASE_URL}/api/run-plan`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: `gc_session=${session.token}`,
+    const replayBody = (clientRequestId: string) => JSON.stringify({
+      nodes: GENERATE_FLOW.nodes,
+      edges: GENERATE_FLOW.edges,
+      onlyNodeId: GENERATE_FLOW.nodes[0].id,
+      includeDownstream: false,
+      projectId: GEN_PROJECT_ID,
+      clientRequestId,
+      evaluation: {
+        caseId: replayCaseId,
+        sampleId: `${replayCaseId}-sample-1`,
+        authorizationId: replayAuthId,
+        campaignId: replayCampaignId,
+        slotId: replaySlotId,
       },
-      body: JSON.stringify({
-        nodes: GENERATE_FLOW.nodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
-        includeDownstream: false,
-        projectId: GEN_PROJECT_ID,
-        clientRequestId: dupSlotIdB,
-        evaluation: {
-          caseId: dupCaseId,
-          sampleId: `${dupCaseId}-sample-2`,
-          authorizationId: dupAuthIdB,
-          campaignId: dupCampaignId,
-          slotId: dupSlotIdB,
-        },
-      }),
+    });
+
+    // First submission enqueues the paid case.
+    const firstRes = await fetch(`${BASE_URL}/api/run-plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: `gc_session=${session.token}` },
+      body: replayBody(replaySlotId),
     });
     assert.strictEqual(
-      dupRes2.status,
-      409,
-      `duplicate caseId should be rejected with 409, got ${dupRes2.status}`,
+      firstRes.status,
+      202,
+      `first submission of the replay case should enqueue, got ${firstRes.status}`,
     );
-    console.log(`  ✓ mutation: duplicate caseId rejected (HTTP ${dupRes2.status})`);
+
+    // Same caseId, NEW clientRequestId → must be rejected as a case replay (409).
+    const replayRes = await fetch(`${BASE_URL}/api/run-plan`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: `gc_session=${session.token}` },
+      body: replayBody(secondRequestId),
+    });
+    assert.strictEqual(
+      replayRes.status,
+      409,
+      `replaying an already-enqueued evaluation caseId under a new clientRequestId ` +
+        `must be rejected with 409, got ${replayRes.status}`,
+    );
+    console.log(`  ✓ mutation: evaluation case replay under new clientRequestId rejected (HTTP ${replayRes.status})`);
   }
 
   // 13. Mutation variant 4: slot budget=72 is accepted at route layer (no budget gate there)
@@ -701,7 +680,7 @@ try {
         ownerId: ADMIN_ID,
         stage: "provider-probe",
         modelId: "gpt-image-2.5-flare-vip",
-        authorizationUnitKey: `sha256:${"0".repeat(64)}`,
+        authorizationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
         codeSha: CODE_SHA,
         maxProviderRequests: 1,
         budgetLimitMinor: BIG_BUDGET,
@@ -732,7 +711,7 @@ try {
         scope: {
           type: "evaluation-unit",
           modelId: "gpt-image-2.5-flare-vip",
-          evaluationUnitKey: `sha256:${"0".repeat(64)}`,
+          evaluationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
         },
         maxProviderRequests: 1,
         priceMinorPerProviderRequest: BIG_BUDGET,
@@ -785,7 +764,7 @@ try {
     console.log(`  ✓ mutation: budget=72 accepted at route layer, confirmed in DB`);
   }
 
-  console.log("\n✓ campaign-runner-preflight: ALL 66 slots passed\n");
+  console.log("\n✓ campaign-runner-preflight: three-state verified — 33 PASS (generate, unitKey chain fixed) + 33 BLOCKED (edit-reference-missing, Track B) + 4 mutation gates\n");
 } finally {
   serverProc.kill("SIGTERM");
   // give the subprocess a moment to exit, don't fail if it's already gone
