@@ -11,6 +11,10 @@ import type { EvaluationCampaignManifest } from "../server/lib/evaluationCampaig
 import type { ImageModelId } from "../src/types/imageModels";
 import { promptEvaluationUnitKey } from "../src/lib/promptEvaluation";
 import crypto from "node:crypto";
+import { buildExecutionPlan, type FlowNode, type FlowEdge } from "../server/engine/dag";
+import { evaluationAuthorizationTargetFromPlan } from "../server/lib/evaluationAuthorizationLedger";
+import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
+import { canonicalJson } from "../src/lib/promptEvaluationRelease";
 import { builtinTemplates } from "../server/routes/templates";
 
 // ---------- helpers ----------
@@ -60,6 +64,7 @@ interface StageRequestCap {
 interface ManifestUnit {
   unitId: string;
   promptVariantId: string;
+  projectId: string;
   evaluationUnitKey: string;
 }
 
@@ -216,6 +221,7 @@ export function loadManifest(path: string): LoadedManifest {
     return {
       unitId: String(entry.unitId ?? ""),
       promptVariantId: String(unit?.promptVariantId ?? ""),
+      projectId: String(unit?.projectId ?? ""),
       evaluationUnitKey: unitKey,
     };
   });
@@ -348,6 +354,7 @@ interface CampaignPlan {
   modelId: string;
   variantId: string;
   unitId: string;
+  projectId: string;
   evaluationUnitKey: string;
   slots: SlotPlan[];
   budgetLimitMinor: number;
@@ -386,6 +393,7 @@ export function generateCampaignPlans(
         modelId,
         variantId: unit.promptVariantId,
         unitId: unit.unitId,
+        projectId: unit.projectId,
         evaluationUnitKey: unit.evaluationUnitKey,
         slots,
         budgetLimitMinor,
@@ -496,6 +504,26 @@ async function sealCampaigns(
     };
 
     for (const plan of plans) {
+      // compute the real authorization unit key from the project flow
+      // (not from the manifest static unit).  Ruling: 62-envelope-authority-ruling.md
+      const project = await database.queryOne<{
+        flow_json: unknown;
+      }>(
+        `SELECT flow_json, nodes, edges FROM saved_projects WHERE id = $1 AND deleted_at IS NULL`,
+        [plan.projectId],
+      );
+      if (!project) {
+        throw new Error(`project ${plan.projectId} not found for campaign ${plan.campaignId}`);
+      }
+      const flow = project.flow_json as Record<string, unknown>;
+      const { nodes: flowNodes, edges: flowEdges } = validateAndMigrateFlow(flow);
+      const execPlan = buildExecutionPlan(
+        flowNodes as FlowNode[],
+        (flowEdges ?? []) as FlowEdge[],
+      );
+      const target = evaluationAuthorizationTargetFromPlan(execPlan);
+      plan.evaluationUnitKey = target.evaluationUnitKey;
+
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,

@@ -88,11 +88,12 @@
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
       "unit": {
+        "projectId": "U7lK9XXlq1",
         "taskFamilyId": "fashion-lookbook",
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
-        "nodeKind": "image",
+        "nodeKind": "image-generator",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "generate",
         "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:generate:v1",
@@ -119,11 +120,12 @@
     {
       "unitId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       "unit": {
+        "projectId": "EVALeditv1F",
         "taskFamilyId": "fashion-lookbook",
         "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
         "presetId": "fashion-lookbook",
         "presetVersion": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-        "nodeKind": "image",
+        "nodeKind": "image-generator",
         "modelId": "gpt-image-2.5-flare-vip",
         "operationMode": "edit",
         "parameterProfileId": "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1",
