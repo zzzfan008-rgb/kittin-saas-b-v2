@@ -180,25 +180,86 @@ await database.initializeDatabase();
 const session = await createSession(adminId, { markExistingAsReplaced: false });
 console.log(`  admin session created, token length=${session.token.length}`);
 
-// 3. Seed 2 saved projects (generate + edit)
+// 3. Seed golden-set fixture projects + files from dev DB (3(b) seeding改造)
+//
+// goldenSetSlotBinding 会在 execute 时按 projectId 查 DB，fixture 项目必须存在。
+// COPY dev garment_canvas → dev-db 连接查询 → test-db 连接 INSERT（dblink pg driver 类型不兼容）
+// PTESTGEN01 / PTESTEDIT1 保留（备用），ON CONFLICT DO NOTHING。
 const GEN_PROJECT_ID = "PTESTGEN01";
 const EDIT_PROJECT_ID = "PTESTEDIT1";
 
+async function copyFromDevDevFirst(query: string): Promise<Record<string, string>[]> {
+  // 用 psql CLI 的 JSON 格式输出（无 CSV 解析问题），继承 trust/localhost auth
+  const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    const cp = spawn("psql", [
+      "-U", process.env.PGUSER ?? "lionfan",
+      "-d", "garment_canvas",
+      "--csv", "-t", "-A", "-c",
+      `SELECT jsonb_agg(row_to_json(t)) FROM (${query}) t`,
+    ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432" } });
+    let out = "", err = "";
+    cp.stdout.on("data", (d) => (out += d));
+    cp.stderr.on("data", (d) => (err += d));
+    cp.on("close", (code) => code === 0 ? resolve({ stdout: out, stderr: err }) : reject(new Error(`psql exit ${code}: ${err}`)));
+  });
+  if (!stdout.trim()) return [];
+  const rows = JSON.parse(stdout.trim());
+  // JSON query 返回 [ {col1:val1,...}, ... ]，pg 将所有值转为字符串（除了 null）
+  return rows as Record<string, string>[];
+}
+
 await database.transaction(async (client) => {
+  // 3(a) COPY 48 golden-set fixture projects
+  // 改用 test ADMIN_ID 作为 owner（避免 COPY dev users 导致的 account_id unique 冲突）
+  const projectRows = await copyFromDevDevFirst(
+    `SELECT id, name, flow_json, lifecycle, created_at, updated_at FROM projects WHERE id LIKE 'EVAL%'`,
+  );
+  for (const row of projectRows) {
+    await client.query(
+      `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at, draft_revision)
+       VALUES ($1,$2,$3,$4,'saved',$5,$6,0)
+       ON CONFLICT (id) DO NOTHING`,
+      [row.id, ADMIN_ID, row.name, row.flow_json, row.created_at, row.updated_at],
+    );
+  }
+  console.log(`  golden-set fixtures seeded: ${projectRows.length} projects from dev DB`);
+
+  // 3(b) COPY image files referenced by edit fixtures
+  const fileRows = await copyFromDevDevFirst(
+    `SELECT f.id, f.owner_id, f.mime_type, f.byte_length::text, f.created_at
+     FROM files f
+     WHERE f.id IN (
+       SELECT replace(jsonb_array_elements_text(
+         (p.flow_json::jsonb->'nodes'->1->'data'->>'outputImages')::jsonb
+       ), '/api/files/', '')
+       FROM projects p
+       WHERE p.id LIKE 'EVALedit%'
+     )`,
+  );
+  for (const row of fileRows) {
+    await client.query(
+      `INSERT INTO files (id, owner_id, source_type, mime_type, byte_length, normalized, created_at)
+       VALUES ($1,$2,'upload',$3,$4,false,$5)
+       ON CONFLICT (id) DO NOTHING`,
+      [row.id, ADMIN_ID, row.mime_type, parseInt(row.byte_length, 10), row.created_at],
+    );
+  }
+  console.log(`  golden-set files seeded: ${fileRows.length} files from dev DB`);
+
+  // 备用：PTEST 静态项目（预检原始逻辑）
   await client.query(
     `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at)
      VALUES ($1, $2, 'preflight-generate', $3, 'saved', NOW(), NOW())
-     ON CONFLICT (id) DO UPDATE SET flow_json = $3, lifecycle = 'saved'`,
+     ON CONFLICT (id) DO NOTHING`,
     [GEN_PROJECT_ID, ADMIN_ID, JSON.stringify(GENERATE_FLOW)],
   );
   await client.query(
     `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at)
      VALUES ($1, $2, 'preflight-edit', $3, 'saved', NOW(), NOW())
-     ON CONFLICT (id) DO UPDATE SET flow_json = $3, lifecycle = 'saved'`,
+     ON CONFLICT (id) DO NOTHING`,
     [EDIT_PROJECT_ID, ADMIN_ID, JSON.stringify(EDIT_FLOW)],
   );
 });
-console.log(`  projects seeded: ${GEN_PROJECT_ID} (generate), ${EDIT_PROJECT_ID} (edit)`);
 
 // 4. Build 66 slot plans (generate + edit, the two active evaluation variants)
 const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
