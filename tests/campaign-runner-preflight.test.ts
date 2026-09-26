@@ -758,6 +758,9 @@ try {
     });
 
     // POST with budget=72 → route-layer should accept (202), the route doesn't check budget
+    const testFlowNodes = (testFlow as { nodes: { id: string; data: { kind?: string } }[] }).nodes;
+    const testFlowImageGen = testFlowNodes.find((n) => n.data?.kind === "image-generator");
+    if (!testFlowImageGen) throw new Error("no image-generator in testFlow");
     const bigRes = await fetch(`${BASE_URL}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -767,7 +770,7 @@ try {
       body: JSON.stringify({
         nodes: (testFlow as { nodes: unknown[] }).nodes,
         edges: (testFlow as { edges: unknown[] }).edges,
-        onlyNodeId: (testFlow as { nodes: { id: string }[] }).nodes[0].id,
+        onlyNodeId: testFlowImageGen.id,
         includeDownstream: false,
         projectId: allSlots[0].projectId,
         clientRequestId: bigBudgetSlotId,
@@ -806,6 +809,9 @@ try {
     assert.ok(genSlot, "at least one generate slot must exist");
     const storedFlow = SEEDED_PROJECT_FLOWS.get(genSlot.projectId) as { nodes: unknown[]; edges: unknown[] } | undefined;
     assert.ok(storedFlow, `seeded flow must exist for ${genSlot.projectId}`);
+    const storedFlowTyped = storedFlow as { nodes: { id: string; data: { kind?: string } }[]; edges: unknown[] };
+    const imageGenNode = storedFlowTyped.nodes.find((n) => n.data?.kind === "image-generator");
+    assert.ok(imageGenNode, "image-generator node must exist in seeded generate flow");
     const modifiedNodes = JSON.parse(JSON.stringify(storedFlow.nodes));
     const textNode = modifiedNodes.find((n: any) => n.data?.kind === "text");
     assert.ok(textNode, "text node must exist in seeded generate flow");
@@ -816,7 +822,7 @@ try {
       body: JSON.stringify({
         nodes: modifiedNodes,
         edges: storedFlow.edges,
-        onlyNodeId: (storedFlow.nodes[0] as { id: string }).id,
+        onlyNodeId: imageGenNode.id,
         includeDownstream: false,
         projectId: genSlot.projectId,
         clientRequestId: PREFIX + "-mutation-text-" + randomUUID().slice(0, 8),
