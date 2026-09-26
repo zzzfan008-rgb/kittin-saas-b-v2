@@ -105,24 +105,30 @@ console.log(`  admin session created, token length=${session.token.length}`);
 // goldenSetSlotBinding 会在 execute 时按 projectId 查 DB，fixture 项目必须存在。
 // COPY dev garment_canvas → dev-db 连接查询 → test-db 连接 INSERT（dblink pg driver 类型不兼容）
 
+// Attempts to query the dev garment_canvas DB via psql CLI.
+// Returns [] if the dev DB is unavailable (e.g. CI environment — no socket, no garment_canvas DB).
+// The preflight test seeds itself from static fixture data when this fallback is triggered.
 async function copyFromDevDevFirst(query: string): Promise<Record<string, string>[]> {
-  // 用 psql CLI 的 JSON 格式输出（无 CSV 解析问题），继承 trust/localhost auth
-  const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-    const cp = spawn("psql", [
-      "-U", process.env.PGUSER ?? "lionfan",
-      "-d", "garment_canvas",
-      "--csv", "-t", "-A", "-c",
-      `SELECT jsonb_agg(row_to_json(t)) FROM (${query}) t`,
-    ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432" } });
-    let out = "", err = "";
-    cp.stdout.on("data", (d) => (out += d));
-    cp.stderr.on("data", (d) => (err += d));
-    cp.on("close", (code) => code === 0 ? resolve({ stdout: out, stderr: err }) : reject(new Error(`psql exit ${code}: ${err}`)));
-  });
-  if (!stdout.trim()) return [];
-  const rows = JSON.parse(stdout.trim());
-  // JSON query 返回 [ {col1:val1,...}, ... ]，pg 将所有值转为字符串（除了 null）
-  return rows as Record<string, string>[];
+  try {
+    const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      const cp = spawn("psql", [
+        "-U", process.env.PGUSER ?? "lionfan",
+        "-d", "garment_canvas",
+        "--csv", "-t", "-A", "-c",
+        `SELECT jsonb_agg(row_to_json(t)) FROM (${query}) t`,
+      ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432" } });
+      let out = "", err = "";
+      cp.stdout.on("data", (d) => (out += d));
+      cp.stderr.on("data", (d) => (err += d));
+      cp.on("close", (code) => code === 0 ? resolve({ stdout: out, stderr: err }) : reject(new Error(`psql exit ${code}: ${err}`)));
+    });
+    if (!stdout.trim()) return [];
+    const rows = JSON.parse(stdout.trim());
+    return rows as Record<string, string>[];
+  } catch {
+    // Dev DB unavailable (CI Docker environment) — seed from static fixture data instead.
+    return [];
+  }
 }
 
 await database.transaction(async (client) => {
@@ -176,6 +182,35 @@ async function loadSeededProjectFlows(): Promise<Map<string, object>> {
   for (const row of rows) {
     map.set(row.id, JSON.parse(row.flow_json));
   }
+
+  // CI fallback: if the test DB has no fixture projects (COPY was unavailable),
+  // inject minimal static flows for the two manifest-referenced projectIds needed by mutation tests.
+  // Both flows have a single image-generator node (needed by imageGenNodeId helper).
+  if (map.size === 0) {
+    map.set("U7lK9XXlq1", {
+      nodes: [
+        { id: "gen-root", type: "root", data: {} },
+        {
+          id: "gen-img",
+          type: "image-generator",
+          data: { kind: "image-generator", batchSize: 1, modelId: "gpt-image-2.5-flare-vip" },
+        },
+      ],
+      edges: [],
+    });
+    map.set("EVALeditv1F", {
+      nodes: [
+        { id: "edit-root", type: "root", data: {} },
+        {
+          id: "edit-img",
+          type: "image-generator",
+          data: { kind: "image-generator", batchSize: 2, modelId: "gpt-image-2.5-flare-vip" },
+        },
+      ],
+      edges: [],
+    });
+  }
+
   return map;
 }
 
