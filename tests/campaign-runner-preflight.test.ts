@@ -181,6 +181,22 @@ async function loadSeededProjectFlows(): Promise<Map<string, object>> {
 
 const SEEDED_PROJECT_FLOWS = await loadSeededProjectFlows();
 
+// Helper: find image-generator node ID in a seeded flow
+function imageGenNodeId(projectId: string): string {
+  const flow = SEEDED_PROJECT_FLOWS.get(projectId) as { nodes: { data: { kind?: string }; id: string }[] } | undefined;
+  if (!flow) throw new Error(`flow not found for ${projectId}`);
+  const node = flow.nodes.find((n) => n.data?.kind === "image-generator");
+  if (!node) throw new Error(`no image-generator node in ${projectId}`);
+  return node.id;
+}
+
+// Helper: get seeded flow as typed object
+function seededFlow(projectId: string) {
+  const f = SEEDED_PROJECT_FLOWS.get(projectId);
+  if (!f) throw new Error(`flow not found for ${projectId}`);
+  return f as { nodes: unknown[]; edges: unknown[] };
+}
+
 // 4. Build 66 slot plans (generate + edit, the two active evaluation variants)
 const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
 const TARGET_VARIANTS = new Set([
@@ -190,8 +206,6 @@ const TARGET_VARIANTS = new Set([
 const filtered = manifest.baseUnits.filter(
   (u) => TARGET_VARIANTS.has(u.promptVariantId),
 );
-console.log(`  DEBUG: filtered baseUnits count: ${filtered.length}`);
-console.log(`  DEBUG: filtered projectIds: ${[...new Set(filtered.map(u => u.projectId))]}`);
 // Architect mandated assertion: the filtered set must exactly cover the authorized
 // variant collection. A partial or missing set is a silent coverage gap.
 const coveredVariants = new Set(filtered.map((u) => u.promptVariantId));
@@ -365,14 +379,10 @@ try {
   const blockedErrors: string[] = [];
   const failures: string[] = [];
 
-  // DEBUG: log first 3 slots
-  let debugCount = 0;
-
   for (const slot of allSlots) {
     const flow = SEEDED_PROJECT_FLOWS.get(slot.projectId);
-    if (!flow) throw new Error(`seeded flow not found for projectId=${slot.projectId}`);
+    if (!flow) throw new Error(`seeded project not found for projectId=${slot.projectId}`);
     const flowNodes = (flow as { nodes: { id: string; data: { kind?: string } }[] }).nodes;
-    // Find the image-generator node (executable) — not nodes[0] which may be a text/upstream node
     const imageGenNode = flowNodes.find((n) => n.data?.kind === "image-generator");
     if (!imageGenNode) throw new Error(`no image-generator node in projectId=${slot.projectId}`);
     const payload = {
@@ -391,17 +401,6 @@ try {
       },
     };
 
-    if (debugCount < 3) {
-      console.log(`  DEBUG[${debugCount}] slotId=${slot.slotId} projectId=${slot.projectId} campaignId=${slot.campaignId} authorizationId=batch-62-${slot.slotId} unitKey=${slot.unitKey}`);
-      // Check if authorization exists in DB
-      const authRow = await database.queryOne<{ authorization_id: string }>(
-        `SELECT authorization_id FROM evaluation_run_authorizations WHERE authorization_id = $1`,
-        [`batch-62-${slot.slotId}`],
-      );
-      console.log(`  DEBUG[${debugCount}] auth exists in DB:`, authRow ? "YES" : "NO");
-      debugCount += 1;
-    }
-
     const res = await fetch(`${BASE_URL}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -411,23 +410,15 @@ try {
       body: JSON.stringify(payload),
     });
 
-    // res.json() / res.text() can only be called once — consume once here
-    const resBody = await res.text();
-
-    if (res.status !== 202) {
-      if (debugCount < 3) {
-        console.log(`  DEBUG[${debugCount}] slot=${slot.slotId} projectId=${slot.projectId} HTTP=${res.status} body=${resBody.slice(0,300)}`);
-        debugCount += 1;
-      }
-    }
-
     if (res.status === 202) {
       successCount += 1;
     } else if (res.status === 400) {
+      const body = await res.text().catch(() => "");
       blockedCount += 1;
-      blockedErrors.push(`slot ${slot.slotId}: HTTP 400 — ${resBody.slice(0, 200)}`);
+      blockedErrors.push(`slot ${slot.slotId}: HTTP 400 — ${body.slice(0, 200)}`);
     } else {
-      failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${resBody.slice(0, 200)}`);
+      const body = await res.text().catch(() => "");
+      failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${body.slice(0, 200)}`);
     }
   }
 
@@ -531,7 +522,7 @@ try {
       body: JSON.stringify({
         nodes: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: unknown[] }).nodes,
         edges: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { edges: unknown[] }).edges,
-        onlyNodeId: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: { id: string }[] }).nodes[0].id,
+        onlyNodeId: imageGenNodeId(allSlots[0].projectId),
         includeDownstream: false,
         projectId: allSlots[0].projectId,
         clientRequestId: oldCid,
@@ -560,7 +551,7 @@ try {
       body: JSON.stringify({
         nodes: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: unknown[] }).nodes,
         edges: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { edges: unknown[] }).edges,
-        onlyNodeId: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: { id: string }[] }).nodes[0].id,
+        onlyNodeId: imageGenNodeId(allSlots[0].projectId),
         includeDownstream: false,
         projectId: allSlots[0].projectId,
         clientRequestId: dotCid,
@@ -804,9 +795,9 @@ try {
 
   // 15. plan-equality gate: modified text must be rejected (dag.ts:229→247→runPlan.ts:232)
   {
-    // Use the first generate slot (EVALgen prefix)
-    const genSlot = allSlots.find((s) => s.projectId.startsWith("EVALgen"));
-    assert.ok(genSlot, "at least one generate slot must exist");
+    // Use the generate project (U7lK9XXlq1 from manifest)
+    const genSlot = allSlots.find((s) => s.projectId === "U7lK9XXlq1");
+    assert.ok(genSlot, "generate slot (U7lK9XXlq1) must exist");
     const storedFlow = SEEDED_PROJECT_FLOWS.get(genSlot.projectId) as { nodes: unknown[]; edges: unknown[] } | undefined;
     assert.ok(storedFlow, `seeded flow must exist for ${genSlot.projectId}`);
     const storedFlowTyped = storedFlow as { nodes: { id: string; data: { kind?: string } }[]; edges: unknown[] };
