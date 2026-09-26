@@ -385,6 +385,17 @@ try {
       },
     };
 
+    if (debugCount < 3) {
+      console.log(`  DEBUG[${debugCount}] slotId=${slot.slotId} projectId=${slot.projectId} campaignId=${slot.campaignId} authorizationId=batch-62-${slot.slotId} unitKey=${slot.unitKey}`);
+      // Check if authorization exists in DB
+      const authRow = await database.queryOne<{ authorization_id: string }>(
+        `SELECT authorization_id FROM evaluation_run_authorizations WHERE authorization_id = $1`,
+        [`batch-62-${slot.slotId}`],
+      );
+      console.log(`  DEBUG[${debugCount}] auth exists in DB:`, authRow ? "YES" : "NO");
+      debugCount += 1;
+    }
+
     const res = await fetch(`${BASE_URL}/api/run-plan`, {
       method: "POST",
       headers: {
@@ -394,21 +405,23 @@ try {
       body: JSON.stringify(payload),
     });
 
+    // res.json() / res.text() can only be called once — consume once here
+    const resBody = await res.text();
+
+    if (res.status !== 202) {
+      if (debugCount < 3) {
+        console.log(`  DEBUG[${debugCount}] slot=${slot.slotId} projectId=${slot.projectId} HTTP=${res.status} body=${resBody.slice(0,300)}`);
+        debugCount += 1;
+      }
+    }
+
     if (res.status === 202) {
       successCount += 1;
     } else if (res.status === 400) {
-      const body = await res.text().catch(() => "");
       blockedCount += 1;
-      blockedErrors.push(`slot ${slot.slotId}: HTTP 400 — ${body.slice(0, 200)}`);
+      blockedErrors.push(`slot ${slot.slotId}: HTTP 400 — ${resBody.slice(0, 200)}`);
     } else {
-      const body = await res.text().catch(() => "");
-      failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${body.slice(0, 200)}`);
-    }
-    // DEBUG: log first 3 non-202 responses
-    if (res.status !== 202 && debugCount < 3) {
-      const body = await res.text().catch(() => "(no body)");
-      console.log(`  DEBUG slot=${slot.slotId} projectId=${slot.projectId} HTTP=${res.status} body=${body.slice(0,300)}`);
-      debugCount += 1;
+      failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${resBody.slice(0, 200)}`);
     }
   }
 
