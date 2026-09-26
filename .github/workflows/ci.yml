@@ -47,6 +47,10 @@ jobs:
     name: unit (test:suite on PostgreSQL)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PGPASSWORD: ${{ secrets.CI_PG_PASSWORD }}
+      PGUSER: garment_canvas
+      PGHOST: 127.0.0.1
     services:
       postgres:
         image: postgres:18
@@ -72,7 +76,9 @@ jobs:
       # 这里的口令是 CI 一次性容器内的 dummy 值，不是任何真实凭据。
       - run: npm run test
         env:
-          DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test
+          DATABASE_URL: postgresql://garment_canvas:${{ secrets.CI_PG_PASSWORD }}@127.0.0.1:5432/garment_canvas_test
+          PGHOST: 127.0.0.1
+          PGPASSWORD: ${{ secrets.CI_PG_PASSWORD }}
 
   e2e:
     name: e2e (playwright chromium, dev mode)

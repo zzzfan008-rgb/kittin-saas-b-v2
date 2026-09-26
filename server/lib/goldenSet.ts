@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Pool } from "pg";
+import pg, { type Pool } from "pg";
 import { createHash } from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -221,13 +221,19 @@ export interface SlotBinding {
  * Throws if variantId is unknown, sampleIdx is out of range, or the fixture
  * project is missing / not alive in the database (fail-closed — no fallback
  * to old template fixtures).
+ *
+ * @param explicitPool  When provided, use this pool (e.g. the test pool so
+ *                      preflight can seed fixture projects into test DB and then
+ *                      bind against them).  When omitted, connects directly to
+ *                      dev garment_canvas — script-only behaviour.
  */
 export async function goldenSetSlotBinding(
-  pool: Pool,
+  explicitPool: Pool | undefined,
   variantId: string,
   stage: "formal-validation" | "internal-experiment" | "provider-probe",
   sampleIdx: number,
 ): Promise<SlotBinding> {
+  const pool = explicitPool ?? (await import("../lib/databaseRuntime")).devDb();
   if (!ALLOWED_FIXTURE_VARIANTS.has(variantId)) {
     throw new Error(
       `unknown variant for fixture binding: ${variantId}. ` +
