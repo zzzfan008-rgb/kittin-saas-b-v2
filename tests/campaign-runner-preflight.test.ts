@@ -113,10 +113,16 @@ async function copyFromDevDevFirst(query: string): Promise<Record<string, string
     const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       const cp = spawn("psql", [
         "-U", process.env.PGUSER ?? "lionfan",
-        "-d", "garment_canvas",
+        "-d", "garment_canvas_test",
         "--csv", "-t", "-A", "-c",
         `SELECT jsonb_agg(row_to_json(t)) FROM (${query}) t`,
-      ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432", PGHOST: process.env.PGHOST ?? "127.0.0.1" } });
+      ], { env: {
+   ...process.env,
+   PGPORT: process.env.PGPORT ?? "5432",
+   PGHOST: process.env.PGHOST ?? "127.0.0.1",
+   PGUSER: process.env.PGUSER ?? "garment_canvas",
+   PGPASSWORD: process.env.PGPASSWORD ?? "",
+ } });
       let out = "", err = "";
       cp.stdout.on("data", (d) => (out += d));
       cp.stderr.on("data", (d) => (err += d));
@@ -148,6 +154,162 @@ await database.transaction(async (client) => {
     );
   }
   console.log(`  golden-set fixtures seeded: ${projectRows.length} projects from dev DB`);
+
+  // CI fallback: if copyFromDevDevFirst returned [] (no dev DB or no fixture data),
+  // seed fixture projects directly from static data. This makes preflight tests
+  // pass in CI Docker where garment_canvas_dev does not exist.
+  if (projectRows.length === 0) {
+    const { loadGoldenSet } = await import("../server/lib/goldenSet");
+    const gs = loadGoldenSet();
+
+    // EVALgen fixtures: projectId → flow_json with schemaVersion=8 + batchSize=1
+    for (let i = 0; i < gs.samples.length; i++) {
+      const sample = gs.samples[i];
+      const idx = String(i + 1).padStart(2, "0");
+      const projectId = `EVALgen-brief-${idx}`;
+      const flowJson = JSON.stringify({
+        schemaVersion: 8,
+        nodes: [
+          {
+            id: "outfit-requirement",
+            type: "text",
+            position: { x: 0, y: -170 },
+            data: {
+              kind: "text",
+              label: "场合/风格/身材",
+              status: "idle",
+              text: "【要求】描述场合、风格与身材",
+            },
+          },
+          {
+            id: "outfit-gen",
+            type: "image-generator",
+            position: { x: 380, y: -170 },
+            data: {
+              kind: "image-generator",
+              label: "穿搭推荐",
+              status: "idle",
+              promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+              modelId: "gpt-image-2.5-flare-vip",
+              modelOptions: { size: "1536x2048" },
+              aspectRatio: "3:4",
+              batchSize: 1,
+            },
+          },
+        ],
+        edges: [
+          {
+            id: "e-outfit-prompt",
+            source: "outfit-requirement",
+            target: "outfit-gen",
+            data: {},
+            targetHandle: "prompt",
+          },
+        ],
+      });
+      await client.query(
+        `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at, draft_revision)
+         VALUES ($1,$2,$3,$4,$5, NOW(), NOW(), $6)`,
+        [projectId, ADMIN_ID, `fixture ${projectId}`, flowJson, 'saved', 0],
+      );
+    }
+
+    // EVALedit fixtures: projectId → flow_json with schemaVersion=8 + batchSize=2 + reference image file
+    for (let i = 0; i < gs.samples.length; i++) {
+      const sample = gs.samples[i];
+      const idx = String(i + 1).padStart(2, "0");
+      const projectId = `EVALedit-brief-${idx}`;
+      const flowJson = JSON.stringify({
+        schemaVersion: 8,
+        nodes: [
+          {
+            id: "mutate-requirement",
+            type: "text",
+            position: { x: 0, y: -170 },
+            data: {
+              kind: "text",
+              label: "裂变方向/数量",
+              status: "idle",
+              text: "【要求】描述裂变方向与数量",
+            },
+          },
+          {
+            id: "mutate-gen",
+            type: "image-generator",
+            position: { x: 380, y: -170 },
+            data: {
+              kind: "image-generator",
+              label: "穿搭裂变",
+              status: "idle",
+              promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+              modelId: "gpt-image-2.5-flare-vip",
+              modelOptions: { size: "1536x2048" },
+              aspectRatio: "3:4",
+              batchSize: 2,
+            },
+          },
+        ],
+        edges: [
+          {
+            id: "e-mutate-prompt",
+            source: "mutate-requirement",
+            target: "mutate-gen",
+            data: {},
+            targetHandle: "prompt",
+          },
+        ],
+      });
+      await client.query(
+        `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at, draft_revision)
+         VALUES ($1,$2,$3,$4,$5, NOW(), NOW(), $6)`,
+        [projectId, ADMIN_ID, `fixture ${projectId}`, flowJson, 'saved', 0],
+      );
+
+      // Seed a placeholder reference file so goldenSetSlotBinding can find the image
+      const refFileId = sample.referenceImage?.fileId;
+      if (refFileId) {
+        await client.query(
+          `INSERT INTO files (id, owner_id, source_type, mime_type, byte_length, normalized, created_at)
+           VALUES ($1,$2,'upload','image/png',1024,false,NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [refFileId, ADMIN_ID],
+        );
+      }
+    }
+
+    // Also seed manifest reference projects with valid v8 flow_json (matching production structure)
+    const manifestGenFlow = JSON.stringify({
+      schemaVersion: 8,
+      nodes: [
+        { id: "outfit-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "场合/风格/身材", status: "idle", text: "【要求】描述场合、风格与身材" } },
+        { id: "outfit-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭推荐", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      edges: [{ id: "e-outfit-prompt", source: "outfit-requirement", target: "outfit-gen", data: {}, targetHandle: "prompt" }],
+    });
+    const manifestEditFlow = JSON.stringify({
+      schemaVersion: 8,
+      nodes: [
+        { id: "mutate-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "裂变方向/数量", status: "idle", text: "【要求】描述裂变方向与数量" } },
+        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 2 } },
+      ],
+      edges: [{ id: "e-mutate-prompt", source: "mutate-requirement", target: "mutate-gen", data: {}, targetHandle: "prompt" }],
+    });
+    for (const [pid, name, flowJson] of [
+      ["U7lK9XXlq1", "manifest reference generate", manifestGenFlow],
+      ["EVALeditv1F", "manifest reference edit", manifestEditFlow],
+    ] as const) {
+      await client.query(
+        `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at, draft_revision)
+         VALUES ($1,$2,$3,$4,'saved',NOW(),NOW(),0)
+         ON CONFLICT (id) DO NOTHING`,
+        [pid, ADMIN_ID, name, flowJson],
+      );
+    }
+
+    console.log(
+      `  golden-set fixtures seeded (CI fallback): ${gs.samples.length * 2} projects + manifest refs`,
+    );
+  }
 
   // 3(b) COPY image files referenced by edit fixtures
   const fileRows = await copyFromDevDevFirst(
@@ -188,26 +350,20 @@ async function loadSeededProjectFlows(): Promise<Map<string, object>> {
   // Both flows have a single image-generator node (needed by imageGenNodeId helper).
   if (map.size === 0) {
     map.set("U7lK9XXlq1", {
+      schemaVersion: 8,
       nodes: [
-        { id: "gen-root", type: "root", data: {} },
-        {
-          id: "gen-img",
-          type: "image-generator",
-          data: { kind: "image-generator", batchSize: 1, modelId: "gpt-image-2.5-flare-vip" },
-        },
+        { id: "outfit-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "场合/风格/身材", status: "idle", text: "【要求】描述场合、风格与身材" } },
+        { id: "outfit-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭推荐", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 1 } },
       ],
-      edges: [],
+      edges: [{ id: "e-outfit-prompt", source: "outfit-requirement", target: "outfit-gen", data: {}, targetHandle: "prompt" }],
     });
     map.set("EVALeditv1F", {
+      schemaVersion: 8,
       nodes: [
-        { id: "edit-root", type: "root", data: {} },
-        {
-          id: "edit-img",
-          type: "image-generator",
-          data: { kind: "image-generator", batchSize: 2, modelId: "gpt-image-2.5-flare-vip" },
-        },
+        { id: "mutate-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "裂变方向/数量", status: "idle", text: "【要求】描述裂变方向与数量" } },
+        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 2 } },
       ],
-      edges: [],
+      edges: [{ id: "e-mutate-prompt", source: "mutate-requirement", target: "mutate-gen", data: {}, targetHandle: "prompt" }],
     });
   }
 
