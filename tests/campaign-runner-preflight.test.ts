@@ -369,10 +369,14 @@ try {
   for (const slot of allSlots) {
     const flow = SEEDED_PROJECT_FLOWS.get(slot.projectId);
     if (!flow) throw new Error(`seeded flow not found for projectId=${slot.projectId}`);
+    const flowNodes = (flow as { nodes: { id: string; data: { kind?: string } }[] }).nodes;
+    // Find the image-generator node (executable) — not nodes[0] which may be a text/upstream node
+    const imageGenNode = flowNodes.find((n) => n.data?.kind === "image-generator");
+    if (!imageGenNode) throw new Error(`no image-generator node in projectId=${slot.projectId}`);
     const payload = {
       nodes: (flow as { nodes: unknown[] }).nodes,
       edges: (flow as { edges: unknown[] }).edges,
-      onlyNodeId: (flow as { nodes: { id: string }[] }).nodes[0].id,
+      onlyNodeId: imageGenNode.id,
       includeDownstream: false,
       projectId: slot.projectId,
       clientRequestId: slot.slotId,
