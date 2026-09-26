@@ -79,6 +79,7 @@ const TEST_FILES = [
   "tests/evaluation-campaign-snapshot.test.ts",
   "tests/evaluation-flow-json-sha.test.ts",
   "tests/evaluation-fixture-pairing.test.ts",
+  "tests/evaluation-fixture-distinct.test.ts",
   "tests/reference-inputs.test.ts",
   "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",
