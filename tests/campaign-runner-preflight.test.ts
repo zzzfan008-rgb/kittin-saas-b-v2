@@ -116,7 +116,7 @@ async function copyFromDevDevFirst(query: string): Promise<Record<string, string
         "-d", "garment_canvas",
         "--csv", "-t", "-A", "-c",
         `SELECT jsonb_agg(row_to_json(t)) FROM (${query}) t`,
-      ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432" } });
+      ], { env: { ...process.env, PGPORT: process.env.PGPORT ?? "5432", PGHOST: process.env.PGHOST ?? "127.0.0.1" } });
       let out = "", err = "";
       cp.stdout.on("data", (d) => (out += d));
       cp.stderr.on("data", (d) => (err += d));
