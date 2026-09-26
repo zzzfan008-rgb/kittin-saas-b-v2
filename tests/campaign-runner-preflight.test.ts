@@ -29,9 +29,11 @@ import {
   type EvaluationAuthorizationRegistration,
 } from "../server/lib/evaluationAuthorizationLedger";
 import { loadManifest, generateCampaignPlans, evaluationUnitKeyFromFlow } from "../scripts/evaluation-campaign-runner";
+import { goldenSetSlotBinding } from "../server/lib/goldenSet";
 import { CLIENT_REQUEST_ID_PATTERN } from "../server/engine/runQueue/types";
 
 const database = await import("../server/lib/database");
+const { db } = database;
 
 // ---------- constants ----------
 
@@ -43,90 +45,8 @@ const SERVER_PORT = 30999; // dedicated test port, never conflicts with 3001 dev
 const BASE_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const PREFIX = "preflight";
 
-// Minimal project flows — each has exactly 1 image-generator node with 1 upstream text node.
-// The text→image-generator edge uses targetHandle="prompt" as required by INV-1.
-const GENERATE_FLOW = {
-  schemaVersion: 8,
-  nodes: [
-    {
-      id: `gen-node-${randomUUID().slice(0, 8)}`,
-      type: "image-generator",
-      position: { x: 100, y: 100 },
-      data: {
-        kind: "image-generator",
-        label: "generate",
-        modelId: "gpt-image-2.5-flare-vip",
-        promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
-        postprocessVersion: "fit-contain-dominant-webp-v1",
-        aspectRatio: "3:4",
-        batchSize: 1,
-        modelOptions: { size: "1536x2048" },
-      },
-      width: 200,
-      height: 100,
-    },
-    {
-      id: `gen-text-${randomUUID().slice(0, 8)}`,
-      type: "text",
-      position: { x: 100, y: 0 },
-      data: { kind: "text", label: "prompt", text: "preflight test prompt" },
-      width: 200,
-      height: 80,
-    },
-  ],
-  edges: [
-    {
-      id: `gen-edge-${randomUUID().slice(0, 8)}`,
-      source: "", // filled after nodes are created
-      target: "", // filled after nodes are created
-      sourceHandle: "text",
-      targetHandle: "prompt",
-    },
-  ],
-};
-// Fill edge source/target with the actual node IDs
-GENERATE_FLOW.edges[0].source = GENERATE_FLOW.nodes[1].id;
-GENERATE_FLOW.edges[0].target = GENERATE_FLOW.nodes[0].id;
-
-const EDIT_FLOW = {
-  schemaVersion: 8,
-  nodes: [
-    {
-      id: `edit-node-${randomUUID().slice(0, 8)}`,
-      type: "image-generator",
-      position: { x: 100, y: 100 },
-      data: {
-        kind: "image-generator",
-        label: "edit",
-        modelId: "gpt-image-2.5-flare-vip",
-        promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-        aspectRatio: "3:4",
-        batchSize: 1,
-      },
-      width: 200,
-      height: 100,
-    },
-    {
-      id: `edit-text-${randomUUID().slice(0, 8)}`,
-      type: "text",
-      position: { x: 100, y: 0 },
-      data: { kind: "text", label: "prompt", text: "preflight test prompt (edit)" },
-      width: 200,
-      height: 80,
-    },
-  ],
-  edges: [
-    {
-      id: `edit-edge-${randomUUID().slice(0, 8)}`,
-      source: "",
-      target: "",
-      sourceHandle: "text",
-      targetHandle: "prompt",
-    },
-  ],
-};
-EDIT_FLOW.edges[0].source = EDIT_FLOW.nodes[1].id;
-EDIT_FLOW.edges[0].target = EDIT_FLOW.nodes[0].id;
+// Map of manifest projectId → seeded project flow (loaded from test DB after seeding).
+// Used to drive HTTP request bodies and envelope key computation.
 
 // ---------- helpers ----------
 
@@ -184,9 +104,6 @@ console.log(`  admin session created, token length=${session.token.length}`);
 //
 // goldenSetSlotBinding 会在 execute 时按 projectId 查 DB，fixture 项目必须存在。
 // COPY dev garment_canvas → dev-db 连接查询 → test-db 连接 INSERT（dblink pg driver 类型不兼容）
-// PTESTGEN01 / PTESTEDIT1 保留（备用），ON CONFLICT DO NOTHING。
-const GEN_PROJECT_ID = "PTESTGEN01";
-const EDIT_PROJECT_ID = "PTESTEDIT1";
 
 async function copyFromDevDevFirst(query: string): Promise<Record<string, string>[]> {
   // 用 psql CLI 的 JSON 格式输出（无 CSV 解析问题），继承 trust/localhost auth
@@ -209,10 +126,12 @@ async function copyFromDevDevFirst(query: string): Promise<Record<string, string
 }
 
 await database.transaction(async (client) => {
-  // 3(a) COPY 48 golden-set fixture projects
-  // 改用 test ADMIN_ID 作为 owner（避免 COPY dev users 导致的 account_id unique 冲突）
+  // 3(a) COPY golden-set fixture projects:
+  //   - 48 fixture projects (EVALgen-brief-XX / EVALedit-brief-XX) — per-sample brief fixtures
+  //   - 2 manifest reference projects (U7lK9XXlq1 / EVALeditv1F) — used as plan.projectId
   const projectRows = await copyFromDevDevFirst(
-    `SELECT id, name, flow_json, lifecycle, created_at, updated_at FROM projects WHERE id LIKE 'EVAL%'`,
+    `SELECT id, name, flow_json, lifecycle, created_at, updated_at FROM projects
+     WHERE id LIKE 'EVAL%' OR id IN ('U7lK9XXlq1', 'EVALeditv1F')`,
   );
   for (const row of projectRows) {
     await client.query(
@@ -245,21 +164,22 @@ await database.transaction(async (client) => {
     );
   }
   console.log(`  golden-set files seeded: ${fileRows.length} files from dev DB`);
-
-  // 备用：PTEST 静态项目（预检原始逻辑）
-  await client.query(
-    `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at)
-     VALUES ($1, $2, 'preflight-generate', $3, 'saved', NOW(), NOW())
-     ON CONFLICT (id) DO NOTHING`,
-    [GEN_PROJECT_ID, ADMIN_ID, JSON.stringify(GENERATE_FLOW)],
-  );
-  await client.query(
-    `INSERT INTO projects (id, owner_id, name, flow_json, lifecycle, created_at, updated_at)
-     VALUES ($1, $2, 'preflight-edit', $3, 'saved', NOW(), NOW())
-     ON CONFLICT (id) DO NOTHING`,
-    [EDIT_PROJECT_ID, ADMIN_ID, JSON.stringify(EDIT_FLOW)],
-  );
 });
+
+// After seeding, load project flow_json from test DB keyed by projectId.
+// Used by HTTP request builder and envelope-key computation below.
+async function loadSeededProjectFlows(): Promise<Map<string, object>> {
+  const rows = await database.query<{ id: string; flow_json: string }>(
+    `SELECT id, flow_json FROM projects WHERE id LIKE 'EVAL%' OR id IN ('U7lK9XXlq1', 'EVALeditv1F')`,
+  );
+  const map = new Map<string, object>();
+  for (const row of rows) {
+    map.set(row.id, JSON.parse(row.flow_json));
+  }
+  return map;
+}
+
+const SEEDED_PROJECT_FLOWS = await loadSeededProjectFlows();
 
 // 4. Build 66 slot plans (generate + edit, the two active evaluation variants)
 const manifest = loadManifest("docs/ai/evaluation/evaluation-manifest-v1.json");
@@ -306,11 +226,13 @@ const allSlots: SlotItem[] = [];
 const adminUser = { id: ADMIN_ID, accountId: ADMIN_ACCOUNT_ID, displayName: "Test Admin", role: "admin" as const, mustChangePassword: false };
 
 for (const plan of plans) {
-  const isGenerate = plan.campaignId.includes("generate-v1");
-  const projectId = isGenerate ? GEN_PROJECT_ID : EDIT_PROJECT_ID;
-  const flow = isGenerate ? GENERATE_FLOW : EDIT_FLOW;
   const unit = filtered.find((u) => plan.campaignId.includes(u.unitId.replace(/\./g, "-")));
   if (!unit) throw new Error(`unit not found for campaign ${plan.campaignId}`);
+
+  // Derive flow from the seeded project (test DB). plan.projectId comes from
+  // the manifest baseUnit and maps 1:1 to the seeded fixture project.
+  const flow = SEEDED_PROJECT_FLOWS.get(plan.projectId);
+  if (!flow) throw new Error(`seeded project not found for projectId=${plan.projectId}`);
 
   // Seed the ledger with the SAME key the route will compute at execute time.
   // The route reads projects.flow_json → buildExecutionPlan →
@@ -390,7 +312,7 @@ for (const plan of plans) {
       caseId: slotPlan.caseId,
       sampleId: slotPlan.sampleId,
       unitKey: envelopeKey,
-      projectId,
+      projectId: plan.projectId,
       modelId: "gpt-image-2.5-flare-vip",
     });
   }
@@ -439,10 +361,12 @@ try {
   const failures: string[] = [];
 
   for (const slot of allSlots) {
+    const flow = SEEDED_PROJECT_FLOWS.get(slot.projectId);
+    if (!flow) throw new Error(`seeded flow not found for projectId=${slot.projectId}`);
     const payload = {
-      nodes: (slot.projectId === GEN_PROJECT_ID ? GENERATE_FLOW : EDIT_FLOW).nodes,
-      edges: (slot.projectId === GEN_PROJECT_ID ? GENERATE_FLOW : EDIT_FLOW).edges,
-      onlyNodeId: (slot.projectId === GEN_PROJECT_ID ? GENERATE_FLOW : EDIT_FLOW).nodes[0].id,
+      nodes: (flow as { nodes: unknown[] }).nodes,
+      edges: (flow as { edges: unknown[] }).edges,
+      onlyNodeId: (flow as { nodes: { id: string }[] }).nodes[0].id,
       includeDownstream: false,
       projectId: slot.projectId,
       clientRequestId: slot.slotId,
@@ -574,11 +498,11 @@ try {
         cookie: `gc_session=${session.token}`,
       },
       body: JSON.stringify({
-        nodes: GENERATE_FLOW.nodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
+        nodes: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: unknown[] }).nodes,
+        edges: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { edges: unknown[] }).edges,
+        onlyNodeId: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: { id: string }[] }).nodes[0].id,
         includeDownstream: false,
-        projectId: GEN_PROJECT_ID,
+        projectId: allSlots[0].projectId,
         clientRequestId: oldCid,
         evaluation: {
           caseId: allSlots[0].caseId,
@@ -603,11 +527,11 @@ try {
         cookie: `gc_session=${session.token}`,
       },
       body: JSON.stringify({
-        nodes: GENERATE_FLOW.nodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
+        nodes: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: unknown[] }).nodes,
+        edges: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { edges: unknown[] }).edges,
+        onlyNodeId: (SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as { nodes: { id: string }[] }).nodes[0].id,
         includeDownstream: false,
-        projectId: GEN_PROJECT_ID,
+        projectId: allSlots[0].projectId,
         clientRequestId: dotCid,
         evaluation: {
           caseId: allSlots[0].caseId,
@@ -640,19 +564,22 @@ try {
     const secondRequestId = `${replayCampaignId}-slot-2`; // fresh clientRequestId, same case
     const DUMMY_HASH = "a".repeat(64);
 
+    const replayFlow = SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as object;
+    if (!replayFlow) throw new Error(`seeded flow not found for projectId=${allSlots[0].projectId}`);
+
     await database.transaction(async (client) => {
       await createSealedEvaluationCampaign(client, adminUser, {
         campaignId: replayCampaignId,
         ownerId: ADMIN_ID,
         stage: "provider-probe",
         modelId: "gpt-image-2.5-flare-vip",
-        authorizationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
+        authorizationUnitKey: evaluationUnitKeyFromFlow(replayFlow),
         codeSha: CODE_SHA,
         maxProviderRequests: 1,
         budgetLimitMinor: PRICE_MINOR,
         budgetCurrency: "USD",
-        // 裁决 C 守卫：真实 hash（GEN_PROJECT_ID seed 的是 JSON.stringify(GENERATE_FLOW)）
-        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(GENERATE_FLOW)),
+        // 裁决 C 守卫：真实 hash（seeded project flow）
+        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(replayFlow)),
         slots: [
           {
             slotId: replaySlotId,
@@ -679,7 +606,7 @@ try {
         scope: {
           type: "evaluation-unit",
           modelId: "gpt-image-2.5-flare-vip",
-          evaluationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
+          evaluationUnitKey: evaluationUnitKeyFromFlow(replayFlow),
         },
         maxProviderRequests: 1,
         priceMinorPerProviderRequest: PRICE_MINOR,
@@ -691,11 +618,11 @@ try {
     });
 
     const replayBody = (clientRequestId: string) => JSON.stringify({
-      nodes: GENERATE_FLOW.nodes,
-      edges: GENERATE_FLOW.edges,
-      onlyNodeId: GENERATE_FLOW.nodes[0].id,
+      nodes: (replayFlow as { nodes: unknown[] }).nodes,
+      edges: (replayFlow as { edges: unknown[] }).edges,
+      onlyNodeId: (replayFlow as { nodes: { id: string }[] }).nodes[0].id,
       includeDownstream: false,
-      projectId: GEN_PROJECT_ID,
+      projectId: allSlots[0].projectId,
       clientRequestId,
       evaluation: {
         caseId: replayCaseId,
@@ -742,19 +669,22 @@ try {
     const BIG_BUDGET = 72;
     const DUMMY_HASH = "a".repeat(64);
 
+    const testFlow = SEEDED_PROJECT_FLOWS.get(allSlots[0].projectId) as object;
+    if (!testFlow) throw new Error(`seeded flow not found for projectId=${allSlots[0].projectId}`);
+
     await database.transaction(async (client) => {
       await createSealedEvaluationCampaign(client, adminUser, {
         campaignId: bigBudgetCampaignId,
         ownerId: ADMIN_ID,
         stage: "provider-probe",
         modelId: "gpt-image-2.5-flare-vip",
-        authorizationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
+        authorizationUnitKey: evaluationUnitKeyFromFlow(testFlow),
         codeSha: CODE_SHA,
         maxProviderRequests: 1,
         budgetLimitMinor: BIG_BUDGET,
         budgetCurrency: "USD",
-        // 裁决 C 守卫：真实 hash（GEN_PROJECT_ID seed 的是 JSON.stringify(GENERATE_FLOW)）
-        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(GENERATE_FLOW)),
+        // 裁决 C 守卫：真实 hash（seeded project flow）
+        flowJsonSha256: computeFlowJsonSha256(JSON.stringify(testFlow)),
         slots: [
           {
             slotId: bigBudgetSlotId,
@@ -781,7 +711,7 @@ try {
         scope: {
           type: "evaluation-unit",
           modelId: "gpt-image-2.5-flare-vip",
-          evaluationUnitKey: evaluationUnitKeyFromFlow(GENERATE_FLOW),
+          evaluationUnitKey: evaluationUnitKeyFromFlow(testFlow),
         },
         maxProviderRequests: 1,
         priceMinorPerProviderRequest: BIG_BUDGET,
@@ -800,11 +730,11 @@ try {
         cookie: `gc_session=${session.token}`,
       },
       body: JSON.stringify({
-        nodes: GENERATE_FLOW.nodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
+        nodes: (testFlow as { nodes: unknown[] }).nodes,
+        edges: (testFlow as { edges: unknown[] }).edges,
+        onlyNodeId: (testFlow as { nodes: { id: string }[] }).nodes[0].id,
         includeDownstream: false,
-        projectId: GEN_PROJECT_ID,
+        projectId: allSlots[0].projectId,
         clientRequestId: bigBudgetSlotId,
         evaluation: {
           caseId: bigBudgetCaseId,
@@ -836,19 +766,22 @@ try {
 
   // 15. plan-equality gate: modified text must be rejected (dag.ts:229→247→runPlan.ts:232)
   {
-    const genSlot = allSlots.find((s) => s.projectId === GEN_PROJECT_ID);
+    // Use the first generate slot (EVALgen prefix)
+    const genSlot = allSlots.find((s) => s.projectId.startsWith("EVALgen"));
     assert.ok(genSlot, "at least one generate slot must exist");
-    const modifiedNodes = JSON.parse(JSON.stringify(GENERATE_FLOW.nodes));
+    const storedFlow = SEEDED_PROJECT_FLOWS.get(genSlot.projectId) as { nodes: unknown[]; edges: unknown[] } | undefined;
+    assert.ok(storedFlow, `seeded flow must exist for ${genSlot.projectId}`);
+    const modifiedNodes = JSON.parse(JSON.stringify(storedFlow.nodes));
     const textNode = modifiedNodes.find((n: any) => n.data?.kind === "text");
-    assert.ok(textNode, "text node must exist in GENERATE_FLOW");
+    assert.ok(textNode, "text node must exist in seeded generate flow");
     textNode.data.text = "MODIFIED TEXT — MUST DIFFER FROM STORED FLOW";
     const res = await fetch(BASE_URL + "/api/run-plan", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: "gc_session=" + session.token },
       body: JSON.stringify({
         nodes: modifiedNodes,
-        edges: GENERATE_FLOW.edges,
-        onlyNodeId: GENERATE_FLOW.nodes[0].id,
+        edges: storedFlow.edges,
+        onlyNodeId: (storedFlow.nodes[0] as { id: string }).id,
         includeDownstream: false,
         projectId: genSlot.projectId,
         clientRequestId: PREFIX + "-mutation-text-" + randomUUID().slice(0, 8),

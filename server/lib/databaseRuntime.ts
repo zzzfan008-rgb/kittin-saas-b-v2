@@ -36,6 +36,25 @@ export function db(): pg.Pool {
   return pool;
 }
 
+/**
+ * Dev-only pool connecting directly to garment_canvas (not the test DB).
+ * Used by goldenSetSlotBinding as the default pool — callers that pass an
+ * explicit pool override this.  Script-only; never call from production server
+ * code (would bypass connection-string-based routing / credential management).
+ */
+export function devDb(): pg.Pool {
+  return new pg.Pool({
+    host: config.databaseHost(),
+    port: config.databasePort(),
+    database: "garment_canvas",
+    user: config.databaseUser(),
+    password: config.databasePassword(),
+    max: 2,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
+  });
+}
+
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   values: unknown[] = [],
