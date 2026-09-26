@@ -231,6 +231,9 @@ for (const plan of plans) {
 
   // Derive flow from the seeded project (test DB). plan.projectId comes from
   // the manifest baseUnit and maps 1:1 to the seeded fixture project.
+  // The DB flow's text node is already the placeholder "【要求】描述场合、风格与身材"
+  // whose SHA256 = DUMMY_HASH, so the HTTP body's resolvedPromptSha256 matches the
+  // stored DUMMY_HASH → authorization PASS without calling the real provider.
   const flow = SEEDED_PROJECT_FLOWS.get(plan.projectId);
   if (!flow) throw new Error(`seeded project not found for projectId=${plan.projectId}`);
 
