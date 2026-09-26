@@ -154,6 +154,7 @@ async function sealCampaign(input: CampaignSetup): Promise<void> {
     maxProviderRequests: input.maxProviderRequests,
     budgetLimitMinor: input.budgetLimitMinor,
     budgetCurrency: "CNY",
+    flowJsonSha256: `sha256:${"f".repeat(64)}`,
     slots: [{
       slotId: input.slotId,
       caseId: input.caseId,

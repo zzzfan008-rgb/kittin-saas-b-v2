@@ -288,6 +288,7 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
         maxProviderRequests: maxRequests,
         budgetLimitMinor: maxRequests * priceMinor,
         budgetCurrency: "CNY",
+        flowJsonSha256: `sha256:${"f".repeat(64)}`,
         slots: [{
           slotId,
           caseId,
@@ -390,6 +391,7 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
         maxProviderRequests: maxRequests,
         budgetLimitMinor: maxRequests,
         budgetCurrency: "CNY",
+        flowJsonSha256: `sha256:${"f".repeat(64)}`,
         slots: [{
           slotId,
           caseId,
@@ -439,6 +441,7 @@ function runtimeFromCapture(capture: CapturedSlotRuntime): EvaluationCampaignSlo
         maxProviderRequests: maxRequests,
         budgetLimitMinor: maxRequests,
         budgetCurrency: "CNY",
+        flowJsonSha256: `sha256:${"f".repeat(64)}`,
         slots: [{
           slotId,
           caseId,

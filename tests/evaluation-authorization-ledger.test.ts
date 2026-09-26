@@ -105,6 +105,7 @@ async function register(
       maxProviderRequests,
       budgetLimitMinor,
       budgetCurrency: "CNY",
+      flowJsonSha256: `sha256:${"f".repeat(64)}`,
       slots: [{
         slotId: runPolicy.slotId,
         caseId: runPolicy.caseId,

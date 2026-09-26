@@ -1375,6 +1375,21 @@ async function migrate(): Promise<void> {
       );
     }
 
+    // migration 24: flow_json_sha256 on evaluation_campaigns (ruling C)
+    // seal writes it (same call as envelope snapshot); execute verifies fail-closed.
+    // nullable: old rows have NULL; new seals must be non-null.
+    // same trigger semantics as version 23 (to_jsonb(NEW) - whitelist covers it).
+    if (!applied.has(24)) {
+      await client.query(`
+        ALTER TABLE evaluation_campaigns
+          ADD COLUMN IF NOT EXISTS flow_json_sha256 TEXT;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (24, $1, $2)",
+        ["flow_json_sha256_campaign_tracking", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

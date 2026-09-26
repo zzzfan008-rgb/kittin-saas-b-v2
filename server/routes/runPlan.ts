@@ -58,6 +58,7 @@ import {
   EvaluationRunPolicyError,
   parseEvaluationRunPolicy,
 } from "../lib/evaluationRunPolicy";
+import { assertFlowJsonNotDrifted } from "../lib/evaluationCampaign";
 
 export const runPlanRouter = Router();
 
@@ -240,6 +241,28 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       const plan = evaluationPolicy
         ? attachEvaluationRunPolicy(basePlan, evaluationPolicy)
         : basePlan;
+      // 裁决 C: evaluation run 入队前验证 flow_json 未在 seal 后被篡改。
+      // 比对逻辑在共享函数 assertFlowJsonNotDrifted（单一计算点，CLI 端同用），
+      // 这里只负责取封存值 + 把违规映射成路由的 409。
+      if (evaluationPolicy) {
+        const sealed = await client.query<{ flow_json_sha256: string | null }>(
+          `SELECT flow_json_sha256 FROM evaluation_campaigns WHERE campaign_id = $1 FOR SHARE`,
+          [evaluationPolicy.campaignId],
+        );
+        try {
+          assertFlowJsonNotDrifted({
+            sealedSha256: sealed.rows[0]?.flow_json_sha256,
+            currentFlowJson: project.flow_json,
+            campaignId: evaluationPolicy.campaignId,
+            projectId,
+          });
+        } catch (error) {
+          throw new EvaluationRunPolicyError(
+            `flow_json integrity guard: ${(error as Error).message}`,
+            409,
+          );
+        }
+      }
       const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
       const staticReferences = staticImageReferencesForPlan(plan);
       assertNoRemoteImageReferencesAtAdmission(staticReferences);

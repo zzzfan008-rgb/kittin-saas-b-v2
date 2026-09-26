@@ -299,6 +299,7 @@ async function authorizeEvaluationPlan(
       maxProviderRequests: target.maximumProviderRequests,
       budgetLimitMinor,
       budgetCurrency: "CNY",
+      flowJsonSha256: `sha256:${"f".repeat(64)}`,
       slots: [{
         slotId: policy.slotId,
         caseId: policy.caseId,

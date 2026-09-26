@@ -80,6 +80,7 @@ await database.transaction((client) => campaignLedger.createSealedEvaluationCamp
   maxProviderRequests: 1,
   budgetLimitMinor: 50,
   budgetCurrency: "CNY",
+  flowJsonSha256: `sha256:${"f".repeat(64)}`,
   slots: [{
     slotId,
     caseId,

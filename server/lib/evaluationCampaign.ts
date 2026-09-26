@@ -62,6 +62,9 @@ export interface EvaluationCampaignManifest {
   inputsSha256: string;
   /** 裁决 6②：密封时注册表的 evaluationVersion */
   evaluationVersion: string;
+  /** 裁决 C：seal 封存的 flow_json sha256。execute 期重算比对 fail-closed。
+   *  新 seal 必须提供（代码约束，禁止可选——缺失即拒）。 */
+  flowJsonSha256: `sha256:${string}`;
   slots: readonly EvaluationCampaignSlotManifest[];
 }
 
@@ -203,6 +206,55 @@ function sha256(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/**
+ * 裁决 C 单一计算点：flow_json 的执行绑定 sha256。
+ * seal 封存与 execute 校验都必须经由本函数（不得各写一份 hash 计算）。
+ *
+ * 哈希对象是 projects.flow_json 的原始 TEXT（不是 buildExecutionPlan 的
+ * 序列化计划）：裁决 C 的变异验收是「篡改 flow_json 一字符 → execute 拒」，
+ * 原始 TEXT 对任何单字符篡改都敏感；canonical plan JSON 会漏掉不参与 plan
+ * 的字段变更（键序、空白、plan 忽略的字段），检测面严格更弱。
+ */
+export function computeFlowJsonSha256(flowJson: string): `sha256:${string}` {
+  return `sha256:${createHash("sha256").update(flowJson, "utf8").digest("hex")}`;
+}
+
+/**
+ * 裁决 C 共享守卫：execute 前验证 project 的 flow_json 未在 seal 后被篡改。
+ *
+ * 两端调用者（runPlan 路由 + evaluation-campaign-runner CLI）都必须经由本函数，
+ * 不得各写一份比对逻辑（本链 6 缺陷的共同形态就是「两侧各持一份 → 静默不等」）。
+ *
+ * fail-closed 语义：
+ *  - sealedSha256 为 NULL/空（migration 24 之前的旧账本、或绕过应用层直改库）→ 拒
+ *  - 重算 hash ≠ 封存值（seal 后有人改了 flow_json）→ 拒
+ *
+ * @throws 带上下文的 Error；调用方决定映射到什么状态码（路由 409 / CLI 直接崩）。
+ */
+export function assertFlowJsonNotDrifted(input: {
+  sealedSha256: string | null | undefined;
+  currentFlowJson: string;
+  campaignId: string;
+  projectId: string;
+}): void {
+  const { sealedSha256, currentFlowJson, campaignId, projectId } = input;
+  if (!sealedSha256) {
+    throw new Error(
+      `campaign ${campaignId} has no sealed flow_json_sha256 — ` +
+        `cannot verify flow integrity for project ${projectId} before paid execute ` +
+        `(fail closed); re-seal required`,
+    );
+  }
+  const current = computeFlowJsonSha256(currentFlowJson);
+  if (current !== sealedSha256) {
+    throw new Error(
+      `flow_json drift detected for project ${projectId}: ` +
+        `sealed=${sealedSha256}, current=${current} — ` +
+        `the flow has been modified since campaign ${campaignId} was sealed`,
+    );
+  }
+}
+
 function safeInteger(value: number | string, field: string, minimum = 0): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new Error(`${field} is invalid`);
@@ -234,6 +286,7 @@ function assertCampaignManifest(input: EvaluationCampaignManifest): void {
     throw new Error("campaign authorizationUnitKey is invalid");
   }
   if (!CODE_SHA_PATTERN.test(input.codeSha)) throw new Error("campaign codeSha is invalid");
+  if (!CONTRACT_HASH_PATTERN.test(input.flowJsonSha256)) throw new Error("campaign flowJsonSha256 is invalid");
   assertPositiveInteger(input.maxProviderRequests, "campaign maxProviderRequests");
   assertPositiveInteger(input.budgetLimitMinor, "campaign budgetLimitMinor");
   if (!CURRENCY_PATTERN.test(input.budgetCurrency)) throw new Error("campaign budgetCurrency is invalid");
@@ -439,14 +492,14 @@ export async function createSealedEvaluationCampaign(
       campaign_id, owner_id, created_by_admin_id, stage, model_id,
       evaluation_unit_key, code_sha, max_provider_requests, budget_limit_minor,
       budget_currency, status, manifest_sha256, created_at,
-      envelope_inputs_json, envelope_inputs_sha256, evaluation_version
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12, $13, $14, $15)
+      envelope_inputs_json, envelope_inputs_sha256, evaluation_version, flow_json_sha256
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ready', $11, $12, $13, $14, $15, $16)
     ON CONFLICT (campaign_id) DO NOTHING
   `, [
     input.campaignId, input.ownerId, actor.id, input.stage, input.modelId,
     input.authorizationUnitKey, input.codeSha, input.maxProviderRequests,
     input.budgetLimitMinor, input.budgetCurrency, manifestSha256, now,
-    input.inputsCanonicalJson, input.inputsSha256, input.evaluationVersion,
+    input.inputsCanonicalJson, input.inputsSha256, input.evaluationVersion, input.flowJsonSha256,
   ]);
   if (inserted.rowCount !== 1) throw new Error("campaignId already exists; a sealed campaign cannot be replaced");
   for (const slot of input.slots) {
