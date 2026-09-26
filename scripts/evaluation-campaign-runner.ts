@@ -1,6 +1,7 @@
 #!/usr/bin/env -S npx tsx
 
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AuthUser } from "../server/lib/auth";
@@ -672,7 +673,39 @@ async function sealCampaigns(
   }
 }
 
-// ---------- subcommand: prepare ----------
+// 62-track-b-wiring-ruling.md §裁决 2: prepare MUST use the same function chain
+// as execute — validateAndMigrateFlow → buildExecutionPlan → capture. The
+// synthetic plan approach (hard-coded inputTexts + empty inputReferences) is
+// permanently deprecated because it materializes hashes the execute path can
+// never reproduce (the v8rel6 defect).
+async function buildPerSlotPlan(
+  pool: import("pg").Pool,
+    variantId: string,
+    stage: "formal-validation" | "internal-experiment" | "provider-probe",
+    sampleIdx: number,
+  ): Promise<{ plan: ReturnType<typeof import("../server/engine/dag").buildExecutionPlan>; projectId: string; briefText: string; referenceImageFileId: string | null }> {
+    const { goldenSetSlotBinding } = await import("../server/lib/goldenSet");
+    const binding = await goldenSetSlotBinding(pool, variantId, stage, sampleIdx);
+    const { projectId, briefText, referenceImageFileId } = binding;
+
+  const projectRow = await pool.query(
+    `SELECT flow_json FROM projects WHERE id = $1`,
+    [projectId],
+  );
+  if (projectRow.rows.length === 0) {
+    throw new Error(`fixture project ${projectId} not found in database`);
+  }
+  const migrated = validateAndMigrateFlow(JSON.parse(projectRow.rows[0].flow_json));
+
+  // Build the FULL execution plan (no onlyNodeId exclusion), so that upstream
+  // reference-image edges (print node → generator node) are resolved into the
+  // generator's inputReferences. If we onlyNodeId the generator, the upstream
+  // image node is excluded from scope and references are empty — which would
+  // reproduce the empty-reference defect even for real fixture projects.
+  const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
+
+  return { plan, projectId, briefText, referenceImageFileId };
+}
 
 interface MaterializedSlot {
   slotId: string;
@@ -708,60 +741,31 @@ async function runPrepare(
   const manifest = loadManifest(DEFAULT_MANIFEST_PATH);
   const filteredUnits = filterAndAssertUnits(manifest.baseUnits, variantIds);
 
-  const { requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
-  const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
   const { attachEvaluationRunPolicy } = await import("../server/lib/evaluationRunPolicy");
   const { executeStep } = await import("../server/engine/runner");
   const evaluationEvidence = await import("../server/lib/evaluationEvidence");
   const { campaignRuntimeBinding } = await import("../server/lib/evaluationEvidenceStore");
+  const database = await import("../server/lib/database");
+  const pool = database.db();
 
   const materialized: MaterializedSlot[] = [];
 
   for (const unit of filteredUnits) {
-    const isGenerate = unit.promptVariantId === GENERATE_VARIANT;
-
-    const variant = requireGarmentPromptVariant({
-      familyId: "fashion-lookbook",
-      modelId: "gpt-image-2.5-flare-vip",
-      nodeKind: "image",
-      mode: isGenerate ? "generate" : "edit",
-    });
-    const modelId = variant.modelId;
-    const parameterProfile = getModelParameterProfile(variant.parameterProfileId);
-    if (!parameterProfile) throw new Error(`missing parameter profile: ${variant.parameterProfileId}`);
-    const parameters = materializeModelParameterProfile(parameterProfile);
-
-    const inputTexts = isGenerate
-      ? ["生成服装效果图"]
-      : ["保持服装结构并优化商业棚拍光线"];
+    const variantId = unit.promptVariantId;
 
     for (const cap of manifest.stageRequestCaps) {
       for (let sampleIdx = 0; sampleIdx < cap.incrementalSamples; sampleIdx++) {
         const safeUnitId = unit.unitId.replace(/\./g, "-");
         const slotId = `${campaignIdPrefix}-slot-${safeUnitId}-${cap.stageId}-${sampleIdx + 1}`;
 
-        const plan = {
-          steps: [{
-            nodeId: "capture-node",
-            kind: "image-generator",
-            inputImages: [],
-            inputReferences: [],
-            params: {
-              inputTexts,
-              promptVariantId: variant.variantId,
-              promptFamilyId: variant.familyId,
-              parameterProfileId: variant.parameterProfileId,
-              contractHash: variant.contractHash,
-              evaluationVersion: variant.evaluationVersion,
-              postprocessVersion: parameterProfile.postprocess.version,
-              operationMode: variant.mode,
-              modelId,
-              modelOptions: parameters.modelOptions,
-              aspectRatio: parameters.aspectRatio,
-              batchSize: parameters.batchSize,
-            },
-          }],
-        };
+        // 裁决 2: use the same chain as execute — read real flow_json,
+        // validateAndMigrateFlow → buildExecutionPlan, then capture.
+        const { plan: basePlan } = await buildPerSlotPlan(
+          pool,
+          variantId,
+          cap.stageId,
+          sampleIdx,
+        );
 
         const policy = {
           caseId: `case-${unit.unitId}`,
@@ -771,7 +775,7 @@ async function runPrepare(
           slotId,
           retryPolicy: "no-retry" as const,
         };
-        const persistedPlan = attachEvaluationRunPolicy(plan, policy);
+        const persistedPlan = attachEvaluationRunPolicy(basePlan, policy);
         const providerStep = persistedPlan.steps.find(
           (s: { params: Record<string, unknown> }) => s.params.evaluationPolicy !== undefined,
         );
@@ -830,6 +834,7 @@ async function runPrepare(
   const { writeFileSync } = await import("node:fs");
   writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
   console.log(JSON.stringify({ prepared: true, slots: materialized.length, out: outPath }));
+  await database.closeDatabaseForTests();
 }// ---------- subcommand: seal ----------
 
 async function runSeal(
@@ -892,6 +897,44 @@ async function runSeal(
       referenceInputsSha256: s.referenceInputsSha256,
     }]));
     console.log(JSON.stringify({ loadedSlots: materialized.slots.length, from: slotsPath }));
+  }
+
+  // 裁决 6: seal-time blacklist assertions — cheapest permanent defense.
+  // (a) An edit slot with sha256("[]") as reference_inputs_sha256 was captured
+  //     without real reference images (prepare synthetic-plan defect from v8rel6).
+  // (b) A slot whose prompt hash matches the UI placeholder fingerprint was
+  //     captured with the hard-coded prompt "生成服装效果图" instead of a golden-set brief.
+  // These two checks catch the wiring defect at seal time (reversible) rather
+  // than at paid execute time (irreversible).
+  if (slotHashes) {
+    const { EMPTY_REFERENCE_SHA256, EDIT_VARIANT, PLACEHOLDER_PROMPT } = await import("../server/lib/goldenSet");
+    const placeholderSha256 = createHash("sha256").update(PLACEHOLDER_PROMPT).digest("hex");
+
+    for (const plan of plans) {
+      const isEdit = plan.variantId === EDIT_VARIANT;
+      for (const slot of plan.slots) {
+        const sh = slotHashes.get(slot.slotId);
+        if (!sh) continue;
+
+        // (a) empty-reference fingerprint on edit slots
+        if (isEdit && sh.referenceInputsSha256 === EMPTY_REFERENCE_SHA256.replace("sha256:", "")) {
+          throw new Error(
+            `seal refused: edit slot ${slot.slotId} has empty-reference hash ${sh.referenceInputsSha256} ` +
+            `(sha256("[]")). This slot was captured without real reference images — ` +
+            `the prepare wiring defect (v8rel6). Run prepare again after fixing the injection wiring.`,
+          );
+        }
+
+        // (b) UI placeholder prompt fingerprint
+        if (sh.resolvedPromptSha256 === placeholderSha256) {
+          throw new Error(
+            `seal refused: slot ${slot.slotId} has placeholder-prompt hash ${sh.resolvedPromptSha256}. ` +
+            `The prompt text is still the UI placeholder "【要求】描述场合、风格与身材" — ` +
+            `the brief was never injected. Run prepare again after fixing the injection wiring.`,
+          );
+        }
+      }
+    }
   }
 
   // 裁决 6.2：seal 输出打印 evaluationVersion 当前值，用于 pending 转正前后 trace。

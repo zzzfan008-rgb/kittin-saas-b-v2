@@ -3,16 +3,20 @@
  *
  * Used by:
  *   - scripts/generate-evaluation-fixtures.ts (fixture generation)
- *   - scripts/evaluation-campaign-runner.ts (preflight/seal)
+ *   - scripts/evaluation-campaign-runner.ts (prepare/seal/execute)
+ *   - tests/campaign-runner-preflight.test.ts (preflight)
  *   - server/lib/evaluationPromotion.ts (promotion hash equality)
  *
- * Any brief→sampleIdx mapping must go through this module only.
- * Do not duplicate the 24 briefs or the sampleIdx arithmetic in any other file.
+ * Any brief→sampleIdx mapping or fixture project resolution must go through
+ * this module only. Do not duplicate the 24 briefs, the sampleIdx arithmetic,
+ * or the projectId naming convention in any other file.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Pool } from "pg";
+import { createHash } from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -165,4 +169,119 @@ export function validateReferenceImageSha256(
   }
 
   return onDiskSha256;
+}
+
+// ── slot binding: shared resolver for fixture projectId / brief / reference ──
+// 62-track-b-wiring-ruling.md §裁决 1: single shared function, four call sites
+// (prepare / seal / execute / preflight). One call returns {projectId, briefText,
+// referenceImageFileId} — the tuple is a construction-site fact, so O1 pairing
+// (brief ↔ reference image) is guaranteed by construction rather than verified
+// after the fact.
+
+/** Full variant IDs as they appear in the manifest and prompt registry. */
+export const GENERATE_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1";
+export const EDIT_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+
+const ALLOWED_FIXTURE_VARIANTS = new Set([GENERATE_VARIANT, EDIT_VARIANT]);
+
+/**
+ * sha256 of the JSON string "[]" — the fingerprint of an empty inputReferences
+ * array. Any edit slot whose reference_inputs_sha256 equals this value was
+ * captured without real reference images (the prepare synthetic-plan defect).
+ *
+ * Computed 2026-09-26 via:
+ *   node -e "console.log(require('crypto').createHash('sha256').update('[]').digest('hex'))"
+ */
+export const EMPTY_REFERENCE_SHA256: `sha256:${string}` =
+  "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
+
+/**
+ * The UI placeholder prompt text. If a slot's brief/prompt equals this string,
+ * the brief was never injected — this is the "fact-gate fingerprint" described
+ * in injection-ruling §3.
+ */
+export const PLACEHOLDER_PROMPT = "【要求】描述场合、风格与身材";
+
+/** Pad a 1-indexed sample number to 2 digits. */
+function padSampleIdx(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+export interface SlotBinding {
+  projectId: string;
+  briefText: string;
+  /** null for generate variants (no reference image). */
+  referenceImageFileId: string | null;
+}
+
+/**
+ * Resolve fixture projectId, brief text, and reference image fileId for a
+ * single slot, and assert the fixture project exists in the database.
+ *
+ * Throws if variantId is unknown, sampleIdx is out of range, or the fixture
+ * project is missing / not alive in the database (fail-closed — no fallback
+ * to old template fixtures).
+ */
+export async function goldenSetSlotBinding(
+  pool: Pool,
+  variantId: string,
+  stage: "formal-validation" | "internal-experiment" | "provider-probe",
+  sampleIdx: number,
+): Promise<SlotBinding> {
+  if (!ALLOWED_FIXTURE_VARIANTS.has(variantId)) {
+    throw new Error(
+      `unknown variant for fixture binding: ${variantId}. ` +
+      `Allowed: ${GENERATE_VARIANT}, ${EDIT_VARIANT}`,
+    );
+  }
+  const isGenerate = variantId === GENERATE_VARIANT;
+
+  // sampleIdx is 1-based in the slot/campaign convention (slotId uses sampleIdx+1).
+  // The project naming convention uses 1-indexed zero-padded IDs (e.g. EVALgen-brief-01).
+  const projectIdx = sampleIdx + 1;
+  const projectId = isGenerate
+    ? `EVALgen-brief-${padSampleIdx(projectIdx)}`
+    : `EVALedit-brief-${padSampleIdx(projectIdx)}`;
+
+  // Assert fixture project exists in DB and is alive (ruling: fail-closed,
+  // no fallback to old template fixtures U7lK9XXlq1 / EVALeditv1F).
+  const r = await pool.query(
+    `SELECT id, lifecycle FROM projects WHERE id = $1`,
+    [projectId],
+  );
+  if (r.rows.length === 0) {
+    throw new Error(
+      `fixture project ${projectId} not found in database ` +
+      `(variant=${variantId}, stage=${stage}, sampleIdx=${sampleIdx}). ` +
+      `Run generate-evaluation-fixtures.ts --commit first.`,
+    );
+  }
+  const row = r.rows[0];
+  if (row.lifecycle !== "saved") {
+    throw new Error(
+      `fixture project ${projectId} has lifecycle "${row.lifecycle}" — expected "saved"`,
+    );
+  }
+
+  const briefText = goldenSetBriefForSlot(stage, sampleIdx);
+
+  let referenceImageFileId: string | null = null;
+  if (!isGenerate) {
+    const goldenSet = loadGoldenSet();
+    const sample = goldenSet.samples[sampleIdx];
+    if (!sample) {
+      throw new Error(
+        `golden-set sample index ${sampleIdx} out of range (max ${goldenSet.samples.length - 1})`,
+      );
+    }
+    const fileId = sample.referenceImage?.fileId;
+    if (!fileId) {
+      throw new Error(
+        `golden-set sample ${sample.id} has no referenceImage.fileId — run upload-evaluation-reference-images.ts --commit first`,
+      );
+    }
+    referenceImageFileId = fileId;
+  }
+
+  return { projectId, briefText, referenceImageFileId };
 }
