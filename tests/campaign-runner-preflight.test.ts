@@ -190,6 +190,8 @@ const TARGET_VARIANTS = new Set([
 const filtered = manifest.baseUnits.filter(
   (u) => TARGET_VARIANTS.has(u.promptVariantId),
 );
+console.log(`  DEBUG: filtered baseUnits count: ${filtered.length}`);
+console.log(`  DEBUG: filtered projectIds: ${[...new Set(filtered.map(u => u.projectId))]}`);
 // Architect mandated assertion: the filtered set must exactly cover the authorized
 // variant collection. A partial or missing set is a silent coverage gap.
 const coveredVariants = new Set(filtered.map((u) => u.promptVariantId));
@@ -646,10 +648,14 @@ try {
       });
     });
 
+    const replayFlowNodes = (replayFlow as { nodes: { id: string; data: { kind?: string } }[] }).nodes;
+    const replayImageGenNode = replayFlowNodes.find((n) => n.data?.kind === "image-generator");
+    if (!replayImageGenNode) throw new Error("no image-generator in replayFlow");
+
     const replayBody = (clientRequestId: string) => JSON.stringify({
       nodes: (replayFlow as { nodes: unknown[] }).nodes,
       edges: (replayFlow as { edges: unknown[] }).edges,
-      onlyNodeId: (replayFlow as { nodes: { id: string }[] }).nodes[0].id,
+      onlyNodeId: replayImageGenNode.id,
       includeDownstream: false,
       projectId: allSlots[0].projectId,
       clientRequestId,
