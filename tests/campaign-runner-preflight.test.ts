@@ -363,6 +363,9 @@ try {
   const blockedErrors: string[] = [];
   const failures: string[] = [];
 
+  // DEBUG: log first 3 slots
+  let debugCount = 0;
+
   for (const slot of allSlots) {
     const flow = SEEDED_PROJECT_FLOWS.get(slot.projectId);
     if (!flow) throw new Error(`seeded flow not found for projectId=${slot.projectId}`);
@@ -400,6 +403,12 @@ try {
     } else {
       const body = await res.text().catch(() => "");
       failures.push(`slot ${slot.slotId}: HTTP ${res.status} — ${body.slice(0, 200)}`);
+    }
+    // DEBUG: log first 3 non-202 responses
+    if (res.status !== 202 && debugCount < 3) {
+      const body = await res.text().catch(() => "(no body)");
+      console.log(`  DEBUG slot=${slot.slotId} projectId=${slot.projectId} HTTP=${res.status} body=${body.slice(0,300)}`);
+      debugCount += 1;
     }
   }
 
