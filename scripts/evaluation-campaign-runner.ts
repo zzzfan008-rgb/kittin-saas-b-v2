@@ -610,6 +610,14 @@ async function sealCampaigns(
       //（单一计算点：seal 封存与 execute 校验都调它，不得各写一份）。
       const flowJsonSha256 = computeFlowJsonSha256(project.flow_json);
 
+      // Extract batchSize from the fixture's image-generator node (edit fixture has batchSize=2,
+      // generate fixture has batchSize=1 — seal must mirror what execute will actually request).
+      const fixtureFlow = JSON.parse(project.flow_json);
+      const imageGenNode = fixtureFlow.nodes.find(
+        (n: { data?: { kind?: string; batchSize?: number } }) => n.data?.kind === "image-generator",
+      );
+      const fixtureBatchSize = imageGenNode?.data?.batchSize ?? 1;
+
       const manifest: EvaluationCampaignManifest = {
         campaignId: plan.campaignId,
         ownerId: adminId,
@@ -639,7 +647,7 @@ async function sealCampaigns(
             resolvedPromptSha256,
             nativeParametersSha256,
             referenceInputsSha256,
-            requestedImageCount: 1,
+            requestedImageCount: fixtureBatchSize,
             maxProviderRequests: 1,
             priceMinorPerProviderRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
             budgetLimitMinor: PRICE_MINOR_PER_PROVIDER_REQUEST,
