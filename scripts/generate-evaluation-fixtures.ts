@@ -12,7 +12,8 @@
  *   ② projects 表无 flow_json_sha256 列 → INSERT 不含该列（裁决 C 的列在
  *      evaluation_campaigns，由 migration 24 提供，seal 写入，与本脚本无关）
  *   ③ --commit 语义 = 直写 dev 库（garment_canvas），不 reset 任何库；
- *      幂等由 ON CONFLICT (id) DO NOTHING 保证；owner_id 运行时从库查询
+ *      幂等由 ON CONFLICT (id) DO UPDATE 保证（P0 修复后为收敛式 upsert：
+ *      旧对象形态行会被 canonical 字符串形态覆盖）；owner_id 运行时从库查询
  *   ④ sha256 白名单：磁盘实算 sha256 == golden-set 声称值；24 号必须
  *      2ffde870…（r4）；5f2a8589…（r2 含水印）直接拒绝
  *   ⑤ goldenSetBriefForSlot 抽到 server/lib/goldenSet.ts（单一实现）
@@ -41,8 +42,11 @@ import {
 } from "../server/lib/goldenSet";
 import {
   assertFileIdMatchesSample,
+  canonicalImageRef,
   type PersistedFlow,
 } from "../server/lib/evaluationFixtureGuards";
+import { validateAndMigrateFlow } from "../server/lib/workflowSchema";
+import { buildExecutionPlan } from "../server/engine/dag";
 import { query, queryOne, db, closeDatabaseForTests } from "../server/lib/database";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -178,13 +182,75 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
 }
 
-/** projects 表 INSERT（⑦ 参数化，幂等）。列与 database.ts:68-77 定义一致。 */
+/** projects 表 INSERT（⑦ 参数化，幂等）。列与 database.ts:68-77 定义一致。
+ *  P0 数据修复（2026-09-26）：ON CONFLICT DO UPDATE——24 个 edit 夹具以对象形态
+ *  {fileId} 入库（违反生产 schema imageReference()），需通过生成脚本幂等路径
+ *  收敛为 canonical 字符串形态。不允许手写 UPDATE。gen 侧 flow 不变，
+ *  DO UPDATE 写入相同 flow_json 是无副作用的收敛。 */
 function buildInsertSql(): string {
   return [
     "INSERT INTO projects (id, owner_id, name, flow_json, created_at, updated_at)",
     "VALUES ($1, $2, $3, $4, $5, $6)",
-    "ON CONFLICT (id) DO NOTHING",
+    "ON CONFLICT (id) DO UPDATE SET",
+    "flow_json = EXCLUDED.flow_json,",
+    "name = EXCLUDED.name,",
+    "updated_at = EXCLUDED.updated_at",
   ].join(" ");
+}
+
+/**
+ * P0 永久防线（hermes 停机令 §3）：夹具在 INSERT/UPDATE 前必须通过生产校验链
+ * validateAndMigrateFlow + buildExecutionPlan。上一轮 24 个 edit 夹具以对象形态
+ * outputImages=[{fileId}] 入库，87/87 全绿没拦住——因为生成器从不过生产校验。
+ * 冒烟不过 = 拒绝入库，fail-closed。
+ *
+ * edit 侧额外断言：buildExecutionPlan 必须解析出 1 条 inputReferences
+ * （print 节点 → mutate-gen 的 reference 边），证明参考图真的接进了执行计划。
+ */
+function assertProductionSchemaSmoke(
+  flow: PersistedFlow,
+  projectId: string,
+  isEdit: boolean,
+): void {
+  // Round-trip through JSON to test exactly what will be stored/read back.
+  const migrated = validateAndMigrateFlow(JSON.parse(JSON.stringify(flow)));
+  const plan = buildExecutionPlan(migrated.nodes, migrated.edges);
+  assert.ok(plan.steps.length >= 1, `${projectId}: plan must have at least 1 step`);
+  const genStep = plan.steps.find((s) => s.kind === "image-generator");
+  if (!genStep) {
+    throw new Error(`${projectId}: plan must contain an image-generator step`);
+  }
+  const inputRefs = genStep.inputReferences ?? [];
+  const inputTexts = (genStep.params as { inputTexts?: unknown[] }).inputTexts ?? [];
+  if (isEdit) {
+    assert.strictEqual(
+      inputRefs.length,
+      1,
+      `${projectId}: edit fixture must resolve exactly 1 inputReference ` +
+        `(print node → generator reference edge), got ${inputRefs.length}`,
+    );
+    assert.ok(
+      typeof inputRefs[0].imageRef === "string" &&
+        inputRefs[0].imageRef.startsWith("/api/files/"),
+      `${projectId}: inputReferences imageRef must be canonical /api/files/ string`,
+    );
+    assert.strictEqual(
+      inputTexts.length,
+      1,
+      `${projectId}: edit fixture must resolve exactly 1 inputText (brief)`,
+    );
+  } else {
+    assert.strictEqual(
+      inputRefs.length,
+      0,
+      `${projectId}: generate fixture must have zero inputReferences`,
+    );
+    assert.strictEqual(
+      inputTexts.length,
+      1,
+      `${projectId}: generate fixture must resolve exactly 1 inputText (brief)`,
+    );
+  }
 }
 
 function buildFixture(
@@ -362,6 +428,8 @@ async function main(): Promise<void> {
     assert.ok(genTextNode);
     genTextNode.data.text = brief;
     assertEdgesOrder(genFlow, genEdgeIds, fixtureProjectId("gen", i));
+    // P0 永久防线：夹具必须通过生产校验链才允许入库（fail-closed）
+    assertProductionSchemaSmoke(genFlow, fixtureProjectId("gen", i), false);
     fixtures.push(
       buildFixture(fixtureProjectId("gen", i), `${sample.id} generate`, genFlow, ownerId),
     );
@@ -374,13 +442,18 @@ async function main(): Promise<void> {
       editTextNode.data.text = brief;
       const imageNode = editFlow.nodes.find((n) => n.type === "image");
       assert.ok(imageNode);
-      imageNode.data.outputImages = [{ fileId: sample.referenceImage.fileId }];
+      // 生产 schema 形态：outputImages 元素是 canonical 字符串 "/api/files/<fileId>"
+      // （workflowSchema imageReference()；真实用户 project 同形态）。
+      imageNode.data.outputImages = [canonicalImageRef(sample.referenceImage.fileId)];
       assertEdgesOrder(editFlow, editEdgeIds, fixtureProjectId("edit", i));
       assertFileIdMatchesSample(
         editFlow,
         sample.referenceImage.fileId,
         fixtureProjectId("edit", i),
       );
+      // P0 永久防线：validateAndMigrateFlow + buildExecutionPlan 冒烟，
+      // 并断言 reference 边解析出 1 条 canonical inputReference
+      assertProductionSchemaSmoke(editFlow, fixtureProjectId("edit", i), true);
       fixtures.push(
         buildFixture(fixtureProjectId("edit", i), `${sample.id} edit`, editFlow, ownerId),
       );
@@ -405,22 +478,21 @@ async function main(): Promise<void> {
   console.log(`  ✓ all ${fixtures.length} flow_json sha256 distinct`);
 
   if (commit) {
-    // ③ --commit：直写 dev 库，不 reset 任何东西；幂等 ON CONFLICT DO NOTHING
+    // ③ --commit：直写 dev 库，不 reset 任何东西；幂等 ON CONFLICT DO UPDATE
+    //（P0 数据修复：edit 夹具对象形态 → canonical 字符串形态，走生成脚本幂等路径）
     const dbNameRow = await queryOne<{ db: string }>("SELECT current_database() AS db");
     const dbName = dbNameRow?.db ?? "";
     assert.ok(
       !dbName.endsWith("_test"),
       `--commit must target the dev database, got "${dbName}" (test db)`,
     );
-    let inserted = 0;
-    let skipped = 0;
+    let written = 0;
     for (const f of fixtures) {
       // raw pool query to get rowCount (wrapper query() returns rows only)
       const res = await db().query(f.sqlText, f.params);
-      if ((res.rowCount ?? 0) > 0) inserted += 1;
-      else skipped += 1;
+      if ((res.rowCount ?? 0) > 0) written += 1;
     }
-    console.log(`  ✓ committed: ${inserted} inserted, ${skipped} skipped (already exist)`);
+    console.log(`  ✓ committed: ${written}/${fixtures.length} rows written (insert-or-converge)`);
   } else {
     console.log("\n-- DRY-RUN SQL (parameterized; add --commit to write to dev db):\n");
     for (const f of fixtures) {

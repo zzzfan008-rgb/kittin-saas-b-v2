@@ -20,7 +20,7 @@ import type { PersistedFlow } from "../server/lib/evaluationFixtureGuards";
 
 const GOLDEN_SET = loadGoldenSet();
 
-/** 构造一个最小合法的 edit flow（仅 image 节点 + outputImages）。 */
+/** 构造一个最小合法的 edit flow（仅 image 节点 + outputImages 字符串形态）。 */
 function makeEditFlow(fileId: string): PersistedFlow {
   return {
     schemaVersion: 8,
@@ -29,7 +29,7 @@ function makeEditFlow(fileId: string): PersistedFlow {
         id: "img",
         type: "image",
         position: { x: 0, y: 0 },
-        data: { kind: "image", label: "test", status: "idle", outputImages: [{ fileId }] },
+        data: { kind: "image", label: "test", status: "idle", outputImages: ["/api/files/" + fileId] },
       },
     ],
     edges: [],
@@ -85,8 +85,44 @@ describe("evaluation O1 fixture pairing (architect annex 2)", () => {
     const flow = makeEditFlow(wrongFileId);
     assert.throws(
       () => assertFileIdMatchesSample(flow, correctFileId, "EVALedit-brief-01"),
-      /fileId.*!=.*golden-set/,
+      /!= canonical/,
       "O1 guard must reject mismatched fileId",
+    );
+  });
+
+  // ── P0 三形态变异探针（hermes 停机令）：对象形态 / 裸 id / 错 fileId 都必须红 ──
+
+  it("O1 mutation: object form {fileId} must throw (old defect form)", () => {
+    const fileId = samples[0].referenceImage!.fileId!;
+    const flow: PersistedFlow = {
+      schemaVersion: 8,
+      nodes: [{
+        id: "img", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "test", status: "idle", outputImages: [{ fileId }] },
+      }],
+      edges: [],
+    };
+    assert.throws(
+      () => assertFileIdMatchesSample(flow, fileId, "EVALedit-brief-01"),
+      /must be a canonical string/,
+      "object form {fileId} violates production schema imageReference()",
+    );
+  });
+
+  it("O1 mutation: bare id without prefix must throw", () => {
+    const fileId = samples[0].referenceImage!.fileId!;
+    const flow: PersistedFlow = {
+      schemaVersion: 8,
+      nodes: [{
+        id: "img", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "test", status: "idle", outputImages: [fileId] },
+      }],
+      edges: [],
+    };
+    assert.throws(
+      () => assertFileIdMatchesSample(flow, fileId, "EVALedit-brief-01"),
+      /!= canonical/,
+      "bare id without /api/files/ prefix must be rejected",
     );
   });
 
