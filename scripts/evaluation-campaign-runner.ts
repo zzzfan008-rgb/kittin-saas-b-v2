@@ -648,7 +648,7 @@ async function sealCampaigns(
             nativeParametersSha256,
             referenceInputsSha256,
             requestedImageCount: fixtureBatchSize,
-            maxProviderRequests: 1,
+            maxProviderRequests: fixtureBatchSize,
             priceMinorPerProviderRequest: PRICE_MINOR_PER_PROVIDER_REQUEST,
             budgetLimitMinor: PRICE_MINOR_PER_PROVIDER_REQUEST,
           };
