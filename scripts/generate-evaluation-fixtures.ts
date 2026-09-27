@@ -138,7 +138,12 @@ const EDIT_TEMPLATE: PersistedFlow = {
         modelId: "gpt-image-2.5-flare-vip",
         modelOptions: { size: "1536x2048" },
         aspectRatio: "3:4",
-        batchSize: 2,
+        // batchSize=1 to match the parameter profile's materialized.batchSize=1 constraint.
+        // The variant's parameterProfileId (set by dag.ts:307) authorizes batchSize=1;
+        // batchSize=2 would violate the "authorised plan output count drifted" gate
+        // in evaluationEvidence.ts:446.
+        batchSize: 1,
+        parameterProfileId: "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1",
       },
     },
   ],

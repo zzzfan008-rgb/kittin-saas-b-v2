@@ -252,20 +252,21 @@ export function materializeModelParameterProfile(
   profile: ModelParameterProfile,
 ): MaterializedModelParameterProfile {
   const aspectRatio = profile.businessFrame.aspectRatio;
+  const requestedOutputs = profile.businessFrame.requestedOutputs;
   switch (profile.native.kind) {
     case "gpt-image-2-mask":
-      return { aspectRatio, batchSize: 1, modelOptions: {}, ignoredNativeFields: [] };
+      return { aspectRatio, batchSize: requestedOutputs, modelOptions: {}, ignoredNativeFields: [] };
     case "gpt-image-2-vip":
       return {
         aspectRatio,
-        batchSize: 1,
+        batchSize: requestedOutputs,
         modelOptions: { size: profile.native.size },
         ignoredNativeFields: profile.native.omittedFields,
       };
     case "gemini-image":
       return {
         aspectRatio,
-        batchSize: 1,
+        batchSize: requestedOutputs,
         modelOptions: {
           aspectRatio: profile.native.aspectRatio,
           imageSize: profile.native.imageSize,
@@ -275,7 +276,7 @@ export function materializeModelParameterProfile(
     case "flux-image":
       return {
         aspectRatio,
-        batchSize: 1,
+        batchSize: requestedOutputs,
         modelOptions: profile.native.derivedFromFirstReference
           ? { outputFormat: profile.native.outputFormat }
           : {
@@ -288,7 +289,7 @@ export function materializeModelParameterProfile(
     case "seedream-image":
       return {
         aspectRatio,
-        batchSize: 1,
+        batchSize: requestedOutputs,
         modelOptions: { size: profile.native.size },
         ignoredNativeFields: profile.native.forbiddenFields,
       };

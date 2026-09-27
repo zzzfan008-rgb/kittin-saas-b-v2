@@ -214,7 +214,7 @@ await database.transaction(async (client) => {
       );
     }
 
-    // EVALedit fixtures: projectId → flow_json with schemaVersion=8 + batchSize=2 + reference image file
+    // EVALedit fixtures: projectId → flow_json with schemaVersion=8 + batchSize=1 + reference image file
     for (let i = 0; i < gs.samples.length; i++) {
       const sample = gs.samples[i];
       const idx = String(i + 1).padStart(2, "0");
@@ -245,7 +245,7 @@ await database.transaction(async (client) => {
               modelId: "gpt-image-2.5-flare-vip",
               modelOptions: { size: "1536x2048" },
               aspectRatio: "3:4",
-              batchSize: 2,
+              batchSize: 1,
             },
           },
         ],
@@ -290,7 +290,7 @@ await database.transaction(async (client) => {
       schemaVersion: 8,
       nodes: [
         { id: "mutate-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "裂变方向/数量", status: "idle", text: "【要求】描述裂变方向与数量" } },
-        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 2 } },
+        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 1 } },
       ],
       edges: [{ id: "e-mutate-prompt", source: "mutate-requirement", target: "mutate-gen", data: {}, targetHandle: "prompt" }],
     });
@@ -361,7 +361,7 @@ async function loadSeededProjectFlows(): Promise<Map<string, object>> {
       schemaVersion: 8,
       nodes: [
         { id: "mutate-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "裂变方向/数量", status: "idle", text: "【要求】描述裂变方向与数量" } },
-        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 2 } },
+        { id: "mutate-gen", type: "image-generator", position: { x: 380, y: -170 }, data: { kind: "image-generator", label: "穿搭裂变", status: "idle", promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1", modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "1536x2048" }, aspectRatio: "3:4", batchSize: 1 } },
       ],
       edges: [{ id: "e-mutate-prompt", source: "mutate-requirement", target: "mutate-gen", data: {}, targetHandle: "prompt" }],
     });

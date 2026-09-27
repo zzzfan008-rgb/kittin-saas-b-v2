@@ -91,6 +91,7 @@ async function dismissTutorial(page: import("@playwright/test").Page) {
 
 async function addRailNode(page: import("@playwright/test").Page, label: "文本" | "图片" | "视频") {
   await page.getByRole("button", { name: "添加" }).hover();
+  await page.waitForTimeout(100); // CI: menu renders async, give DOM time to appear
   const menu = page.getByRole("menu", { name: "添加" });
   await expect(menu).toBeVisible();
   await Promise.all([
