@@ -363,12 +363,30 @@ export async function lockEvaluationRunAuthorization(
   `, [policy.authorizationId])).rows[0];
   if (!row) throw new EvaluationRunPolicyError("真实评估 authorizationId 未登记", 403);
   assertAuthorizationMatches(row, policy, ownerId, target, now);
-  const budgetLimitMinor = databaseSafeInteger(row.budget_limit_minor, "budget_limit_minor");
+  // Slot 表的 max_provider_requests / budget_limit_minor 是授权上限（由 seal 阶段
+  // 根据 batchSize=1 fixture 固定写入），而非 fixture 实际推导值。
+  // binding 必须与 slot 表一致，assertBindingMatchesSlot 做 exact match 校验。
+  const slotRow = (await client.query<{
+    max_provider_requests: number;
+    budget_limit_minor: number;
+    price_minor_per_provider_request: number;
+  }>(`
+    SELECT max_provider_requests, budget_limit_minor, price_minor_per_provider_request
+    FROM evaluation_campaign_slots
+    WHERE campaign_id = $1 AND slot_id = $2
+    FOR UPDATE
+  `, [policy.campaignId, policy.slotId])).rows[0];
+  if (!slotRow) throw new EvaluationRunPolicyError("真实评估 slot 未登记", 403);
+
+  const budgetLimitMinor = databaseSafeInteger(slotRow.budget_limit_minor, "budget_limit_minor");
   const priceMinorPerProviderRequest = databaseSafeInteger(
-    row.price_minor_per_provider_request,
+    slotRow.price_minor_per_provider_request,
     "price_minor_per_provider_request",
   );
-  const reservedBudgetMinor = target.maximumProviderRequests * priceMinorPerProviderRequest;
+  // slot 表的 max_provider_requests 是授权上限，不是 fixture 推导值。
+  // assertBindingMatchesSlot 做 exact match，故用 slot 表值而非 target.maximumProviderRequests。
+  const slotMaxProviderRequests = databaseSafeInteger(slotRow.max_provider_requests, "max_provider_requests");
+  const reservedBudgetMinor = slotMaxProviderRequests * priceMinorPerProviderRequest;
   if (!Number.isSafeInteger(reservedBudgetMinor) || reservedBudgetMinor > budgetLimitMinor) {
     throw new EvaluationRunPolicyError("真实评估计划的最坏请求总额超过授权预算", 409);
   }
@@ -380,7 +398,7 @@ export async function lockEvaluationRunAuthorization(
     ownerId,
     modelId: target.modelId,
     evaluationUnitKey: target.evaluationUnitKey,
-    maxProviderRequests: target.maximumProviderRequests,
+    maxProviderRequests: slotMaxProviderRequests,
     priceMinorPerProviderRequest,
     budgetLimitMinor,
     budgetCurrency: row.budget_currency,
