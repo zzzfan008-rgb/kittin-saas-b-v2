@@ -289,6 +289,7 @@ async function documentNodePositions(page: Page): Promise<Array<{ id: string; x:
 async function addRailNode(page: Page, label: "文本" | "图片" | "视频"): Promise<void> {
   const addButton = page.getByRole("button", { name: "添加" });
   await addButton.hover();
+  await page.waitForTimeout(100); // CI: menu renders async, give DOM time to appear
   const menu = page.getByRole("menu", { name: "添加" });
   await expect(menu).toBeVisible();
   const item = menu.getByRole("menuitem", { name: label });
