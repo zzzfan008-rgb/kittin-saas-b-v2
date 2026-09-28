@@ -145,12 +145,6 @@ export function postProcessDirectGenerateImages(
 }
 
 generateRouter.post("/", asyncHandler(async (req, res) => {
-  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "evaluation")) {
-    res.status(400).json({
-      error: "真实评估只能通过 /api/run-plan 并显式提交 onlyNodeId；/api/generate 不接受 evaluation payload",
-    });
-    return;
-  }
   const {
     providerId, modelId: requestedModelId, request, projectId, nodeId, nodeLabel, kind, clientRequestId,
   } = req.body as {
