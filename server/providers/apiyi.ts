@@ -1,3 +1,4 @@
+import { fetch as undiciFetch, FormData as UndiciFormData } from "undici";
 import sharp from "sharp";
 import {
   type AIProvider,
@@ -147,7 +148,7 @@ export async function adaptFluxReference(dataUrl: string): Promise<string> {
   }
 }
 
-function appendImages(form: FormData, refs: string[], modelId: ImageModelId): void {
+function appendImages(form: FormData | import("undici").FormData, refs: string[], modelId: ImageModelId): void {
   const editContract = getImageModelContract(modelId).edit;
   const field = refs.length === 1
     ? editContract.singleImageField
@@ -539,7 +540,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
   switch (modelId) {
     case "gpt-image-2.5-sunburst": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
-        const form = new FormData();
+        const form = new UndiciFormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
         if (options.size) form.append("size", String(options.size));
@@ -549,7 +550,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         form.append("mask", new Blob([new Uint8Array(mask.buffer)], { type: "image/png" }), "mask.png");
         form.append("background", "opaque");
         form.append("output_format", "png");
-        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
+        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;
       });
       return parseApiyiImageResult(response, async () => ({
         images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
@@ -558,11 +559,11 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
     }
     case "gpt-image-2.5-all": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
-        const form = new FormData();
+        const form = new UndiciFormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
         appendImages(form, refs, modelId);
-        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
+        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;
       });
       return parseApiyiImageResult(response, async () => ({
         images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
@@ -572,13 +573,13 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
     case "gpt-image-2.5-sunburst-vip":
     case "gpt-image-2.5-flare-vip": {
       response = await fetchApiyi(modelId, contract.edit.path, () => {
-        const form = new FormData();
+        const form = new UndiciFormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
         form.append("size", String(options.size));
         form.append("quality", String(options.quality ?? "high"));
         appendImages(form, refs, modelId);
-        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form };
+        return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;
       });
       return parseApiyiImageResult(response, async () => ({
         images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
