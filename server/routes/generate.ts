@@ -122,7 +122,7 @@ export function validateDirectGenerateRequest(
     return { ok: false, error: `${request.operationMode} mode requires at least one reference image` };
   }
   if (kind === undefined) {
-    return { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" };
+    return { ok: false, error: "kind is required; direct paid runs need an explicit node kind" };
   }
   if (!isDirectGenerateKind(kind)) {
     return { ok: false, error: "kind must identify a supported AI node" };

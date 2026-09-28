@@ -158,14 +158,13 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
 }
 
 runPlanRouter.post("/", asyncHandler(async (req, res) => {
-  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId, evaluation } = req.body as {
+  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId } = req.body as {
     nodes?: unknown[];
     edges?: unknown[];
     onlyNodeId?: string;
     includeDownstream?: boolean;
     projectId?: string;
     clientRequestId?: string;
-    evaluation?: unknown;
   };
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     res.status(400).json({ error: "nodes and edges arrays are required" });

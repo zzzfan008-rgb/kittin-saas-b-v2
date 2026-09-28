@@ -62,16 +62,6 @@ export async function handleJobError(
       await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now);
       return;
     }
-    if (row.retry_policy === "no-retry") {
-      await terminateRun(
-        client,
-        row,
-        "failed",
-        `no-retry 策略不自动重放：${message}`,
-        now,
-      );
-      return;
-    }
     const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
     const maxRetries = Math.min(retryDelays.length, DEFAULT_RETRY_DELAYS_MS.length);
     if (isRetryableProviderError(error) && row.retry_count < maxRetries) {

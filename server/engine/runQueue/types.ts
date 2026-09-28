@@ -33,7 +33,7 @@ export interface DurableRunRow {
   node_id: string;
   status: DurableRunStatus | "success" | "error";
   target_step_id: string | null;
-  run_type: "workflow" | "direct" | "evaluation";
+  run_type: "workflow" | "direct";
   started_at: number;
   finished_at: number | null;
 }
@@ -48,12 +48,7 @@ export interface ClaimedJob {
   step: NodeExecution;
   retryCount: number;
   startedAt: number;
-  runType: "workflow" | "direct" | "evaluation";
-  retryPolicy: "standard" | "no-retry";
-  evaluationCaseId: string | null;
-  evaluationAuthorizationId: string | null;
-  evaluationCampaignId: string | null;
-  evaluationSlotId: string | null;
+  runType: "workflow" | "direct";
 }
 
 
@@ -70,21 +65,7 @@ export interface JobLockRow {
   step_json: string;
   step_started_at: number | null;
   target_step_id: string | null;
-  run_type: "workflow" | "direct" | "evaluation";
-  retry_policy: "standard" | "no-retry";
-  evaluation_case_id: string | null;
-  evaluation_authorization_id: string | null;
-  evaluation_campaign_id: string | null;
-  evaluation_slot_id: string | null;
-}
-
-
-export interface EvaluationRecoveryEvidenceSummary {
-  request_count: number;
-  ambiguous_request_count: number;
-  succeeded_request_count: number;
-  succeeded_output_count: number;
-  provider_original_count: number;
+  run_type: "workflow" | "direct";
 }
 
 

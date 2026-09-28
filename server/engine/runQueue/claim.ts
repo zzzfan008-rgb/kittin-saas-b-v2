@@ -1,4 +1,4 @@
-import { ClaimedJob, DurableRunRow, JobLockRow, EvaluationRecoveryEvidenceSummary, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS, lockRun } from "./types";
+import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS, lockRun } from "./types";
 import { appendRunEvent } from "./events";
 import { terminateRun } from "./lifecycle";
 import type { PoolClient } from "pg";
@@ -20,9 +20,7 @@ import {
 export const CLAIM_NEXT_JOB_SQL = `
   SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
     s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at,
-    r.target_step_id, r.run_type, r.retry_policy,
-    r.evaluation_case_id, r.evaluation_authorization_id,
-    r.evaluation_campaign_id, r.evaluation_slot_id
+    r.target_step_id, r.run_type
   FROM generation_jobs j
   JOIN generation_run_steps s ON s.id = j.step_id
   JOIN generation_runs r ON r.id = j.run_id
@@ -79,11 +77,6 @@ export async function claimNextJob(
       retryCount: row.retry_count,
       startedAt: now,
       runType: row.run_type,
-      retryPolicy: row.retry_policy,
-      evaluationCaseId: row.evaluation_case_id,
-      evaluationAuthorizationId: row.evaluation_authorization_id,
-      evaluationCampaignId: row.evaluation_campaign_id,
-      evaluationSlotId: row.evaluation_slot_id,
     };
   });
 }
@@ -102,7 +95,7 @@ export async function markAttemptStarted(
       status: DurableRunStatus;
       worker_id: string | null;
       owner_id: string;
-      run_type: "workflow" | "direct" | "evaluation";
+      run_type: "workflow" | "direct";
     }>(`
       SELECT j.status, j.worker_id, r.owner_id, r.run_type
       FROM generation_jobs j

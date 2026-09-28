@@ -23,15 +23,6 @@ export function evaluateClaimedJobPromptAdmission(
   if (generationKindOf(job.step.kind) !== "image") {
     return { allowed: true, reason: "非付费节点不调用 Provider。" };
   }
-  if (
-    job.runType === "evaluation"
-    || job.retryPolicy === "no-retry"
-  ) {
-    return {
-      allowed: false,
-      reason: "付费运行禁止使用 evaluation run type 或 no-retry 策略。",
-    };
-  }
   const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
     order: reference.order,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),

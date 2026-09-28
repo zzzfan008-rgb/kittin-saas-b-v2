@@ -1,7 +1,7 @@
 /**
  * 持久化生成队列：facade 模块。
  *
- * 实现已拆分到 ./runQueue/ 子目录（types/events/evaluation/promptAdmission/
+ * 实现已拆分到 ./runQueue/ 子目录（types/events/promptAdmission/
  * persist/claim/lifecycle/worker/queries），本文件保留 ./runQueue 路径作为
  * 稳定入口；外部 importer 不需要改路径。
  *

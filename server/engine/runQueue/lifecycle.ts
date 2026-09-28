@@ -89,11 +89,7 @@ export async function finalizeSuccessfulRun(
   }
   await client.query(`
     UPDATE generation_runs SET status = 'succeeded', successful_count = $1, provider_requests = $2,
-      model = $3, error = $4, finished_at = $5, updated_at = $5,
-      billing_reconciliation_status = CASE
-        WHEN run_type = 'evaluation' AND $2 > 0 THEN 'pending'
-        ELSE billing_reconciliation_status
-      END
+      model = $3, error = $4, finished_at = $5, updated_at = $5
     WHERE id = $6
   `, [outputCount, providerRequests, model, warning, finishedAt, run.id]);
   if (outputCount > 0) {

@@ -39,11 +39,6 @@ function required(name: string): string {
   return v;
 }
 
-/**
- * Resolve and reject an unsafe paid-evaluation identity before database setup
- * or Worker startup. Git worktrees must be clean; packaged runtimes must match
- * their immutable build identity.
- */
 export const config = {
   /** API易图片接口；路径由本地模型知识库逐模型声明。 */
   apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.apiyi.com").replace(/\/+$/, ""),
