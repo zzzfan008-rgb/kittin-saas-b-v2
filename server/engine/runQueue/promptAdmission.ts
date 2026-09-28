@@ -1,5 +1,4 @@
 import { ClaimedJob, PromptAdmissionBlockedBeforeProviderCall } from "./types";
-import { persistedEvaluationPolicy } from "./evaluation";
 import { createHash } from "node:crypto";
 import type {
   ExecutionPlan,
@@ -24,47 +23,13 @@ export function evaluateClaimedJobPromptAdmission(
   if (generationKindOf(job.step.kind) !== "image") {
     return { allowed: true, reason: "非付费节点不调用 Provider。" };
   }
-  const hasEvaluationPolicy = (
-    job.runType === "evaluation"
-    && job.retryPolicy === "no-retry"
-    && typeof job.evaluationCaseId === "string"
-    && job.evaluationCaseId.trim().length > 0
-    && typeof job.evaluationAuthorizationId === "string"
-    && job.evaluationAuthorizationId.trim().length > 0
-    && typeof job.evaluationCampaignId === "string"
-    && job.evaluationCampaignId.trim().length > 0
-    && typeof job.evaluationSlotId === "string"
-    && job.evaluationSlotId.trim().length > 0
-  );
-  if (job.runType === "evaluation" && !hasEvaluationPolicy) {
-    return {
-      allowed: false,
-      reason: "真实评估任务缺少持久化的 no-retry、caseId、authorizationId、campaignId 或 slotId。",
-    };
-  }
-  if (hasEvaluationPolicy) {
-    try {
-      persistedEvaluationPolicy(job);
-    } catch (error) {
-      return {
-        allowed: false,
-        reason: error instanceof Error ? error.message : "真实评估策略快照无法验证。",
-      };
-    }
-  }
   if (
-    job.runType !== "evaluation"
-    && (
-      job.retryPolicy !== "standard"
-      || job.evaluationCaseId !== null
-      || job.evaluationAuthorizationId !== null
-      || job.evaluationCampaignId !== null
-      || job.evaluationSlotId !== null
-    )
+    job.runType === "evaluation"
+    || job.retryPolicy === "no-retry"
   ) {
     return {
       allowed: false,
-      reason: "普通任务不得携带真实评估授权或 no-retry 策略。",
+      reason: "付费运行禁止使用 evaluation run type 或 no-retry 策略。",
     };
   }
   const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
@@ -72,11 +37,8 @@ export function evaluateClaimedJobPromptAdmission(
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
   }));
   return evaluatePromptRunAdmission(
-    // Prompt/model/native parameter binding remains anchored to the reviewed,
-    // durable step. Only the reference-role sequence is replaced at the final
-    // Provider boundary with the inputs resolved for this run.
     promptRunAdmissionInputFromParams(job.step.kind, job.step.params, references),
-    { evaluationRun: hasEvaluationPolicy },
+    {},
   );
 }
 

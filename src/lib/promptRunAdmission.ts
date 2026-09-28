@@ -552,17 +552,6 @@ export function evaluatePromptRunAdmission(
   if (support.status === "verified" || support.status === "recommended") {
     return { allowed: true, code: "verified", reason: support.reason, variant };
   }
-  if (
-    options.evaluationRun
-    && (support.status === "unverified" || support.status === "experimental")
-  ) {
-    return {
-      allowed: true,
-      code: "evaluation-only",
-      reason: "仅允许在管理员显式授权的 no-retry 真实评估运行中使用。",
-      variant,
-    };
-  }
   return {
     allowed: false,
     code: "support-status-blocked",
