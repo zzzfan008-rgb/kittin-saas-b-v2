@@ -1,6 +1,5 @@
 import { CLIENT_REQUEST_ID_PATTERN, ClaimedJob, DurableRunRow, PromptAdmissionBlockedBeforeProviderCall, lockRun, parseJson } from "./types";
 import { appendRunEvent } from "./events";
-import { persistedEvaluationPolicy, planWithPersistedEvaluationPolicy } from "./evaluation";
 
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -21,24 +20,10 @@ import {
   persistImageRefWithReceipt,
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
-import type { EvaluationRunPolicy } from "../../lib/evaluationRunPolicy";
-import {
-  consumeEvaluationRunAuthorization,
-  evaluationAuthorizationTargetFromPlan,
-  lockEvaluationRunAuthorization,
-} from "../../lib/evaluationAuthorizationLedger";
-import {
-  completeEvaluationCaseEvidence,
-  failEvaluationCaseEvidence,
-  recordEvaluationProviderRequestFailure,
-  recordEvaluationProviderRequestSuccess,
-  startEvaluationProviderRequestEvidence,
-} from "../../lib/evaluationEvidenceStore";
 import { ACTIVE_RUN_LIMIT } from "../../lib/generationLimits";
 import { lockActiveOwner } from "../../lib/ownerMutation";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   isRetryableProviderError,
@@ -83,14 +68,10 @@ export async function insertGenerationRun(
   plan: ExecutionPlan,
   ownerId: string,
   context: GenerationRecordContext,
-  runType: "workflow" | "direct" | "evaluation" = "workflow",
-  evaluationPolicy?: EvaluationRunPolicy,
+  runType: "workflow" | "direct" = "workflow",
 ): Promise<{ id: string }> {
   if (!ownerId.trim() || context.userId !== ownerId) throw new Error("run owner is invalid");
   if (plan.steps.length === 0) throw new Error("execution plan has no steps");
-  if ((runType === "evaluation") !== Boolean(evaluationPolicy)) {
-    throw new Error("evaluation run type and policy must be supplied together");
-  }
   await assertGenerationOwnerActive(client, ownerId);
   const clientRequestId = context.clientRequestId?.trim() || undefined;
   if (clientRequestId && !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
@@ -98,22 +79,17 @@ export async function insertGenerationRun(
   }
   const runId = nanoid(10);
   const createdAt = Date.now();
-  const persistedPlan = planWithPersistedEvaluationPolicy(plan, evaluationPolicy);
-  const requestedTargetIndex = persistedPlan.steps.findIndex((step) => step.nodeId === context.nodeId);
-  const targetIndex = requestedTargetIndex >= 0 ? requestedTargetIndex : persistedPlan.steps.length - 1;
-  const stepIds = persistedPlan.steps.map(() => nanoid(12));
-  const targetStep = persistedPlan.steps[targetIndex] ?? persistedPlan.steps.at(-1)!;
+  const requestedTargetIndex = plan.steps.findIndex((step) => step.nodeId === context.nodeId);
+  const targetIndex = requestedTargetIndex >= 0 ? requestedTargetIndex : plan.steps.length - 1;
+  const stepIds = plan.steps.map(() => nanoid(12));
+  const targetStep = plan.steps[targetIndex] ?? plan.steps.at(-1)!;
   const targetStepId = stepIds[targetIndex] ?? stepIds.at(-1)!;
   const initialModel = isImageModelId(targetStep.params.modelId) ? targetStep.params.modelId : null;
-  const planJson = JSON.stringify(persistedPlan);
+  const planJson = JSON.stringify(plan);
   const requestFingerprint = clientRequestId
     ? createHash("sha256")
       .update(JSON.stringify({
         runType,
-        evaluationCaseId: evaluationPolicy?.caseId ?? null,
-        evaluationAuthorizationId: evaluationPolicy?.authorizationId ?? null,
-        evaluationCampaignId: evaluationPolicy?.campaignId ?? null,
-        evaluationSlotId: evaluationPolicy?.slotId ?? null,
         projectId: context.projectId ?? null,
         nodeId: context.nodeId,
       }))
@@ -139,13 +115,6 @@ export async function insertGenerationRun(
       return { id: existing.id };
     }
   }
-  if (evaluationPolicy) {
-    const existingCase = (await client.query<{ id: string }>(`
-      SELECT id FROM generation_runs
-      WHERE owner_id = $1 AND evaluation_case_id = $2
-    `, [ownerId, evaluationPolicy.caseId])).rows[0];
-    if (existingCase) throw new EvaluationCaseConflictError();
-  }
   const activeCount = (await client.query<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
     WHERE owner_id = $1
@@ -155,22 +124,15 @@ export async function insertGenerationRun(
   `, [ownerId])).rows[0]?.count ?? 0;
   if (activeCount >= ACTIVE_RUN_LIMIT) throw new ActiveRunLimitError();
 
-  // The ledger row is locked until this transaction either binds it to the new
-  // run or rolls back. HTTP validation alone can never mint an authorization.
-  const lockedEvaluationAuthorization = evaluationPolicy
-    ? await lockEvaluationRunAuthorization(client, evaluationPolicy, ownerId, persistedPlan, createdAt)
-    : undefined;
-
   const inserted = await client.query<{ id: string }>(`
       INSERT INTO generation_runs (
         id, owner_id, project_id, project_name, node_id, node_label, kind, prompt,
         parameters_json, reference_images_json, reference_inputs_json, model, requested_count, status,
         started_at, plan_json, target_step_id, run_type, updated_at,
-        client_request_id, request_fingerprint, retry_policy,
-        evaluation_case_id, evaluation_authorization_id, evaluation_campaign_id, evaluation_slot_id
+        client_request_id, request_fingerprint, retry_policy
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'queued',
-        $14, $15, $16, $17, $14, $18, $19, $20, $21, $22, $23, $24
+        $14, $15, $16, $17, $14, $18, $19, 'standard'
       )
       ON CONFLICT (owner_id, client_request_id)
         WHERE client_request_id IS NOT NULL
@@ -183,11 +145,6 @@ export async function insertGenerationRun(
       JSON.stringify(context.referenceInputs ?? targetStep.inputReferences ?? []),
       initialModel, context.requestedCount, createdAt, planJson, targetStepId, runType,
       clientRequestId ?? null, requestFingerprint,
-      evaluationPolicy?.retryPolicy ?? "standard",
-      evaluationPolicy?.caseId ?? null,
-      evaluationPolicy?.authorizationId ?? null,
-      evaluationPolicy?.campaignId ?? null,
-      evaluationPolicy?.slotId ?? null,
     ]);
 
   if (inserted.rowCount === 0) {
@@ -201,18 +158,7 @@ export async function insertGenerationRun(
     return { id: existing.id };
   }
 
-  if (evaluationPolicy && lockedEvaluationAuthorization) {
-    await consumeEvaluationRunAuthorization(
-      client,
-      lockedEvaluationAuthorization,
-      evaluationPolicy,
-      ownerId,
-      runId,
-      createdAt,
-    );
-  }
-
-  for (const [index, step] of persistedPlan.steps.entries()) {
+  for (const [index, step] of plan.steps.entries()) {
     const stepId = stepIds[index];
     const model = isImageModelId(step.params.modelId) ? step.params.modelId : null;
     await client.query(`
@@ -239,10 +185,9 @@ export async function enqueueGenerationRunInTransaction(
   plan: ExecutionPlan,
   ownerId: string,
   context: GenerationRecordContext,
-  runType: "workflow" | "direct" | "evaluation" = "workflow",
-  evaluationPolicy?: EvaluationRunPolicy,
+  runType: "workflow" | "direct" = "workflow",
 ): Promise<{ id: string }> {
-  return insertGenerationRun(client, plan, ownerId, context, runType, evaluationPolicy);
+  return insertGenerationRun(client, plan, ownerId, context, runType);
 }
 
 
@@ -250,11 +195,10 @@ export async function enqueueGenerationRun(
   plan: ExecutionPlan,
   ownerId: string,
   context: GenerationRecordContext,
-  runType: "workflow" | "direct" | "evaluation" = "workflow",
-  evaluationPolicy?: EvaluationRunPolicy,
+  runType: "workflow" | "direct" = "workflow",
 ): Promise<{ id: string }> {
   return transaction((client) => insertGenerationRun(
-    client, plan, ownerId, context, runType, evaluationPolicy,
+    client, plan, ownerId, context, runType,
   ));
 }
 
@@ -366,7 +310,6 @@ export async function captureProviderOriginals(
   offset: number,
   createdAt: number,
 ): Promise<PersistedImageReceipt[]> {
-  const evaluationPolicy = persistedEvaluationPolicy(job);
   await assertJobOwnedForCompletion(job, workerId);
   const persisted: PersistedImageReceipt[] = [];
   try {
@@ -417,16 +360,6 @@ export async function captureProviderOriginals(
           new Date(createdAt).toISOString(),
         ]);
       }
-      await recordEvaluationProviderRequestSuccess(client, {
-        runId: job.runId,
-        policy: evaluationPolicy,
-        requestIndex: artifact.providerRequest,
-        providerModel: artifact.model,
-        providerOutputSizes: artifact.providerOutputSizes,
-        providerOriginalStorageRefs: urls,
-        providerRequestId: artifact.providerRequestId,
-        finishedAt: createdAt,
-      });
     });
     return persisted;
   } catch (error) {

@@ -41,13 +41,6 @@ export class GenerationOwnerUnavailableError extends Error {
   }
 }
 
-export class EvaluationCaseConflictError extends Error {
-  constructor() {
-    super("evaluation.caseId 已存在；真实评估禁止重放，请在账单核对和重新授权后使用关联的新 caseId");
-    this.name = "EvaluationCaseConflictError";
-  }
-}
-
 export function isTerminalRunStatus(status: string): boolean {
   return TERMINAL_RUN_STATUSES.has(status as DurableRunStatus) || status === "success" || status === "error";
 }

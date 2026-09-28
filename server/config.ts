@@ -5,11 +5,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  resolveEvaluationCodeIdentity,
-  type EvaluationCodeIdentity,
-} from "./lib/evaluationCodeIdentity";
-import { assertEvaluationCampaignReady } from "./lib/evaluationCampaign";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** 项目根目录（server/ 的上一级） */
@@ -49,19 +44,6 @@ function required(name: string): string {
  * or Worker startup. Git worktrees must be clean; packaged runtimes must match
  * their immutable build identity.
  */
-export function assertPaidEvaluationStartupConfig(
-  env: NodeJS.ProcessEnv = process.env,
-  repoCwd = ROOT_DIR,
-): EvaluationCodeIdentity | undefined {
-  if (env.ENABLE_PAID_EVALUATION_RUNS !== "true") return undefined;
-  const identity = resolveEvaluationCodeIdentity(repoCwd, env);
-  if (identity.dirty) {
-    throw new Error("paid evaluation requires a clean Git worktree at the exact GARMENT_CANVAS_CODE_SHA");
-  }
-  assertEvaluationCampaignReady();
-  return identity;
-}
-
 export const config = {
   /** API易图片接口；路径由本地模型知识库逐模型声明。 */
   apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.apiyi.com").replace(/\/+$/, ""),

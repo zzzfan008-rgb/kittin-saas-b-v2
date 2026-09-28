@@ -11,7 +11,6 @@
 export * from "./runQueue/index";
 export {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
 } from "./runQueueContracts";

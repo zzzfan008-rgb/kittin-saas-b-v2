@@ -1,6 +1,5 @@
 import { ClaimedJob, DurableRunRow, JobLockRow, parseJson, lockRun } from "./types";
 import { appendRunEvent } from "./events";
-import { persistedEvaluationPolicy, persistedEvaluationPolicyFromRow } from "./evaluation";
 import type { PoolClient } from "pg";
 import { nanoid } from "nanoid";
 import type {
@@ -18,20 +17,9 @@ import {
   persistImageRefWithReceipt,
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
-import type { EvaluationRunPolicy } from "../../lib/evaluationRunPolicy";
-import { finalizeEvaluationCampaignSlot } from "../../lib/evaluationCampaign";
-import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import {
-  completeEvaluationCaseEvidence,
-  failEvaluationCaseEvidence,
-  recordEvaluationProviderRequestFailure,
-  recordEvaluationProviderRequestSuccess,
-  startEvaluationProviderRequestEvidence,
-} from "../../lib/evaluationEvidenceStore";
 import type { RunEvent, StepResult } from "../runner";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   isRetryableProviderError,
@@ -180,7 +168,6 @@ export async function completeJobSuccess(
     assetSha256: reference.assetSha256,
     ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
   }));
-  const evaluationPolicy = persistedEvaluationPolicy(job);
   await transaction(async (client) => {
     const locked = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(
       "SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE",
@@ -240,12 +227,6 @@ export async function completeJobSuccess(
         VALUES ($1, $2, 'generation', $3, $4, $5, 'video/mp4', $6) ON CONFLICT (id) DO NOTHING
       `, [videoId, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
     }
-    await completeEvaluationCaseEvidence(client, {
-      runId: job.runId,
-      policy: evaluationPolicy,
-      postprocessedStorageRefs: imageUrls,
-      finishedAt,
-    });
     const partialWarning = result.failures?.length ? `${result.failures.length} 个生成任务失败` : undefined;
     // result-node-created：一轮 run 发一次，携带该 run 的全部产物（runtime.md §3.2）。
     // 产物落结果节点，不覆写生成节点自身。resultNodeId 与 runId 一一对应，恢复补发幂等。
@@ -313,26 +294,16 @@ export async function terminateRun(
   status: "failed" | "outcome_unknown" | "cancelled",
   message: string,
   finishedAt: number,
-  phase: string = "provider",
 ): Promise<void> {
   const run = await lockRun(client, row.run_id);
   if (!run || isTerminalRunStatus(run.status)) return;
-  let evaluationPolicy: EvaluationRunPolicy | undefined;
-  let terminalMessage = message;
-  let policyIntegrityFailure: string | undefined;
-  try {
-    evaluationPolicy = persistedEvaluationPolicyFromRow(row);
-  } catch (error) {
-    policyIntegrityFailure = error instanceof Error ? error.message : String(error);
-    terminalMessage = `${message}；评估证据策略快照损坏：${policyIntegrityFailure}`;
-  }
   await client.query(`
     UPDATE generation_jobs SET status = $1, worker_id = NULL, lease_expires_at = NULL,
       last_error = $2, updated_at = $3 WHERE id = $4
-  `, [status, terminalMessage, finishedAt, row.id]);
+  `, [status, message, finishedAt, row.id]);
   await client.query(`
     UPDATE generation_run_steps SET status = $1, error = $2, finished_at = $3 WHERE id = $4
-  `, [status, terminalMessage, finishedAt, row.step_id]);
+  `, [status, message, finishedAt, row.step_id]);
   await client.query(`
     UPDATE generation_jobs SET status = 'cancelled', worker_id = NULL, lease_expires_at = NULL,
       last_error = $1, updated_at = $2
@@ -347,55 +318,26 @@ export async function terminateRun(
       (ARRAY_AGG(model ORDER BY step_index DESC) FILTER (WHERE model IS NOT NULL))[1] AS model
     FROM generation_run_steps WHERE run_id = $1
   `, [row.run_id])).rows[0];
-  await failEvaluationCaseEvidence(client, {
-    runId: row.run_id,
-    policy: evaluationPolicy,
-    outcome: status,
-    phase: phase as EvaluationErrorPhase,
-    code: status === "outcome_unknown" ? "provider-outcome-unknown" : `evaluation-${status}`,
-    message: terminalMessage,
-    finishedAt,
-    hardBlockers: policyIntegrityFailure ? [{
-      code: "evidence-integrity-failure",
-      detail: policyIntegrityFailure,
-    }] : undefined,
-  });
-  if (!evaluationPolicy && row.run_type === "evaluation") {
-    if (!row.evaluation_campaign_id || !row.evaluation_slot_id || !row.evaluation_authorization_id) {
-      throw new Error("evaluation run lost its campaign/slot binding before terminal closure");
-    }
-    await finalizeEvaluationCampaignSlot(client, {
-      campaignId: row.evaluation_campaign_id,
-      slotId: row.evaluation_slot_id,
-      authorizationId: row.evaluation_authorization_id,
-      runId: row.run_id,
-      outcome: status,
-    });
-  }
   await client.query(`
     UPDATE generation_runs SET status = $1, error = $2, provider_requests = $3,
-      model = COALESCE($4, model), finished_at = $5, updated_at = $5,
-      billing_reconciliation_status = CASE
-        WHEN run_type = 'evaluation' AND $3 > 0 THEN 'pending'
-        ELSE billing_reconciliation_status
-      END
+      model = COALESCE($4, model), finished_at = $5, updated_at = $5
     WHERE id = $6
-  `, [status, terminalMessage, aggregate?.provider_requests ?? 0, aggregate?.model ?? null, finishedAt, row.run_id]);
+  `, [status, message, aggregate?.provider_requests ?? 0, aggregate?.model ?? null, finishedAt, row.run_id]);
   await client.query("DELETE FROM generation_outputs WHERE run_id = $1", [row.run_id]);
   if (status === "failed") {
     await client.query(`
       INSERT INTO generation_outputs (id, run_id, image, status, error, created_at)
       VALUES ($1, $2, '', 'error', $3, $4)
-    `, [nanoid(12), row.run_id, terminalMessage, finishedAt]);
+    `, [nanoid(12), row.run_id, message, finishedAt]);
   }
   const clientStatus = status === "failed" ? "error" : status;
   await appendRunEvent(client, row.run_id, {
-    type: "node-status", nodeId: row.node_id, status: clientStatus, error: terminalMessage,
+    type: "node-status", nodeId: row.node_id, status: clientStatus, error: message,
     startedAt: row.step_started_at ?? undefined, finishedAt,
   } as RunEvent, finishedAt);
   if (status === "failed") {
     await appendRunEvent(client, row.run_id, {
-      type: "run-error", nodeId: row.node_id, error: terminalMessage, finishedAt,
+      type: "run-error", nodeId: row.node_id, error: message, finishedAt,
     }, finishedAt);
   } else {
     await appendRunEvent(client, row.run_id, { type: "done" }, finishedAt);

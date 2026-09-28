@@ -36,7 +36,6 @@ export async function handleJobError(
   workerId: string,
   error: unknown,
   options: ProcessGenerationJobOptions,
-  phase: string,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
   const message = error instanceof ProviderError
@@ -60,7 +59,7 @@ export async function handleJobError(
     `, [job.id])).rows[0];
     if (!row || row.worker_id !== workerId) return;
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
-      await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now, phase);
+      await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now);
       return;
     }
     if (row.retry_policy === "no-retry") {
@@ -68,9 +67,8 @@ export async function handleJobError(
         client,
         row,
         "failed",
-        `真实评估采用 no-retry，未自动重放：${message}`,
+        `no-retry 策略不自动重放：${message}`,
         now,
-        phase,
       );
       return;
     }
@@ -109,7 +107,7 @@ export async function handleJobError(
         delayMs: null, exhausted: true,
       }));
     }
-    await terminateRun(client, row, "failed", message, now, phase);
+    await terminateRun(client, row, "failed", message, now);
   });
 }
 
@@ -234,7 +232,7 @@ export async function processNextGenerationJob(
       throw error;
     }
   } catch (error) {
-    await handleJobError(job, workerId, error, options, failurePhase);
+    await handleJobError(job, workerId, error, options);
   } finally {
     clearInterval(heartbeat);
   }
