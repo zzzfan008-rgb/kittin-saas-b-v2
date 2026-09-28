@@ -1,6 +1,5 @@
 import { ClaimedJob, JobLockRow, ProcessGenerationJobOptions, PromptAdmissionBlockedBeforeProviderCall, lockRun, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS } from "./types";
 import { appendRunEvent } from "./events";
-import { persistedEvaluationPolicy, assertEvaluationRuntimeReferenceBinding } from "./evaluation";
 import { evaluateClaimedJobPromptAdmission, runtimeUserReferenceInputs } from "./promptAdmission";
 import { inputImagesForStep, persistStepImages, captureProviderOriginals, compensatePersistedImages, assertJobOwnedForCompletion } from "./persist";
 import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted, markVideoTaskSubmitted } from "./claim";
@@ -15,14 +14,6 @@ import {
   persistImageRefWithReceipt,
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
-import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import {
-  completeEvaluationCaseEvidence,
-  failEvaluationCaseEvidence,
-  recordEvaluationProviderRequestFailure,
-  recordEvaluationProviderRequestSuccess,
-  startEvaluationProviderRequestEvidence,
-} from "../../lib/evaluationEvidenceStore";
 import { getProvider } from "../../providers";
 import { getVideoProvider } from "../../providers/videoProvider";
 import {
@@ -33,7 +24,6 @@ import {
 import { executeStep, type ProviderResolver, type RunEvent, type StepResult } from "../runner";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   isRetryableProviderError,
@@ -46,7 +36,7 @@ export async function handleJobError(
   workerId: string,
   error: unknown,
   options: ProcessGenerationJobOptions,
-  phase: EvaluationErrorPhase,
+  phase: string,
 ): Promise<void> {
   const now = options.now?.() ?? Date.now();
   const message = error instanceof ProviderError
@@ -63,9 +53,7 @@ export async function handleJobError(
     const row = (await client.query<JobLockRow>(`
       SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at,
-        r.target_step_id, r.run_type, r.retry_policy,
-        r.evaluation_case_id, r.evaluation_authorization_id,
-        r.evaluation_campaign_id, r.evaluation_slot_id
+        r.target_step_id, r.run_type, r.retry_policy
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
       JOIN generation_runs r ON r.id = j.run_id
       WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
@@ -146,7 +134,7 @@ export async function processNextGenerationJob(
     });
   }, heartbeatMs);
   heartbeat.unref();
-  let failurePhase: EvaluationErrorPhase = "admission";
+  let failurePhase: string = "admission";
   try {
     const preflightAdmission = evaluateClaimedJobPromptAdmission(job);
     if (!preflightAdmission.allowed) {
@@ -189,7 +177,6 @@ export async function processNextGenerationJob(
           if (!admission.allowed) {
             throw new PromptAdmissionBlockedBeforeProviderCall(admission.reason);
           }
-          assertEvaluationRuntimeReferenceBinding(job, runtimeUserReferences);
           await markAttemptStarted(
             job,
             workerId,
@@ -197,24 +184,8 @@ export async function processNextGenerationJob(
             leaseMs,
             providerRequest,
             request,
-            options.evaluationCodeIdentity,
           );
           failurePhase = "provider";
-        },
-        onProviderCallError: async ({ providerRequest, error }) => {
-          const evaluationPolicy = persistedEvaluationPolicy(job);
-          await transaction((client) => recordEvaluationProviderRequestFailure(client, {
-            runId: job.runId,
-            policy: evaluationPolicy,
-            requestIndex: providerRequest,
-            outcome: error instanceof ProviderError && error.category === "outcome_unknown"
-              ? "outcome_unknown"
-              : "failed",
-            errorCategory: error instanceof ProviderError ? error.category : "provider-error",
-            errorMessage: error instanceof Error ? error.message : String(error),
-            providerRequestId: error instanceof ProviderError ? error.requestId : undefined,
-            finishedAt: options.now?.() ?? Date.now(),
-          }));
         },
         captureProviderImages: async (artifact) => {
           failurePhase = "provider-persist";

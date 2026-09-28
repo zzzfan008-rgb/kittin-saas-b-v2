@@ -313,7 +313,7 @@ export async function terminateRun(
   status: "failed" | "outcome_unknown" | "cancelled",
   message: string,
   finishedAt: number,
-  phase: EvaluationErrorPhase = "provider",
+  phase: string = "provider",
 ): Promise<void> {
   const run = await lockRun(client, row.run_id);
   if (!run || isTerminalRunStatus(run.status)) return;
@@ -351,7 +351,7 @@ export async function terminateRun(
     runId: row.run_id,
     policy: evaluationPolicy,
     outcome: status,
-    phase,
+    phase: phase as EvaluationErrorPhase,
     code: status === "outcome_unknown" ? "provider-outcome-unknown" : `evaluation-${status}`,
     message: terminalMessage,
     finishedAt,

@@ -1,6 +1,5 @@
 import { ClaimedJob, DurableRunRow, JobLockRow, EvaluationRecoveryEvidenceSummary, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS, lockRun } from "./types";
 import { appendRunEvent } from "./events";
-import { persistedEvaluationPolicy } from "./evaluation";
 import { terminateRun } from "./lifecycle";
 import type { PoolClient } from "pg";
 import type {
@@ -11,22 +10,11 @@ import type {
   ReferenceImageSource,
 } from "../../../src/types/workflow";
 import { db, query, queryOne, transaction } from "../../lib/database";
-import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
-import {
-  completeEvaluationCaseEvidence,
-  failEvaluationCaseEvidence,
-  recordEvaluationProviderRequestFailure,
-  recordEvaluationProviderRequestSuccess,
-  startEvaluationProviderRequestEvidence,
-} from "../../lib/evaluationEvidenceStore";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
-  isRetryableProviderError,
   isTerminalRunStatus,
-  outcomeUnknownMessage,
   type DurableRunStatus,
 } from "../runQueueContracts";
 export const CLAIM_NEXT_JOB_SQL = `
@@ -108,23 +96,15 @@ export async function markAttemptStarted(
   leaseMs: number,
   providerRequest: number,
   request: ImageGenRequest,
-  evaluationCodeIdentity?: EvaluationCodeIdentity,
 ): Promise<void> {
-  const evaluationPolicy = persistedEvaluationPolicy(job);
   await transaction(async (client) => {
     const row = (await client.query<{
       status: DurableRunStatus;
       worker_id: string | null;
       owner_id: string;
       run_type: "workflow" | "direct" | "evaluation";
-      evaluation_case_id: string | null;
-      evaluation_authorization_id: string | null;
-      evaluation_campaign_id: string | null;
-      evaluation_slot_id: string | null;
     }>(`
-      SELECT j.status, j.worker_id, r.owner_id, r.run_type,
-        r.evaluation_case_id, r.evaluation_authorization_id,
-        r.evaluation_campaign_id, r.evaluation_slot_id
+      SELECT j.status, j.worker_id, r.owner_id, r.run_type
       FROM generation_jobs j
       JOIN generation_runs r ON r.id = j.run_id
       WHERE j.id = $1 AND r.deleted_at IS NULL
@@ -134,26 +114,6 @@ export async function markAttemptStarted(
     )).rows[0];
     if (!row || row.worker_id !== workerId) throw new Error("generation job lease was lost");
     if (row.status !== "running") throw new Error(`generation job is ${row.status}`);
-    if (row.run_type === "evaluation") {
-      if (
-        !row.evaluation_case_id
-        || !row.evaluation_authorization_id
-        || !row.evaluation_campaign_id
-        || !row.evaluation_slot_id
-        || !evaluationPolicy
-      ) throw new Error("evaluation run lost its authorization/campaign/slot binding");
-      await startEvaluationProviderRequestEvidence(client, {
-        runId: job.runId,
-        ownerId: row.owner_id,
-        plan: { steps: [job.step] },
-        step: job.step,
-        policy: evaluationPolicy,
-        requestIndex: providerRequest,
-        request,
-        startedAt: now,
-        ...(evaluationCodeIdentity ? { codeIdentity: evaluationCodeIdentity } : {}),
-      });
-    }
     await client.query(`
       UPDATE generation_jobs SET attempt_started_at = COALESCE(attempt_started_at, $1),
         lease_expires_at = $2, updated_at = $1 WHERE id = $3
@@ -205,9 +165,7 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
     const rows = (await client.query<JobLockRow>(`
       SELECT j.id, j.run_id, j.step_id, j.status, j.retry_count, j.attempt_started_at, j.worker_id,
         s.node_id, s.step_index, s.step_json, s.started_at AS step_started_at,
-        r.target_step_id, r.run_type, r.retry_policy,
-        r.evaluation_case_id, r.evaluation_authorization_id,
-        r.evaluation_campaign_id, r.evaluation_slot_id
+        r.target_step_id, r.run_type, r.retry_policy
       FROM generation_jobs j JOIN generation_run_steps s ON s.id = j.step_id
       JOIN generation_runs r ON r.id = j.run_id
       WHERE j.status = 'running'
@@ -217,42 +175,9 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
     `, [now])).rows;
     for (const row of rows) {
       if (row.attempt_started_at !== null) {
-        if (row.run_type === "evaluation") {
-          const evidence = (await client.query<EvaluationRecoveryEvidenceSummary>(`
-            SELECT
-              COUNT(*)::int AS request_count,
-              COUNT(*) FILTER (WHERE outcome IN ('started','outcome_unknown'))::int
-                AS ambiguous_request_count,
-              COUNT(*) FILTER (WHERE outcome = 'succeeded')::int AS succeeded_request_count,
-              COALESCE(SUM(output_count) FILTER (WHERE outcome = 'succeeded'), 0)::int
-                AS succeeded_output_count,
-              (
-                SELECT COUNT(*)::int FROM evaluation_image_evidence images
-                WHERE images.run_id = $1 AND images.layer = 'provider-original'
-              ) AS provider_original_count
-            FROM evaluation_provider_request_evidence requests
-            WHERE requests.run_id = $1
-          `, [row.run_id])).rows[0];
-          if (evidence && evidence.request_count > 0 && evidence.ambiguous_request_count === 0) {
-            const providerSucceeded = evidence.succeeded_request_count > 0;
-            const originalsComplete = providerSucceeded
-              && evidence.succeeded_output_count > 0
-              && evidence.provider_original_count === evidence.succeeded_output_count;
-            const phase: EvaluationErrorPhase = providerSucceeded
-              ? originalsComplete ? "postprocess" : "provider-persist"
-              : "provider";
-            const message = originalsComplete
-              ? "Worker 在 Provider 请求已确认成功且原图已持久化后中断；本次评估按后处理失败关闭，不进入待核对队列"
-              : providerSucceeded
-                ? "Worker 在 Provider 请求已确认成功后中断，但原图证据不完整；本次评估按证据持久化失败关闭"
-                : "Worker 在 Provider 请求已记录为确定失败后中断；本次评估按确定失败关闭，不进入待核对队列";
-            await terminateRun(client, row, "failed", message, now, phase);
-            continue;
-          }
-        }
         await terminateRun(
           client, row, "outcome_unknown",
-          outcomeUnknownMessage("Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试"), now,
+          "Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试", now,
         );
         continue;
       }
