@@ -344,61 +344,7 @@ export function evaluatePromptRunAdmission(
 ): PromptRunAdmissionDecision {
   const compatibility = evaluatePromptRunCompatibility(input);
   if (compatibility) return compatibility;
-  // If promptVariantId is provided, also verify binding matches for better UX errors.
-  if (
-    typeof input.promptVariantId === "string"
-    && input.promptVariantId.trim()
-  ) {
-    // Dynamic import to avoid circular dependency on garmentPromptPresets.ts.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { getGarmentPromptVariantById } = require("./garmentPromptPresets");
-    const variant = getGarmentPromptVariantById(input.promptVariantId);
-    if (variant) {
-      const bindingMatches = (
-        input.modelId === variant.modelId
-        && nodeKindMatchesCatalogAxis(input.nodeKind, variant.nodeKind)
-        && input.operationMode === variant.mode
-        && input.promptFamilyId === variant.familyId
-        && input.parameterProfileId === variant.parameterProfileId
-        && input.contractHash === variant.contractHash
-        && input.evaluationVersion === variant.evaluationVersion
-      );
-      if (!bindingMatches) {
-        return {
-          allowed: false,
-          code: "parameter-drift",
-          reason: "提示词变体与当前模型、节点、模式、契约或评估版本不一致；请重新选择并确认精确变体。",
-        };
-      }
-      if (!synthesizedPromptMatchesVariant(input, variant)) {
-        return {
-          allowed: false,
-          code: "prompt-drift",
-          reason: "无法用所绑定变体内联合成当前运行提示词（缺少上游文本正文或正文形状不受信）；为避免借用旧评估结论，必须重新选择并确认。",
-        };
-      }
-      const profile = getModelParameterProfile(variant.parameterProfileId);
-      if (!profile || input.postprocessVersion !== profile.postprocess.version) {
-        return {
-          allowed: false,
-          code: "parameter-drift",
-          reason: "参数档案或后处理版本与提示词评估证据不一致。",
-        };
-      }
-      const materialized = materializeModelParameterProfile(profile);
-      const aspectMatches = materialized.aspectRatio === "source" || input.aspectRatio === materialized.aspectRatio;
-      const batchMatches = input.batchSize === materialized.batchSize;
-      const modelOptionsMatch = JSON.stringify(input.modelOptions ?? {}) === JSON.stringify(materialized.modelOptions);
-      if (!aspectMatches || !batchMatches || !modelOptionsMatch) {
-        return {
-          allowed: false,
-          code: "parameter-drift",
-          reason: "当前原生参数、业务画幅或输出数量已偏离已评估参数档案；系统不会静默修正。",
-        };
-      }
-    }
-  }
-  return { allowed: true, code: "verified", reason: "compatibility-ok" };
+  return { allowed: true, code: "verified", reason: "compatible" };
 }
 
 export function promptRunAdmissionInputFromParams(
