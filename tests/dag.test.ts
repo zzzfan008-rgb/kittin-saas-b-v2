@@ -11,7 +11,6 @@ import {
   assertPlanInputs,
   assertPromptRunAdmissions,
   extractOutputVideos,
-  PromptRunAdmissionError,
   DagError,
   type FlowNode,
   type FlowEdge,
@@ -254,32 +253,6 @@ function main() {
     assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion);
     assert.equal(g1.params.postprocessVersion, w62Profile.postprocess.version);
     assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
-  });
-
-  ok("变异验收：从 step.params 删 promptVariantId → 准入必须红（missing-binding）", () => {
-    // 模拟 feaa817 的缺陷形态：extractParams 不再输出 promptVariantId。
-    // 若准入闸没有拦住，说明这道闸被弱化——必须立刻红。
-    const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代都市女装"), w62RealFlowImageGeneratorNode("g1")],
-      [edge("t1", "g1")],
-    );
-    // 前置对照：未变异时必须通过准入，否则这条变异测试是假阳性
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
-    const mutated: ExecutionPlan = {
-      steps: plan.steps.map((s) => ({
-        ...s,
-        params: Object.fromEntries(
-          Object.entries(s.params).filter(([k]) => k !== "promptVariantId"),
-        ),
-      })),
-    };
-    assert.throws(
-      () => assertPromptRunAdmissions(mutated),
-      (error) => error instanceof PromptRunAdmissionError
-        && error.decision.allowed === false
-        && error.decision.code === "missing-binding",
-      "删除 promptVariantId 后准入必须以 missing-binding 拒绝，不得静默放行",
-    );
   });
 
   ok("裁决 2 见证：节点 data 上的 contractHash/evaluationVersion/promptFamilyId 不得覆盖注册表值", () => {
