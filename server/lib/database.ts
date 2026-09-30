@@ -1395,11 +1395,11 @@ async function migrate(): Promise<void> {
       await client.query(`
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS evaluation_case_id;
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS evaluation_authorization_id;
+        ALTER TABLE generation_runs DROP CONSTRAINT IF EXISTS generation_runs_evaluation_policy_check;
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS evaluation_campaign_id;
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS evaluation_slot_id;
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS billing_reconciliation_status;
         ALTER TABLE generation_runs DROP COLUMN IF EXISTS billing_reconciliation_note;
-        ALTER TABLE generation_runs DROP CONSTRAINT IF EXISTS generation_runs_evaluation_policy_check;
         ALTER TABLE generation_runs DROP CONSTRAINT IF EXISTS generation_runs_billing_reconciliation_check;
         DROP INDEX IF EXISTS generation_runs_owner_evaluation_case_unique;
         DROP TABLE IF EXISTS evaluation_billing_reconciliation_events CASCADE;
