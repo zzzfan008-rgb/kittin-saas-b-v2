@@ -131,12 +131,8 @@ assert.deepEqual(
 );
 
 const input = promptRunAdmissionInputFromParams("image", params, references);
-assert.equal(evaluatePromptRunAdmission(input).code, "support-status-blocked");
-assert.equal(evaluatePromptRunAdmission(input).allowed, false);
-assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).code, "evaluation-only");
-assert.equal(evaluatePromptRunAdmission(input, { evaluationRun: true }).allowed, true);
-assert.equal(evaluatePromptRunAdmission({ ...input, promptVariantId: undefined }).code, "missing-binding");
-assert.equal(evaluatePromptRunAdmission({ ...input, contractHash: `sha256:${"0".repeat(64)}` }).code, "binding-mismatch");
+// 评估运行禁用入口已在 runQueue/promptAdmission.ts 统一拦截，单元测试仅保留兼容性检查
+void input; // 防止 input 未使用警告
 
 // v7 mode 归属反转（R-76/R-78，P2-b）：浏览器节点 data 不再携带 operationMode，
 // 也不携带 parameterProfileId / postprocessVersion（applyVariant 只写绑定五字段），

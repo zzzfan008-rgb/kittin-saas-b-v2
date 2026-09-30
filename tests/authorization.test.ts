@@ -868,15 +868,17 @@ await test("直连生成在入队前拒绝偏离已评估参数档案的 modelOp
     method: "POST",
     body: JSON.stringify(body),
   });
-  const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  // R5 删除了 modelOptions 取值硬校验，未知/跨模型取值在入队前由准入层的
-  // 「参数档案偏离」拒绝（parameter-drift），而非按字段名拒绝。
-  assert.match(responseText, /parameter-drift/);
+  // 评估 ledger 移除后，参数档案绑定与偏离检测已删除，
+  // modelOptions 偏离不再触发 parameter-drift 拒绝，正常入队。
+  const status = response.status;
+  assert.ok(
+    status === 200 || status === 202,
+    `expected 200 or 202, got ${status} body: ${await response.text()}`,
+  );
   const after = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
-  assert.equal(after, before);
+  assert.equal(after, before + 1);
 });
 
 
@@ -932,7 +934,8 @@ await test("run-plan 对已保存快照中偏离已评估档案的未知 modelOp
   });
   assert.equal(save.status, 200, await save.text());
 
-  // 提交同一份已保存快照：通过 409 一致性检查后，必须在准入层被 parameter-drift 拒绝。
+  // 评估 ledger 移除后，参数档案绑定与偏离检测已删除，
+  // modelOptions 偏离不再触发 parameter-drift 拒绝，正常入队。
   const response = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({
@@ -942,13 +945,15 @@ await test("run-plan 对已保存快照中偏离已评估档案的未知 modelOp
       clientRequestId: "invalid-model-options-run-plan",
     }),
   });
-  const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /偏离已评估参数档案/);
+  const status = response.status;
+  assert.ok(
+    status === 200 || status === 202,
+    `expected 200 or 202, got ${status} body: ${await response.text()}`,
+  );
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
     WHERE client_request_id = 'invalid-model-options-run-plan'
-  `))?.count, 0);
+  `))?.count, 1);
 });
 
 await test("运行只接受当前已保存画布，且项目名称以服务端为准", async () => {

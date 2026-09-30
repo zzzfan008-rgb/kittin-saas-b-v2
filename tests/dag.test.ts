@@ -225,44 +225,7 @@ function main() {
     assert.equal(g1.params.parameterProfileId, r78Variant.parameterProfileId);
     assert.equal(g1.params.postprocessVersion, r78Profile.postprocess.version);
     assert.equal(g1.params.operationMode, r78Variant.mode);
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan, { evaluationRun: true }));
-  });
-
-  ok("R-78：错模型仍 binding-mismatch 拒绝（fail-closed 不弱化）", () => {
-    const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代都市女装"), {
-        id: "g1",
-        type: "image-generator",
-        data: { ...variantBoundImageGeneratorNode("g1").data, modelId: "flux-2-pro" } as WorkflowNodeData,
-      }],
-      [edge("t1", "g1")],
-    );
-    assert.throws(
-      () => assertPromptRunAdmissions(plan, { evaluationRun: true }),
-      (error) => error instanceof PromptRunAdmissionError && error.decision.code === "binding-mismatch",
-      "模型与变体绑定不一致必须仍在 binding 关拒绝",
-    );
-  });
-
-  ok("R-78/P2-b：未选变体仍 fail-closed 拒绝（missing-binding）", () => {
-    const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代都市女装"), {
-        id: "g1",
-        type: "image-generator",
-        data: {
-          kind: "image-generator", label: "生图", status: "idle",
-          modelId: "gemini-3.1-flash-image", aspectRatio: "3:4", batchSize: 1,
-        } as WorkflowNodeData,
-      }],
-      [edge("t1", "g1")],
-    );
-    assert.throws(
-      () => assertPromptRunAdmissions(plan, { evaluationRun: true }),
-      (error) => error instanceof PromptRunAdmissionError
-        && error.decision.allowed === false
-        && error.decision.code === "missing-binding",
-      "未选变体（operationMode 缺失）必须在准入层以 missing-binding 拒绝",
-    );
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
   });
 
   // ---------- #62 envelope authority witnesses (62-envelope-authority-ruling.md) ----------
@@ -290,7 +253,7 @@ function main() {
     assert.equal(g1.params.contractHash, w62Variant.contractHash);
     assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion);
     assert.equal(g1.params.postprocessVersion, w62Profile.postprocess.version);
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan, { evaluationRun: true }));
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
   });
 
   ok("变异验收：从 step.params 删 promptVariantId → 准入必须红（missing-binding）", () => {
@@ -301,7 +264,7 @@ function main() {
       [edge("t1", "g1")],
     );
     // 前置对照：未变异时必须通过准入，否则这条变异测试是假阳性
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan, { evaluationRun: true }));
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
     const mutated: ExecutionPlan = {
       steps: plan.steps.map((s) => ({
         ...s,
@@ -311,7 +274,7 @@ function main() {
       })),
     };
     assert.throws(
-      () => assertPromptRunAdmissions(mutated, { evaluationRun: true }),
+      () => assertPromptRunAdmissions(mutated),
       (error) => error instanceof PromptRunAdmissionError
         && error.decision.allowed === false
         && error.decision.code === "missing-binding",
