@@ -42,12 +42,6 @@ import {
   referenceDataUrls,
   referenceInputsTransportError,
 } from "../../src/lib/referenceInputs";
-import {
-  evaluatePromptRunAdmission,
-  promptRunAdmissionFailurePayload,
-  promptRunAdmissionInputFromParams,
-  type PromptRunReferenceSnapshot,
-} from "../../src/lib/promptRunAdmission";
 
 export const generateRouter = Router();
 
@@ -248,12 +242,6 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     referenceImages: requestReferenceImages.length ? requestReferenceImages : undefined,
     modelOptions,
   };
-  const admissionReferences: PromptRunReferenceSnapshot[] = structuredReferences.length > 0
-    ? structuredReferences.map((reference) => ({
-      order: reference.order,
-      ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-    }))
-    : requestReferenceImages.map((_imageRef, order) => ({ order }));
   const inputReferences: ReferenceImageSource[] = requestReferenceImages.map((imageRef, order) => ({
     imageRef,
     order,
@@ -286,14 +274,6 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }],
   };
   try {
-    const admission = evaluatePromptRunAdmission(
-      promptRunAdmissionInputFromParams(generationKindOf(resolvedKind), basePlan.steps[0].params, admissionReferences),
-      { evaluationRun: false },
-    );
-    if (!admission.allowed) {
-      res.status(400).json(promptRunAdmissionFailurePayload(admission));
-      return;
-    }
     assertNoRemoteImageReferencesAtAdmission(accessReferences);
     // All cheap syntax/model/parameter/admission checks are complete. Decode
     // inline inputs exactly once, outside the database transaction but inside
