@@ -244,7 +244,7 @@ function makeStandardImageVariants(): PromptVariant[] {
           promptLocale: "zh-CN",
           fullPrompt: MODEL_PROMPTS[modelId][preset.id][mode],
           parameterProfileId: `${modelId}:${preset.id}:${mode}:v1`,
-          supportStatus: "verified",
+          supportStatus: "unverified",
           contractHash: imageModelContractHash(modelId),
           evaluationVersion: EVALUATION_VERSION,
           statusReason: UNVERIFIED_REASON,

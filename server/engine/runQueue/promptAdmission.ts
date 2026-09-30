@@ -1,38 +1,12 @@
-import { ClaimedJob, PromptAdmissionBlockedBeforeProviderCall } from "./types";
+import type { ClaimedJob } from "./types";
+import { PromptAdmissionBlockedBeforeProviderCall } from "./types";
 import { createHash } from "node:crypto";
 import type {
-  ExecutionPlan,
   ImageGenRequest,
-  NodeExecution,
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { NODE_SPECS, generationKindOf } from "../../../src/types/workflow";
 import { validateImageDataUrl } from "../../lib/imageValidation";
-import {
-  evaluatePromptRunAdmission,
-  promptRunAdmissionInputFromParams,
-  type PromptRunReferenceSnapshot,
-} from "../../../src/lib/promptRunAdmission";
-
-export function evaluateClaimedJobPromptAdmission(
-  job: ClaimedJob,
-  runtimeUserReferences?: readonly PromptRunReferenceSnapshot[],
-): { allowed: boolean; reason: string } {
-  // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
-  if (generationKindOf(job.step.kind) !== "image") {
-    return { allowed: true, reason: "非付费节点不调用 Provider。" };
-  }
-  const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
-    order: reference.order,
-    ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-  }));
-  return evaluatePromptRunAdmission(
-    promptRunAdmissionInputFromParams(job.step.kind, job.step.params, references),
-    {},
-  );
-}
-
 
 export function runtimeUserReferenceInputs(
   job: ClaimedJob,

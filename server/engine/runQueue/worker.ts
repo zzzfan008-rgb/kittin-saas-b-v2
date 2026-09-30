@@ -1,6 +1,6 @@
-import { ClaimedJob, JobLockRow, ProcessGenerationJobOptions, PromptAdmissionBlockedBeforeProviderCall, lockRun, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS } from "./types";
+import { ClaimedJob, JobLockRow, ProcessGenerationJobOptions, lockRun, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS } from "./types";
 import { appendRunEvent } from "./events";
-import { evaluateClaimedJobPromptAdmission, runtimeUserReferenceInputs } from "./promptAdmission";
+import { runtimeUserReferenceInputs } from "./promptAdmission";
 import { inputImagesForStep, persistStepImages, captureProviderOriginals, compensatePersistedImages, assertJobOwnedForCompletion } from "./persist";
 import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted, markVideoTaskSubmitted } from "./claim";
 import { completeJobSuccess, terminateRun } from "./lifecycle";
@@ -122,12 +122,7 @@ export async function processNextGenerationJob(
     });
   }, heartbeatMs);
   heartbeat.unref();
-  let failurePhase: string = "admission";
   try {
-    const preflightAdmission = evaluateClaimedJobPromptAdmission(job);
-    if (!preflightAdmission.allowed) {
-      throw new PromptAdmissionBlockedBeforeProviderCall(preflightAdmission.reason);
-    }
     const input = await inputImagesForStep(job.runId, job.step);
     const capturedProviderReceipts: PersistedImageReceipt[] = [];
     const result = await executeStep(
@@ -154,17 +149,6 @@ export async function processNextGenerationJob(
           });
         },
         beforeProviderCall: async (providerRequest, request) => {
-          const runtimeUserReferences = runtimeUserReferenceInputs(job, request);
-          const admission = evaluateClaimedJobPromptAdmission(
-            job,
-            runtimeUserReferences.map((reference) => ({
-              order: reference.order,
-              ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-            })),
-          );
-          if (!admission.allowed) {
-            throw new PromptAdmissionBlockedBeforeProviderCall(admission.reason);
-          }
           await markAttemptStarted(
             job,
             workerId,
@@ -173,10 +157,8 @@ export async function processNextGenerationJob(
             providerRequest,
             request,
           );
-          failurePhase = "provider";
         },
         captureProviderImages: async (artifact) => {
-          failurePhase = "provider-persist";
           const captured = await captureProviderOriginals(
             artifact,
             job,
@@ -185,7 +167,6 @@ export async function processNextGenerationJob(
             options.now?.() ?? Date.now(),
           );
           capturedProviderReceipts.push(...captured);
-          failurePhase = "postprocess";
           return captured.map((image) => image.url);
         },
       },
@@ -204,7 +185,6 @@ export async function processNextGenerationJob(
     const persistedImages: PersistedImageReceipt[] = [];
     try {
       persistedImages.push(...await persistStepImages(result.images, job));
-      failurePhase = "completion-persist";
       await completeJobSuccess(
         job,
         workerId,
