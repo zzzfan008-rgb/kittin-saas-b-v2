@@ -222,7 +222,7 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       // 点击单节点默认只执行自己，避免无意触发整条下游产生额外费用。
       if (basePlan.steps.length === 0) return { status: "empty" as const };
       assertPlanInputs(basePlan, flow.edges);
-      assertPromptRunAdmissions(basePlan, { evaluationRun: false });
+      assertPromptRunAdmissions(basePlan);
       const targetStep = basePlan.steps.find((step) => step.nodeId === onlyNodeId) ?? basePlan.steps[basePlan.steps.length - 1];
       const staticReferences = staticImageReferencesForPlan(basePlan);
       assertNoRemoteImageReferencesAtAdmission(staticReferences);
