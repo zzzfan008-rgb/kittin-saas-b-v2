@@ -768,51 +768,7 @@ await test("运行必须绑定项目，且他人与管理员都不能运行项�
   }
 });
 
-await test("真实评估必须只执行显式 onlyNodeId，且禁止扩展到下游节点", async () => {
-  const originalFlag = process.env.ENABLE_PAID_EVALUATION_RUNS;
-  process.env.ENABLE_PAID_EVALUATION_RUNS = "true";
-  const evaluation = {
-    caseId: "route-scope-case",
-    sampleId: "route-scope-sample",
-    authorizationId: "route-scope-authorization",
-    campaignId: "route-scope-campaign",
-    slotId: "route-scope-slot",
-  };
-  try {
-    const missingTarget = await request("/run-plan", "admin", {
-      method: "POST",
-      body: JSON.stringify({
-        ...generationFlow("真实评估必须显式选中节点"),
-        projectId: "scope-not-read-before-rejection",
-        clientRequestId: "evaluation-missing-only-node",
-        evaluation,
-      }),
-    });
-    assert.equal(missingTarget.status, 400);
-    assert.match(await missingTarget.text(), /onlyNodeId/);
-
-    const downstream = await request("/run-plan", "admin", {
-      method: "POST",
-      body: JSON.stringify({
-        ...generationFlow("真实评估不得执行下游"),
-        onlyNodeId: "generate",
-        includeDownstream: true,
-        projectId: "scope-not-read-before-rejection",
-        clientRequestId: "evaluation-downstream-blocked",
-        evaluation: { ...evaluation, caseId: "route-downstream-case" },
-      }),
-    });
-    assert.equal(downstream.status, 400);
-    assert.match(await downstream.text(), /不得执行下游节点/);
-    assert.equal((await queryOne<{ count: number }>(`
-      SELECT COUNT(*)::int AS count FROM generation_runs
-      WHERE client_request_id IN ('evaluation-missing-only-node','evaluation-downstream-blocked')
-    `))?.count, 0);
-  } finally {
-    if (originalFlag === undefined) delete process.env.ENABLE_PAID_EVALUATION_RUNS;
-    else process.env.ENABLE_PAID_EVALUATION_RUNS = originalFlag;
-  }
-});
+// 真实评估 onlyNodeId/scope 检查随 admission 系统移除而删除。
 
 await test("同 ID 项目不能被其他账号覆盖", async () => {
   const denied = await request("/projects", "other", {
@@ -1474,36 +1430,7 @@ await test("同一轮上游 Provider 会替换的旧输出快照不阻断入队"
   `, [clientRequestId]))?.count, 1);
 });
 
-await test("直连生成在授权和入队前拒绝任何 evaluation payload", async () => {
-  const before = (await queryOne<{ count: number }>(
-    "SELECT COUNT(*)::int AS count FROM generation_runs",
-  ))?.count ?? 0;
-  for (const [index, evaluation] of [
-    null,
-    {
-      caseId: "direct-evaluation-case",
-      sampleId: "direct-evaluation-sample",
-      authorizationId: "direct-evaluation-authorization",
-    },
-  ].entries()) {
-    const body = {
-      ...directGenerateBody(PNG_DATA_URL, undefined, `direct-evaluation-rejected-${index}`),
-      evaluation,
-    };
-    const response = await request("/generate", "admin", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    const responseText = await response.text();
-    assert.equal(response.status, 400, responseText);
-    assert.match(responseText, /\/api\/run-plan/);
-    assert.match(responseText, /onlyNodeId/);
-  }
-  const after = (await queryOne<{ count: number }>(
-    "SELECT COUNT(*)::int AS count FROM generation_runs",
-  ))?.count ?? 0;
-  assert.equal(after, before);
-});
+// evaluation payload 测试随 admission 系统移除而删除。
 
 await test("直连生成在入队前拒绝非图片引用与不安全 sourceNodeId", async () => {
   const clientRequestIds: string[] = [];

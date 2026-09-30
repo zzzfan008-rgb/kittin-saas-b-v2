@@ -15,6 +15,7 @@ import {
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   isTerminalRunStatus,
+  outcomeUnknownMessage,
   type DurableRunStatus,
 } from "../runQueueContracts";
 export const CLAIM_NEXT_JOB_SQL = `
@@ -170,7 +171,7 @@ export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<nu
       if (row.attempt_started_at !== null) {
         await terminateRun(
           client, row, "outcome_unknown",
-          "Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试", now,
+          outcomeUnknownMessage("Worker 在上游调用开始后中断，结果可能已经生成；系统不会自动重试"), now,
         );
         continue;
       }

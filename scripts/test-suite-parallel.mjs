@@ -58,10 +58,6 @@ const TEST_FILES = [
   "tests/r48-version-gate.test.ts",
   "tests/model-parameter-profiles.test.ts",
   "tests/node-prompt-parameter-matrix.test.ts",
-  "tests/campaign-runner.test.ts",
-  "tests/campaign-runner-execute.test.ts",
-  "tests/campaign-runner-prepare.test.ts",
-  "tests/campaign-runner-preflight.test.ts",
   "tests/prompt-run-admission.test.ts",
   "tests/dag.test.ts",
   "tests/document-snapshot.test.ts",
@@ -121,10 +117,6 @@ const TEST_FILES = [
   "tests/r48-version-gate.test.ts",
   "tests/model-parameter-profiles.test.ts",
   "tests/node-prompt-parameter-matrix.test.ts",
-  "tests/campaign-runner.test.ts",
-  "tests/campaign-runner-execute.test.ts",
-  "tests/campaign-runner-prepare.test.ts",
-  "tests/campaign-runner-preflight.test.ts",
   "tests/prompt-run-admission.test.ts",
   "tests/dag.test.ts",
   "tests/document-snapshot.test.ts",
@@ -174,8 +166,6 @@ const SERIAL_TEST_FILES = new Set([
   "tests/tutorials.test.ts",
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
-  "tests/campaign-runner-prepare.test.ts",
-  "tests/campaign-runner-preflight.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");

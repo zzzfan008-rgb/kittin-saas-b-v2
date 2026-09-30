@@ -149,6 +149,8 @@ export async function processNextGenerationJob(
           });
         },
         beforeProviderCall: async (providerRequest, request) => {
+          // Format validation only — does NOT gate admission (admission gates removed in v8rel7).
+          runtimeUserReferenceInputs(job, request);
           await markAttemptStarted(
             job,
             workerId,
