@@ -13,6 +13,7 @@ import {
   type ReferenceInputIssue,
 } from "./referenceInputs";
 import { nodeProductPolicy } from "./nodeProductPolicy";
+import { getGarmentPromptVariantById } from "./garmentPromptPresets";
 import type {
   ImageOperationMode,
   NodeKind,
@@ -384,6 +385,22 @@ export function promptRunAdmissionInputFromNode(
     data as unknown as Record<string, unknown>,
     references,
   );
+  // v7（mode 归属反转）：operationMode 的唯一事实源是选中变体，节点不自描述
+  // （flowStore v8 迁移会 delete data.operationMode）。server 侧 dag.ts:304 从
+  // data.promptVariantId 派生 variant.mode；client 侧必须保持同一派生，否则节点
+  // data 没有 operationMode 字段时 compatibility 的参考图门（edit 无参考图 → 禁用）
+  // 会误判为「未绑定直连路径」而跳过，UI 失去即时反馈。这里仅恢复派生供
+  // compatibility 用，不引入任何 binding/drift/support-status 准入门。
+  // 与 dag.ts 语义一致：变体不存在时 operationMode 缺省（不 fail）。
+  if (input.operationMode === undefined) {
+    const variant = typeof data.promptVariantId === "string"
+      ? getGarmentPromptVariantById(data.promptVariantId)
+      : undefined;
+    const derivedMode = variant?.mode;
+    if (derivedMode !== undefined) {
+      input.operationMode = derivedMode;
+    }
+  }
   return inputTexts === undefined ? input : { ...input, inputTexts };
 }
 
