@@ -38,8 +38,7 @@ export function db(): pg.Pool {
 
 /**
  * Dev-only pool connecting directly to garment_canvas (not the test DB).
- * Used by goldenSetSlotBinding as the default pool — callers that pass an
- * explicit pool override this.  Script-only; never call from production server
+ * Script-only; never call from production server
  * code (would bypass connection-string-based routing / credential management).
  */
 export function devDb(): pg.Pool {
