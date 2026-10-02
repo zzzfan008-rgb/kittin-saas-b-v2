@@ -73,7 +73,7 @@ try {
   );
   assert.match(
     baseline.stdout,
-    /\[golden-path\].*unverified starter.*completes the isolated golden path/,
+    /\[golden-path\].*catalog variants run directly.*isolated golden path completes/,
     "isolated golden-path project must remain in the browser regression matrix",
   );
   // v7 起 initial-draft 拆成「空态惰性落库」与「重登录恢复」两条用例，

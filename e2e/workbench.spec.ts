@@ -412,9 +412,10 @@ async function selectCanvasNode(node: Locator): Promise<void> {
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
-test("generator nodes keep params inline while unverified variants stay blocked with an explicit reason", async ({ page }) => {
+test("generator nodes keep params inline while all catalog variants stay selectable", async ({ page }) => {
   // v8：生成与参数从 v7 的悬浮「功能设置」窗口迁到生成节点卡片内联（plan.md §1.1/§3.3），
-  // 输入节点完全不承载生成语义。断言强度落在同一个产品事实上：未受审变体不得触达运行。
+  // 输入节点完全不承载生成语义。发布状态只做展示、不做拦截（评估发布体系已随 #81 移除）：
+  // 目录内功能在「功能」下拉里一律可选，不出现「（未发布）」后缀、禁用态或拒绝文案。
   // 模板并入当前画布（不再新建页签）：原有 1 个图片节点 + 模板 4 个节点，模板自带 3 条边。
   const nodesBeforeTemplate = await page.locator(".react-flow__node").count();
   await startBuiltinTemplate(page, "模特试穿");
@@ -426,7 +427,7 @@ test("generator nodes keep params inline while unverified variants stay blocked 
   // 内联参数面板字段顺序：功能 → 模型 → 画幅 + 数量 → 模型参数（plan.md §3.3）。
   const functionSelect = generator.getByRole("combobox", { name: "功能" });
   await expect(functionSelect).toContainText("写实穿搭");
-  await expect(functionSelect).toContainText("（未发布）");
+  await expect(functionSelect).not.toContainText("（未发布）");
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
   await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
   await expect(generator.getByRole("combobox", { name: "数量" })).toContainText("1");
@@ -434,12 +435,13 @@ test("generator nodes keep params inline while unverified variants stay blocked 
   await expect(params).toBeVisible();
   await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
   await expect(params.getByRole("button", { name: "+ 添加参数" })).toBeVisible();
+  // 发布状态不再产生拦截文案：旧「运行会被拒绝」提示必须不存在。
   await expect(
     generator.getByText("目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。"),
-  ).toBeVisible();
-  // 目录里的未受审变体在「功能」下拉里必须不可选（v7 悬浮窗口的目录强度不变）。
+  ).toHaveCount(0);
+  // 发布状态不再产生禁用：目录内变体在「功能」下拉里必须全部可选（无 aria-disabled）。
   // 下拉会在目录/对账数据落地的那次重渲染里被收起（满负载全量跑 1024 实测：先是 0 个选项，
-  // 再是选项已渲染但下拉已被收起）。所以按「必须存在 aria-disabled 的选项」这一结果收敛，
+  // 再是选项已渲染但下拉已被收起）。所以按「选项存在且无禁用项」这一结果收敛，
   // 必要时重开下拉，而不是只断言一次「选项存在」。
   await functionSelect.click();
   const variantOptions = page.getByRole("option");
@@ -447,17 +449,18 @@ test("generator nodes keep params inline while unverified variants stay blocked 
     options.filter((option) => option.getAttribute("aria-disabled") === "true").length
   ));
   await expect(async () => {
-    if (await disabledVariantCount() === 0) {
+    if (await variantOptions.count() === 0) {
       await page.keyboard.press("Escape");
       await functionSelect.click();
     }
-    expect(await disabledVariantCount()).toBeGreaterThan(0);
+    await expect(variantOptions.first()).toBeVisible();
+    expect(await disabledVariantCount()).toBe(0);
   }).toPass({ timeout: 20_000 });
   await page.keyboard.press("Escape");
 
   // 运行准入不通过时，卡片内运行按钮为禁用态并给出可读原因（不静默、不隐藏）。
-  // 准入按序给出首个阻断原因：这里还没上传参考图，因此先报「缺参考图」；未受审变体
-  // 那个原因在参考图就位后接管（见 golden-path 的完整链路）。
+  // 准入只做 compatibility 检查（模型/模式/参考图）：这里还没上传参考图，因此报「缺参考图」；
+  // 发布状态不再参与准入，也没有第二个「未受审」原因接管。
   const runButton = generator.getByRole("button", { name: "尚不可运行" });
   await expect(runButton).toBeDisabled();
   await expect(runButton).toHaveAttribute("title", /edit 模式至少需要一张参考图/);

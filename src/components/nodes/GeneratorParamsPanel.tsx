@@ -49,7 +49,6 @@ import {
   listGarmentPromptVariants,
   type PromptVariant,
 } from "@/lib/garmentPromptPresets";
-import { effectivePromptSupport } from "@/lib/promptEvaluationRelease";
 import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 import { saveMaskDraft } from "@/lib/maskUpload";
 import { Input } from "@/components/ui/input";
@@ -297,20 +296,13 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const selectedVariant: PromptVariant | undefined = data.promptVariantId
     ? getGarmentPromptVariantById(data.promptVariantId)
     : undefined;
-  const support = selectedVariant ? effectivePromptSupport(selectedVariant) : undefined;
-  const variantRevoked = Boolean(
-    support && support.status !== "verified" && support.status !== "recommended" && support.status !== "unverified",
-  );
 
-  const variantOptions: SelectOption[] = catalog.map((variant) => {
-    const variantSupport = effectivePromptSupport(variant);
-    const published = variantSupport.status === "verified" || variantSupport.status === "recommended";
-    return {
-      value: variant.variantId,
-      label: `${promptFamilyLabel(variant.familyId)} · ${variant.mode}${published ? "" : "（未发布）"}`,
-      disabled: !published,
-    };
-  });
+  // 发布状态只做展示信息、不做禁用或拦截：评估/发布体系已随 #81 移除（后端准入保护已删），
+  // 所有目录变体一律可选；运行与否只由 compatibility 准入（模型/模式/参考图）决定。
+  const variantOptions: SelectOption[] = catalog.map((variant) => ({
+    value: variant.variantId,
+    label: `${promptFamilyLabel(variant.familyId)} · ${variant.mode}`,
+  }));
 
   const modelOptions: SelectOption[] = mediaKind === "image"
     ? GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) }))
@@ -424,16 +416,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           if (variant) applyVariant(variant);
         }}
       />
-      {variantOptions.length > 0 && variantOptions.every((option) => option.disabled) && (
-        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-          目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。
-        </p>
-      )}
-      {variantRevoked && selectedVariant && (
-        <p role="alert" className="rounded-md border border-[var(--gc-status-error)]/40 px-2 py-1.5 text-label leading-relaxed text-[var(--gc-status-error)]">
-          所选功能已被撤销，请重新选择；运行会被拒绝。
-        </p>
-      )}
 
       <OptionSelect
         label="模型"

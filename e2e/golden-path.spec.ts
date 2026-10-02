@@ -147,44 +147,6 @@ async function stubRunBoundary(page: Page, runs: RunPlanBody[]): Promise<void> {
   });
 }
 
-/**
- * 受审发布的浏览器侧注入（只作用于本用例的页面）：与生产同一条 effectivePromptSupport
- * 证据链——目录状态 + 同代码 SHA 的受审发布快照才算 verified。这里显式注入 e2e 专属证据，
- * 未受审目录项仍保持「未发布」。
- */
-async function installTestOnlyReviewedVariant(page: Page, variantId: string): Promise<void> {
-  await page.evaluate(async (targetVariantId) => {
-    const promptCatalogPath = "/src/lib/garmentPromptPresets.ts";
-    const releasePath = "/src/lib/promptEvaluationRelease.ts";
-    const registryPath = "/src/lib/promptEvaluationReleaseRegistry.ts";
-    const [catalog, releaseTools, registry] = await Promise.all([
-      import(/* @vite-ignore */ promptCatalogPath),
-      import(/* @vite-ignore */ releasePath),
-      import(/* @vite-ignore */ registryPath),
-    ]);
-    const codeSha = "0123456789abcdef0123456789abcdef01234567";
-    (globalThis as unknown as { process?: { env?: Record<string, string> } }).process = {
-      env: { GARMENT_CANVAS_CODE_SHA: codeSha },
-    };
-    const variant = catalog.getGarmentPromptVariantById(targetVariantId);
-    if (!variant) throw new Error(`Missing E2E prompt variant ${targetVariantId}`);
-    variant.supportStatus = "verified";
-    const releases = registry.PROMPT_EVALUATION_RELEASES as unknown as Array<unknown>;
-    releases.push(releaseTools.createPromptEvaluationReleaseSnapshot(
-      variant,
-      "verified",
-      "e2e-test-only-evidence",
-      {
-        evaluationStage: "formal-validation",
-        evidenceArtifactSha256: "0".repeat(64),
-        gateReceiptSha256: "0".repeat(64),
-        evaluationUnitKey: `sha256:${"0".repeat(64)}`,
-        codeSha,
-      },
-    ));
-  }, variantId);
-}
-
 /** 当前文档的节点/边（只读形状），用于「运行载荷 == 画布文档」的同一性断言。 */
 async function activeDocument(page: Page): Promise<ActiveDocument> {
   return page.evaluate(async () => {
@@ -226,7 +188,7 @@ async function selectCanvasNode(node: ReturnType<Page["locator"]>): Promise<void
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
-test("an unverified starter no longer blocks run while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
+test("catalog variants run directly from the UI while the isolated golden path completes without publication gating", async ({ page }) => {
   const garmentImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
@@ -310,9 +272,9 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
 
-  // ---------- ④ 未受审变体：目录未发布标记仍在；admission 移除准入门后运行不再被阻断 ----------
+  // ---------- ④ 发布状态只做展示：目录内功能不再有「未发布」标记，运行不再被发布态阻断 ----------
   await expect(generatorNode).toContainText("试穿生成");
-  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("（未发布）");
+  await expect(generatorNode.getByRole("combobox", { name: "功能" })).not.toContainText("（未发布）");
   // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
   const availableReferenceLabels = await page.evaluate(async (generatorId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
@@ -335,16 +297,15 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   const runButton = generatorNode.getByRole("button", { name: "运行" });
   await expect(runButton).toBeEnabled();
   await expect(runButton).not.toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
-  // ④ 段不点击运行：未受审变体现在可以触达运行边界（准入门已删除），本段只断言「可用但未发起」；
-  // 完整付费链路（POST /api/run-plan → 202 → 结果节点）仍由 ⑤ 段在安装受审变体后验证。
+  // ④ 段不点击运行：发布状态不再阻断运行，本段只断言「可用但未发起」；
+  // 完整付费链路（POST /api/run-plan → 202 → 结果节点）仍由 ⑤ 段验证。
   expect(runs, "④ 段尚未发起任何运行").toHaveLength(0);
-  // 工具条「运行」是同一动作的另一入口（选中态才渲染），⑤ 段用它发起受审运行。
+  // 工具条「运行」是同一动作的另一入口（选中态才渲染），⑤ 段用它发起运行。
   await selectCanvasNode(generatorNode);
   const generatorToolbar = generatorNode.locator('[data-node-toolbar="image-generator"]');
 
-  // ---------- ⑤ 受审变体：从 UI 发起隔离运行并跑完整条链路 ----------
-  await installTestOnlyReviewedVariant(page, TRYON_VARIANT_ID);
-  // 运行载荷以「发起时刻」的文档为准：受审运行随后会追加结果节点，所以先冻结文档快照。
+  // ---------- ⑤ 从 UI 发起隔离运行并跑完整条链路（发布状态不参与准入）----------
+  // 运行载荷以「发起时刻」的文档为准：运行随后会追加结果节点，所以先冻结文档快照。
   const documentGraph = await activeDocument(page);
   const runResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "POST"
@@ -354,7 +315,7 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   const runResponse = await runResponsePromise;
   expect(
     runResponse,
-    `受审变体必须能由 UI 发起付费运行；实际未发出 POST /api/run-plan。节点给出的原因：${
+    `目录内变体必须能由 UI 发起付费运行；实际未发出 POST /api/run-plan。节点给出的原因：${
       (await generatorNode.locator(".text-red-400").allInnerTexts()).join(" | ")
     }`,
   ).not.toBeNull();
