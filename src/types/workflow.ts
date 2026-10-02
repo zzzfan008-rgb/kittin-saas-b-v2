@@ -148,7 +148,7 @@ export interface VideoNodeData extends BaseNodeData {
 
 export interface ImageGeneratorNodeData extends BaseNodeData {
   kind: "image-generator";
-  /** 功能绑定；必填（C4）。决定业务方向与提示词变体。 */
+  /** 功能绑定；必填；允许空串表示待选功能（草稿态）。 */
   promptVariantId: string;
   promptFamilyId?: string;
   parameterProfileId?: string;
@@ -168,7 +168,7 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
 
 export interface VideoGeneratorNodeData extends BaseNodeData {
   kind: "video-generator";
-  /** 功能绑定；必填（C4）。 */
+  /** 功能绑定；必填；允许空串表示待选功能（草稿态）。 */
   promptVariantId: string;
   contractHash?: `sha256:${string}`;
   evaluationVersion?: string;

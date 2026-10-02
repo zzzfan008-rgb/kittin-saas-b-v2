@@ -265,6 +265,24 @@ function main() {
     assert.throws(() => validateAndMigrateFlow({ schemaVersion: undefined, nodes: [], edges: [] }), /旧版本格式/);
   });
 
+  ok("草稿正向：image-generator 空 promptVariantId 通过 schema（待选功能草稿态）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageGeneratorNode("g1", { promptVariantId: "" })],
+      [promptEdge("e1", "t1", "g1")],
+    ));
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    assert.equal((g.data as { promptVariantId: string }).promptVariantId, "");
+  });
+
+  ok("草稿正向：video-generator 空 promptVariantId 通过 schema（待选功能草稿态）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageNode("i1"), videoGeneratorNode("v1", { promptVariantId: "" })],
+      [promptEdge("e1", "t1", "v1"), firstFrameEdge("e2", "i1", "v1")],
+    ));
+    const v = result.nodes.find((n) => n.id === "v1")!;
+    assert.equal((v.data as { promptVariantId: string }).promptVariantId, "");
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 

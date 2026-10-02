@@ -231,7 +231,7 @@ function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (raw.outputImages !== undefined) {
         fail(`${path}.outputImages`, "生成节点不得承载产物（产物归结果节点）");
       }
-      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`, { nonEmpty: true });
+      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`);
       const modelId = raw.modelId;
       if (!isImageModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的图片生成模型");
@@ -276,7 +276,7 @@ function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (raw.outputVideos !== undefined) {
         fail(`${path}.outputVideos`, "生成节点不得承载产物（产物归结果节点）");
       }
-      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`, { nonEmpty: true });
+      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`);
       const modelId = raw.modelId;
       if (!isVideoModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的视频生成模型");

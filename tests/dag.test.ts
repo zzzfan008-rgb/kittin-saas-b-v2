@@ -197,6 +197,36 @@ function main() {
     );
   });
 
+  ok("空 promptVariantId 的 image-generator 被 assertPlanInputs 拒绝（草稿态不可付费运行）", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1", undefined, "")],
+      [edge("t1", "g1")],
+    );
+    assert.throws(
+      () => assertPlanInputs(plan, [edge("t1", "g1")]),
+      /请先选择功能/,
+    );
+  });
+
+  ok("空 promptVariantId 的 video-generator 被 assertPlanInputs 拒绝（同口一并守卫）", () => {
+    const videoGeneratorNodeEmpty = {
+      id: "v1",
+      type: "video-generator",
+      data: {
+        kind: "video-generator", label: "生视频", status: "idle",
+        modelId: "doubao-seedance-2-5-260628", promptVariantId: "", aspectRatio: "adaptive",
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代女装"), videoGeneratorNodeEmpty],
+      [edge("t1", "v1")],
+    );
+    assert.throws(
+      () => assertPlanInputs(plan, [edge("t1", "v1")]),
+      /请先选择功能/,
+    );
+  });
+
   ok("环检测：A↔B 抛 DagError", () => {
     assert.throws(
       () => buildExecutionPlan(
