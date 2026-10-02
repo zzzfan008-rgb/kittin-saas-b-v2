@@ -301,7 +301,7 @@ await test("直接生成接口校验操作模式、参考图与节点种类", as
       prompt: "不允许推断 kind",
       operationMode: "generate",
     }),
-    { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" },
+    { ok: false, error: "kind is required; direct paid runs need an explicit node kind" },
   );
   assert.deepEqual(validateDirectGenerateRequest("text", {
     prompt: "非图像节点种类",

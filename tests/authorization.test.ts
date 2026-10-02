@@ -768,51 +768,7 @@ await test("运行必须绑定项目，且他人与管理员都不能运行项�
   }
 });
 
-await test("真实评估必须只执行显式 onlyNodeId，且禁止扩展到下游节点", async () => {
-  const originalFlag = process.env.ENABLE_PAID_EVALUATION_RUNS;
-  process.env.ENABLE_PAID_EVALUATION_RUNS = "true";
-  const evaluation = {
-    caseId: "route-scope-case",
-    sampleId: "route-scope-sample",
-    authorizationId: "route-scope-authorization",
-    campaignId: "route-scope-campaign",
-    slotId: "route-scope-slot",
-  };
-  try {
-    const missingTarget = await request("/run-plan", "admin", {
-      method: "POST",
-      body: JSON.stringify({
-        ...generationFlow("真实评估必须显式选中节点"),
-        projectId: "scope-not-read-before-rejection",
-        clientRequestId: "evaluation-missing-only-node",
-        evaluation,
-      }),
-    });
-    assert.equal(missingTarget.status, 400);
-    assert.match(await missingTarget.text(), /onlyNodeId/);
-
-    const downstream = await request("/run-plan", "admin", {
-      method: "POST",
-      body: JSON.stringify({
-        ...generationFlow("真实评估不得执行下游"),
-        onlyNodeId: "generate",
-        includeDownstream: true,
-        projectId: "scope-not-read-before-rejection",
-        clientRequestId: "evaluation-downstream-blocked",
-        evaluation: { ...evaluation, caseId: "route-downstream-case" },
-      }),
-    });
-    assert.equal(downstream.status, 400);
-    assert.match(await downstream.text(), /不得执行下游节点/);
-    assert.equal((await queryOne<{ count: number }>(`
-      SELECT COUNT(*)::int AS count FROM generation_runs
-      WHERE client_request_id IN ('evaluation-missing-only-node','evaluation-downstream-blocked')
-    `))?.count, 0);
-  } finally {
-    if (originalFlag === undefined) delete process.env.ENABLE_PAID_EVALUATION_RUNS;
-    else process.env.ENABLE_PAID_EVALUATION_RUNS = originalFlag;
-  }
-});
+// 真实评估 onlyNodeId/scope 检查随 admission 系统移除而删除。
 
 await test("同 ID 项目不能被其他账号覆盖", async () => {
   const denied = await request("/projects", "other", {
@@ -868,15 +824,17 @@ await test("直连生成在入队前拒绝偏离已评估参数档案的 modelOp
     method: "POST",
     body: JSON.stringify(body),
   });
-  const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  // R5 删除了 modelOptions 取值硬校验，未知/跨模型取值在入队前由准入层的
-  // 「参数档案偏离」拒绝（parameter-drift），而非按字段名拒绝。
-  assert.match(responseText, /parameter-drift/);
+  // 评估 ledger 移除后，参数档案绑定与偏离检测已删除，
+  // modelOptions 偏离不再触发 parameter-drift 拒绝，正常入队。
+  const status = response.status;
+  assert.ok(
+    status === 200 || status === 202,
+    `expected 200 or 202, got ${status} body: ${await response.text()}`,
+  );
   const after = (await queryOne<{ count: number }>(
     "SELECT COUNT(*)::int AS count FROM generation_runs",
   ))?.count ?? 0;
-  assert.equal(after, before);
+  assert.equal(after, before + 1);
 });
 
 
@@ -932,7 +890,8 @@ await test("run-plan 对已保存快照中偏离已评估档案的未知 modelOp
   });
   assert.equal(save.status, 200, await save.text());
 
-  // 提交同一份已保存快照：通过 409 一致性检查后，必须在准入层被 parameter-drift 拒绝。
+  // 评估 ledger 移除后，参数档案绑定与偏离检测已删除，
+  // modelOptions 偏离不再触发 parameter-drift 拒绝，正常入队。
   const response = await request("/run-plan", "owner", {
     method: "POST",
     body: JSON.stringify({
@@ -942,13 +901,15 @@ await test("run-plan 对已保存快照中偏离已评估档案的未知 modelOp
       clientRequestId: "invalid-model-options-run-plan",
     }),
   });
-  const responseText = await response.text();
-  assert.equal(response.status, 400, responseText);
-  assert.match(responseText, /偏离已评估参数档案/);
+  const status = response.status;
+  assert.ok(
+    status === 200 || status === 202,
+    `expected 200 or 202, got ${status} body: ${await response.text()}`,
+  );
   assert.equal((await queryOne<{ count: number }>(`
     SELECT COUNT(*)::int AS count FROM generation_runs
     WHERE client_request_id = 'invalid-model-options-run-plan'
-  `))?.count, 0);
+  `))?.count, 1);
 });
 
 await test("运行只接受当前已保存画布，且项目名称以服务端为准", async () => {
@@ -1469,36 +1430,7 @@ await test("同一轮上游 Provider 会替换的旧输出快照不阻断入队"
   `, [clientRequestId]))?.count, 1);
 });
 
-await test("直连生成在授权和入队前拒绝任何 evaluation payload", async () => {
-  const before = (await queryOne<{ count: number }>(
-    "SELECT COUNT(*)::int AS count FROM generation_runs",
-  ))?.count ?? 0;
-  for (const [index, evaluation] of [
-    null,
-    {
-      caseId: "direct-evaluation-case",
-      sampleId: "direct-evaluation-sample",
-      authorizationId: "direct-evaluation-authorization",
-    },
-  ].entries()) {
-    const body = {
-      ...directGenerateBody(PNG_DATA_URL, undefined, `direct-evaluation-rejected-${index}`),
-      evaluation,
-    };
-    const response = await request("/generate", "admin", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    const responseText = await response.text();
-    assert.equal(response.status, 400, responseText);
-    assert.match(responseText, /\/api\/run-plan/);
-    assert.match(responseText, /onlyNodeId/);
-  }
-  const after = (await queryOne<{ count: number }>(
-    "SELECT COUNT(*)::int AS count FROM generation_runs",
-  ))?.count ?? 0;
-  assert.equal(after, before);
-});
+// evaluation payload 测试随 admission 系统移除而删除。
 
 await test("直连生成在入队前拒绝非图片引用与不安全 sourceNodeId", async () => {
   const clientRequestIds: string[] = [];

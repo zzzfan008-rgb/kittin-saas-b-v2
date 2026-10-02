@@ -4,7 +4,6 @@
  */
 export * from "./types";
 export * from "./events";
-export * from "./evaluation";
 export * from "./promptAdmission";
 export * from "./persist";
 export * from "./claim";

@@ -4,7 +4,7 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { assertPaidEvaluationStartupConfig, config, ROOT_DIR } from "./config";
+import { config, ROOT_DIR } from "./config";
 import { generateRouter } from "./routes/generate";
 import { runPlanRouter } from "./routes/runPlan";
 import { filesRouter } from "./routes/files";
@@ -26,7 +26,6 @@ import { mountProductionFrontend } from "./lib/staticFrontend";
 import type { ErrorRequestHandler } from "express";
 import { startGenerationWorker } from "./engine/runQueue";
 import { reconcileOpenAiMaskTestAccountMutations } from "./lib/openaiMaskTestLifecycle";
-import { assertEvaluationReleaseRuntimeConfig } from "./lib/evaluationReleaseRuntime";
 
 const app = express();
 
@@ -130,12 +129,6 @@ app.use(apiErrorHandler);
 
 const port = config.port();
 async function start(): Promise<void> {
-  assertEvaluationReleaseRuntimeConfig({
-    projectRoot: ROOT_DIR,
-    isProduction,
-    apiOnly,
-  });
-  assertPaidEvaluationStartupConfig();
   await initializeDatabase();
   await pruneExpiredSessions();
   await migrateLegacyData();

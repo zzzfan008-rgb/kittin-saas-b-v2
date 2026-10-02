@@ -226,7 +226,7 @@ async function selectCanvasNode(node: ReturnType<Page["locator"]>): Promise<void
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
-test("an unverified starter stays blocked while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
+test("an unverified starter no longer blocks run while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
   const garmentImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
@@ -310,7 +310,7 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
 
-  // ---------- ④ 未受审变体：目录未发布 + 运行不得触达 durable-run 边界 ----------
+  // ---------- ④ 未受审变体：目录未发布标记仍在；admission 移除准入门后运行不再被阻断 ----------
   await expect(generatorNode).toContainText("试穿生成");
   await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("（未发布）");
   // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
@@ -329,19 +329,18 @@ test("an unverified starter stays blocked while a test-reviewed variant complete
       .map((row: { sourceLabel: string }) => row.sourceLabel);
   }, GENERATOR_NODE_ID);
   expect(availableReferenceLabels).toEqual(["服装图", "数字模特"]);
-  // 卡片内运行按钮：准入不通过 → 禁用 + 给出可读原因（未受审变体不得静默运行）。
-  const runButton = generatorNode.getByRole("button", { name: "尚不可运行" });
-  await expect(runButton).toBeDisabled();
-  await expect(runButton).toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
-  // 工具条「运行」是同一动作的另一入口；这里用它触发被拒绝的运行，并在节点上取回显式原因。
+  // 卡片内运行按钮：admission 已简化为 compatibility-only（generate 禁带参考图 / edit 必须带参考图
+  // / 参考图数量与结构等正确性约束保留；unverified 拦截、variant 绑定、参数漂移等准入门已删除）。
+  // 参考图已在③就位，compatibility 满足 → run 按钮可用，也不再有旧准入门的拒绝原因文案。
+  const runButton = generatorNode.getByRole("button", { name: "运行" });
+  await expect(runButton).toBeEnabled();
+  await expect(runButton).not.toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
+  // ④ 段不点击运行：未受审变体现在可以触达运行边界（准入门已删除），本段只断言「可用但未发起」；
+  // 完整付费链路（POST /api/run-plan → 202 → 结果节点）仍由 ⑤ 段在安装受审变体后验证。
+  expect(runs, "④ 段尚未发起任何运行").toHaveLength(0);
+  // 工具条「运行」是同一动作的另一入口（选中态才渲染），⑤ 段用它发起受审运行。
   await selectCanvasNode(generatorNode);
   const generatorToolbar = generatorNode.locator('[data-node-toolbar="image-generator"]');
-  await generatorToolbar.getByRole("button", { name: "运行", exact: true }).click();
-  await expect.poll(
-    async () => (await generatorNode.locator(".text-red-400").allInnerTexts()).join(" | "),
-    { message: "未受审变体被拒绝时必须在节点上给出显式原因" },
-  ).toContain("尚未完成当前契约版本的真实评估");
-  expect(runs, "未受审变体不得触达付费运行边界").toHaveLength(0);
 
   // ---------- ⑤ 受审变体：从 UI 发起隔离运行并跑完整条链路 ----------
   await installTestOnlyReviewedVariant(page, TRYON_VARIANT_ID);

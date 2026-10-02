@@ -42,12 +42,6 @@ import {
   referenceDataUrls,
   referenceInputsTransportError,
 } from "../../src/lib/referenceInputs";
-import {
-  evaluatePromptRunAdmission,
-  promptRunAdmissionFailurePayload,
-  promptRunAdmissionInputFromParams,
-  type PromptRunReferenceSnapshot,
-} from "../../src/lib/promptRunAdmission";
 
 export const generateRouter = Router();
 
@@ -122,7 +116,7 @@ export function validateDirectGenerateRequest(
     return { ok: false, error: `${request.operationMode} mode requires at least one reference image` };
   }
   if (kind === undefined) {
-    return { ok: false, error: "kind is required; direct paid runs cannot infer an evaluation node kind" };
+    return { ok: false, error: "kind is required; direct paid runs need an explicit node kind" };
   }
   if (!isDirectGenerateKind(kind)) {
     return { ok: false, error: "kind must identify a supported AI node" };
@@ -145,12 +139,6 @@ export function postProcessDirectGenerateImages(
 }
 
 generateRouter.post("/", asyncHandler(async (req, res) => {
-  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "evaluation")) {
-    res.status(400).json({
-      error: "真实评估只能通过 /api/run-plan 并显式提交 onlyNodeId；/api/generate 不接受 evaluation payload",
-    });
-    return;
-  }
   const {
     providerId, modelId: requestedModelId, request, projectId, nodeId, nodeLabel, kind, clientRequestId,
   } = req.body as {
@@ -254,12 +242,6 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     referenceImages: requestReferenceImages.length ? requestReferenceImages : undefined,
     modelOptions,
   };
-  const admissionReferences: PromptRunReferenceSnapshot[] = structuredReferences.length > 0
-    ? structuredReferences.map((reference) => ({
-      order: reference.order,
-      ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-    }))
-    : requestReferenceImages.map((_imageRef, order) => ({ order }));
   const inputReferences: ReferenceImageSource[] = requestReferenceImages.map((imageRef, order) => ({
     imageRef,
     order,
@@ -292,14 +274,6 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     }],
   };
   try {
-    const admission = evaluatePromptRunAdmission(
-      promptRunAdmissionInputFromParams(generationKindOf(resolvedKind), basePlan.steps[0].params, admissionReferences),
-      { evaluationRun: false },
-    );
-    if (!admission.allowed) {
-      res.status(400).json(promptRunAdmissionFailurePayload(admission));
-      return;
-    }
     assertNoRemoteImageReferencesAtAdmission(accessReferences);
     // All cheap syntax/model/parameter/admission checks are complete. Decode
     // inline inputs exactly once, outside the database transaction but inside

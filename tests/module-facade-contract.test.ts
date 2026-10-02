@@ -15,13 +15,11 @@ import {
 } from "../server/lib/databaseRuntime";
 import {
   ActiveRunLimitError as ActiveRunLimitErrorFacade,
-  EvaluationCaseConflictError as EvaluationCaseConflictErrorFacade,
   GenerationOwnerUnavailableError as GenerationOwnerUnavailableErrorFacade,
   GenerationRequestConflictError as GenerationRequestConflictErrorFacade,
 } from "../server/engine/runQueue";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
 } from "../server/engine/runQueueContracts";
@@ -60,7 +58,6 @@ console.log("  ✓ 数据库旧入口保持运行时导出身份");
 assert.equal(GenerationRequestConflictErrorFacade, GenerationRequestConflictError);
 assert.equal(ActiveRunLimitErrorFacade, ActiveRunLimitError);
 assert.equal(GenerationOwnerUnavailableErrorFacade, GenerationOwnerUnavailableError);
-assert.equal(EvaluationCaseConflictErrorFacade, EvaluationCaseConflictError);
 console.log("  ✓ 持久队列旧入口保持错误类型身份");
 
 assert.equal(postProcessFacade, postProcessGeneratedOutputImages);

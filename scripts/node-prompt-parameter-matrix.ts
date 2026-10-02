@@ -33,7 +33,7 @@ import {
   type ModelParameterProfile,
 } from "../src/types/modelParameterProfiles";
 
-const OUTPUT_PATH = fileURLToPath(new URL("../docs/ai/evaluation/node-prompt-parameter-matrix-v1.json", import.meta.url));
+const OUTPUT_PATH = fileURLToPath(new URL("../docs/ai/evaluation.DEPRECATED/node-prompt-parameter-matrix-v1.json", import.meta.url));
 
 /**
  * R-68 裁定（2026-09-20）：三节点重构后矩阵主轴为 familyId × modelId（域内模型全集），

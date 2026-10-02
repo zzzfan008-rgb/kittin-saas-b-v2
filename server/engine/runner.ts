@@ -228,21 +228,22 @@ async function executeImageGeneratorStep(
   if (!isModelAllowedForNode(modelId, generationKindOf(step.kind))) {
     throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
   }
+  // variant is required when coming from the DAG (promptVariantId was resolved at plan-build time).
+  // For bare API requests (direct-generate without promptVariantId), variant may be absent;
+  // derive operationMode and taskPrompt from step.params instead.
   const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
   const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
-  if (!variant) {
-    throw new Error(`Node ${step.nodeId} 没有绑定当前版本的提示词变体`);
-  }
-  // operationMode 由提示词变体携带（runtime.md §1）；needsMask 由 mask-edit 模式驱动（P2-d 显式化 needsMask 字段）。
-  const operationMode: ImageOperationMode = variant.mode;
+  const operationMode: ImageOperationMode = variant?.mode ?? (step.params.operationMode ?? "generate") as ImageOperationMode;
   const needsMask = operationMode === "mask-edit";
-  // runtime.md §1 第 3 步：taskPrompt = variant.fullPrompt + "\n\n" + userPrompt（不再走 buildGarmentPrompt 包装）。
-  // userPrompt：DAG 路径取上游 text 正文；直接生成路径（无 text 上游）回退到 params.prompt。
   const inputTexts = inputTextsOf(step);
   const userPrompt = inputTexts.length > 0
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
-  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+  // With a variant: prepend the system fullPrompt (runtime.md §1 step 3).
+  // Without a variant (bare request): use the prompt as-is — no system wrapper.
+  const taskPrompt = variant
+    ? `${variant.fullPrompt}\n\n${userPrompt}`.trim()
+    : userPrompt;
 
   const inputReferenceSources = options.referenceSources !== undefined
     ? options.referenceSources.map((reference) => ({ ...reference }))
@@ -355,15 +356,14 @@ async function executeVideoGeneratorStep(
   const modelId = isVideoModelId(step.params.modelId) ? step.params.modelId : DEFAULT_VIDEO_MODEL_ID;
   const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
   const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
-  if (!variant) {
-    throw new Error(`Node ${step.nodeId} 没有绑定当前版本的提示词变体`);
-  }
-  // runtime.md §2：1–4 同 image——taskPrompt = variant.fullPrompt + "\n\n" + userPrompt。
+  // variant may be absent for bare video API requests (no promptVariantId).
   const inputTexts = inputTextsOf(step);
   const userPrompt = inputTexts.length > 0
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
-  const taskPrompt = `${variant.fullPrompt}\n\n${userPrompt}`.trim();
+  const taskPrompt = variant
+    ? `${variant.fullPrompt}\n\n${userPrompt}`.trim()
+    : userPrompt;
   if (!taskPrompt) {
     throw new Error("视频节点没有可发送的提示词");
   }
