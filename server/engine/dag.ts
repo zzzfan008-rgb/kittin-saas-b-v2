@@ -96,6 +96,15 @@ export function assertPromptRunAdmissions(
 /** 运行前验证会产生费用的节点具备真实输入（runtime.md §3）。 */
 export function assertPlanInputs(plan: ExecutionPlan, _edges: FlowEdge[]): void {
   for (const step of plan.steps) {
+    // promptVariantId 守卫：草稿态允许空串（schema 放行），但运行必须先绑定功能。
+    // image-generator 与 video-generator 同走 runPlan 付费入队口（video-generator
+    // 执行走异步 submit+poll 路径），故守卫置于下方 kind 过滤之前一并拦截。
+    if (step.kind === "image-generator" || step.kind === "video-generator") {
+      const promptVariantId = step.params.promptVariantId;
+      if (typeof promptVariantId !== "string" || promptVariantId.trim() === "") {
+        throw new DagError(`Node ${step.nodeId} 请先选择功能（promptVariantId 为空）`);
+      }
+    }
     // v8：只有 image-generator 产生付费图片；video-generator 归异步视频路径。
     if (step.kind !== "image-generator") continue;
 

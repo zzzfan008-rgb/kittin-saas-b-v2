@@ -1176,7 +1176,7 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
     case "video":
       return { ...base, kind, outputVideos: [] };
     case "image-generator":
-      // 功能未选（空串）表示「待接线/待选功能」，不阻断保存；运行准入会拒绝。
+      // 功能未选（空串）表示「待接线/待选功能」，不阻断保存；运行前由 assertPlanInputs 拒绝。
       return {
         ...base, kind,
         promptVariantId: "",
