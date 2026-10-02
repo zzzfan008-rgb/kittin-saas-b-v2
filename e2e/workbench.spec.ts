@@ -470,6 +470,96 @@ test("generator nodes keep params inline while unverified variants stay blocked 
   await expect(page.getByRole("dialog", { name: /功能设置/ })).toHaveCount(0);
 });
 
+test("select value echo stays legible against its trigger surface at every desktop width", async ({ page }) => {
+  // Phase 0（Select 可见性硬化）：触发器回显必须在计算样式层面可读——直接断言
+  // 「回显文字色对触发器底色的 WCAG 对比度」与弹层几何，而不是断言 class 名
+  //（AGENTS.md §6：桌面 UI 断言渲染结果与交互，三宽度 project 矩阵自动覆盖）。
+  await startBuiltinTemplate(page, "模特试穿");
+  const generator = page.getByTestId("rf__node-tryon-gen");
+  await expect(generator).toBeVisible();
+
+  /** 读取触发器内回显 span 的计算颜色，并对第一个不透明祖先底色算 WCAG 对比度。 */
+  const echoLegibility = (trigger: Locator) =>
+    trigger.evaluate((element) => {
+      const value = element.querySelector('[data-slot="select-value"]');
+      if (!value) return { ok: false as const, reason: "触发器内没有 select-value 回显" };
+      const parse = (color: string) => {
+        const match = color.match(/rgba?\(([^)]+)\)/);
+        if (!match) return null;
+        const [r, g, b, a = 1] = match[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+        return { r, g, b, a };
+      };
+      const luminance = ({ r, g, b }: { r: number; g: number; b: number }) => {
+        const channel = (v: number) => {
+          const s = v / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+      };
+      const fg = parse(getComputedStyle(value).color);
+      let surface: Element | null = element;
+      let bg: ReturnType<typeof parse> = null;
+      while (surface) {
+        const candidate = parse(getComputedStyle(surface).backgroundColor);
+        if (candidate && candidate.a > 0) {
+          bg = candidate;
+          break;
+        }
+        surface = surface.parentElement;
+      }
+      if (!fg || !bg) return { ok: false as const, reason: "无法解析前景色或底色" };
+      const l1 = luminance(fg);
+      const l2 = luminance(bg);
+      const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      return { ok: true as const, ratio, text: (value.textContent ?? "").trim() };
+    });
+
+  // 1)「功能」回显：模板落图即带选中值（写实穿搭…），断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。
+  const functionSelect = generator.getByRole("combobox", { name: "功能" });
+  await expect(functionSelect).toContainText("写实穿搭");
+  const functionEcho = await echoLegibility(functionSelect);
+  expect(functionEcho.ok, JSON.stringify(functionEcho)).toBe(true);
+  if (functionEcho.ok) {
+    expect(functionEcho.text.length, "回显不得为空白").toBeGreaterThan(0);
+    expect(functionEcho.ratio, `功能回显对比度 ${functionEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+  }
+
+  // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
+  const params = generator.getByRole("region", { name: "模型参数" });
+  const qualitySelect = params.getByRole("combobox", { name: "画质" });
+  await expect(qualitySelect).toBeVisible();
+  const qualityEcho = await echoLegibility(qualitySelect);
+  expect(qualityEcho.ok, JSON.stringify(qualityEcho)).toBe(true);
+  if (qualityEcho.ok) {
+    expect(qualityEcho.ratio, `画质回显对比度 ${qualityEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+  }
+
+  // 3) 交互路径：非门控的「数量」下拉改选后，新回显仍必须可读；同时锁弹层宽度兜底
+  //    （min-w-[max(8rem,var(--anchor-width))]：窄触发器下弹层不得塌缩到 8rem 以下）。
+  const batchSelect = generator.getByRole("combobox", { name: "数量" });
+  await batchSelect.click();
+  const popup = page.locator('[data-slot="select-popup"]');
+  await expect(popup).toBeVisible();
+  // 计算样式断言：min-width 兜底 = max(8rem, anchor)，不受入场缩放动画影响。
+  const popupMinWidth = await popup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
+  expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
+  // 渲染几何：入场动画 zoom-in-95（150ms）会把包围盒临时缩到 95%（128×0.95=121.6），
+  // 因此轮询到动画结束后的实际宽度，而不是在动画中途读一次。
+  await expect
+    .poll(async () => (await popup.boundingBox())?.width ?? 0, {
+      message: "弹层渲染宽度不得低于 8rem 兜底",
+    })
+    .toBeGreaterThanOrEqual(128);
+  await page.getByRole("option", { name: "2", exact: true }).click();
+  await expect(batchSelect).toContainText("2");
+  const batchEcho = await echoLegibility(batchSelect);
+  expect(batchEcho.ok, JSON.stringify(batchEcho)).toBe(true);
+  if (batchEcho.ok) {
+    expect(batchEcho.text, "改选后的回显不得为空白").toBe("2");
+    expect(batchEcho.ratio, `数量回显对比度 ${batchEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("node toolbars follow the v8 per-kind contract and the color tool no longer occupies the rail", async ({ page }) => {
   // plan.md §3.2：工具条仅选中态渲染，内容按 kind 互不雷同；R-88 把色彩工具从左侧 Rail
   // 移入 text 节点工具条。

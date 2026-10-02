@@ -160,7 +160,9 @@ function OptionSelect({
           <SelectValue placeholder={placeholder ?? "未选择"}>
             {(selected) => {
               const current = typeof selected === "string" ? selected : "";
-              return options.find((option) => option.value === current)?.label ?? placeholder ?? "未选择";
+              const option = options.find((candidate) => candidate.value === current);
+              // 空 label 防御：label 缺失时回退到 value，绝不渲染空白回显。
+              return option?.label || option?.value || placeholder || "未选择";
             }}
           </SelectValue>
         </SelectTrigger>
@@ -170,7 +172,7 @@ function OptionSelect({
               <SelectList>
                 {options.map((option) => (
                   <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                    {option.label}
+                    {option.label || option.value || "—"}
                   </SelectItem>
                 ))}
               </SelectList>

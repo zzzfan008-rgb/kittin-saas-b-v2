@@ -33,6 +33,8 @@ const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
  * 前 8 个是 .mjs（node 直接运行），其余是 .ts（tsx 运行）。
  */
 const TEST_FILES = [
+  // Select 可见性硬化契约（Phase 0）：登记一次即可，数组既有重复问题是独立基建卡。
+  "tests/select-visibility.test.ts",
   "tests/test-runner-isolation.test.mjs",
   "tests/bundle-budget.test.mjs",
   "tests/bundle-boundaries.test.mjs",
