@@ -33,7 +33,6 @@ import {
   CLIENT_REQUEST_ID_PATTERN,
   DURABLE_RUN_EVENT_BATCH_SIZE,
   enqueueGenerationRunInTransaction,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   getDurableRunForUser,
@@ -53,12 +52,6 @@ import {
   type ImageReferenceAccessEvidence,
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
-import {
-  attachEvaluationRunPolicy,
-  EvaluationRunPolicyError,
-  parseEvaluationRunPolicy,
-} from "../lib/evaluationRunPolicy";
-import { assertFlowJsonNotDrifted } from "../lib/evaluationCampaign";
 
 export const runPlanRouter = Router();
 
@@ -165,14 +158,13 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
 }
 
 runPlanRouter.post("/", asyncHandler(async (req, res) => {
-  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId, evaluation } = req.body as {
+  const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId } = req.body as {
     nodes?: unknown[];
     edges?: unknown[];
     onlyNodeId?: string;
     includeDownstream?: boolean;
     projectId?: string;
     clientRequestId?: string;
-    evaluation?: unknown;
   };
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
     res.status(400).json({ error: "nodes and edges arrays are required" });
@@ -196,13 +188,6 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
   }
   try {
     const user = requestUser(req);
-    const evaluationPolicy = parseEvaluationRunPolicy(evaluation, user);
-    if (evaluationPolicy && !onlyNodeId) {
-      throw new EvaluationRunPolicyError("真实评估必须明确 onlyNodeId，并且只执行唯一的付费节点", 400);
-    }
-    if (evaluationPolicy && includeDownstream === true) {
-      throw new EvaluationRunPolicyError("真实评估不得执行下游节点；上游输入只使用已保存画布快照", 400);
-    }
     const outcome = await transaction(async (client) => {
       // 与账号转移/删除统一 user → project → assets → files → run 的锁顺序。
       await assertGenerationOwnerActive(client, user.id);
@@ -237,34 +222,9 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       // 点击单节点默认只执行自己，避免无意触发整条下游产生额外费用。
       if (basePlan.steps.length === 0) return { status: "empty" as const };
       assertPlanInputs(basePlan, flow.edges);
-      assertPromptRunAdmissions(basePlan, { evaluationRun: Boolean(evaluationPolicy) });
-      const plan = evaluationPolicy
-        ? attachEvaluationRunPolicy(basePlan, evaluationPolicy)
-        : basePlan;
-      // 裁决 C: evaluation run 入队前验证 flow_json 未在 seal 后被篡改。
-      // 比对逻辑在共享函数 assertFlowJsonNotDrifted（单一计算点，CLI 端同用），
-      // 这里只负责取封存值 + 把违规映射成路由的 409。
-      if (evaluationPolicy) {
-        const sealed = await client.query<{ flow_json_sha256: string | null }>(
-          `SELECT flow_json_sha256 FROM evaluation_campaigns WHERE campaign_id = $1 FOR SHARE`,
-          [evaluationPolicy.campaignId],
-        );
-        try {
-          assertFlowJsonNotDrifted({
-            sealedSha256: sealed.rows[0]?.flow_json_sha256,
-            currentFlowJson: project.flow_json,
-            campaignId: evaluationPolicy.campaignId,
-            projectId,
-          });
-        } catch (error) {
-          throw new EvaluationRunPolicyError(
-            `flow_json integrity guard: ${(error as Error).message}`,
-            409,
-          );
-        }
-      }
-      const targetStep = plan.steps.find((step) => step.nodeId === onlyNodeId) ?? plan.steps[plan.steps.length - 1];
-      const staticReferences = staticImageReferencesForPlan(plan);
+      assertPromptRunAdmissions(basePlan);
+      const targetStep = basePlan.steps.find((step) => step.nodeId === onlyNodeId) ?? basePlan.steps[basePlan.steps.length - 1];
+      const staticReferences = staticImageReferencesForPlan(basePlan);
       assertNoRemoteImageReferencesAtAdmission(staticReferences);
       await assertImageReferencesAccessible(staticReferences.map((reference) => reference.imageRef), user.id, client, {
         verifyStoredFiles: true,
@@ -274,7 +234,7 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       const targetNode = flow.nodes.find((node) => node.id === targetStep.nodeId);
       const params = targetStep.params;
       const requestedCount = requestedCountForStep(targetStep.kind, params);
-      const run = await enqueueGenerationRunInTransaction(client, plan, user.id, {
+      const run = await enqueueGenerationRunInTransaction(client, basePlan, user.id, {
         userId: user.id,
         clientRequestId,
         projectId,
@@ -290,7 +250,7 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
         referenceImages: targetStep.inputImages,
         referenceInputs: targetStep.inputReferences,
         requestedCount,
-      }, evaluationPolicy ? "evaluation" : "workflow", evaluationPolicy);
+      }, "workflow");
       return { status: "queued" as const, runId: run.id };
     });
     if (outcome.status === "not_found") {
@@ -305,15 +265,13 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       res.status(202).json({ runId: outcome.runId, status: "queued" });
     }
   } catch (err) {
-    if (err instanceof EvaluationRunPolicyError) {
-      res.status(err.status).json({ error: err.message });
-    } else if (err instanceof PromptRunAdmissionError) {
+    if (err instanceof PromptRunAdmissionError) {
       res.status(400).json(promptRunAdmissionFailurePayload(err.decision));
     } else if (err instanceof DagError || err instanceof WorkflowValidationError) {
       res.status(400).json({ error: err.message });
     } else if (err instanceof ImageReferenceAccessError) {
       res.status(403).json(imageReferenceAccessFailurePayload(err));
-    } else if (err instanceof GenerationRequestConflictError || err instanceof EvaluationCaseConflictError) {
+    } else if (err instanceof GenerationRequestConflictError) {
       res.status(409).json({ error: err.message });
     } else if (err instanceof ActiveRunLimitError) {
       res.status(409).json({ error: err.message });

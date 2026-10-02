@@ -6,11 +6,9 @@ import type {
   ReferenceImageSource,
 } from "../../../src/types/workflow";
 import type { PoolClient } from "pg";
-import type { EvaluationCodeIdentity, EvaluationErrorPhase } from "../../lib/evaluationEvidence";
 import type { ProviderResolver, VideoProviderResolver } from "../runner";
 import {
   ActiveRunLimitError,
-  EvaluationCaseConflictError,
   GenerationOwnerUnavailableError,
   GenerationRequestConflictError,
   isRetryableProviderError,
@@ -35,7 +33,7 @@ export interface DurableRunRow {
   node_id: string;
   status: DurableRunStatus | "success" | "error";
   target_step_id: string | null;
-  run_type: "workflow" | "direct" | "evaluation";
+  run_type: "workflow" | "direct";
   started_at: number;
   finished_at: number | null;
 }
@@ -50,12 +48,7 @@ export interface ClaimedJob {
   step: NodeExecution;
   retryCount: number;
   startedAt: number;
-  runType: "workflow" | "direct" | "evaluation";
-  retryPolicy: "standard" | "no-retry";
-  evaluationCaseId: string | null;
-  evaluationAuthorizationId: string | null;
-  evaluationCampaignId: string | null;
-  evaluationSlotId: string | null;
+  runType: "workflow" | "direct";
 }
 
 
@@ -72,21 +65,7 @@ export interface JobLockRow {
   step_json: string;
   step_started_at: number | null;
   target_step_id: string | null;
-  run_type: "workflow" | "direct" | "evaluation";
-  retry_policy: "standard" | "no-retry";
-  evaluation_case_id: string | null;
-  evaluation_authorization_id: string | null;
-  evaluation_campaign_id: string | null;
-  evaluation_slot_id: string | null;
-}
-
-
-export interface EvaluationRecoveryEvidenceSummary {
-  request_count: number;
-  ambiguous_request_count: number;
-  succeeded_request_count: number;
-  succeeded_output_count: number;
-  provider_original_count: number;
+  run_type: "workflow" | "direct";
 }
 
 
@@ -94,8 +73,6 @@ export interface ProcessGenerationJobOptions {
   resolveProvider?: ProviderResolver;
   /** video 节点 Provider 解析器（测试注入用）；缺省走 getVideoProvider。 */
   resolveVideoProvider?: VideoProviderResolver;
-  /** Test-only injection; production workers always resolve the fail-closed runtime identity. */
-  evaluationCodeIdentity?: EvaluationCodeIdentity;
   now?: () => number;
   retryDelaysMs?: readonly number[];
   random?: () => number;

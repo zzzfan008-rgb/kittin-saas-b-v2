@@ -1,85 +1,12 @@
-import { ClaimedJob, PromptAdmissionBlockedBeforeProviderCall } from "./types";
-import { persistedEvaluationPolicy } from "./evaluation";
+import type { ClaimedJob } from "./types";
+import { PromptAdmissionBlockedBeforeProviderCall } from "./types";
 import { createHash } from "node:crypto";
 import type {
-  ExecutionPlan,
   ImageGenRequest,
-  NodeExecution,
   ReferenceImageInput,
   ReferenceImageSource,
 } from "../../../src/types/workflow";
-import { NODE_SPECS, generationKindOf } from "../../../src/types/workflow";
 import { validateImageDataUrl } from "../../lib/imageValidation";
-import {
-  evaluatePromptRunAdmission,
-  promptRunAdmissionInputFromParams,
-  type PromptRunReferenceSnapshot,
-} from "../../../src/lib/promptRunAdmission";
-
-export function evaluateClaimedJobPromptAdmission(
-  job: ClaimedJob,
-  runtimeUserReferences?: readonly PromptRunReferenceSnapshot[],
-): { allowed: boolean; reason: string } {
-  // v8：付费节点判定按生成语义 kind（image-generator → image），v7 的 image 别名继续放行。
-  if (generationKindOf(job.step.kind) !== "image") {
-    return { allowed: true, reason: "非付费节点不调用 Provider。" };
-  }
-  const hasEvaluationPolicy = (
-    job.runType === "evaluation"
-    && job.retryPolicy === "no-retry"
-    && typeof job.evaluationCaseId === "string"
-    && job.evaluationCaseId.trim().length > 0
-    && typeof job.evaluationAuthorizationId === "string"
-    && job.evaluationAuthorizationId.trim().length > 0
-    && typeof job.evaluationCampaignId === "string"
-    && job.evaluationCampaignId.trim().length > 0
-    && typeof job.evaluationSlotId === "string"
-    && job.evaluationSlotId.trim().length > 0
-  );
-  if (job.runType === "evaluation" && !hasEvaluationPolicy) {
-    return {
-      allowed: false,
-      reason: "真实评估任务缺少持久化的 no-retry、caseId、authorizationId、campaignId 或 slotId。",
-    };
-  }
-  if (hasEvaluationPolicy) {
-    try {
-      persistedEvaluationPolicy(job);
-    } catch (error) {
-      return {
-        allowed: false,
-        reason: error instanceof Error ? error.message : "真实评估策略快照无法验证。",
-      };
-    }
-  }
-  if (
-    job.runType !== "evaluation"
-    && (
-      job.retryPolicy !== "standard"
-      || job.evaluationCaseId !== null
-      || job.evaluationAuthorizationId !== null
-      || job.evaluationCampaignId !== null
-      || job.evaluationSlotId !== null
-    )
-  ) {
-    return {
-      allowed: false,
-      reason: "普通任务不得携带真实评估授权或 no-retry 策略。",
-    };
-  }
-  const references = runtimeUserReferences ?? (job.step.inputReferences ?? []).map((reference) => ({
-    order: reference.order,
-    ...(reference.sourceNodeId ? { sourceNodeId: reference.sourceNodeId } : {}),
-  }));
-  return evaluatePromptRunAdmission(
-    // Prompt/model/native parameter binding remains anchored to the reviewed,
-    // durable step. Only the reference-role sequence is replaced at the final
-    // Provider boundary with the inputs resolved for this run.
-    promptRunAdmissionInputFromParams(job.step.kind, job.step.params, references),
-    { evaluationRun: hasEvaluationPolicy },
-  );
-}
-
 
 export function runtimeUserReferenceInputs(
   job: ClaimedJob,

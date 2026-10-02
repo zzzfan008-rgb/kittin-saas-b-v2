@@ -77,7 +77,6 @@ export class PromptRunAdmissionError extends DagError {
  */
 export function assertPromptRunAdmissions(
   plan: ExecutionPlan,
-  options: { evaluationRun?: boolean } = {},
 ): void {
   for (const step of plan.steps) {
     if (step.kind !== "image-generator") continue;
@@ -87,7 +86,6 @@ export function assertPromptRunAdmissions(
     }));
     const decision = evaluatePromptRunAdmission(
       promptRunAdmissionInputFromParams(generationKindOf(step.kind), step.params, references),
-      options,
     );
     if (!decision.allowed) {
       throw new PromptRunAdmissionError(step.nodeId, decision);
