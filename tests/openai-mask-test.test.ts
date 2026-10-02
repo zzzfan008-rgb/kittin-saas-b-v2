@@ -104,7 +104,10 @@ try {
   const testData = { prompt, source:input.url,mask:selection.url,requestId:body.id };
   const snapshot=createDocumentSnapshot({projectName:"Native",nodes:[{id:"native",type:"image",position:{x:0,y:0},data:{kind:"image",label:"Native",status:"idle",openaiMaskTest:testData}}],edges:[]});
   const flow=validateAndMigrateFlow(documentSnapshotToPersistedWorkflow(snapshot));
-  assert.deepEqual(flow.nodes[0].data.openaiMaskTest,testData);
+  // v8 类型化白名单 schema：workflowSchema 按 WorkflowNodeData 白名单重建节点 data，类型外字段被有意剥离。
+  // openaiMaskTest 属 src/types/openaiMaskTest.ts 的路由内部数据（files 表 + 内存 run），不在 ImageNodeData，
+  // 生产持久化不依赖 workflow 字段。本断言原期望 18834a8 时代「任意字段直存」行为，测试从未进清单故未更新。
+  assert.equal((flow.nodes[0].data as Record<string, unknown>).openaiMaskTest, undefined);
   console.log("PASS project snapshot and schema round trip");
 } finally {
   release?.();
