@@ -310,9 +310,10 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
 
-  // ---------- ④ 未受审变体：目录未发布标记仍在；admission 移除准入门后运行不再被阻断 ----------
+  // ---------- ④ v9 模板不带 variant 绑定：功能下拉显示 placeholder；admission 移除准入门后运行不再被阻断 ----------
   await expect(generatorNode).toContainText("试穿生成");
-  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("（未发布）");
+  // v9 模板下生成节点不再有 promptVariantId，功能下拉显示 placeholder「选择功能」（Phase 2 该行整体删除）。
+  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("选择功能");
   // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
   const availableReferenceLabels = await page.evaluate(async (generatorId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
@@ -369,8 +370,9 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   expect(illegalEdgeIndexes(run.nodes, run.edges)).toEqual([]);
   expect(run.nodes.map((node) => node.id).sort()).toEqual(documentGraph.nodes.map((node) => node.id).sort());
   expect(run.edges.map(edgeKey).sort()).toEqual(documentGraph.edges.map(edgeKey).sort());
+  // v9 语义：变体不再写入生成节点 data（无 promptVariantId 绑定），运行时按 frozen preset 装配系统文本。
   expect(documentGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.promptVariantId)
-    .toBe(TRYON_VARIANT_ID);
+    .toBeUndefined();
 
   // ---------- ⑥ 结果节点：RunEvent 驱动的独立结果节点（v8 §3.4 / runtime.md §3.1） ----------
   const resultNodeId = `result-${"e2e-golden-1"}`;
