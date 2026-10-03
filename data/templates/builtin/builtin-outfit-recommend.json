@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "builtin-outfit-recommend",
   "name": "穿搭推荐",
   "description": "描述场合、风格与身材，纯文生图生成穿搭推荐",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "nodes": [
       {
         "id": "outfit-requirement",
@@ -19,7 +19,7 @@
           "kind": "text",
           "label": "场合/风格/身材",
           "status": "idle",
-          "text": "【要求】描述场合、风格与身材"
+          "text": "GPT Image 2 VIP 写实穿搭生成。创建单人全身 3:4 品牌 Lookbook：平视机位、中远景、约 50mm 视角，人物完整入镜、主体居中并留呼吸空间；动作自然，可有轻微行走或衣摆运动，但不得摆拍僵硬。\n精确呈现指定服装的版型、颜色、分割线、图案、缝线、褶皱、垂坠与真实面料；柔和自然光，克制中性背景，真实肤质和可信的小瑕疵。\n不生成文字、Logo、水印、多余人物、随机配饰、错误肢体或服装结构变形，不裁切手脚，不使用过度磨皮或塑料质感。"
         }
       },
       {
@@ -33,12 +33,12 @@
           "kind": "image-generator",
           "label": "穿搭推荐",
           "status": "idle",
-          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+          "operationMode": "generate",
           "modelId": "gpt-image-2.5-flare-vip",
           "modelOptions": {
-            "size": "1536x2048"
+            "quality": "high"
           },
-          "aspectRatio": "3:4",
+          "aspectRatio": "1:1",
           "batchSize": 1
         }
       }

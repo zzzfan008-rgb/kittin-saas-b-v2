@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "builtin-garment-recolor",
   "name": "服装换色",
   "description": "上传服装图，列出目标配色，生成换色效果",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "nodes": [
       {
         "id": "recolor-requirement",
@@ -19,7 +19,7 @@
           "kind": "text",
           "label": "目标配色清单",
           "status": "idle",
-          "text": "【要求】列出目标配色"
+          "text": "保持服装的版型、款式细节、构图和光线完全不变，仅将面料配色替换为用户指定的配色。配色应用于面料主体，呈现真实面料质感与准确色彩，无文字无水印。"
         }
       },
       {
@@ -47,12 +47,12 @@
           "kind": "image-generator",
           "label": "换色生成",
           "status": "idle",
-          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare-vip",
           "modelOptions": {
-            "size": "1536x2048"
+            "quality": "high"
           },
-          "aspectRatio": "3:4",
+          "aspectRatio": "1:1",
           "batchSize": 1
         }
       }
