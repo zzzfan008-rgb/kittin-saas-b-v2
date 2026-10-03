@@ -2,7 +2,7 @@ import type { ImageModelOptions } from "../types/imageModels";
 import { DEFAULT_GENERATION_MODEL_ID } from "../types/imageModels";
 import type { VideoModelOptions } from "../types/videoModels";
 import { DEFAULT_VIDEO_MODEL_ID } from "../types/videoModels";
-import { getGarmentPromptVariant, getGarmentPromptVariantById } from "./garmentPromptPresets";
+import { frozenPromptBindingForVariantId } from "./promptPresetsFrozenClient";
 import {
   EDGE_HANDLE_FIRST_FRAME,
   EDGE_HANDLE_PROMPT,
@@ -811,26 +811,18 @@ function migrateV8GeneratorBindingsToV9(raw: Record<string, unknown>): Persisted
     const data = node.data;
     const variantId = data.promptVariantId;
     if (typeof variantId === "string" && variantId.trim() !== "") {
-      const variant = getGarmentPromptVariantById(variantId);
-      // 默认模型同 family+mode 的变体 fullPrompt = server 冻结表同源文本。
-      const defaultModelId = variant?.nodeKind === "video" ? DEFAULT_VIDEO_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
-      const defaultVariant = variant
-        ? getGarmentPromptVariant({
-            familyId: variant.familyId,
-            modelId: defaultModelId,
-            nodeKind: variant.nodeKind,
-            mode: variant.mode,
-          })
-        : undefined;
-      if (variant && defaultVariant) {
-        data.operationMode = variant.mode;
+      // v9（64 Phase 3a）：迁移改冻冻结绑定表——不再依赖待删的 garmentPromptPresets。
+      const binding = frozenPromptBindingForVariantId(variantId);
+      if (binding) {
+        data.operationMode = binding.mode;
+        // 迁移三态：空文本→填入预设模板 / 非空保留正文丢弃绑定 / 无上游文本边→丢弃绑定。
         for (const edge of raw.edges) {
           if (!isRecord(edge) || edge.target !== node.id || edge.targetHandle !== "prompt") continue;
           const textData = textDataById.get(String(edge.source));
           if (!textData) continue;
           const current = textData.text;
           if (typeof current === "string" && current.trim() !== "") break; // 非空保留，丢弃绑定
-          textData.text = defaultVariant.fullPrompt;
+          textData.text = binding.text;
           break;
         }
       }
