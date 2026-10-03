@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "builtin-print-extract",
   "name": "印花提取",
   "description": "上传带印花服装，描述提取要求，平铺提取印花图案",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "nodes": [
       {
         "id": "extract-requirement",
@@ -19,7 +19,7 @@
           "kind": "text",
           "label": "提取要求",
           "status": "idle",
-          "text": "【要求】描述印花提取的范围与整理要求"
+          "text": "提取这件衣服上的印花图案：将印花完整抠出并平铺展开为规整的矩形图案，纯白背景，去除衣身、褶皱、阴影和穿着效果，印花的比例、细节和色彩与原图保持一致，适合作为印花素材复用"
         }
       },
       {
@@ -47,12 +47,12 @@
           "kind": "image-generator",
           "label": "印花提取",
           "status": "idle",
-          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare-vip",
           "modelOptions": {
-            "size": "1536x2048"
+            "quality": "high"
           },
-          "aspectRatio": "3:4",
+          "aspectRatio": "1:1",
           "batchSize": 1
         }
       }
