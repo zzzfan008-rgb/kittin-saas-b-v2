@@ -226,6 +226,31 @@ async function selectCanvasNode(node: ReturnType<Page["locator"]>): Promise<void
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
+/**
+ * hover 打开左侧 rail 的二级菜单并返回它。
+ *
+ * 加固（非本 PR 断言面）：WorkbenchShell 的 rail 菜单是 hover 异步打开——handleEnter 里
+ * `if (suppressHoverRef.current) return`（点击关闭后 250ms 抑制窗口）+ 120ms openTimer 才
+ * setOpenMenuId。原先「hover → 直接断言」依赖菜单已开，时序一变就超时，故轮询到菜单出现、
+ * 必要时重新 hover。断言强度不变。
+ */
+async function hoverRailMenu(
+  page: Page,
+  entryLabel: string,
+): Promise<ReturnType<Page["getByRole"]>> {
+  const entry = page.getByRole("navigation", { name: "工作台左侧工具" })
+    .getByRole("button", { name: entryLabel });
+  const menu = page.getByRole("menu", { name: entryLabel });
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await entry.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
+  return menu;
+}
+
 test("an unverified starter no longer blocks run while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
   const garmentImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
@@ -273,10 +298,7 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   );
   expect(mappedTemplateIds.size).toBe(BUILTIN_TEMPLATE_COUNT);
 
-  const workflowRail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  await workflowRail.getByRole("button", { name: "AI 换装工作流" }).hover();
-  const tryonMenu = page.getByRole("menu", { name: "AI 换装工作流" });
-  await expect(tryonMenu).toBeVisible();
+  const tryonMenu = await hoverRailMenu(page, "AI 换装工作流");
   await expect(tryonMenu.getByRole("menuitem", { name: TEMPLATE_NAME })).toBeVisible();
 
   // ---------- ③ 模板落地：上传位上传两张真实图片（参考图顺序：图1 → 图2） ----------
@@ -286,9 +308,9 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   page.on("filechooser", (chooser) => {
     void chooser.setFiles([]);
   });
-  // 二级菜单是 hover 展开的：点之前重新 hover 一次（幂等），不依赖 §② 之后菜单还开着。
-  await workflowRail.getByRole("button", { name: "AI 换装工作流" }).hover();
-  await expect(tryonMenu).toBeVisible();
+  // 二级菜单是 hover 展开的：点之前重新收敛一次（幂等，helper 内部按需重新 hover），
+  // 不依赖 §② 之后菜单还开着。
+  await hoverRailMenu(page, "AI 换装工作流");
   await tryonMenu.getByRole("menuitem", { name: TEMPLATE_NAME }).click();
   const garmentNode = page.getByTestId("rf__node-garment");
   const modelNode = page.getByTestId("rf__node-model");
@@ -461,10 +483,7 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   // ---------- ⑧ 加节点入口：左侧工具栏的「添加」工作流菜单（节点库面板已下线） ----------
   const canvasNodes = page.locator(".react-flow__node");
   const nodeCountBeforeAdd = await canvasNodes.count();
-  const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  await rail.getByRole("button", { name: "添加", exact: true }).hover();
-  const addMenu = page.getByRole("menu", { name: "添加" });
-  await expect(addMenu).toBeVisible();
+  const addMenu = await hoverRailMenu(page, "添加");
   await addMenu.getByRole("menuitem", { name: "文本" }).click();
   await expect(canvasNodes).toHaveCount(nodeCountBeforeAdd + 1);
 

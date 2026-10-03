@@ -285,13 +285,27 @@ async function documentNodePositions(page: Page): Promise<Array<{ id: string; x:
   });
 }
 
-/** 左侧悬浮工具栏「添加」工作流：hover 自动弹出菜单，选中即建节点（v8 起替代节点库面板）。 */
+/**
+ * 左侧悬浮工具栏「添加」工作流：hover 自动弹出菜单，选中即建节点（v8 起替代节点库面板）。
+ *
+ * helper 加固（非本 PR 断言面）：WorkbenchShell 的 rail 菜单打开是 hover 触发的异步路径——
+ * handleEnter 里 `if (suppressHoverRef.current) return`（点击关闭后 250ms 抑制窗口）+
+ * 120ms openTimer 才 setOpenMenuId。原先「hover → 固定 waitForTimeout(100) → 断言」比实现
+ * 要求的 120ms 还短，且前序交互留下的抑制标志会让 hover 完全无效，故按「hover 后轮询菜单出现、
+ * 必要时重新 hover」收敛。断言强度不变（仍断言菜单与菜单项可见）。
+ */
 async function addRailNode(page: Page, label: "文本" | "图片" | "视频"): Promise<void> {
   const addButton = page.getByRole("button", { name: "添加" });
-  await addButton.hover();
-  await page.waitForTimeout(100); // CI: menu renders async, give DOM time to appear
   const menu = page.getByRole("menu", { name: "添加" });
-  await expect(menu).toBeVisible();
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      // 重新 hover 前先把指针移开，确保 mousemove 真的产生一次 enter 事件
+      //（指针原地不动时 hover() 不触发新的 mouseenter）。
+      await page.mouse.move(0, 0);
+      await addButton.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   const item = menu.getByRole("menuitem", { name: label });
   await expect(item).toBeVisible();
   // image 会顺带打开文件选择器；这里显式消化它，避免悬挂。
@@ -370,9 +384,17 @@ test.beforeEach(async ({ page }) => {
  */
 async function openRailMenu(page: Page, entryLabel: string): Promise<Locator> {
   const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  await rail.getByRole("button", { name: entryLabel }).hover();
+  const entry = rail.getByRole("button", { name: entryLabel });
   const menu = page.getByRole("menu", { name: entryLabel });
-  await expect(menu).toBeVisible();
+  // helper 加固（非本 PR 断言面）：同 addRailNode——hover 打开是异步路径（120ms openTimer）
+  // 且点击关闭后有 250ms hover 抑制窗口，故轮询到菜单出现、必要时重新 hover。
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await entry.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   return menu;
 }
 
@@ -920,9 +942,16 @@ test("adding a node from the rail keeps the canvas mounted and adds no implicit 
   const imageNodeId = await nodeIdOfKind(page, "image");
   await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
   const addButton = page.getByRole("button", { name: "添加" });
-  await addButton.hover();
   const addMenu = page.getByRole("menu", { name: "添加" });
-  await expect(addMenu).toBeVisible();
+  // hover 打开是异步路径（WorkbenchShell: 120ms openTimer + 250ms 点击抑制窗口），
+  // 故轮询到菜单出现、必要时重新 hover（断言强度不变）。
+  await expect(async () => {
+    if (!(await addMenu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await addButton.hover();
+    }
+    await expect(addMenu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   // 「添加」菜单固定暴露文本 / 图片 / 视频三个基础节点入口（生成 / 结果节点不可手动新增）。
   for (const label of ["文本", "图片", "视频"]) {
     await expect(addMenu.getByRole("menuitem", { name: label })).toBeVisible();
