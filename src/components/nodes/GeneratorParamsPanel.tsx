@@ -40,16 +40,6 @@ import {
   videoModelRecommendedOptions,
   type VideoModelId,
 } from "@/types/videoModels";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "@/types/modelParameterProfiles";
-import {
-  getGarmentPromptVariantById,
-  listGarmentPromptVariants,
-  type PromptVariant,
-} from "@/lib/garmentPromptPresets";
-import { effectivePromptSupport } from "@/lib/promptEvaluationRelease";
 import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 import { saveMaskDraft } from "@/lib/maskUpload";
 import { Input } from "@/components/ui/input";
@@ -68,14 +58,12 @@ import { MaskEditor } from "./MaskEditor";
 import { RunButton } from "./NodeFrame";
 
 /**
- * v8 生成节点内联参数面板（plan.md §3.3）。
+ * v9 生成节点内联参数面板（64 Phase 2 §6.2 / 裁决 C）。
  *
- * - 字段顺序固定：功能 → 模型 → 画幅比例 + 数量 → 模型其它参数 → 接线回显 → 运行。
- * - 模型与「模型其它参数」全部按契约动态渲染（`recommendedOptions`），组件不硬编码参数表；
- *   契约未声明的既有 key 仍以自由 key-value 形式可编辑（R5 语义），只产生 warning 不阻断。
- * - 视频节点的「时长 / 运动」由模型契约给出（plan.md T2）：`seconds` 等既出现在模型参数段，
- *   不新增独立字段。
- * - 本面板取代 v7 悬浮窗口（NodeInspectorWindowPortal）承载功能目录与参数的职责。
+ * - 字段顺序：操作 → 模型 → 画幅 + 批次 → 模型其它参数 → 接线回显 → 运行。
+ * - operationMode 显式归节点 data（裁决 A），缺省 generate；edit/mask-edit 显示兼容提示。
+ * - 模型与「模型其它参数」全部按契约动态渲染（`recommendedOptions`），组件不硬编码参数表。
+ * - 视频节点的「时长 / 运动」由模型契约给出（seconds 等既出现在模型参数段，不新增独立字段）。
  */
 
 const MEDIA_KIND: Record<GeneratorNodeKind, "image" | "video"> = {
@@ -83,27 +71,21 @@ const MEDIA_KIND: Record<GeneratorNodeKind, "image" | "video"> = {
   "video-generator": "video",
 };
 
-/** 目录族的展示名（功能选项下拉用）。 */
-export function promptFamilyLabel(familyId: string): string {
-  const names: Record<string, string> = {
-    "fashion-lookbook": "写实穿搭",
-    "commerce-hero": "电商主图",
-    "design-sheet": "服装设定表",
-    "mask-local-edit": "局部重绘（蒙版）",
-    upscale: "高清放大",
-    "print-extract": "印花提取",
-    "print-mutate": "印花变体",
-    "fabric-recolor": "面料换色",
-    "prompt-polish": "提示词润色",
-    "prompt-generate": "提示词生成",
-    "video-animate": "款式动效",
-  };
-  return names[familyId] ?? familyId;
-}
+/** 操作模式选项（mask-edit 仅 image 可用，video 不展示）。 */
+const IMAGE_OPERATION_OPTIONS = [
+  { value: "generate", label: "生成" },
+  { value: "edit", label: "编辑" },
+  { value: "mask-edit", label: "局部重绘（蒙版）" },
+] as const;
+
+const VIDEO_OPERATION_OPTIONS = [
+  { value: "generate", label: "生成" },
+  { value: "edit", label: "编辑" },
+] as const;
 
 /** 模型参数的中文名字（未知 key 原样显示，不隐藏）。 */
 const PARAM_LABELS: Record<string, string> = {
-  aspectRatio: "画幅比例",
+  aspectRatio: "画幅",
   size: "尺寸",
   imageSize: "分辨率档位",
   quality: "画质",
@@ -156,12 +138,12 @@ function OptionSelect({
           if (typeof next === "string") onChange(next);
         }}
       >
-        <SelectTrigger aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-label">
+        {/* §5.2 1a：text-label → text-[11px] 处置 twMerge 挤掉 text-foreground 的冲突源头 */}
+        <SelectTrigger aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-[11px]">
           <SelectValue placeholder={placeholder ?? "未选择"}>
             {(selected) => {
               const current = typeof selected === "string" ? selected : "";
               const option = options.find((candidate) => candidate.value === current);
-              // 空 label 防御：label 缺失时回退到 value，绝不渲染空白回显。
               return option?.label || option?.value || placeholder || "未选择";
             }}
           </SelectValue>
@@ -214,7 +196,7 @@ function ParamControl({
             if (typeof next === "number" || typeof next === "boolean") onChange(next);
           }}
         >
-          <SelectTrigger aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-label">
+          <SelectTrigger aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-[11px]">
             <SelectValue placeholder="未设置">{(selected) => paramText(selected) || "未设置"}</SelectValue>
           </SelectTrigger>
           <SelectPortal>
@@ -241,18 +223,11 @@ function ParamControl({
             const numeric = typeof value === "number" && raw !== "" && Number.isFinite(Number(raw));
             onChange(numeric ? Number(raw) : raw);
           }}
-          className="nodrag h-7 min-w-0 flex-1 bg-[var(--gc-node-inner)] text-label text-[var(--gc-node-text)]"
+          className="nodrag h-7 min-w-0 flex-1 bg-[var(--gc-node-inner)] text-[11px] text-[var(--gc-node-text)]"
         />
       )}
     </label>
   );
-}
-
-/** 生成节点的「功能选项」动作：v8 功能目录内联在节点内，动作 = 聚焦功能选择器。 */
-export function focusGeneratorFunctionControl(nodeId: string): void {
-  const panel = document.querySelector<HTMLElement>(`[data-generator-panel="${CSS.escape(nodeId)}"]`);
-  const control = panel?.querySelector<HTMLElement>('[aria-haspopup], input, select, button');
-  control?.focus();
 }
 
 export interface GeneratorParamsPanelProps {
@@ -270,51 +245,33 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const disabled = readOnly || running;
   const admission = usePromptRunAdmission(nodeId, data);
   const [editingMask, setEditingMask] = useState(false);
-  /** 「+ 添加参数」的草稿行：只在本地存活，键名为空时不写回节点数据。 */
   const [draftParam, setDraftParam] = useState<{ key: string; value: string } | null>(null);
 
-  // 接线回显（plan.md §3.3 末段）：入边按 targetHandle 分类计数。
+  // v9（裁决 A）：operationMode 显式归节点 data，缺省 generate。
+  const operationMode = (data as ImageGeneratorNodeData).operationMode ?? "generate";
+
+  // 接线回显：入边按 targetHandle 分类计数。
   const wiring = useFlowStore(
     useShallow((s) => {
       const edges = selectActiveEdges(s);
       const nodes = selectActiveNodes(s);
       let prompt = 0;
       let firstFrame = 0;
+      let reference = 0;
       for (const edge of edges) {
         if (edge.target !== nodeId) continue;
         if (isPromptEdge(edge) && nodes.find((node) => node.id === edge.source)?.data.kind === "text") {
           prompt += 1;
         } else if (edge.targetHandle === EDGE_HANDLE_FIRST_FRAME) {
           firstFrame += 1;
+        } else {
+          const sourceKind = nodes.find((node) => node.id === edge.source)?.data.kind;
+          if (sourceKind === "image" || sourceKind === "result-image") reference += 1;
         }
       }
-      return { prompt, firstFrame };
+      return { prompt, firstFrame, reference };
     }),
   );
-
-  const catalog = useMemo(
-    () => listGarmentPromptVariants({ nodeKind: mediaKind }),
-    [mediaKind],
-  );
-  // 64 Phase 1 类型适配：v9 删除 data.promptVariantId 字段（Phase 2 本功能行整体重构）；
-  // typeof 守卫与原 truthy 判断行为等价，且对脏数据更防御。
-  const selectedVariant: PromptVariant | undefined = typeof data.promptVariantId === "string" && data.promptVariantId
-    ? getGarmentPromptVariantById(data.promptVariantId)
-    : undefined;
-  const support = selectedVariant ? effectivePromptSupport(selectedVariant) : undefined;
-  const variantRevoked = Boolean(
-    support && support.status !== "verified" && support.status !== "recommended" && support.status !== "unverified",
-  );
-
-  const variantOptions: SelectOption[] = catalog.map((variant) => {
-    const variantSupport = effectivePromptSupport(variant);
-    const published = variantSupport.status === "verified" || variantSupport.status === "recommended";
-    return {
-      value: variant.variantId,
-      label: `${promptFamilyLabel(variant.familyId)} · ${variant.mode}${published ? "" : "（未发布）"}`,
-      disabled: !published,
-    };
-  });
 
   const modelOptions: SelectOption[] = mediaKind === "image"
     ? GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) }))
@@ -340,16 +297,16 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
       ? videoAspectRatioOptions(data.modelId as VideoModelId).map((ratio) => ({ value: ratio, label: ratio }))
       : [];
 
+  const operationOptions = mediaKind === "image"
+    ? IMAGE_OPERATION_OPTIONS
+    : VIDEO_OPERATION_OPTIONS;
+
   const patchModel = (modelId: string) => {
     if (mediaKind === "image") {
-      // 换模型必须显式解除功能绑定（不静默换模、不借用旧评估结论）。
+      // v9（裁决 C）：换模型时物化默认 modelOptions，不再清除 variant binding（已随概念删除）。
       updateNodeData(nodeId, {
         modelId,
-        modelOptions: defaultImageModelOptions(modelId as ImageModelOptionsId, data.aspectRatio),
-        promptVariantId: "",
-        promptFamilyId: undefined,
-        contractHash: undefined,
-        evaluationVersion: undefined,
+        modelOptions: defaultImageModelOptions(modelId as Parameters<typeof defaultImageModelOptions>[0], data.aspectRatio),
         error: undefined,
       });
       return;
@@ -358,9 +315,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     updateNodeData(nodeId, {
       modelId: videoId,
       modelOptions: defaultVideoModelOptions(videoId),
-      promptVariantId: "",
-      contractHash: undefined,
-      evaluationVersion: undefined,
       error: undefined,
     });
   };
@@ -376,29 +330,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     updateNodeData(nodeId, { aspectRatio, modelOptions: { ...options, aspectRatio } });
   };
 
-  const applyVariant = (variant: PromptVariant) => {
-    const patch: Record<string, unknown> = {
-      promptVariantId: variant.variantId,
-      promptFamilyId: variant.familyId,
-      contractHash: variant.contractHash,
-      evaluationVersion: variant.evaluationVersion,
-      error: undefined,
-    };
-    if (mediaKind === "image" && isImageModelId(variant.modelId)) {
-      patch.modelId = variant.modelId;
-      const profile = getModelParameterProfile(variant.parameterProfileId);
-      if (profile) {
-        const materialized = materializeModelParameterProfile(profile);
-        patch.modelOptions = materialized.modelOptions;
-        patch.batchSize = materialized.batchSize;
-        if (materialized.aspectRatio !== "source") patch.aspectRatio = materialized.aspectRatio;
-      }
-    } else if (mediaKind === "video") {
-      patch.modelId = variant.modelId;
-    }
-    updateNodeData(nodeId, patch);
-  };
-
   const setParam = (key: string, next: string | number) => {
     updateNodeData(nodeId, { modelOptions: { ...options, [key]: next } });
   };
@@ -409,7 +340,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
       return document ? selectNodeInputImages(document, nodeId)[0] : undefined;
     }),
   );
-  // 蒙版字段只存在于 image-generator 数据；联合类型下按 image 形状读取。
   const displayMask = typeof (data as ImageGeneratorNodeData).mask === "string"
     ? (data as ImageGeneratorNodeData).mask
     : undefined;
@@ -417,25 +347,21 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
+      {/* 操作（裁决 A：operationMode 归节点 data） */}
       <OptionSelect
-        label="功能"
-        value={typeof data.promptVariantId === "string" ? data.promptVariantId : ""}
-        options={variantOptions}
+        label="操作"
+        value={operationMode}
+        options={operationOptions as unknown as readonly SelectOption[]}
         disabled={disabled}
-        placeholder={catalog.length === 0 ? "当前没有可用功能" : "选择功能"}
-        onChange={(next) => {
-          const variant = catalog.find((candidate) => candidate.variantId === next);
-          if (variant) applyVariant(variant);
-        }}
+        onChange={(next) => updateNodeData(nodeId, { operationMode: next })}
       />
-      {variantOptions.length > 0 && variantOptions.every((option) => option.disabled) && (
-        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-          目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。
-        </p>
+      {/* 兼容提示（裁决 C5 语义对齐 server DagError 文案） */}
+      {mediaKind === "image" && operationMode === "edit" && (
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">需上游参考图</p>
       )}
-      {variantRevoked && selectedVariant && (
-        <p role="alert" className="rounded-md border border-[var(--gc-status-error)]/40 px-2 py-1.5 text-label leading-relaxed text-[var(--gc-status-error)]">
-          所选功能已被撤销，请重新选择；运行会被拒绝。
+      {mediaKind === "image" && operationMode === "mask-edit" && (
+        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
+          需上游参考图，且需先绘制蒙版
         </p>
       )}
 
@@ -457,7 +383,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         />
         {mediaKind === "image" && (
           <OptionSelect
-            label="数量"
+            label="批次"
             value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
             options={[...BATCH_SIZES].map((size) => ({ value: String(size), label: String(size) }))}
             disabled={disabled}
@@ -528,7 +454,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               placeholder="参数名"
               disabled={disabled}
               onChange={(event) => setDraftParam({ ...draftParam, key: event.target.value })}
-              className="nodrag h-7 min-w-0 flex-1 text-label"
+              className="nodrag h-7 min-w-0 flex-1 text-[11px]"
             />
             <Input
               value={draftParam.value}
@@ -536,7 +462,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               placeholder="值"
               disabled={disabled}
               onChange={(event) => setDraftParam({ ...draftParam, value: event.target.value })}
-              className="nodrag h-7 min-w-0 flex-1 text-label"
+              className="nodrag h-7 min-w-0 flex-1 text-[11px]"
             />
             <Button
               type="button"
@@ -572,7 +498,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           size="xs"
           disabled={disabled || draftParam !== null}
           onClick={() => setDraftParam({ key: "", value: "" })}
-          className="w-full text-label"
+          className="w-full text-[11px]"
         >
           + 添加参数
         </Button>
@@ -580,11 +506,11 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
       <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
         {mediaKind === "image"
-          ? `参考图 ${admission.referenceRows.length} 张 · 提示词 ${wiring.prompt} 条`
+          ? `参考图 ${wiring.reference} 张 · 提示词 ${wiring.prompt} 条`
           : `提示词 ${wiring.prompt} 条 · 首帧${wiring.firstFrame > 0 ? "已接" : "未接"}`}
       </p>
 
-      {selectedVariant?.needsMask && (
+      {mediaKind === "image" && operationMode === "mask-edit" && (
         <div className="space-y-1.5 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] p-2">
           <div className="flex items-center justify-between text-label">
             <span className="text-[var(--gc-node-muted)]">蒙版（该功能要求）</span>
@@ -662,8 +588,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     </div>
   );
 }
-
-type ImageModelOptionsId = Parameters<typeof defaultImageModelOptions>[0];
 
 /** 视频模型契约的推荐默认值（`recommendedOptions.default`）。 */
 function defaultVideoModelOptions(modelId: VideoModelId) {

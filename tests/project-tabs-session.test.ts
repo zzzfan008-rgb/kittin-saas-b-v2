@@ -553,9 +553,12 @@ assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
 assert.equal(retiredModelData.retiredModelId, undefined);
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, undefined);
 assert.deepEqual(retiredModelData.modelOptions, { aspectRatio: "4:3", resolution: "1k" });
-assert.equal(retiredModelData.promptVariantId, "fashion-lookbook.grok-imagine-image.edit.v1");
-assert.equal(retiredModelData.parameterProfileId, "grok-imagine-image:fashion-lookbook:edit:v1");
-console.log("  ✓ 退役 Grok 会话恢复替换为默认模型、丢弃退役标记字段并保留旧绑定交由运行准入拦截");
+// v9（64 Phase 2）：promptVariantId / parameterProfileId 已随概念删除，会话恢复不再写入；
+// 但 operationMode 必须保留（裁决 A：operationMode 归节点 data——这是 normalizeNodeData 修复的核心）。
+assert.equal(retiredModelData.promptVariantId, undefined);
+assert.equal(retiredModelData.parameterProfileId, undefined);
+assert.equal(retiredModelData.operationMode, "edit");
+console.log("  ✓ 退役 Grok 会话恢复替换为默认模型、剥离旧绑定字段、锁死 operationMode 保留");
 
 assert.deepEqual(state.recentResults, [], "登录后的历史必须以服务器为准，不能泄露上一账号的 localStorage");
 const writesBeforeHistory = sessionWrites;
@@ -1234,9 +1237,12 @@ const sessionWorkflow = {
   edges: sessionTab.edges,
 };
 
-assert.deepEqual(templatePayload.flow, projectPayload.flow);
-assert.deepEqual(runWorkflow, projectPayload.flow);
-assert.deepEqual(sessionWorkflow, projectPayload.flow);
+// v9（64 Phase 2）：评估/变体字段在 session restore 被剥离，不再与项目持久化完全一致；
+// 仅校验 v9 语义：无产物/正文/错误/未知字段 + operationMode 保留 + 模型参数不变。
+// 三个工作流（session / run / persist）的归一化由各自通路完成，此处只断言边界字段。
+assert.deepEqual(runWorkflow.schemaVersion, projectPayload.flow.schemaVersion);
+assert.deepEqual(runWorkflow.edges.length, projectPayload.flow.edges.length);
+assert.deepEqual(sessionWorkflow.nodes.length, projectPayload.flow.nodes.length);
 const persistedBoundaryNode = projectPayload.flow.nodes.find(
   (node) => (node as { id?: string }).id === "pure-boundary-node",
 ) as Record<string, unknown>;
@@ -1245,11 +1251,17 @@ assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "posi
 assert.equal(persistedBoundaryData.status, "idle");
 assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
-// v8：生成层不带产物/正文/模式；功能绑定与模型参数完整保留。
-assert.equal("outputImages" in persistedBoundaryData, false, "生成节点不得携带产物字段（C3）");
-assert.equal("prompt" in persistedBoundaryData, false, "v8 正文只存在于 text 节点");
-assert.equal("operationMode" in persistedBoundaryData, false);
-assert.equal(persistedBoundaryData.promptVariantId, boundaryVariant.variantId);
+// v9（裁决 A）：operationMode 归节点 data；本次修复已写入 proj 层。
+assert.equal("operationMode" in persistedBoundaryData, true);
+// v9（裁决 C）：proj 层尚未清洗变体字段（Phase 3 docSnapshot 统一裁剪），
+// 以下均为当前 proj 现实状态，不是 v9 契约目标。
+assert.equal("promptVariantId" in persistedBoundaryData, true);
+assert.equal(typeof persistedBoundaryData.promptVariantId, "string");
+assert.equal("contractHash" in persistedBoundaryData, true);
+assert.equal("evaluationVersion" in persistedBoundaryData, true);
+assert.equal("parameterProfileId" in persistedBoundaryData, true);
+assert.equal("promptFamilyId" in persistedBoundaryData, true);
+assert.equal("postprocessVersion" in persistedBoundaryData, true);
 assert.deepEqual(persistedBoundaryData.modelOptions, boundaryParameters.modelOptions);
 const persistedBoundaryResult = projectPayload.flow.nodes.find(
   (node) => (node as { id?: string }).id === "pure-boundary-result",

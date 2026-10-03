@@ -255,6 +255,7 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
           ? Math.max(1, Math.min(8, Math.round(data.batchSize)))
           : 1,
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
+        ...optionalString("operationMode", typeof data.operationMode === "string" ? data.operationMode : undefined),
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
         ...(typeof featherRadius === "number" && Number.isFinite(featherRadius)
@@ -271,6 +272,7 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
         modelId: stringOrEmpty(data.modelId),
         aspectRatio: generatorAspectRatio(data, "adaptive"),
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
+        ...optionalString("operationMode", typeof data.operationMode === "string" ? data.operationMode : undefined),
         // documentSnapshot reads data.contractHash / data.evaluationVersion for
         // serialisation only. These fields do NOT participate in the authorization
         // identity chain (see dag.ts:343-344). If video-generator gains
@@ -326,6 +328,7 @@ const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
     "promptVariantId", "promptFamilyId", "parameterProfileId",
     "contractHash", "evaluationVersion", "postprocessVersion",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
+    "operationMode",
     "mask", "maskSourceRef", "featherRadius",
   ],
   "video-generator": [
@@ -333,6 +336,7 @@ const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
     "promptVariantId", "promptFamilyId", "parameterProfileId",
     "contractHash", "evaluationVersion",
     "modelId", "aspectRatio", "modelOptions",
+    "operationMode",
   ],
   "result-image": [
     "kind", "label", "images", "thumbnail",

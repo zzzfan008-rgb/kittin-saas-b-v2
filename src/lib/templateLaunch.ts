@@ -43,10 +43,11 @@ export function inferTemplateLaunchMode(
 }
 
 function isMissingParameter(data: WorkflowNodeData): boolean {
-  // v8：text 缺正文 / image 输入节点缺产物 / 生成节点未选功能绑定，都视为待补参数。
+  // v9（64 Phase 2）：text 缺正文 / image 输入节点缺产物 仍为待补参数；
+  // 生成节点默认值已物化（裁决 C），不存在「未绑定功能」概念，恒视为参数完备。
   if (data.kind === "text") return !data.text.trim();
   if (data.kind === "image") return data.outputImages.length === 0;
-  if (isGeneratorNodeKind(data.kind)) return !data.promptVariantId;
+  if (isGeneratorNodeKind(data.kind)) return false;
   return false;
 }
 

@@ -1176,19 +1176,17 @@ function defaultNodeData(kind: NodeKind): WorkflowNodeData {
     case "video":
       return { ...base, kind, outputVideos: [] };
     case "image-generator":
-      // 功能未选（空串）表示「待接线/待选功能」，不阻断保存；运行前由 assertPlanInputs 拒绝。
+      // v9（64 裁决 C）：默认值在节点创建时物化；aspectRatio 缺省 1:1（裁决 C §10.3）。
       return {
         ...base, kind,
-        promptVariantId: "",
-        aspectRatio: "3:4", batchSize: 1,
+        aspectRatio: "1:1", batchSize: 1,
         modelId: DEFAULT_GENERATION_MODEL_ID,
-        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "3:4"),
+        modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
       };
     case "video-generator":
       // R10：视频唯一模型 doubao-seedance-2-5-260628；首帧任务画幅必须 adaptive（C6）。
       return {
         ...base, kind,
-        promptVariantId: "",
         aspectRatio: "adaptive",
         modelId: DEFAULT_VIDEO_MODEL_ID,
         modelOptions: defaultVideoModelOptions(DEFAULT_VIDEO_MODEL_ID),
@@ -1960,9 +1958,10 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
     status,
   };
   if (typeof input.error !== "string") delete data.error;
-  // v7 删除字段族（operationMode / retiredModel / modelSelectionNeedsConfirmation）
+  // v7 删除字段族（retiredModel / modelSelectionNeedsConfirmation）
   // 不再参与会话归一：历史会话里的这些键直接丢弃。
-  delete data.operationMode;
+  // 注：operationMode 在 v9 中是生成节点的合法字段（裁决 A），保留不删；
+  // 输入/结果节点从 session 恢复时不会带 operationMode，删与不删等价。
   delete data.operationModeNeedsConfirmation;
   delete data.retiredModelId;
   delete data.modelSelectionNeedsConfirmation;
@@ -1983,16 +1982,18 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       data.outputVideos = stringList(input.outputVideos);
       break;
     case "image-generator": {
-      data.promptVariantId = typeof input.promptVariantId === "string" ? input.promptVariantId : "";
-      // 生成节点的模型是必填文档字段（C4）：合法 id 保留原值，退役/契约外的非空 id 按 R-61
-      // 替换为默认模型（会话恢复策略，运行准入另行拦截），缺省则回落默认模型。
+      // v9（64 Phase 2）：promptVariantId 已随概念删除，不再写入；operationMode 保留（裁决 A）。
+      if (typeof input.operationMode === 'string' && (input.operationMode === "generate" || input.operationMode === "edit" || input.operationMode === "mask-edit")) {
+        data.operationMode = input.operationMode;
+      }
       const modelId: string = isImageModelId(input.modelId) && !isRetiredImageModelId(input.modelId)
         ? input.modelId
         : DEFAULT_GENERATION_MODEL_ID;
       data.modelId = modelId;
+      // v9（64 裁决 C）：aspectRatio 缺省 1:1；意象比例不在枚举中则回落缺省。
       data.aspectRatio = typeof input.aspectRatio === "string" && IMAGE_ASPECT_RATIOS.includes(input.aspectRatio)
         ? input.aspectRatio
-        : "3:4";
+        : "1:1";
       data.batchSize = BATCH_SIZES.includes(Number(input.batchSize) as (typeof BATCH_SIZES)[number])
         ? Number(input.batchSize)
         : 1;
@@ -2006,13 +2007,14 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
         data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
       }
-      copyOptionalStrings(data, input, [
-        "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion", "postprocessVersion",
-      ]);
+      // v9（64 Phase 2）：评估字段已随概念删除，不再从会话拷贝。
       break;
     }
     case "video-generator": {
-      data.promptVariantId = typeof input.promptVariantId === "string" ? input.promptVariantId : "";
+      // v9（64 Phase 2）：promptVariantId 已随概念删除；operationMode 保留。
+      if (typeof input.operationMode === 'string' && (input.operationMode === "generate" || input.operationMode === "edit" || input.operationMode === "mask-edit")) {
+        data.operationMode = input.operationMode;
+      }
       data.modelId = isVideoModelId(input.modelId) ? input.modelId : DEFAULT_VIDEO_MODEL_ID;
       // C6：首帧任务画幅必须 adaptive；会话恢复一律保守回落到 adaptive。
       data.aspectRatio = typeof input.aspectRatio === "string" && input.aspectRatio ? input.aspectRatio : "adaptive";
@@ -2025,9 +2027,7 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
         }
       }
       data.modelOptions = options;
-      copyOptionalStrings(data, input, [
-        "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion",
-      ]);
+      // v9（64 Phase 2）：评估字段已随概念删除，不再从会话拷贝。
       break;
     }
     case "result-image": {
@@ -3573,7 +3573,7 @@ export const useFlowStore = create<FlowState>()(
           ))));
           return;
         }
-        // 可运行前置检查（变体准入/R3 上游）由 evaluatePromptRunAdmission 与服务端兜底。
+        // v9（64 Phase 2）：输入完整性兼容检查（model/mode/reference）；服务端 dag 为权威闸。
         const promptReferences = promptRunReferenceSnapshotsFromGraph(
           initialDocument.nodes,
           initialDocument.edges,

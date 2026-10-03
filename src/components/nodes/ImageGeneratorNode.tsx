@@ -3,13 +3,13 @@ import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type ImageGeneratorNodeData } from "@/types/workflow";
 import { Developing, NodeFrame, STATUS_TEXT } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
-import { GeneratorParamsPanel, focusGeneratorFunctionControl } from "./GeneratorParamsPanel";
+import { GeneratorParamsPanel } from "./GeneratorParamsPanel";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
 
 /**
- * v8 生成层生图节点（plan.md §1、data-model.md §4）：
- * 功能选项 + 模型/画幅/数量/模型参数面板 + 运行；不承载任何媒体展示（产物归 result-image）。
- * 工具条（plan.md §3.2）：[功能选项] [运行] [复制]。
+ * v9 生成层生图节点（64 Phase 2 §6.2）：
+ * 操作 + 模型/画幅/尺寸/批次/模型参数面板 + 运行；不承载任何媒体展示（产物归 result-image）。
+ * 工具条：[运行] [复制]。
  */
 export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageGeneratorNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
@@ -32,11 +32,6 @@ export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageG
             kind="image-generator"
             selected={selected}
             actions={{
-              "function-picker": {
-                onSelect: () => focusGeneratorFunctionControl(id),
-                disabled,
-                disabledReason: readOnly ? "只读项目不能修改功能" : "运行中不能修改功能",
-              },
               run: {
                 onSelect: () => void runNode(id),
                 disabled,
