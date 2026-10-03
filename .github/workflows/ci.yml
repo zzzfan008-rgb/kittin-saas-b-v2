@@ -48,7 +48,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PGPASSWORD: ${{ secrets.CI_PG_PASSWORD }}
+      # CI 口令统一明文 ci-test-password（docs/ci/2026-09-18-github-actions-gate.md 裁决：
+      # CI 口令可硬编码）。service 容器与 job env/DATABASE_URL 使用同一来源，
+      # 消除「容器明文、引用 secrets、两者侥幸一致」的漂移风险。
+      PGPASSWORD: ci-test-password
       PGUSER: garment_canvas
       PGHOST: 127.0.0.1
     services:
@@ -76,9 +79,9 @@ jobs:
       # 这里的口令是 CI 一次性容器内的 dummy 值，不是任何真实凭据。
       - run: npm run test
         env:
-          DATABASE_URL: postgresql://garment_canvas:${{ secrets.CI_PG_PASSWORD }}@127.0.0.1:5432/garment_canvas_test
+          DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test
           PGHOST: 127.0.0.1
-          PGPASSWORD: ${{ secrets.CI_PG_PASSWORD }}
+          PGPASSWORD: ci-test-password
 
   e2e:
     name: e2e (playwright chromium, dev mode)

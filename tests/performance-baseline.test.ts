@@ -9,8 +9,12 @@ import type { ExecutionPlan, NodeExecution } from "../src/types/workflow";
 import { summarizeDurations } from "../scripts/performance-baseline";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
-const outputPath = process.env.PERFORMANCE_BASELINE_SERVER_OUTPUT;
-if (!outputPath) throw new Error("PERFORMANCE_BASELINE_SERVER_OUTPUT is required");
+const outputPath =
+  process.env.PERFORMANCE_BASELINE_SERVER_OUTPUT ??
+  // test:suite 裸跑兜底：本测试的官方入口是 npm run audit:performance-baseline
+  // （scripts/performance-baseline.ts 注入输出路径并汇总报告）。test:suite 直跑时
+  // 无该 env，输出落到临时目录；全部测量与断言照常执行，不跳过任何检查。
+  path.join(fs.mkdtempSync(path.join(os.tmpdir(), "gc-perf-baseline-standalone-")), "server.json");
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-server-performance-"));
 process.env.DATA_DIR = temp;

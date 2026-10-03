@@ -540,7 +540,9 @@ try {
   MockEventSource.instances[3].emit({ type: "done", seq: 1 }, "1");
   await waitFor(() => MockEventSource.instances[3].closed, "缺少终态时连接未关闭");
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
-  assert.equal(useFlowStore.getState().recentResults[0].status, "retry_wait");
+  // RUN-03（9609dae，契约 §2）：SSE 非法终态（done 但无终态）从 retry_wait 改判 outcome_unknown；
+  // 本测试此前未进 test:suite 清单故未跟上该语义（error 文案「勿重复提交」不变）。
+  assert.equal(useFlowStore.getState().recentResults[0].status, "outcome_unknown");
   assert.match(useFlowStore.getState().recentResults[0].error ?? "", /勿重复提交/);
 
   useFlowStore.setState({ recentResults: [{ ...resumable, id: "out-of-order", status: "running" }] });

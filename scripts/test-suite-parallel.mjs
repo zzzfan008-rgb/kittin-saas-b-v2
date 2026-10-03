@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
  * test:suite 并行运行器。
  *
  * 现状：`test:suite` 是一条 75 段的 `&&` 链，每段一个新进程串行 spawn（实测 99.6s）。
- * 本脚本在「任一文件失败 → 整体失败、退出码非 0」这一语义不变的前提下，把 75 个测试
- * 文件分批并发执行，只保留「碰库」的文件串行，把墙钟压到尽量低。
+ * 本脚本在「任一文件失败 → 整体失败、退出码非 0」这一语义不变的前提下，把测试文件
+ * 分批并发执行，只保留「碰库」的文件串行，把墙钟压到尽量低。
  *
  * 并行安全边界（安全优先于速度）：
  * - 每个测试文件都在自己的进程里运行，进程间没有共享内存状态，唯一共享资源是
@@ -20,20 +20,27 @@ import { fileURLToPath } from "node:url";
  *   两个这样的测试并发时会把彼此的库状态冲掉，因此它们必须串行。
  * - 其余测试（纯单元 / 契约 / 前端静态检查）不连接 PostgreSQL，可在并发 worker 里并行。
  *
+ * 清单完整性不变量（fail-closed，防复发）：启动时把盘上 tests/*.test.{ts,mjs} 与
+ * TEST_FILES 的去重集做精确相等断言，并拒绝任何重复条目。历史上 TEST_FILES 曾累积出
+ * 59 条整块重复副本且漏登记 17 个测试文件（同名测试重复并发互踩临时目录、碰库测试逃逸
+ * 串行分类扫描），本断言让这两类漂移在启动时直接报错拒绝运行，而不是悄悄产出不可信的
+ * 「通过」。留盘不登记的文件在 EXCLUDED_FROM_MANIFEST 里显式豁免。
+ *
  * 分类不变量（fail-closed）：SERIAL_TEST_FILES 是「碰库」文件的显式登记表；启动时会对
- * 每个测试文件做一次源码扫描，凡导入 resetPostgresTestDatabase 标记的文件必须恰好等于
- * 这张登记表。若有人新增了碰库测试却没把它加进登记表，本脚本直接报错拒绝运行，而不是
- * 把它放到并发池里制造偶发串扰。
+ * TEST_FILES 里的每个测试文件做一次源码扫描，凡导入 resetPostgresTestDatabase 标记的文件
+ * 必须恰好等于这张登记表。若有人新增了碰库测试却没把它加进登记表，本脚本直接报错拒绝
+ * 运行，而不是把它放到并发池里制造偶发串扰。
  */
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /**
- * 全套件 75 个测试文件（有序，取代 package.json 里原来的 `&&` 链）。
- * 前 8 个是 .mjs（node 直接运行），其余是 .ts（tsx 运行）。
+ * 全套件测试文件（有序，取代 package.json 里原来的 `&&` 链）。
+ * 清单必须与盘上 tests/*.test.{ts,mjs} 精确一致（见 EXCLUDED_FROM_MANIFEST 豁免），
+ * 启动时由 assertManifestMatchesDisk 做 fail-closed 断言。
  */
 const TEST_FILES = [
-  // Select 可见性硬化契约（Phase 0）：登记一次即可，数组既有重复问题是独立基建卡。
+  // Select 可见性硬化契约（Phase 0）。
   "tests/select-visibility.test.ts",
   "tests/test-runner-isolation.test.mjs",
   "tests/bundle-budget.test.mjs",
@@ -94,66 +101,38 @@ const TEST_FILES = [
   "tests/result-export.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
-"tests/test-runner-isolation.test.mjs",
-  "tests/bundle-budget.test.mjs",
-  "tests/bundle-boundaries.test.mjs",
-  "tests/e2e-safety.test.mjs",
-  "tests/claude-guardrail-hook.test.mjs",
-  "tests/spec-kit-skills.test.mjs",
-  "tests/codex-gate.test.mjs",
-  "tests/apiyi-knowledge-base.test.mjs",
-  "tests/node-version-contract.test.ts",
-  "tests/dependency-security-contract.test.ts",
-  "tests/performance-baseline-contract.test.ts",
-  "tests/module-facade-contract.test.ts",
-  "tests/database-transaction-rollback.test.ts",
-  "tests/upload-normalization-config.test.ts",
-  "tests/upload-normalization-optimization-evidence.test.ts",
-  "tests/vite-proxy-config.test.ts",
-  "tests/dev-preflight.test.ts",
-  "tests/theme-contract.test.ts",
-  "tests/generation-safety.test.ts",
-  "tests/workbench-shell.test.ts",
-  "tests/asset-library-model.test.ts",
-  "tests/apiyi-docs.test.ts",
-  "tests/r48-version-gate.test.ts",
-  "tests/model-parameter-profiles.test.ts",
-  "tests/node-prompt-parameter-matrix.test.ts",
-  "tests/prompt-run-admission.test.ts",
-  "tests/dag.test.ts",
-  "tests/document-snapshot.test.ts",
-  "tests/active-document-boundary.test.ts",
-  "tests/workflow-schema.test.ts",
-  "tests/text-provider.test.ts",
-  "tests/generation-kind-contract.test.ts",
-  "tests/apiyi-transport.test.ts",
-  "tests/provider-contract.test.ts",
-  "tests/mask-processing.test.ts",
-  "tests/provider-retry.test.ts",
-  "tests/exact-generation.test.ts",
-  "tests/upload-image-normalization.test.ts",
-  "tests/mask-upload.test.ts",
-  "tests/static-frontend.test.ts",
-  "tests/sqlite-postgres-migration.test.ts",
-  "tests/auth-storage.test.ts",
-  "tests/auth-client.test.ts",
-  "tests/authorization.test.ts",
-  "tests/tutorials.test.ts",
-  "tests/schema-migrations.test.ts",
-  "tests/run-queue.test.ts",
-  "tests/unknown-kind-viewer.test.ts",
-  "tests/image-viewer-reference-evidence.test.ts",
-  "tests/project-tabs-session.test.ts",
-  "tests/initial-draft-client.test.ts",
-  "tests/empty-canvas.test.ts",
-  "tests/flow-history.test.ts",
-  "tests/text-edit-coalescing.test.ts",
-  "tests/selection-consistency.test.ts",
-  "tests/project-tabs.test.ts",
-  "tests/result-export.test.ts",
-  "tests/verify-bundle-budget.test.ts",
-  "tests/cards-58-60-61.test.ts",
+
+  // P0 清单修复（审计 2026-10-02）：以下 12 个测试文件此前只在盘上、从未被执行。
+  "tests/asset-model-category.test.ts",
+  "tests/canvas-dock-keyboard.test.ts",
+  "tests/five-node-model-ui.test.ts",
+  "tests/grid-snap-ui.test.ts",
+  "tests/grid-snap.test.ts",
+  "tests/node-product-policy.test.ts",
+  "tests/openai-mask-test.test.ts",
+  "tests/performance-baseline.test.ts",
+  "tests/provider-error-i18n.test.ts",
+  "tests/recent-results.test.ts",
+  "tests/reference-inputs.test.ts",
+  "tests/video-provider.test.ts",
 ];
+
+/**
+ * 留盘不登记的测试文件（豁免清单完整性断言）：文件保留在盘上但不进 TEST_FILES，
+ * 处置统一归档 64 Phase 3（用户已拍板）：
+ * - prompt-presets / prompt-preset-ui / templates-v8 / prompt-evaluation-release：
+ *   被测模块属于待删孤儿，测试文件先留盘随 64 Phase 3 一并处置。
+ * - prompt-evaluation：用户拍板 a=删，随 64 Phase 3 连同被测孤儿模块删除。
+ * 若其中某个文件先于 64 Phase 3 被删除，本常量需同步移除对应条目，
+ * 否则 assertManifestMatchesDisk 的 excludedButGone 检查会 fail-closed 报错。
+ */
+const EXCLUDED_FROM_MANIFEST = new Set([
+  "tests/prompt-presets.test.ts",
+  "tests/prompt-preset-ui.test.ts",
+  "tests/templates-v8.test.ts",
+  "tests/prompt-evaluation-release.test.ts",
+  "tests/prompt-evaluation.test.ts",
+]);
 
 /**
  * 「碰库」测试登记表：这些文件会 resetPostgresTestDatabase()（DROP SCHEMA public CASCADE）
@@ -168,6 +147,10 @@ const SERIAL_TEST_FILES = new Set([
   "tests/tutorials.test.ts",
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
+  // P0 清单修复补入：以下 3 个碰库测试此前不在清单（连同清单一起逃逸扫描）。
+  "tests/asset-model-category.test.ts",
+  "tests/openai-mask-test.test.ts",
+  "tests/performance-baseline.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
@@ -183,6 +166,71 @@ function concurrencyLimit() {
     return value;
   }
   return Math.max(1, Math.floor((cpus().length || 1) / 2));
+}
+
+/** 盘上 tests/*.test.{ts,mjs} 全量发现（清单完整性断言的数据源）。 */
+function discoverTestFilesOnDisk() {
+  return readdirSync(join(repoRoot, "tests"))
+    .filter((name) => /\.test\.(ts|mjs)$/.test(name))
+    .map((name) => `tests/${name}`)
+    .sort();
+}
+
+/**
+ * 清单完整性不变量（fail-closed）：
+ * 1. TEST_FILES 内不得有重复条目（同名测试重复并发会互踩临时目录）；
+ * 2. 盘上测试文件（扣除 EXCLUDED_FROM_MANIFEST）必须与 TEST_FILES 去重集精确相等，
+ *    双向差异都会报错并打印清单；
+ * 3. EXCLUDED_FROM_MANIFEST 的条目必须仍在盘上（已删文件需同步清理常量）。
+ */
+function assertManifestMatchesDisk(testFiles) {
+  const problems = [];
+
+  const seen = new Set();
+  const duplicates = [];
+  for (const file of testFiles) {
+    if (seen.has(file)) duplicates.push(file);
+    seen.add(file);
+  }
+  if (duplicates.length > 0) {
+    problems.push(
+      `TEST_FILES 存在重复条目（同名测试重复执行会互踩临时目录，请去重）：\n  ${[...new Set(duplicates)].join("\n  ")}`,
+    );
+  }
+
+  const onDisk = discoverTestFilesOnDisk();
+  const registered = new Set(testFiles);
+  const missingFromManifest = onDisk.filter(
+    (file) => !registered.has(file) && !EXCLUDED_FROM_MANIFEST.has(file),
+  );
+  const staleInManifest = testFiles.filter((file) => !onDisk.includes(file));
+  const excludedButRegistered = testFiles.filter((file) => EXCLUDED_FROM_MANIFEST.has(file));
+  const excludedButGone = [...EXCLUDED_FROM_MANIFEST].filter((file) => !onDisk.includes(file));
+
+  if (missingFromManifest.length > 0) {
+    problems.push(
+      `以下测试文件在盘上但未登记进 TEST_FILES（会从未被执行；若应运行请登记，若留盘不登记请加入 EXCLUDED_FROM_MANIFEST）：\n  ${missingFromManifest.join("\n  ")}`,
+    );
+  }
+  if (staleInManifest.length > 0) {
+    problems.push(
+      `以下路径登记在 TEST_FILES 但盘上已不存在（请从清单移除）：\n  ${staleInManifest.join("\n  ")}`,
+    );
+  }
+  if (excludedButRegistered.length > 0) {
+    problems.push(
+      `以下路径既在 TEST_FILES 又在 EXCLUDED_FROM_MANIFEST（豁免只适用于留盘不登记的文件，请二选一）：\n  ${excludedButRegistered.join("\n  ")}`,
+    );
+  }
+  if (excludedButGone.length > 0) {
+    problems.push(
+      `以下路径登记在 EXCLUDED_FROM_MANIFEST 但盘上已不存在（请同步清理豁免常量）：\n  ${excludedButGone.join("\n  ")}`,
+    );
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`清单完整性断言失败（fail-closed，拒绝运行）：\n${problems.join("\n")}`);
+  }
 }
 
 /** 分类不变量：凡导入碰库重置辅助函数的测试，必须恰好等于 SERIAL_TEST_FILES。 */
@@ -274,6 +322,7 @@ process.once("SIGINT", () => shutdown("SIGINT"));
 process.once("SIGTERM", () => shutdown("SIGTERM"));
 
 async function main() {
+  assertManifestMatchesDisk(TEST_FILES);
   assertSerialClassificationConsistent(TEST_FILES, SERIAL_TEST_FILES);
 
   const serialTests = TEST_FILES.filter((file) => SERIAL_TEST_FILES.has(file));
