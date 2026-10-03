@@ -1,10 +1,13 @@
 /**
- * v8 内置模板结构回归测试（R-87，纯逻辑，不调真实 API/DB）。
+ * 内置模板结构回归测试（R-87 → 64 Phase 1 C7 v9 重写，纯逻辑，不调真实 API/DB）。
  *
  * 覆盖模板格式契约 docs/design/2026-09-21-five-node-model/contracts/template-format.md
- * 的可机检验收项 P1 / P3–P10。P2（逐模板过 validateAndMigrateFlow）依赖 R-85 的
- * schema v8 重写（server/lib/workflowSchema.ts）。schema 已是 v8（R-85 已落地），
- * 因此 P2 以 assert.doesNotThrow 硬断言执行；探测/跳过分支仅为历史兼容兜底。
+ * 的可机检验收项 P1/P3/P5/P7–P10，以及 C7 v9 快照断言：
+ * - schemaVersion = 9
+ * - generator 显式 modelId + operationMode + 契约默认参数（aspectRatio 1:1 / batchSize 1，
+ *   LookBook/印花裂变覆盖 batchSize 2；modelOptions = 契约推荐默认）
+ * - text 节点 = family 预设模板文本（server/lib/promptPresetsFrozen.ts 冻结表，所见即所发）
+ * - 逐模板过 validateAndMigrateFlow（v9）
  *
  * 运行：node node_modules/tsx/dist/cli.mjs tests/templates-v8.test.ts
  */
@@ -18,19 +21,36 @@ const TEST_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-temp
 process.env.DATA_DIR = TEST_DATA_DIR;
 
 const { builtinTemplates } = await import("../server/routes/templates");
-const { validateAndMigrateFlow, WorkflowValidationError } = await import("../server/lib/workflowSchema");
-const { getGarmentPromptVariantById } = await import("../src/lib/garmentPromptPresets");
-
-const GENERATE_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1";
-const EDIT_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
-const VIDEO_VARIANT = "video-animate.doubao-seedance-2-5-260628.edit.v1";
+const { validateAndMigrateFlow } = await import("../server/lib/workflowSchema");
+const { presetTemplateText } = await import("../server/lib/promptPresetsFrozen");
+const { DEFAULT_GENERATION_MODEL_ID, defaultImageModelOptions } = await import("../src/types/imageModels");
+const { DEFAULT_VIDEO_MODEL_ID } = await import("../src/types/videoModels");
 
 const INPUT_KINDS = new Set(["text", "image", "video"]);
 const GENERATOR_KINDS = new Set(["image-generator", "video-generator"]);
 const RESULT_KINDS = new Set(["result-image", "result-video"]);
 
+/** 每模板期望：text 节点预设（family, mode）+ generator operationMode（+ batchSize 覆盖）。 */
+const EXPECTED: Record<string, { preset: readonly [string, string]; operationMode: string; batchSize?: number }> = {
+  "builtin-model-tryon": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-pose": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-background-swap": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-lookbook": { preset: ["fashion-lookbook", "edit"], operationMode: "edit", batchSize: 2 },
+  "builtin-digital-model": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-print-extract": { preset: ["print-extract", "edit"], operationMode: "edit" },
+  "builtin-print-mutate": { preset: ["print-mutate", "edit"], operationMode: "edit", batchSize: 2 },
+  "builtin-garment-recolor": { preset: ["fabric-recolor", "edit"], operationMode: "edit" },
+  "builtin-fabric-swap": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-sketch-to-garment": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-ai-restyle": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  "builtin-outfit-recommend": { preset: ["fashion-lookbook", "generate"], operationMode: "generate" },
+  "builtin-person-to-mannequin": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+  // 视频模板：operationMode=generate（零系统文本），动效任务文本写入 text 正文（避免重复拼装）
+  "builtin-video-runway": { preset: ["video-animate", "edit"], operationMode: "generate" },
+  "builtin-video-xhs": { preset: ["video-animate", "edit"], operationMode: "generate" },
+};
+
 let passed = 0;
-let skipped = 0;
 function ok(name: string, fn: () => void): void {
   try {
     fn();
@@ -42,13 +62,9 @@ function ok(name: string, fn: () => void): void {
     process.exitCode = 1;
   }
 }
-function skip(name: string, reason: string): void {
-  skipped += 1;
-  console.log(`  – ${name}（跳过：${reason}）`);
-}
 
 function main() {
-  console.log("v8 内置模板结构回归测试");
+  console.log("内置模板结构回归测试（64 Phase 1 C7，v9）");
 
   const templates = builtinTemplates();
 
@@ -56,26 +72,9 @@ function main() {
     assert.equal(templates.length, 15);
   });
 
-  const expectedIds = [
-    "builtin-model-tryon",
-    "builtin-pose",
-    "builtin-background-swap",
-    "builtin-lookbook",
-    "builtin-digital-model",
-    "builtin-print-extract",
-    "builtin-print-mutate",
-    "builtin-garment-recolor",
-    "builtin-fabric-swap",
-    "builtin-sketch-to-garment",
-    "builtin-ai-restyle",
-    "builtin-outfit-recommend",
-    "builtin-person-to-mannequin",
-    "builtin-video-runway",
-    "builtin-video-xhs",
-  ];
   ok("P1：15 个模板 id 与契约完全一致", () => {
     const ids = templates.map((t) => t.id).sort();
-    assert.deepEqual(ids, [...expectedIds].sort());
+    assert.deepEqual(ids, [...Object.keys(EXPECTED)].sort());
   });
 
   ok("P10：延后模板 keyframes / video-clone 未注册", () => {
@@ -100,58 +99,86 @@ function main() {
     }
   });
 
-  ok("P4：每个 image-generator 的 promptVariantId 可解析", () => {
+  ok("C7：全部模板 schemaVersion = 9（模板与 flow）", () => {
     for (const tpl of templates) {
-      for (const node of tpl.flow.nodes) {
-        if (node.type !== "image-generator") continue;
-        const variantId = (node.data as { promptVariantId?: string }).promptVariantId;
-        assert.ok(variantId, `${tpl.id}/${node.id} 缺少 promptVariantId`);
-        assert.ok(getGarmentPromptVariantById(variantId), `${tpl.id}/${node.id} 变体无法解析: ${variantId}`);
-      }
+      assert.equal(tpl.schemaVersion, 9, `${tpl.id} schemaVersion != 9`);
+      assert.equal(tpl.flow.schemaVersion, 9, `${tpl.id} flow.schemaVersion != 9`);
     }
   });
 
-  ok("P4b：每个 video-generator 的 promptVariantId 可解析", () => {
+  ok("C7：generator 显式 modelId + operationMode + 契约默认参数（快照）", () => {
     for (const tpl of templates) {
-      for (const node of tpl.flow.nodes) {
-        if (node.type !== "video-generator") continue;
-        const variantId = (node.data as { promptVariantId?: string }).promptVariantId;
-        assert.ok(variantId, `${tpl.id}/${node.id} 缺少 promptVariantId`);
-        assert.ok(getGarmentPromptVariantById(variantId), `${tpl.id}/${node.id} 变体无法解析: ${variantId}`);
-      }
-    }
-  });
-
-  ok("P5：每个 video-generator 的 aspectRatio 为 adaptive", () => {
-    for (const tpl of templates) {
-      for (const node of tpl.flow.nodes) {
-        if (node.type !== "video-generator") continue;
-        const data = node.data as { aspectRatio?: string; modelOptions?: { aspectRatio?: string } };
-        assert.equal(data.aspectRatio, "adaptive", `${tpl.id}/${node.id} aspectRatio != adaptive`);
-        assert.equal(data.modelOptions?.aspectRatio, "adaptive", `${tpl.id}/${node.id} modelOptions.aspectRatio != adaptive`);
-      }
-    }
-  });
-
-  ok("P6：模板 12（outfit）是唯一 GENERATE_VARIANT，其余用 EDIT_VARIANT/视频变体", () => {
-    for (const tpl of templates) {
+      const expected = EXPECTED[tpl.id];
+      assert.ok(expected, `${tpl.id} 不在期望表`);
       for (const node of tpl.flow.nodes) {
         if (node.type === "image-generator") {
-          const variantId = (node.data as { promptVariantId?: string }).promptVariantId;
-          if (tpl.id === "builtin-outfit-recommend") {
-            assert.equal(variantId, GENERATE_VARIANT, `${tpl.id}/${node.id} 应为 GENERATE_VARIANT`);
-          } else {
-            assert.equal(variantId, EDIT_VARIANT, `${tpl.id}/${node.id} 应为 EDIT_VARIANT`);
-          }
+          const data = node.data as {
+            modelId?: string; operationMode?: string; aspectRatio?: string;
+            batchSize?: number; modelOptions?: Record<string, unknown>;
+            promptVariantId?: unknown;
+          };
+          assert.equal(data.modelId, DEFAULT_GENERATION_MODEL_ID, `${tpl.id}/${node.id} modelId`);
+          assert.equal(data.operationMode, expected.operationMode, `${tpl.id}/${node.id} operationMode`);
+          assert.equal(data.aspectRatio, "1:1", `${tpl.id}/${node.id} aspectRatio`);
+          assert.equal(data.batchSize, expected.batchSize ?? 1, `${tpl.id}/${node.id} batchSize`);
+          assert.deepEqual(
+            data.modelOptions,
+            defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
+            `${tpl.id}/${node.id} modelOptions 应为契约推荐默认`,
+          );
+          assert.ok(!("promptVariantId" in data), `${tpl.id}/${node.id} 不得携带 promptVariantId`);
         } else if (node.type === "video-generator") {
-          const variantId = (node.data as { promptVariantId?: string }).promptVariantId;
-          assert.equal(variantId, VIDEO_VARIANT, `${tpl.id}/${node.id} 应为 VIDEO_VARIANT`);
+          const data = node.data as {
+            modelId?: string; operationMode?: string; aspectRatio?: string;
+            modelOptions?: { aspectRatio?: string };
+          };
+          assert.equal(data.modelId, DEFAULT_VIDEO_MODEL_ID, `${tpl.id}/${node.id} modelId`);
+          assert.equal(data.operationMode, expected.operationMode, `${tpl.id}/${node.id} operationMode`);
+          assert.equal(data.aspectRatio, "adaptive", `${tpl.id}/${node.id} aspectRatio`);
         }
       }
     }
   });
 
-  ok("P7：模板 9（fabric）生成节点恰有 2 条 reference 边", () => {
+  ok("C7：text 节点 = family 预设模板文本（冻结表逐字，所见即所发）", () => {
+    for (const tpl of templates) {
+      const expected = EXPECTED[tpl.id];
+      const expectedText = presetTemplateText(expected.preset[0], expected.preset[1]);
+      assert.ok(expectedText, `预设不存在: ${expected.preset.join(":")}`);
+      for (const node of tpl.flow.nodes) {
+        if (node.type !== "text") continue;
+        assert.equal(
+          (node.data as { text: string }).text,
+          expectedText,
+          `${tpl.id}/${node.id} text 应为 ${expected.preset.join(":")} 预设模板文本`,
+        );
+      }
+    }
+  });
+
+  ok("C5 模板侧自洽：edit 模板的 generator 必有 ≥1 条参考图入边", () => {
+    for (const tpl of templates) {
+      const expected = EXPECTED[tpl.id];
+      if (expected.operationMode !== "edit") continue;
+      for (const node of tpl.flow.nodes) {
+        if (node.type !== "image-generator") continue;
+        const refEdges = tpl.flow.edges.filter((e) => e.target === node.id && e.targetHandle === "reference");
+        assert.ok(refEdges.length >= 1, `${tpl.id}/${node.id} edit 模板缺参考图入边`);
+      }
+    }
+  });
+
+  ok("P5：每个 video-generator 的 modelOptions.aspectRatio 为 adaptive", () => {
+    for (const tpl of templates) {
+      for (const node of tpl.flow.nodes) {
+        if (node.type !== "video-generator") continue;
+        const data = node.data as { modelOptions?: { aspectRatio?: string } };
+        assert.equal(data.modelOptions?.aspectRatio, "adaptive", `${tpl.id}/${node.id} modelOptions.aspectRatio != adaptive`);
+      }
+    }
+  });
+
+  ok("P7：模板 fabric 生成节点恰有 2 条 reference 边", () => {
     const fabric = templates.find((t) => t.id === "builtin-fabric-swap");
     assert.ok(fabric, "缺少 builtin-fabric-swap");
     const generatorId = fabric.flow.nodes.find((n) => n.type === "image-generator")?.id;
@@ -201,27 +228,24 @@ function main() {
     }
   });
 
-  // P2：逐模板过 validateAndMigrateFlow。schema 已是 v8（R-85 已落地）。
-  // 探测分支仅为历史兼容兜底；正常路径 schemaV8Ready === true，直接走硬断言。
-  const first = templates[0];
-  let schemaV8Ready = true;
-  try {
-    validateAndMigrateFlow(first.flow);
-  } catch (error) {
-    if (error instanceof WorkflowValidationError) schemaV8Ready = false;
-    else throw error;
-  }
-  if (schemaV8Ready) {
-    ok("P2：每个模板通过 validateAndMigrateFlow", () => {
-      for (const tpl of templates) {
-        assert.doesNotThrow(() => validateAndMigrateFlow(tpl.flow), `${tpl.id} 未通过校验`);
-      }
-    });
-  } else {
-    skip("P2：每个模板通过 validateAndMigrateFlow", "依赖 R-85 的 schema v8（workflowSchema.ts 仍为 v7，只认 text/image/video）");
-  }
+  ok("P2：每个模板通过 validateAndMigrateFlow（v9）", () => {
+    for (const tpl of templates) {
+      assert.doesNotThrow(() => validateAndMigrateFlow(tpl.flow), `${tpl.id} 未通过校验`);
+    }
+  });
 
-  console.log(`\n通过 ${passed} 项，跳过 ${skipped} 项`);
+  ok("输入层纯净：输入节点不携带任何生成语义字段", () => {
+    for (const tpl of templates) {
+      for (const node of tpl.flow.nodes) {
+        if (!INPUT_KINDS.has(node.type)) continue;
+        for (const field of ["modelId", "operationMode", "aspectRatio", "batchSize", "promptVariantId"]) {
+          assert.ok(!(field in (node.data as Record<string, unknown>)), `${tpl.id}/${node.id} 不得携带 ${field}`);
+        }
+      }
+    }
+  });
+
+  console.log(`\n通过 ${passed} 项`);
 }
 
 main();

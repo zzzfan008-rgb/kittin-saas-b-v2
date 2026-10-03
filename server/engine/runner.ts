@@ -3,8 +3,9 @@
  * 运行队列与事件持久化已迁移到 runQueue/（PostgreSQL 持久队列）；本文件只保留
  * executeStep 及其纯执行辅助函数（参考图解析、Provider 请求、后处理）。
  *
- * v8 五节点模型：只有生成节点可运行（runtime.md §1）。
- * - image-generator：统一生成路径，operationMode 由提示词变体携带，蒙版由 needsMask 驱动。
+ * v9 五节点模型：只有生成节点可运行（runtime.md §1；64 Phase 1 参数自治）。
+ * - image-generator：统一生成路径，operationMode 由节点 data 携带（step.params，缺省 generate，
+ *   裁决 A）；系统文本按 modeSystemText 冻结映射拼装（裁决 E）；蒙版由 mask-edit 驱动。
  * - video-generator：异步任务路径（submit + poll），Provider 实现归 videoProvider。
  * - text / image / video / result-image / result-video：不可执行，executeStep 直接 throw。
  */
@@ -46,7 +47,8 @@ import {
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { DEFAULT_VIDEO_MODEL_ID, isVideoModelId, type VideoModelOptions } from "../../src/types/videoModels";
-import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
+import { IMAGE_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
+import { modeSystemText } from "../lib/promptPresetsFrozen";
 import { compositeMaskedEdit, prepareMaskForGeneration, resolveMaskFeatherRadius } from "../lib/maskProcessing";
 import { renderProviderPrompt, type ProviderPromptReference } from "../../src/lib/providerPromptRenderer";
 import { postProcessGeneratedOutputImages } from "./runnerOutputProcessing";
@@ -228,22 +230,20 @@ async function executeImageGeneratorStep(
   if (!isModelAllowedForNode(modelId, generationKindOf(step.kind))) {
     throw new Error(`Model ${modelId} is not allowed for node ${step.nodeId}`);
   }
-  // variant is required when coming from the DAG (promptVariantId was resolved at plan-build time).
-  // For bare API requests (direct-generate without promptVariantId), variant may be absent;
-  // derive operationMode and taskPrompt from step.params instead.
-  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
-  const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
-  const operationMode: ImageOperationMode = variant?.mode ?? (step.params.operationMode ?? "generate") as ImageOperationMode;
+  // v9（64 Phase 1 C3）：variant 查询与 taskPrompt variant 分支删除。
+  // operationMode 显式取节点参数（缺省 generate，裁决 A）；非法值防御性回退 generate。
+  const operationMode: ImageOperationMode =
+    typeof step.params.operationMode === "string"
+    && (IMAGE_OPERATION_MODE_VALUES as readonly string[]).includes(step.params.operationMode)
+      ? step.params.operationMode as ImageOperationMode
+      : "generate";
   const needsMask = operationMode === "mask-edit";
   const inputTexts = inputTextsOf(step);
   const userPrompt = inputTexts.length > 0
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
-  // With a variant: prepend the system fullPrompt (runtime.md §1 step 3).
-  // Without a variant (bare request): use the prompt as-is — no system wrapper.
-  const taskPrompt = variant
-    ? `${variant.fullPrompt}\n\n${userPrompt}`.trim()
-    : userPrompt;
+  // 裁决 E：taskPrompt = 冻结系统文本 + 用户正文（generate 系统文本为空串 = 裸 API 行为零回归）。
+  const taskPrompt = `${modeSystemText(step.kind, operationMode)}\n\n${userPrompt}`.trim();
 
   const inputReferenceSources = options.referenceSources !== undefined
     ? options.referenceSources.map((reference) => ({ ...reference }))
@@ -300,14 +300,7 @@ async function executeImageGeneratorStep(
   const request: ImageGenRequest = {
     prompt,
     operationMode,
-    promptVariantId,
-    ...(typeof step.params.promptFamilyId === "string" ? { promptFamilyId: step.params.promptFamilyId } : {}),
-    ...(typeof step.params.parameterProfileId === "string" ? { parameterProfileId: step.params.parameterProfileId } : {}),
-    ...(typeof step.params.contractHash === "string"
-      ? { contractHash: step.params.contractHash as `sha256:${string}` }
-      : {}),
-    ...(typeof step.params.evaluationVersion === "string" ? { evaluationVersion: step.params.evaluationVersion } : {}),
-    ...(typeof step.params.postprocessVersion === "string" ? { postprocessVersion: step.params.postprocessVersion } : {}),
+    // v9（64 Phase 1 C6）：variant 绑定六字段不再组装（ImageGenRequest 类型已删）。
     references: providerReferences.length ? providerReferences : undefined,
     referenceImages: providerReferenceImages.length ? providerReferenceImages : undefined,
     aspectRatio: typeof step.params.aspectRatio === "string" ? step.params.aspectRatio : undefined,
@@ -354,16 +347,18 @@ async function executeVideoGeneratorStep(
   options: ExecuteStepOptions,
 ): Promise<StepResult> {
   const modelId = isVideoModelId(step.params.modelId) ? step.params.modelId : DEFAULT_VIDEO_MODEL_ID;
-  const promptVariantId = typeof step.params.promptVariantId === "string" ? step.params.promptVariantId : undefined;
-  const variant = promptVariantId ? getGarmentPromptVariantById(promptVariantId) : undefined;
-  // variant may be absent for bare video API requests (no promptVariantId).
+  // v9（64 Phase 1 C3）：variant 查询删除；operationMode 取节点参数（缺省 generate）。
+  const videoOperationMode: ImageOperationMode =
+    typeof step.params.operationMode === "string"
+    && (IMAGE_OPERATION_MODE_VALUES as readonly string[]).includes(step.params.operationMode)
+      ? step.params.operationMode as ImageOperationMode
+      : "generate";
   const inputTexts = inputTextsOf(step);
   const userPrompt = inputTexts.length > 0
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
-  const taskPrompt = variant
-    ? `${variant.fullPrompt}\n\n${userPrompt}`.trim()
-    : userPrompt;
+  // 裁决 E：video 系统文本同样走冻结映射（video.edit = 动效任务文本；generate = 空串）。
+  const taskPrompt = `${modeSystemText(step.kind, videoOperationMode)}\n\n${userPrompt}`.trim();
   if (!taskPrompt) {
     throw new Error("视频节点没有可发送的提示词");
   }
@@ -379,14 +374,11 @@ async function executeVideoGeneratorStep(
   }
 
   const provider = resolveVideoProvider(modelId);
+  // v9（64 Phase 1 C6）：promptVariantId/contractHash 不再组装（variant 概念删除）。
   const request: VideoGenRequest = {
     prompt: taskPrompt,
-    promptVariantId,
     ...(firstFrame ? { firstFrame } : {}),
     modelOptions: step.params.modelOptions as VideoModelOptions | undefined,
-    ...(typeof step.params.contractHash === "string"
-      ? { contractHash: step.params.contractHash as `sha256:${string}` }
-      : {}),
   };
 
   const { taskId } = await provider.submit(request);

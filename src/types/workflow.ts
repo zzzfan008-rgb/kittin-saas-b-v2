@@ -148,19 +148,17 @@ export interface VideoNodeData extends BaseNodeData {
 
 export interface ImageGeneratorNodeData extends BaseNodeData {
   kind: "image-generator";
-  /** 功能绑定；必填；允许空串表示待选功能（草稿态）。 */
-  promptVariantId: string;
-  promptFamilyId?: string;
-  parameterProfileId?: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
-  postprocessVersion?: string;
+  /**
+   * 操作模式（64 裁决 A）：显式归节点 data，缺省即 generate。
+   * edit/mask-edit 需 ≥1 条参考图入边；mask-edit 另需 PNG 蒙版（mask/maskSourceRef）。
+   */
+  operationMode?: ImageOperationMode;
   modelId: GenerationImageModelId;
   /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
   batchSize: BatchSize; // 1 | 2 | 4 | 8
-  /** 蒙版能力：仅当 promptVariantId 对应变体声明 needsMask=true 时启用 */
+  /** 蒙版能力：仅 operationMode="mask-edit" 时启用 */
   mask?: string;
   maskSourceRef?: string;
   featherRadius?: number; // 0–64
@@ -168,10 +166,8 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
 
 export interface VideoGeneratorNodeData extends BaseNodeData {
   kind: "video-generator";
-  /** 功能绑定；必填；允许空串表示待选功能（草稿态）。 */
-  promptVariantId: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
+  /** 操作模式（64 裁决 A）：显式归节点 data，缺省即 generate。 */
+  operationMode?: ImageOperationMode;
   modelId: VideoModelId;
   /** 时长走 modelOptions.seconds（与契约 recommendedOptions 同源，不设独立 duration 字段）。 */
   modelOptions?: VideoModelOptions;
@@ -224,11 +220,12 @@ export function isNodeRunTerminal(status: NodeRunStatus): boolean {
 
 // ---------- 持久化工作流（项目 / 模板共用）----------
 /**
- * 版本 8 为三层七节点模型（本文件）。
- * 版本 <= 7 的持久化数据由迁移层惰性升到 v8（migration.md）；
- * 版本 > 8 一律拒绝（未知的更高版本，fail-closed）。
+ * 版本 9（64 Phase 1）：生成节点参数自治——variant 绑定六字段删除，operationMode
+ * 显式归节点 data（缺省 generate）；text 节点承载提示词正文（预设模板插入落点）。
+ * 版本 8 的持久化数据由迁移层惰性升到 v9（server/lib/workflowSchema.ts C2）；
+ * 版本 > 9 一律拒绝（未知的更高版本，fail-closed）。
  */
-export const WORKFLOW_SCHEMA_VERSION = 8 as const;
+export const WORKFLOW_SCHEMA_VERSION = 9 as const;
 export type WorkflowSchemaVersion = typeof WORKFLOW_SCHEMA_VERSION;
 
 export interface PersistedWorkflowNode {
@@ -259,14 +256,10 @@ export interface PersistedWorkflow {
 /** 所有 AI 调用必须经此接口，禁止业务代码直连第三方 SDK */
 export interface ImageGenRequest {
   prompt: string;
-  /** Exact reviewed prompt/evaluation binding; direct calls are fail-closed without it. */
-  promptVariantId?: string;
-  promptFamilyId?: string;
-  parameterProfileId?: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
-  postprocessVersion?: string;
-  /** 调用模式；由选中的提示词变体携带（variant.mode），节点不自描述。 */
+  /**
+   * 调用模式（64 裁决 A）：归节点 data（dag extractParams 从 data.operationMode 注入，
+   * 缺省 generate）；节点自描述，不再由提示词变体携带。
+   */
   operationMode: ImageOperationMode;
   /**
    * 新的可追溯参考图契约。Provider 按 order 转换为各自协议；

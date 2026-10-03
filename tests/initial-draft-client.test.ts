@@ -573,15 +573,16 @@ useFlowStore.setState({ tabs: [openPlaceholder], activeTabId: openPlaceholder.id
 
 assert.throws(
   () => useFlowStore.getState().openFlowTab({
-    projectId: "p-v9",
+    projectId: "p-v10",
     projectName: "更高版本项目",
-    flow: { schemaVersion: 9, nodes: [], edges: [] },
+    // 64 Phase 1：当前 schema 为 v9，更高版本边界顺移为 10。
+    flow: { schemaVersion: 10, nodes: [], edges: [] },
   }),
   DocumentFlowVersionError,
-  "schemaVersion 9 的项目必须拒绝打开",
+  "schemaVersion 10 的项目必须拒绝打开",
 );
 assert.equal(
-  useFlowStore.getState().tabs.some((candidate) => candidate.projectId === "p-v9"),
+  useFlowStore.getState().tabs.some((candidate) => candidate.projectId === "p-v10"),
   false,
   "被拒绝的文档不得留下页签",
 );
@@ -624,7 +625,7 @@ assert.equal(nodeDataOf(openedV7Tab, 1).batchSize, undefined);
 assert.deepEqual(nodeDataOf(openedV7Tab, 1).outputImages, ["/api/files/kept.png"], "产物零丢失（M2）");
 assert.deepEqual(nodeDataOf(openedV7Tab, 0).text, "白色风衣");
 const savedV7Tab = persistedWorkflowForProjectTab(openedV7Tab);
-assert.equal(savedV7Tab.schemaVersion, 8, "v7 项目首次保存必须写回迁移结果");
+assert.equal(savedV7Tab.schemaVersion, 9, "v7 项目首次保存必须写回迁移结果（64 Phase 1：当前 v9）");
 for (const node of savedV7Tab.nodes) {
   assert.ok(!("modelId" in (node.data as Record<string, unknown>)), "落盘产物不得残留未迁移字段");
 }
@@ -638,7 +639,7 @@ assert.equal(loadedTab.projectId, "p-v7-load");
 assert.deepEqual(loadedTab.edges, []);
 assert.equal(nodeDataOf(loadedTab, 1).modelId, undefined);
 assert.throws(
-  () => useFlowStore.getState().loadFlow({ projectId: "p-v9-load", projectName: "更高版本", flow: { schemaVersion: 9, nodes: [], edges: [] } }),
+  () => useFlowStore.getState().loadFlow({ projectId: "p-v10-load", projectName: "更高版本", flow: { schemaVersion: 10, nodes: [], edges: [] } }),
   DocumentFlowVersionError,
 );
 console.log("  ✓ loadFlow 与 openFlowTab 共用同一读取入口");
@@ -647,8 +648,8 @@ const draftPlaceholder = openPathTab({ id: "tab-draft-gate", projectId: "project
 useFlowStore.setState({ tabs: [draftPlaceholder], activeTabId: draftPlaceholder.id, viewer: null });
 assert.throws(
   () => applyServerInitialDraftToTab(draftPlaceholder.id, {
-    ...draft({ id: "draft-v9" }),
-    flow: { schemaVersion: 9, nodes: [], edges: [] } as never,
+    ...draft({ id: "draft-v10" }),
+    flow: { schemaVersion: 10, nodes: [], edges: [] } as never,
   }),
   DocumentFlowVersionError,
 );
@@ -683,13 +684,13 @@ assert.deepEqual(launchedTab.edges, []);
 assert.equal(nodeDataOf(launchedTab, 1).modelId, undefined, "模板 flow 也必须经读取闸投影");
 assert.throws(
   () => launchTemplateInNewTab({
-    schemaVersion: 9,
-    id: "tpl-v9",
-    name: "v9 模板",
+    schemaVersion: 10,
+    id: "tpl-v10",
+    name: "v10 模板",
     description: "",
     createdAt: "2026-08-13T00:00:00.000Z",
-    flow: { schemaVersion: 9, nodes: [], edges: [] },
+    flow: { schemaVersion: 10, nodes: [], edges: [] },
   } as unknown as WorkflowTemplate),
   DocumentFlowVersionError,
 );
-console.log("  ✓ 模板 flow 走同一版本闸（v7 迁移、v9 拒绝）");
+console.log("  ✓ 模板 flow 走同一版本闸（v7 迁移、更高版本拒绝）");

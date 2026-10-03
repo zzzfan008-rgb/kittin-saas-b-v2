@@ -17,6 +17,8 @@ import {
   isImageModelId,
 } from "../../src/types/imageModels";
 import { isVideoModelId } from "../../src/types/videoModels";
+import { IMAGE_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
+import { frozenPromptBindingForVariantId } from "./promptPresetsFrozen";
 
 const NODE_KINDS: readonly NodeKind[] = [
   "text", "image", "video", "image-generator", "video-generator", "result-image", "result-video",
@@ -41,12 +43,13 @@ const MASK_DATA_URL_CONTRACT = (() => {
 })();
 
 /**
- * C2：输入节点不得携带生成语义字段（data-model.md §3「输入节点不承载任何生成语义」）。
- * 机检范围取 data-model.md §7 C2 明确列出的三字段，外加其余生成字段以 fail-closed。
+ * C2（data-model.md §3「输入节点不承载任何生成语义」）：输入节点禁带生成语义字段清单。
+ * v9（64 Phase 1）：variant 绑定六字段（promptVariantId/promptFamilyId/parameterProfileId/
+ * contractHash/evaluationVersion/postprocessVersion）随概念删除，从清单移除；
+ * operationMode（裁决 A）为新的生成语义字段，加入清单 fail-closed。
  */
 const GENERATION_FIELDS = [
-  "modelId", "promptVariantId", "modelOptions", "promptFamilyId", "parameterProfileId",
-  "contractHash", "evaluationVersion", "postprocessVersion", "aspectRatio", "batchSize",
+  "modelId", "operationMode", "modelOptions", "aspectRatio", "batchSize",
   "mask", "maskSourceRef", "featherRadius",
 ] as const;
 
@@ -79,12 +82,10 @@ function optionalString(value: unknown, path: string): string | undefined {
   return value === undefined ? undefined : stringValue(value, path);
 }
 
-function optionalContractHash(value: unknown, path: string): `sha256:${string}` | undefined {
-  const contractHash = optionalString(value, path);
-  if (contractHash !== undefined && !/^sha256:[a-f0-9]{64}$/.test(contractHash)) {
-    fail(path, "must be a sha256: prefixed lowercase SHA-256");
-  }
-  return contractHash as `sha256:${string}` | undefined;
+/** v9（64 裁决 A）：operationMode 显式归生成节点 data；可缺省（缺省 = generate）。 */
+function optionalOperationMode(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  return oneOf(value, IMAGE_OPERATION_MODE_VALUES, path);
 }
 
 interface ImageReferenceOptions {
@@ -191,10 +192,11 @@ function assertNoGenerationFields(raw: Record<string, unknown>, path: string): v
 }
 
 /**
- * v8 七值 kind 的节点数据校验（data-model.md §7 C1-C6）。
+ * v9 七值 kind 的节点数据校验（data-model.md §7 C1-C6；64 Phase 1 参数自治）。
  * 返回归一化后的干净节点数据（只保留契约已知字段），替代 documentSnapshot 的字段收敛。
+ * variant 绑定六字段在 v9 已不存在：输入若携带则被白名单重建静默剥离（v8 文档走 C2 迁移）。
  */
-function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
+function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): WorkflowNodeData {
   const input = record(rawValue, path);
   // 运行中与失败状态不能跨保存/模板持久化；成功结果本身可以保留。
   const runtimeStatus = input.status;
@@ -231,16 +233,12 @@ function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (raw.outputImages !== undefined) {
         fail(`${path}.outputImages`, "生成节点不得承载产物（产物归结果节点）");
       }
-      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`);
       const modelId = raw.modelId;
       if (!isImageModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的图片生成模型");
       }
-      const promptFamilyId = optionalString(raw.promptFamilyId, `${path}.promptFamilyId`);
-      const parameterProfileId = optionalString(raw.parameterProfileId, `${path}.parameterProfileId`);
-      const contractHash = optionalContractHash(raw.contractHash, `${path}.contractHash`);
-      const evaluationVersion = optionalString(raw.evaluationVersion, `${path}.evaluationVersion`);
-      const postprocessVersion = optionalString(raw.postprocessVersion, `${path}.postprocessVersion`);
+      // v9（64 裁决 A）：operationMode 显式归节点 data；缺省即 generate（不注入）。
+      const operationMode = optionalOperationMode(raw.operationMode, `${path}.operationMode`);
       validateModelOptionsShape(raw.modelOptions, path);
       const aspectRatio = oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
       const batchSize = oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
@@ -256,13 +254,8 @@ function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): Workfl
         kind,
         label,
         status,
-        promptVariantId,
+        ...(operationMode !== undefined ? { operationMode } : {}),
         modelId,
-        ...(promptFamilyId !== undefined ? { promptFamilyId } : {}),
-        ...(parameterProfileId !== undefined ? { parameterProfileId } : {}),
-        ...(contractHash !== undefined ? { contractHash } : {}),
-        ...(evaluationVersion !== undefined ? { evaluationVersion } : {}),
-        ...(postprocessVersion !== undefined ? { postprocessVersion } : {}),
         ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
         aspectRatio,
         batchSize,
@@ -276,23 +269,20 @@ function validateDataV8(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (raw.outputVideos !== undefined) {
         fail(`${path}.outputVideos`, "生成节点不得承载产物（产物归结果节点）");
       }
-      const promptVariantId = stringValue(raw.promptVariantId, `${path}.promptVariantId`);
       const modelId = raw.modelId;
       if (!isVideoModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的视频生成模型");
       }
-      const contractHash = optionalContractHash(raw.contractHash, `${path}.contractHash`);
-      const evaluationVersion = optionalString(raw.evaluationVersion, `${path}.evaluationVersion`);
+      // v9（64 裁决 A）：operationMode 显式归节点 data；缺省即 generate（不注入）。
+      const operationMode = optionalOperationMode(raw.operationMode, `${path}.operationMode`);
       validateModelOptionsShape(raw.modelOptions, path);
       const aspectRatio = oneOf(raw.aspectRatio, [VIDEO_ASPECT_RATIO], `${path}.aspectRatio`);
       return {
         kind,
         label,
         status,
-        promptVariantId,
+        ...(operationMode !== undefined ? { operationMode } : {}),
         modelId,
-        ...(contractHash !== undefined ? { contractHash } : {}),
-        ...(evaluationVersion !== undefined ? { evaluationVersion } : {}),
         ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
         aspectRatio,
         ...withError({}),
@@ -366,6 +356,54 @@ function migrateV7NodeData(
   }
 }
 
+/**
+ * v8→v9 惰性迁移（64 Phase 1 C2，沿 v7→v8 惰性模式）：
+ * - 生成节点的 variant 绑定六字段剥离——由 validateDataV9 白名单重建静默完成，本函数不处理。
+ * - promptVariantId 非空的生成节点：按边序找第一条 prompt 上游 text 节点——
+ *   text 为空 → 填入该预设模板文本（frozenPromptBindingForVariantId 解析）；
+ *   text 非空 → 保留正文、丢弃绑定（绝不覆盖用户文本）；
+ *   无上游 text → 丢弃绑定。
+ * - 已知变体的 mode 物化到 data.operationMode（保持运行语义：v8 由 variant 携带 mode；
+ *   丢失会让存量 edit 项目迁移后被参考图兼容校验误拒）。
+ * - 未知 variantId → 绑定静默丢弃（fail-closed 不猜），text 不填、mode 不写。
+ * 原地修改 raw nodes 的 data；调用方随后经 validateNode 白名单重建输出干净 v9 数据。
+ */
+function migrateV8GeneratorBindings(rawNodes: unknown[], rawEdges: unknown[]): void {
+  const textDataById = new Map<string, Record<string, unknown>>();
+  for (const node of rawNodes) {
+    if (typeof node !== "object" || node === null || Array.isArray(node)) continue;
+    const n = node as Record<string, unknown>;
+    if (n.type === "text" && typeof n.data === "object" && n.data !== null && !Array.isArray(n.data)) {
+      textDataById.set(String(n.id), n.data as Record<string, unknown>);
+    }
+  }
+  for (const node of rawNodes) {
+    if (typeof node !== "object" || node === null || Array.isArray(node)) continue;
+    const n = node as Record<string, unknown>;
+    if (n.type !== "image-generator" && n.type !== "video-generator") continue;
+    if (typeof n.data !== "object" || n.data === null || Array.isArray(n.data)) continue;
+    const data = n.data as Record<string, unknown>;
+    const variantId = data.promptVariantId;
+    // 空串/缺失 = 草稿态（v8 已放宽为空合法）：无绑定可迁移。
+    if (typeof variantId !== "string" || variantId.trim() === "") continue;
+    const binding = frozenPromptBindingForVariantId(variantId);
+    // 未知变体：绑定丢弃（含 text 填充与 mode 物化）。
+    if (!binding) continue;
+    data.operationMode = binding.mode;
+    for (const edge of rawEdges) {
+      if (typeof edge !== "object" || edge === null || Array.isArray(edge)) continue;
+      const e = edge as Record<string, unknown>;
+      if (e.target !== n.id || e.targetHandle !== "prompt") continue;
+      const textData = textDataById.get(String(e.source));
+      if (!textData) continue; // 非 text 源（脏数据）：按边序继续找下一条 prompt 边
+      const current = textData.text;
+      if (typeof current === "string" && current.trim() !== "") break; // 非空保留，丢弃绑定
+      textData.text = binding.text;
+      break;
+    }
+  }
+}
+
 function validateNode(value: unknown, index: number): PersistedWorkflowNode {
   const path = `flow.nodes[${index}]`;
   const raw = record(value, path);
@@ -375,7 +413,7 @@ function validateNode(value: unknown, index: number): PersistedWorkflowNode {
   const position = record(raw.position, `${path}.position`);
   finiteNumber(position.x, `${path}.position.x`);
   finiteNumber(position.y, `${path}.position.y`);
-  const data = validateDataV8(type, raw.data, `${path}.data`);
+  const data = validateDataV9(type, raw.data, `${path}.data`);
   return {
     id,
     type,
@@ -408,8 +446,8 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   return result;
 }
 
-/** v8 图级校验：边 handle 类型 + INV-1/INV-2/INV-3 + C7（data-model.md §7 / runtime.md §2.1）。 */
-function validateV8Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflowEdge[]): PersistedWorkflow {
+/** v9 图级校验：边 handle 类型 + INV-1/INV-2/INV-3 + C7（data-model.md §7 / runtime.md §2.1）。 */
+function validateV9Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflowEdge[]): PersistedWorkflow {
   const nodeIds = new Set<string>();
   for (const node of nodes) {
     if (nodeIds.has(node.id)) fail("flow.nodes", `duplicate node id: ${node.id}`);
@@ -507,11 +545,13 @@ function validateV8Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflow
 }
 
 /**
- * Validate untrusted JSON（schema v8，三层七节点模型）。
- * - schemaVersion === 8 → 直接校验（C1-C7）。
+ * Validate untrusted JSON（schema v9，三层七节点模型；64 Phase 1 参数自治）。
+ * - schemaVersion === 9 → 直接校验。
+ * - schemaVersion === 8 → 惰性迁移（C2）：variant 绑定 → text 模板填充 + operationMode 物化，
+ *   随后按 v9 校验。
  * - schemaVersion === 7 → 惰性迁移：保留输入节点内容、剥离生成字段、丢弃全部边（migration.md）。
- * - schemaVersion < 7（含 undefined/0）→ 拒绝（v7 已确立「v6 及以下一律拒绝」，v8 沿用该边界）。
- * - schemaVersion > 8 → 拒绝（未知的更高版本，fail-closed）。
+ * - schemaVersion < 7（含 undefined/0）→ 拒绝（v7 已确立「v6 及以下一律拒绝」，后续版本沿用该边界）。
+ * - schemaVersion > 9 → 拒绝（未知的更高版本，fail-closed）。
  */
 export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
   const raw = record(value, "flow");
@@ -531,7 +571,7 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
     if (raw.nodes.length > MAX_WORKFLOW_NODES) {
       fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
     }
-    // v7 → v8：只保留节点、剥离生成字段；丢弃全部边（migration.md §3 M4）。
+    // v7 → v9：只保留节点、剥离生成字段；丢弃全部边（migration.md §3 M4）。
     const nodes: PersistedWorkflowNode[] = raw.nodes.map((node, index) => {
       const path = `flow.nodes[${index}]`;
       const n = record(node, path);
@@ -548,17 +588,20 @@ export function validateAndMigrateFlow(value: unknown): PersistedWorkflow {
         data: migrateV7NodeData(type, n.data, `${path}.data`),
       };
     });
-    return validateV8Flow(nodes, []);
+    return validateV9Flow(nodes, []);
   }
 
-  // versionNumber === 8：直接校验。
+  // versionNumber === 8：C2 惰性迁移后按 v9 校验（versionNumber === 9 直接落入本分支）。
   if (!Array.isArray(raw.nodes)) fail("flow.nodes", "must be an array");
   if (!Array.isArray(raw.edges)) fail("flow.edges", "must be an array");
   if (raw.nodes.length > MAX_WORKFLOW_NODES) {
     fail("flow.nodes", `must contain at most ${MAX_WORKFLOW_NODES} nodes`);
   }
   if (raw.edges.length > MAX_EDGES) fail("flow.edges", `must contain at most ${MAX_EDGES} edges`);
+  if (versionNumber === 8) {
+    migrateV8GeneratorBindings(raw.nodes, raw.edges);
+  }
   const nodes = raw.nodes.map((node, index) => validateNode(node, index));
   const edges = raw.edges.map((edge, index) => validateEdge(edge, index));
-  return validateV8Flow(nodes, edges);
+  return validateV9Flow(nodes, edges);
 }

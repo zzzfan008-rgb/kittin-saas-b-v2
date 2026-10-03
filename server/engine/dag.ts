@@ -29,8 +29,6 @@ import {
   promptRunAdmissionInputFromParams,
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
-import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
-import { getModelParameterProfile } from "../../src/types/modelParameterProfiles";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -96,17 +94,16 @@ export function assertPromptRunAdmissions(
 /** 运行前验证会产生费用的节点具备真实输入（runtime.md §3）。 */
 export function assertPlanInputs(plan: ExecutionPlan, _edges: FlowEdge[]): void {
   for (const step of plan.steps) {
-    // promptVariantId 守卫：草稿态允许空串（schema 放行），但运行必须先绑定功能。
-    // image-generator 与 video-generator 同走 runPlan 付费入队口（video-generator
-    // 执行走异步 submit+poll 路径），故守卫置于下方 kind 过滤之前一并拦截。
-    if (step.kind === "image-generator" || step.kind === "video-generator") {
-      const promptVariantId = step.params.promptVariantId;
-      if (typeof promptVariantId !== "string" || promptVariantId.trim() === "") {
-        throw new DagError(`Node ${step.nodeId} 请先选择功能（promptVariantId 为空）`);
-      }
-    }
     // v8：只有 image-generator 产生付费图片；video-generator 归异步视频路径。
     if (step.kind !== "image-generator") continue;
+
+    // 操作兼容（64 裁决 C5）：edit/mask-edit 需 ≥1 条参考图入边。
+    // 只对 image-generator 生效：video-generator 的物理输入是 first-frame（0..1），
+    // 其 edit 语义（首帧动效）由 first-frame 边与 schema handle 校验承载，无「参考图」概念。
+    const operationMode = typeof step.params.operationMode === "string" ? step.params.operationMode : "generate";
+    if ((operationMode === "edit" || operationMode === "mask-edit") && step.inputImages.length === 0) {
+      throw new DagError(`Node ${step.nodeId} 操作 ${operationMode} 需要至少 1 条参考图入边`);
+    }
 
     const modelId = step.params.modelId;
     if (!isImageModelId(modelId)) {
@@ -286,7 +283,7 @@ export function extractOutputVideos(data: WorkflowNodeData): string[] {
   }
 }
 
-/** 提取节点执行参数（v8 七值 kind；operationMode 由提示词变体携带）。 */
+/** 提取节点执行参数（v9 七值 kind；operationMode 归节点 data，缺省不注入 = generate，64 裁决 A）。 */
 function extractParams(data: WorkflowNodeData): Record<string, unknown> {
   switch (data.kind) {
     case "text":
@@ -302,38 +299,13 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       if (!isImageModelId(modelId)) {
         throw new DagError("Node data for image-generator must select an explicit supported image model");
       }
-      // v8 信任模型（runtime.md §1）：variant 绑定是唯一事实源，节点不自描述。
-      // operationMode / parameterProfileId / postprocessVersion 均由已选变体推导：
-      // - operationMode ← variant.mode（mode 归属反转）
-      // - parameterProfileId ← variant.parameterProfileId
-      // - postprocessVersion ← getModelParameterProfile(variant.parameterProfileId).postprocess.version
-      const variant = typeof data.promptVariantId === "string"
-        ? getGarmentPromptVariantById(data.promptVariantId)
-        : undefined;
-      const operationMode = variant?.mode;
-      const parameterProfileId = variant?.parameterProfileId;
-      const postprocessVersion = parameterProfileId
-        ? getModelParameterProfile(parameterProfileId)?.postprocess.version
-        : undefined;
+      // v9（64 Phase 1 C4）：variant 绑定五字段注入删除；operationMode 显式归节点 data。
       return {
-              modelId,
-              ...(operationMode ? { operationMode } : {}),
-              ...(parameterProfileId ? { parameterProfileId } : {}),
-              ...(postprocessVersion ? { postprocessVersion } : {}),
-              // Ruling 2026-09-26 (62-envelope-authority-ruling.md §2):
-              // variant registry is the sole authority source for these three fields
-              // (v8 trust model: "variant binding is the sole source of truth, nodes do
-              // not self-describe" — dag.ts:298). They MUST NOT be read from data.*
-              // because the real project flow_json does not carry them, and allowing an
-              // override would let the user write a contract hash into the canvas to
-              // change the authorization identity (violates AGENTS.md §4).
-              ...(variant?.familyId ? { promptFamilyId: variant.familyId } : {}),
-              ...(variant?.contractHash ? { contractHash: variant.contractHash } : {}),
-              ...(variant?.evaluationVersion ? { evaluationVersion: variant.evaluationVersion } : {}),
+        modelId,
+        ...(data.operationMode ? { operationMode: data.operationMode } : {}),
         aspectRatio: data.aspectRatio,
         batchSize: data.batchSize,
         modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
-        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
         ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
         ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
@@ -342,17 +314,10 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
       };
     }
     case "video-generator":
-      // video-generator is currently image-only evaluation P2-e: its
-      // contractHash/evaluationVersion are NOT consumed by the authorization
-      // identity chain (evaluationAuthorizationTargetFromPlan only reads
-      // image-generator steps). These fields are display-only; they MUST NOT
-      // be re-purposed for authorization without this comment being revisited.
       return {
-        ...(typeof data.promptVariantId === "string" ? { promptVariantId: data.promptVariantId } : {}),
         ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
         ...(data.modelOptions ? { modelOptions: { ...data.modelOptions } } : {}),
-        ...(typeof data.contractHash === "string" ? { contractHash: data.contractHash } : {}),
-        ...(typeof data.evaluationVersion === "string" ? { evaluationVersion: data.evaluationVersion } : {}),
+        ...(data.operationMode ? { operationMode: data.operationMode } : {}),
         aspectRatio: data.aspectRatio,
       };
   }

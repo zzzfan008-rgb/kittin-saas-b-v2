@@ -296,7 +296,9 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     () => listGarmentPromptVariants({ nodeKind: mediaKind }),
     [mediaKind],
   );
-  const selectedVariant: PromptVariant | undefined = data.promptVariantId
+  // 64 Phase 1 类型适配：v9 删除 data.promptVariantId 字段（Phase 2 本功能行整体重构）；
+  // typeof 守卫与原 truthy 判断行为等价，且对脏数据更防御。
+  const selectedVariant: PromptVariant | undefined = typeof data.promptVariantId === "string" && data.promptVariantId
     ? getGarmentPromptVariantById(data.promptVariantId)
     : undefined;
   const support = selectedVariant ? effectivePromptSupport(selectedVariant) : undefined;
@@ -417,7 +419,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     <div className="space-y-3" data-generator-panel={nodeId}>
       <OptionSelect
         label="功能"
-        value={data.promptVariantId ?? ""}
+        value={typeof data.promptVariantId === "string" ? data.promptVariantId : ""}
         options={variantOptions}
         disabled={disabled}
         placeholder={catalog.length === 0 ? "当前没有可用功能" : "选择功能"}
