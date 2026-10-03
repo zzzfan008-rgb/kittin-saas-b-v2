@@ -1,8 +1,9 @@
 /**
- * DAG v8 执行计划回归测试（R-85，纯逻辑，不调真实 API/DB）。
+ * DAG v9 执行计划回归测试（R-85，纯逻辑，不调真实 API/DB；64 Phase 1 参数自治）。
  * 覆盖：只有生成节点是步骤、extractOutputImages（result-image → images）、
  * extractOutputVideos、text 正文沿 prompt 边传播、INV-2（上游 text 全空拒绝）、
- * 环检测、局部重跑、R-78 变体绑定解析。
+ * C4 extractParams（operationMode 归节点 data、variant 字段零残留）、
+ * C5 操作兼容校验（edit/mask-edit 需参考图入边）、环检测、局部重跑。
  * 运行：node node_modules/tsx/dist/cli.mjs tests/dag.test.ts
  */
 import assert from "node:assert/strict";
@@ -16,11 +17,6 @@ import {
   type FlowEdge,
 } from "../server/engine/dag";
 import type { ExecutionPlan, WorkflowNodeData } from "../src/types/workflow";
-import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../src/types/modelParameterProfiles";
 
 let passed = 0;
 function ok(name: string, fn: () => void): void {
@@ -54,14 +50,16 @@ function resultImageNode(id: string, images: string[]): FlowNode {
 function imageGeneratorNode(
   id: string,
   modelId = "gpt-image-2.5-flare-vip",
-  promptVariantId = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
+  extra: Record<string, unknown> = {},
 ): FlowNode {
+  // v9 夹具（64 Phase 1）：variant 绑定字段已删除；operationMode 走 extra 显式注入。
   return {
     id,
     type: "image-generator",
     data: {
       kind: "image-generator", label: "生图", status: "idle",
-      modelId, promptVariantId, aspectRatio: "3:4", batchSize: 1,
+      modelId, aspectRatio: "3:4", batchSize: 1,
+      ...extra,
     } as WorkflowNodeData,
   };
 }
@@ -69,70 +67,8 @@ function imageGeneratorNode(
 const edge = (source: string, target: string, targetHandle = "prompt"): FlowEdge =>
   ({ source, target, targetHandle });
 
-// R-78：variant 绑定是唯一事实源——parameterProfileId/postprocessVersion 由服务端从已选变体推导。
-const r78Variant = requireGarmentPromptVariant({
-  familyId: "fashion-lookbook",
-  modelId: "gemini-3.1-flash-image",
-  nodeKind: "image",
-  mode: "generate",
-});
-const r78Profile = getModelParameterProfile(r78Variant.parameterProfileId)!;
-const r78Materialized = materializeModelParameterProfile(r78Profile);
-
-function variantBoundImageGeneratorNode(id: string): FlowNode {
-  return {
-    id,
-    type: "image-generator",
-    data: {
-      kind: "image-generator",
-      label: "生图",
-      status: "idle",
-      modelId: r78Variant.modelId,
-      promptVariantId: r78Variant.variantId,
-      promptFamilyId: r78Variant.familyId,
-      contractHash: r78Variant.contractHash,
-      evaluationVersion: r78Variant.evaluationVersion,
-      aspectRatio: r78Materialized.aspectRatio,
-      batchSize: r78Materialized.batchSize,
-      modelOptions: r78Materialized.modelOptions,
-    } as WorkflowNodeData,
-  };
-}
-
-// #62 见证测试用的 gpt-image 变体（与真实 generate 侧 project 同一变体）
-const w62Variant = requireGarmentPromptVariant({
-  familyId: "fashion-lookbook",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "generate",
-});
-const w62Profile = getModelParameterProfile(w62Variant.parameterProfileId)!;
-const w62Materialized = materializeModelParameterProfile(w62Profile);
-
-/**
- * 真实 project flow 的 image-generator 节点形态：只携带 7 个 key
- * （kind/label/modelId/promptVariantId/aspectRatio/batchSize/status），
- * 3 个身份字段（promptFamilyId/contractHash/evaluationVersion）由服务端从变体注册表派生。
- */
-function w62RealFlowImageGeneratorNode(id: string): FlowNode {
-  return {
-    id,
-    type: "image-generator",
-    data: {
-      kind: "image-generator",
-      label: "生图",
-      status: "idle",
-      modelId: w62Variant.modelId,
-      promptVariantId: w62Variant.variantId,
-      aspectRatio: w62Materialized.aspectRatio,
-      batchSize: w62Materialized.batchSize,
-      modelOptions: w62Materialized.modelOptions,
-    } as WorkflowNodeData,
-  };
-}
-
 function main() {
-  console.log("DAG v8 执行计划回归测试");
+  console.log("DAG v9 执行计划回归测试");
 
   ok("只有生成节点是步骤；text/image 输入节点不是步骤", () => {
     const plan = buildExecutionPlan(
@@ -196,34 +132,90 @@ function main() {
     );
   });
 
-  ok("空 promptVariantId 的 image-generator 被 assertPlanInputs 拒绝（草稿态不可付费运行）", () => {
+  // ---------- C4（64 Phase 1）：extractParams operationMode 归节点 data ----------
+  ok("C4：operationMode 缺省不注入 params（缺省 = generate）", () => {
     const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1", undefined, "")],
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1")],
+      [edge("t1", "g1")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.ok(!("operationMode" in g1.params));
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(g1.params.aspectRatio, "3:4");
+    assert.equal(g1.params.batchSize, 1);
+  });
+
+  for (const mode of ["generate", "edit", "mask-edit"] as const) {
+    ok(`C4：operationMode="${mode}" 从 data 注入 params`, () => {
+      const plan = buildExecutionPlan(
+        [textNode("t1", "设计一套现代女装"), imageNode("i1", ["/api/files/a.png"]), imageGeneratorNode("g1", undefined, { operationMode: mode })],
+        [edge("t1", "g1"), edge("i1", "g1", "reference")],
+      );
+      const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+      assert.equal(g1.params.operationMode, mode);
+    });
+  }
+
+  ok("C4：params 零 variant 字段残留（promptVariantId/promptFamilyId/contractHash/evaluationVersion/parameterProfileId/postprocessVersion）", () => {
+    // 即使脏 data 携带旧字段，extractParams 也绝不注入（64 C4：variant 五字段注入删除）。
+    const forged = imageGeneratorNode("g1", undefined, {
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+      promptFamilyId: "fashion-lookbook",
+      contractHash: "sha256:" + "f".repeat(64),
+      evaluationVersion: "forged-eval-v99",
+      parameterProfileId: "forged-profile",
+      postprocessVersion: "p1",
+    });
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代都市女装"), forged],
+      [edge("t1", "g1")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    for (const field of ["promptVariantId", "promptFamilyId", "contractHash", "evaluationVersion", "parameterProfileId", "postprocessVersion"]) {
+      assert.ok(!(field in g1.params), `params 不得注入 ${field}（64 C4 variant 注入已删除）`);
+    }
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
+  });
+
+  // ---------- C5（64 Phase 1）：操作兼容校验 ----------
+  ok("C5：edit 无参考图入边 → DagError（文案固定）", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1", undefined, { operationMode: "edit" })],
       [edge("t1", "g1")],
     );
     assert.throws(
       () => assertPlanInputs(plan, [edge("t1", "g1")]),
-      /请先选择功能/,
+      (e) => e instanceof DagError && (e as Error).message === "Node g1 操作 edit 需要至少 1 条参考图入边",
     );
   });
 
-  ok("空 promptVariantId 的 video-generator 被 assertPlanInputs 拒绝（同口一并守卫）", () => {
-    const videoGeneratorNodeEmpty = {
-      id: "v1",
-      type: "video-generator",
-      data: {
-        kind: "video-generator", label: "生视频", status: "idle",
-        modelId: "doubao-seedance-2-5-260628", promptVariantId: "", aspectRatio: "adaptive",
-      } as WorkflowNodeData,
-    };
+  ok("C5：mask-edit 无参考图入边 → DagError（文案固定）", () => {
     const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代女装"), videoGeneratorNodeEmpty],
-      [edge("t1", "v1")],
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1", undefined, { operationMode: "mask-edit" })],
+      [edge("t1", "g1")],
     );
     assert.throws(
-      () => assertPlanInputs(plan, [edge("t1", "v1")]),
-      /请先选择功能/,
+      () => assertPlanInputs(plan, [edge("t1", "g1")]),
+      (e) => e instanceof DagError && (e as Error).message === "Node g1 操作 mask-edit 需要至少 1 条参考图入边",
     );
+  });
+
+  ok("C5：generate 无参考图入边 → 通过（含 INV-2 文本检查）", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1")],
+      [edge("t1", "g1")],
+    );
+    assert.doesNotThrow(() => assertPlanInputs(plan, [edge("t1", "g1")]));
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
+  });
+
+  ok("C5：edit 有参考图入边 → 通过（兼容性准入同过）", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把这件衣服穿到模特身上"), imageNode("i1", ["/api/files/a.png"]), imageGeneratorNode("g1", undefined, { operationMode: "edit" })],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    assert.doesNotThrow(() => assertPlanInputs(plan, [edge("t1", "g1")]));
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
   });
 
   ok("环检测：A↔B 抛 DagError", () => {
@@ -243,70 +235,6 @@ function main() {
       { onlyNodeId: "g1", includeDownstream: false },
     );
     assert.deepStrictEqual(plan.steps.map((s) => s.nodeId), ["g1"]);
-  });
-
-  ok("R-78：image-generator 选变体但节点 data 无 parameterProfileId/postprocessVersion，服务端从变体解析并放行", () => {
-    const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代都市女装"), variantBoundImageGeneratorNode("g1")],
-      [edge("t1", "g1")],
-    );
-    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
-    assert.equal(g1.params.parameterProfileId, r78Variant.parameterProfileId);
-    assert.equal(g1.params.postprocessVersion, r78Profile.postprocess.version);
-    assert.equal(g1.params.operationMode, r78Variant.mode);
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
-  });
-
-  // ---------- #62 envelope authority witnesses (62-envelope-authority-ruling.md) ----------
-
-  ok("回归见证：image-generator 步骤必须携带 promptVariantId/aspectRatio/batchSize/modelOptions + 3 个注册表派生字段", () => {
-    // feaa817 曾整块重写 extractParams 的 image-generator return，误删 4 行
-    // （aspectRatio/batchSize/modelOptions/promptVariantId）→ promptVariantId 不进
-    // step.params → 准入闸 missing-binding → generate 侧真实路径全挂。
-    // tsc 看不出（这些字段在类型里可选），只有这条断言能拦住。
-    const plan = buildExecutionPlan(
-      [textNode("t1", "设计一套现代都市女装"), w62RealFlowImageGeneratorNode("g1")],
-      [edge("t1", "g1")],
-    );
-    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
-    assert.equal(
-      g1.params.promptVariantId,
-      w62Variant.variantId,
-      "extractParams 必须把 data.promptVariantId 放进 step.params（删掉即回归）",
-    );
-    assert.equal(g1.params.aspectRatio, w62Materialized.aspectRatio);
-    assert.equal(g1.params.batchSize, w62Materialized.batchSize);
-    assert.deepStrictEqual(g1.params.modelOptions, w62Materialized.modelOptions);
-    // 3 字段来自 variant 注册表（dag.ts:323-325），不是 data.*
-    assert.equal(g1.params.promptFamilyId, w62Variant.familyId);
-    assert.equal(g1.params.contractHash, w62Variant.contractHash);
-    assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion);
-    assert.equal(g1.params.postprocessVersion, w62Profile.postprocess.version);
-    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
-  });
-
-  ok("裁决 2 见证：节点 data 上的 contractHash/evaluationVersion/promptFamilyId 不得覆盖注册表值", () => {
-    // 62-envelope-authority-ruling.md 裁决 2：dag.ts 原 :320-322 读 data.* 被删除，
-    // 不得保留为 override —— 保留等于允许用户在画布上写契约哈希改变授权身份（违反 §4）。
-    const forged: FlowNode = {
-      id: "g1",
-      type: "image-generator",
-      data: {
-        ...w62RealFlowImageGeneratorNode("g1").data,
-        // 伪造值：若 extractParams 仍读 data.*，这些会覆盖注册表值 → 授权身份被篡改
-        contractHash: "sha256:" + "f".repeat(64),
-        evaluationVersion: "forged-eval-v99",
-        promptFamilyId: "forged-family",
-      } as WorkflowNodeData,
-    };
-    const plan = buildExecutionPlan([textNode("t1", "设计一套现代都市女装"), forged], [edge("t1", "g1")]);
-    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
-    assert.equal(g1.params.contractHash, w62Variant.contractHash, "contractHash 必须来自注册表，不得被 data.* 覆盖");
-    assert.equal(g1.params.evaluationVersion, w62Variant.evaluationVersion, "evaluationVersion 必须来自注册表");
-    assert.equal(g1.params.promptFamilyId, w62Variant.familyId, "promptFamilyId 必须来自注册表");
-    assert.notEqual(g1.params.contractHash, "sha256:" + "f".repeat(64));
-    assert.notEqual(g1.params.evaluationVersion, "forged-eval-v99");
-    assert.notEqual(g1.params.promptFamilyId, "forged-family");
   });
 
   console.log(`\n通过 ${passed} 项`);
