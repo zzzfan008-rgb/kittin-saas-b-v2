@@ -12,8 +12,6 @@ import {
   readFlowDocumentForOpen,
   unprojectedDocumentFields,
 } from "../src/lib/documentSnapshot";
-import { buildGarmentPrompt, requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
-import { getModelParameterProfile } from "../src/types/modelParameterProfiles";
 import { WORKFLOW_SCHEMA_VERSION } from "../src/types/workflow";
 
 /**
@@ -191,12 +189,7 @@ assert.deepEqual(snapshot, {
       data: {
         kind: "image-generator",
         label: "生图",
-        promptVariantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
-        promptFamilyId: "mask-local-edit",
-        parameterProfileId: "gpt-image-2.5-sunburst:mask-local-edit:mask-edit:v1",
-        contractHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-        evaluationVersion: "eval-1",
-        postprocessVersion: "mask-composite-png-v3",
+        // v9（64 Phase 3）：输入源携带的 v7 六绑定字段（脏输入）必须被投影整体剥离。
         modelId: "gpt-image-2.5-sunburst",
         aspectRatio: "3:4",
         batchSize: 2,
@@ -709,25 +702,7 @@ assert.equal(
   "重复的 (source, handle) 组合必须拒绝",
 );
 
-// ---------- 7. 蒙版绑定往返（v8：蒙版在生成节点上） ----------
-
-const maskVariant = requireGarmentPromptVariant({
-  familyId: "mask-local-edit",
-  modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "image",
-  mode: "mask-edit",
-});
-const maskProfile = getModelParameterProfile(maskVariant.parameterProfileId);
-assert.ok(maskProfile, "蒙版提示词变体必须引用存在的参数档案");
-const expectedMaskBinding = {
-  promptVariantId: maskVariant.variantId,
-  promptFamilyId: maskVariant.familyId,
-  parameterProfileId: maskVariant.parameterProfileId,
-  contractHash: maskVariant.contractHash,
-  evaluationVersion: maskVariant.evaluationVersion,
-  postprocessVersion: maskProfile.postprocess.version,
-};
-buildGarmentPrompt(maskVariant.variantId, "将蒙版区域改成银色拉链");
+// ---------- 7. 蒙版节点往返（v9：operationMode 归节点 data，六绑定字段已删） ----------
 
 const maskBindingSnapshot = createDocumentSnapshot({
   projectName: "蒙版绑定往返",
@@ -745,23 +720,42 @@ const maskBindingSnapshot = createDocumentSnapshot({
       featherRadius: 12,
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
-      ...expectedMaskBinding,
-    },
-  }] as never,
+      operationMode: "mask-edit",
+      // v7 六绑定字段（脏输入）：投影必须整体剥离，不落盘。
+      promptVariantId: "fashion-lookbook.mask-edit.gpt-image-2.5-sunburst.v7",
+      promptFamilyId: "mask-local-edit",
+      parameterProfileId: "pp-gpt-mask-v7",
+      contractHash: "sha256:deadbeef",
+      evaluationVersion: "sha256:cafebabe",
+      postprocessVersion: "sha256:feedface",
+    } as never,
+  }],
   edges: [],
 });
 const savedMaskNode = maskBindingSnapshot.nodes[0];
 assert.equal(savedMaskNode?.data.kind, "image-generator");
 if (savedMaskNode?.data.kind !== "image-generator") throw new Error("蒙版快照节点丢失");
 assert.equal(savedMaskNode.data.featherRadius, 12, "保存快照必须保留用户指定的羽化宽度");
-assert.deepEqual({
-  promptVariantId: savedMaskNode.data.promptVariantId,
-  promptFamilyId: savedMaskNode.data.promptFamilyId,
-  parameterProfileId: savedMaskNode.data.parameterProfileId,
-  contractHash: savedMaskNode.data.contractHash,
-  evaluationVersion: savedMaskNode.data.evaluationVersion,
-  postprocessVersion: savedMaskNode.data.postprocessVersion,
-}, expectedMaskBinding, "保存快照必须保留完整蒙版提示词绑定");
+assert.equal(savedMaskNode.data.mask, "/api/files/mask-binding.png", "保存快照必须保留蒙版引用");
+assert.equal(
+  (savedMaskNode.data as { operationMode?: string }).operationMode,
+  "mask-edit",
+  "v9：operationMode（C2 迁移物化）必须随节点 data 保存",
+);
+for (const deadField of [
+  "promptVariantId",
+  "promptFamilyId",
+  "parameterProfileId",
+  "contractHash",
+  "evaluationVersion",
+  "postprocessVersion",
+]) {
+  assert.equal(
+    (savedMaskNode.data as Record<string, unknown>)[deadField],
+    undefined,
+    `v9 投影必须剥离 v7 死字段 ${deadField}，不得落盘`,
+  );
+}
 
 const maskBindingWire = documentSnapshotToPersistedWorkflow(maskBindingSnapshot);
 const reloadedMaskSnapshot = createDocumentSnapshot({
@@ -772,13 +766,10 @@ const reloadedMaskSnapshot = createDocumentSnapshot({
 const reloadedMaskNode = reloadedMaskSnapshot.nodes[0];
 if (reloadedMaskNode?.data.kind !== "image-generator") throw new Error("重载后的蒙版节点丢失");
 assert.equal(reloadedMaskNode.data.featherRadius, 12, "重载后必须保留用户指定的羽化宽度");
-assert.deepEqual({
-  promptVariantId: reloadedMaskNode.data.promptVariantId,
-  promptFamilyId: reloadedMaskNode.data.promptFamilyId,
-  parameterProfileId: reloadedMaskNode.data.parameterProfileId,
-  contractHash: reloadedMaskNode.data.contractHash,
-  evaluationVersion: reloadedMaskNode.data.evaluationVersion,
-  postprocessVersion: reloadedMaskNode.data.postprocessVersion,
-}, expectedMaskBinding, "重载后必须保留完整蒙版提示词绑定");
+assert.equal(
+  (reloadedMaskNode.data as { operationMode?: string }).operationMode,
+  "mask-edit",
+  "wire 往返后 operationMode 必须保留",
+);
 
-console.log("通过 7 组纯文档快照边界测试（v8 投影 / 落盘闸 / v7→v8 迁移 / 读取归一 / 不变量 / 连线规则 / 蒙版往返）");
+console.log("通过 7 组纯文档快照边界测试（v9 投影 / 落盘闸 / v7→v8→v9 迁移 / 读取归一 / 不变量 / 连线规则 / 蒙版往返）");

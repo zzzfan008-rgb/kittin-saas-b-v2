@@ -62,7 +62,6 @@ function aiNode(id = "history-node"): FlowNode {
       kind: "image-generator",
       label: "历史事务节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: "gpt-image-2.5-flare-vip",
       modelOptions: { size: "auto" },
       aspectRatio: "1:1",

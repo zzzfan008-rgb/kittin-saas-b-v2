@@ -7,7 +7,6 @@ import path from "node:path";
 import express, { type Request } from "express";
 import sharp from "sharp";
 import type { AIProvider, NodeExecution } from "../src/types/workflow";
-import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import { resetPostgresTestDatabase } from "./postgresTestDatabase";
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "garment-canvas-upload-normalization-"));
@@ -374,7 +373,6 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 600, y: 0 },
         data: {
           kind: "image-generator", label: "局部重绘", status: "idle",
-          promptVariantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
           modelId: "gpt-image-2.5-sunburst", modelOptions: {},
           aspectRatio: "3:4", batchSize: 1,
           mask, maskSourceRef: body.url,
@@ -725,12 +723,6 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
       return { images: [prepared], model: "normalization-gate-test" };
     },
   };
-  const normalizationVariant = requireGarmentPromptVariant({
-    familyId: "commerce-hero",
-    modelId: "flux-2-pro",
-    nodeKind: "image",
-    mode: "edit",
-  });
   const step: NodeExecution = {
     nodeId: "normalization-gate",
     kind: "image-generator",
@@ -740,7 +732,6 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
       operationMode: "edit",
       modelId: "flux-2-pro",
       modelOptions: { width: 1024, height: 1024, outputFormat: "png" },
-      promptVariantId: normalizationVariant.variantId,
     },
   };
   await executeStep(step, step.inputImages, () => provider);

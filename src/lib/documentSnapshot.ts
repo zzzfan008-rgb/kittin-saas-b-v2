@@ -19,6 +19,7 @@ import {
   missingTextUpstreamNodeIds,
   nodeSpecForKind,
   textNodesOverGeneratorLimit,
+  type ImageOperationMode,
   type NodeKind,
   type PersistedWorkflow,
   type ReferenceEdgeData,
@@ -42,45 +43,39 @@ import {
  * 3. 校验（文档图不变量）：plan.md §2 连线规则 + data-model.md §7 C1-C7 的前端侧回归网。
  */
 
-interface PromptBindingDocumentFields {
-  promptVariantId?: string;
-  promptFamilyId?: string;
-  parameterProfileId?: string;
-  contractHash?: `sha256:${string}`;
-  evaluationVersion?: string;
-  postprocessVersion?: string;
-}
-
 /**
  * 文档节点数据（不含运行态字段 status/error；保存时统一写 idle）。
  * 输入节点只保留契约字段，v7 遗留的生成字段在投影时被剥离（migration.md §2 M8）。
+ *
+ * v9（64 Phase 3）：v7 variant 绑定六字段（promptVariantId/promptFamilyId/
+ * parameterProfileId/contractHash/evaluationVersion/postprocessVersion）已随概念删除；
+ * 模式改由 operationMode 归节点 data（64 裁决 A）。
  */
 export type DocumentNodeData =
   | { kind: "text"; label: string; text: string }
   | { kind: "image"; label: string; outputImages: string[] }
   | { kind: "video"; label: string; outputVideos: string[] }
-  | ({
+  | {
       kind: "image-generator";
       label: string;
-      /** 必填字段（C4）；空串表示「尚未选择功能」，只影响可运行性，不阻断文档保存。 */
-      promptVariantId: string;
       /** 文档层保留原始模型 id（历史文档可能绑定已退役模型，运行准入负责 fail-closed）。 */
       modelId: string;
       aspectRatio: string;
       batchSize: number;
       modelOptions?: ImageModelOptions;
+      operationMode?: ImageOperationMode;
       mask?: string;
       maskSourceRef?: string;
       featherRadius?: number;
-    } & Omit<PromptBindingDocumentFields, "promptVariantId">)
-  | ({
+    }
+  | {
       kind: "video-generator";
       label: string;
-      promptVariantId: string;
       modelId: string;
       aspectRatio: string;
       modelOptions?: VideoModelOptions;
-    } & Pick<PromptBindingDocumentFields, "contractHash" | "evaluationVersion">)
+      operationMode?: ImageOperationMode;
+    }
   | {
       kind: "result-image";
       label: string;
@@ -204,29 +199,17 @@ function cloneScalarRecord(value: unknown): ImageModelOptions | undefined {
   return result;
 }
 
-function contractHashField(value: unknown): { contractHash?: `sha256:${string}` } {
-  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value)
-    ? { contractHash: value as `sha256:${string}` }
-    : {};
-}
-
-/** 生成层的功能绑定字段（data-model.md §4；值非字符串一律不写入文档）。 */
-function promptBindingFields(data: WorkflowNodeData): Partial<PromptBindingDocumentFields> {
-  const field = (key: string): string | undefined => (
-    typeof data[key] === "string" ? data[key] as string : undefined
-  );
-  return {
-    ...optionalString("promptFamilyId", field("promptFamilyId")),
-    ...optionalString("parameterProfileId", field("parameterProfileId")),
-    ...contractHashField(field("contractHash")),
-    ...optionalString("evaluationVersion", field("evaluationVersion")),
-    ...optionalString("postprocessVersion", field("postprocessVersion")),
-  };
-}
-
 function generatorAspectRatio(data: WorkflowNodeData, fallback: string): string {
   const value = data.aspectRatio;
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+/** v9：operationMode 窄化写入（三值合法集，其余不写文档——与 flowStore 会话恢复同判据）。 */
+function operationModeField(data: WorkflowNodeData): { operationMode?: ImageOperationMode } {
+  const value = data.operationMode;
+  return value === "generate" || value === "edit" || value === "mask-edit"
+    ? { operationMode: value }
+    : {};
 }
 
 /**
@@ -248,38 +231,28 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
       return {
         kind: "image-generator",
         label: data.label,
-        promptVariantId: stringOrEmpty(data.promptVariantId),
         modelId: stringOrEmpty(data.modelId),
         aspectRatio: generatorAspectRatio(data, "3:4"),
         batchSize: typeof data.batchSize === "number" && Number.isFinite(data.batchSize)
           ? Math.max(1, Math.min(8, Math.round(data.batchSize)))
           : 1,
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
-        ...optionalString("operationMode", typeof data.operationMode === "string" ? data.operationMode : undefined),
+        ...operationModeField(data),
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
         ...(typeof featherRadius === "number" && Number.isFinite(featherRadius)
           ? { featherRadius: Math.max(0, Math.min(64, Math.round(featherRadius))) }
           : {}),
-        ...promptBindingFields(data),
       };
     }
     case "video-generator":
       return {
         kind: "video-generator",
         label: data.label,
-        promptVariantId: stringOrEmpty(data.promptVariantId),
         modelId: stringOrEmpty(data.modelId),
         aspectRatio: generatorAspectRatio(data, "adaptive"),
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
-        ...optionalString("operationMode", typeof data.operationMode === "string" ? data.operationMode : undefined),
-        // documentSnapshot reads data.contractHash / data.evaluationVersion for
-        // serialisation only. These fields do NOT participate in the authorization
-        // identity chain (see dag.ts:343-344). If video-generator gains
-        // authorization identity semantics, these snapshot fields MUST be
-        // re-derived from the variant registry like image-generator.
-        ...contractHashField(data.contractHash),
-        ...optionalString("evaluationVersion", typeof data.evaluationVersion === "string" ? data.evaluationVersion : undefined),
+        ...operationModeField(data),
       };
     case "result-image": {
       const outputSizes = optionalNullableStringList(data.outputSizes);
@@ -325,16 +298,12 @@ const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",
-    "promptVariantId", "promptFamilyId", "parameterProfileId",
-    "contractHash", "evaluationVersion", "postprocessVersion",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
     "operationMode",
     "mask", "maskSourceRef", "featherRadius",
   ],
   "video-generator": [
     "kind", "label",
-    "promptVariantId", "promptFamilyId", "parameterProfileId",
-    "contractHash", "evaluationVersion",
     "modelId", "aspectRatio", "modelOptions",
     "operationMode",
   ],
@@ -577,8 +546,7 @@ export type DocumentGraphIssueCode =
   | "missing-text-upstream"
   | "misdirected-result-source"
   | "dangling-result-source"
-  | "video-generator-aspect-ratio"
-  | "generator-missing-binding";
+  | "video-generator-aspect-ratio";
 
 export interface DocumentGraphIssue {
   code: DocumentGraphIssueCode;
@@ -596,7 +564,8 @@ export interface DocumentGraphIssue {
  *   · missing-text-upstream：runtime.md §5 允许生成节点上游全断（「待接线」），D10 禁止自我销毁
  *   · dangling-result-source：C7 情形 (b)（data-model.md §7，R-90 两档语义）——生成节点已被用户
  *     删除，悬空引用合法（§5.1「删除生成节点不删 result 节点」），溯源走 runId，故不在此 fail-closed
- *   · generator-missing-binding：用户可能先建生成节点再选功能（C4 的运行期语义）
+ *   · v9（64 Phase 3）：「generator-missing-binding」不变量已随 variant 绑定概念删除——
+ *     modelId 恒有缺省回落，任务文本由上游 text 供词，不存在「未绑定功能」状态
  *
  * C7 两档互斥（命中非生成节点 → error；不命中任何节点 → warning），由
  * `misdirectedResultSourceNodeIds` / `danglingResultNodeIds` 两个谓词分别承担，
@@ -666,23 +635,7 @@ export function documentGraphIssues(snapshot: Pick<DocumentSnapshot, "nodes" | "
     });
   }
   for (const node of snapshot.nodes) {
-    if (node.data.kind === "image-generator" && !node.data.promptVariantId) {
-      issues.push({
-        code: "generator-missing-binding",
-        severity: "warning",
-        nodeId: node.id,
-        message: `生成节点 ${node.id} 尚未绑定功能，无法运行`,
-      });
-    }
     if (node.data.kind === "video-generator") {
-      if (!node.data.promptVariantId) {
-        issues.push({
-          code: "generator-missing-binding",
-          severity: "warning",
-          nodeId: node.id,
-          message: `生成节点 ${node.id} 尚未绑定功能，无法运行`,
-        });
-      }
       const hasFirstFrame = snapshot.edges.some((edge) => (
         edge.target === node.id && resolveTargetHandle(
           snapshot.nodes.find((candidate) => candidate.id === edge.source)?.data.kind,

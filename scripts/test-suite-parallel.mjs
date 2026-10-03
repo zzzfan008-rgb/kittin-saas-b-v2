@@ -67,14 +67,11 @@ const TEST_FILES = [
   "tests/asset-library-model.test.ts",
   "tests/apiyi-docs.test.ts",
   "tests/r48-version-gate.test.ts",
-  "tests/model-parameter-profiles.test.ts",
-  "tests/node-prompt-parameter-matrix.test.ts",
   "tests/prompt-run-admission.test.ts",
   "tests/dag.test.ts",
   "tests/document-snapshot.test.ts",
   "tests/active-document-boundary.test.ts",
   "tests/workflow-schema.test.ts",
-  "tests/text-provider.test.ts",
   "tests/generation-kind-contract.test.ts",
   "tests/apiyi-transport.test.ts",
   "tests/provider-contract.test.ts",
@@ -127,19 +124,15 @@ const TEST_FILES = [
 
 /**
  * 留盘不登记的测试文件（豁免清单完整性断言）：文件保留在盘上但不进 TEST_FILES，
- * 处置统一归档 64 Phase 3（用户已拍板）：
- * - prompt-presets / prompt-preset-ui / prompt-evaluation-release：
- *   被测模块属于待删孤儿，测试文件先留盘随 64 Phase 3 一并处置。
- * - prompt-evaluation：用户拍板 a=删，随 64 Phase 3 连同被测孤儿模块删除。
- * （templates-v8 已于 64 Phase 1 C7 重写并重新登记，不再豁免。）
- * 若其中某个文件先于 64 Phase 3 被删除，本常量需同步移除对应条目，
+ * 处置统一归档 64 Phase 3 / 65（用户已拍板）：
+ * - prompt-preset-ui：被测 UI 模块属 64 Phase 2 前端重构面，测试文件留盘随 65 UX 改造一并处置。
+ *   （prompt-presets / prompt-evaluation-release 已随 64 Phase 3 删除，prompt-evaluation
+ *   已随用户拍板 a=删连同被测孤儿模块删除，豁免已同步撤除。）
+ * 若其中某个文件先被删除，本常量需同步移除对应条目，
  * 否则 assertManifestMatchesDisk 的 excludedButGone 检查会 fail-closed 报错。
  */
 const EXCLUDED_FROM_MANIFEST = new Set([
-  "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",
-  "tests/prompt-evaluation-release.test.ts",
-  "tests/prompt-evaluation.test.ts",
 ]);
 
 /**

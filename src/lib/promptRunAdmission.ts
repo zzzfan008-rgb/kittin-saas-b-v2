@@ -1,8 +1,4 @@
 import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../types/modelParameterProfiles";
-import {
   getImageModelContract,
   isImageModelId,
   modelMaxReferenceImages,
@@ -123,12 +119,6 @@ export interface PromptRunAdmissionInput {
    * 生成路由（/api/generate）作回退。unknown：形状必须被证明，绝不静默过滤。
    */
   inputTexts?: unknown;
-  promptVariantId?: unknown;
-  promptFamilyId?: unknown;
-  parameterProfileId?: unknown;
-  contractHash?: unknown;
-  evaluationVersion?: unknown;
-  postprocessVersion?: unknown;
   aspectRatio?: unknown;
   batchSize?: unknown;
   modelOptions?: unknown;
@@ -140,9 +130,6 @@ export interface PromptRunAdmissionDecision {
   code:
     | "verified"
     | "node-product-policy-blocked"
-    | "unknown-variant"
-    | "prompt-drift"
-    | "parameter-drift"
     | "retired-model"
     | "unsupported-model"
     | "model-node-incompatible"
@@ -157,54 +144,6 @@ export interface PromptRunAdmissionDecision {
 
 function isImageOperationMode(value: unknown): value is ImageOperationMode {
   return value === "generate" || value === "edit" || value === "mask-edit";
-}
-
-/**
- * v7 task prompt 合成（runtime.md §1 第 3 步），必须与
- * server/engine/runner.ts executeImageStep、server/lib/evaluationEvidence.ts
- * 逐字同一套：taskPrompt = variant.fullPrompt + "\n\n" + userPrompt；
- * userPrompt 取上游 text 正文（inputTexts，边顺序、"\n\n" 拼接），无 text
- * 上游的直连生成路径回退 params.prompt。
- *
- * 准入是 fail-closed 证据边界：inputTexts 一旦提供就必须是全字符串数组
- * （DAG 产出的形状）；伪造请求或脏持久化产生的其他形状返回 null，绝不按
- * runner 的容错 filter 静默丢弃。用户正文缺失时同样返回 null。
- */
-export function synthesizeVariantTaskPrompt(
-  input: { inputTexts?: unknown; prompt?: unknown },
-  variant: { fullPrompt: string },
-): string | null {
-  let inputTexts: string[];
-  if (input.inputTexts === undefined) {
-    inputTexts = [];
-  } else if (
-    Array.isArray(input.inputTexts)
-    && (input.inputTexts as unknown[]).every((value) => typeof value === "string")
-  ) {
-    inputTexts = input.inputTexts as string[];
-  } else {
-    return null;
-  }
-  const userPrompt = inputTexts.length > 0
-    ? inputTexts.join("\n\n")
-    : (typeof input.prompt === "string" ? input.prompt : "");
-  if (!userPrompt) return null;
-  return `${variant.fullPrompt}\n\n${userPrompt}`.trim();
-}
-
-/**
- * v7 drift 语义：受审身份是服务端目录钉死的 variant.fullPrompt（变体绑定五字段
- * + parameterProfile 已单独比对），客户端无法影响系统提示词。这里验证合成出的
- * taskPrompt 确实把该 fullPrompt 完整内联在最前；v6 的「提示词变体：<id>」
- * 客户端包装后缀校验已删除，且没有任何兼容路径。
- */
-function synthesizedPromptMatchesVariant(
-  input: PromptRunAdmissionInput,
-  variant: { fullPrompt: string },
-): boolean {
-  const taskPrompt = synthesizeVariantTaskPrompt(input, variant);
-  if (taskPrompt === null) return false;
-  return taskPrompt.startsWith(`${variant.fullPrompt}\n\n`);
 }
 
 /** Shared early model/mode/reference compatibility gate for UI, Store and DAG. */
@@ -274,10 +213,9 @@ export function evaluatePromptRunCompatibility(
     }
   }
   const references = input.references ?? [];
-  if (
-    operationMode === "generate"
-    || (operationMode === undefined && input.promptVariantId === undefined)
-  ) {
+  // v9（64 Phase 2）：operationMode 归节点 data。generate 的参考图冲突来自 mode 本身；
+  // operationMode 未定义时（直连生成路由），server 侧 DAG 授权兜底，浏览器闸跳过。
+  if (operationMode === "generate") {
     if (references.length > 0) {
       return {
         allowed: false,
@@ -322,19 +260,6 @@ export function evaluatePromptRunCompatibility(
 }
 
 /**
- * v8 过渡桥：生成节点在提示词目录里仍以 v7 轴（`image` / `video`）登记
- * （`PromptVariant.nodeKind` 属服务端目录契约；目录轴迁移未完成，见 architect R-89）。
- * 绑定比较必须接受这组对映，否则每个 v8 生成节点都会被 fail-closed 拒绝。
- * 目录轴迁移完成后本函数与其调用点一并删除。
- */
-function nodeKindMatchesCatalogAxis(nodeKind: string, catalogNodeKind: string): boolean {
-  if (nodeKind === catalogNodeKind) return true;
-  if (nodeKind === "image-generator" && catalogNodeKind === "image") return true;
-  if (nodeKind === "video-generator" && catalogNodeKind === "video") return true;
-  return false;
-}
-
-/**
  * Compatibility-only admission: evaluates model/mode/reference compatibility
  * without binding, drift, or support-status gates. Use for UI/Store/DAG.
  * Server-side authorization is handled by the run queue.
@@ -361,12 +286,6 @@ export function promptRunAdmissionInputFromParams(
     operationModeNeedsConfirmation: params.operationModeNeedsConfirmation,
     prompt: params.prompt,
     inputTexts: params.inputTexts,
-    promptVariantId: params.promptVariantId,
-    promptFamilyId: params.promptFamilyId,
-    parameterProfileId: params.parameterProfileId,
-    contractHash: params.contractHash,
-    evaluationVersion: params.evaluationVersion,
-    postprocessVersion: params.postprocessVersion,
     aspectRatio: params.aspectRatio,
     batchSize: params.batchSize,
     modelOptions: params.modelOptions,

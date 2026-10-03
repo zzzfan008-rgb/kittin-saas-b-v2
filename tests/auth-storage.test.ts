@@ -21,35 +21,19 @@ const { purgeExpiredProjects } = await import("../server/routes/projects");
 const { openAiMaskTestRecordPath } = await import("../server/lib/openaiMaskTestLifecycle");
 const { verifyPassword } = await import("../server/lib/password");
 const { enqueueGenerationRun, processNextGenerationJob } = await import("../server/engine/runQueue");
-const { requireGarmentPromptVariant } = await import("../src/lib/garmentPromptPresets");
-const { getModelParameterProfile, materializeModelParameterProfile } = await import("../src/types/modelParameterProfiles");
-const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
-
-const storageGenerateVariant = requireGarmentPromptVariant({
-  familyId: "fashion-lookbook",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "generate",
-});
-promotePromptVariantForTest(storageGenerateVariant);
-const storageGenerateProfile = getModelParameterProfile(storageGenerateVariant.parameterProfileId)!;
-const storageGenerateParameters = materializeModelParameterProfile(storageGenerateProfile);
+// v9（64 Phase 3）：variant 绑定概念已删——params 直给模型与模式（dag extractParams 同源形态）。
 
 function boundStorageGenerateParams(intent: string): Record<string, unknown> {
   return {
-    // v8：用户正文沿 text 边进入 inputTexts，不再提交 buildGarmentPrompt 包装。
+    // v9（64 Phase 3）：用户正文沿 text 边进入 inputTexts；任务模式/模型直给，
+    // 六绑定字段（promptVariantId/promptFamilyId/parameterProfileId/contractHash/
+    // evaluationVersion/postprocessVersion）已随 variant 概念删除。
     inputTexts: [intent],
-    promptVariantId: storageGenerateVariant.variantId,
-    promptFamilyId: storageGenerateVariant.familyId,
-    parameterProfileId: storageGenerateVariant.parameterProfileId,
-    contractHash: storageGenerateVariant.contractHash,
-    evaluationVersion: storageGenerateVariant.evaluationVersion,
-    postprocessVersion: storageGenerateProfile.postprocess.version,
-    operationMode: storageGenerateVariant.mode,
-    modelId: storageGenerateVariant.modelId,
-    modelOptions: storageGenerateParameters.modelOptions,
-    aspectRatio: storageGenerateParameters.aspectRatio,
-    batchSize: storageGenerateParameters.batchSize,
+    operationMode: "generate",
+    modelId: "gpt-image-2.5-flare-vip",
+    modelOptions: {},
+    aspectRatio: "1:1",
+    batchSize: 1,
   };
 }
 
