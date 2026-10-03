@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "builtin-print-mutate",
   "name": "印花裂变",
   "description": "上传印花图，描述裂变方向与数量，生成风格一致的新变体",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "nodes": [
       {
         "id": "mutate-requirement",
@@ -19,7 +19,7 @@
           "kind": "text",
           "label": "裂变方向/数量",
           "status": "idle",
-          "text": "【要求】描述印花裂变的方向与数量"
+          "text": "基于这张印花图案生成风格一致的新变体：保持原有配色体系、艺术风格与笔触质感，重新编排元素的构图与组合方式，纯白背景，适合作为印花素材复用"
         }
       },
       {
@@ -47,12 +47,12 @@
           "kind": "image-generator",
           "label": "印花裂变",
           "status": "idle",
-          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare-vip",
           "modelOptions": {
-            "size": "1536x2048"
+            "quality": "high"
           },
-          "aspectRatio": "3:4",
+          "aspectRatio": "1:1",
           "batchSize": 2
         }
       }

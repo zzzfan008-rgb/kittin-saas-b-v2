@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "builtin-digital-model",
   "name": "数字模特",
   "description": "上传服装图，描述数字模特风格，生成数字模特上身效果",
   "builtIn": true,
   "createdAt": "2026-08-05T00:00:00.000Z",
   "flow": {
-    "schemaVersion": 8,
+    "schemaVersion": 9,
     "nodes": [
       {
         "id": "model-requirement",
@@ -19,7 +19,7 @@
           "kind": "text",
           "label": "数字模特风格要求",
           "status": "idle",
-          "text": "【要求】描述数字模特的风格与外观要求"
+          "text": "GPT Image 2 VIP 多图写实穿搭编辑。严格按请求中“图1、图2……”的序号及 identity、pose_composition、garment_top、garment_bottom、garment_full、fabric、accessory、styling_only、background 角色使用每张图，不得跨角色挪用身份或服装。\n将指定服装穿到 identity 模特身上，按 pose_composition 设置平视机位、中远景、约 50mm 视角、姿势与取景；忠实保留模特特征、服装版型、花型、材质和穿搭层级，动作与衣摆运动方向可信。\n输出 3:4 单人全身时装 Lookbook；除明确指定的穿搭替换外，脸部、发型、肤色、身材、姿势、背景和非目标区域不变，无文字、Logo、水印、僵硬手势或过度磨皮。"
         }
       },
       {
@@ -47,12 +47,12 @@
           "kind": "image-generator",
           "label": "数字模特生成",
           "status": "idle",
-          "promptVariantId": "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+          "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare-vip",
           "modelOptions": {
-            "size": "1536x2048"
+            "quality": "high"
           },
-          "aspectRatio": "3:4",
+          "aspectRatio": "1:1",
           "batchSize": 1
         }
       }
