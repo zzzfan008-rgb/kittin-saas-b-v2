@@ -5,6 +5,10 @@
  * 「我的模板」功能已取消（2026-09-25 决策）：POST / DELETE 写入路径已移除，
  * 用户模板生命周期（server/lib/userTemplateLifecycle.ts）已删除。
  * 内置模板存 data/templates/builtin/（启动时增量补齐）。
+ *
+ * v9（64 Phase 1 C7）：generator 模板显式 modelId + operationMode + 契约默认参数
+ * （aspectRatio 1:1 / batchSize 1，拍板③）；text 模板写入 family 预设模板文本
+ * （server/lib/promptPresetsFrozen.ts 冻结表），所见即所发（裁决 B）。
  */
 import { Router } from "express";
 import fs from "node:fs";
@@ -17,6 +21,7 @@ import { thumbnailUrlForImage } from "../lib/fileStore";
 import {
   WORKFLOW_SCHEMA_VERSION,
   type BatchSize,
+  type ImageOperationMode,
   type PersistedWorkflowEdge,
   type PersistedWorkflowNode,
   type WorkflowTemplate,
@@ -29,11 +34,7 @@ import {
   DEFAULT_VIDEO_MODEL_ID,
   type VideoModelOptions,
 } from "../../src/types/videoModels";
-import { getGarmentPromptVariantById } from "../../src/lib/garmentPromptPresets";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../../src/types/modelParameterProfiles";
+import { presetTemplateText } from "../lib/promptPresetsFrozen";
 
 export const templatesRouter = Router();
 
@@ -47,28 +48,31 @@ function templatePath(id: string): string {
   return path.join(templatesDir(), `${path.basename(id)}.json`);
 }
 
-// ---------- 内置模板（v8 三层七节点：输入层 + 生成层 + 边，不含 result 节点）----------
+// ---------- 内置模板（v9 三层七节点：输入层 + 生成层 + 边，不含 result 节点）----------
 // 结构契约：docs/design/2026-09-21-five-node-model/contracts/template-format.md
 const BUILTIN_CREATED_AT = "2026-08-05T00:00:00.000Z";
-// 变体 id 以 src/lib/garmentPromptPresets.ts（P2-d 目录）实际值为准；
-// 注册前经 getGarmentPromptVariantById 逐条解析验证（P4）。
-const GENERATE_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1";
-const EDIT_VARIANT = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
-const VIDEO_VARIANT = "video-animate.doubao-seedance-2-5-260628.edit.v1";
 // 视频生成节点硬约束：aspectRatio 必须 "adaptive"（Seedance 首帧任务，C6/P5）。
 const VIDEO_OPTIONS = { seconds: "5", resolution: "720p", aspectRatio: "adaptive" } as const;
+
+/** family 预设模板文本（冻结表查询）；缺失即启动即抛（fail-closed，模板与目录必须同步）。 */
+function requirePresetText(familyId: string, mode: ImageOperationMode): string {
+  const text = presetTemplateText(familyId, mode);
+  if (text === undefined) {
+    throw new Error(`内置模板引用了不存在的预设模板文本: ${familyId}:${mode}`);
+  }
+  return text;
+}
 
 function textNode(id: string, x: number, y: number, label: string, text: string): PersistedWorkflowNode {
   return { id, type: "text", position: { x, y }, data: { kind: "text", label, status: "idle", text } };
 }
 
 function imageNode(id: string, x: number, y: number, label: string): PersistedWorkflowNode {
-  // v8：输入节点不承载任何生成语义（无 variantId / modelId / aspectRatio / batchSize）。
+  // v9：输入节点不承载任何生成语义（无 modelId / operationMode / aspectRatio / batchSize）。
   return { id, type: "image", position: { x, y }, data: { kind: "image", label, status: "idle", outputImages: [] } };
 }
 
 interface ImageGeneratorOptions {
-  aspectRatio?: string;
   batchSize?: BatchSize;
 }
 
@@ -77,21 +81,13 @@ function imageGeneratorNode(
   x: number,
   y: number,
   label: string,
-  variantId: string,
+  operationMode: ImageOperationMode,
   options: ImageGeneratorOptions = {},
 ): PersistedWorkflowNode {
-  // 生成层：功能绑定 + 参数物化。变体绑定是唯一事实源，档案缺失时退回合同推荐默认值，
-  // 由 parameter-drift 闸门在运行时拒绝（沿用 v7 的物化口径）。
-  const boundVariant = getGarmentPromptVariantById(variantId);
-  const boundProfile = boundVariant
-    ? getModelParameterProfile(boundVariant.parameterProfileId)
-    : undefined;
-  const materialized = boundProfile
-    ? materializeModelParameterProfile(boundProfile)
-    : undefined;
-  const aspectRatio = options.aspectRatio
-    ?? (materialized && materialized.aspectRatio !== "source" ? materialized.aspectRatio : "3:4");
-  const batchSize = options.batchSize ?? (materialized ? materialized.batchSize : 1);
+  // v9（64 Phase 1 C7）：variant 绑定删除；显式 modelId + operationMode + 契约默认参数
+  //（aspectRatio 1:1 / batchSize 1，拍板③）；modelOptions 走契约推荐默认（裁决 C）。
+  const aspectRatio = "1:1";
+  const batchSize = options.batchSize ?? 1;
   return {
     id,
     type: "image-generator",
@@ -100,20 +96,13 @@ function imageGeneratorNode(
       kind: "image-generator",
       label,
       status: "idle",
-      promptVariantId: variantId,
+      operationMode,
       modelId: DEFAULT_GENERATION_MODEL_ID,
-      modelOptions: materialized
-        ? materialized.modelOptions
-        : defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
+      modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
       aspectRatio,
       batchSize,
     },
   };
-}
-
-interface VideoGeneratorOptions {
-  aspectRatio?: string;
-  modelOptions?: VideoModelOptions;
 }
 
 function videoGeneratorNode(
@@ -121,9 +110,9 @@ function videoGeneratorNode(
   x: number,
   y: number,
   label: string,
-  variantId: string,
-  options: VideoGeneratorOptions = {},
 ): PersistedWorkflowNode {
+  // v9：variant 绑定删除。视频模板 operationMode=generate（零系统文本），
+  // 动效任务文本写入 text 正文（frozen video-animate），避免与 runner 系统文本重复拼装。
   return {
     id,
     type: "video-generator",
@@ -132,10 +121,10 @@ function videoGeneratorNode(
       kind: "video-generator",
       label,
       status: "idle",
-      promptVariantId: variantId,
+      operationMode: "generate",
       modelId: DEFAULT_VIDEO_MODEL_ID,
-      modelOptions: options.modelOptions ?? { ...VIDEO_OPTIONS },
-      aspectRatio: options.aspectRatio ?? "adaptive",
+      modelOptions: { ...VIDEO_OPTIONS },
+      aspectRatio: "adaptive",
     },
   };
 }
@@ -157,10 +146,10 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("tryon-requirement", 0, -170, "试穿要求", "【服装】上传服装图\n【数字模特】上传数字模特图\n【要求】描述试穿后的模特姿态、场景与镜头（可空）"),
+          textNode("tryon-requirement", 0, -170, "试穿要求", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("model", 0, 210, "数字模特"),
-          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", EDIT_VARIANT),
+          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit"),
         ],
         edges: [
           edge("e-tryon-prompt", "tryon-requirement", "tryon-gen", "prompt"),
@@ -179,9 +168,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("pose-requirement", 0, -170, "Pose/镜头要求", "【要求】描述目标 Pose、镜头与构图"),
+          textNode("pose-requirement", 0, -170, "Pose/镜头要求", requirePresetText("fashion-lookbook", "edit")),
           imageNode("source", 0, 20, "服装或模特图"),
-          imageGeneratorNode("pose-gen", 380, -75, "摆拍生成", EDIT_VARIANT),
+          imageGeneratorNode("pose-gen", 380, -75, "摆拍生成", "edit"),
         ],
         edges: [
           edge("e-pose-prompt", "pose-requirement", "pose-gen", "prompt"),
@@ -199,9 +188,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("background-requirement", 0, -170, "目标背景描述", "【要求】描述目标背景"),
+          textNode("background-requirement", 0, -170, "目标背景描述", requirePresetText("fashion-lookbook", "edit")),
           imageNode("subject", 0, 20, "人物或产品图"),
-          imageGeneratorNode("background-gen", 380, -75, "换背景生成", EDIT_VARIANT),
+          imageGeneratorNode("background-gen", 380, -75, "换背景生成", "edit"),
         ],
         edges: [
           edge("e-background-prompt", "background-requirement", "background-gen", "prompt"),
@@ -219,9 +208,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("lookbook-requirement", 0, -170, "风格/场景清单", "【要求】列出风格与场景清单"),
+          textNode("lookbook-requirement", 0, -170, "风格/场景清单", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
-          imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", EDIT_VARIANT, { batchSize: 2 }),
+          imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", "edit", { batchSize: 2 }),
         ],
         edges: [
           edge("e-lookbook-prompt", "lookbook-requirement", "lookbook-gen", "prompt"),
@@ -239,9 +228,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("model-requirement", 0, -170, "数字模特风格要求", "【要求】描述数字模特的风格与外观要求"),
+          textNode("model-requirement", 0, -170, "数字模特风格要求", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
-          imageGeneratorNode("model-gen", 380, -75, "数字模特生成", EDIT_VARIANT),
+          imageGeneratorNode("model-gen", 380, -75, "数字模特生成", "edit"),
         ],
         edges: [
           edge("e-model-prompt", "model-requirement", "model-gen", "prompt"),
@@ -260,9 +249,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("extract-requirement", 0, -170, "提取要求", "【要求】描述印花提取的范围与整理要求"),
+          textNode("extract-requirement", 0, -170, "提取要求", requirePresetText("print-extract", "edit")),
           imageNode("garment", 0, 20, "带印花服装"),
-          imageGeneratorNode("extract-gen", 380, -75, "印花提取", EDIT_VARIANT),
+          imageGeneratorNode("extract-gen", 380, -75, "印花提取", "edit"),
         ],
         edges: [
           edge("e-extract-prompt", "extract-requirement", "extract-gen", "prompt"),
@@ -280,9 +269,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("mutate-requirement", 0, -170, "裂变方向/数量", "【要求】描述印花裂变的方向与数量"),
+          textNode("mutate-requirement", 0, -170, "裂变方向/数量", requirePresetText("print-mutate", "edit")),
           imageNode("print", 0, 20, "印花图"),
-          imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", EDIT_VARIANT, { batchSize: 2 }),
+          imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", "edit", { batchSize: 2 }),
         ],
         edges: [
           edge("e-mutate-prompt", "mutate-requirement", "mutate-gen", "prompt"),
@@ -300,9 +289,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("recolor-requirement", 0, -170, "目标配色清单", "【要求】列出目标配色"),
+          textNode("recolor-requirement", 0, -170, "目标配色清单", requirePresetText("fabric-recolor", "edit")),
           imageNode("garment", 0, 20, "服装图"),
-          imageGeneratorNode("recolor-gen", 380, -75, "换色生成", EDIT_VARIANT),
+          imageGeneratorNode("recolor-gen", 380, -75, "换色生成", "edit"),
         ],
         edges: [
           edge("e-recolor-prompt", "recolor-requirement", "recolor-gen", "prompt"),
@@ -320,10 +309,10 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("fabric-requirement", 0, -170, "面料说明", "【要求】描述目标面料的质感与说明"),
+          textNode("fabric-requirement", 0, -170, "面料说明", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("fabric", 0, 210, "面料参考"),
-          imageGeneratorNode("fabric-gen", 380, 20, "面料更换合成", EDIT_VARIANT),
+          imageGeneratorNode("fabric-gen", 380, 20, "面料更换合成", "edit"),
         ],
         edges: [
           edge("e-fabric-prompt", "fabric-requirement", "fabric-gen", "prompt"),
@@ -342,9 +331,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("sketch-requirement", 0, -170, "面料/色彩/风格", "【要求】描述面料、色彩与风格"),
+          textNode("sketch-requirement", 0, -170, "面料/色彩/风格", requirePresetText("fashion-lookbook", "edit")),
           imageNode("sketch", 0, 20, "线稿"),
-          imageGeneratorNode("sketch-gen", 380, -75, "线稿渲染", EDIT_VARIANT),
+          imageGeneratorNode("sketch-gen", 380, -75, "线稿渲染", "edit"),
         ],
         edges: [
           edge("e-sketch-prompt", "sketch-requirement", "sketch-gen", "prompt"),
@@ -362,9 +351,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("restyle-requirement", 0, -170, "改款指令", "【要求】描述改款方向（领型、袖长、廓形等）"),
+          textNode("restyle-requirement", 0, -170, "改款指令", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
-          imageGeneratorNode("restyle-gen", 380, -75, "改款生成", EDIT_VARIANT),
+          imageGeneratorNode("restyle-gen", 380, -75, "改款生成", "edit"),
         ],
         edges: [
           edge("e-restyle-prompt", "restyle-requirement", "restyle-gen", "prompt"),
@@ -382,8 +371,8 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("outfit-requirement", 0, -170, "场合/风格/身材", "【要求】描述场合、风格与身材"),
-          imageGeneratorNode("outfit-gen", 380, -170, "穿搭推荐", GENERATE_VARIANT),
+          textNode("outfit-requirement", 0, -170, "场合/风格/身材", requirePresetText("fashion-lookbook", "generate")),
+          imageGeneratorNode("outfit-gen", 380, -170, "穿搭推荐", "generate"),
         ],
         edges: [
           edge("e-outfit-prompt", "outfit-requirement", "outfit-gen", "prompt"),
@@ -400,9 +389,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("mannequin-requirement", 0, -170, "人台要求", "【要求】描述人台与立裁要求"),
+          textNode("mannequin-requirement", 0, -170, "人台要求", requirePresetText("fashion-lookbook", "edit")),
           imageNode("person", 0, 20, "真人着装图"),
-          imageGeneratorNode("mannequin-gen", 380, -75, "转人台生成", EDIT_VARIANT),
+          imageGeneratorNode("mannequin-gen", 380, -75, "转人台生成", "edit"),
         ],
         edges: [
           edge("e-mannequin-prompt", "mannequin-requirement", "mannequin-gen", "prompt"),
@@ -421,9 +410,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", "【要求】描述走秀动作、镜头与场景"),
+          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", requirePresetText("video-animate", "edit")),
           imageNode("source", 0, 20, "服装或模特图"),
-          videoGeneratorNode("runway-gen", 380, -75, "走秀视频", VIDEO_VARIANT),
+          videoGeneratorNode("runway-gen", 380, -75, "走秀视频"),
         ],
         edges: [
           edge("e-runway-prompt", "runway-requirement", "runway-gen", "prompt"),
@@ -441,9 +430,9 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("xhs-requirement", 0, -170, "小红书脚本", "【要求】描述小红书视频脚本"),
+          textNode("xhs-requirement", 0, -170, "小红书脚本", requirePresetText("video-animate", "edit")),
           imageNode("main-image", 0, 20, "主图"),
-          videoGeneratorNode("xhs-gen", 380, -75, "小红书视频", VIDEO_VARIANT),
+          videoGeneratorNode("xhs-gen", 380, -75, "小红书视频"),
         ],
         edges: [
           edge("e-xhs-prompt", "xhs-requirement", "xhs-gen", "prompt"),
