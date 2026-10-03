@@ -90,10 +90,18 @@ async function dismissTutorial(page: import("@playwright/test").Page) {
 }
 
 async function addRailNode(page: import("@playwright/test").Page, label: "文本" | "图片" | "视频") {
-  await page.getByRole("button", { name: "添加" }).hover();
-  await page.waitForTimeout(100); // CI: menu renders async, give DOM time to appear
+  const addButton = page.getByRole("button", { name: "添加" });
   const menu = page.getByRole("menu", { name: "添加" });
-  await expect(menu).toBeVisible();
+  // helper 加固（非本 PR 断言面）：rail 菜单是 hover 异步打开（WorkbenchShell 120ms openTimer
+  // + 点击关闭后 250ms hover 抑制窗口），固定等待不足以覆盖；轮询菜单出现、必要时重新 hover。
+  // 断言强度不变。
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await addButton.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   await Promise.all([
     page.waitForEvent("filechooser", { timeout: 4_000 }).catch(() => undefined),
     menu.getByRole("menuitem", { name: label }).click(),

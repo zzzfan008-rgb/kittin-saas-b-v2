@@ -1,26 +1,51 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-// v8（plan.md §3.3）：功能目录 / 参数配置由 v7 悬浮窗口（NodeInspectorWindowPortal，已退役）
-// 迁到生成节点内的内联面板 GeneratorParamsPanel。
+// v9（64 Phase 2）：功能目录迁出，生成节点面板参数自治（裁决 C）。
 const panelSource = fs.readFileSync(
   new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
   "utf8",
 );
+const toolbarSource = fs.readFileSync(
+  new URL("../src/components/nodes/NodeToolbar.tsx", import.meta.url),
+  "utf8",
+);
+const textNodeSource = fs.readFileSync(
+  new URL("../src/components/nodes/TextNode.tsx", import.meta.url),
+  "utf8",
+);
 
-// 提示词变体选择仍是「直接绑定」：选中即写 promptVariantId，不再有 pending 确认态；
-// 撤销/下线由 variantRevoked 拦截运行。
-assert.match(panelSource, /const selectedVariant[\s\S]{0,80}data\.promptVariantId/);
-assert.doesNotMatch(panelSource, /pendingVariant/);
-assert.match(panelSource, /variantRevoked/);
-assert.match(panelSource, /promptVariantId: variant\.variantId/);
-// 内联面板没有对话框，但「阻塞原因」必须走可访问的告警语义 + 参数 warning 走 role=status。
-assert.match(panelSource, /role="alert"/);
-assert.match(panelSource, /role="status"/);
-assert.match(panelSource, /aria-label="模型参数"/);
-// 运行闸门仍由准入判定决定（不允许 UI 自己放行）。
+console.log("v9 生成面板 + 工具条 + 文本节点预设 UI 契约测试");
+
+// -- 面板：删功能行，增操作下拉 --
+assert.doesNotMatch(panelSource, /data\.promptVariantId/);
+assert.doesNotMatch(panelSource, /applyVariant/);
+assert.doesNotMatch(panelSource, /focusGeneratorFunctionControl/);
+assert.match(panelSource, /label="操作"/);
+assert.match(panelSource, /operationMode/);
+assert.match(panelSource, /需上游参考图/);
+assert.match(panelSource, /需先绘制蒙版/);
+// 运行闸门仍由兼容判定决定（不允许 UI 自己放行）。
 assert.match(panelSource, /admission\.allowed \? undefined : admission\.reason/);
 assert.match(panelSource, /imageModelOptionsWarnings\(/);
 assert.match(panelSource, /videoModelOptionsWarnings\(/);
+// 模型参数区 aria-label 保留。
+assert.match(panelSource, /aria-label="模型参数"/);
+// §5.2 1a：text-label → text-[11px]（twMerge 挤掉 text-foreground 元凶处置）。
+assert.match(panelSource, /text-\[11px\]/);
+// 字段口径：批次（替换数量）。
+assert.match(panelSource, /label="批次"/);
+assert.doesNotMatch(panelSource, /label="数量"/);
 
-console.log("提示词变体选择 UI 契约测试通过");
+// -- 工具条：无 function-picker，有 preset-picker --
+assert.doesNotMatch(toolbarSource, /function-picker/);
+assert.match(toolbarSource, /preset-picker/);
+assert.match(toolbarSource, /提示词预设/);
+
+// -- 文本节点：预设下拉接线（替换写入） --
+assert.match(textNodeSource, /listTextPresetTemplates/);
+assert.match(textNodeSource, /getTextPresetTemplate/);
+assert.match(textNodeSource, /updateValue\(preset\.text\)/);
+assert.match(textNodeSource, /textEdit\.flush\(\)/);
+
+console.log("v9 提示词预设 UI 契约测试通过");

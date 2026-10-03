@@ -39,7 +39,7 @@ function render(node: FlowNode, selected = true) {
 
 console.log("v8 三层七节点 UI 渲染测试");
 
-test("文本节点：工具条动作齐全，正文可编辑，且不再有「功能设置」入口条", () => {
+test("文本节点：工具条动作齐全（含预设下拉），正文可编辑，且不再有「功能设置」入口条", () => {
   const node = {
     id: "text-1",
     type: "text",
@@ -53,21 +53,19 @@ test("文本节点：工具条动作齐全，正文可编辑，且不再有「�
     edges: [],
   });
   const html = render(node);
-  const labels = ["色彩工具", "复制"];
+  const labels = ["色彩工具", "提示词预设", "复制"];
   for (const label of labels) assert.match(html, new RegExp(`aria-label="${label}"`), `缺少工具条动作 ${label}`);
   assert.match(html, /role="toolbar"/);
   assert.match(html, /一件棉质白衬衫/);
   assert.doesNotMatch(html, /功能设置/);
-  // v8 几何：卡片宽度只能来自 token，不在组件里硬编码 280px。
   assert.match(html, /w-\[var\(--gc-node-width\)\]/);
   assert.doesNotMatch(html, /w-\[280px\]/);
-  // 未选中：工具条不占 DOM（plan.md §3.2「仅选中态渲染」）。
   const unselected = render(node, false);
   assert.doesNotMatch(unselected, /role="toolbar"/);
   assert.match(unselected, /一件棉质白衬衫/);
 });
 
-test("生图节点：功能 / 模型 / 画幅 / 运行内联在卡片上，未绑定功能时运行闸门关闭", () => {
+test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运行闸门按兼容判定", () => {
   const node = {
     id: "image-generator-1",
     type: "image-generator",
@@ -76,7 +74,6 @@ test("生图节点：功能 / 模型 / 画幅 / 运行内联在卡片上，未�
       kind: "image-generator",
       label: "生图",
       status: "idle",
-      promptVariantId: "",
       modelId: "gemini-3.1-flash-image",
       modelOptions: { aspectRatio: "3:4", imageSize: "2K" },
       aspectRatio: "3:4",
@@ -91,13 +88,11 @@ test("生图节点：功能 / 模型 / 画幅 / 运行内联在卡片上，未�
   });
   const html = render(node);
   if (process.env.GC_DUMP) console.log(html.slice(-1500));
-  assert.match(html, /aria-label="功能"/);
+  assert.match(html, /aria-label="操作"/);
   assert.match(html, /aria-label="模型"/);
   assert.match(html, /aria-label="画幅"/);
   assert.match(html, /aria-label="模型参数"/);
   assert.match(html, /参考图 0 张 · 提示词 0 条/);
-  // 未绑定功能（空串）= fail-closed：运行控件以不可运行态呈现并给出阻塞原因
-  // （安全门未清算时显示「生成暂不可用」，否则显示准入判定原因）。
   assert.match(html, /生成暂不可用|尚不可运行/);
   assert.match(html, /disabled/);
   assert.doesNotMatch(html, /功能设置/);
@@ -140,7 +135,6 @@ test("生视频节点：提示词 / 首帧接线回显与 adaptive 画幅来自�
       kind: "video-generator",
       label: "生视频",
       status: "idle",
-      promptVariantId: "",
       modelId: "doubao-seedance-2-5-260628",
       modelOptions: { aspectRatio: "adaptive" },
       aspectRatio: "adaptive",
@@ -153,7 +147,7 @@ test("生视频节点：提示词 / 首帧接线回显与 adaptive 画幅来自�
     edges: [],
   });
   const html = render(node);
-  assert.match(html, /aria-label="功能"/);
+  assert.match(html, /aria-label="操作"/);
   // 视频侧接线回显是「提示词 M 条 · 首帧已接/未接」，不是参考图张数。
   assert.match(html, /提示词 0 条 · 首帧未接/);
   assert.match(html, /单次任务产出一个 MP4/);

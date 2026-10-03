@@ -42,6 +42,8 @@ const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const TEST_FILES = [
   // Select 可见性硬化契约（Phase 0）。
   "tests/select-visibility.test.ts",
+  // 预设模板文本一致性锁定（64 Phase 2 裁决 B）。
+  "tests/prompt-presets-catalog.test.ts",
   "tests/test-runner-isolation.test.mjs",
   "tests/bundle-budget.test.mjs",
   "tests/bundle-boundaries.test.mjs",

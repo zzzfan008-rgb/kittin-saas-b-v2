@@ -285,13 +285,27 @@ async function documentNodePositions(page: Page): Promise<Array<{ id: string; x:
   });
 }
 
-/** 左侧悬浮工具栏「添加」工作流：hover 自动弹出菜单，选中即建节点（v8 起替代节点库面板）。 */
+/**
+ * 左侧悬浮工具栏「添加」工作流：hover 自动弹出菜单，选中即建节点（v8 起替代节点库面板）。
+ *
+ * helper 加固（非本 PR 断言面）：WorkbenchShell 的 rail 菜单打开是 hover 触发的异步路径——
+ * handleEnter 里 `if (suppressHoverRef.current) return`（点击关闭后 250ms 抑制窗口）+
+ * 120ms openTimer 才 setOpenMenuId。原先「hover → 固定 waitForTimeout(100) → 断言」比实现
+ * 要求的 120ms 还短，且前序交互留下的抑制标志会让 hover 完全无效，故按「hover 后轮询菜单出现、
+ * 必要时重新 hover」收敛。断言强度不变（仍断言菜单与菜单项可见）。
+ */
 async function addRailNode(page: Page, label: "文本" | "图片" | "视频"): Promise<void> {
   const addButton = page.getByRole("button", { name: "添加" });
-  await addButton.hover();
-  await page.waitForTimeout(100); // CI: menu renders async, give DOM time to appear
   const menu = page.getByRole("menu", { name: "添加" });
-  await expect(menu).toBeVisible();
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      // 重新 hover 前先把指针移开，确保 mousemove 真的产生一次 enter 事件
+      //（指针原地不动时 hover() 不触发新的 mouseenter）。
+      await page.mouse.move(0, 0);
+      await addButton.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   const item = menu.getByRole("menuitem", { name: label });
   await expect(item).toBeVisible();
   // image 会顺带打开文件选择器；这里显式消化它，避免悬挂。
@@ -370,9 +384,17 @@ test.beforeEach(async ({ page }) => {
  */
 async function openRailMenu(page: Page, entryLabel: string): Promise<Locator> {
   const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
-  await rail.getByRole("button", { name: entryLabel }).hover();
+  const entry = rail.getByRole("button", { name: entryLabel });
   const menu = page.getByRole("menu", { name: entryLabel });
-  await expect(menu).toBeVisible();
+  // helper 加固（非本 PR 断言面）：同 addRailNode——hover 打开是异步路径（120ms openTimer）
+  // 且点击关闭后有 250ms hover 抑制窗口，故轮询到菜单出现、必要时重新 hover。
+  await expect(async () => {
+    if (!(await menu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await entry.hover();
+    }
+    await expect(menu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   return menu;
 }
 
@@ -412,10 +434,10 @@ async function selectCanvasNode(node: Locator): Promise<void> {
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
-test("generator nodes keep params inline while v9 templates bind no variant and expose a plain run button", async ({ page }) => {
-  // v9：生成与参数内联在生成节点卡片内（plan.md §1.1/§3.3），输入节点不承载生成语义。
-  // 断言的是 v9 的过渡态事实：模板只带 frozen preset、不绑 promptVariantId，因此功能下拉
-  // 显示 placeholder「选择功能」，运行按钮是可用的「运行」（准入门不在浏览器侧阻断）。
+test("generator nodes keep params inline while the v9 panel exposes an operation select instead of a function row", async ({ page }) => {
+  // v9（64 Phase 2 §6.2 / 裁决 C）：生成与参数内联在生成节点卡片内，「功能」行整体删除，
+  // 改为「操作」下拉（generate/edit/mask-edit），operationMode 显式归节点 data（裁决 A）。
+  // 输入层节点不承载生成语义。
   // 模板并入当前画布（不再新建页签）：原有 1 个图片节点 + 模板 4 个节点，模板自带 3 条边。
   const nodesBeforeTemplate = await page.locator(".react-flow__node").count();
   await startBuiltinTemplate(page, "模特试穿");
@@ -424,49 +446,29 @@ test("generator nodes keep params inline while v9 templates bind no variant and 
 
   const generator = page.getByTestId("rf__node-tryon-gen");
   await expect(generator).toBeVisible();
-  // 内联参数面板字段顺序：功能 → 模型 → 画幅 + 数量 → 模型参数（plan.md §3.3）。
-  // v9 模板不带 variant 绑定：功能下拉显示 placeholder「选择功能」，无「（未发布）」标记
-  //（Phase 2「功能」行整体删除，这里是过渡态）。
-  const functionSelect = generator.getByRole("combobox", { name: "功能" });
-  await expect(functionSelect).toContainText("选择功能");
+  // 内联参数面板字段顺序：操作 → 模型 → 画幅 + 批次 → 模型参数（plan.md §3.3 / 面板头注释）。
+  // v9 模板 tryon-gen 显式带 operationMode=edit（templates.ts:152），面板回显「编辑」。
+  await expect(generator.getByRole("combobox", { name: "功能" })).toHaveCount(0);
+  const operationSelect = generator.getByRole("combobox", { name: "操作" });
+  await expect(operationSelect).toContainText("编辑");
+  // edit 模式的兼容提示（裁决 C5，语义对齐 server DagError 文案）。
+  await expect(generator.getByText("需上游参考图")).toBeVisible();
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
   // v9 模板默认画幅 1:1（server/routes/templates.ts 拍板③：aspectRatio "1:1" / batchSize 1）。
   await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
-  await expect(generator.getByRole("combobox", { name: "数量" })).toContainText("1");
+  // v9 面板把 v8 的「数量」改名为「批次」。
+  await expect(generator.getByRole("combobox", { name: "批次" })).toContainText("1");
   const params = generator.getByRole("region", { name: "模型参数" });
   await expect(params).toBeVisible();
   await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
   await expect(params.getByRole("button", { name: "+ 添加参数" })).toBeVisible();
-  await expect(
-    generator.getByText("目录中的功能都还没有当前版本的受审评估发布快照，运行会被拒绝。"),
-  ).toBeVisible();
-  // 目录里的未受审变体在「功能」下拉里必须不可选（v7 悬浮窗口的目录强度不变）。
-  // 下拉会在目录/对账数据落地的那次重渲染里被收起（满负载全量跑 1024 实测：先是 0 个选项，
-  // 再是选项已渲染但下拉已被收起）。所以按「必须存在 aria-disabled 的选项」这一结果收敛，
-  // 必要时重开下拉，而不是只断言一次「选项存在」。
-  await functionSelect.click();
-  const variantOptions = page.getByRole("option");
-  const disabledVariantCount = () => variantOptions.evaluateAll((options) => (
-    options.filter((option) => option.getAttribute("aria-disabled") === "true").length
-  ));
-  await expect(async () => {
-    if (await disabledVariantCount() === 0) {
-      await page.keyboard.press("Escape");
-      await functionSelect.click();
-    }
-    expect(await disabledVariantCount()).toBeGreaterThan(0);
-  }).toPass({ timeout: 20_000 });
-  await page.keyboard.press("Escape");
 
-  // 运行按钮在 v9 过渡态是可用的「运行」：生成节点不再绑定 promptVariantId（模板只带
-  // frozen preset），operationMode 无从派生，compatibility 的「edit 无参考图 → 禁用」门
-  // 因此跳过，按钮不进入「尚不可运行」禁用态（v8 那套「缺参考图即禁用 + 可读原因」的
-  // 浏览器侧阻断在 v9 不再触发）。
-  // 已知不一致：面板警告文案「目录中的功能都还没有…运行会被拒绝」在此过渡态仍渲染
-  //（GeneratorParamsPanel 的 variantOptions 全 disabled 分支），与按钮可用性矛盾；
-  // 该「功能」行 Phase 2 整体删除，此处只断言 v9 实际行为，不替 frontend 决定去留。
-  const runButton = generator.getByRole("button", { name: "运行" }).first();
-  await expect(runButton).toBeEnabled();
+  // 运行按钮在 v9 是可用的「运行」还是禁用态的「尚不可运行」，由 compatibility 门决定：
+  // operationMode=edit 且本测试未上传参考图 → 触发 edit-reference-missing，按钮禁用并给出可读原因
+  //（裁决 C5 语义对齐 server DagError）。这与 v8 的参考图门一致，Phase 2 把它恢复成显式路径。
+  const runButton = generator.getByRole("button", { name: "尚不可运行" });
+  await expect(runButton).toBeDisabled();
+  await expect(generator.getByText("edit 模式至少需要一张参考图。")).toBeVisible();
   // 输入层节点不再承载任何生成入口（v7 的「选择功能」已随五合一 image 节点退役）。
   const garment = page.getByTestId("rf__node-garment");
   await expect(garment.getByRole("button", { name: "选择功能" })).toHaveCount(0);
@@ -519,15 +521,16 @@ test("select value echo stays legible against its trigger surface at every deskt
       return { ok: true as const, ratio, text: (value.textContent ?? "").trim() };
     });
 
-  // 1)「功能」回显：v9 模板不带 variant 绑定，模板落图即显示 placeholder「选择功能」，断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。
-  //    placeholder 也是回显的一部分（PR #84 给 SelectValue 加的 data-placeholder:muted 正是为它）。
-  const functionSelect = generator.getByRole("combobox", { name: "功能" });
-  await expect(functionSelect).toContainText("选择功能");
-  const functionEcho = await echoLegibility(functionSelect);
-  expect(functionEcho.ok, JSON.stringify(functionEcho)).toBe(true);
-  if (functionEcho.ok) {
-    expect(functionEcho.text.length, "回显不得为空白").toBeGreaterThan(0);
-    expect(functionEcho.ratio, `功能回显对比度 ${functionEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+  // 1)「操作」回显：v9 面板删掉了「功能」行，首个下拉改为「操作」；模板值 edit 即回显「编辑」，
+  //    断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。placeholder 也属回显的一部分（PR #84 给
+  //    SelectValue 加的 data-placeholder:muted 正是为它）。
+  const operationSelect = generator.getByRole("combobox", { name: "操作" });
+  await expect(operationSelect).toContainText("编辑");
+  const operationEcho = await echoLegibility(operationSelect);
+  expect(operationEcho.ok, JSON.stringify(operationEcho)).toBe(true);
+  if (operationEcho.ok) {
+    expect(operationEcho.text.length, "回显不得为空白").toBeGreaterThan(0);
+    expect(operationEcho.ratio, `操作回显对比度 ${operationEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
   }
 
   // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
@@ -540,29 +543,35 @@ test("select value echo stays legible against its trigger surface at every deskt
     expect(qualityEcho.ratio, `画质回显对比度 ${qualityEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
   }
 
-  // 3) 交互路径：非门控的「数量」下拉改选后，新回显仍必须可读；同时锁弹层宽度兜底
+  // 3) 交互路径：非门控的「批次」下拉改选后，新回显仍必须可读；同时锁弹层宽度兜底
   //    （min-w-[max(8rem,var(--anchor-width))]：窄触发器下弹层不得塌缩到 8rem 以下）。
-  const batchSelect = generator.getByRole("combobox", { name: "数量" });
-  await batchSelect.click();
-  const popup = page.locator('[data-slot="select-popup"]');
-  await expect(popup).toBeVisible();
-  // 计算样式断言：min-width 兜底 = max(8rem, anchor)，不受入场缩放动画影响。
-  const popupMinWidth = await popup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
-  expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
-  // 渲染几何：入场动画 zoom-in-95（150ms）会把包围盒临时缩到 95%（128×0.95=121.6），
-  // 因此轮询到动画结束后的实际宽度，而不是在动画中途读一次。
-  await expect
-    .poll(async () => (await popup.boundingBox())?.width ?? 0, {
-      message: "弹层渲染宽度不得低于 8rem 兜底",
-    })
-    .toBeGreaterThanOrEqual(128);
-  await page.getByRole("option", { name: "2", exact: true }).click();
+  //    v9 面板把 v8 的「数量」改名为「批次」（可选项同为 1..8）。
+  //    两处必须按「打开态弹层」收敛，否则会读到假值：
+  //    a) 关掉的弹层不卸载，残留为 0×0 + data-closed（本文件既有的 1024 实测行为），
+  //       故用 [data-open] 严格选中当前打开的那个；
+  //    b) 模板落地后那次画布重渲染会收起刚打开的下拉（同上方「必要时重开下拉」的既有处理）。
+  const batchSelect = generator.getByRole("combobox", { name: "批次" });
+  const openPopup = page.locator('[data-slot="select-popup"][data-open]');
+  await expect(async () => {
+    if (await openPopup.count() === 0) {
+      await batchSelect.click();
+    }
+    await expect(openPopup).toBeVisible();
+    // 计算样式断言：min-width 兜底 = max(8rem, anchor)，不受入场缩放动画影响。
+    const popupMinWidth = await openPopup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
+    expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
+    // 渲染几何：入场动画 zoom-in-95（150ms）会把包围盒临时缩到 95%（128×0.95=121.6），
+    // 因此轮询到动画结束后的实际宽度，而不是在动画中途读一次。
+    const popupWidth = (await openPopup.boundingBox())?.width ?? 0;
+    expect(popupWidth, "弹层渲染宽度不得低于 8rem 兜底").toBeGreaterThanOrEqual(128);
+  }).toPass({ timeout: 20_000 });
+  await openPopup.getByRole("option", { name: "2", exact: true }).click();
   await expect(batchSelect).toContainText("2");
   const batchEcho = await echoLegibility(batchSelect);
   expect(batchEcho.ok, JSON.stringify(batchEcho)).toBe(true);
   if (batchEcho.ok) {
     expect(batchEcho.text, "改选后的回显不得为空白").toBe("2");
-    expect(batchEcho.ratio, `数量回显对比度 ${batchEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+    expect(batchEcho.ratio, `批次回显对比度 ${batchEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
   }
 });
 
@@ -575,6 +584,17 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   await expect(textNode.locator('[data-node-toolbar="text"]')).toBeVisible();
   await expect(textNode.getByRole("button", { name: "色彩工具" })).toBeVisible();
   await expect(textNode.getByRole("button", { name: "复制" })).toBeVisible();
+  // v9 Phase 2 新增：text 工具条内联「提示词预设」下拉（NodeToolbar 的 PRESET_PICKER）。
+  // 选中一个预设即把该预设正文写入节点 text（TextNode.onPresetSelect → textEdit.updateValue + flush）。
+  // 注意：正文 textarea 无 accessible name（实测 label 文本「提示词正文」未关联到控件），
+  // 故用节点作用域内的 textarea 定位，避免用 getByRole 的 name 断言一个不存在的可访问名。
+  const presetPicker = textNode.getByRole("combobox", { name: "提示词预设" });
+  await expect(presetPicker).toBeVisible();
+  const textBody = textNode.locator("textarea");
+  await expect(textBody).not.toHaveValue(/GPT Image 2 VIP 写实穿搭生成/);
+  await presetPicker.click();
+  await page.getByRole("option", { name: "写实穿搭", exact: true }).click();
+  await expect(textBody).toHaveValue(/GPT Image 2 VIP 写实穿搭生成/);
   // 未选中节点不渲染工具条（不占 DOM）。
   const imageNodeId = await nodeIdOfKind(page, "image");
   const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);
@@ -596,13 +616,14 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
   await expect(rail.getByRole("button", { name: "色彩工具" })).toHaveCount(0);
 
-  // 生成节点工具条：[功能选项] [运行] [复制]（复制尚未接入 → 禁用并给出原因）。
+  // 生成节点工具条：[运行][复制]（v9 Phase 2 退役 FUNCTION_PICKER「功能选项」——功能行已整体删除；
+  // 复制尚未接入 → 禁用并给出原因）。
   await startBuiltinTemplate(page, "模特试穿");
   const generator = page.getByTestId("rf__node-tryon-gen");
   await selectCanvasNode(generator);
   const generatorToolbar = generator.locator('[data-node-toolbar="image-generator"]');
   await expect(generatorToolbar).toHaveAttribute("aria-label", "生图工具栏");
-  await expect(generatorToolbar.getByRole("button", { name: "功能选项" })).toBeEnabled();
+  await expect(generatorToolbar.getByRole("button", { name: "功能选项" })).toHaveCount(0);
   await expect(generatorToolbar.getByRole("button", { name: "运行", exact: true })).toBeEnabled();
   const generatorCopy = generatorToolbar.getByRole("button", { name: "复制" });
   await expect(generatorCopy).toBeDisabled();
@@ -921,9 +942,16 @@ test("adding a node from the rail keeps the canvas mounted and adds no implicit 
   const imageNodeId = await nodeIdOfKind(page, "image");
   await page.locator(`.react-flow__node[data-id="${imageNodeId}"]`).locator(".gc-node-header").click();
   const addButton = page.getByRole("button", { name: "添加" });
-  await addButton.hover();
   const addMenu = page.getByRole("menu", { name: "添加" });
-  await expect(addMenu).toBeVisible();
+  // hover 打开是异步路径（WorkbenchShell: 120ms openTimer + 250ms 点击抑制窗口），
+  // 故轮询到菜单出现、必要时重新 hover（断言强度不变）。
+  await expect(async () => {
+    if (!(await addMenu.isVisible().catch(() => false))) {
+      await page.mouse.move(0, 0);
+      await addButton.hover();
+    }
+    await expect(addMenu).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   // 「添加」菜单固定暴露文本 / 图片 / 视频三个基础节点入口（生成 / 结果节点不可手动新增）。
   for (const label of ["文本", "图片", "视频"]) {
     await expect(addMenu.getByRole("menuitem", { name: label })).toBeVisible();

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-03T14:25:31.815Z",
+  "baseCommit": "7a71b75e708b54181c010564ffca8479913d0597",
+  "changeFingerprintSha256": "5348c5280eaad9edf411ab51296abb34c228c526c9f2459a8100fdac3c1bd6af",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "prompt run admission client-side operationMode derivation removed variant binding",
+  "affectedPaths": [
+    "src/lib/promptRunAdmission.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/image-prompt-doctor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/image-prompt-doctor.md",
+      "pageLocalPath": "pages/en/api-capabilities/image-prompt-doctor.md",
+      "title": "Image Prompt Doctor Skill",
+      "sha256": "4b68f9bdfc9805c64a27a864eddaba3db66f983c89b8329b53ee28c5e750b050"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/image-prompt-doctor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/image-prompt-doctor.md",
+      "pageLocalPath": "pages/ja/api-capabilities/image-prompt-doctor.md",
+      "title": "Image Prompt Doctor Skill",
+      "sha256": "fc7050a602211fcc2cdcc494239106d60f86092ecc04e862c6ba6a5e9d2b8a17"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/image-prompt-doctor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/image-prompt-doctor.md",
+      "pageLocalPath": "pages/ko/api-capabilities/image-prompt-doctor.md",
+      "title": "이미지 Prompt Doctor 스킬",
+      "sha256": "8b89c05f580edc297e88ccc94b595dda59081e00a10ee37e6526b388619390d0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/image-prompt-doctor",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/image-prompt-doctor.md",
+      "pageLocalPath": "pages/ru/api-capabilities/image-prompt-doctor.md",
+      "title": "Навык Image Prompt Doctor",
+      "sha256": "be011f1a23ad116d15837695a273bb50dab210dd242019f7218ddbd97ae1517d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/image-long-prompt",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/image-long-prompt.md",
+      "pageLocalPath": "pages/en/api-capabilities/image-long-prompt.md",
+      "title": "Long Prompts and Two-Stage Generation: Where the 32K Limit Comes From",
+      "sha256": "67700fe7649468ef74c253d13cb65d335e2110f992b5449fbb5f84cda5ad1880"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok/prompt-caching",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok/prompt-caching.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok/prompt-caching.md",
+      "title": "Grok Prompt Caching Billing Guide",
+      "sha256": "3fffcb18eae877ddaba6b313862ee4c3fc44c3ba5de70f176f442b423a4f5b57"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/prompt-caching",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/openai/prompt-caching.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/prompt-caching.md",
+      "title": "OpenAI Prompt Caching Billing Guide",
+      "sha256": "1628c0b274488a77bb7c830a18cfe53fa3ac8347c6b5da23bd1443eafb0ee6a6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/image-long-prompt",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/image-long-prompt.md",
+      "pageLocalPath": "pages/ko/api-capabilities/image-long-prompt.md",
+      "title": "긴 prompt와 2단계 생성: 32K 제한은 어디에서 비롯되는가",
+      "sha256": "7c1b32be4d4a097ad71620f4fb226e3cd2f350b063da8fa91f0a06b99cc9b192"
+    }
+  ],
+  "decisionSummary": "64 Phase 2: client admission consumption removed; operationMode now read from node data (ruling A); variant derivation chain deleted; file kept for Phase 3 whole-file removal",
+  "unresolvedChoices": []
+}

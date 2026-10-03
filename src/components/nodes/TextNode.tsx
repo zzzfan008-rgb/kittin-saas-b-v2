@@ -21,11 +21,12 @@ import {
   removeColorChip,
   COLOR_TOKEN_RE,
 } from "@/lib/color/colorToken";
+import { getTextPresetTemplate, listTextPresetTemplates } from "@/lib/promptPresets";
 
 /**
- * v8 输入层文本节点（plan.md §1 / 卡 #61）：
+ * v9 输入层文本节点（64 Phase 2 §6.1）：
  * 只承载提示词正文，不含任何生成语义字段与运行按钮；提示词由 text 边流向生成节点。
- * 工具条（plan.md §3.2）：[色彩工具] [复制]。
+ * 工具条：[色彩工具] [预设下拉] [复制]。预设选中即替换写入 data.text（useCoalescedTextEdit+flush，可 undo）。
  *
  * 正文中的 {{color:#RRGGBB:名称}} 标记在渲染时展开为 ColorChip，
  * 删除时同步从原文中移除对应标记符。
@@ -38,6 +39,9 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
+  const presetOptions = useMemo(() =>
+    listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
+  []);
 
   /** 从正文解析所有颜色 chip。 */
   const chips = useMemo(() => parseColorChips(data.text ?? ""), [data.text]);
@@ -103,6 +107,18 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
                 disabled: readOnly,
                 disabledReason: "只读项目不能修改正文",
                 label: colorToolOpen ? "收起色彩工具" : "色彩工具",
+              },
+              "preset-picker": {
+                presetOptions,
+                onPresetSelect: (value) => {
+                  if (readOnly) return;
+                  const preset = getTextPresetTemplate(value);
+                  if (!preset) return;
+                  textEdit.updateValue(preset.text);
+                  textEdit.flush();
+                },
+                disabled: readOnly,
+                disabledReason: "只读项目不能修改正文",
               },
               copy: {
                 onSelect: () => void duplicateNode(id),

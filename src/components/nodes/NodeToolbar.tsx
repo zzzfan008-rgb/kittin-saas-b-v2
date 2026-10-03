@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRightToLineIcon,
@@ -18,15 +19,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectItem,
+  SelectList,
+  SelectPopup,
+  SelectPortal,
+  SelectPositioner,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { nodeTitleForKind, type NodeKind } from "@/types/workflow";
 
 /**
- * v8 节点工具条（plan.md §3.2）。
+ * v9 节点工具条（64 Phase 2 §6）。
  *
  * - 位置与出现时机：节点卡片正上方 8px 居中，**仅选中态渲染**（未选中不占 DOM）。
  * - 每个按钮 = 图标 + `aria-label`（hover 由 Tooltip 显示同一文案），键盘可达、可见焦点环。
  * - 全部由本地 shadcn `Button`（variant="ghost" / size="icon-sm"）组合，不手搓按钮。
  * - 禁用态不隐藏：保留按钮并给出原因（`title` 与 Tooltip 同文案）。
+ * - 预设下拉 = shadcn Select 内联（图标 trigger + chevron + tooltip「提示词预设」）。
  *
  * 配置表是各 kind 工具条内容的唯一事实源；节点组件只负责提供各动作的接线（actions）。
  */
@@ -37,7 +48,7 @@ export type NodeToolbarActionId =
   | "matting"
   | "copy"
   | "replace"
-  | "function-picker"
+  | "preset-picker"
   | "run"
   | "preview"
   | "play"
@@ -46,7 +57,6 @@ export type NodeToolbarActionId =
 
 export interface NodeToolbarActionDefinition {
   id: NodeToolbarActionId;
-  /** 面向用户的动作名（aria-label 与 Tooltip 共用；plan.md §3.2 按钮语义表） */
   label: string;
   icon: LucideIcon;
 }
@@ -56,37 +66,37 @@ const CROP: NodeToolbarActionDefinition = { id: "crop", label: "裁剪", icon: C
 const MATTING: NodeToolbarActionDefinition = { id: "matting", label: "抠图", icon: ScissorsIcon };
 const COPY: NodeToolbarActionDefinition = { id: "copy", label: "复制", icon: CopyIcon };
 const REPLACE: NodeToolbarActionDefinition = { id: "replace", label: "替换", icon: RefreshCwIcon };
-const FUNCTION_PICKER: NodeToolbarActionDefinition = { id: "function-picker", label: "功能选项", icon: SparklesIcon };
+const PRESET_PICKER: NodeToolbarActionDefinition = { id: "preset-picker", label: "提示词预设", icon: SparklesIcon };
 const RUN: NodeToolbarActionDefinition = { id: "run", label: "运行", icon: PlayIcon };
 const PREVIEW: NodeToolbarActionDefinition = { id: "preview", label: "预览", icon: EyeIcon };
 const PLAY: NodeToolbarActionDefinition = { id: "play", label: "播放", icon: PlayIcon };
 const DOWNLOAD: NodeToolbarActionDefinition = { id: "download", label: "下载", icon: DownloadIcon };
 const AS_INPUT: NodeToolbarActionDefinition = { id: "as-input", label: "作为输入", icon: ArrowRightToLineIcon };
 
-/** plan.md §3.2 配置表；数组顺序即从左到右的渲染顺序。 */
+/** v9 配置表（64 Phase 2 §6）；数组顺序即从左到右的渲染顺序。 */
 export const NODE_TOOLBAR_ACTIONS: Record<NodeKind, readonly NodeToolbarActionDefinition[]> = {
-  text: [COLOR_TOOL, COPY],
+  text: [COLOR_TOOL, PRESET_PICKER, COPY],
   image: [CROP, MATTING, COPY, REPLACE],
   video: [COPY, REPLACE],
-  "image-generator": [FUNCTION_PICKER, RUN, COPY],
-  "video-generator": [FUNCTION_PICKER, RUN, COPY],
+  "image-generator": [RUN, COPY],
+  "video-generator": [RUN, COPY],
   "result-image": [PREVIEW, DOWNLOAD, AS_INPUT, COPY],
   "result-video": [PLAY, DOWNLOAD, AS_INPUT, COPY],
 };
 
 export interface NodeToolbarActionBinding {
-  /** 动作实现；缺省 = 该动作当前无接线，按钮按禁用态渲染。 */
   onSelect?: () => void;
   disabled?: boolean;
-  /** 禁用原因（plan.md §3.2：禁用态给出 title 原因，不隐藏）。 */
   disabledReason?: string;
-  /** 覆盖默认动作名（如运行中显示状态文案）。 */
   label?: string;
+  /** 预设下拉选项（仅 preset-picker）。 */
+  presetOptions?: readonly { value: string; label: string }[];
+  /** 预设选中回调（仅 preset-picker；value = 预设 id）。 */
+  onPresetSelect?: (value: string) => void;
 }
 
 export interface NodeToolbarProps {
   kind: NodeKind;
-  /** 仅选中态渲染工具条（plan.md §3.2）。 */
   selected?: boolean;
   actions?: Partial<Record<NodeToolbarActionId, NodeToolbarActionBinding>>;
 }
@@ -112,6 +122,72 @@ export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
           const label = binding?.label ?? definition.label;
           const disabledReason = binding?.disabledReason ?? "暂不可用";
           const Icon = definition.icon;
+
+          // -- 预设下拉（shadcn Select 内联）--
+          if (definition.id === "preset-picker") {
+            const options = binding?.presetOptions;
+            const presetDisabled = binding?.disabled ?? (!options || options.length === 0);
+            const onPresetSelect = binding?.onPresetSelect;
+            const [selectKey, setSelectKey] = useState(0);
+
+            if (!options || options.length === 0) {
+              // 无选项时渲染禁用按钮
+              return (
+                <Tooltip key={definition.id}>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button type="button" variant="ghost" size="icon-sm" aria-label={label} disabled title={`${label}：暂无可选预设`} className="text-[var(--gc-node-text)]">
+                      <Icon aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>{`${label}：暂无可选预设`}</TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return (
+              <Tooltip key={definition.id}>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Select
+                    key={selectKey}
+                    disabled={presetDisabled}
+                    onValueChange={(value) => {
+                      if (typeof value === "string") {
+                        onPresetSelect?.(value);
+                        // 每次选择后重置 Select 内部状态，保持「恒显示未选择态」。
+                        setSelectKey((k) => k + 1);
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label={label}
+                      title={presetDisabled ? `${label}：${disabledReason}` : label}
+                      className="nodrag size-7 justify-center gap-0 rounded-[min(var(--radius-md),12px)] border-0 bg-transparent p-0 text-[var(--gc-node-text)] hover:bg-muted"
+                    >
+                      <Icon aria-hidden="true" />
+                    </SelectTrigger>
+                    <SelectPortal>
+                      <SelectPositioner>
+                        <SelectPopup>
+                          <SelectList>
+                            {options.map((option) => (
+                              <SelectItem key={option.value} value={option.value} className="text-[11px]">
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectList>
+                        </SelectPopup>
+                      </SelectPositioner>
+                    </SelectPortal>
+                  </Select>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  {presetDisabled ? `${label}：${disabledReason}` : label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          // -- 普通按钮 --
           return (
             <Tooltip key={definition.id}>
               <TooltipTrigger render={<span className="inline-flex" />}>
