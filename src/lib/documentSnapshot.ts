@@ -1,5 +1,8 @@
 import type { ImageModelOptions } from "../types/imageModels";
+import { DEFAULT_GENERATION_MODEL_ID } from "../types/imageModels";
 import type { VideoModelOptions } from "../types/videoModels";
+import { DEFAULT_VIDEO_MODEL_ID } from "../types/videoModels";
+import { getGarmentPromptVariant, getGarmentPromptVariantById } from "./garmentPromptPresets";
 import {
   EDGE_HANDLE_FIRST_FRAME,
   EDGE_HANDLE_PROMPT,
@@ -772,6 +775,71 @@ function migrateV7FlowToV8(raw: Record<string, unknown>): PersistedWorkflow {
  * - `schemaVersion > 8` → 拒绝（未知的更高版本，fail-closed）
  * 迁移只在读取时进行；**写回发生在用户保存时**，打开不静默覆写磁盘（migration.md §5）。
  */
+/** v8 生成节点的 variant 绑定字段（64 Phase 1 v9 删除；迁移时 fail-closed 剥离）。 */
+const LEGACY_GENERATOR_BINDING_FIELDS = [
+  "promptVariantId", "promptFamilyId", "parameterProfileId",
+  "contractHash", "evaluationVersion", "postprocessVersion",
+] as const;
+
+/**
+ * v8→v9 惰性迁移（64 Phase 1，客户端侧；与 server/lib/workflowSchema.ts 的 C2 同语义）：
+ * - 生成节点的 variant 绑定六字段剥离（fail-closed：白名单外一律不保留）。
+ * - promptVariantId 非空：按边序找第一条 prompt 上游 text 节点——text 为空则填入该预设
+ *   模板文本（family+mode 的默认模型变体 fullPrompt，与 server 冻结表同源同值）；
+ *   非空则保留正文、丢弃绑定（绝不覆盖用户文本）；无上游 text 则丢弃绑定。
+ * - 已知变体的 mode 物化到 data.operationMode；未知变体静默丢弃绑定（fail-closed 不猜）。
+ * 与 server 版的一致性由两端迁移测试锁定（tests/workflow-schema.test.ts C2 / initial-draft-client）。
+ */
+function migrateV8GeneratorBindingsToV9(raw: Record<string, unknown>): PersistedWorkflow {
+  if (!Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) {
+    throw new TypeError("flow.nodes / flow.edges 必须是数组");
+  }
+  const textDataById = new Map<string, Record<string, unknown>>();
+  for (const node of raw.nodes) {
+    if (!isRecord(node)) continue;
+    if (node.type === "text" && isRecord(node.data)) {
+      textDataById.set(String(node.id), node.data);
+    }
+  }
+  for (const node of raw.nodes) {
+    if (!isRecord(node) || (node.type !== "image-generator" && node.type !== "video-generator")) continue;
+    if (!isRecord(node.data)) continue;
+    const data = node.data;
+    const variantId = data.promptVariantId;
+    if (typeof variantId === "string" && variantId.trim() !== "") {
+      const variant = getGarmentPromptVariantById(variantId);
+      // 默认模型同 family+mode 的变体 fullPrompt = server 冻结表同源文本。
+      const defaultModelId = variant?.nodeKind === "video" ? DEFAULT_VIDEO_MODEL_ID : DEFAULT_GENERATION_MODEL_ID;
+      const defaultVariant = variant
+        ? getGarmentPromptVariant({
+            familyId: variant.familyId,
+            modelId: defaultModelId,
+            nodeKind: variant.nodeKind,
+            mode: variant.mode,
+          })
+        : undefined;
+      if (variant && defaultVariant) {
+        data.operationMode = variant.mode;
+        for (const edge of raw.edges) {
+          if (!isRecord(edge) || edge.target !== node.id || edge.targetHandle !== "prompt") continue;
+          const textData = textDataById.get(String(edge.source));
+          if (!textData) continue;
+          const current = textData.text;
+          if (typeof current === "string" && current.trim() !== "") break; // 非空保留，丢弃绑定
+          textData.text = defaultVariant.fullPrompt;
+          break;
+        }
+      }
+    }
+    for (const field of LEGACY_GENERATOR_BINDING_FIELDS) delete data[field];
+  }
+  return {
+    schemaVersion: WORKFLOW_SCHEMA_VERSION,
+    nodes: raw.nodes as unknown as PersistedWorkflow["nodes"],
+    edges: raw.edges as unknown as PersistedWorkflow["edges"],
+  };
+}
+
 export function migrateFlowToV8(value: unknown): { flow: PersistedWorkflow; migrated: boolean } {
   if (!isRecord(value)) throw new TypeError("flow 必须是对象");
   const version = value.schemaVersion;
@@ -789,12 +857,15 @@ export function migrateFlowToV8(value: unknown): { flow: PersistedWorkflow; migr
     );
   }
   if (version < WORKFLOW_SCHEMA_VERSION) {
-    if (version !== 7) {
-      throw new DocumentFlowVersionError(
-        `该项目为旧版本格式（v${version}），已在七节点重构中清理，请新建项目`,
-      );
+    if (version === 7) {
+      return { flow: migrateV7FlowToV8(value), migrated: true };
     }
-    return { flow: migrateV7FlowToV8(value), migrated: true };
+    if (version === 8) {
+      return { flow: migrateV8GeneratorBindingsToV9(value), migrated: true };
+    }
+    throw new DocumentFlowVersionError(
+      `该项目为旧版本格式（v${version}），已在七节点重构中清理，请新建项目`,
+    );
   }
   if (!Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
     throw new TypeError("flow.nodes / flow.edges 必须是数组");
