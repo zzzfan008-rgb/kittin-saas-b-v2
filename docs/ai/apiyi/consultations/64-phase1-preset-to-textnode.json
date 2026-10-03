@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-03T06:11:12.901Z",
+  "baseCommit": "1caeed10f6e6921ee84214602717d425e7a3b3a7",
+  "changeFingerprintSha256": "328538f9023f24ee37d049eb0779ff4021a062a708b6b0044119cde58a045fb7",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "prompt variant mode operation generate edit mask-edit image generation parameters aspect ratio batch",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/engine/runner.ts",
+    "server/lib/promptPresetsFrozen.ts",
+    "server/lib/workflowSchema.ts",
+    "server/routes/templates.ts",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-1",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-1.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-1.md",
+      "title": "GPT-Image-1 Image Generation API - OpenAI's Latest Image API",
+      "sha256": "3ee5fbcf25449b1c23fb4479d678ac3ba075e6533b04d23e586a390589c7c80f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/overview.md",
+      "title": "Seedream Image Generation & Editing",
+      "sha256": "9c9f26bcb04af4d70873636e8eff2d3d7ce6bd24140e32695779c64153306656"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "f0a0e67a3becaed143f278c9b0f9321a649f5f8523e34c176f0592521e8e40c0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/flux/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/flux/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/flux/overview.md",
+      "title": "FLUX Image Generation & Editing",
+      "sha256": "751fcd96d18e1507ac754012b93d3a3bb2c4930a2bec25ec127c8bbe395b3365"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok-imagine-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "title": "Grok Imagine 2 Image Gen & Editing",
+      "sha256": "efae10fcd4ade47b685996e71f42325f10777a72c95acdd55efe1fbdd062ff0b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All Image Gen/Editing",
+      "sha256": "25435e1b964be46e8886809f47f30e0e70caa07eaa71cdc0c8a399cec4cb6008"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/sora-image-generation",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/sora-image-generation.md",
+      "pageLocalPath": "pages/en/api-capabilities/sora-image-generation.md",
+      "title": "Sora Image Generation API",
+      "sha256": "079520d9bb9480f4d7da640edd697b8deb8e33a6e660983210f060f936d506b9"
+    }
+  ],
+  "decisionSummary": "64 Phase 1 (C1-C7): workflow schema v8->v9; generator variant-binding fields removed; operationMode moves to node data (default generate); taskPrompt assembled from frozen MODE_SYSTEM_TEXT map; templates rewritten with explicit modelId/operationMode/contract defaults",
+  "unresolvedChoices": []
+}

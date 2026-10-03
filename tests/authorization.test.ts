@@ -134,8 +134,9 @@ function flow(images: string[] = []) {
 }
 
 function generationFlow(prompt: string) {
+  // 64 Phase 1：v9 夹具——variant 绑定六字段删除；operationMode 缺省 generate（无参考图）。
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     nodes: [
       promptTextNode(prompt),
       {
@@ -148,12 +149,6 @@ function generationFlow(prompt: string) {
           status: "idle",
           modelId: "gemini-3.1-flash-image",
           modelOptions: generationParameters.modelOptions,
-          promptVariantId: generationVariant.variantId,
-          promptFamilyId: generationVariant.familyId,
-          parameterProfileId: generationVariant.parameterProfileId,
-          contractHash: generationVariant.contractHash,
-          evaluationVersion: generationVariant.evaluationVersion,
-          postprocessVersion: generationProfile.postprocess.version,
           aspectRatio: generationParameters.aspectRatio,
           batchSize: 1,
         },
@@ -164,8 +159,9 @@ function generationFlow(prompt: string) {
 }
 
 function editFlow(imageUrl: string) {
+  // 64 Phase 1：v9 夹具——variant 绑定六字段删除；operationMode 显式 edit（带参考图）。
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     nodes: [
       promptTextNode("改成短袖"),
       {
@@ -187,14 +183,9 @@ function editFlow(imageUrl: string) {
           kind: "image-generator",
           label: "改款",
           status: "idle",
+          operationMode: "edit",
           modelId: "gpt-image-2.5-flare-vip",
           modelOptions: editParameters.modelOptions,
-          promptVariantId: editVariant.variantId,
-          promptFamilyId: editVariant.familyId,
-          parameterProfileId: editVariant.parameterProfileId,
-          contractHash: editVariant.contractHash,
-          evaluationVersion: editVariant.evaluationVersion,
-          postprocessVersion: editProfile.postprocess.version,
           aspectRatio: editParameters.aspectRatio,
           batchSize: 1,
         },
@@ -211,7 +202,7 @@ function independentEditFlow(firstImageUrl: string, secondImageUrl: string) {
   const first = editFlow(firstImageUrl);
   const second = editFlow(secondImageUrl);
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     nodes: [
       { ...first.nodes[0], id: "prompt-a" },
       { ...first.nodes[1], id: "source-a" },
@@ -239,7 +230,7 @@ function branchedEditFlow(imageUrl: string) {
   };
   const secondPrompt = { ...base.nodes[0], id: "prompt-b", position: { x: 0, y: 240 } };
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     nodes: [base.nodes[0], base.nodes[1], firstEdit, secondPrompt, secondEdit],
     edges: [
       { ...base.edges[0], id: "prompt-edit-a", target: "edit-a" },
@@ -274,7 +265,7 @@ function chainedEditFlow(sourceImageUrl: string, savedFirstOutput: string) {
     position: { x: 1280, y: 0 },
   };
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     nodes: [base.nodes[0], base.nodes[1], firstEdit, resultOfFirst, secondPrompt, secondEdit],
     edges: [
       { ...base.edges[0], id: "prompt-edit-first", target: "edit-first" },
@@ -356,15 +347,9 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
     request: {
-      // v7 直连：request.prompt 是纯用户正文；fullPrompt 由 worker 内联，
-      // 不再提交 buildGarmentPrompt 包装。
+      // v9 直连（64 Phase 1）：request.prompt 是纯用户正文；variant 绑定字段已删除，
+      // operationMode 显式携带（裁决 A），系统文本由 runner 冻结映射拼装（裁决 E）。
       prompt: "改成短袖",
-      promptVariantId: editVariant.variantId,
-      promptFamilyId: editVariant.familyId,
-      parameterProfileId: editVariant.parameterProfileId,
-      contractHash: editVariant.contractHash,
-      evaluationVersion: editVariant.evaluationVersion,
-      postprocessVersion: editProfile.postprocess.version,
       operationMode: "edit",
       aspectRatio: editParameters.aspectRatio,
       batchSize: 1,
@@ -399,7 +384,7 @@ await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式�
       type: "image-generator",
       data: {
         kind: "image-generator", label: "结果", status: "idle",
-        promptVariantId: editVariant.variantId,
+        operationMode: "edit",
         modelId: "gpt-image-2.5-flare-vip",
         aspectRatio: "3:4", batchSize: 1,
       },

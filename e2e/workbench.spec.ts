@@ -412,9 +412,10 @@ async function selectCanvasNode(node: Locator): Promise<void> {
   await expect(node.locator("[data-node-toolbar]")).toHaveCount(1);
 }
 
-test("generator nodes keep params inline while unverified variants stay blocked with an explicit reason", async ({ page }) => {
-  // v8：生成与参数从 v7 的悬浮「功能设置」窗口迁到生成节点卡片内联（plan.md §1.1/§3.3），
-  // 输入节点完全不承载生成语义。断言强度落在同一个产品事实上：未受审变体不得触达运行。
+test("generator nodes keep params inline while v9 templates bind no variant and expose a plain run button", async ({ page }) => {
+  // v9：生成与参数内联在生成节点卡片内（plan.md §1.1/§3.3），输入节点不承载生成语义。
+  // 断言的是 v9 的过渡态事实：模板只带 frozen preset、不绑 promptVariantId，因此功能下拉
+  // 显示 placeholder「选择功能」，运行按钮是可用的「运行」（准入门不在浏览器侧阻断）。
   // 模板并入当前画布（不再新建页签）：原有 1 个图片节点 + 模板 4 个节点，模板自带 3 条边。
   const nodesBeforeTemplate = await page.locator(".react-flow__node").count();
   await startBuiltinTemplate(page, "模特试穿");
@@ -424,11 +425,13 @@ test("generator nodes keep params inline while unverified variants stay blocked 
   const generator = page.getByTestId("rf__node-tryon-gen");
   await expect(generator).toBeVisible();
   // 内联参数面板字段顺序：功能 → 模型 → 画幅 + 数量 → 模型参数（plan.md §3.3）。
+  // v9 模板不带 variant 绑定：功能下拉显示 placeholder「选择功能」，无「（未发布）」标记
+  //（Phase 2「功能」行整体删除，这里是过渡态）。
   const functionSelect = generator.getByRole("combobox", { name: "功能" });
-  await expect(functionSelect).toContainText("写实穿搭");
-  await expect(functionSelect).toContainText("（未发布）");
+  await expect(functionSelect).toContainText("选择功能");
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
-  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
+  // v9 模板默认画幅 1:1（server/routes/templates.ts 拍板③：aspectRatio "1:1" / batchSize 1）。
+  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
   await expect(generator.getByRole("combobox", { name: "数量" })).toContainText("1");
   const params = generator.getByRole("region", { name: "模型参数" });
   await expect(params).toBeVisible();
@@ -455,13 +458,15 @@ test("generator nodes keep params inline while unverified variants stay blocked 
   }).toPass({ timeout: 20_000 });
   await page.keyboard.press("Escape");
 
-  // 运行准入不通过时，卡片内运行按钮为禁用态并给出可读原因（不静默、不隐藏）。
-  // 准入按序给出首个阻断原因：这里还没上传参考图，因此先报「缺参考图」；未受审变体
-  // 那个原因在参考图就位后接管（见 golden-path 的完整链路）。
-  const runButton = generator.getByRole("button", { name: "尚不可运行" });
-  await expect(runButton).toBeDisabled();
-  await expect(runButton).toHaveAttribute("title", /edit 模式至少需要一张参考图/);
-
+  // 运行按钮在 v9 过渡态是可用的「运行」：生成节点不再绑定 promptVariantId（模板只带
+  // frozen preset），operationMode 无从派生，compatibility 的「edit 无参考图 → 禁用」门
+  // 因此跳过，按钮不进入「尚不可运行」禁用态（v8 那套「缺参考图即禁用 + 可读原因」的
+  // 浏览器侧阻断在 v9 不再触发）。
+  // 已知不一致：面板警告文案「目录中的功能都还没有…运行会被拒绝」在此过渡态仍渲染
+  //（GeneratorParamsPanel 的 variantOptions 全 disabled 分支），与按钮可用性矛盾；
+  // 该「功能」行 Phase 2 整体删除，此处只断言 v9 实际行为，不替 frontend 决定去留。
+  const runButton = generator.getByRole("button", { name: "运行" }).first();
+  await expect(runButton).toBeEnabled();
   // 输入层节点不再承载任何生成入口（v7 的「选择功能」已随五合一 image 节点退役）。
   const garment = page.getByTestId("rf__node-garment");
   await expect(garment.getByRole("button", { name: "选择功能" })).toHaveCount(0);
@@ -514,9 +519,10 @@ test("select value echo stays legible against its trigger surface at every deskt
       return { ok: true as const, ratio, text: (value.textContent ?? "").trim() };
     });
 
-  // 1)「功能」回显：模板落图即带选中值（写实穿搭…），断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。
+  // 1)「功能」回显：v9 模板不带 variant 绑定，模板落图即显示 placeholder「选择功能」，断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。
+  //    placeholder 也是回显的一部分（PR #84 给 SelectValue 加的 data-placeholder:muted 正是为它）。
   const functionSelect = generator.getByRole("combobox", { name: "功能" });
-  await expect(functionSelect).toContainText("写实穿搭");
+  await expect(functionSelect).toContainText("选择功能");
   const functionEcho = await echoLegibility(functionSelect);
   expect(functionEcho.ok, JSON.stringify(functionEcho)).toBe(true);
   if (functionEcho.ok) {

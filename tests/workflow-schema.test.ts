@@ -41,13 +41,13 @@ function imageNode(id: string, outputImages = ["/api/files/a.png"]): Record<stri
 }
 
 function imageGeneratorNode(id: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  // v9 夹具（64 Phase 1）：variant 绑定字段已删除；operationMode 可缺省。
   return {
     id,
     type: "image-generator",
     position: { x: 380, y: 0 },
     data: {
       kind: "image-generator", label: "生图", status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
       modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1,
       ...extra,
     },
@@ -61,7 +61,6 @@ function videoGeneratorNode(id: string, extra: Record<string, unknown> = {}): Re
     position: { x: 380, y: 0 },
     data: {
       kind: "video-generator", label: "生视频", status: "idle",
-      promptVariantId: "fashion-lookbook.doubao-seedance-2-5-260628.v1",
       modelId: VIDEO_MODEL, aspectRatio: "adaptive",
       ...extra,
     },
@@ -77,7 +76,7 @@ function resultImageNode(id: string, sourceGeneratorId: string): Record<string, 
   };
 }
 
-function flow(nodes: unknown[], edges: unknown[], version = 8): unknown {
+function flow(nodes: unknown[], edges: unknown[], version = 9): unknown {
   return { schemaVersion: version, nodes, edges };
 }
 
@@ -86,14 +85,14 @@ const referenceEdge = (id: string, source: string, target: string) => ({ id, sou
 const firstFrameEdge = (id: string, source: string, target: string) => ({ id, source, target, targetHandle: "first-frame", data: {} });
 
 function main() {
-  console.log("workflowSchema v8 校验 + 迁移回归测试");
+  console.log("workflowSchema v9 校验 + 迁移回归测试");
 
-  ok("v8 合法：text → image-generator（prompt）+ image → image-generator（reference）", () => {
+  ok("v9 合法：text → image-generator（prompt）+ image → image-generator（reference）", () => {
     const result = validateAndMigrateFlow(flow(
       [textNode("t1"), imageNode("i1"), imageGeneratorNode("g1")],
       [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
     ));
-    assert.equal(result.schemaVersion, 8);
+    assert.equal(result.schemaVersion, 9);
     assert.equal(result.nodes.length, 3);
     assert.equal(result.edges.length, 2);
   });
@@ -215,15 +214,15 @@ function main() {
     );
   });
 
-  ok("schemaVersion > 8 被拒绝（M7）", () => {
+  ok("schemaVersion > 9 被拒绝（M7）", () => {
     assert.throws(
-      () => validateAndMigrateFlow(flow([], [], 9)),
+      () => validateAndMigrateFlow(flow([], [], 10)),
       (e) => e instanceof WorkflowValidationError && /unsupported version/.test(e.message),
     );
   });
 
   // ---------- 迁移（migration.md M1-M8） ----------
-  ok("M1-M6：v7 text/image 迁移保留内容、边清空、可过 v8 校验", () => {
+  ok("M1-M6：v7 text/image 迁移保留内容、边清空、可过 v9 校验", () => {
     const v7 = {
       schemaVersion: 7,
       nodes: [
@@ -233,7 +232,7 @@ function main() {
       edges: [promptEdge("e1", "t1", "i1")],
     };
     const result = validateAndMigrateFlow(v7);
-    assert.equal(result.schemaVersion, 8);
+    assert.equal(result.schemaVersion, 9);
     assert.equal(result.edges.length, 0); // M4
     assert.equal(result.nodes.length, 2);
     const t = result.nodes.find((n) => n.id === "t1")!;
@@ -265,22 +264,172 @@ function main() {
     assert.throws(() => validateAndMigrateFlow({ schemaVersion: undefined, nodes: [], edges: [] }), /旧版本格式/);
   });
 
-  ok("草稿正向：image-generator 空 promptVariantId 通过 schema（待选功能草稿态）", () => {
+  // ---------- v9（64 Phase 1 C1）：operationMode 归节点 data ----------
+  ok("v9：operationMode 缺省通过（不注入字段，缺省 = generate）", () => {
     const result = validateAndMigrateFlow(flow(
-      [textNode("t1"), imageGeneratorNode("g1", { promptVariantId: "" })],
+      [textNode("t1"), imageGeneratorNode("g1")],
       [promptEdge("e1", "t1", "g1")],
     ));
     const g = result.nodes.find((n) => n.id === "g1")!;
-    assert.equal((g.data as { promptVariantId: string }).promptVariantId, "");
+    assert.ok(!("operationMode" in (g.data as Record<string, unknown>)));
   });
 
-  ok("草稿正向：video-generator 空 promptVariantId 通过 schema（待选功能草稿态）", () => {
+  for (const mode of ["generate", "edit", "mask-edit"] as const) {
+    ok(`v9：operationMode="${mode}" 通过`, () => {
+      const result = validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), imageGeneratorNode("g1", { operationMode: mode })],
+        [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
+      ));
+      const g = result.nodes.find((n) => n.id === "g1")!;
+      assert.equal((g.data as { operationMode?: string }).operationMode, mode);
+    });
+  }
+
+  ok("v9：operationMode 非法值被拒绝", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageGeneratorNode("g1", { operationMode: "restyle" })],
+        [promptEdge("e1", "t1", "g1")],
+      )),
+      (e) => e instanceof WorkflowValidationError && /operationMode/.test(e.message),
+    );
+  });
+
+  ok("v9：text 节点携带 operationMode 被拒绝（输入节点禁带生成语义）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{ ...textNode("t1"), data: { ...(textNode("t1").data as Record<string, unknown>), operationMode: "edit" } }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /输入节点不得携带生成语义字段/.test(e.message),
+    );
+  });
+
+  ok("v9：generator 携带旧 promptVariantId 被白名单剥离（不报错、输出干净）", () => {
     const result = validateAndMigrateFlow(flow(
-      [textNode("t1"), imageNode("i1"), videoGeneratorNode("v1", { promptVariantId: "" })],
-      [promptEdge("e1", "t1", "v1"), firstFrameEdge("e2", "i1", "v1")],
+      [textNode("t1"), imageGeneratorNode("g1", { promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1" })],
+      [promptEdge("e1", "t1", "g1")],
     ));
-    const v = result.nodes.find((n) => n.id === "v1")!;
-    assert.equal((v.data as { promptVariantId: string }).promptVariantId, "");
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    assert.ok(!("promptVariantId" in data));
+    assert.ok(!("operationMode" in data)); // v9 直存路径不做迁移物化（v8 路径才物化）
+  });
+
+  // ---------- v8→v9 迁移（64 Phase 1 C2）三态 + flow_json 夹具 ----------
+  const V8_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+
+  ok("C2 迁移态一：v8 generator 空 text 上游 → 填入预设模板文本", () => {
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "" } },
+        imageNode("i1"),
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: V8_VARIANT_ID, modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const text = (t.data as { text: string }).text;
+    // 填入 = 冻结表 fashion-lookbook:edit 文本（逐字，快照测试锁定）
+    assert.ok(text.startsWith("GPT Image 2 VIP 多图写实穿搭编辑。"), `填入文本异常: ${text.slice(0, 40)}`);
+    assert.equal((g.data as { operationMode?: string }).operationMode, "edit"); // mode 物化
+    assert.ok(!("promptVariantId" in (g.data as Record<string, unknown>))); // 绑定剥离
+  });
+
+  ok("C2 迁移态二：v8 generator 非空 text 上游 → 保留正文、丢弃绑定（绝不覆盖用户文本）", () => {
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "用户自己写的提示词" } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: V8_VARIANT_ID, modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    assert.equal((t.data as { text: string }).text, "用户自己写的提示词");
+  });
+
+  ok("C2 迁移态三：v8 generator 无上游 text → 丢弃绑定（text 不填、mode 不写）", () => {
+    const v8 = flow(
+      [
+        imageNode("i1"),
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: V8_VARIANT_ID, modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [referenceEdge("e2", "i1", "g1")],
+      8,
+    );
+    // INV-1 要求生成节点必须有 prompt 入边——无上游 text 的图本来就被 INV-1 拒绝，
+    // 此处验证迁移不抛出与绑定相关的错误；INV-1 拒绝是既有不变量（原样保留）。
+    assert.throws(
+      () => validateAndMigrateFlow(v8),
+      (e) => e instanceof WorkflowValidationError && /上游文本节点/.test(e.message),
+    );
+  });
+
+  ok("C2 迁移：未知 variantId → 绑定静默丢弃（text 不填、mode 不写）", () => {
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "" } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: "no-such-family.gpt-4o.edit.v1", modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    assert.equal((t.data as { text: string }).text, "");
+    assert.ok(!("operationMode" in (g.data as Record<string, unknown>)));
+  });
+
+  ok("C2 迁移：v8 空 promptVariantId（草稿态）→ 无绑定可迁移，v9 合法通过", () => {
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "" } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: "", modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    assert.ok(!("promptVariantId" in data)); // 草稿态概念随 v9 删除：字段剥离
+    assert.ok(!("operationMode" in data)); // 缺省 generate
+  });
+
+  ok("C2 迁移 flow_json 夹具：v8 换装项目（2 参考图 + edit 变体）→ v9 全字段快照", () => {
+    const v8 = flow(
+      [
+        { id: "tryon-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "试穿要求", status: "idle", text: "" } },
+        imageNode("garment"),
+        imageNode("model"),
+        { id: "tryon-gen", type: "image-generator", position: { x: 380, y: 20 }, data: { kind: "image-generator", label: "试穿生成", status: "idle", promptVariantId: V8_VARIANT_ID, promptFamilyId: "fashion-lookbook", parameterProfileId: "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1", contractHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evaluationVersion: "garment-eval-v3-pending", postprocessVersion: "p1", modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [
+        promptEdge("e-tryon-prompt", "tryon-requirement", "tryon-gen"),
+        referenceEdge("e-tryon-garment", "garment", "tryon-gen"),
+        referenceEdge("e-tryon-model", "model", "tryon-gen"),
+      ],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    assert.equal(result.schemaVersion, 9);
+    assert.equal(result.edges.length, 3);
+    const g = result.nodes.find((n) => n.id === "tryon-gen")!;
+    const data = g.data as Record<string, unknown>;
+    // 六字段全剥离
+    for (const field of ["promptVariantId", "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion", "postprocessVersion"]) {
+      assert.ok(!(field in data), `字段 ${field} 应被剥离`);
+    }
+    assert.equal(data.operationMode, "edit");
+    assert.equal(data.modelId, IMAGE_MODEL);
+    const t = result.nodes.find((n) => n.id === "tryon-requirement")!;
+    assert.ok((t.data as { text: string }).text.startsWith("GPT Image 2 VIP 多图写实穿搭编辑。"));
   });
 
   console.log(`\n通过 ${passed} 项`);

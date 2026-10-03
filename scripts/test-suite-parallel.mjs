@@ -115,21 +115,27 @@ const TEST_FILES = [
   "tests/recent-results.test.ts",
   "tests/reference-inputs.test.ts",
   "tests/video-provider.test.ts",
+
+  // 64 Phase 1（backend C1-C7）：冻结提示词常量快照 + runner taskPrompt 组装回归（纯逻辑，非碰库）。
+  "tests/prompt-presets-frozen.test.ts",
+  "tests/runner-task-prompt.test.ts",
+  // 64 Phase 1 C7：templates-v8.test.ts 已重写为 v9 快照断言（处置落地），从 EXCLUDED 摘除重新登记。
+  "tests/templates-v8.test.ts",
 ];
 
 /**
  * 留盘不登记的测试文件（豁免清单完整性断言）：文件保留在盘上但不进 TEST_FILES，
  * 处置统一归档 64 Phase 3（用户已拍板）：
- * - prompt-presets / prompt-preset-ui / templates-v8 / prompt-evaluation-release：
+ * - prompt-presets / prompt-preset-ui / prompt-evaluation-release：
  *   被测模块属于待删孤儿，测试文件先留盘随 64 Phase 3 一并处置。
  * - prompt-evaluation：用户拍板 a=删，随 64 Phase 3 连同被测孤儿模块删除。
+ * （templates-v8 已于 64 Phase 1 C7 重写并重新登记，不再豁免。）
  * 若其中某个文件先于 64 Phase 3 被删除，本常量需同步移除对应条目，
  * 否则 assertManifestMatchesDisk 的 excludedButGone 检查会 fail-closed 报错。
  */
 const EXCLUDED_FROM_MANIFEST = new Set([
   "tests/prompt-presets.test.ts",
   "tests/prompt-preset-ui.test.ts",
-  "tests/templates-v8.test.ts",
   "tests/prompt-evaluation-release.test.ts",
   "tests/prompt-evaluation.test.ts",
 ]);

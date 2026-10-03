@@ -269,7 +269,8 @@ assert.ok(
 // ---------- 2. wire 往返 + 落盘闸 ----------
 
 const wire = documentSnapshotToPersistedWorkflow(snapshot);
-assert.equal(wire.schemaVersion, 8);
+// 64 Phase 1：schema v9（variant 绑定字段删除、operationMode 归节点 data）。
+assert.equal(wire.schemaVersion, 9);
 assert.deepEqual(wire.nodes, snapshot.nodes.map((node) => ({
   ...node,
   data: { ...node.data, status: "idle" },
@@ -389,7 +390,8 @@ const v7Flow = {
 
 const migration = migrateFlowToV8(structuredClone(v7Flow));
 assert.equal(migration.migrated, true, "v7 文档必须走惰性迁移");
-assert.equal(migration.flow.schemaVersion, 8);
+// 64 Phase 1：迁移输出当前 schema（v9）。
+assert.equal(migration.flow.schemaVersion, 9);
 // M4/M5：v7 的边在 v8 全部非法 → 整体丢弃；不凭空造生成/结果节点。
 assert.deepEqual(migration.flow.edges, [], "v7 的 prompt/reference 边必须全部丢弃");
 assert.deepEqual(migration.flow.nodes.map((node) => node.type), ["text", "image", "video"]);
@@ -423,7 +425,7 @@ assert.equal(migrationAgain.snapshot.nodes.length, 3);
 
 // M7：更高版本 fail-closed。
 assert.throws(
-  () => migrateFlowToV8({ schemaVersion: 9, nodes: [], edges: [] }),
+  () => migrateFlowToV8({ schemaVersion: 10, nodes: [], edges: [] }),
   (error: unknown) => error instanceof DocumentFlowVersionError && /更高的节点模型版本/.test((error as Error).message),
   "更高版本必须被拒绝",
 );
@@ -505,7 +507,7 @@ assert.deepEqual(reopenedV8.flow, openedV7.flow);
 
 // 版本闸：更高版本 / v6 及以下一律拒绝。
 assert.throws(
-  () => readFlowDocumentForOpen({ schemaVersion: 9, nodes: [], edges: [] }),
+  () => readFlowDocumentForOpen({ schemaVersion: 10, nodes: [], edges: [] }),
   DocumentFlowVersionError,
   "更高版本必须被拒绝",
 );
