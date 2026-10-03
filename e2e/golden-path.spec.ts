@@ -18,7 +18,7 @@ const TRYON_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
 interface RunPlanNode {
   id: string;
   type: string;
-  data: { kind: NodeKind; label?: string; promptVariantId?: string; text?: string; images?: string[] };
+  data: { kind: NodeKind; label?: string; operationMode?: string; text?: string; images?: string[] };
 }
 
 interface RunPlanEdge {
@@ -194,13 +194,13 @@ async function activeDocument(page: Page): Promise<ActiveDocument> {
     const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
     if (!tab) throw new Error("当前没有活动文档");
     return {
-      nodes: tab.nodes.map((node: { id: string; type?: string; data: { kind: string; label?: string; promptVariantId?: string; text?: string; images?: string[] } }) => ({
+      nodes: tab.nodes.map((node: { id: string; type?: string; data: { kind: string; label?: string; operationMode?: string; text?: string; images?: string[] } }) => ({
         id: node.id,
         type: node.type ?? node.data.kind,
         data: {
           kind: node.data.kind,
           label: node.data.label,
-          ...(node.data.promptVariantId ? { promptVariantId: node.data.promptVariantId } : {}),
+          ...(typeof node.data.operationMode === "string" ? { operationMode: node.data.operationMode } : {}),
           ...(typeof node.data.text === "string" ? { text: node.data.text } : {}),
           ...(Array.isArray(node.data.images) ? { images: node.data.images } : {}),
         },
@@ -310,10 +310,12 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   await expect(page.locator(".react-flow__node")).toHaveCount(4);
   await expect(page.locator(".react-flow__edge")).toHaveCount(3);
 
-  // ---------- ④ v9 模板不带 variant 绑定：功能下拉显示 placeholder；admission 移除准入门后运行不再被阻断 ----------
+  // ---------- ④ v9 模板显式带 operationMode=edit：无「功能」行，运行按钮给出兼容性原因 ----------
   await expect(generatorNode).toContainText("试穿生成");
-  // v9 模板下生成节点不再有 promptVariantId，功能下拉显示 placeholder「选择功能」（Phase 2 该行整体删除）。
-  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toContainText("选择功能");
+  // Phase 2 裁决 C/§6.2：生成节点面板的「功能」行整体删除，改为「操作」下拉（generate/edit/mask-edit）；
+  // v9 模板显式带 operationMode=edit（server/routes/templates.ts:152 imageGeneratorNode("tryon-gen", …, "edit")）。
+  await expect(generatorNode.getByRole("combobox", { name: "功能" })).toHaveCount(0);
+  await expect(generatorNode.getByRole("combobox", { name: "操作" })).toContainText("编辑");
   // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
   const availableReferenceLabels = await page.evaluate(async (generatorId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
@@ -370,9 +372,9 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   expect(illegalEdgeIndexes(run.nodes, run.edges)).toEqual([]);
   expect(run.nodes.map((node) => node.id).sort()).toEqual(documentGraph.nodes.map((node) => node.id).sort());
   expect(run.edges.map(edgeKey).sort()).toEqual(documentGraph.edges.map(edgeKey).sort());
-  // v9 语义：变体不再写入生成节点 data（无 promptVariantId 绑定），运行时按 frozen preset 装配系统文本。
-  expect(documentGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.promptVariantId)
-    .toBeUndefined();
+  // v9 语义：变体绑定已删除，operationMode 显式归节点 data（裁决 A），模板值为 edit。
+  expect(documentGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.operationMode)
+    .toBe("edit");
 
   // ---------- ⑥ 结果节点：RunEvent 驱动的独立结果节点（v8 §3.4 / runtime.md §3.1） ----------
   const resultNodeId = `result-${"e2e-golden-1"}`;
