@@ -113,7 +113,6 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
     kind: "image-generator",
     label: "AI 改款",
     status: "idle",
-    promptVariantId: "standard-image-edit.gemini-3.1-flash-image.edit.v1",
     modelId: DEFAULT_GENERATION_MODEL_ID,
     aspectRatio: "1:1",
     batchSize: 4,
@@ -133,7 +132,6 @@ test("各批量节点正确计算用户选择的卡片数量", () => {
     kind: "video-generator",
     label: "生视频",
     status: "idle",
-    promptVariantId: "video-animate.doubao-seedance-2-5-260628.edit.v1",
     modelId: "doubao-seedance-2-5-260628",
     aspectRatio: "adaptive",
   }), 1, "视频生成节点一次运行只产出一条结果");

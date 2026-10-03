@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-03T19:34:17.791Z",
+  "baseCommit": "c9f4206196c9779d3393b6c59fcc3c6bdb6e0f9e",
+  "changeFingerprintSha256": "51ea6265c8c46097825492b99588f07592097938db2e0f1d68e2e65febe736ed",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "64 Phase 3 删除波：v7 variant 基础设施整删（garmentPromptPresets/promptEvaluationRelease 系列/modelParameterProfiles/textProvider 等 16 文件），promptRunAdmission 瘦身只留兼容闸九类校验主体（删除 synthesizeVariantTaskPrompt/synthesizedPromptMatchesVariant/nodeKindMatchesCatalogAxis 与六绑定字段输入面），documentSnapshot 死字段收敛到 v9 字段面（DOCUMENT_NODE_ALLOWED_FIELDS/createDocumentNodeData 删六绑定字段，generator-missing-binding 不变量删除），flowStore SESSION_GENERATION_FIELDS 保留防御性清理，videoProvider VideoGenRequest 删 promptVariantId/contractHash 死字段，codex-gate BOOTSTRAP_SCOPE_RULES 移除指向已删文件的死规则，C8 白名单 gate 脚本（rg 六 token 允许迁移模块/活概念/防复发断言，挂 npm run check）",
+  "affectedPaths": [
+    "scripts/check-legacy-variant-grep.mjs",
+    "scripts/codex-gate.mjs",
+    "scripts/node-prompt-parameter-matrix.ts",
+    "server/engine/dag.ts",
+    "server/providers/textProvider.ts",
+    "server/providers/videoProvider.ts",
+    "src/lib/documentSnapshot.ts",
+    "src/lib/garmentPromptPresets.ts",
+    "src/lib/promptEvaluation.ts",
+    "src/lib/promptEvaluationRelease.ts",
+    "src/lib/promptEvaluationReleaseRegistry.ts",
+    "src/lib/promptRunAdmission.ts",
+    "src/lib/promptRuntimeShutdown.ts",
+    "src/store/flowStore.ts",
+    "src/types/modelParameterProfiles.ts",
+    "src/types/promptEvaluation.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 Video Generation",
+      "sha256": "f5d50e6f744c4d06555163a34c2730a8530230e0905bdc8c40755cd4b4c1efcc"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/overview.md",
+      "title": "Seedance 2.0 / 2.5 视频生成",
+      "sha256": "693a068a2a1ba83fdce83f745ea49ad36b1f0f7c3e8fca89b2cef57fd78f606f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/max-tokens",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/faq/max-tokens.md",
+      "pageLocalPath": "pages/faq/max-tokens.md",
+      "title": "max_tokens 是什么？不设置会怎样？",
+      "sha256": "92ea32e94a366485dfe9c272107ba9e94d26a6569d356c0db9b076a078c37fb1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/max-tokens",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/faq/max-tokens.md",
+      "pageLocalPath": "pages/zh-Hant/faq/max-tokens.md",
+      "title": "max_tokens 是什麼？不設定會怎樣？",
+      "sha256": "a4f2a1525cc4aa949f0a72b6cada450d5982d23cee4b97db87d4b4f1c264ff8f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 生图/编辑",
+      "sha256": "2c91629dced4429d69901985232644d058397c99940bed931e776ef5a4765e54"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok-imagine-image/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok-imagine-image/overview.md",
+      "title": "Grok Imagine 2 Image Gen & Editing",
+      "sha256": "efae10fcd4ade47b685996e71f42325f10777a72c95acdd55efe1fbdd062ff0b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 生圖/編輯",
+      "sha256": "a3243e20e398ff5279183bd5b7f6b27bc96463b6618d1810cdeb2bc80d3ab2bd"
+    }
+  ],
+  "decisionSummary": "删除 v7 变体绑定概念后 promptRunAdmission 只保留 operationMode/参考图/模型兼容性闸；系统文本走 server 冻结常量 modeSystemText（裁决 E）；文档/会话死字段收敛到 v9 契约面，旧数据经迁移与投影兜底剥离；无 prompt 变体或模型参数逻辑变更",
+  "unresolvedChoices": []
+}

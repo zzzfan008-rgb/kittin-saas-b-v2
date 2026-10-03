@@ -70,8 +70,9 @@ export class PromptRunAdmissionError extends DagError {
  * legacy migration tests can inspect a plan without authorising a paid run.
  * Both paid enqueue routes must call this immediately before enqueueing.
  *
- * v7：仅 image 节点走异步 runQueue 的付费准入；text 节点走同步链路（§1b），
- * video 节点归 P2-e。准入继续按 promptVariantId 工作，语义不变。
+ * v9（64 Phase 3）：仅 image 节点走异步 runQueue 的付费准入；text 节点走同步链路（§1b），
+ * video 节点归 P2-e。v7 变体绑定准入已随 variant 概念删除——准入只做
+ * 兼容性闸（operationMode/参考图/模型），服务端授权由 run queue 统一承担。
  */
 export function assertPromptRunAdmissions(
   plan: ExecutionPlan,

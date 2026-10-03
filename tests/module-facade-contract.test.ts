@@ -44,7 +44,6 @@ import {
   IMAGE_OPERATION_MODE_VALUES,
   type ImageOperationMode,
 } from "../src/types/imageOperations";
-import type { ModelParameterProfile } from "../src/types/modelParameterProfiles";
 
 console.log("兼容门面导出契约测试");
 
@@ -71,8 +70,8 @@ console.log("  ✓ Flow store 旧入口保持运行事件帮助函数身份");
 assert.equal(WORKFLOW_IMAGE_OPERATION_MODE_VALUES, IMAGE_OPERATION_MODE_VALUES);
 const workflowMode: WorkflowImageOperationMode = "edit";
 const sharedMode: ImageOperationMode = workflowMode;
-const profileMode: ModelParameterProfile["mode"] = sharedMode;
-assert.equal(profileMode, "edit");
+// v9（64 Phase 3）：modelParameterProfiles 已删；ImageOperationMode 即共享契约。
+assert.equal(sharedMode, "edit");
 console.log("  ✓ 图片操作模式由单一契约定义且旧入口保持导出身份");
 
 assert.equal(apiErrorMessage(400, { error: " invalid request " }), "invalid request");

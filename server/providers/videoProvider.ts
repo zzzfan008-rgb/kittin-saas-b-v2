@@ -29,8 +29,6 @@ export interface VideoGenRequest {
   prompt: string;
   firstFrame?: ReferenceImageInput;
   modelOptions?: VideoModelOptions;
-  promptVariantId?: string;
-  contractHash?: `sha256:${string}`;
 }
 
 export type VideoPollResult =
