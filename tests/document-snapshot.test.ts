@@ -180,7 +180,8 @@ assert.deepEqual(snapshot, {
       id: "image-upload",
       type: "image",
       position: { x: 40, y: 50 },
-      data: { kind: "image", label: "参考图", outputImages: ["/api/files/sketch-a.png"] },
+      // 65b：mask/featherRadius 是 image 节点的合法字段，投影保留（不再是 "必剥"）。
+      data: { kind: "image", label: "参考图", outputImages: ["/api/files/sketch-a.png"], mask: "/api/files/legacy-mask.png", featherRadius: 8 },
     },
     {
       id: "image-generator-1",
@@ -189,14 +190,12 @@ assert.deepEqual(snapshot, {
       data: {
         kind: "image-generator",
         label: "生图",
-        // v9（64 Phase 3）：输入源携带的 v7 六绑定字段（脏输入）必须被投影整体剥离。
+        // v9（64 Phase 3）：aspectRatio/batchSize/modelId/modelOptions/runId 为剥离项；
+        // mask/maskSourceRef/featherRadius 已迁至 image 节点（65b），生成器不再保留。
         modelId: "gpt-image-2.5-sunburst",
         aspectRatio: "3:4",
         batchSize: 2,
         modelOptions: { aspectRatio: "3:4", imageSize: "2K" },
-        mask: "/api/files/mask.png",
-        maskSourceRef: "/api/files/source.png",
-        featherRadius: 12,
       },
     },
     {
