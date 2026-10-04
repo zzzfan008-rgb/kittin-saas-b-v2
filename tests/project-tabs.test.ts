@@ -1467,9 +1467,10 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(
-    generatorPanelSource,
-    /setParam.*=> updateNodeData.*modelOptions.*\[k\] = n/,
+  assert.ok(
+    generatorPanelSource.includes(
+      "const setParam = (k: string, n: string | number) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });",
+    ),
     "生成节点内联面板必须是原生参数唯一写回入口",
   );
   assert.match(

@@ -243,18 +243,13 @@ const maskLocal = tab({
   projectId: "mask-source-project",
   nodes: [{
     id: "mask-node",
-    type: "image-generator",
+    type: "image",
     position: { x: 0, y: 0 },
     data: {
-      // v8：蒙版住在生成节点上（输入层节点不带蒙版）。
-      kind: "image-generator",
+      // 65b：蒙版随 image 节点 data 携带。
+      kind: "image",
       label: "局部重绘",
       status: "idle",
-      promptVariantId: "",
-      modelId: "gpt-image-2.5-sunburst",
-      modelOptions: {},
-      aspectRatio: "3:4",
-      batchSize: 1,
       mask: "/api/files/source-mask.png",
     },
   }],
