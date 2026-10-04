@@ -222,15 +222,19 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
   switch (data.kind) {
     case "text":
       return { kind: "text", label: data.label, text: stringOrEmpty(data.text) };
-    case "image":
+    case "image": {
+      const fr = typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+        ? Math.max(0, Math.min(64, Math.round(data.featherRadius)))
+        : undefined;
       return {
         kind: "image",
         label: data.label,
         outputImages: stringList(data.outputImages),
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
-        ...featherRadiusField(data.featherRadius),
+        ...(fr !== undefined ? { featherRadius: fr } : {}),
       };
+    }
     case "video":
       return { kind: "video", label: data.label, outputVideos: stringList(data.outputVideos) };
     case "image-generator": {
