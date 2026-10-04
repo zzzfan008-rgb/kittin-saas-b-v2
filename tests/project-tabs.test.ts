@@ -1697,6 +1697,11 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
 await test("羽化宽度经生成层参数面板透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
   // v8（R-83）：蒙版编辑器入口随生成层 UI 迁入 GeneratorParamsPanel；该面板只把已保存的
   // featherRadius 透传给 MaskEditor（缺省 = 自适应），节点层不设第二处输入控件。
+  // 65a 判定链：原正则钉死旧断言形态 `(data as ImageGeneratorNodeData).featherRadius`；
+  // 裁决 A 类型守卫降级（蒙版三字段从生成节点迁到图片节点后的类型收窄机械后果，
+  // 运行时行为逐位一致）改写为 dataRecord 读取 + 独立 const，本测试正则同步更新，
+  // 守护意图不变：仍是 typeof number 钳制后经 featherRadius 透传 MaskEditor。
+  // 注明：65b 蒙版入口整体迁出 GeneratorParamsPanel 时本测试将重写。
   const panelSource = fs.readFileSync(
     new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
     "utf8",
@@ -1711,7 +1716,11 @@ await test("羽化宽度经生成层参数面板透传 MaskEditor 并在 0–64 
   );
   assert.match(
     panelSource,
-    /<MaskEditor[\s\S]*featherRadius=\{typeof \(data as ImageGeneratorNodeData\)\.featherRadius === "number"[\s\S]*: undefined\}/,
+    /<MaskEditor[\s\S]*featherRadius=\{maskFeatherRadius\}/,
+  );
+  assert.match(
+    panelSource,
+    /const maskFeatherRadius = typeof dataRecord\.featherRadius === "number"[\s\S]*: undefined/,
   );
   assert.doesNotMatch(panelSource, /<input[^>]*type="range"/);
   assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
