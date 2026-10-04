@@ -294,13 +294,12 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius"],
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
     "operationMode",
-    "mask", "maskSourceRef", "featherRadius",
   ],
   "video-generator": [
     "kind", "label",
