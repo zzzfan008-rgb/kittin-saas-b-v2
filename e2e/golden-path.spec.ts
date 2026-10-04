@@ -297,7 +297,9 @@ test("an unverified starter no longer blocks run, and the run completes the isol
   // Phase 2 裁决 C/§6.2：生成节点面板的「功能」行整体删除，改为「操作」下拉（generate/edit/mask-edit）；
   // v9 模板显式带 operationMode=edit（server/routes/templates.ts:152 imageGeneratorNode("tryon-gen", …, "edit")）。
   await expect(generatorNode.getByRole("combobox", { name: "功能" })).toHaveCount(0);
-  await expect(generatorNode.getByRole("combobox", { name: "操作" })).toContainText("编辑");
+  // 65b：操作改为自动推断，无下拉，代以语境文本。
+  await expect(generatorNode.getByRole("combobox", { name: "操作" })).toHaveCount(0);
+  await expect(generatorNode.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
   // 参考图顺序 = 连线顺序（v8「只保留顺序语义」）：取 app 自己的派生函数，针对真实画布求值。
   const availableReferenceLabels = await page.evaluate(async (generatorId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";

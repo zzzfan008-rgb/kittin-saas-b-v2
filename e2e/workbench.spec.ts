@@ -449,10 +449,10 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   // 内联参数面板字段顺序：操作 → 模型 → 画幅 + 批次 → 模型参数（plan.md §3.3 / 面板头注释）。
   // v9 模板 tryon-gen 显式带 operationMode=edit（templates.ts:152），面板回显「编辑」。
   await expect(generator.getByRole("combobox", { name: "功能" })).toHaveCount(0);
-  const operationSelect = generator.getByRole("combobox", { name: "操作" });
-  await expect(operationSelect).toContainText("编辑");
-  // edit 模式的兼容提示（裁决 C5，语义对齐 server DagError 文案）。
-  await expect(generator.getByText("需上游参考图")).toBeVisible();
+  // 65b: 操作由接线自动推断，无 combobox；改用语境文本展示推断结果。
+  await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
+  await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
+  // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
   // v9 模板默认画幅 1:1（server/routes/templates.ts 拍板③：aspectRatio "1:1" / batchSize 1）。
   await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
@@ -461,7 +461,8 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   const params = generator.getByRole("region", { name: "模型参数" });
   await expect(params).toBeVisible();
   await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
-  await expect(params.getByRole("button", { name: "+ 添加参数" })).toBeVisible();
+  // 65b: 参数全下拉，"添加参数" 自由输入入口已退役。
+  await expect(params.getByRole("button", { name: "+ 添加参数" })).toHaveCount(0);
 
   // 运行按钮在 v9 是可用的「运行」还是禁用态的「尚不可运行」，由 compatibility 门决定：
   // operationMode=edit 且本测试未上传参考图 → 触发 edit-reference-missing，按钮禁用并给出可读原因
