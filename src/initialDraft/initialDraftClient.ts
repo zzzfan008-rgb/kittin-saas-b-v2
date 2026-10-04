@@ -51,8 +51,8 @@ function projectMaskRefs(flow: PersistedWorkflow): Array<{
   nodeId: string;
 }> {
   return flow.nodes.flatMap((node) => {
-    // v8：蒙版是生成节点能力（输入层节点不带蒙版，写入闸会拒绝），因此只看 image-generator。
-    if (node.data.kind !== "image-generator" || typeof node.data.mask !== "string") return [];
+    // 65b：蒙版三字段随 image 节点 data 携带（65a 契约搬迁）。
+    if (node.data.kind !== "image" || typeof node.data.mask !== "string") return [];
     const match = /^\/api\/files\/([^/?#]+\.png)$/.exec(node.data.mask);
     return match ? [{ sourceUrl: node.data.mask, fileId: match[1], nodeId: node.id }] : [];
   });
@@ -118,8 +118,8 @@ export async function copyProjectScopedMasks(input: {
     flow: {
       ...input.flow,
       nodes: input.flow.nodes.map((node) => {
-        // v8：蒙版只可能挂在生成节点上（与 projectMaskRefs 同一判据）。
-        if (node.data.kind !== "image-generator" || typeof node.data.mask !== "string") return node;
+        // 65b：蒙版随 image 节点数据（65a 契约搬迁）。
+        if (node.data.kind !== "image" || typeof node.data.mask !== "string") return node;
         const mask = replacements.get(node.data.mask);
         return mask ? { ...node, data: { ...node.data, mask } } : node;
       }),

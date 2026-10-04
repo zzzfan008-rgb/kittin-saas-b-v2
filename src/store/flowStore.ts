@@ -2001,6 +2001,12 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       break;
     case "image":
       data.outputImages = stringList(input.outputImages);
+      // 65b：蒙版三字段随图片节点 data 会话恢复。
+      if (typeof input.mask === "string" && input.mask) data.mask = input.mask;
+      if (typeof input.maskSourceRef === "string" && input.maskSourceRef) data.maskSourceRef = input.maskSourceRef;
+      if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
+        data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
+      }
       break;
     case "video":
       data.outputVideos = stringList(input.outputVideos);
@@ -2025,12 +2031,6 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
         modelId as Parameters<typeof normalizeImageModelOptions>[0],
         input.modelOptions,
       );
-      if (typeof input.mask === "string" && input.mask) data.mask = input.mask;
-      if (typeof input.maskSourceRef === "string" && input.maskSourceRef) data.maskSourceRef = input.maskSourceRef;
-      // 羽化宽度仅接受 0–64 的有限数值；缺省/非数值维持自适应羽化（不写该字段）。
-      if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
-        data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
-      }
       // v9（64 Phase 2）：评估字段已随概念删除，不再从会话拷贝。
       break;
     }
