@@ -813,10 +813,10 @@ assert.match(
 useFlowStore.getState().switchTab(quotaTabId);
 
 failSessionWrites = false;
-useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/old-mask.png" });
+useFlowStore.getState().updateNodeData("quota-mask", { modelOptions: { imageSize: "2K" } });
 assert.match(
   sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "",
-  /old-mask\.png/,
+  /imageSize.*2K/,
   "失败后改回旧内容也必须重新写入已被移除的页签 key",
 );
 assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);

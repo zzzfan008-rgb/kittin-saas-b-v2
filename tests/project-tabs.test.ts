@@ -1469,7 +1469,7 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
   );
   assert.match(
     generatorPanelSource,
-    /updateNodeData\(nodeId, \{ modelOptions: \{ \.\.\.options, \[key\]: next \} \}\)/,
+    /setParam.*=> updateNodeData.*modelOptions.*\[k\] = n/,
     "生成节点内联面板必须是原生参数唯一写回入口",
   );
   assert.match(

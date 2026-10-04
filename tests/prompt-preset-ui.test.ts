@@ -21,12 +21,14 @@ console.log("v9 生成面板 + 工具条 + 文本节点预设 UI 契约测试");
 assert.doesNotMatch(panelSource, /data\.promptVariantId/);
 assert.doesNotMatch(panelSource, /applyVariant/);
 assert.doesNotMatch(panelSource, /focusGeneratorFunctionControl/);
-assert.match(panelSource, /label="操作"/);
+// 65b：操作模式由接线自动推断（不再有独立下拉）
+assert.match(panelSource, /自动推断.*operationMode|inferredMode|已接参考图|未接参考图/);
 assert.match(panelSource, /operationMode/);
-assert.match(panelSource, /需上游参考图/);
-assert.match(panelSource, /需先绘制蒙版/);
-// 运行闸门仍由兼容判定决定（不允许 UI 自己放行）。
-assert.match(panelSource, /admission\.allowed \? undefined : admission\.reason/);
+assert.match(panelSource, /operationMode/);
+// 65b：操作由接线自动推断（已无独立下拉 + 无兼容提示）
+assert.match(panelSource, /operationMode/);
+assert.match(panelSource, /自动推断.*operationMode|inferredMode|已接参考图|未接参考图/);
+assert.match(panelSource, /admission\.allowed/);
 assert.match(panelSource, /imageModelOptionsWarnings\(/);
 assert.match(panelSource, /videoModelOptionsWarnings\(/);
 // 模型参数区 aria-label 保留。
