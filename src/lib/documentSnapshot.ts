@@ -227,7 +227,7 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
     case "video":
       return { kind: "video", label: data.label, outputVideos: stringList(data.outputVideos) };
     case "image-generator": {
-      const featherRadius = data.featherRadius;
+      // 65a+65b (Q4 裁决 A)：mask 三字段已迁至 image 节点；存量 generator 蒙版静默丢弃。
       return {
         kind: "image-generator",
         label: data.label,
@@ -238,11 +238,6 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
           : 1,
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
         ...operationModeField(data),
-        ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
-        ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
-        ...(typeof featherRadius === "number" && Number.isFinite(featherRadius)
-          ? { featherRadius: Math.max(0, Math.min(64, Math.round(featherRadius))) }
-          : {}),
       };
     }
     case "video-generator":

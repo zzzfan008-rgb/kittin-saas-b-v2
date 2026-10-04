@@ -29,7 +29,8 @@ assert.match(selectSource, /data-selected:text-accent-foreground/);
 assert.match(selectSource, /min-w-\[max\(8rem,var\(--anchor-width\)\)\]/);
 assert.doesNotMatch(selectSource, /overflow-hidden/);
 // 5) OptionSelect 空 label 防御：回显与选项行都回退到 value，绝不渲染空白。
-assert.match(panelSource, /option\?\.label \|\| option\?\.value/);
-assert.match(panelSource, /\{option\.label \|\| option\.value \|\| "—"\}/);
+// 65b 变量名变更：option → opt / o（参数全下拉后语义更精确）
+assert.match(panelSource, /opt\?\.label \|\| opt\?\.value/);
+assert.match(panelSource, /o\.label \|\| o\.value \|\| "—"/);
 
 console.log("Select 可见性硬化契约测试通过");
