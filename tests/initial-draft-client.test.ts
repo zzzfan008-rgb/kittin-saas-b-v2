@@ -278,7 +278,7 @@ try {
   assert.deepEqual(maskCopyPayload?.masks, [{ fileId: "source-mask.png", nodeId: "mask-node" }]);
   assert.equal(copied.targetProjectId, "mask-target-project");
   assert.equal(copied.flow.nodes[0].data.kind, "image-generator");
-  if (copied.flow.nodes[0].data.kind !== "image-generator") throw new Error("unexpected node kind");
+  if (copied.flow.nodes[0].data.kind !== "image") throw new Error("unexpected node kind");
   assert.equal(copied.flow.nodes[0].data.mask, "/api/files/copied-mask.png");
 } finally {
   globalThis.fetch = originalFetch;
