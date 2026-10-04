@@ -82,8 +82,9 @@ const APIYI_BOOTSTRAP_SCOPE_RULES = Object.freeze([
   { kind: "prefix", value: "server/providers/" },
   { kind: "exact", value: "server/routes/generate.ts" },
   { kind: "exact", value: "src/types/imageModels.ts" },
-  { kind: "exact", value: "src/types/modelParameterProfiles.ts" },
-  { kind: "exact", value: "src/lib/garmentPromptPresets.ts" },
+  // v9（64 Phase 3）：modelParameterProfiles.ts / garmentPromptPresets.ts 已随
+  // variant 概念删除——指向它们的 bootstrap scope 规则同步移除（死配置）；
+  // 未来若以新路径恢复同类模块，会按新路径重新进入 scope。
 ]);
 
 const REVIEW_SCHEMA = {

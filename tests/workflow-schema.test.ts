@@ -402,6 +402,77 @@ function main() {
     assert.ok(!("operationMode" in data)); // 缺省 generate
   });
 
+  // 64 Phase 3（3c-3）：C2 非默认模型 variantId 边界。v8 时代存在非默认模型的变体
+  // （如 fashion-lookbook.gemini-3.1-flash-image.edit.v1）。冻结绑定表按 familyId+mode
+  // 查表、modelId 段不参与解析（promptPresetsFrozenClient VARIANT_ID_PATTERN 语义）——
+  // 以下断言以实现真语义为准：非默认模型变体同样命中预设文本与 mode 物化，
+  // 且迁移绝不改写节点自身的 modelId（绑定来自变体，模型归节点）。
+  ok("C2 迁移（非默认模型）：gemini 变体空 text 上游 → 填入预设模板 + mode 物化 + modelId 不被改写", () => {
+    const NON_DEFAULT_MODEL = "gemini-3.1-flash-image";
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "" } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: "fashion-lookbook.gemini-3.1-flash-image.edit.v1", modelId: NON_DEFAULT_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    // 非默认模型变体命中 familyId=fashion-lookbook + mode=edit 的冻结绑定。
+    assert.equal(data.operationMode, "edit", "非默认模型变体同样物化 mode");
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    const text = (t.data as { text?: string }).text ?? "";
+    assert.ok(text.trim().length > 0, "空 text 上游必须填入预设模板文本");
+    assert.match(text, /GPT Image 2 VIP/, "填入的是 fashion-lookbook:edit 预设模板正文");
+    // 迁移绝不改写节点自身 modelId（64 裁决：绑定来自变体，模型归节点）。
+    assert.equal(data.modelId, NON_DEFAULT_MODEL, "迁移不得改写非默认模型的 modelId");
+    // 六绑定字段全部剥离。
+    for (const field of ["promptVariantId", "promptFamilyId", "parameterProfileId", "contractHash", "evaluationVersion", "postprocessVersion"]) {
+      assert.ok(!(field in data), `${field} 必须剥离`);
+    }
+  });
+
+  ok("C2 迁移（非默认模型）：gemini 变体非空 text 上游 → 保留正文 + mode 物化 + modelId 不变", () => {
+    const NON_DEFAULT_MODEL = "gemini-3.1-flash-image";
+    const USER_TEXT = "用户自己的提示词正文，不得被覆盖";
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: USER_TEXT } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: "fashion-lookbook.gemini-3.1-flash-image.edit.v1", modelId: NON_DEFAULT_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    assert.equal((t.data as { text?: string }).text, USER_TEXT, "非空正文绝不覆盖");
+    assert.equal(data.operationMode, "edit");
+    assert.equal(data.modelId, NON_DEFAULT_MODEL);
+    assert.ok(!("promptVariantId" in data));
+  });
+
+  ok("C2 迁移（非默认模型）：未知 family 组合 → 绑定静默丢弃（fail-closed 不猜）", () => {
+    const v8 = flow(
+      [
+        { id: "t1", type: "text", position: { x: 0, y: 0 }, data: { kind: "text", label: "提示词", status: "idle", text: "" } },
+        { id: "g1", type: "image-generator", position: { x: 380, y: 0 }, data: { kind: "image-generator", label: "生图", status: "idle", promptVariantId: "no-such-family.gemini-3.1-flash-image.edit.v1", modelId: "gemini-3.1-flash-image", aspectRatio: "3:4", batchSize: 1 } },
+      ],
+      [promptEdge("e1", "t1", "g1")],
+      8,
+    );
+    const result = validateAndMigrateFlow(v8);
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    const t = result.nodes.find((n) => n.id === "t1")!;
+    assert.equal((t.data as { text?: string }).text ?? "", "", "未知组合不得填文本");
+    assert.ok(!("operationMode" in data), "未知组合不得物化 mode");
+    assert.ok(!("promptVariantId" in data));
+  });
+
   ok("C2 迁移 flow_json 夹具：v8 换装项目（2 参考图 + edit 变体）→ v9 全字段快照", () => {
     const v8 = flow(
       [

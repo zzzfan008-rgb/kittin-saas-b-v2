@@ -29,52 +29,15 @@ const { executeStep } = await import("../server/engine/runner");
 const { generateRouter } = await import("../server/routes/generate");
 const { historyRouter } = await import("../server/routes/history");
 const { streamDurableRunEvents } = await import("../server/routes/runPlan");
-const {
-  requireGarmentPromptVariant,
-} = await import("../src/lib/garmentPromptPresets");
-const {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} = await import("../src/types/modelParameterProfiles");
+// v9（64 Phase 3）：variant 绑定概念已删——params 直给模型与模式。
+// 任务文本与 runner.ts executeImageStep 同源：taskPrompt = modeSystemText(kind, mode) + 用户正文。
+const { modeSystemText } = await import("../server/lib/promptPresetsFrozen");
 const { renderProviderPrompt } = await import("../src/lib/providerPromptRenderer");
-const {
-  promotePromptVariantForTest,
-} = await import("./promptReleaseTestSupport");
 await database.initializeDatabase();
 
-const queueVariant = requireGarmentPromptVariant({
-  familyId: "fashion-lookbook",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "generate",
-});
-// Queue tests exercise already-reviewed production jobs unless a test explicitly
-// changes this status to prove execution-time fail-closed behaviour.
-promotePromptVariantForTest(queueVariant);
-const queueProfile = getModelParameterProfile(queueVariant.parameterProfileId)!;
-const queueParameters = materializeModelParameterProfile(queueProfile);
-
-const runtimeEditVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "edit",
-});
-promotePromptVariantForTest(runtimeEditVariant);
-const runtimeEditProfile = getModelParameterProfile(runtimeEditVariant.parameterProfileId)!;
-const runtimeEditParameters = materializeModelParameterProfile(runtimeEditProfile);
-
-const maskVariant = requireGarmentPromptVariant({
-  familyId: "mask-local-edit",
-  modelId: "gpt-image-2.5-sunburst",
-  nodeKind: "image",
-  mode: "mask-edit",
-});
-// This isolated queue/route fixture needs an accepted run to inspect persistence.
-// Model reviewed evidence only inside this process; production catalog remains fail-closed.
-promotePromptVariantForTest(maskVariant);
-const maskProfile = getModelParameterProfile(maskVariant.parameterProfileId)!;
-const maskParameters = materializeModelParameterProfile(maskProfile);
+// v9（64 Phase 3）：原 variant fixture 的模型直给（fashion-lookbook / commerce-hero 同模型）。
+const QUEUE_MODEL_ID: ImageModelId = "gpt-image-2.5-flare-vip";
+const MASK_MODEL_ID: ImageModelId = "gpt-image-2.5-sunburst";
 
 const owner = await database.queryOne<{ id: string }>("SELECT id FROM users WHERE account_id = 'queue-admin'");
 assert.ok(owner);
@@ -115,19 +78,13 @@ function boundQueueParams(
   overrides: Readonly<Record<string, unknown>> = {},
 ): NodeExecution["params"] {
   return {
-    // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts，params 无 prompt。
+    // v9（64 Phase 3）：用户正文沿 text 边进入 inputTexts；模式/模型直给（dag extractParams 同源）。
     inputTexts: [intent],
-    promptVariantId: queueVariant.variantId,
-    promptFamilyId: queueVariant.familyId,
-    parameterProfileId: queueVariant.parameterProfileId,
-    contractHash: queueVariant.contractHash,
-    evaluationVersion: queueVariant.evaluationVersion,
-    postprocessVersion: queueProfile.postprocess.version,
-    operationMode: queueVariant.mode,
-    modelId: queueVariant.modelId,
-    modelOptions: queueParameters.modelOptions,
-    aspectRatio: queueParameters.aspectRatio,
-    batchSize: queueParameters.batchSize,
+    operationMode: "generate",
+    modelId: QUEUE_MODEL_ID,
+    modelOptions: {},
+    aspectRatio: "1:1",
+    batchSize: 1,
     ...overrides,
   };
 }
@@ -146,22 +103,27 @@ function step(nodeId: string, upstream?: NodeExecution["upstream"]): NodeExecuti
 // runner.ts executeImageStep 的渲染输出（runtime.md §1 第 3/6 步），否则
 // 评估证据侧会判定 prompt 与共享受审渲染器漂移。
 function runnerTaskPromptForStep(step: NodeExecution): string {
-  // 与 runner.ts inputTextsOf + 合成表达式逐字一致（inputTexts 优先，
-  // 无 text 上游时回退 params.prompt；直连路径）。
+  // 与 runner.ts executeImageStep 逐字一致（裁决 E）：
+  // taskPrompt = modeSystemText(kind, operationMode) + 用户正文；
+  // inputTexts 优先，无 text 上游时回退 params.prompt（直连路径）。
   const inputTexts = Array.isArray(step.params.inputTexts)
     ? step.params.inputTexts.filter((value): value is string => typeof value === "string")
     : [];
   const userPrompt = inputTexts.length > 0
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
-  return `${queueVariant.fullPrompt}\n\n${userPrompt}`.trim();
+  const operationMode = typeof step.params.operationMode === "string"
+    && (["generate", "edit", "mask-edit"] as const).some((mode) => mode === step.params.operationMode)
+      ? step.params.operationMode
+      : "generate";
+  return `${modeSystemText(step.kind, operationMode)}\n\n${userPrompt}`.trim();
 }
 
 function runnerPromptForGenerateStep(step: NodeExecution): string {
   return renderProviderPrompt({
     nodeKind: "image",
-    modelId: queueVariant.modelId as ImageModelId,
-    operationMode: queueVariant.mode,
+    modelId: QUEUE_MODEL_ID,
+    operationMode: "generate",
     taskPrompt: runnerTaskPromptForStep(step),
     references: [],
     needsMask: false,
@@ -179,19 +141,13 @@ function confirmedRuntimeEditStep(nodeId: string): NodeExecution {
       sourceNodeId: `${nodeId}-source`,
     }],
     params: {
-      // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts。
+      // v9（64 Phase 3）：用户正文沿 text 边进入 inputTexts；模式/模型直给。
       inputTexts: ["保持服装结构并优化商业棚拍光线"],
-      promptVariantId: runtimeEditVariant.variantId,
-      promptFamilyId: runtimeEditVariant.familyId,
-      parameterProfileId: runtimeEditVariant.parameterProfileId,
-      contractHash: runtimeEditVariant.contractHash,
-      evaluationVersion: runtimeEditVariant.evaluationVersion,
-      postprocessVersion: runtimeEditProfile.postprocess.version,
-      operationMode: runtimeEditVariant.mode,
-      modelId: runtimeEditVariant.modelId,
-      modelOptions: runtimeEditParameters.modelOptions,
-      aspectRatio: runtimeEditParameters.aspectRatio,
-      batchSize: runtimeEditParameters.batchSize,
+      operationMode: "edit",
+      modelId: QUEUE_MODEL_ID,
+      modelOptions: {},
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
   };
 }
@@ -443,7 +399,7 @@ await test("Worker 不修复损坏的静态 reference order/imageRef/数量快�
       [JSON.stringify(damagedStep), run.id],
     );
 
-    const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+    const fake = resolver(() => ({ images: [PNG_DATA_URL], model: QUEUE_MODEL_ID }));
     assert.equal(await queue.processNextGenerationJob(`worker-static-snapshot-${corruption.name}`, {
       resolveProvider: fake.resolveProvider,
       now: () => tick(),
@@ -468,7 +424,7 @@ await test("Worker 拒绝绕过入队门禁的远程参考图且 Provider 零调
     owner.id,
     runtimeEditContext(nodeId),
   );
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: runtimeEditVariant.modelId }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: QUEUE_MODEL_ID }));
 
   assert.equal(await queue.processNextGenerationJob("worker-remote-reference", {
     resolveProvider: fake.resolveProvider,
@@ -495,19 +451,14 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       sourceNodeId: `${nodeId}:user-garment`,
     }],
     params: {
-      // v7：真实 DAG 产出——蒙版用户正文沿 text 边进入 inputTexts。
+      // v9（64 Phase 3）：蒙版用户正文沿 text 边进入 inputTexts；模式/模型直给
+      // （值与原 mask-local-edit 参数档案 materialize 等价：aspectRatio "source"、batchSize 1）。
       inputTexts: ["仅修改蒙版区域的拉链颜色"],
-      promptVariantId: maskVariant.variantId,
-      promptFamilyId: maskVariant.familyId,
-      parameterProfileId: maskVariant.parameterProfileId,
-      contractHash: maskVariant.contractHash,
-      evaluationVersion: maskVariant.evaluationVersion,
-      postprocessVersion: maskProfile.postprocess.version,
-      operationMode: maskVariant.mode,
-      modelId: maskVariant.modelId,
-      modelOptions: maskParameters.modelOptions,
-      aspectRatio: maskParameters.aspectRatio,
-      batchSize: maskParameters.batchSize,
+      operationMode: "mask-edit",
+      modelId: MASK_MODEL_ID,
+      modelOptions: {},
+      aspectRatio: "source",
+      batchSize: 1,
       mask: "https://references.example.invalid/mask.png",
       maskSourceRef: PNG_DATA_URL,
       maskPipelineVersion: 3,
@@ -525,7 +476,7 @@ await test("Worker 拒绝绕过入队门禁的远程蒙版且 Provider 零调用
       requestedCount: 1,
     },
   );
-  const fake = resolver(() => ({ images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId }));
+  const fake = resolver(() => ({ images: [OPAQUE_PNG_DATA_URL], model: MASK_MODEL_ID }));
 
   assert.equal(await queue.processNextGenerationJob("worker-remote-mask", {
     resolveProvider: fake.resolveProvider,
@@ -551,7 +502,7 @@ await test("Worker 在普通 Provider 边界拒绝与实际内容不符的 refer
   let validations = 0;
   let providerCalls = 0;
   const provider: AIProvider = {
-    id: runtimeEditVariant.modelId,
+    id: QUEUE_MODEL_ID,
     validate(request) {
       validations += 1;
       assert.ok(request.references?.[0]);
@@ -559,11 +510,11 @@ await test("Worker 在普通 Provider 边界拒绝与实际内容不符的 refer
     },
     async generate() {
       providerCalls += 1;
-      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      return { images: [PNG_DATA_URL], model: QUEUE_MODEL_ID };
     },
     async edit() {
       providerCalls += 1;
-      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      return { images: [PNG_DATA_URL], model: QUEUE_MODEL_ID };
     },
   };
   assert.equal(await queue.processNextGenerationJob("worker-reference-hash-workflow", {
@@ -589,7 +540,7 @@ await test("Worker 拒绝 references 与 Provider 兼容数组内容分叉且 Pr
   let validations = 0;
   let providerCalls = 0;
   const provider: AIProvider = {
-    id: runtimeEditVariant.modelId,
+    id: QUEUE_MODEL_ID,
     validate(request) {
       validations += 1;
       assert.ok(request.referenceImages?.[0]);
@@ -597,11 +548,11 @@ await test("Worker 拒绝 references 与 Provider 兼容数组内容分叉且 Pr
     },
     async generate() {
       providerCalls += 1;
-      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      return { images: [PNG_DATA_URL], model: QUEUE_MODEL_ID };
     },
     async edit() {
       providerCalls += 1;
-      return { images: [PNG_DATA_URL], model: runtimeEditVariant.modelId };
+      return { images: [PNG_DATA_URL], model: QUEUE_MODEL_ID };
     },
   };
   assert.equal(await queue.processNextGenerationJob("worker-reference-content-mismatch", {
@@ -629,19 +580,13 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
       sourceNodeId: `${nodeId}:user-garment`,
     }],
     params: {
-      // v7：真实 DAG 产出——蒙版用户正文沿 text 边进入 inputTexts。
+      // v9（64 Phase 3）：蒙版用户正文沿 text 边进入 inputTexts；模式/模型直给。
       inputTexts: ["仅修改蒙版区域的拉链颜色"],
-      promptVariantId: maskVariant.variantId,
-      promptFamilyId: maskVariant.familyId,
-      parameterProfileId: maskVariant.parameterProfileId,
-      contractHash: maskVariant.contractHash,
-      evaluationVersion: maskVariant.evaluationVersion,
-      postprocessVersion: maskProfile.postprocess.version,
-      operationMode: maskVariant.mode,
-      modelId: maskVariant.modelId,
-      modelOptions: maskParameters.modelOptions,
-      aspectRatio: maskParameters.aspectRatio,
-      batchSize: maskParameters.batchSize,
+      operationMode: "mask-edit",
+      modelId: MASK_MODEL_ID,
+      modelOptions: {},
+      aspectRatio: "source",
+      batchSize: 1,
       mask: PNG_DATA_URL,
       maskSourceRef: PNG_DATA_URL,
       maskPipelineVersion: 3,
@@ -663,7 +608,7 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
   let generateCalls = 0;
   let editCalls = 0;
   const provider: AIProvider = {
-    id: maskVariant.modelId,
+    id: MASK_MODEL_ID,
     validate(request) {
       validations += 1;
       assert.ok(request.references && request.references.length >= 2);
@@ -671,11 +616,11 @@ await test("Worker 拒绝 Provider 校验阶段篡改系统蒙版 guide order �
     },
     async generate() {
       generateCalls += 1;
-      return { images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId };
+      return { images: [OPAQUE_PNG_DATA_URL], model: MASK_MODEL_ID };
     },
     async edit() {
       editCalls += 1;
-      return { images: [OPAQUE_PNG_DATA_URL], model: maskVariant.modelId };
+      return { images: [OPAQUE_PNG_DATA_URL], model: MASK_MODEL_ID };
     },
   };
 
@@ -1025,19 +970,14 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
       { nodeId: secondNodeId, images: [] },
     ],
     params: {
-      // v7：真实 DAG 产出——用户正文沿 text 边进入 inputTexts。
+      // v9（64 Phase 3）：用户正文沿 text 边进入 inputTexts；模式/模型直给
+      // （值与原 commerce-hero edit 参数档案 materialize 等价：aspectRatio "1:1"）。
       inputTexts: ["整合两组服装效果图为统一商业棚拍画面"],
-      promptVariantId: runtimeEditVariant.variantId,
-      promptFamilyId: runtimeEditVariant.familyId,
-      parameterProfileId: runtimeEditVariant.parameterProfileId,
-      contractHash: runtimeEditVariant.contractHash,
-      evaluationVersion: runtimeEditVariant.evaluationVersion,
-      postprocessVersion: runtimeEditProfile.postprocess.version,
-      operationMode: runtimeEditVariant.mode,
-      modelId: runtimeEditVariant.modelId,
-      modelOptions: runtimeEditParameters.modelOptions,
-      aspectRatio: runtimeEditParameters.aspectRatio,
-      batchSize: runtimeEditParameters.batchSize,
+      operationMode: "edit",
+      modelId: QUEUE_MODEL_ID,
+      modelOptions: {},
+      aspectRatio: "1:1",
+      batchSize: 1,
     },
   };
   const plan: ExecutionPlan = {
@@ -1332,18 +1272,12 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         kind: "image-generator",
         nodeId: "direct-mask-test",
         request: {
-          // v7 直连路径：request.prompt 是纯用户正文（runner 回退 params.prompt
-          // 后再内联 variant.fullPrompt），不再提交 v6 包装文本。
+          // v9（64 Phase 3）：直连路径 request.prompt 是纯用户正文；六绑定字段已删，
+          // 模式/画幅直给（operationMode/mask 语义不变）。
           prompt: "只修改左侧衣袖",
-          promptVariantId: maskVariant.variantId,
-          promptFamilyId: maskVariant.familyId,
-          parameterProfileId: maskVariant.parameterProfileId,
-          contractHash: maskVariant.contractHash,
-          evaluationVersion: maskVariant.evaluationVersion,
-          postprocessVersion: maskProfile.postprocess.version,
           operationMode: "mask-edit",
-          aspectRatio: maskParameters.aspectRatio,
-          batchSize: maskParameters.batchSize,
+          aspectRatio: "source",
+          batchSize: 1,
           references: [{
             dataUrl: PNG_DATA_URL,
             order: 0,
@@ -1351,7 +1285,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
           }],
           mask: PNG_DATA_URL,
           maskMode: "replace",
-          modelOptions: maskParameters.modelOptions,
+          modelOptions: {},
         },
       }),
     });
@@ -1385,22 +1319,16 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
         nodeId: "direct-mask-over-limit",
         request: {
           prompt: "局部修改",
-          promptVariantId: maskVariant.variantId,
-          promptFamilyId: maskVariant.familyId,
-          parameterProfileId: maskVariant.parameterProfileId,
-          contractHash: maskVariant.contractHash,
-          evaluationVersion: maskVariant.evaluationVersion,
-          postprocessVersion: maskProfile.postprocess.version,
           operationMode: "mask-edit",
-          aspectRatio: maskParameters.aspectRatio,
-          batchSize: maskParameters.batchSize,
+          aspectRatio: "source",
+          batchSize: 1,
           references: Array.from({ length: 8 }, (_value, order) => ({
             dataUrl: PNG_DATA_URL,
             order,
             assetSha256: "b".repeat(64),
           })),
           mask: PNG_DATA_URL,
-          modelOptions: maskParameters.modelOptions,
+          modelOptions: {},
         },
       }),
     });

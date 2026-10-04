@@ -1882,13 +1882,17 @@ const NODE_KINDS = new Set<NodeKind>(Object.keys(NODE_SPECS) as NodeKind[]);
 
 /**
  * C2/C3：会话恢复时必须清空的生成层字段（v7 的 image/video/text 节点曾自描述这些）。
- * 清空后按 v8 分层重新填入，使会话草稿本身就是合法 v8 文档形状。
+ * 清空后按 v9 分层重新填入，使会话草稿本身就是合法 v9 文档形状。
+ * v9（64 Phase 3）：variant 绑定六字段保留在清理清单中——这是防御性 delete 语义
+ * （旧 localStorage 会话数据可能仍携带 v7 字段），清理它们不等于写入；
+ * v9 写入面不再产生这些字段，新会话数据天然无此六项。
  */
 const SESSION_GENERATION_FIELDS = [
-  "modelId", "modelOptions", "promptVariantId", "promptFamilyId", "parameterProfileId",
+  "modelId", "modelOptions",
+  "promptVariantId", "promptFamilyId", "parameterProfileId",
   "contractHash", "evaluationVersion", "postprocessVersion",
   "aspectRatio", "batchSize", "mask", "maskSourceRef", "featherRadius",
-  // v7 的 image 节点曾自描述请求正文；v8 的正文只存在于 text 节点（生成节点由上游 text 供词）。
+  // v7 的 image 节点曾自描述请求正文；v8+ 的正文只存在于 text 节点（生成节点由上游 text 供词）。
   "prompt",
   "outputText", "lastRunInput",
 ] as const;

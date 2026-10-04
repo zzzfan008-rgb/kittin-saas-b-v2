@@ -9,6 +9,8 @@
  * server→src 已有反向引用，单向 dep 不变）。
  */
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { TEXT_PROMPT_PRESETS, OPTIONAL_PROMPT_POLISH_PRESET } from "../src/lib/promptPresets";
 import {
@@ -147,3 +149,78 @@ for (const variantId of TEST_VARIANT_IDS) {
 }
 
 console.log(`\n全量一致性锁定通过 ✓`);
+
+// ===== 64 Phase 3（3c-4）：data/templates/builtin JSON 快照一致性 =====
+// 断言内置模板 JSON 的 text 节点文本与 server 冻结表 PRESET_TEMPLATE_TEXTS 逐字一致：
+// 手改任一边（模板 JSON 的提示词正文 / server 冻结常量）CI 即红。
+// JSON 是 v9 再生产物（PR #89 收敛入库）；文本随预设模板进 text 节点，模式在 generator 的
+// operationMode（生成节点任务文本由 runner 冻结系统文本拼装，不进模板 JSON）。
+console.log("\n--- 3c-4：data/templates/builtin JSON 快照一致性 ---");
+const BUILTIN_DIR = join(process.cwd(), "data", "templates", "builtin");
+const builtinFiles = readdirSync(BUILTIN_DIR).filter((name) => name.endsWith(".json"));
+assert.ok(builtinFiles.length > 0, "data/templates/builtin 下必须有内置模板 JSON");
+
+interface BuiltinNodeLike {
+  id?: string;
+  type?: string;
+  data?: { kind?: string; text?: string; operationMode?: string };
+}
+
+for (const fileName of builtinFiles) {
+  const raw = JSON.parse(readFileSync(join(BUILTIN_DIR, fileName), "utf8")) as {
+    flow?: { nodes?: BuiltinNodeLike[] };
+    nodes?: BuiltinNodeLike[];
+  };
+  const nodes = raw.flow?.nodes ?? raw.nodes;
+  assert.ok(Array.isArray(nodes), `${fileName}: 缺少 nodes`);
+  const textNodes = nodes.filter((node) => node.data?.kind === "text" && typeof node.data.text === "string" && node.data.text.trim() !== "");
+  const imageGenerators = nodes.filter((node) => node.data?.kind === "image-generator");
+  const videoGenerators = nodes.filter((node) => node.data?.kind === "video-generator");
+  assert.ok(textNodes.length > 0, `${fileName}: 缺少携带预设文本的 text 节点`);
+  assert.ok(imageGenerators.length + videoGenerators.length > 0, `${fileName}: 缺少生成节点`);
+  // image 模板：节点 operationMode 与冻结表条目 mode 同轴（预设目录 familyId:mode = 节点模式）。
+  // video 模板：节点 operationMode 为 video 生成轴的 "generate"，预设目录轴记为
+  // video-animate:edit（Seedance 协议文本条目）——两套轴不同，文本逐字命中即可，
+  // mode 断言按 video 生成节点的真实语义走（文本必须命中 video-animate:edit 条目）。
+  for (const textNode of textNodes) {
+    const nodeText = textNode.data?.text ?? "";
+    if (imageGenerators.length > 0 && videoGenerators.length === 0) {
+      const operationMode = imageGenerators[0]?.data?.operationMode;
+      assert.ok(
+        typeof operationMode === "string" && operationMode.length > 0,
+        `${fileName}: 生成节点缺少 operationMode（v9 模式归节点 data）`,
+      );
+      // 命中冻结表：存在同文本条目且 mode 匹配（JSON text 与 frozen 表逐字一致）。
+      const matchedKeys = serverKeys.filter((key) => {
+        const entry = PRESET_TEMPLATE_TEXTS[key];
+        return entry.text === nodeText && entry.mode === operationMode;
+      });
+      assert.ok(
+        matchedKeys.length > 0,
+        `${fileName}: text 节点「${nodeText.slice(0, 40)}…」在冻结表中不存在（mode=${operationMode}）——模板 JSON 与 server 冻结常量漂移`,
+      );
+      assert.equal(
+        matchedKeys.length,
+        1,
+        `${fileName}: text 节点命中多条冻结表条目（${matchedKeys.join(", ")}）——条目应唯一`,
+      );
+      console.log(`  ✓ ${fileName} → ${matchedKeys[0]}（mode=${operationMode}）`);
+    } else {
+      // video 模板：文本必须逐字命中 video-animate:edit（Seedance 协议文本）。
+      const videoEntry = PRESET_TEMPLATE_TEXTS["video-animate:edit"];
+      assert.ok(videoEntry, "冻结表缺少 video-animate:edit 条目");
+      assert.equal(
+        nodeText,
+        videoEntry.text,
+        `${fileName}: video 模板 text 与 video-animate:edit 冻结文本漂移`,
+      );
+      assert.equal(
+        videoGenerators[0]?.data?.operationMode,
+        "generate",
+        `${fileName}: video 生成节点 operationMode 必须是 generate（视频生成轴）`,
+      );
+      console.log(`  ✓ ${fileName} → video-animate:edit（video 生成轴 operationMode=generate）`);
+    }
+  }
+}
+console.log(`\n3c-4：${builtinFiles.length} 个内置模板 JSON 与冻结表逐字一致 ✓`);

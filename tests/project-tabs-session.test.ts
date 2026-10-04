@@ -8,27 +8,12 @@ import {
   PROJECT_TAB_STORAGE_KEY_PREFIX,
   projectTabStorageKey,
 } from "../src/lib/tabSessionStorage";
-import {
-  buildGarmentPrompt,
-  requireGarmentPromptVariant,
-} from "../src/lib/garmentPromptPresets";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../src/types/modelParameterProfiles";
-import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
-
-const boundaryVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "generate",
-});
-// This isolated serializer fixture needs to cross the client admission gate so
-// it can compare the save/run payloads; production catalog state stays closed.
-promotePromptVariantForTest(boundaryVariant);
-const boundaryProfile = getModelParameterProfile(boundaryVariant.parameterProfileId)!;
-const boundaryParameters = materializeModelParameterProfile(boundaryProfile);
+// v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数
+// （值与原 commerce-hero generate 参数档案 materialize 等价：aspectRatio "1:1"、
+// batchSize 1、modelOptions { size: "2048x2048" }）。
+const BOUNDARY_ASPECT_RATIO = "1:1";
+const BOUNDARY_BATCH_SIZE = 1;
+const BOUNDARY_MODEL_OPTIONS = { size: "2048x2048" };
 
 interface MemoryStorage {
   readonly length: number;
@@ -1133,19 +1118,20 @@ const unsafeDocumentNode = {
     label: "纯文档边界",
     status: "error",
     error: "旧运行错误不得持久化",
-    aspectRatio: boundaryParameters.aspectRatio,
-    batchSize: boundaryParameters.batchSize,
+    aspectRatio: BOUNDARY_ASPECT_RATIO,
+    batchSize: BOUNDARY_BATCH_SIZE,
     modelId: "gpt-image-2.5-flare-vip",
-    modelOptions: boundaryParameters.modelOptions,
-    promptVariantId: boundaryVariant.variantId,
-    promptFamilyId: boundaryVariant.familyId,
-    parameterProfileId: boundaryVariant.parameterProfileId,
-    contractHash: boundaryVariant.contractHash,
-    evaluationVersion: boundaryVariant.evaluationVersion,
-    postprocessVersion: boundaryProfile.postprocess.version,
+    modelOptions: BOUNDARY_MODEL_OPTIONS,
+    // v9（64 Phase 3）：v7 六绑定字段（脏输入）——投影必须整体剥离，不得进入文档。
+    promptVariantId: "commerce-hero.generate.gpt-image-2.5-flare-vip.v7",
+    promptFamilyId: "commerce-hero",
+    parameterProfileId: "pp-v7-dirty",
+    contractHash: "sha256:deadbeef",
+    evaluationVersion: "eval-dirty",
+    postprocessVersion: "post-dirty",
     unknownData: "不得持久化",
     // v7 遗留：image 节点曾自描述的正文/产物/模式，v8 不得进入文档（C2/C3）。
-    prompt: buildGarmentPrompt(boundaryVariant.variantId, "保留衣身，只修改领型"),
+    prompt: "保留衣身，只修改领型",
     outputImages: ["/api/files/pure-boundary-before.png"],
     operationMode: "generate",
   },
@@ -1237,12 +1223,17 @@ const sessionWorkflow = {
   edges: sessionTab.edges,
 };
 
-// v9（64 Phase 2）：评估/变体字段在 session restore 被剥离，不再与项目持久化完全一致；
-// 仅校验 v9 语义：无产物/正文/错误/未知字段 + operationMode 保留 + 模型参数不变。
-// 三个工作流（session / run / persist）的归一化由各自通路完成，此处只断言边界字段。
+// v9（64 Phase 2→3）：评估/变体字段在 session restore 与 proj 持久化均被剥离。
+// Phase 3（本 PR）完成 docSnapshot 统一裁剪后，proj 层字段面收敛到 v9 契约——
+// 三工作流归一化由各自通路完成，此处断言契约目标状态（剥离后的边界字段）。
 assert.deepEqual(runWorkflow.schemaVersion, projectPayload.flow.schemaVersion);
 assert.deepEqual(runWorkflow.edges.length, projectPayload.flow.edges.length);
 assert.deepEqual(sessionWorkflow.nodes.length, projectPayload.flow.nodes.length);
+// 64 Phase 3（3c-1）：字段面收敛后补回三路 deepEqual 全等强断言
+// （Phase 2 时因 proj 层仍写 v7 变体字段而弱化为边界断言，条件是 Phase 3 统一裁剪后补回）。
+assert.deepEqual(templatePayload.flow, projectPayload.flow, "template 工作流与项目持久化流必须全等");
+assert.deepEqual(runWorkflow, projectPayload.flow, "run 工作流与项目持久化流必须全等");
+assert.deepEqual(sessionWorkflow, projectPayload.flow, "session 工作流与项目持久化流必须全等");
 const persistedBoundaryNode = projectPayload.flow.nodes.find(
   (node) => (node as { id?: string }).id === "pure-boundary-node",
 ) as Record<string, unknown>;
@@ -1251,18 +1242,25 @@ assert.deepEqual(Object.keys(persistedBoundaryNode).sort(), ["data", "id", "posi
 assert.equal(persistedBoundaryData.status, "idle");
 assert.equal("error" in persistedBoundaryData, false);
 assert.equal("unknownData" in persistedBoundaryData, false);
-// v9（裁决 A）：operationMode 归节点 data；本次修复已写入 proj 层。
+// v9（裁决 A）：operationMode 归节点 data；proj 层写入。
 assert.equal("operationMode" in persistedBoundaryData, true);
-// v9（裁决 C）：proj 层尚未清洗变体字段（Phase 3 docSnapshot 统一裁剪），
-// 以下均为当前 proj 现实状态，不是 v9 契约目标。
-assert.equal("promptVariantId" in persistedBoundaryData, true);
-assert.equal(typeof persistedBoundaryData.promptVariantId, "string");
-assert.equal("contractHash" in persistedBoundaryData, true);
-assert.equal("evaluationVersion" in persistedBoundaryData, true);
-assert.equal("parameterProfileId" in persistedBoundaryData, true);
-assert.equal("promptFamilyId" in persistedBoundaryData, true);
-assert.equal("postprocessVersion" in persistedBoundaryData, true);
-assert.deepEqual(persistedBoundaryData.modelOptions, boundaryParameters.modelOptions);
+// v9（64 Phase 3，契约目标）：v7 六绑定字段在 proj 层不再写入——docSnapshot
+// DOCUMENT_NODE_ALLOWED_FIELDS 与 createDocumentNodeData 已收敛到 v9 字段面。
+for (const deadField of [
+  "promptVariantId",
+  "contractHash",
+  "evaluationVersion",
+  "parameterProfileId",
+  "promptFamilyId",
+  "postprocessVersion",
+]) {
+  assert.equal(
+    deadField in persistedBoundaryData,
+    false,
+    `v9 proj 层不得写入死字段 ${deadField}`,
+  );
+}
+assert.deepEqual(persistedBoundaryData.modelOptions, BOUNDARY_MODEL_OPTIONS);
 const persistedBoundaryResult = projectPayload.flow.nodes.find(
   (node) => (node as { id?: string }).id === "pure-boundary-result",
 ) as Record<string, unknown>;

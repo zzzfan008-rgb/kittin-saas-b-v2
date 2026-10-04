@@ -32,36 +32,13 @@ const {
 } = await import("../server/routes/projects");
 const { usageRouter } = await import("../server/routes/usage");
 const { historyRouter } = await import("../server/routes/history");
-const {
-  requireGarmentPromptVariant,
-} = await import("../src/lib/garmentPromptPresets");
-const {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} = await import("../src/types/modelParameterProfiles");
-const { promotePromptVariantForTest } = await import("./promptReleaseTestSupport");
-
-const generationVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gemini-3.1-flash-image",
-  nodeKind: "image",
-  mode: "generate",
-});
-const editVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "edit",
-});
-// Route authorization tests need accepted jobs without changing production status.
-// Mutate only this isolated process's catalog objects to model already-reviewed evidence.
-for (const variant of [generationVariant, editVariant]) {
-  promotePromptVariantForTest(variant);
-}
-const generationProfile = getModelParameterProfile(generationVariant.parameterProfileId)!;
-const generationParameters = materializeModelParameterProfile(generationProfile);
-const editProfile = getModelParameterProfile(editVariant.parameterProfileId)!;
-const editParameters = materializeModelParameterProfile(editProfile);
+// v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数（值与原参数档案
+// materialize 等价：gemini commerce-hero generate → aspectRatio "1:1" + imageSize "2K"；
+// flare-vip commerce-hero edit → aspectRatio "1:1" + size "2048x2048"）。
+const GENERATE_MODEL_OPTIONS = { aspectRatio: "1:1", imageSize: "2K" };
+const GENERATE_ASPECT_RATIO = "1:1";
+const EDIT_MODEL_OPTIONS = { size: "2048x2048" };
+const EDIT_ASPECT_RATIO = "1:1";
 
 const users: Record<string, AuthUser> = {
   owner: {
@@ -148,8 +125,8 @@ function generationFlow(prompt: string) {
           label: "生成效果图",
           status: "idle",
           modelId: "gemini-3.1-flash-image",
-          modelOptions: generationParameters.modelOptions,
-          aspectRatio: generationParameters.aspectRatio,
+          modelOptions: GENERATE_MODEL_OPTIONS,
+          aspectRatio: GENERATE_ASPECT_RATIO,
           batchSize: 1,
         },
       },
@@ -185,8 +162,8 @@ function editFlow(imageUrl: string) {
           status: "idle",
           operationMode: "edit",
           modelId: "gpt-image-2.5-flare-vip",
-          modelOptions: editParameters.modelOptions,
-          aspectRatio: editParameters.aspectRatio,
+          modelOptions: EDIT_MODEL_OPTIONS,
+          aspectRatio: EDIT_ASPECT_RATIO,
           batchSize: 1,
         },
       },
@@ -347,18 +324,18 @@ function directGenerateBody(referenceImage: string, projectId?: string, clientRe
     projectName: "客户端伪造名称",
     nodeId: "direct-edit",
     request: {
-      // v9 直连（64 Phase 1）：request.prompt 是纯用户正文；variant 绑定字段已删除，
+      // v9 直连（64 Phase 1/3）：request.prompt 是纯用户正文；variant 绑定字段已删除，
       // operationMode 显式携带（裁决 A），系统文本由 runner 冻结映射拼装（裁决 E）。
       prompt: "改成短袖",
       operationMode: "edit",
-      aspectRatio: editParameters.aspectRatio,
+      aspectRatio: EDIT_ASPECT_RATIO,
       batchSize: 1,
       references: [{
         dataUrl: referenceImage,
         order: 0,
         assetSha256: "a".repeat(64),
       }],
-      modelOptions: editParameters.modelOptions,
+      modelOptions: EDIT_MODEL_OPTIONS,
     },
   };
 }
@@ -1623,8 +1600,8 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
     ...duplicateBody.request.references[0],
     order: 1,
   });
-  promotePromptVariantForTest(editVariant, "verified");
-  try {
+  // v9（64 Phase 3）：variant 发布状态概念已删，无需 promote。
+  {
     const duplicateDenied = await request("/generate", "owner", {
       method: "POST",
       body: JSON.stringify(duplicateBody),
@@ -1638,8 +1615,6 @@ await test("直连生成复用项目与文件授权，且不信任客户端项�
         { order: 1, reason: "reference image is unavailable" },
       ],
     });
-  } finally {
-    promotePromptVariantForTest(editVariant);
   }
 
   const shared = await request("/generate", "other", {

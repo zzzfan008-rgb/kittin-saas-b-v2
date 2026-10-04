@@ -12,8 +12,6 @@ const BUILTIN_TEMPLATE_COUNT = 15;
 /** 金路径使用的模板：AI 换装 → 模特试穿（builtin-model-tryon）。 */
 const TEMPLATE_NAME = "模特试穿";
 const GENERATOR_NODE_ID = "tryon-gen";
-/** builtin-model-tryon 的生成节点绑定变体（templates.ts EDIT_VARIANT）。 */
-const TRYON_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
 
 interface RunPlanNode {
   id: string;
@@ -147,44 +145,6 @@ async function stubRunBoundary(page: Page, runs: RunPlanBody[]): Promise<void> {
   });
 }
 
-/**
- * 受审发布的浏览器侧注入（只作用于本用例的页面）：与生产同一条 effectivePromptSupport
- * 证据链——目录状态 + 同代码 SHA 的受审发布快照才算 verified。这里显式注入 e2e 专属证据，
- * 未受审目录项仍保持「未发布」。
- */
-async function installTestOnlyReviewedVariant(page: Page, variantId: string): Promise<void> {
-  await page.evaluate(async (targetVariantId) => {
-    const promptCatalogPath = "/src/lib/garmentPromptPresets.ts";
-    const releasePath = "/src/lib/promptEvaluationRelease.ts";
-    const registryPath = "/src/lib/promptEvaluationReleaseRegistry.ts";
-    const [catalog, releaseTools, registry] = await Promise.all([
-      import(/* @vite-ignore */ promptCatalogPath),
-      import(/* @vite-ignore */ releasePath),
-      import(/* @vite-ignore */ registryPath),
-    ]);
-    const codeSha = "0123456789abcdef0123456789abcdef01234567";
-    (globalThis as unknown as { process?: { env?: Record<string, string> } }).process = {
-      env: { GARMENT_CANVAS_CODE_SHA: codeSha },
-    };
-    const variant = catalog.getGarmentPromptVariantById(targetVariantId);
-    if (!variant) throw new Error(`Missing E2E prompt variant ${targetVariantId}`);
-    variant.supportStatus = "verified";
-    const releases = registry.PROMPT_EVALUATION_RELEASES as unknown as Array<unknown>;
-    releases.push(releaseTools.createPromptEvaluationReleaseSnapshot(
-      variant,
-      "verified",
-      "e2e-test-only-evidence",
-      {
-        evaluationStage: "formal-validation",
-        evidenceArtifactSha256: "0".repeat(64),
-        gateReceiptSha256: "0".repeat(64),
-        evaluationUnitKey: `sha256:${"0".repeat(64)}`,
-        codeSha,
-      },
-    ));
-  }, variantId);
-}
-
 /** 当前文档的节点/边（只读形状），用于「运行载荷 == 画布文档」的同一性断言。 */
 async function activeDocument(page: Page): Promise<ActiveDocument> {
   return page.evaluate(async () => {
@@ -251,7 +211,7 @@ async function hoverRailMenu(
   return menu;
 }
 
-test("an unverified starter no longer blocks run while a test-reviewed variant completes the isolated golden path", async ({ page }) => {
+test("an unverified starter no longer blocks run, and the run completes the isolated golden path end to end", async ({ page }) => {
   const garmentImage = await sharp({
     create: { width: 96, height: 64, channels: 3, background: "#735b42" },
   }).png().toBuffer();
@@ -355,21 +315,20 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   }, GENERATOR_NODE_ID);
   expect(availableReferenceLabels).toEqual(["服装图", "数字模特"]);
   // 卡片内运行按钮：admission 已简化为 compatibility-only（generate 禁带参考图 / edit 必须带参考图
-  // / 参考图数量与结构等正确性约束保留；unverified 拦截、variant 绑定、参数漂移等准入门已删除）。
+  // / 参考图数量与结构等正确性约束保留；旧版的 unverified 拦截与参数漂移等准入门已删除）。
   // 参考图已在③就位，compatibility 满足 → run 按钮可用，也不再有旧准入门的拒绝原因文案。
   const runButton = generatorNode.getByRole("button", { name: "运行" });
   await expect(runButton).toBeEnabled();
   await expect(runButton).not.toHaveAttribute("title", /尚未完成当前契约版本的真实评估/);
-  // ④ 段不点击运行：未受审变体现在可以触达运行边界（准入门已删除），本段只断言「可用但未发起」；
-  // 完整付费链路（POST /api/run-plan → 202 → 结果节点）仍由 ⑤ 段在安装受审变体后验证。
+  // ④ 段不点击运行：v9 下准入门已删除，本段只断言「可用但未发起」；
+  // 完整付费链路（POST /api/run-plan → 202 → 结果节点）由 ⑤ 段验证。
   expect(runs, "④ 段尚未发起任何运行").toHaveLength(0);
-  // 工具条「运行」是同一动作的另一入口（选中态才渲染），⑤ 段用它发起受审运行。
+  // 工具条「运行」是同一动作的另一入口（选中态才渲染），⑤ 段用它发起运行。
   await selectCanvasNode(generatorNode);
   const generatorToolbar = generatorNode.locator('[data-node-toolbar="image-generator"]');
 
-  // ---------- ⑤ 受审变体：从 UI 发起隔离运行并跑完整条链路 ----------
-  await installTestOnlyReviewedVariant(page, TRYON_VARIANT_ID);
-  // 运行载荷以「发起时刻」的文档为准：受审运行随后会追加结果节点，所以先冻结文档快照。
+  // ---------- ⑤ 从 UI 发起隔离运行并跑完整条链路 ----------
+  // 运行载荷以「发起时刻」的文档为准：运行随后会追加结果节点，所以先冻结文档快照。
   const documentGraph = await activeDocument(page);
   const runResponsePromise = page.waitForResponse((response) => (
     response.request().method() === "POST"
@@ -379,7 +338,7 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   const runResponse = await runResponsePromise;
   expect(
     runResponse,
-    `受审变体必须能由 UI 发起付费运行；实际未发出 POST /api/run-plan。节点给出的原因：${
+    `运行必须能由 UI 发起；实际未发出 POST /api/run-plan。节点给出的原因：${
       (await generatorNode.locator(".text-red-400").allInnerTexts()).join(" | ")
     }`,
   ).not.toBeNull();
@@ -394,7 +353,7 @@ test("an unverified starter no longer blocks run while a test-reviewed variant c
   expect(illegalEdgeIndexes(run.nodes, run.edges)).toEqual([]);
   expect(run.nodes.map((node) => node.id).sort()).toEqual(documentGraph.nodes.map((node) => node.id).sort());
   expect(run.edges.map(edgeKey).sort()).toEqual(documentGraph.edges.map(edgeKey).sort());
-  // v9 语义：变体绑定已删除，operationMode 显式归节点 data（裁决 A），模板值为 edit。
+  // v9 语义：operationMode 显式归节点 data（裁决 A），模板值为 edit。
   expect(documentGraph.nodes.find((node) => node.id === GENERATOR_NODE_ID)?.data.operationMode)
     .toBe("edit");
 

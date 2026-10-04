@@ -24,40 +24,19 @@ import {
   type RecentResult,
 } from "../src/store/flowStore";
 import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
-import {
-  buildGarmentPrompt,
-  requireGarmentPromptVariant,
-  type PromptVariant,
-} from "../src/lib/garmentPromptPresets";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../src/types/modelParameterProfiles";
-import { promotePromptVariantForTest } from "./promptReleaseTestSupport";
-
-const aiTestVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gpt-image-2.5-flare-vip",
-  nodeKind: "image",
-  mode: "edit",
-});
-// These tests exercise store concurrency and persistence after admission. Keep
-// the production catalog closed while modelling reviewed evidence in-process.
-promotePromptVariantForTest(aiTestVariant);
-const aiTestProfile = getModelParameterProfile(aiTestVariant.parameterProfileId)!;
-const aiTestParameters = materializeModelParameterProfile(aiTestProfile);
-const AI_TEST_PROMPT = buildGarmentPrompt(aiTestVariant.variantId, "修改衣领");
-/** v8：text 节点承载的是用户正文，系统提示词由 variant.fullPrompt 在服务端内联。 */
+// v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数
+// （值与原参数档案 materialize 等价：commerce-hero edit → aspectRatio "1:1"、batchSize 1；
+// flare-vip modelOptions { size: "2048x2048" }；gemini modelOptions { aspectRatio: "1:1", imageSize: "2K" }）。
+const AI_TEST_MODEL_ID = "gpt-image-2.5-flare-vip";
+const AI_TEST_ASPECT_RATIO = "1:1";
+const AI_TEST_BATCH_SIZE = 1;
+const AI_TEST_MODEL_OPTIONS = { size: "2048x2048" };
+/** v9：text 节点承载用户正文；系统提示词由 server 冻结常量在任务侧拼装（裁决 E）。 */
 const AI_TEST_USER_PROMPT = "修改衣领";
-const geminiTestVariant = requireGarmentPromptVariant({
-  familyId: "commerce-hero",
-  modelId: "gemini-3.1-flash-image",
-  nodeKind: "image",
-  mode: "edit",
-});
-promotePromptVariantForTest(geminiTestVariant);
-const geminiTestProfile = getModelParameterProfile(geminiTestVariant.parameterProfileId)!;
-const geminiTestParameters = materializeModelParameterProfile(geminiTestProfile);
+const GEMINI_TEST_MODEL_ID = "gemini-3.1-flash-image";
+const GEMINI_TEST_ASPECT_RATIO = "1:1";
+const GEMINI_TEST_BATCH_SIZE = 1;
+const GEMINI_TEST_MODEL_OPTIONS = { aspectRatio: "1:1", imageSize: "2K" };
 
 let passed = 0;
 
@@ -99,7 +78,8 @@ function imageNode(id: string, label: string): FlowNode {
 }
 
 function aiNode(id: string, label: string): FlowNode {
-  // v8：可运行的生成节点是 `image-generator`；正文由上游 text 提供，产物归结果节点。
+  // v9（64 Phase 3）：可运行的生成节点是 `image-generator`；正文由上游 text 提供，
+  // 模式/模型直给（dag extractParams 同源形态），六绑定字段已随 variant 概念删除。
   return {
     id,
     type: "image-generator",
@@ -108,16 +88,11 @@ function aiNode(id: string, label: string): FlowNode {
       kind: "image-generator",
       label,
       status: "idle",
-      aspectRatio: aiTestParameters.aspectRatio,
-      batchSize: aiTestParameters.batchSize,
-      modelId: aiTestVariant.modelId,
-      modelOptions: aiTestParameters.modelOptions,
-      promptVariantId: aiTestVariant.variantId,
-      promptFamilyId: aiTestVariant.familyId,
-      parameterProfileId: aiTestVariant.parameterProfileId,
-      contractHash: aiTestVariant.contractHash,
-      evaluationVersion: aiTestVariant.evaluationVersion,
-      postprocessVersion: aiTestProfile.postprocess.version,
+      operationMode: "edit",
+      aspectRatio: AI_TEST_ASPECT_RATIO,
+      batchSize: AI_TEST_BATCH_SIZE,
+      modelId: AI_TEST_MODEL_ID,
+      modelOptions: AI_TEST_MODEL_OPTIONS,
     },
   };
 }
@@ -1373,20 +1348,15 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
   });
   const invariantTabId = useFlowStore.getState().activeTabId;
   const expected = {
-    modelId: geminiTestVariant.modelId,
-    modelOptions: geminiTestParameters.modelOptions,
+    modelId: GEMINI_TEST_MODEL_ID,
+    modelOptions: GEMINI_TEST_MODEL_OPTIONS,
   };
 
   useFlowStore.getState().updateNodeData(generationNode.id, {
     ...expected,
-    aspectRatio: geminiTestParameters.aspectRatio,
-    batchSize: geminiTestParameters.batchSize,
-    promptVariantId: geminiTestVariant.variantId,
-    promptFamilyId: geminiTestVariant.familyId,
-    parameterProfileId: geminiTestVariant.parameterProfileId,
-    contractHash: geminiTestVariant.contractHash,
-    evaluationVersion: geminiTestVariant.evaluationVersion,
-    postprocessVersion: geminiTestProfile.postprocess.version,
+    aspectRatio: GEMINI_TEST_ASPECT_RATIO,
+    batchSize: GEMINI_TEST_BATCH_SIZE,
+    operationMode: "edit",
   });
   assertNodeModelSelection(activeDocument().nodes, generationNode.id, expected);
 
@@ -1406,7 +1376,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
       kind: "image-generator",
       label: "蒙版局部重绘",
       status: "idle",
-      promptVariantId: geminiTestVariant.variantId,
+      operationMode: "mask-edit",
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
       aspectRatio: "3:4",
@@ -1666,8 +1636,9 @@ await test("丢失响应后即使参数变化收到 409，也持续复用原付�
 
   try {
     await useFlowStore.getState().runNode("ambiguous-conflict");
-    useFlowStore.getState().updateNodeData("ambiguous-conflict", {
-      prompt: buildGarmentPrompt(aiTestVariant.variantId, "响应丢失后的新提示词"),
+    // v9（64 Phase 3）：提示词正文由上游 text 节点供词——「换提示词」改的是 text 节点。
+    useFlowStore.getState().updateNodeData("ambiguous-conflict-prompt", {
+      text: "响应丢失后的新提示词",
     });
     await useFlowStore.getState().runNode("ambiguous-conflict");
     await useFlowStore.getState().runNode("ambiguous-conflict");
@@ -1775,7 +1746,6 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           kind: "image-generator",
           label: "蒙版局部重绘",
           status: "idle",
-          promptVariantId: "",
           modelId: "gpt-image-2.5-sunburst",
           modelOptions: {},
           aspectRatio: "3:4",

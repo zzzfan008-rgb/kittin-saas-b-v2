@@ -22,7 +22,7 @@
     "build:server": "tsx scripts/build-server.ts",
     "start": "NODE_ENV=production node dist-server/index.js",
     "lint": "tsc --noEmit",
-    "check": "npm run lint && npm run build:web && npm run test",
+    "check": "npm run lint && node scripts/check-legacy-variant-grep.mjs && npm run build:web && npm run test",
     "test": "node scripts/test-with-postgres.mjs",
     "test:e2e": "node scripts/e2e-with-postgres.mjs",
     "test:e2e:production": "node scripts/e2e-production-smoke.mjs",

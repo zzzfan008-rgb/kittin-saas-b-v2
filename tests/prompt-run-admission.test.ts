@@ -1,46 +1,22 @@
 import assert from "node:assert/strict";
-import { requireGarmentPromptVariant } from "../src/lib/garmentPromptPresets";
 import {
   evaluatePromptRunAdmission,
   evaluatePromptRunCompatibility,
   promptRunAdmissionInputFromParams,
   promptRunInputTextsFromGraph,
   promptRunReferenceSnapshotsFromGraph,
-  synthesizeVariantTaskPrompt,
   type PromptRunAdmissionInput,
   type PromptRunGraphNode,
 } from "../src/lib/promptRunAdmission";
-import { createPromptEvaluationReleaseSnapshot } from "../src/lib/promptEvaluationRelease";
-import { TEST_PROMPT_RELEASE_CODE_SHA } from "./promptReleaseTestSupport";
-import {
-  getModelParameterProfile,
-  materializeModelParameterProfile,
-} from "../src/types/modelParameterProfiles";
 
-const variant = requireGarmentPromptVariant({
-  familyId: "fashion-lookbook",
-  modelId: "gemini-3.1-flash-image",
-  nodeKind: "image",
-  mode: "edit",
-});
-const profile = getModelParameterProfile(variant.parameterProfileId)!;
-const materialized = materializeModelParameterProfile(profile);
-const params = {
-  modelId: variant.modelId,
-  operationMode: variant.mode,
-  // v7：用户提示词只沿 text 边进入 params.inputTexts（dag.ts buildExecutionPlan），
-  // image 分支不再产出 params.prompt。
-  inputTexts: ["把黑色蕾丝上衣与白色阔腿裤穿到模特身上"],
-  promptVariantId: variant.variantId,
-  promptFamilyId: variant.familyId,
-  parameterProfileId: variant.parameterProfileId,
-  contractHash: variant.contractHash,
-  evaluationVersion: variant.evaluationVersion,
-  postprocessVersion: profile.postprocess.version,
-  aspectRatio: materialized.aspectRatio,
-  batchSize: materialized.batchSize,
-  modelOptions: materialized.modelOptions,
-};
+// v9（64 Phase 3）：v7 变体绑定五字段（promptVariantId/promptFamilyId/
+// parameterProfileId/contractHash/evaluationVersion/postprocessVersion）已删。
+// 本文件聚焦保留下来的两类职责：
+//   1. 浏览器镜像闸的图采集函数（与 server/engine/dag.ts 同源同语义）；
+//   2. 兼容性闸（operationMode / 参考图冲突与数量 / 结构校验）。
+// v7 的绑定/drift/合成断言已随模块瘦身移除（合成文本由 server 冻结常量承载，
+// 见 server/lib/promptPresetsFrozen.ts 与 tests/prompt-presets-catalog.test.ts）。
+
 const references = [
   { order: 0, sourceNodeId: "multi-output" },
   { order: 1, sourceNodeId: "multi-output" },
@@ -52,7 +28,7 @@ const graphNodes: PromptRunGraphNode[] = [
   {
     id: "multi-output",
     data: {
-      // v7：上游输出图由 image 节点 outputImages 承载（R8）。
+      // 上游输出图由 image 节点 outputImages 承载（R8）。
       kind: "image",
       label: "上游两张图",
       status: "success",
@@ -77,7 +53,7 @@ const graphNodes: PromptRunGraphNode[] = [
   {
     id: "empty-garment",
     data: {
-      // v7：未上传的 image 节点 = outputImages 为空（R8 输入输出同体）。
+      // 未上传的 image 节点 = outputImages 为空（R8 输入输出同体）。
       kind: "image",
       label: "尚未上传",
       status: "idle",
@@ -106,9 +82,9 @@ assert.deepEqual(promptRunReferenceSnapshotsFromGraph(graphNodes, [
   { order: 2, sourceNodeId: "identity" },
 ], "旧 Provider 边同样按连线顺序逐图片展开");
 
-// v7（P2-b）：浏览器镜像闸按 dag 的 edges 顺序收集上游 text 正文（与
+// 浏览器镜像闸按 dag 的 edges 顺序收集上游 text 正文（与
 // server/engine/dag.ts buildExecutionPlan 同源同语义），跳过非 text 来源、
-// 只取指向目标节点的边。若此处与服务端收集不一致，UI 会在 prompt-drift 误拦。
+// 只取指向目标节点的边。
 const inputTextsGraphNodes: PromptRunGraphNode[] = [
   { id: "t1", data: { kind: "text", label: "提示词1", status: "idle", text: "第一段正文" } },
   { id: "img-a", data: { kind: "image", label: "上游图", status: "success", aspectRatio: "1:1", batchSize: 1, outputImages: ["a"] } },
@@ -127,55 +103,86 @@ assert.deepEqual(
 assert.deepEqual(
   promptRunInputTextsFromGraph(inputTextsGraphNodes, [], "target"),
   [],
-  "目标节点无上游入边时正文为空（随后由 prompt-drift 拒绝）",
+  "目标节点无上游入边时正文为空",
 );
 
-const input = promptRunAdmissionInputFromParams("image", params, references);
-// 评估运行禁用入口已在 runQueue/promptAdmission.ts 统一拦截，单元测试仅保留兼容性检查
-void input; // 防止 input 未使用警告
+// ---------- v9 兼容性闸 ----------
+const params = {
+  modelId: "gemini-3.1-flash-image",
+  operationMode: "edit",
+  inputTexts: ["把黑色蕾丝上衣与白色阔腿裤穿到模特身上"],
+  aspectRatio: "1:1",
+};
 
-// v7 mode 归属反转（R-76/R-78，P2-b）：浏览器节点 data 不再携带 operationMode，
-// 也不携带 parameterProfileId / postprocessVersion（applyVariant 只写绑定五字段），
-// admission 输入必须从选中变体推导出这三项（与 dag.ts extractParams 同源），
-// golden-path 受审变体因此不再在 UI 镜像闸被 operation-mode-incompatible /
-// binding-mismatch / parameter-drift 死拦。
-const {
-  operationMode: _browserParamsDoNotCarryMode,
-  parameterProfileId: _browserParamsDoNotCarryProfile,
-  postprocessVersion: _browserParamsDoNotCarryPostprocess,
-  ...browserNodeParams
-} = params;
-const browserInput: PromptRunAdmissionInput = promptRunAdmissionInputFromParams(
+// edit + 参考图齐全：兼容性闸放行。
+const input: PromptRunAdmissionInput = promptRunAdmissionInputFromParams(
   "image",
-  browserNodeParams,
-  references,
+  params,
+  references.slice(0, 1),
 );
 assert.equal(
-  evaluatePromptRunCompatibility(browserInput),
+  evaluatePromptRunCompatibility(input),
   undefined,
-  "选中目录内变体后兼容性闸放行",
+  "v9：operationMode 归节点 data（dag extractParams 同源），edit + 参考图兼容",
 );
-assert.notEqual(
-  evaluatePromptRunAdmission({ ...input, inputTexts: ["任意自由用户意图：换成其他文案也仍绑定同一受审系统提示词"] }).code,
-  "prompt-drift",
-  "用户正文内容自由，不再有 v6 客户端包装后缀校验",
+assert.deepEqual(
+  evaluatePromptRunAdmission(input),
+  { allowed: true, code: "verified", reason: "compatible" },
+  "评估运行禁用入口在 runQueue/promptAdmission 统一拦截；此处只保留兼容性检查",
 );
-// 合成必须与 runner.executeImageStep 逐字同一套：fullPrompt + "\n\n" + inputTexts.join("\n\n")。
+
+// edit 无参考图：edit-reference-missing（fail-closed）。
 assert.equal(
-  synthesizeVariantTaskPrompt(input, variant),
-  `${variant.fullPrompt}\n\n${params.inputTexts.join("\n\n")}`.trim(),
+  (evaluatePromptRunCompatibility({
+    ...input,
+    references: [],
+  }) as { code: string }).code,
+  "edit-reference-missing",
+  "edit/mask-edit 模式至少需要一张参考图",
 );
-// 无 text 上游的直连路径回退 params.prompt（generate.ts），合成规则同样逐字一致。
+
+// generate 带参考图：generate-reference-conflict（fail-closed）。
 assert.equal(
-  synthesizeVariantTaskPrompt({ prompt: "直连用户正文" }, variant),
-  `${variant.fullPrompt}\n\n直连用户正文`,
+  (evaluatePromptRunCompatibility(promptRunAdmissionInputFromParams(
+    "image",
+    { ...params, operationMode: "generate", modelId: "gemini-3.1-flash-image" },
+    references.slice(0, 1),
+  )) as { code: string }).code,
+  "generate-reference-conflict",
+  "generate 模式不能携带参考图；请明确改为 edit，而不是由系统临时推断模式",
 );
-// v6 包装协议彻底失效：包装形状的字符串不再被识别为身份证据，它在回退路径里
-// 只是普通用户正文（能否通过只看 v7 合成，不看任何「提示词变体：」后缀）。
-const v6Wrapped = `任意前缀\n提示词变体：${variant.variantId}\n${variant.fullPrompt}`;
+
+// operationMode 未定义（直连生成路由）：跳过参考图闸，由 server 侧 DAG/授权兜底。
 assert.equal(
-  synthesizeVariantTaskPrompt({ prompt: v6Wrapped }, variant),
-  `${variant.fullPrompt}\n\n${v6Wrapped}`,
+  evaluatePromptRunCompatibility(promptRunAdmissionInputFromParams(
+    "image",
+    { modelId: "gemini-3.1-flash-image", inputTexts: params.inputTexts },
+    references.slice(0, 1),
+  )),
+  undefined,
+  "operationMode 未定义时不拦参考图（server 侧授权兜底）",
 );
-// 合成必须与 runner.executeImageStep 逐字同一套：fullPrompt + "\n\n" + inputTexts.join("\n\n")。
-console.log("提示词运行时发布门禁测试通过");
+
+// operationMode 非法：operation-mode-incompatible（fail-closed）。
+assert.equal(
+  (evaluatePromptRunCompatibility(promptRunAdmissionInputFromParams(
+    "image",
+    { ...params, operationMode: "invented-mode" },
+    references.slice(0, 1),
+  )) as { code: string }).code,
+  "operation-mode-incompatible",
+  "非法 operationMode 拒绝",
+);
+
+// 参考图超过模型上限：reference-limit-exceeded（fail-closed）。
+assert.equal(
+  (evaluatePromptRunCompatibility(promptRunAdmissionInputFromParams(
+    "image",
+    params,
+    Array.from({ length: 10 }, (_, order) => ({ order, sourceNodeId: "overflow" })),
+  )) as { code: string }).code,
+  "reference-limit-exceeded",
+  "超限参考图拒绝，系统不会静默裁剪",
+);
+
+console.log("提示词运行时准入（v9 兼容性闸）测试通过");

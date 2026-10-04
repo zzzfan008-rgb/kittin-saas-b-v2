@@ -22,7 +22,6 @@ import {
 } from "../server/lib/fileStore";
 import { executeStep } from "../server/engine/runner";
 import { getProvider } from "../server/providers";
-import { GARMENT_PROMPT_VARIANTS } from "../src/lib/garmentPromptPresets";
 
 let passed = 0;
 
@@ -61,7 +60,7 @@ function videoStep(overrides: Partial<NodeExecution["params"]> = {}): NodeExecut
     kind: "video-generator",
     inputImages: [],
     params: {
-      promptVariantId: GARMENT_PROMPT_VARIANTS[0].variantId,
+      // v9（64 Phase 3）：promptVariantId 已删，video 任务文本沿 text 边进入 inputTexts。
       modelId: "doubao-seedance-2-5-260628",
       modelOptions: { seconds: "5", resolution: "720p" },
       inputTexts: ["一段服装视频提示词"],
