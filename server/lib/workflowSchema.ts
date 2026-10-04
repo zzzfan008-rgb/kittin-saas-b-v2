@@ -47,10 +47,11 @@ const MASK_DATA_URL_CONTRACT = (() => {
  * v9（64 Phase 1）：variant 绑定六字段（promptVariantId/promptFamilyId/parameterProfileId/
  * contractHash/evaluationVersion/postprocessVersion）随概念删除，从清单移除；
  * operationMode（裁决 A）为新的生成语义字段，加入清单 fail-closed。
+ * v9（65a）：mask/maskSourceRef/featherRadius 从本清单移除——蒙版归属图片本身
+ * （65 Q1：官方 single mask 语义，一张图一个蒙版，随 image[0]），image 节点允许携带。
  */
 const GENERATION_FIELDS = [
   "modelId", "operationMode", "modelOptions", "aspectRatio", "batchSize",
-  "mask", "maskSourceRef", "featherRadius",
 ] as const;
 
 export class WorkflowValidationError extends Error {
@@ -222,7 +223,26 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
     case "image": {
       assertNoGenerationFields(raw, path);
       const outputImages = imageReferenceArray(raw.outputImages, `${path}.outputImages`);
-      return { kind, label, status, outputImages, ...withError({}) } as WorkflowNodeData;
+      // 65a（Q1 官方 single mask）：蒙版归属图片本身。三字段可选、值校验与
+      // v9 生成节点时代同规则（mask 数据 URL 契约 / maskSourceRef 图片引用 / 羽化 0-64）。
+      const mask = optionalMaskReference(raw.mask, `${path}.mask`);
+      const maskSourceRef = optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
+      let featherRadius: number | undefined;
+      if (raw.featherRadius !== undefined) {
+        const radius = finiteNumber(raw.featherRadius, `${path}.featherRadius`);
+        if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
+        featherRadius = radius;
+      }
+      return {
+        kind,
+        label,
+        status,
+        outputImages,
+        ...(mask !== undefined ? { mask } : {}),
+        ...(maskSourceRef !== undefined ? { maskSourceRef } : {}),
+        ...(featherRadius !== undefined ? { featherRadius } : {}),
+        ...withError({}),
+      } as WorkflowNodeData;
     }
     case "video": {
       assertNoGenerationFields(raw, path);
@@ -242,14 +262,9 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       validateModelOptionsShape(raw.modelOptions, path);
       const aspectRatio = oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
       const batchSize = oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
-      const mask = optionalMaskReference(raw.mask, `${path}.mask`);
-      const maskSourceRef = optionalImageReference(raw.maskSourceRef, `${path}.maskSourceRef`);
-      let featherRadius: number | undefined;
-      if (raw.featherRadius !== undefined) {
-        const radius = finiteNumber(raw.featherRadius, `${path}.featherRadius`);
-        if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
-        featherRadius = radius;
-      }
+      // 65a：蒙版三字段已搬到 image 节点。存量文档（v9 早期试探期草稿）在生成节点
+      // 携带的三字段在此静默丢弃（Q4 裁决 A：DB 实查恰 1 个 0-runs 草稿，mask 资产
+      // 仍在可重涂；不报错不迁移）——返回对象是白名单重建，天然只含契约字段。
       return {
         kind,
         label,
@@ -259,9 +274,6 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
         aspectRatio,
         batchSize,
-        ...(mask !== undefined ? { mask } : {}),
-        ...(maskSourceRef !== undefined ? { maskSourceRef } : {}),
-        ...(featherRadius !== undefined ? { featherRadius } : {}),
         ...withError({}),
       } as WorkflowNodeData;
     }

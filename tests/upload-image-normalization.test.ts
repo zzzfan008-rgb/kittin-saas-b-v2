@@ -360,27 +360,28 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 0, y: 0 },
         data: { kind: "text", label: "提示词", status: "idle", text: "改成银色" },
       }, {
-        id: "source-node",
+        // 65a：蒙版归属 image 节点（认领 nodeId = 蒙版载体节点 id）。
+        id: maskNodeId,
         type: "image",
         position: { x: 300, y: 0 },
         data: {
           kind: "image", label: "原图", status: "idle",
           outputImages: [body.url],
+          mask, maskSourceRef: body.url,
         },
       }, {
-        id: maskNodeId,
+        id: "mask-generator",
         type: "image-generator",
         position: { x: 600, y: 0 },
         data: {
           kind: "image-generator", label: "局部重绘", status: "idle",
           modelId: "gpt-image-2.5-sunburst", modelOptions: {},
           aspectRatio: "3:4", batchSize: 1,
-          mask, maskSourceRef: body.url,
         },
       }],
       edges: [
-        { id: "prompt-mask", source: "prompt-node", target: maskNodeId, targetHandle: "prompt", data: {} },
-        { id: `source-${maskNodeId}`, source: "source-node", target: maskNodeId, targetHandle: "reference", data: {} },
+        { id: "prompt-mask", source: "prompt-node", target: "mask-generator", targetHandle: "prompt", data: {} },
+        { id: `source-${maskNodeId}`, source: maskNodeId, target: "mask-generator", targetHandle: "reference", data: {} },
       ],
     });
     const saveMaskProject = async (

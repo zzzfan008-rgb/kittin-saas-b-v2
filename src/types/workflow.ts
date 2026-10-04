@@ -136,6 +136,12 @@ export interface ImageNodeData extends BaseNodeData {
   kind: "image";
   /** 用户上传的图片引用（/api/files/xxx）。输入节点不写生成结果。 */
   outputImages: string[];
+  /** 65a（Q1 官方 single mask）：蒙版归属图片本身——一张图一个蒙版，随 image[0]。
+   *  mask/maskSourceRef/featherRadius 三字段从生成节点搬到图片节点 data。
+   *  图一旦携带 mask，其携带者作为生成节点 inputImages[0] 时触发 mask-edit 推断。 */
+  mask?: string;
+  maskSourceRef?: string;
+  featherRadius?: number; // 0–64
 }
 
 export interface VideoNodeData extends BaseNodeData {
@@ -150,7 +156,8 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   kind: "image-generator";
   /**
    * 操作模式（64 裁决 A）：显式归节点 data，缺省即 generate。
-   * edit/mask-edit 需 ≥1 条参考图入边；mask-edit 另需 PNG 蒙版（mask/maskSourceRef）。
+   * edit/mask-edit 需 ≥1 条参考图入边；mask-edit 的蒙版随上游 image[0]
+   * 携带（65a 官方 single mask 语义，本节点不再持有 mask 三字段）。
    */
   operationMode?: ImageOperationMode;
   modelId: GenerationImageModelId;
@@ -158,10 +165,6 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
   batchSize: BatchSize; // 1 | 2 | 4 | 8
-  /** 蒙版能力：仅 operationMode="mask-edit" 时启用 */
-  mask?: string;
-  maskSourceRef?: string;
-  featherRadius?: number; // 0–64
 }
 
 export interface VideoGeneratorNodeData extends BaseNodeData {

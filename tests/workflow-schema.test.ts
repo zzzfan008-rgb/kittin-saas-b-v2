@@ -316,6 +316,79 @@ function main() {
     assert.ok(!("operationMode" in data)); // v9 直存路径不做迁移物化（v8 路径才物化）
   });
 
+  // ---------- 65a：蒙版搬到图片节点（Q4 裁决 A：存量静默丢弃，v9 不变） ----------
+
+  ok("65a：image-generator 携带 mask 三字段（存量草稿）→ 静默丢弃后通过", () => {
+    const result = validateAndMigrateFlow(flow(
+      [
+        textNode("t1"),
+        imageNode("i1"),
+        imageGeneratorNode("g1", { operationMode: "edit", mask: "data:image/png;base64,OLD==", maskSourceRef: "/api/files/a.png", featherRadius: 8 }),
+      ],
+      [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
+    ));
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const data = g.data as Record<string, unknown>;
+    assert.ok(!("mask" in data), "存量生成节点 mask 必须静默丢弃");
+    assert.ok(!("maskSourceRef" in data));
+    assert.ok(!("featherRadius" in data));
+    assert.equal((data as { operationMode?: string }).operationMode, "edit"); // 非蒙版字段保留
+  });
+
+  ok("65a：image-generator 携带非法 mask 值 → 静默丢弃通过（不再校验旧位置）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageGeneratorNode("g1", { mask: 12345 })],
+      [promptEdge("e1", "t1", "g1")],
+    ));
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    assert.ok(!("mask" in (g.data as Record<string, unknown>)));
+  });
+
+  ok("65a：image 节点携带 mask 三字段 → 通过且保留", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), {
+        id: "i1", type: "image", position: { x: 380, y: 0 },
+        data: {
+          kind: "image", label: "图片", status: "idle",
+          outputImages: ["/api/files/a.png"],
+          mask: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", maskSourceRef: "/api/files/a.png", featherRadius: 12,
+        },
+      }, imageGeneratorNode("g1")],
+      [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
+    ));
+    const i = result.nodes.find((n) => n.id === "i1")!;
+    const data = i.data as Record<string, unknown>;
+    assert.equal(data.mask, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
+    assert.equal(data.maskSourceRef, "/api/files/a.png");
+    assert.equal(data.featherRadius, 12);
+  });
+
+  ok("65a：image 节点 featherRadius 越界 → 拒（值校验随字段搬家）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{
+          id: "i1", type: "image", position: { x: 0, y: 0 },
+          data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], featherRadius: 65 },
+        }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /featherRadius/.test(e.message),
+    );
+  });
+
+  ok("65a：image 节点 mask 非字符串 → 拒（值校验随字段搬家）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{
+          id: "i1", type: "image", position: { x: 0, y: 0 },
+          data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], mask: 42 },
+        }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /mask/.test(e.message),
+    );
+  });
+
   // ---------- v8→v9 迁移（64 Phase 1 C2）三态 + flow_json 夹具 ----------
   const V8_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
 

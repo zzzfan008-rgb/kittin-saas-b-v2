@@ -340,10 +340,15 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
       return document ? selectNodeInputImages(document, nodeId)[0] : undefined;
     }),
   );
-  const displayMask = typeof (data as ImageGeneratorNodeData).mask === "string"
-    ? (data as ImageGeneratorNodeData).mask
+  // 65a：蒙版三字段已归属 image 节点，这里经 BaseNodeData 索引签名读取为 unknown。
+  // 显式 typeof 守卫降级是类型收窄的机械后果（运行时行为与旧代码逐位一致）；
+  // 65b 蒙版入口搬迁将整体重写该面。
+  const dataRecord = data as Record<string, unknown>;
+  const displayMask = typeof dataRecord.mask === "string" ? dataRecord.mask : undefined;
+  const maskSourceRef = dataRecord.maskSourceRef;
+  const maskFeatherRadius = typeof dataRecord.featherRadius === "number"
+    ? dataRecord.featherRadius
     : undefined;
-  const maskSourceRef = (data as ImageGeneratorNodeData).maskSourceRef;
 
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
@@ -542,9 +547,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         <MaskEditor
           source={maskSource}
           initialMask={maskSourceRef === maskSource ? displayMask : undefined}
-          featherRadius={typeof (data as ImageGeneratorNodeData).featherRadius === "number"
-            ? (data as ImageGeneratorNodeData).featherRadius
-            : undefined}
+          featherRadius={maskFeatherRadius}
           onClose={() => setEditingMask(false)}
           onSave={async (mask) => {
             const releaseUploadPending = beginMaskWork();

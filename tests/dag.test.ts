@@ -237,6 +237,154 @@ function main() {
     assert.deepStrictEqual(plan.steps.map((s) => s.nodeId), ["g1"]);
   });
 
+  // ---------- 65a：蒙版搬到图片节点（Q1 官方 single mask 语义） ----------
+
+  ok("65a：image 节点带 mask → 注入生成节点 params 且 operationMode 物化 mask-edit", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+        maskSourceRef: "/api/files/a.png",
+        featherRadius: 12,
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1")],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.operationMode, "mask-edit"); // 推断物化
+    assert.equal(g1.params.mask, "data:image/png;base64,MASK==");
+    assert.equal(g1.params.maskSourceRef, "/api/files/a.png");
+    assert.equal(g1.params.featherRadius, 12);
+    assert.doesNotThrow(() => assertPlanInputs(plan, [edge("t1", "g1"), edge("i1", "g1", "reference")]));
+    assert.doesNotThrow(() => assertPromptRunAdmissions(plan));
+  });
+
+  ok("65a：mask 缺省 maskSourceRef → 回落图自身引用（maskSourceRef===inputImages[0] 语义不变）", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1")],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.maskSourceRef, "/api/files/a.png");
+    assert.doesNotThrow(() => assertPlanInputs(plan, [edge("t1", "g1"), edge("i1", "g1", "reference")]));
+  });
+
+  ok("65a：image-generator 自身 data 带 mask（存量草稿）→ 静默丢弃，params 无 mask、不物化 mask-edit", () => {
+    const plan = buildExecutionPlan(
+      [
+        textNode("t1", "设计一套现代女装"),
+        imageNode("i1", ["/api/files/a.png"]),
+        imageGeneratorNode("g1", undefined, { mask: "data:image/png;base64,OLD==", maskSourceRef: "/api/files/a.png", featherRadius: 8 }),
+      ],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.ok(!("mask" in g1.params), "存量生成节点 mask 不得注入 params");
+    assert.ok(!("maskSourceRef" in g1.params));
+    assert.ok(!("featherRadius" in g1.params));
+    assert.ok(!("operationMode" in g1.params), "无推断源时不物化 operationMode");
+  });
+
+  ok("65a：maskSourceRef 与 inputImages[0] 不一致 → assertPlanInputs 拒（校验语义不变）", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+        maskSourceRef: "/api/files/stale.png",
+      } as WorkflowNodeData,
+    };
+    const edges = [edge("t1", "g1"), edge("i1", "g1", "reference")];
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1")],
+      edges,
+    );
+    assert.throws(
+      () => assertPlanInputs(plan, edges),
+      (e: unknown) => e instanceof DagError && (e as Error).message === "Node g1 mask does not match its current source image",
+    );
+  });
+
+  ok("65a 独占：同一带 mask 图片节点作两个生成节点 image[0] → submit 兜底 DagError（文案固定）", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+        maskSourceRef: "/api/files/a.png",
+      } as WorkflowNodeData,
+    };
+    assert.throws(
+      () => buildExecutionPlan(
+        [
+          textNode("t1", "提示词甲"), textNode("t2", "提示词乙"),
+          maskedImage,
+          imageGeneratorNode("g1"), imageGeneratorNode("g2"),
+        ],
+        [edge("t1", "g1"), edge("i1", "g1", "reference"), edge("t2", "g2"), edge("i1", "g2", "reference")],
+      ),
+      (e: unknown) => e instanceof DagError
+        && (e as Error).message === "Node i1 的蒙版一次只能服务 1 个生成节点的 image[0]（官方 single mask 语义）；当前同时用于生成节点 g1, g2",
+    );
+  });
+
+  ok("65a 独占豁免：不带 mask 的图作两个生成节点 image[0] → 允许（独占只约束蒙版）", () => {
+    const plan = buildExecutionPlan(
+      [
+        textNode("t1", "提示词甲"), textNode("t2", "提示词乙"),
+        imageNode("i1", ["/api/files/a.png"]),
+        imageGeneratorNode("g1"), imageGeneratorNode("g2"),
+      ],
+      [edge("t1", "g1"), edge("i1", "g1", "reference"), edge("t2", "g2"), edge("i1", "g2", "reference")],
+    );
+    assert.deepStrictEqual(plan.steps.map((s) => s.nodeId).sort(), ["g1", "g2"]);
+  });
+
+  ok("65a 独占：mask 图作同一生成节点 image[0] 与其他生成节点的参考图 → 不误伤", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+        maskSourceRef: "/api/files/a.png",
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [
+        textNode("t1", "提示词甲"), textNode("t2", "提示词乙"),
+        maskedImage, imageNode("i2", ["/api/files/b.png"]),
+        imageGeneratorNode("g1"), imageGeneratorNode("g2"),
+      ],
+      // i2 边必须先于 i1：上游按 edges 数组顺序，g2 的 image[0] 落在 i2（无 mask），
+      // i1 只作为 g2 的第二参考图（无蒙版推断），i1 的蒙版消费者仅 g1 → 独占不触发。
+      [edge("t2", "g2"), edge("i2", "g2", "reference"), edge("i1", "g2", "reference"), edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    // g2 的 inputImages[0] 是 i2（边序决定）→ i1 在 g2 只是普通参考图，无蒙版推断。
+    const g2 = plan.steps.find((s) => s.nodeId === "g2")!;
+    assert.equal(g2.inputImages[0], "/api/files/b.png");
+    assert.ok(!("mask" in g2.params));
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 
