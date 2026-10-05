@@ -544,12 +544,21 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
         edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
       );
       if (!targetHasReference) {
-        // 检查该 masked source 是否已是另一个生成节点的 image[0]（第一 reference 边）
+        // 检查该 masked source 是否已是另一个生成节点的 image[0]
+        // image[0] = 按文档边序第一个 reference 入边（非 prompt / 非 first-frame）
         const usedAsImageZero = document.edges.some((e) =>
           e.source === source.id &&
           e.target !== target.id &&
           edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
-          edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
+          edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME &&
+          // 确认 e 是它目标的 image[0]：该目标没有更早的 reference 入边
+          !document.edges.some((pe) =>
+            pe.target === e.target &&
+            pe.source !== source.id &&
+            edgeHandleOf(document, pe) !== EDGE_HANDLE_PROMPT &&
+            edgeHandleOf(document, pe) !== EDGE_HANDLE_FIRST_FRAME &&
+            document.edges.indexOf(pe) < document.edges.indexOf(e)
+          )
         );
         if (usedAsImageZero) return false;
       }
