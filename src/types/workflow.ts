@@ -145,6 +145,8 @@ export interface ImageNodeData extends BaseNodeData {
   mask?: string;
   maskSourceRef?: string;
   featherRadius?: number; // 0–64
+  /** 65d 蒙版重绘面板：用户输入的编辑描述（≤500 字）。运行后清空。 */
+  editPrompt?: string;
 }
 
 export interface VideoNodeData extends BaseNodeData {
@@ -159,10 +161,9 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   kind: "image-generator";
   /**
    * 操作模式（64 裁决 A）：显式归节点 data，缺省即 generate。
-   * edit/mask-edit 需 ≥1 条参考图入边；mask-edit 的蒙版随上游 image[0]
-   * 携带（65a 官方 single mask 语义，本节点不再持有 mask 三字段）。
+   * 65d：mask-edit 从生成节点剥离，只留 generate/edit。
    */
-  operationMode?: ImageOperationMode;
+  operationMode?: "generate" | "edit";
   modelId: GenerationImageModelId;
   /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
   modelOptions?: ImageModelOptions;
@@ -769,8 +770,21 @@ export interface ResultNodeCreatedRunEvent {
   outputSizes?: Array<string | null>;
 }
 
+export interface ImageNodeUpdatedRunEvent {
+  type: "image-node-updated";
+  nodeId: string;
+  urls: string[];
+  model: string;
+  prompts: string[];
+  providerOutputSizes: Array<string | null>;
+  failures?: Array<{ prompt: string; error: string }>;
+  runId: string;
+  seq?: number;
+}
+
 export type RunEvent =
   | NodeStatusRunEvent
   | ResultNodeCreatedRunEvent
+  | ImageNodeUpdatedRunEvent
   | { seq?: number; type: "done" }
   | { seq?: number; type: "run-error"; nodeId?: string; error: string; finishedAt?: number };
