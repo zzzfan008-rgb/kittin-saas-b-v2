@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-04T16:39:00.957Z",
+  "baseCommit": "58a4004b0ef339447b8ce84758e190b838ba81d7",
+  "changeFingerprintSha256": "fce145d77b1703ea5973719b92f12d9790cc6ce539af6ab5527e4239146ec986",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "mask editing mask image node",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/lib/workflowSchema.ts",
+    "server/routes/projects.ts",
+    "src/components/nodes/GeneratorParamsPanel.tsx",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5.md",
+      "pageLocalPath": "pages/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5.md",
+      "title": "Community node update: Luck GPT-Image 2 ComfyUI nodes now support gpt-image-2.5",
+      "sha256": "1988af930f4ef2b224c74868461f17f98865a5fdf0e028a4e60894e96a29e8bb"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP Image Gen/Editing",
+      "sha256": "8a5c6e2e5724f0f31ffd5742b76c63bc6d6ea3535e59b792916ae36beaa9fa88"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All Image Gen/Editing",
+      "sha256": "25435e1b964be46e8886809f47f30e0e70caa07eaa71cdc0c8a399cec4cb6008"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/gpt-image-2-all-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/news/gpt-image-2-all-launch.md",
+      "pageLocalPath": "pages/en/news/gpt-image-2-all-launch.md",
+      "title": "gpt-image-2-all Launch: $0.03/image GPT Reverse-Engineered Image Model",
+      "sha256": "e16d196a8fe835879862af4d7c0f1ef6b7121248066b31cabd80f50a093f2f49"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "Mask Inpainting Guide",
+      "sha256": "4ff54f602a47f28e30cafb2c61bfe84128e394f488bdbb747d54c2d0aa90c857"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "f0a0e67a3becaed143f278c9b0f9321a649f5f8523e34c176f0592521e8e40c0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok-imagine-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok-imagine-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok-imagine-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "9b1db8536088514189999e4b2a89e1648975a7f021f12f46cf5eda84e220c0e1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "65a81374d7dd76a528ce2d95b00de0d599be6923118028e8439e62743f9cfd44"
+    }
+  ],
+  "decisionSummary": "65a 蒙版数据归属从生成节点搬到图片节点（官方 single mask 语义：一张图一个蒙版、mask 只作用 image[0]）。schema image case 允许 mask 三字段、image-generator case 静默丢弃；dag 组装面从上游 image[0] 读取蒙版并在带 mask 时物化 operationMode=mask-edit；独占校验同一带 mask 图只可作一个生成节点 image[0]。复用 apiyi 官方 mask-editing 语义本体零重写。",
+  "unresolvedChoices": []
+}

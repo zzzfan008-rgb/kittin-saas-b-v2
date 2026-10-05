@@ -180,7 +180,8 @@ assert.deepEqual(snapshot, {
       id: "image-upload",
       type: "image",
       position: { x: 40, y: 50 },
-      data: { kind: "image", label: "参考图", outputImages: ["/api/files/sketch-a.png"] },
+      // 65b：mask/featherRadius 是 image 节点的合法字段，投影保留（不再是 "必剥"）。
+      data: { kind: "image", label: "参考图", outputImages: ["/api/files/sketch-a.png"], mask: "/api/files/legacy-mask.png", featherRadius: 8 },
     },
     {
       id: "image-generator-1",
@@ -189,14 +190,12 @@ assert.deepEqual(snapshot, {
       data: {
         kind: "image-generator",
         label: "生图",
-        // v9（64 Phase 3）：输入源携带的 v7 六绑定字段（脏输入）必须被投影整体剥离。
+        // v9（64 Phase 3）：aspectRatio/batchSize/modelId/modelOptions/runId 为剥离项；
+        // mask/maskSourceRef/featherRadius 已迁至 image 节点（65b），生成器不再保留。
         modelId: "gpt-image-2.5-sunburst",
         aspectRatio: "3:4",
         batchSize: 2,
         modelOptions: { aspectRatio: "3:4", imageSize: "2K" },
-        mask: "/api/files/mask.png",
-        maskSourceRef: "/api/files/source.png",
-        featherRadius: 12,
       },
     },
     {
@@ -397,6 +396,9 @@ assert.deepEqual(migration.flow.nodes[1].data, {
   kind: "image",
   label: "草图渲染",
   outputImages: ["/api/files/kept.png"],
+  // 65b：mask/featherRadius 是 image 节点的合法字段，迁移投影保留。
+  mask: "/api/files/mask.png",
+  featherRadius: 12,
   status: "idle",
 });
 assert.deepEqual(migration.flow.nodes[2].data, {
@@ -405,7 +407,7 @@ assert.deepEqual(migration.flow.nodes[2].data, {
   outputVideos: ["/api/files/kept.mp4"],
   status: "idle",
 });
-assert.deepEqual(Object.keys(migration.flow.nodes[1].data).sort(), ["kind", "label", "outputImages", "status"]);
+assert.deepEqual(Object.keys(migration.flow.nodes[1].data).sort(), ["featherRadius", "kind", "label", "mask", "outputImages", "status"]);
 assert.deepEqual(migration.flow.nodes[1].data.kind === "image" && unprojectedDocumentFields({
   ...migration.flow.nodes[1].data,
   status: undefined,
@@ -479,6 +481,9 @@ assert.deepEqual(openedV7.flow.nodes[1].data, {
   kind: "image",
   label: "草图渲染",
   outputImages: ["/api/files/kept.png"],
+  // 65b：mask/featherRadius 是 image 节点的合法字段，迁移投影保留。
+  mask: "/api/files/mask.png",
+  featherRadius: 12,
   status: "idle",
 }, "M2/M8：产物逐项保留，生成字段剥离");
 const openedV7Resave = documentSnapshotToPersistedWorkflow(createDocumentSnapshot({
@@ -707,16 +712,32 @@ assert.equal(
 const maskBindingSnapshot = createDocumentSnapshot({
   projectName: "蒙版绑定往返",
   nodes: [{
+    id: "mask-binding-image",
+    type: "image",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "image",
+      label: "蒙版原图",
+      status: "idle",
+      outputImages: ["/api/files/mask-source.png"],
+      // 65b：蒙版三字段归 image 节点，保存必须整体保留。
+      mask: "/api/files/mask-binding.png",
+      maskSourceRef: "/api/files/mask-source.png",
+      featherRadius: 12,
+    } as never,
+  }, {
     id: "mask-binding",
     type: "image-generator",
-    position: { x: 0, y: 0 },
+    position: { x: 380, y: 0 },
     data: {
       kind: "image-generator",
       label: "蒙版重绘",
       status: "idle",
       aspectRatio: "3:4",
       batchSize: 1,
+      // 65b：蒙版三字段不再是 generator 的合法字段，投影必须静默丢弃。
       mask: "/api/files/mask-binding.png",
+      maskSourceRef: "/api/files/mask-source.png",
       featherRadius: 12,
       modelId: "gpt-image-2.5-sunburst",
       modelOptions: {},
@@ -732,11 +753,18 @@ const maskBindingSnapshot = createDocumentSnapshot({
   }],
   edges: [],
 });
-const savedMaskNode = maskBindingSnapshot.nodes[0];
+const savedMaskImage = maskBindingSnapshot.nodes[0];
+assert.equal(savedMaskImage?.data.kind, "image");
+if (savedMaskImage?.data.kind !== "image") throw new Error("蒙版原图节点丢失");
+assert.equal(savedMaskImage.data.featherRadius, 12, "保存快照必须保留用户指定的羽化宽度（image 节点）");
+assert.equal(savedMaskImage.data.mask, "/api/files/mask-binding.png", "保存快照必须保留蒙版引用（image 节点）");
+assert.equal(savedMaskImage.data.maskSourceRef, "/api/files/mask-source.png", "保存快照必须保留蒙版源引用（image 节点）");
+const savedMaskNode = maskBindingSnapshot.nodes[1];
 assert.equal(savedMaskNode?.data.kind, "image-generator");
 if (savedMaskNode?.data.kind !== "image-generator") throw new Error("蒙版快照节点丢失");
-assert.equal(savedMaskNode.data.featherRadius, 12, "保存快照必须保留用户指定的羽化宽度");
-assert.equal(savedMaskNode.data.mask, "/api/files/mask-binding.png", "保存快照必须保留蒙版引用");
+assert.equal(savedMaskNode.data.featherRadius, undefined, "65b：generator 投影必须丢弃 featherRadius");
+assert.equal(savedMaskNode.data.mask, undefined, "65b：generator 投影必须丢弃 mask");
+assert.equal(savedMaskNode.data.maskSourceRef, undefined, "65b：generator 投影必须丢弃 maskSourceRef");
 assert.equal(
   (savedMaskNode.data as { operationMode?: string }).operationMode,
   "mask-edit",
@@ -763,9 +791,12 @@ const reloadedMaskSnapshot = createDocumentSnapshot({
   nodes: maskBindingWire.nodes,
   edges: maskBindingWire.edges,
 });
-const reloadedMaskNode = reloadedMaskSnapshot.nodes[0];
+const reloadedMaskImage = reloadedMaskSnapshot.nodes[0];
+if (reloadedMaskImage?.data.kind !== "image") throw new Error("重载后的蒙版原图节点丢失");
+assert.equal(reloadedMaskImage.data.featherRadius, 12, "重载后必须保留用户指定的羽化宽度（image 节点）");
+assert.equal(reloadedMaskImage.data.mask, "/api/files/mask-binding.png", "重载后必须保留蒙版引用（image 节点）");
+const reloadedMaskNode = reloadedMaskSnapshot.nodes[1];
 if (reloadedMaskNode?.data.kind !== "image-generator") throw new Error("重载后的蒙版节点丢失");
-assert.equal(reloadedMaskNode.data.featherRadius, 12, "重载后必须保留用户指定的羽化宽度");
 assert.equal(
   (reloadedMaskNode.data as { operationMode?: string }).operationMode,
   "mask-edit",

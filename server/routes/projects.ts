@@ -123,8 +123,10 @@ async function syncAssetRefs(
 
 function projectMaskFileRefs(flow: PersistedWorkflow): ProjectMaskFileRef[] {
   return flow.nodes.flatMap((node) => {
-    // v8：蒙版是 image-generator 节点能力（needsMask 变体），mask 字段内嵌在 ImageGeneratorNodeData。
-    if (node.data.kind !== "image-generator" || typeof node.data.mask !== "string") return [];
+    // 65a（Q1 官方 single mask）：蒙版归属 image 节点 data（从 image-generator 搬家）。
+    // 认领扫描必须随归属迁移：存量生成节点 mask 已被 schema 静默丢弃，扫 generator 只会
+    // 得到空集，跨项目/跨节点的 403 兜底（syncMaskFiles 不匹配即拒）将整体失效。
+    if (node.data.kind !== "image" || typeof node.data.mask !== "string") return [];
     if (!isLocalImageReference(node.data.mask)) return [];
     return [{
       fileId: node.data.mask.slice("/api/files/".length),

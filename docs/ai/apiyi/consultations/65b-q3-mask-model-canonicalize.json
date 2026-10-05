@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-05T10:38:01.316Z",
+  "baseCommit": "76b21e494de3873697c4bc474e6a410f44c122f3",
+  "changeFingerprintSha256": "fe9585ad37158a79522abcad08737c99112d7d0d5aeccb1b4bb44502e078d0c5",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "mask-edit 与 gpt-image-2.5-sunburst 双向唯一性，modelId canonicalize 强制配对，官方 single mask 语义",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "tests/dag.test.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "Mask Inpainting Guide",
+      "sha256": "4ff54f602a47f28e30cafb2c61bfe84128e394f488bdbb747d54c2d0aa90c857"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-03/model-status-0331-1611",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-03/model-status-0331-1611.md",
+      "pageLocalPath": "pages/live/2026-03/model-status-0331-1611.md",
+      "title": "Nano Banana Pro 同样受谷歌官方 503 高负载影响，并发受限，静待官方恢复",
+      "sha256": "f99270c7b8e89f3ace7d2771778f6ab114ed27363e75039c1d1498231670c718"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-07/sora2-official-offline",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/2026-07/sora2-official-offline.md",
+      "pageLocalPath": "pages/live/2026-07/sora2-official-offline.md",
+      "title": "Sora 2 官方分组已下线 · 早于官方 9 月正式下线",
+      "sha256": "a1b4c53d147a31535fa75ebc2ed65710361ac93c6ffd43357880c9198c72c143"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "蒙版局部重绘指南",
+      "sha256": "33924a0effb12bc86432e27a419fe365fe4997deb6b56eca4936dcf17174bb5e"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "蒙版局部重繪指南",
+      "sha256": "e5d22118e74f14aa3084651de6f2a277f5fce7401f872e568719956d6799e686"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "マスクインペインティングガイド",
+      "sha256": "ea3d3daab68f720797308d6e37a8ffd31464a67f844e9196f545b5ed1d0b1822"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/ko/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "마스크 인페인팅 가이드",
+      "sha256": "241916acd3e2fc0552e932071e7ae4371b741dbcf149379a175e9694bbc999ab"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "Руководство по масковому inpainting",
+      "sha256": "15a9bbc1477aa8f2bea17333c3ca91bdad175103eed2c649887fa2a36d8b8bc9"
+    }
+  ],
+  "decisionSummary": "65b Q3 运行链落地：plan 构造期将 mask-edit 的 modelId 强制收为官方 sunburst，apiyi.ts 双向闸保持不变，非 mask-edit 语义零破坏",
+  "unresolvedChoices": []
+}

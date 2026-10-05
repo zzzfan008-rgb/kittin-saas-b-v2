@@ -739,8 +739,8 @@ useFlowStore.getState().openFlowTab({
     position: { x: 0, y: 0 },
     data: {
       kind: "image", label: "原图", status: "idle",
-      aspectRatio: "3:4", batchSize: 1,
       outputImages: ["/api/files/quota-source.png"],
+      mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
   }, {
     id: "quota-mask",
@@ -748,10 +748,8 @@ useFlowStore.getState().openFlowTab({
     position: { x: 300, y: 0 },
     data: {
       kind: "image-generator", label: "局部重绘", status: "idle",
-      promptVariantId: "mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1",
       modelId: "gpt-image-2.5-sunburst", modelOptions: {},
       aspectRatio: "3:4", batchSize: 1,
-      mask: "/api/files/old-mask.png", maskSourceRef: "/api/files/quota-source.png",
     },
   }],
   edges: [{ id: "quota-edge", source: "quota-source", target: "quota-mask", targetHandle: "reference" }],
@@ -766,7 +764,7 @@ assert.match(sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "", /ol
 failedSessionTabId = quotaTabId;
 failSessionWrites = true;
 const oversizedInlineMask = `data:image/png;base64,${"x".repeat(300_000)}`;
-useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
+useFlowStore.getState().updateNodeData("quota-source", { mask: oversizedInlineMask });
 assert.equal(
   sessionStorage.getItem(projectTabStorageKey(quotaTabId)),
   null,
@@ -813,7 +811,7 @@ assert.match(
 useFlowStore.getState().switchTab(quotaTabId);
 
 failSessionWrites = false;
-useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/old-mask.png" });
+useFlowStore.getState().updateNodeData("quota-source", { mask: "/api/files/old-mask.png" });
 assert.match(
   sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "",
   /old-mask\.png/,
@@ -822,13 +820,13 @@ assert.match(
 assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
 
 failSessionWrites = true;
-useFlowStore.getState().updateNodeData("quota-mask", { mask: oversizedInlineMask });
+useFlowStore.getState().updateNodeData("quota-source", { mask: oversizedInlineMask });
 assert.equal(sessionStorage.getItem(projectTabStorageKey(quotaTabId)), null);
 failSessionWrites = false;
 assert.equal(retryTabSessionPersistence(), true, "同一份未变化快照必须能够显式重试");
 assert.match(sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "", /data:image\/png;base64/);
 assert.equal(useFlowStore.getState().tabSessionPersistenceError, null);
-useFlowStore.getState().updateNodeData("quota-mask", { mask: "/api/files/latest-mask.png" });
+useFlowStore.getState().updateNodeData("quota-source", { mask: "/api/files/latest-mask.png" });
 const compactSession = sessionStorage.getItem(projectTabStorageKey(quotaTabId)) ?? "";
 assert.match(compactSession, /latest-mask\.png/);
 assert.doesNotMatch(compactSession, /data:image\/png;base64/);

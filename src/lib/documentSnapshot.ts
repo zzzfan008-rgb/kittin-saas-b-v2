@@ -222,12 +222,23 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
   switch (data.kind) {
     case "text":
       return { kind: "text", label: data.label, text: stringOrEmpty(data.text) };
-    case "image":
-      return { kind: "image", label: data.label, outputImages: stringList(data.outputImages) };
+    case "image": {
+      const fr = typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+        ? Math.max(0, Math.min(64, Math.round(data.featherRadius)))
+        : undefined;
+      return {
+        kind: "image",
+        label: data.label,
+        outputImages: stringList(data.outputImages),
+        ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
+        ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
+        ...(fr !== undefined ? { featherRadius: fr } : {}),
+      };
+    }
     case "video":
       return { kind: "video", label: data.label, outputVideos: stringList(data.outputVideos) };
     case "image-generator": {
-      const featherRadius = data.featherRadius;
+      // 65a+65b (Q4 裁决 A)：mask 三字段已迁至 image 节点；存量 generator 蒙版静默丢弃。
       return {
         kind: "image-generator",
         label: data.label,
@@ -238,11 +249,6 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
           : 1,
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
         ...operationModeField(data),
-        ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
-        ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
-        ...(typeof featherRadius === "number" && Number.isFinite(featherRadius)
-          ? { featherRadius: Math.max(0, Math.min(64, Math.round(featherRadius))) }
-          : {}),
       };
     }
     case "video-generator":
@@ -294,13 +300,12 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius"],
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
     "operationMode",
-    "mask", "maskSourceRef", "featherRadius",
   ],
   "video-generator": [
     "kind", "label",

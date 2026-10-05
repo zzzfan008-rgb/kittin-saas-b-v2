@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import {
+  beginMaskWork,
   selectActiveDocumentTarget,
   selectActiveProjectName,
   selectActiveReadOnly,
+  selectDocumentForTab,
   selectNodeInputImages,
   useFlowStore,
 } from "@/store/flowStore";
@@ -12,21 +14,22 @@ import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
 import { assetNameFromUpload, saveImageToModelLibrary } from "@/lib/assetSave";
+import { saveMaskDraft } from "@/lib/maskUpload";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
+import { MaskEditor } from "./MaskEditor";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
 import { useReferenceOrdinal } from "./ReferenceOrdinals";
 import { duplicateNode } from "./nodeDuplicate";
 
 /**
- * v8 输入层图片节点（plan.md §1、data-model.md §3）：
- * 只做上传 / 展示 / 作为参考图来源，**不含**模型、画幅、数量、蒙版与运行按钮；
+ * v9 输入层图片节点（65b 蒙版入口迁入）：
+ * 只做上传 / 展示 / 作为参考图来源，**不含**模型、画幅、数量与运行按钮；
  * 全部生成语义归 image-generator（生成层）。
- * 工具条（plan.md §3.2）：[裁剪] [抠图] [复制] [替换]。
- * 上传入口可勾选「存入数字模特库」（asset-library-model.md §5）：勾选后本次上传的图片
- * 同时以 category="model" 存入素材库；勾选状态是节点本地 UI 状态，不进入文档数据。
+ * 工具条：[裁剪] [抠图] [蒙版] [复制] [替换]。
+ * 上传入口可勾选「存入数字模特库」。
  */
 
 interface NormalizedUploadResponse {
@@ -70,11 +73,10 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  /** 勾选后本次上传的图片同时存入素材库「数字模特」分类（category="model"）。 */
   const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
-  /** 入库的三态：idle 未入库 / saving 入库中 / saved 已入库 / error 入库失败（上传本身仍成功）。 */
   const [libraryState, setLibraryState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [editingMask, setEditingMask] = useState(false);
 
   // 作为参考图来源时的序号（派生视图，永不持久化）。
   const referenceCount = useFlowStore(
@@ -84,10 +86,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     }),
   );
 
-  /**
-   * 入库到数字模特库：与上传解耦——入库失败只标记入库状态，
-   * 不回写节点 status/error（图片已经上传成功，不能被辅助动作覆盖成失败）。
-   */
   const storeToModelLibrary = useCallback(
     async (image: string, fileName: string, requestId: number) => {
       setLibraryState("saving");
@@ -118,8 +116,15 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
       try {
         const upload = await uploadFile(file);
         if (requestId !== uploadRequestRef.current) return;
-        // 上传位语义：覆盖式写入 outputImages。
-        updateNodeDataInTab(target, id, { outputImages: [upload.url], status: "success", error: undefined });
+        // 上传位语义：覆盖式写入 outputImages；蒙版随图片重置清除。
+        updateNodeDataInTab(target, id, {
+          outputImages: [upload.url],
+          status: "success",
+          error: undefined,
+          mask: undefined,
+          maskSourceRef: undefined,
+          featherRadius: undefined,
+        });
         if (saveToModelLibrary) void storeToModelLibrary(upload.url, file.name, requestId);
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
@@ -157,12 +162,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   }, [id]);
 
   const hasUpload = data.outputImages.length > 0;
-  /**
-   * 节点内的真实文件选择器（视觉隐藏，由点击槽位 / 工具条「替换」触发）。
-   * slot：空槽位时盖在最上层，同时接管点击、拖放与 Tab 停靠。
-   * replace：已有图片时退到缩略图下方，只作「替换」的程序化入口——
-   *          不抢占缩略图的单击看大图，也不新增不可见的 Tab 停靠点。
-   */
+  const hasMask = typeof data.mask === "string" && data.mask.length > 0;
+
   const renderFileInput = (variant: "slot" | "replace") => (
     <input
       type="file"
@@ -181,7 +182,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     />
   );
 
-  /** 上传入口的入库选项（asset-library-model.md §5）：控制本次上传是否同时进数字模特库。 */
   const modelLibraryOption = (
     <div className="nodrag nopan flex items-center justify-between gap-2 text-label text-[var(--gc-node-muted)]">
       <label className="flex items-center gap-2">
@@ -191,7 +191,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           disabled={readOnly}
           onCheckedChange={(checked) => {
             setSaveToModelLibrary(checked === true);
-            // 目标库变了，允许对下一张上传图重新入库
             setLibraryState("idle");
             setLibraryError(null);
           }}
@@ -239,6 +238,12 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 disabled: true,
                 disabledReason: "暂不可用：抠图能力尚未接入",
               },
+              mask: {
+                onSelect: () => setEditingMask(true),
+                disabled: !hasUpload || readOnly,
+                disabledReason: !hasUpload ? "请先上传图片后再绘制蒙版" : "只读项目不能编辑蒙版",
+                label: hasMask ? "编辑蒙版" : "蒙版",
+              },
               copy: {
                 onSelect: () => void duplicateNode(id),
                 disabled: readOnly,
@@ -274,7 +279,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 className="max-h-40 w-full bg-[var(--gc-node-inner)] object-contain"
               />
             </button>
-            {/* 选择器排在缩略图之后：z-0 让缩略图保持可点，DOM 顺序让焦点落地仍先命中缩略图按钮。 */}
             {renderFileInput("replace")}
             <OrdinalBadgeSlot nodeId={id} />
           </div>
@@ -324,11 +328,67 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         </p>
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
+
+      {/* 蒙版编辑器（65b：蒙版入口从生成节点面板迁入图片节点） */}
+      {editingMask && hasUpload && (
+        <MaskEditor
+          source={data.outputImages[0]}
+          initialMask={
+            typeof data.maskSourceRef === "string" && data.maskSourceRef === data.outputImages[0]
+              ? data.mask
+              : undefined
+          }
+          featherRadius={
+            typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
+              ? data.featherRadius
+              : undefined
+          }
+          onClose={() => setEditingMask(false)}
+          onSave={async (mask) => {
+            const releaseUploadPending = beginMaskWork();
+            const state = useFlowStore.getState();
+            const target = selectActiveDocumentTarget(state);
+            const tab = selectDocumentForTab(state, target.tabId);
+            try {
+              if (!tab || tab.readOnly || !tab.nodes.some((node) => node.id === id)) {
+                throw new Error(tab?.readOnly ? "只读项目不能保存蒙版" : "当前节点已关闭，请重新打开项目后再试");
+              }
+              const sourceRef = data.outputImages[0];
+              await saveMaskDraft(
+                {
+                  dataUrl: mask,
+                  sourceRef,
+                  projectId: tab.projectId,
+                  nodeId: id,
+                },
+                {
+                  commit: (url) => {
+                    const current = useFlowStore.getState();
+                    const currentTab = selectDocumentForTab(current, target.tabId);
+                    if (
+                      !currentTab ||
+                      currentTab.readOnly ||
+                      !currentTab.nodes.some((node) => node.id === id) ||
+                      (currentTab.nodes.find((node) => node.id === id)?.data as ImageNodeData | undefined)?.outputImages?.[0] !== sourceRef
+                    ) {
+                      throw new Error("原图已变化，旧蒙版未覆盖当前节点，请基于新原图重新绘制");
+                    }
+                    // 65b：蒙版写入图片节点 data（非生成节点）。
+                    updateNodeDataInTab(target, id, { mask: url, maskSourceRef: sourceRef, error: undefined });
+                  },
+                  close: () => setEditingMask(false),
+                },
+              );
+            } finally {
+              releaseUploadPending();
+            }
+          }}
+        />
+      )}
     </>
   );
 }
 
-/** 序号徽标订阅位：由画布层提供 (选中目标, 本源图) 的派生序号。 */
 function OrdinalBadgeSlot({ nodeId }: { nodeId: string }) {
   const ordinal = useReferenceOrdinal(nodeId);
   if (ordinal === null) return null;

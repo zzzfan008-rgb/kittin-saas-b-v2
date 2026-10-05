@@ -449,10 +449,10 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   // 内联参数面板字段顺序：操作 → 模型 → 画幅 + 批次 → 模型参数（plan.md §3.3 / 面板头注释）。
   // v9 模板 tryon-gen 显式带 operationMode=edit（templates.ts:152），面板回显「编辑」。
   await expect(generator.getByRole("combobox", { name: "功能" })).toHaveCount(0);
-  const operationSelect = generator.getByRole("combobox", { name: "操作" });
-  await expect(operationSelect).toContainText("编辑");
-  // edit 模式的兼容提示（裁决 C5，语义对齐 server DagError 文案）。
-  await expect(generator.getByText("需上游参考图")).toBeVisible();
+  // 65b: 操作由接线自动推断，无 combobox；改用语境文本展示推断结果。
+  await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
+  await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
+  // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
   // v9 模板默认画幅 1:1（server/routes/templates.ts 拍板③：aspectRatio "1:1" / batchSize 1）。
   await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
@@ -461,7 +461,8 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   const params = generator.getByRole("region", { name: "模型参数" });
   await expect(params).toBeVisible();
   await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
-  await expect(params.getByRole("button", { name: "+ 添加参数" })).toBeVisible();
+  // 65b: 参数全下拉，"添加参数" 自由输入入口已退役。
+  await expect(params.getByRole("button", { name: "+ 添加参数" })).toHaveCount(0);
 
   // 运行按钮在 v9 是可用的「运行」还是禁用态的「尚不可运行」，由 compatibility 门决定：
   // operationMode=edit 且本测试未上传参考图 → 触发 edit-reference-missing，按钮禁用并给出可读原因
@@ -521,17 +522,12 @@ test("select value echo stays legible against its trigger surface at every deskt
       return { ok: true as const, ratio, text: (value.textContent ?? "").trim() };
     });
 
-  // 1)「操作」回显：v9 面板删掉了「功能」行，首个下拉改为「操作」；模板值 edit 即回显「编辑」，
-  //    断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。placeholder 也属回显的一部分（PR #84 给
-  //    SelectValue 加的 data-placeholder:muted 正是为它）。
-  const operationSelect = generator.getByRole("combobox", { name: "操作" });
-  await expect(operationSelect).toContainText("编辑");
-  const operationEcho = await echoLegibility(operationSelect);
-  expect(operationEcho.ok, JSON.stringify(operationEcho)).toBe(true);
-  if (operationEcho.ok) {
-    expect(operationEcho.text.length, "回显不得为空白").toBeGreaterThan(0);
-    expect(operationEcho.ratio, `操作回显对比度 ${operationEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
-  }
+  // 1)「操作」行：65b 起操作由接线自动推断，combobox 已退役，面板以 opHint 语境文本展示
+  //    （与 :437 测试一致）。模板 tryon-gen 自带参考图边 → 回显「已接参考图 → 编辑模式」。
+  await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
+  const operationHint = generator.getByText(/已接参考图 → 编辑模式/);
+  await expect(operationHint).toBeVisible();
+  expect(((await operationHint.textContent()) ?? "").trim().length, "操作推断回显不得为空白").toBeGreaterThan(0);
 
   // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
   const params = generator.getByRole("region", { name: "模型参数" });

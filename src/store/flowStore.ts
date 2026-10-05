@@ -1517,6 +1517,26 @@ export function documentConnectionRejection(
   if (handle === EDGE_HANDLE_FIRST_FRAME) {
     return "该生成节点最多接受 1 张首帧图片";
   }
+  // 65b Q1 独占语义：带蒙版的图片节点只能服务一个生成节点的 image[0]
+  if (sourceKind === "image") {
+    const maskImage = document.nodes.find((n) => n.id === source.id);
+    if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
+        (maskImage.data as { mask?: string }).mask!.length > 0) {
+      const existingMasks = document.edges.filter((e) =>
+        e.source === source.id &&
+        e.target !== target.id &&
+        e.targetHandle !== EDGE_HANDLE_PROMPT &&
+        e.targetHandle !== EDGE_HANDLE_FIRST_FRAME
+      );
+      if (existingMasks.length > 0) {
+        const genNames = existingMasks.map((e) => {
+          const tgt = document.nodes.find((n) => n.id === e.target);
+          return tgt?.data?.label ?? tgt?.id ?? "生成节点";
+        }).join("、");
+        return `该图片已带有蒙版，一次只能服务 1 个生成节点的参考图入口（当前已用于：${genNames}）`;
+      }
+    }
+  }
   return "该生成节点的参考图输入已达上限";
 }
 
@@ -1981,6 +2001,12 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
       break;
     case "image":
       data.outputImages = stringList(input.outputImages);
+      // 65b：蒙版三字段随图片节点 data 会话恢复。
+      if (typeof input.mask === "string" && input.mask) data.mask = input.mask;
+      if (typeof input.maskSourceRef === "string" && input.maskSourceRef) data.maskSourceRef = input.maskSourceRef;
+      if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
+        data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
+      }
       break;
     case "video":
       data.outputVideos = stringList(input.outputVideos);
@@ -2005,12 +2031,6 @@ function normalizeSessionNode(value: unknown): FlowNode | undefined {
         modelId as Parameters<typeof normalizeImageModelOptions>[0],
         input.modelOptions,
       );
-      if (typeof input.mask === "string" && input.mask) data.mask = input.mask;
-      if (typeof input.maskSourceRef === "string" && input.maskSourceRef) data.maskSourceRef = input.maskSourceRef;
-      // 羽化宽度仅接受 0–64 的有限数值；缺省/非数值维持自适应羽化（不写该字段）。
-      if (typeof input.featherRadius === "number" && Number.isFinite(input.featherRadius)) {
-        data.featherRadius = Math.max(0, Math.min(64, Math.round(input.featherRadius)));
-      }
       // v9（64 Phase 2）：评估字段已随概念删除，不再从会话拷贝。
       break;
     }

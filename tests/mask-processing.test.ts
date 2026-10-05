@@ -296,15 +296,24 @@ await test("统一局部修改完整保留延展区内的低对比纹理，不�
 });
 
 await test("节点只展示统一局部修改说明，不再暴露技术处理模式", () => {
-  // v8（plan.md §3.3）：蒙版入口随生成语义内联到生成节点面板，不再由输入层图片节点承载。
+  // 65b（Q1 拍板）：蒙版入口从生成节点面板迁到图片节点工具条。
+  // 生成节点面板不再有蒙版按钮；图片节点工具条新增蒙版入口。
   const maskPanelCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/GeneratorParamsPanel.tsx"), "utf8");
   const imageNodeCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/ImageNode.tsx"), "utf8");
+  const toolbarCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/NodeToolbar.tsx"), "utf8");
   const maskEditorCode = fs.readFileSync(path.join(REPO_ROOT, "src/components/nodes/MaskEditor.tsx"), "utf8");
   const processingCode = fs.readFileSync(path.join(REPO_ROOT, "server/lib/maskProcessing.ts"), "utf8");
   assert.match(maskEditorCode, /红色是修改中心，不是裁切框/);
   assert.match(maskEditorCode, /新内容可在金色融合区内完整延展/);
-  assert.match(maskPanelCode, /蒙版（该功能要求）/);
-  assert.match(maskPanelCode, /该功能需要先涂蒙版/);
+  // 65b：蒙版入口在图片节点工具条（非生成节点面板）
+  assert.match(toolbarCode, /mask/);
+  assert.match(imageNodeCode, /MaskEditor/);
+  assert.match(imageNodeCode, /editingMask/);
+  // 生成节点面板不再渲染蒙版按钮
+  assert.doesNotMatch(maskPanelCode, /蒙版（该功能要求）/);
+  assert.doesNotMatch(maskPanelCode, /该功能需要先涂蒙版/);
+  assert.doesNotMatch(maskPanelCode, /MaskEditor/);
+  // 不暴露技术模式名的语义全局守护
   assert.doesNotMatch(maskPanelCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
   assert.doesNotMatch(imageNodeCode, /保持原图|替换选区|maskMode|蒙版处理方式/);
   assert.doesNotMatch(maskEditorCode, /保持原图|替换选区|maskMode|蒙版处理方式/);

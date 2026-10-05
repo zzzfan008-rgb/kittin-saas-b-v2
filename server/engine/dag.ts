@@ -22,6 +22,7 @@ import {
 import {
   isImageModelId,
   isModelAllowedForNode,
+  MASK_REDRAW_MODEL_ID,
   modelMaxReferenceImages,
 } from "../../src/types/imageModels";
 import {
@@ -243,15 +244,76 @@ export function buildExecutionPlan(
         throw new DagError(`Node ${id} reference role expansion does not match its input images`);
       }
 
+      // 65a（65 定案 Q1：官方 single mask 语义，一张图一个蒙版，只作用 image[0]）：
+      // 蒙版归属图片节点 data。本步骤 params 的 mask/maskSourceRef/featherRadius
+      // 从 inputImages[0] 的上游 image 节点 data 读取（不再读生成节点自身 data）；
+      // 图带 mask → operationMode 物化为 mask-edit（推断优先，方案 §3 规则 3）。
+      // 65b Q3 canonicalize（发布门禁重演阻断）：mask-edit 只有官方 sunburst
+      // （MASK_REDRAW_MODEL_ID）能承载，且它只支持 mask-edit（apiyi.ts 双向闸）；
+      // 前端送的 modelId 可能仍是面板上的任意生成模型（flare-vip 等），若不在此
+      // 强制收为 sunburst，validateApiyiRequest 必 400「不支持 mask-edit」。
+      // 在 plan 构造期收（schema/提交链权威端），发放给 runner/证据链的 params 即已是
+      // 正确对子，无需类型放宽亦不改前端（dag 只产出运行时物化，不写回 node.data）。
+      const params = { ...extractParams(data), inputTexts };
+      if (data.kind === "image-generator") {
+        const maskCarrier = upstream.find((source) => source.images.length > 0);
+        const carrierData = maskCarrier ? nodeMap.get(maskCarrier.nodeId)!.data : undefined;
+        const carrierMask = carrierData?.kind === "image"
+          && typeof carrierData.mask === "string"
+          && carrierData.mask !== ""
+          ? carrierData
+          : undefined;
+        if (carrierMask) {
+          // maskSourceRef 默认回落该图自身引用（inputImages[0] 即 carrierMask.outputImages[0]），
+          // 保持 assertPlanInputs 的 maskSourceRef === inputImages[0] 校验语义不变。
+          const sourceRef = typeof carrierMask.maskSourceRef === "string" && carrierMask.maskSourceRef !== ""
+            ? carrierMask.maskSourceRef
+            : maskCarrier!.images[0];
+          Object.assign(params, {
+            operationMode: "mask-edit" as const,
+            // 65b Q3 canonicalize：mask-edit 与 sunburst 双向唯一（apiyi.ts:419/422），
+            // 运行时 modelId 强制收成官方蒙版重绘模型。params 侧的任意面板模型值
+            // （flare-vip 等）在此被替换，避免 validate 必 400；不改写 node.data。
+            modelId: MASK_REDRAW_MODEL_ID,
+            mask: carrierMask.mask,
+            maskSourceRef: sourceRef,
+            ...(typeof carrierMask.featherRadius === "number" && Number.isFinite(carrierMask.featherRadius)
+              ? { featherRadius: carrierMask.featherRadius }
+              : {}),
+          });
+        }
+      }
+
       return {
         nodeId: id,
         kind: data.kind,
         inputImages,
         inputReferences,
         upstream,
-        params: { ...extractParams(data), inputTexts },
+        params,
       };
     });
+
+  // 65a 独占校验（65 定案 Q1 + 任务书）：同一带蒙版 image 节点只可作 1 个生成节点的
+  // inputImages[0]（官方 single mask 语义：一张图一个蒙版，不能和任何生成节点共享）。
+  // 基于本次 plan 的 scope 消费面检查：submit 全图 plan 时即全量兜底；
+  // 局部重跑只查范围内消费方，不因范围外既有违规阻塞重跑。
+  const maskCarrierConsumers = new Map<string, string[]>();
+  for (const step of steps) {
+    if (step.kind !== "image-generator") continue;
+    if (typeof step.params.mask !== "string" || step.params.mask === "") continue;
+    // params.mask 存在 ⇒ mask 载体是 inputImages[0] 的上游（推断注入条件保证）。
+    const carrier = (step.upstream ?? []).find((source) => source.images.length > 0);
+    if (!carrier) continue;
+    maskCarrierConsumers.set(carrier.nodeId, [...(maskCarrierConsumers.get(carrier.nodeId) ?? []), step.nodeId]);
+  }
+  for (const [maskNodeId, consumerIds] of maskCarrierConsumers) {
+    if (consumerIds.length > 1) {
+      throw new DagError(
+        `Node ${maskNodeId} 的蒙版一次只能服务 1 个生成节点的 image[0]（官方 single mask 语义）；当前同时用于生成节点 ${consumerIds.join(", ")}`,
+      );
+    }
+  }
 
   return { steps };
 }
@@ -301,17 +363,14 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
         throw new DagError("Node data for image-generator must select an explicit supported image model");
       }
       // v9（64 Phase 1 C4）：variant 绑定五字段注入删除；operationMode 显式归节点 data。
+      // 65a：mask/maskSourceRef/featherRadius 已搬到上游 image 节点 data——
+      // 本函数不再读取，蒙版注入在 buildExecutionPlan 组装面（见 maskCarrierForImageInput）。
       return {
         modelId,
         ...(data.operationMode ? { operationMode: data.operationMode } : {}),
         aspectRatio: data.aspectRatio,
         batchSize: data.batchSize,
         modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
-        ...(typeof data.mask === "string" ? { mask: data.mask } : {}),
-        ...(typeof data.maskSourceRef === "string" ? { maskSourceRef: data.maskSourceRef } : {}),
-        ...(typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
-          ? { featherRadius: data.featherRadius }
-          : {}),
       };
     }
     case "video-generator":
