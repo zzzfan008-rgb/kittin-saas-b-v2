@@ -56,6 +56,7 @@ import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
+  isMaskImageZeroConsumer,
   isV8ConnectionValid,
   normalizeFlowForDocumentRead,
   readFlowDocumentForOpen,
@@ -1492,7 +1493,10 @@ export function documentConnectionRejection(
     return "该节点不能作为连线来源";
   }
   const spec = nodeSpecForKind(targetKind);
-  if (!spec || !spec.acceptsInputEdges) {
+  // acceptsInputEdges 在 NODE_SPECS 里恒为 false，用它当入边闸会把所有
+  // 指向生成节点的被拒连接都误报成「该节点不接受输入连线」。
+  // 是否接受入边 = inputs（prompt+reference+firstFrame）总和大于 0。
+  if (!spec || (spec.inputs.prompt + spec.inputs.reference + spec.inputs.firstFrame) <= 0) {
     return "该节点不接受输入连线";
   }
   const handle = resolveTargetHandle(sourceKind, targetKind, connection.targetHandle ?? null);
@@ -1522,18 +1526,12 @@ export function documentConnectionRejection(
     const maskImage = document.nodes.find((n) => n.id === source.id);
     if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
         (maskImage.data as { mask?: string }).mask!.length > 0) {
-      const existingMasks = document.edges.filter((e) =>
-        e.source === source.id &&
-        e.target !== target.id &&
-        e.targetHandle !== EDGE_HANDLE_PROMPT &&
-        e.targetHandle !== EDGE_HANDLE_FIRST_FRAME
-      );
-      if (existingMasks.length > 0) {
-        const genNames = existingMasks.map((e) => {
-          const tgt = document.nodes.find((n) => n.id === e.target);
-          return tgt?.data?.label ?? tgt?.id ?? "生成节点";
-        }).join("、");
-        return `该图片已带有蒙版，一次只能服务 1 个生成节点的参考图入口（当前已用于：${genNames}）`;
+      if (isMaskImageZeroConsumer(document, source.id, target.id)) {
+        const usedBy = document.edges
+          .filter((e) => e.source === source.id && e.target !== target.id)
+          .map((e) => document.nodes.find((n) => n.id === e.target)?.data?.label ?? e.target)
+          .join("、");
+        return `该图片已带有蒙版，一次只能服务 1 个生成节点的参考图入口（当前已用于：${usedBy}）`;
       }
     }
   }
