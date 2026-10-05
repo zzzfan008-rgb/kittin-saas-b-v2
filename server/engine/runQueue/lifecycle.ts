@@ -224,20 +224,39 @@ export async function completeJobSuccess(
       `, [videoId, run.owner_id, run.project_id, job.nodeId, run.id, new Date(finishedAt).toISOString()]);
     }
     const partialWarning = result.failures?.length ? `${result.failures.length} 个生成任务失败` : undefined;
-    // result-node-created：一轮 run 发一次，携带该 run 的全部产物（runtime.md §3.2）。
-    // 产物落结果节点，不覆写生成节点自身。resultNodeId 与 runId 一一对应，恢复补发幂等。
     const mediaKind: "image" | "video" = job.step.kind === "video-generator" ? "video" : "image";
     const resultUrls = mediaKind === "video" ? videoUrls : imageUrls;
     if (resultUrls.length > 0) {
-      await appendRunEvent(client, run.id, {
-        type: "result-node-created",
-        resultNodeId: `result-${run.id}`,
-        sourceGeneratorId: job.nodeId,
-        runId: run.id,
-        mediaKind,
-        urls: resultUrls,
-        ...(result.providerOutputSizes ? { outputSizes: result.providerOutputSizes } : {}),
-      }, finishedAt);
+      if (job.step.params.syntheticEdit === true) {
+        // 65d §1.4：合成 run（蒙版重绘/整图编辑，dag.ts 由 onlyNodeId→image 节点物化，
+        // params.syntheticEdit=true）发 image-node-updated 原位替换 image 节点；
+        // 绝不能发 result-node-created（result 节点 sourceGeneratorId=image 节点会被
+        // C7 溯源校验判伪造，§6 硬规则）。
+        await appendRunEvent(client, run.id, {
+          type: "image-node-updated",
+          nodeId: job.nodeId,
+          urls: imageUrls,
+          model: result.model ?? "",
+          prompts: result.prompts ?? [],
+          providerOutputSizes: result.providerOutputSizes ?? [],
+          ...(result.failures?.length
+            ? { failures: result.failures.map((f) => ({ prompt: f.prompt ?? "", error: f.error })) }
+            : {}),
+          runId: run.id,
+        }, finishedAt);
+      } else {
+        // result-node-created：一轮 run 发一次，携带该 run 的全部产物（runtime.md §3.2）。
+        // 产物落结果节点，不覆写生成节点自身。resultNodeId 与 runId 一一对应，恢复补发幂等。
+        await appendRunEvent(client, run.id, {
+          type: "result-node-created",
+          resultNodeId: `result-${run.id}`,
+          sourceGeneratorId: job.nodeId,
+          runId: run.id,
+          mediaKind,
+          urls: resultUrls,
+          ...(result.providerOutputSizes ? { outputSizes: result.providerOutputSizes } : {}),
+        }, finishedAt);
+      }
     }
     await appendRunEvent(client, run.id, {
       type: "node-status",

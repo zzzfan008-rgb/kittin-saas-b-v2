@@ -454,6 +454,77 @@ function main() {
     assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
   });
 
+  // ---------- 65d §3：蒙版重绘/整图编辑合成 step（方案 A：onlyNodeId→image 节点不走 filter 主链）----------
+  const MASK_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+  function imageWithEdit(
+    id: string,
+    fields: Record<string, unknown>,
+  ): FlowNode {
+    return {
+      id,
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        ...fields,
+      } as WorkflowNodeData,
+    };
+  }
+
+  ok("65d §3.2：image 节点带 mask+editPrompt → 单个合成 step（mask-edit + sunburst）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", { mask: MASK_B64, maskSourceRef: "/api/files/a.png", featherRadius: 12, editPrompt: "把领口改成方领" })],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    assert.equal(plan.steps.length, 1);
+    const step = plan.steps[0]!;
+    assert.equal(step.nodeId, "i1");
+    assert.equal(step.kind, "image-generator");
+    assert.deepEqual(step.inputImages, ["/api/files/a.png"]);
+    assert.equal(step.params.operationMode, "mask-edit");
+    assert.equal(step.params.modelId, "gpt-image-2.5-sunburst");
+    assert.equal(step.params.mask, MASK_B64);
+    assert.equal(step.params.maskSourceRef, "/api/files/a.png");
+    assert.equal(step.params.featherRadius, 12);
+  });
+
+  ok("65d §3.2：image 节点无 mask + editPrompt → 单个合成 step（edit + flare-vip）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", { editPrompt: "换个纯色背景" })],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    assert.equal(plan.steps.length, 1);
+    const step = plan.steps[0]!;
+    assert.equal(step.params.operationMode, "edit");
+    assert.equal(step.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(step.params.mask, undefined);
+  });
+
+  ok("65d §3.2：合成 step params 形状完整（prompt=inputTexts[0]、batchSize=1、显式 modelId）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", { editPrompt: "把袖子改短" })],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    const step = plan.steps[0]!;
+    assert.equal(step.params.prompt, "把袖子改短");
+    assert.deepEqual(step.params.inputTexts, ["把袖子改短"]);
+    assert.equal(step.params.batchSize, 1);
+    assert.equal(step.params.modelId, "gpt-image-2.5-flare-vip");
+  });
+
+  ok("65d §3：image 节点无 editPrompt → 不合成（走正常 filter，返回空 steps）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", {})],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    assert.equal(plan.steps.length, 0);
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 

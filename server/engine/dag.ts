@@ -20,6 +20,7 @@ import {
   NODE_SPECS,
 } from "../../src/types/workflow";
 import {
+  DEFAULT_GENERATION_MODEL_ID,
   isImageModelId,
   isModelAllowedForNode,
   MASK_REDRAW_MODEL_ID,
@@ -163,6 +164,49 @@ export function buildExecutionPlan(
   for (const e of edges) {
     if (!nodeMap.has(e.source)) throw new DagError(`Edge source not found: ${e.source}`);
     if (!nodeMap.has(e.target)) throw new DagError(`Edge target not found: ${e.target}`);
+  }
+
+  // 65d §3.1 方案 A：onlyNodeId 指向 image 节点且带 editPrompt → 蒙版重绘/整图编辑合成 step。
+  // 不走 generator 拓扑 filter 主链（image 节点会被 filter 挡在 steps 外），直接返回单个 synthetic step。
+  // 运行时复用 generator 执行/账单/验证链；nodeId 用 image 节点 id，lifecycle 据此发 image-node-updated
+  // （禁发 result-node-created，否则 C7 溯源判伪造）。runPlan 的 imageEditGate 已在 route 层保证
+  // editPrompt 非空（缺口 4 的 400），这里再做一次自持判定，使 buildExecutionPlan 单独调用语义自洽。
+  if (opts?.onlyNodeId) {
+    const target = nodeMap.get(opts.onlyNodeId);
+    if (target?.data.kind === "image") {
+      const img = target.data;
+      const editPrompt = typeof img.editPrompt === "string" ? img.editPrompt.trim() : "";
+      if (editPrompt) {
+        const mask = typeof img.mask === "string" && img.mask.trim() !== "" ? img.mask : undefined;
+        const primary = img.outputImages[0];
+        // §3.2：显式 modelId 对冲「删 carrierMask canonicalize 后无人落 sunburst」：
+        // 有 mask=sunburst（官方蒙版重绘），无 mask=flare-vip（整图编辑定案）。
+        const syntheticStep: NodeExecution = {
+          nodeId: target.id,
+          kind: "image-generator",
+          inputImages: primary ? [primary] : [],
+          inputReferences: primary
+            ? [{ imageRef: primary, order: 0, sourceNodeId: target.id }]
+            : [],
+          upstream: [{ nodeId: target.id, images: primary ? [primary] : [] }],
+          params: {
+            operationMode: mask ? "mask-edit" : "edit",
+            modelId: mask ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID,
+            mask,
+            maskSourceRef: mask ? (img.maskSourceRef || primary) : undefined,
+            featherRadius: mask ? (img.featherRadius ?? undefined) : undefined,
+            inputTexts: [editPrompt],
+            prompt: editPrompt,
+            modelOptions: {},
+            aspectRatio: "1:1",
+            batchSize: 1,
+            // 合成 run 标记：lifecycle 据此发 image-node-updated（§1.4），绝不发 result-node-created（§6 硬规则）。
+            syntheticEdit: true,
+          },
+        };
+        return { steps: [syntheticStep] };
+      }
+    }
   }
 
   // 局部重跑：目标节点始终在范围内；按需继续扩展到全部下游。
