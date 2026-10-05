@@ -529,18 +529,30 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
     ))) return false;
     return incomingCount(document, target.id, EDGE_HANDLE_PROMPT) < targetSpec.inputs.prompt;
   }
-  // 65b Q1 独占语义：带蒙版的图片节点只能服务一个生成节点的 image[0]
+  // 65b Q1 独占语义：带蒙版图片节点的 image[0] 位只能服务一个生成节点
+  // （server dag 单 mask 语义：仅 inputImages[0] 触发 mask-edit）。
+  // 规则：同一带 mask 图不能作两个生成节点的 image[0]；mixed consumption (g1[0]+g2[1]) 合法。
   if (targetSpec.inputs.reference > 0 && sourceKind === "image") {
     const maskImage = document.nodes.find((n) => n.id === source.id);
-    if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
-        (maskImage.data as { mask?: string }).mask!.length > 0) {
-      const usedByAnotherGenerator = document.edges.some((e) =>
-        e.source === source.id &&
-        e.target !== target.id &&
+    const hasMask = maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
+        (maskImage.data as { mask?: string }).mask!.length > 0;
+    if (hasMask) {
+      // 该边会成为 image[0] 仅当当前 target 尚无 reference 入边
+      const targetHasReference = document.edges.some((e) =>
+        e.target === target.id &&
         edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
         edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
       );
-      if (usedByAnotherGenerator) return false;
+      if (!targetHasReference) {
+        // 检查该 masked source 是否已是另一个生成节点的 image[0]（第一 reference 边）
+        const usedAsImageZero = document.edges.some((e) =>
+          e.source === source.id &&
+          e.target !== target.id &&
+          edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
+          edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
+        );
+        if (usedAsImageZero) return false;
+      }
     }
   }
   if (isResultNodeKind(targetKind) || isInputNodeKind(targetKind)) return false;
