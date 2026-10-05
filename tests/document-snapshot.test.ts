@@ -804,3 +804,40 @@ assert.equal(
 );
 
 console.log("通过 7 组纯文档快照边界测试（v9 投影 / 落盘闸 / v7→v8→v9 迁移 / 读取归一 / 不变量 / 连线规则 / 蒙版往返）");
+
+// ---------- 65c 蒙版接线独占四用例 ----------
+
+const maskImg = { id: "mi", type: "image", data: { kind: "image", mask: "/api/files/m.png", outputImages: ["/a/png"] } };
+const normalImg = { id: "ni", type: "image", data: { kind: "image", outputImages: ["/a/png"] } };
+const otherImg = { id: "oi", type: "image", data: { kind: "image", outputImages: ["/a/png"] } };
+const gen1 = { id: "g1", type: "image-generator", data: { kind: "image-generator", modelId: "x" } };
+const gen2 = { id: "g2", type: "image-generator", data: { kind: "image-generator", modelId: "x" } };
+
+const buildDoc = (edges) => ({
+  nodes: [maskImg, normalImg, otherImg, gen1, gen2],
+  edges: edges.map((e, i) => ({ id: "e" + i, source: e.source, target: e.target, sourceHandle: null, targetHandle: null })),
+});
+
+// a. mask 已是 g1 的 image[0] → 连 g2 的 image[0] → invalid
+{
+  const doc = buildDoc([{ source: "mi", target: "g1" }]);
+  assert.equal(isV8ConnectionValid(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null }), false, "a. mask[g1:0] + g2:0 → invalid");
+}
+
+// b. mask 已是 g1 的 image[0] → 连 g2 的第二 reference（g2 已有 other img 的 image[0]）→ valid
+{
+  const doc = buildDoc([{ source: "mi", target: "g1" }, { source: "oi", target: "g2" }]);
+  assert.equal(isV8ConnectionValid(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null }), true, "b. mask[g1:0] + g2[oi:0, mi:1] → valid");
+}
+
+// c. mask 对 g1 只占 image[1]（g1 的 image[0] 是别的图）→ 连 g2 的 image[0] → valid
+{
+  const doc = buildDoc([{ source: "oi", target: "g1" }, { source: "mi", target: "g1" }]);
+  assert.equal(isV8ConnectionValid(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null }), true, "c. mask[g1:1] + g2:0 → valid");
+}
+
+// d. 无 mask 图连两个生成节点 image[0] → valid
+{
+  const doc = buildDoc([{ source: "ni", target: "g1" }]);
+  assert.equal(isV8ConnectionValid(doc, { source: "ni", target: "g2", sourceHandle: null, targetHandle: null }), true, "d. no-mask → g1:0 + g2:0 → valid");
+}
