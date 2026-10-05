@@ -138,7 +138,10 @@ export interface ImageNodeData extends BaseNodeData {
   outputImages: string[];
   /** 65a（Q1 官方 single mask）：蒙版归属图片本身——一张图一个蒙版，随 image[0]。
    *  mask/maskSourceRef/featherRadius 三字段从生成节点搬到图片节点 data。
-   *  图一旦携带 mask，其携带者作为生成节点 inputImages[0] 时触发 mask-edit 推断。 */
+   *  图一旦携带 mask，其携带者作为生成节点 inputImages[0] 时触发 mask-edit 推断。
+   *  65b Q3 补口面：mask-edit 推断后运行链把 modelId 强制收成官方蒙版重绘模型
+   *  （MASK_REDRAW_MODEL_ID），属 dag 运行时物化——本节点的 data 类型只描述持久化
+   *  脸谱，不掺和运行时 plan 的 modelId 配对。 */
   mask?: string;
   maskSourceRef?: string;
   featherRadius?: number; // 0–64

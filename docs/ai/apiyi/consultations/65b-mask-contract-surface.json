@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-05T10:52:29.307Z",
+  "baseCommit": "15c8d7ef0497eb0ec6b041fe3b9dbec827ecf35e",
+  "changeFingerprintSha256": "8c478941fae499c867b150c13abd90b90d35af2fd8434687127a0ac0109469d5",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "mask editing official single mask semantics image node owns mask fields mask-edit routes through sunburst online pipeline",
+  "affectedPaths": [
+    "server/lib/workflowSchema.ts",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP Image Gen/Editing",
+      "sha256": "8a5c6e2e5724f0f31ffd5742b76c63bc6d6ea3535e59b792916ae36beaa9fa88"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/vs-gpt-image-2-all.md",
+      "title": "GPT-image-2.5 / 2 Official vs Reverse",
+      "sha256": "dd2eb08079d9b32d0144a60e58bf3084ac762621e7d66bcaa3e1fa91b68e5783"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/scenarios/ecosystem/luckgpt2-comfyui",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/scenarios/ecosystem/luckgpt2-comfyui.md",
+      "pageLocalPath": "pages/en/scenarios/ecosystem/luckgpt2-comfyui.md",
+      "title": "Luck GPT-Image 2 - ComfyUI Nodes",
+      "sha256": "91eaab7bdcd395c0a5c24524dd3513bd97a5771b410d05d0a6aa968f50c9cf1d"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5.md",
+      "pageLocalPath": "pages/en/live/2026-09/luck-gpt-image-2-comfyui-gpt-image-2-5.md",
+      "title": "Community node update: Luck GPT-Image 2 ComfyUI nodes now support gpt-image-2.5",
+      "sha256": "1988af930f4ef2b224c74868461f17f98865a5fdf0e028a4e60894e96a29e8bb"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All Image Gen/Editing",
+      "sha256": "25435e1b964be46e8886809f47f30e0e70caa07eaa71cdc0c8a399cec4cb6008"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/gpt-image-2-5-vip-supply-gap",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/2026-09/gpt-image-2-5-vip-supply-gap.md",
+      "pageLocalPath": "pages/en/live/2026-09/gpt-image-2-5-vip-supply-gap.md",
+      "title": "Both gpt-image-2.5 -vip Reverse Models Still Short on Supply, Official and -all Routes Normal, gpt-image-2-vip Stable",
+      "sha256": "e865a8ce1121810cbe7570deb03f7331633221d2abe84574cf760808d920700f"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/mask-editing",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/mask-editing.md",
+      "title": "Mask Inpainting Guide",
+      "sha256": "4ff54f602a47f28e30cafb2c61bfe84128e394f488bdbb747d54c2d0aa90c857"
+    }
+  ],
+  "decisionSummary": "65b Q3 契约补口面：蒙版三字段归属图片节点是 65a 已定案语义；mask-edit 的 modelId→sunburst 配对由运行链 dag 物化执行，schema 与节点类型只描述持久化脸谱不掺和配对。本凭证覆盖 58a4004..head 中 workflowSchema.ts 与 workflow.ts 两文件的 API 语义变更面（仅注释补口，运行时零变更）。",
+  "unresolvedChoices": []
+}
