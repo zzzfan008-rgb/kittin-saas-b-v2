@@ -13,6 +13,8 @@ import {
   unprojectedDocumentFields,
 } from "../src/lib/documentSnapshot";
 import { WORKFLOW_SCHEMA_VERSION } from "../src/types/workflow";
+import { documentConnectionRejection } from "../src/store/flowStore";
+// (测试仅用其纯函数侧; flowStore 依赖 zustand 但 import 无副作用执行阻力)
 
 /**
  * 文档快照边界测试（schema v8，三层七节点）。
@@ -840,4 +842,21 @@ const buildDoc = (edges) => ({
 {
   const doc = buildDoc([{ source: "ni", target: "g1" }]);
   assert.equal(isV8ConnectionValid(doc, { source: "ni", target: "g2", sourceHandle: null, targetHandle: null }), true, "d. no-mask → g1:0 + g2:0 → valid");
+}
+
+// e. 文案侧与主判定同源：场景 c（mask 只占 g1 的 image[1]）rejection 必须为 null（不出现「连接成功却弹拒绝」）。
+{
+  const doc = buildDoc([{ source: "oi", target: "g1" }, { source: "mi", target: "g1" }]);
+  assert.equal(
+    documentConnectionRejection(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null }),
+    null,
+    "e. mask[g1:1] + g2:0 → rejection null",
+  );
+}
+
+// f. 场景 a（真独占冲突）rejection 出解释文案。
+{
+  const doc = buildDoc([{ source: "mi", target: "g1" }]);
+  const reason = documentConnectionRejection(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null });
+  assert.ok(typeof reason === "string" && reason.includes("一次只能服务 1 个生成节点"), "f. mask[g1:0] + g2:0 → rejection 文案");
 }

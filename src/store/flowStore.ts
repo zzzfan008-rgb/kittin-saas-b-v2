@@ -1493,7 +1493,10 @@ export function documentConnectionRejection(
     return "该节点不能作为连线来源";
   }
   const spec = nodeSpecForKind(targetKind);
-  if (!spec || !spec.acceptsInputEdges) {
+  // acceptsInputEdges 在 NODE_SPECS 里恒为 false，用它当入边闸会把所有
+  // 指向生成节点的被拒连接都误报成「该节点不接受输入连线」。
+  // 是否接受入边 = inputs（prompt+reference+firstFrame）总和大于 0。
+  if (!spec || (spec.inputs.prompt + spec.inputs.reference + spec.inputs.firstFrame) <= 0) {
     return "该节点不接受输入连线";
   }
   const handle = resolveTargetHandle(sourceKind, targetKind, connection.targetHandle ?? null);
