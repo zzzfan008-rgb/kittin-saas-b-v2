@@ -522,17 +522,12 @@ test("select value echo stays legible against its trigger surface at every deskt
       return { ok: true as const, ratio, text: (value.textContent ?? "").trim() };
     });
 
-  // 1)「操作」回显：v9 面板删掉了「功能」行，首个下拉改为「操作」；模板值 edit 即回显「编辑」，
-  //    断言非空 + 对比度 ≥ 4.5（11px 正文 AA）。placeholder 也属回显的一部分（PR #84 给
-  //    SelectValue 加的 data-placeholder:muted 正是为它）。
-  const operationSelect = generator.getByRole("combobox", { name: "操作" });
-  await expect(operationSelect).toContainText("编辑");
-  const operationEcho = await echoLegibility(operationSelect);
-  expect(operationEcho.ok, JSON.stringify(operationEcho)).toBe(true);
-  if (operationEcho.ok) {
-    expect(operationEcho.text.length, "回显不得为空白").toBeGreaterThan(0);
-    expect(operationEcho.ratio, `操作回显对比度 ${operationEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
-  }
+  // 1)「操作」行：65b 起操作由接线自动推断，combobox 已退役，面板以 opHint 语境文本展示
+  //    （与 :437 测试一致）。模板 tryon-gen 自带参考图边 → 回显「已接参考图 → 编辑模式」。
+  await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
+  const operationHint = generator.getByText(/已接参考图 → 编辑模式/);
+  await expect(operationHint).toBeVisible();
+  expect(((await operationHint.textContent()) ?? "").trim().length, "操作推断回显不得为空白").toBeGreaterThan(0);
 
   // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
   const params = generator.getByRole("region", { name: "模型参数" });
