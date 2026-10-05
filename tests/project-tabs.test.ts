@@ -1676,9 +1676,10 @@ await test("React Flow 初始化尺寸不会移动节点或标记项目未保存
   assert.deepEqual(after.nodes[0].measured, { width: 280, height: 162 });
 });
 
-await test("打开含蒙版节点的项目时只订阅稳定的首张输入图", () => {
-  // v8（R-83）：蒙版能力随生成层 UI 从 ImageNode 迁入 GeneratorParamsPanel；
-  // 输入层 ImageNode 仍以 useShallow 稳定订阅输入图，蒙版源仍是稳定订阅后的首张输入图。
+await test("打开含蒙版节点的项目时蒙版源直取本节点首张产物，订阅保持稳定", () => {
+  // 65b：蒙版入口从生成层面板迁回 ImageNode；蒙版源不再订阅上游首图，
+  // 直接取图片节点自身的 data.outputImages[0]（零新增订阅）；
+  // 输入层其它派生视图（引用序号）仍以 useShallow 稳定订阅。
   const imageNodeSource = fs.readFileSync(
     new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
@@ -1687,22 +1688,17 @@ await test("打开含蒙版节点的项目时只订阅稳定的首张输入图",
     new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
     "utf8",
   );
+  assert.match(imageNodeSource, /source=\{data\.outputImages\[0\]\}/);
   assert.match(imageNodeSource, /selectNodeInputImages\(document, id\)/);
-  assert.match(panelSource, /const maskSource = useFlowStore\(\s*useShallow\(/);
-  assert.match(panelSource, /selectNodeInputImages\(document, nodeId\)\[0\]/);
+  assert.match(panelSource, /useFlowStore\(useShallow\(/);
   // 反例守卫：两个订阅位都不得退化为每次渲染都新建数组的裸订阅。
   assert.doesNotMatch(imageNodeSource, /const sourceImages = useFlowStore/);
   assert.doesNotMatch(panelSource, /const sourceImages = useFlowStore/);
 });
 
-await test("羽化宽度经生成层参数面板透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
-  // v8（R-83）：蒙版编辑器入口随生成层 UI 迁入 GeneratorParamsPanel；该面板只把已保存的
-  // featherRadius 透传给 MaskEditor（缺省 = 自适应），节点层不设第二处输入控件。
-  // 65a 判定链：原正则钉死旧断言形态 `(data as ImageGeneratorNodeData).featherRadius`；
-  // 裁决 A 类型守卫降级（蒙版三字段从生成节点迁到图片节点后的类型收窄机械后果，
-  // 运行时行为逐位一致）改写为 dataRecord 读取 + 独立 const，本测试正则同步更新，
-  // 守护意图不变：仍是 typeof number 钳制后经 featherRadius 透传 MaskEditor。
-  // 注明：65b 蒙版入口整体迁出 GeneratorParamsPanel 时本测试将重写。
+await test("羽化宽度经图片节点透传 MaskEditor 并在 0–64 内钳制，节点体不设滑块", () => {
+  // 65b：蒙版编辑器入口挂图片节点，自节点 data 直读（无生成层面板透传层）；
+  // 已保存的 featherRadius 仅在为有限数时透传（缺省 = 自适应），节点层不设第二处输入控件。
   const panelSource = fs.readFileSync(
     new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
     "utf8",
@@ -1715,13 +1711,10 @@ await test("羽化宽度经生成层参数面板透传 MaskEditor 并在 0–64 
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
+  assert.match(imageNodeSource, /featherRadius=\{/);
   assert.match(
-    panelSource,
-    /<MaskEditor[\s\S]*featherRadius=\{maskFeatherRadius\}/,
-  );
-  assert.match(
-    panelSource,
-    /const maskFeatherRadius = typeof dataRecord\.featherRadius === "number"[\s\S]*: undefined/,
+    imageNodeSource,
+    /typeof data\.featherRadius === "number" && Number\.isFinite\(data\.featherRadius\)[\s\S]*\? data\.featherRadius[\s\S]*: undefined/,
   );
   assert.doesNotMatch(panelSource, /<input[^>]*type="range"/);
   assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
@@ -1771,13 +1764,14 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
   const beforeSave = maskRedrawReadiness({ source, prompt: "" });
   assert.equal(beforeSave.canOpenRunAction, false);
 
-  useFlowStore.getState().updateNodeData("mask-node", {
+  // 65b：蒙版写入图片节点 data（非生成节点）。
+  useFlowStore.getState().updateNodeData("mask-source", {
     mask: "data:image/png;base64,bWFzaw==",
     maskSourceRef: source,
   });
-  const savedNode = activeDocument().nodes.find((node) => node.id === "mask-node");
-  assert.equal(savedNode?.data.kind, "image-generator");
-  if (savedNode?.data.kind !== "image-generator") throw new Error("蒙版节点丢失");
+  const savedNode = activeDocument().nodes.find((node) => node.id === "mask-source");
+  assert.equal(savedNode?.data.kind, "image");
+  if (savedNode?.data.kind !== "image") throw new Error("蒙版原图节点丢失");
   const afterSave = maskRedrawReadiness({
     source,
     mask: savedNode.data.mask,
@@ -1841,9 +1835,9 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  // v8（R-83）：蒙版上传 pending 与原图校验随生成层 UI 迁入 GeneratorParamsPanel.onSave 闭包。
+  // 65b：蒙版上传 pending 与原图校验随蒙版入口迁回 ImageNode.onSave 闭包。
   const redrawSource = fs.readFileSync(
-    new URL("../src/components/nodes/GeneratorParamsPanel.tsx", import.meta.url),
+    new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
   );
   const appSource = fs.readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -1865,11 +1859,10 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   );
   assert.match(redrawSource, /const releaseUploadPending = beginMaskWork\(\)/);
   assert.match(redrawSource, /finally \{\s*releaseUploadPending\(\)/);
-  assert.match(redrawSource, /selectNodeInputImages\(currentTab, nodeId\)\[0\] !== maskSource/);
+  assert.match(redrawSource, /outputImages\?\.\[0\] !== sourceRef/);
   // R-94：AGENTS.md §3 要求蒙版这类异步写入绑定发起页签的 tabId + projectId + documentEpoch。
-  // 当前 v8 实现回退为 updateNodeData(nodeId, ...)（写「提交时」的活动文档），此断言不弱化：
-  // 必须回到 updateNodeDataInTab(target, nodeId, ...)。缺陷已在本卡评论上交。
-  assert.match(redrawSource, /updateNodeDataInTab\(target, nodeId, \{ mask: url, maskSourceRef: maskSource/);
+  // 65b 实现已回到 updateNodeDataInTab(target, id, ...)，锁定不退化成裸 updateNodeData。
+  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: sourceRef, error: undefined \}\)/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);
