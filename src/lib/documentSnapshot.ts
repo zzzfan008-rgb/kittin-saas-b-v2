@@ -498,6 +498,29 @@ function incomingCount(document: DocumentGraphLike, targetId: string, handle: Ed
  * v8 连线规则唯一纯函数：画布拉线、快捷建图与读取归一必须共用它。
  * runtime.md §1（只有生成节点可运行）、§2.1（入边分区）、plan.md §2.2（禁止的边）。
  */
+
+/** 65b Q1 独占：maskSource 是否已是 otherTarget 的 image[0] 消费方（位精确）。 */
+export function isMaskImageZeroConsumer(
+  document: DocumentGraphLike,
+  sourceNodeId: string,
+  targetNodeId: string,
+): boolean {
+  return document.edges.some((e) =>
+    e.source === sourceNodeId &&
+    e.target !== targetNodeId &&
+    edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
+    edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME &&
+    // e 是其目标的 image[0]：该目标没有更早的 reference 入边
+    !document.edges.some((pe) =>
+      pe.target === e.target &&
+      pe.source !== sourceNodeId &&
+      edgeHandleOf(document, pe) !== EDGE_HANDLE_PROMPT &&
+      edgeHandleOf(document, pe) !== EDGE_HANDLE_FIRST_FRAME &&
+      document.edges.indexOf(pe) < document.edges.indexOf(e)
+    )
+  );
+}
+
 export function isV8ConnectionValid(document: DocumentGraphLike, connection: ConnectionLike): boolean {
   if (!connection.source || !connection.target || connection.source === connection.target) return false;
   const source = document.nodes.find((node) => node.id === connection.source);
@@ -544,23 +567,7 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
         edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
       );
       if (!targetHasReference) {
-        // 检查该 masked source 是否已是另一个生成节点的 image[0]
-        // image[0] = 按文档边序第一个 reference 入边（非 prompt / 非 first-frame）
-        const usedAsImageZero = document.edges.some((e) =>
-          e.source === source.id &&
-          e.target !== target.id &&
-          edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
-          edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME &&
-          // 确认 e 是它目标的 image[0]：该目标没有更早的 reference 入边
-          !document.edges.some((pe) =>
-            pe.target === e.target &&
-            pe.source !== source.id &&
-            edgeHandleOf(document, pe) !== EDGE_HANDLE_PROMPT &&
-            edgeHandleOf(document, pe) !== EDGE_HANDLE_FIRST_FRAME &&
-            document.edges.indexOf(pe) < document.edges.indexOf(e)
-          )
-        );
-        if (usedAsImageZero) return false;
+        if (isMaskImageZeroConsumer(document, source.id, target.id)) return false;
       }
     }
   }
