@@ -35,6 +35,7 @@ import {
   type VideoModelOptions,
 } from "../../src/types/videoModels";
 import { presetTemplateText } from "../lib/promptPresetsFrozen";
+import { type GeneratorOperationMode } from "../../src/types/imageOperations";
 
 export const templatesRouter = Router();
 
@@ -81,7 +82,7 @@ function imageGeneratorNode(
   x: number,
   y: number,
   label: string,
-  operationMode: ImageOperationMode,
+  operationMode: GeneratorOperationMode,
   options: ImageGeneratorOptions = {},
 ): PersistedWorkflowNode {
   // v9（64 Phase 1 C7）：variant 绑定删除；显式 modelId + operationMode + 契约默认参数
