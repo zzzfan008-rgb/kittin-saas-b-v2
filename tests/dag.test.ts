@@ -385,6 +385,70 @@ function main() {
     assert.ok(!("mask" in g2.params));
   });
 
+  // ---------- 65b Q3 canonicalize：mask-edit 自动锁 sunburst（运行链落地） ----------
+
+  ok("65b Q3：图带 mask → plan params.modelId 强制收成 gpt-image-2.5-sunburst", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1", "gpt-image-2.5-flare-vip")],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.operationMode, "mask-edit");
+    // 前端面板无论送什么 modelId（flare-vip 等），运行链产物 params.modelId
+    // 都必须是官方蒙版重绘模型 → runner resolveProvider 拿到 sunburst，验证闸放行。
+    assert.equal(g1.params.modelId, "gpt-image-2.5-sunburst");
+  });
+
+  ok("65b Q3：canonicalize 只发生在 plan 构造期，不改写传入 node.data", () => {
+    const maskedImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+        mask: "data:image/png;base64,MASK==",
+      } as WorkflowNodeData,
+    };
+    const g1Node = imageGeneratorNode("g1", "gpt-image-2.5-flare-vip");
+    const plan = buildExecutionPlan(
+      [textNode("t1", "把背景改成纯白"), maskedImage, g1Node],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    // plan 产物：运行时 modelId 已收成官方蒙版重绘模型。
+    assert.equal(plan.steps.find((s) => s.nodeId === "g1")!.params.modelId, "gpt-image-2.5-sunburst");
+    // 传入节点对象本身保持前端全量送的 flare-vip：canonicalize 不回写 node.data。
+    assert.equal((g1Node.data as { modelId: string }).modelId, "gpt-image-2.5-flare-vip");
+    // image 节点 data 更不得被注入 modelId。
+    assert.ok(!("modelId" in maskedImage.data));
+  });
+
+  ok("65b Q3：无 mask 时 modelId 保持前端送的任意生成模型（不强制）", () => {
+    const plainImage = {
+      id: "i1",
+      type: "image",
+      data: {
+        kind: "image", label: "图片", status: "idle",
+        outputImages: ["/api/files/a.png"],
+      } as WorkflowNodeData,
+    };
+    const plan = buildExecutionPlan(
+      [textNode("t1", "改个背景"), plainImage, imageGeneratorNode("g1", "gpt-image-2.5-flare-vip", { operationMode: "edit" })],
+      [edge("t1", "g1"), edge("i1", "g1", "reference")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.operationMode, "edit");
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 

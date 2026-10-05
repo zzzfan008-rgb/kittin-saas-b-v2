@@ -22,6 +22,7 @@ import {
 import {
   isImageModelId,
   isModelAllowedForNode,
+  MASK_REDRAW_MODEL_ID,
   modelMaxReferenceImages,
 } from "../../src/types/imageModels";
 import {
@@ -247,6 +248,12 @@ export function buildExecutionPlan(
       // 蒙版归属图片节点 data。本步骤 params 的 mask/maskSourceRef/featherRadius
       // 从 inputImages[0] 的上游 image 节点 data 读取（不再读生成节点自身 data）；
       // 图带 mask → operationMode 物化为 mask-edit（推断优先，方案 §3 规则 3）。
+      // 65b Q3 canonicalize（发布门禁重演阻断）：mask-edit 只有官方 sunburst
+      // （MASK_REDRAW_MODEL_ID）能承载，且它只支持 mask-edit（apiyi.ts 双向闸）；
+      // 前端送的 modelId 可能仍是面板上的任意生成模型（flare-vip 等），若不在此
+      // 强制收为 sunburst，validateApiyiRequest 必 400「不支持 mask-edit」。
+      // 在 plan 构造期收（schema/提交链权威端），发放给 runner/证据链的 params 即已是
+      // 正确对子，无需类型放宽亦不改前端（dag 只产出运行时物化，不写回 node.data）。
       const params = { ...extractParams(data), inputTexts };
       if (data.kind === "image-generator") {
         const maskCarrier = upstream.find((source) => source.images.length > 0);
@@ -264,6 +271,10 @@ export function buildExecutionPlan(
             : maskCarrier!.images[0];
           Object.assign(params, {
             operationMode: "mask-edit" as const,
+            // 65b Q3 canonicalize：mask-edit 与 sunburst 双向唯一（apiyi.ts:419/422），
+            // 运行时 modelId 强制收成官方蒙版重绘模型。params 侧的任意面板模型值
+            // （flare-vip 等）在此被替换，避免 validate 必 400；不改写 node.data。
+            modelId: MASK_REDRAW_MODEL_ID,
             mask: carrierMask.mask,
             maskSourceRef: sourceRef,
             ...(typeof carrierMask.featherRadius === "number" && Number.isFinite(carrierMask.featherRadius)
