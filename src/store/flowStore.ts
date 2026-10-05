@@ -56,7 +56,6 @@ import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
-  isMaskImageZeroConsumer,
   isV8ConnectionValid,
   normalizeFlowForDocumentRead,
   readFlowDocumentForOpen,
@@ -1520,20 +1519,6 @@ export function documentConnectionRejection(
   }
   if (handle === EDGE_HANDLE_FIRST_FRAME) {
     return "该生成节点最多接受 1 张首帧图片";
-  }
-  // 65b Q1 独占语义：带蒙版的图片节点只能服务一个生成节点的 image[0]
-  if (sourceKind === "image") {
-    const maskImage = document.nodes.find((n) => n.id === source.id);
-    if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
-        (maskImage.data as { mask?: string }).mask!.length > 0) {
-      if (isMaskImageZeroConsumer(document, source.id, target.id)) {
-        const usedBy = document.edges
-          .filter((e) => e.source === source.id && e.target !== target.id)
-          .map((e) => document.nodes.find((n) => n.id === e.target)?.data?.label ?? e.target)
-          .join("、");
-        return `该图片已带有蒙版，一次只能服务 1 个生成节点的参考图入口（当前已用于：${usedBy}）`;
-      }
-    }
   }
   return "该生成节点的参考图输入已达上限";
 }
