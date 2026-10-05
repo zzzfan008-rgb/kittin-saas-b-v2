@@ -529,6 +529,20 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
     ))) return false;
     return incomingCount(document, target.id, EDGE_HANDLE_PROMPT) < targetSpec.inputs.prompt;
   }
+  // 65b Q1 独占语义：带蒙版的图片节点只能服务一个生成节点的 image[0]
+  if (targetSpec.inputs.reference > 0 && sourceKind === "image") {
+    const maskImage = document.nodes.find((n) => n.id === source.id);
+    if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
+        (maskImage.data as { mask?: string }).mask!.length > 0) {
+      const usedByAnotherGenerator = document.edges.some((e) =>
+        e.source === source.id &&
+        e.target !== target.id &&
+        edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
+        edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
+      );
+      if (usedByAnotherGenerator) return false;
+    }
+  }
   if (isResultNodeKind(targetKind) || isInputNodeKind(targetKind)) return false;
   const limit = handle === EDGE_HANDLE_FIRST_FRAME ? targetSpec.inputs.firstFrame : targetSpec.inputs.reference;
   if (limit <= 0) return false;

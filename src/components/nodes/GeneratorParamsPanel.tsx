@@ -188,7 +188,9 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   }));
 
   const modelSel: SelectOption[] = mediaKind === "image"
-    ? GENERATION_IMAGE_MODEL_IDS.filter((id) => !modelLocked || id === SUNBURST_MODEL_ID).map((id) => ({ value: id, label: imageModelLabel(id) }))
+    ? (modelLocked
+        ? [{ value: SUNBURST_MODEL_ID, label: imageModelLabel(SUNBURST_MODEL_ID as Parameters<typeof imageModelLabel>[0]) }]
+        : GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) })))
     : VIDEO_MODEL_IDS.map((id) => ({ value: id, label: videoModelLabel(id) }));
 
   const options = (data.modelOptions ?? {}) as ImageModelOptions;
