@@ -23,6 +23,10 @@ projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，�
 **backend 建议**：不改 files.ts:277-290，按 `purge_after` 30d 走。
 **待 architect**：确认是否照此修正落地口径 3。
 
+**backend 2026-10-06 补充（二次核后落地口径）**：若纠偏确认，落地 = edit-draft 设
+`purge_after=now+30d`，不改 files.ts:277-290，也**不进** syncMaskFiles 的 mask 认领
+（:169/:182/:188）。回收判定 = `purge_after<=now` 且未被 asset/活跃 run 引用。
+
 ## 待确认 2 — 裁决落地口径 1「轻校验：image/png + 非空 + 尺寸上限」中「尺寸」语义
 
 裁决原文只一句「尺寸上限」。backend 列两案：
@@ -35,6 +39,16 @@ projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，�
 真实客户端不会超——server 校验属防伪造/异常兜底。
 **待 architect**：给一句话口径（A / B / 另定）。
 
+**backend 2026-10-06 补充（实现细节）**：项目已用 sharp（maskProcessing/fileStore）。
+方案 (i) 上限常量出处 `maskProcessing.ts:14-17`（GPT_IMAGE_MAX_SIDE=3840 /
+MAX_PIXELS=8_294_400 / aspect≤3），`sharp(dataUrl).metadata()` 读头不重编码、
+fail-closed 判超限、width/height 入库（files 表可空 database.ts:88-89）；
+超限图提前拦截，而非拖到 provider 才炸。
+方案 (ii) 复用 saveDataUrl 内 validateImageDataUrl（image/png magic + 非空 +
+≤MAX_IMAGE_BYTES 20MB），不解码、维度存 NULL；合成 run 读 edit-draft 当
+inputImage 时 provider 自解码字节、不依赖 DB 尺寸。
+backend 倾向 **(i)**。前端侧无偏好（合成端已限长边 2048），请 architect 拍。
+
 ---
 
 ## 已解决（记录备查）
@@ -43,6 +57,10 @@ projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，�
   （`feat/65d-mask-redraw-client`，已推远端）`src/types/workflow.ts:154`
   （`editInputRef?: string;`，ImageNodeData 内）。backend 单文件取用：
   `git checkout 9877653 -- src/types/workflow.ts`，无需 standalone commit。
+- **独立类型 commit 已按 backend 请求推达**：**fa0ab1a** @ 分支
+  **feat/65d-edit-input-ref-type**（从 9b9423e 基线独立，仅 workflow.ts +5 行，
+  不携带组件改动；fetch 实测 origin 确认存在）。backend：
+  `git fetch origin feat/65d-edit-input-ref-type && git cherry-pick fa0ab1a`。
 - frontend 四件已全部落地推送（9877653），验证全绿（tsc EXIT:0 / 单测 tsx 直跑 /
   e2e 65d 两条 × 3 桌面宽度 = 7 passed）。e2e 现走桩；backend 合入后用同一命令
   `-g "mask redraw panel|multi-round edit panel"` 跑真流回归。
