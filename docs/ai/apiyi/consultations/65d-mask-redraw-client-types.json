@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-06T09:48:41.520Z",
+  "baseCommit": "d895c889488109a6ec16fbc5da27174d1a9ab679",
+  "changeFingerprintSha256": "84aa948a3fac85b180e0dedade04b6bbeb6987cfea68822684a85d51be2f6843",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "图片节点本地编辑 RunEvent failures RunFailure 类型收敛 operationMode generate edit 收窄 editPrompt 契约",
+  "affectedPaths": [
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-2-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-2-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-2-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "1b17b181ca03ad9b032b8852f97f59a375e3a61acf6c7836a6576beff2b49c64"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-lite-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-lite-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-lite-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "f42805776ba7013582002b8c355a3b377a1ba1f6b394fcb1d6087c51bf7b8cb0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "65a81374d7dd76a528ce2d95b00de0d599be6923118028e8439e62743f9cfd44"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/seedream-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/seedream-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/seedream-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "f0a0e67a3becaed143f278c9b0f9321a649f5f8523e34c176f0592521e8e40c0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/nano-banana-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/nano-banana-image/image-edit.md",
+      "pageLocalPath": "pages/ja/api-capabilities/nano-banana-image/image-edit.md",
+      "title": "Image Editing API リファレンス",
+      "sha256": "67e3a969059ab7603f93ef9f5d6765b893aa13ea9b4aa1e4f299b3401d0be674"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/flux/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/flux/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/flux/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "1f78b49d8da07b618856d92d66e18ffa5454c2bd4bca253f81fdb1ba5acc7641"
+    }
+  ],
+  "decisionSummary": "65d client 侧共享类型收敛：ImageNodeUpdatedRunEvent.failures 收敛为 RunFailure[]（prompt 可选，与生产端 runFailures() 发射形状及 result-node-created 同构，契约 §1.4 {prompt,error} 兼容方向）；ImageNodeData.editPrompt 字段（≤500）；ImageGeneratorNodeData.operationMode 收窄为 generate|edit（GENERATOR_OPERATION_MODE_VALUES）。服务端对应 PR #95。无 API 协议变化（Provider 层 IMAGE_OPERATION_MODE_VALUES 三值不动）。",
+  "unresolvedChoices": []
+}
