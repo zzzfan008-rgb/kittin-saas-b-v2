@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>65d 设计确认 v2 · 蒙版重绘（改造）＋ 多轮修改（新建）</title>
+<style>
+  :root{
+    --shell:#1a1c22; --canvas:#16181d; --panel:#21242a; --panel-hover:#2b2f36;
+    --text:#e8eaee; --muted:#9ba1a9; --border:#33373f; --border-strong:#454a53;
+    --accent:#B7F35A; --accent-ink:#131313; --accent-deep:#4a7a17; --warn:#fbbf24;
+    --node:#ffffff; --node-inner:#f2f3f5; --node-border:#e4e6ea; --node-text:#1d1d1f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 22px 34px;background:#101216;color:var(--text);
+       font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+       font-size:13px;line-height:1.5;width:1000px}
+  h1{font-size:16px;font-weight:600;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+  h2{font-size:13.5px;font-weight:600;margin:26px 0 10px;display:flex;align-items:center;gap:8px}
+  h2 .n{display:inline-flex;width:19px;height:19px;border-radius:50%;background:var(--accent);color:var(--accent-ink);align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .card{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--shell)}
+
+  .screen{display:flex;height:506px;position:relative}
+  .stage{flex:1;min-width:0;background:var(--canvas);display:flex;align-items:center;justify-content:center;padding:18px;position:relative}
+  .photo{position:relative;height:100%;max-height:458px;aspect-ratio:4/5;border-radius:4px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+  .photo svg{display:block;width:100%;height:100%}
+  .ovl{position:absolute;inset:0}
+  .rail{width:25%;min-width:238px;max-width:302px;background:var(--shell);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  .rail-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--border);flex:none}
+  .rail-title{font-size:13px;font-weight:600;letter-spacing:.02em}
+  .x{margin-left:auto;width:24px;height:24px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;line-height:1;cursor:default}
+  .rail-body{padding:12px;display:flex;flex-direction:column;gap:13px;overflow:hidden}
+  .sec{display:flex;flex-direction:column;gap:7px}
+  .lab{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .seg{display:flex;border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px}
+  .seg span{flex:1;text-align:center;font-size:11.5px;padding:5px 0;border-radius:5px;color:var(--muted)}
+  .seg .on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+  .slide{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+  .track{flex:1;height:3px;border-radius:2px;background:var(--border-strong);position:relative}
+  .track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent)}
+  .track b{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%)}
+  .val{font-size:10.5px;min-width:34px;text-align:right}
+  .cbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .cbox i{width:12px;height:12px;border-radius:3px;border:1px solid var(--border-strong);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:9px;font-weight:700;color:transparent}
+  .cbox.on{color:var(--accent)}
+  .cbox.on i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btns{display:flex;gap:6px;flex-wrap:wrap}
+  .tb{font-size:11.5px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:transparent}
+  .ta{border:1px solid var(--border);border-radius:7px;background:#15171c;padding:8px 9px;color:var(--muted);font-size:11.5px;min-height:54px}
+  .count{text-align:right;font-size:10.5px;color:var(--muted)}
+  .cta{background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:12px;text-align:center;border-radius:7px;padding:8px 0}
+  .ghost{border:1px solid var(--border);color:var(--text);font-size:11.5px;text-align:center;border-radius:7px;padding:7px 0}
+  .status{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px}
+  .status b{color:var(--text);font-weight:600}
+  .thumbs{display:flex;gap:7px}
+  .thumbs i{width:46px;height:56px;border-radius:4px;border:1px solid var(--border);display:block;position:relative;overflow:hidden;font-style:normal}
+  .thumbs i.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .thumbs i em{position:absolute;left:0;right:0;bottom:0;font-size:9px;text-align:center;background:rgba(16,18,22,.82);color:var(--muted);font-style:normal;line-height:1.55}
+
+  .nodewrap{padding:30px 24px 16px;display:flex;justify-content:center;overflow:visible}
+  .nodebox{position:relative;width:300px}
+  .pill{position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);
+        display:flex;gap:2px;padding:3px;border-radius:999px;background:#fff;border:1px solid var(--node-border);
+        box-shadow:0 8px 20px rgba(0,0,0,.4)}
+  .pill button{width:26px;height:26px;border:0;border-radius:50%;background:transparent;color:#4b4f57;display:flex;align-items:center;justify-content:center}
+  .pill button .dot{position:absolute;top:1px;right:1px;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 1.5px #fff}
+  .card-node{background:#fff;border:1px solid var(--node-border);border-radius:12px;overflow:hidden;box-shadow:0 14px 30px rgba(0,0,0,.45)}
+  .card-node .hd{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--node-border);font-size:12px;color:var(--node-text);font-weight:600}
+  .card-node .bd{padding:10px;background:#fff}
+  .thumb-img{width:100%;aspect-ratio:4/3;border-radius:6px;overflow:hidden;background:var(--node-inner)}
+  .tb-legend{display:flex;justify-content:center;margin-top:12px}
+  .tb-legend div{font-size:10.5px;color:var(--muted);width:44px;text-align:center}
+  .tb-legend div b{display:block;color:var(--text);font-weight:600;font-size:10.5px;white-space:nowrap}
+  .tb-legend div.hi b{color:var(--accent-deep)}
+
+  .states{display:flex;gap:12px;margin-top:12px}
+  .states .s{flex:1;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--shell)}
+  .states .s .mini{height:138px;background:var(--canvas);display:flex;align-items:center;justify-content:center;padding:10px;position:relative}
+  .states .s p{margin:0;padding:8px 10px;font-size:11px;color:var(--muted);border-top:1px solid var(--border)}
+  .states .s p b{color:var(--text);font-weight:600}
+  .mini .photo{max-height:118px}
+
+  .develop{position:absolute;inset:0;border-radius:4px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(183,243,90,.05),rgba(183,243,90,.14));border:1px solid var(--border)}
+  .develop .grid{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(183,243,90,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(183,243,90,.13) 1px,transparent 1px);
+    background-size:16px 16px}
+  .develop .scan{position:absolute;left:0;right:0;top:38%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 12px var(--accent)}
+  .develop .lb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--accent-deep);font-size:11px;letter-spacing:.22em;background:rgba(22,24,29,.35)}
+
+  .notes{margin:10px 0 0;padding:0 0 0 18px;color:var(--muted);font-size:11.5px}
+  .notes li{margin:3px 0}
+  .notes b{color:var(--text);font-weight:600}
+
+  .check{margin-top:26px;border:1px solid var(--border);border-radius:12px;background:var(--shell);padding:14px 16px}
+  .check h3{margin:0 0 9px;font-size:13px;font-weight:600;color:var(--accent)}
+  .check h3+h3{margin-top:16px}
+  .check ol{margin:0;padding-left:20px;color:var(--muted);font-size:12px}
+  .check li{margin:5px 0}
+  .check b{color:var(--text)}
+  .check .next{margin:16px 0 0;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text)}
+  .check .next b{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>65d 设计确认 v2 · 蒙版重绘（改造）＋ 多轮修改（新建）</h1>
+<div class="sub">v2 更新：① 羽化＝默认勾选「自适应」、拖滑杆自动取消；②「蒙版重绘 · 多轮修改」前置到工具条最前；③ 命名与标记口径已按你拍板锁定</div>
+
+<!-- ============ ① 工具条 ============ -->
+<h2><span class="n">1</span>图片节点上方悬浮框：「蒙版重绘」「多轮修改」前置到最前</h2>
+<div class="card">
+  <div class="nodewrap">
+    <div class="nodebox">
+      <div class="pill">
+        <button title="蒙版重绘"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20c1.6-5.2 4.8-8.4 10-10.4L20 4l-1.2 5.6c-2 5.2-5.2 8.4-10.4 10z"/><path d="M4 20l3.2-1.4"/></svg></button>
+        <button title="多轮修改" style="position:relative"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg><span class="dot"></span></button>
+        <button title="裁剪"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v14h14"/><path d="M2 6h14v14"/></svg></button>
+        <button title="抠图"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.4 9.6L20 20M8.1 8.1L12 12"/></svg></button>
+        <button title="复制"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg></button>
+        <button title="替换"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11A8 8 0 006 5.3M4 13a8 8 0 0014 5.7"/><path d="M20 4v7h-7M4 20v-7h7"/></svg></button>
+      </div>
+      <div class="card-node">
+        <div class="hd"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>参考图 · 图片节点</div>
+        <div class="bd">
+          <div class="thumb-img">
+            <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+              <defs>
+                <linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcd2c4"/><stop offset="1" stop-color="#b6a48d"/></linearGradient>
+                <linearGradient id="cl1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8d9c86"/><stop offset="1" stop-color="#6f7e6b"/></linearGradient>
+              </defs>
+              <rect width="400" height="300" fill="url(#bg1)"/>
+              <ellipse cx="200" cy="105" rx="46" ry="56" fill="#e8c9a6"/>
+              <path d="M110 300c0-92 34-140 90-140s90 48 90 140z" fill="url(#cl1)"/>
+              <path d="M200 168c-26 0-46 12-58 32 18 14 38 21 58 21s40-7 58-21c-12-20-32-32-58-32z" fill="#c7b299" opacity=".5"/>
+            </svg>
+          </div>
+          <div style="margin-top:7px;font-size:10.5px;color:#9ba1a9">作为参考图来源；生成请用生图节点</div>
+        </div>
+      </div>
+      <div class="tb-legend">
+        <div><b>蒙版重绘</b></div>
+        <div><b>多轮修改</b></div>
+        <div><b>裁剪</b></div>
+        <div><b>抠图</b></div>
+        <div><b>复制</b></div>
+        <div><b>替换</b></div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li>顺序：<b>蒙版重绘 · 多轮修改 · 裁剪 · 抠图 · 复制 · 替换</b>（前两个前置；绿点=本次新增项）</li>
+    <li>节点卡片上的内联「修改描述＋按钮」整块移除，内容全部迁入两个专属编辑页</li>
+    <li>两者均为「点击 → 弹出专属全屏编辑页」；未上传图片时禁用，提示「请先上传图片」</li>
+  </ul>
+</div>
+
+<!-- ============ ② 蒙版重绘页 ============ -->
+<h2><span class="n">2</span>「蒙版重绘」编辑页（去顶栏；标题＋✕入右栏；羽化＝勾选式自适应）</h2>
+<div class="card">
+  <div class="screen">
+    <div class="stage">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="bgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ded4c6"/><stop offset="1" stop-color="#b4a28b"/></linearGradient>
+            <linearGradient id="clA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93a08b"/><stop offset="1" stop-color="#6d7c69"/></linearGradient>
+          </defs>
+          <rect width="400" height="500" fill="url(#bgA)"/>
+          <ellipse cx="200" cy="150" rx="52" ry="63" fill="#e9caa7"/>
+          <path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="url(#clA)"/>
+          <path d="M200 324c-30 0-54 14-68 38 21 17 45 25 68 25s47-8 68-25c-14-24-38-38-68-38z" fill="#cbb69c" opacity=".5"/>
+        </svg>
+        <svg class="ovl" viewBox="0 0 400 500">
+          <defs><filter id="softA" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="11"/></filter></defs>
+          <g filter="url(#softA)"><path d="M150 350c30-26 74-30 106-8 26 18 30 52 6 70-34 26-92 22-118-8-14-16-10-38 6-54z" fill="rgba(245,158,11,.32)"/></g>
+          <path d="M150 350c30-26 74-30 106-8 26 18 30 52 6 70-34 26-92 22-118-8-14-16-10-38 6-54z" fill="rgba(239,68,68,.48)"/>
+        </svg>
+      </div>
+    </div>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title">蒙版重绘</span><button class="x">✕</button></div>
+      <div class="rail-body">
+        <div class="sec">
+          <div class="lab">绘画工具</div>
+          <div class="seg"><span class="on">涂抹修改区</span><span>恢复保留区</span></div>
+          <div class="slide">笔刷<div class="track"><i style="width:26%"></i><b style="left:26%"></b></div><span class="val">80px</span></div>
+          <div class="slide">羽化<span class="cbox on"><i>✓</i>自适应</span><div class="track"><i style="width:42%"></i><b style="left:42%"></b></div><span class="val">自适应</span></div>
+          <div class="btns"><span class="tb">撤销</span><span class="tb">重做</span><span class="tb">清空</span><span class="tb">反选</span></div>
+        </div>
+        <div class="sec">
+          <div class="lab">修改描述</div>
+          <div class="ta">把口袋改成米色帆布，其余保持不变…</div>
+          <div class="count">22 / 500</div>
+          <div class="cta">蒙版重绘</div>
+          <div class="ghost">保存蒙版</div>
+        </div>
+        <div class="status">上次执行：<b>成功</b> · 结果已覆盖左侧图 · 可继续涂抹再执行</div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="states">
+  <div class="s">
+    <div class="mini">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#cbbfae"/><ellipse cx="200" cy="150" rx="52" ry="63" fill="#e2c5a3"/><path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="#8b9a84"/></svg>
+        <div class="develop"><div class="grid"></div><div class="scan"></div><div class="lb">显影中</div></div>
+      </div>
+    </div>
+    <p><b>运行中</b>：左栏整幅切「显影中」动效（与图片/结果节点同款），控件锁定</p>
+  </div>
+  <div class="s">
+    <div class="mini">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#d3c9ba"/><ellipse cx="200" cy="150" rx="52" ry="63" fill="#e9caa7"/><path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="#93a08b"/><path d="M152 352h96v62h-96z" fill="#ded3bd"/></svg>
+      </div>
+    </div>
+    <p><b>完成</b>：结果<b>直接覆盖左侧合成图</b>，页内停留可看；点 ✕ / ESC 手动关闭</p>
+  </div>
+</div>
+<ul class="notes">
+  <li><b>羽化（v2）</b>：默认勾选「自适应」→ 不写数值、系统自动算；<b>一拖滑杆勾选自动取消</b>，按滑杆数值（0–64）生效；重新勾选回到自适应</li>
+  <li>点<b>「蒙版重绘」</b>= 自动保存当前涂抹与羽化 → 发起执行 → 左栏显影中 → 结果覆盖左图（无须先手动保存）</li>
+  <li><b>「保存蒙版」</b>保留为次按钮（只存草稿不执行）；顶栏整体去除；ESC 或右栏 ✕ 关闭</li>
+</ul>
+
+<!-- ============ ③ 多轮修改页 ============ -->
+<h2><span class="n">3</span>「多轮修改」编辑页（新建：图上标记＋文字描述 → 多轮迭代）</h2>
+<div class="card">
+  <div class="screen">
+    <div class="stage">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ded4c6"/><stop offset="1" stop-color="#b4a28b"/></linearGradient>
+            <linearGradient id="clB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93a08b"/><stop offset="1" stop-color="#6d7c69"/></linearGradient>
+          </defs>
+          <rect width="400" height="500" fill="url(#bgB)"/>
+          <ellipse cx="200" cy="150" rx="52" ry="63" fill="#e9caa7"/>
+          <path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="url(#clB)"/>
+          <path d="M200 324c-30 0-54 14-68 38 21 17 45 25 68 25s47-8 68-25c-14-24-38-38-68-38z" fill="#cbb69c" opacity=".5"/>
+        </svg>
+        <svg class="ovl" viewBox="0 0 400 500">
+          <g fill="none" stroke="#ff4d4f" stroke-width="3.4" stroke-linecap="round">
+            <ellipse cx="198" cy="384" rx="74" ry="47" opacity=".95"/>
+            <path d="M312 232c-30 34-58 66-82 100"/>
+            <path d="M222 344l16-9 2 18"/>
+          </g>
+          <g fill="#ff4d4f" font-family="system-ui,-apple-system,PingFang SC,sans-serif" font-size="17" font-weight="600">
+            <text x="290" y="222">换成米色</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <aside class="rail">
+      <div class="rail-head"><span class="rail-title">多轮修改</span><button class="x">✕</button></div>
+      <div class="rail-body">
+        <div class="sec">
+          <div class="lab">标记工具</div>
+          <div class="btns">
+            <span class="tb" style="border-color:var(--accent);color:var(--accent)">✎ 画笔</span>
+            <span class="tb">↗ 箭头</span>
+            <span class="tb">▢ 矩形</span>
+            <span class="tb">◯ 圆形</span>
+            <span class="tb">T 文字</span>
+          </div>
+          <div class="slide">颜色
+            <span style="display:flex;gap:6px;align-items:center;margin-left:2px">
+              <i style="width:13px;height:13px;border-radius:50%;background:#ff4d4f;display:inline-block;box-shadow:0 0 0 2px rgba(255,77,79,.35)"></i>
+              <i style="width:13px;height:13px;border-radius:50%;background:#B7F35A;display:inline-block"></i>
+              <i style="width:13px;height:13px;border-radius:50%;background:#4dabf7;display:inline-block"></i>
+              <i style="width:13px;height:13px;border-radius:50%;background:#ffffff;display:inline-block"></i>
+            </span>
+          </div>
+          <div class="slide">粗细<div class="track"><i style="width:38%"></i><b style="left:38%"></b></div><span class="val">3px</span></div>
+          <div class="btns"><span class="tb">撤销</span><span class="tb">重做</span><span class="tb">清空标记</span></div>
+        </div>
+        <div class="sec">
+          <div class="lab">修改描述 · 第 2 轮</div>
+          <div class="ta">按标记把口袋换成米色帆布，其余保持不变…</div>
+          <div class="count">30 / 500</div>
+          <div class="cta">开始修改</div>
+        </div>
+        <div class="sec">
+          <div class="lab">修改记录</div>
+          <div class="thumbs">
+            <i style="background:linear-gradient(160deg,#ded4c6,#b4a28b)"><em>原图</em></i>
+            <i style="background:linear-gradient(160deg,#d8cfc0,#a99a86)"><em>第1轮</em></i>
+            <i class="cur" style="background:linear-gradient(160deg,#d5ccbd,#a2947f)"><em>第2轮</em></i>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="states">
+  <div class="s">
+    <div class="mini">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#cbbfae"/><ellipse cx="200" cy="150" rx="52" ry="63" fill="#e2c5a3"/><path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="#8b9a84"/></svg>
+        <div class="develop"><div class="grid"></div><div class="scan"></div><div class="lb">显影中</div></div>
+      </div>
+    </div>
+    <p><b>运行中</b>：左栏切「显影中」；标记层锁定，防止误改本轮输入</p>
+  </div>
+  <div class="s">
+    <div class="mini">
+      <div class="photo">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#d3c9ba"/><ellipse cx="200" cy="150" rx="52" ry="63" fill="#e9caa7"/><path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="#93a08b"/><path d="M152 352h96v62h-96z" fill="#ded3bd"/></svg>
+      </div>
+    </div>
+    <p><b>完成</b>：结果覆盖左图、标记层清空 → 直接画下一轮（页内停留，手动关闭）</p>
+  </div>
+</div>
+<ul class="notes">
+  <li><b>多轮 = 客户端自管理</b>：每轮独立一次修改请求，「上一轮结果」即下一轮底图——天然多轮，无需服务端会话（已拍板）</li>
+  <li><b>标记不保留（已拍板）</b>：底图＋标记合成一张图作为本轮输入提交；提交后只保留<b>新生成的图</b>，旧图标记不落盘，新图作为下一轮底图继续标记</li>
+  <li><b>修改记录</b>：页内展示各轮结果（原图/第1轮/第2轮…），当前轮高亮；本期仅展示，不出回退（未拍板要做）</li>
+  <li>与蒙版重绘<b>并列独立</b>：各自入口、各自编辑页、各自执行按钮，流程不合并</li>
+</ul>
+
+<!-- ============ 更新与锁定 ============ -->
+<div class="check">
+  <h3>v2 更新（按你的三条反馈）</h3>
+  <ol>
+    <li>羽化＝默认勾选「自适应」；拖滑杆自动取消勾选、按滑杆数值生效；重新勾选回自适应 ✓ 已画进第 2 节右栏</li>
+    <li>「蒙版重绘 · 多轮修改」前置到工具条最前，其余顺延 ✓ 已画进第 1 节</li>
+    <li>命名：「蒙版」→「蒙版重绘」（工具条按钮与面板标题统一）✓</li>
+  </ol>
+  <h3>已锁定口径（你的拍板）</h3>
+  <ol>
+    <li>多轮机制：每轮独立一次修改请求，「上一轮结果」即下一轮底图</li>
+    <li>标记提交（方案 A）：只保留新生成的图；新图作为下一轮底图，继续让用户做标记；旧图标记不保留</li>
+    <li>命名：蒙版 → 蒙版重绘</li>
+  </ol>
+  <p class="next">下一步：你确认此版设计 → 我把完整方案（含唯一跨域契约点：「标记输入图」字段的服务端接收与清理）发<b>系统架构师</b>审核 → 通过后动手实现</p>
+</div>
+
+</body>
+</html>
