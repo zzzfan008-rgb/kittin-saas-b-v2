@@ -68,6 +68,17 @@ function main(): void {
     assert.equal(imageEditGate(nodes, "img1"), null);
   });
 
+  // ---------- 65d v2 §4.4：mask 与 editInputRef 互斥（第二层）----------
+  ok("image 节点 mask + editInputRef → 400『蒙版与编辑输入图互斥，请清除蒙版后重试』(65d v2 §4.4 第二层)", () => {
+    const nodes: GateNode[] = [{ id: "img1", data: { kind: "image", mask: "m", editPrompt: "改个袖子", editInputRef: "/api/files/ed.png" } }];
+    assert.equal(imageEditGate(nodes, "img1"), "蒙版与编辑输入图互斥，请清除蒙版后重试");
+  });
+
+  ok("image 节点 editInputRef + editPrompt 无 mask（多轮修改）→ 放行(null)", () => {
+    const nodes: GateNode[] = [{ id: "img1", data: { kind: "image", editPrompt: "再改一下", editInputRef: "/api/files/ed.png" } }];
+    assert.equal(imageEditGate(nodes, "img1"), null);
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 

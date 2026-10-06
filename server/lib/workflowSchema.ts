@@ -264,6 +264,9 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       }
       // 65d §1.1：蒙版重绘面板的编辑描述（trim 非空 + <=500 字，用户拍板定案）。
       const editPrompt = optionalEditPrompt(raw.editPrompt, `${path}.editPrompt`);
+      // 65d v2 §4.1：本轮编辑输入图（/api/files/ URL）。与 mask 互斥由 run 层
+      // （imageEditGate 400 / dag DagError）fail-closed，schema 只校验单字段值。
+      const editInputRef = optionalImageReference(raw.editInputRef, `${path}.editInputRef`);
       return {
         kind,
         label,
@@ -273,6 +276,7 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         ...(maskSourceRef !== undefined ? { maskSourceRef } : {}),
         ...(featherRadius !== undefined ? { featherRadius } : {}),
         ...(editPrompt !== undefined ? { editPrompt } : {}),
+        ...(editInputRef !== undefined ? { editInputRef } : {}),
         ...withError({}),
       } as WorkflowNodeData;
     }
