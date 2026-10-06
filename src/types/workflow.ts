@@ -147,6 +147,11 @@ export interface ImageNodeData extends BaseNodeData {
   featherRadius?: number; // 0–64
   /** 65d 蒙版重绘面板：用户输入的编辑描述（≤500 字）。运行后清空。 */
   editPrompt?: string;
+  /** 65d v2 多轮修改（architect 裁决 §4.1）：本轮编辑输入图（/api/files/ URL，前端离屏
+   *  canvas 以原图自然尺寸把「底图 + 标记」合成后经 /api/files/edit-draft 上传）。
+   *  合成 step 的 primary = editInputRef ?? outputImages[0]；与 mask 互斥（§4.4 fail-closed
+   *  三层：面板禁用 / imageEditGate 400 / dag DagError）。运行后清空。 */
+  editInputRef?: string;
 }
 
 export interface VideoNodeData extends BaseNodeData {
