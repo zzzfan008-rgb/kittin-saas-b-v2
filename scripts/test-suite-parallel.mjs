@@ -73,6 +73,8 @@ const TEST_FILES = [
   "tests/active-document-boundary.test.ts",
   "tests/workflow-schema.test.ts",
   "tests/generation-kind-contract.test.ts",
+  // 65d §1.3：runPlan 蒙版重绘前置校验（纯函数，不碰库）。
+  "tests/run-plan-image-edit.test.ts",
   "tests/apiyi-transport.test.ts",
   "tests/provider-contract.test.ts",
   "tests/mask-processing.test.ts",

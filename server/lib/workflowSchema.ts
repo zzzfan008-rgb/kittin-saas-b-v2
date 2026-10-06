@@ -17,7 +17,7 @@ import {
   isImageModelId,
 } from "../../src/types/imageModels";
 import { isVideoModelId } from "../../src/types/videoModels";
-import { IMAGE_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
+import { IMAGE_OPERATION_MODE_VALUES, GENERATOR_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
 import { frozenPromptBindingForVariantId } from "./promptPresetsFrozen";
 
 const NODE_KINDS: readonly NodeKind[] = [
@@ -90,6 +90,32 @@ function optionalString(value: unknown, path: string): string | undefined {
 function optionalOperationMode(value: unknown, path: string): string | undefined {
   if (value === undefined) return undefined;
   return oneOf(value, IMAGE_OPERATION_MODE_VALUES, path);
+}
+
+/** 65d §1.2：image-generator case 专用——operationMode 收窄为 generate/edit
+ *  （mask-edit 已剥离出生成节点，蒙版重绘改为图片节点本地编辑动作）。
+ *  video-generator 仍走 optionalOperationMode（IMAGE_OPERATION_MODE_VALUES 三值，
+ *  Provider 协议层需要 mask-edit）。 */
+function optionalGeneratorOperationMode(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  return oneOf(value, GENERATOR_OPERATION_MODE_VALUES, path);
+}
+
+/** 65d §1.1：editPrompt 长度上限（用户拍板定案，替换默认 2000）。 */
+const MAX_EDIT_PROMPT_LENGTH = 500;
+
+/** 65d §1.1：蒙版重绘面板编辑描述校验——string + trim 非空 + trim.length <=500
+ *  （用户拍板定案）。返回 trim 后的值（与 imageEditGate/合成 step 的 trim 语义一致）。
+ *  editPrompt 不在 GENERATION_FIELDS，assertNoGenerationFields 不拦。 */
+function optionalEditPrompt(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") fail(path, "must be a string");
+  const trimmed = value.trim();
+  if (trimmed.length === 0) fail(path, "must not be empty");
+  if (trimmed.length > MAX_EDIT_PROMPT_LENGTH) {
+    fail(path, `must be at most ${MAX_EDIT_PROMPT_LENGTH} characters`);
+  }
+  return trimmed;
 }
 
 interface ImageReferenceOptions {
@@ -236,6 +262,8 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         if (radius < 0 || radius > 64) fail(`${path}.featherRadius`, "must be between 0 and 64");
         featherRadius = radius;
       }
+      // 65d §1.1：蒙版重绘面板的编辑描述（trim 非空 + <=500 字，用户拍板定案）。
+      const editPrompt = optionalEditPrompt(raw.editPrompt, `${path}.editPrompt`);
       return {
         kind,
         label,
@@ -244,6 +272,7 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         ...(mask !== undefined ? { mask } : {}),
         ...(maskSourceRef !== undefined ? { maskSourceRef } : {}),
         ...(featherRadius !== undefined ? { featherRadius } : {}),
+        ...(editPrompt !== undefined ? { editPrompt } : {}),
         ...withError({}),
       } as WorkflowNodeData;
     }
@@ -260,8 +289,8 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (!isImageModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的图片生成模型");
       }
-      // v9（64 裁决 A）：operationMode 显式归节点 data；缺省即 generate（不注入）。
-      const operationMode = optionalOperationMode(raw.operationMode, `${path}.operationMode`);
+      // 65d §1.2：生成节点 operationMode 收窄为 generate/edit（mask-edit 已剥离出生成节点）。
+      const operationMode = optionalGeneratorOperationMode(raw.operationMode, `${path}.operationMode`);
       validateModelOptionsShape(raw.modelOptions, path);
       const aspectRatio = oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
       const batchSize = oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);

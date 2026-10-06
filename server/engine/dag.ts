@@ -20,6 +20,7 @@ import {
   NODE_SPECS,
 } from "../../src/types/workflow";
 import {
+  DEFAULT_GENERATION_MODEL_ID,
   isImageModelId,
   isModelAllowedForNode,
   MASK_REDRAW_MODEL_ID,
@@ -165,6 +166,49 @@ export function buildExecutionPlan(
     if (!nodeMap.has(e.target)) throw new DagError(`Edge target not found: ${e.target}`);
   }
 
+  // 65d §3.1 方案 A：onlyNodeId 指向 image 节点且带 editPrompt → 蒙版重绘/整图编辑合成 step。
+  // 不走 generator 拓扑 filter 主链（image 节点会被 filter 挡在 steps 外），直接返回单个 synthetic step。
+  // 运行时复用 generator 执行/账单/验证链；nodeId 用 image 节点 id，lifecycle 据此发 image-node-updated
+  // （禁发 result-node-created，否则 C7 溯源判伪造）。runPlan 的 imageEditGate 已在 route 层保证
+  // editPrompt 非空（缺口 4 的 400），这里再做一次自持判定，使 buildExecutionPlan 单独调用语义自洽。
+  if (opts?.onlyNodeId) {
+    const target = nodeMap.get(opts.onlyNodeId);
+    if (target?.data.kind === "image") {
+      const img = target.data;
+      const editPrompt = typeof img.editPrompt === "string" ? img.editPrompt.trim() : "";
+      if (editPrompt) {
+        const mask = typeof img.mask === "string" && img.mask.trim() !== "" ? img.mask : undefined;
+        const primary = img.outputImages[0];
+        // §3.2：显式 modelId 对冲「删 carrierMask canonicalize 后无人落 sunburst」：
+        // 有 mask=sunburst（官方蒙版重绘），无 mask=flare-vip（整图编辑定案）。
+        const syntheticStep: NodeExecution = {
+          nodeId: target.id,
+          kind: "image-generator",
+          inputImages: primary ? [primary] : [],
+          inputReferences: primary
+            ? [{ imageRef: primary, order: 0, sourceNodeId: target.id }]
+            : [],
+          upstream: [{ nodeId: target.id, images: primary ? [primary] : [] }],
+          params: {
+            operationMode: mask ? "mask-edit" : "edit",
+            modelId: mask ? MASK_REDRAW_MODEL_ID : DEFAULT_GENERATION_MODEL_ID,
+            mask,
+            maskSourceRef: mask ? (img.maskSourceRef || primary) : undefined,
+            featherRadius: mask ? (img.featherRadius ?? undefined) : undefined,
+            inputTexts: [editPrompt],
+            prompt: editPrompt,
+            modelOptions: {},
+            aspectRatio: "1:1",
+            batchSize: 1,
+            // 合成 run 标记：lifecycle 据此发 image-node-updated（§1.4），绝不发 result-node-created（§6 硬规则）。
+            syntheticEdit: true,
+          },
+        };
+        return { steps: [syntheticStep] };
+      }
+    }
+  }
+
   // 局部重跑：目标节点始终在范围内；按需继续扩展到全部下游。
   let scope: Set<string> | null = null;
   if (opts?.onlyNodeId) {
@@ -244,45 +288,10 @@ export function buildExecutionPlan(
         throw new DagError(`Node ${id} reference role expansion does not match its input images`);
       }
 
-      // 65a（65 定案 Q1：官方 single mask 语义，一张图一个蒙版，只作用 image[0]）：
-      // 蒙版归属图片节点 data。本步骤 params 的 mask/maskSourceRef/featherRadius
-      // 从 inputImages[0] 的上游 image 节点 data 读取（不再读生成节点自身 data）；
-      // 图带 mask → operationMode 物化为 mask-edit（推断优先，方案 §3 规则 3）。
-      // 65b Q3 canonicalize（发布门禁重演阻断）：mask-edit 只有官方 sunburst
-      // （MASK_REDRAW_MODEL_ID）能承载，且它只支持 mask-edit（apiyi.ts 双向闸）；
-      // 前端送的 modelId 可能仍是面板上的任意生成模型（flare-vip 等），若不在此
-      // 强制收为 sunburst，validateApiyiRequest 必 400「不支持 mask-edit」。
-      // 在 plan 构造期收（schema/提交链权威端），发放给 runner/证据链的 params 即已是
-      // 正确对子，无需类型放宽亦不改前端（dag 只产出运行时物化，不写回 node.data）。
+      // 65d（决策 C 路线1）：蒙版重绘从生成节点彻底剥离为图片节点本地编辑动作。
+      // 生成节点不再从上游 image 节点推断 carrierMask / canonicalize 成 sunburst（65a/65b Q3 已删），
+      // 生成节点 operationMode 只剩 generate/edit；mask 只在图片节点自身被重跑（合成 step）时生效。
       const params = { ...extractParams(data), inputTexts };
-      if (data.kind === "image-generator") {
-        const maskCarrier = upstream.find((source) => source.images.length > 0);
-        const carrierData = maskCarrier ? nodeMap.get(maskCarrier.nodeId)!.data : undefined;
-        const carrierMask = carrierData?.kind === "image"
-          && typeof carrierData.mask === "string"
-          && carrierData.mask !== ""
-          ? carrierData
-          : undefined;
-        if (carrierMask) {
-          // maskSourceRef 默认回落该图自身引用（inputImages[0] 即 carrierMask.outputImages[0]），
-          // 保持 assertPlanInputs 的 maskSourceRef === inputImages[0] 校验语义不变。
-          const sourceRef = typeof carrierMask.maskSourceRef === "string" && carrierMask.maskSourceRef !== ""
-            ? carrierMask.maskSourceRef
-            : maskCarrier!.images[0];
-          Object.assign(params, {
-            operationMode: "mask-edit" as const,
-            // 65b Q3 canonicalize：mask-edit 与 sunburst 双向唯一（apiyi.ts:419/422），
-            // 运行时 modelId 强制收成官方蒙版重绘模型。params 侧的任意面板模型值
-            // （flare-vip 等）在此被替换，避免 validate 必 400；不改写 node.data。
-            modelId: MASK_REDRAW_MODEL_ID,
-            mask: carrierMask.mask,
-            maskSourceRef: sourceRef,
-            ...(typeof carrierMask.featherRadius === "number" && Number.isFinite(carrierMask.featherRadius)
-              ? { featherRadius: carrierMask.featherRadius }
-              : {}),
-          });
-        }
-      }
 
       return {
         nodeId: id,
@@ -294,27 +303,9 @@ export function buildExecutionPlan(
       };
     });
 
-  // 65a 独占校验（65 定案 Q1 + 任务书）：同一带蒙版 image 节点只可作 1 个生成节点的
-  // inputImages[0]（官方 single mask 语义：一张图一个蒙版，不能和任何生成节点共享）。
-  // 基于本次 plan 的 scope 消费面检查：submit 全图 plan 时即全量兜底；
-  // 局部重跑只查范围内消费方，不因范围外既有违规阻塞重跑。
-  const maskCarrierConsumers = new Map<string, string[]>();
-  for (const step of steps) {
-    if (step.kind !== "image-generator") continue;
-    if (typeof step.params.mask !== "string" || step.params.mask === "") continue;
-    // params.mask 存在 ⇒ mask 载体是 inputImages[0] 的上游（推断注入条件保证）。
-    const carrier = (step.upstream ?? []).find((source) => source.images.length > 0);
-    if (!carrier) continue;
-    maskCarrierConsumers.set(carrier.nodeId, [...(maskCarrierConsumers.get(carrier.nodeId) ?? []), step.nodeId]);
-  }
-  for (const [maskNodeId, consumerIds] of maskCarrierConsumers) {
-    if (consumerIds.length > 1) {
-      throw new DagError(
-        `Node ${maskNodeId} 的蒙版一次只能服务 1 个生成节点的 image[0]（官方 single mask 语义）；当前同时用于生成节点 ${consumerIds.join(", ")}`,
-      );
-    }
-  }
-
+  // 65d：删去原 65a 独占校验（一张蒙版只能服务一个生成节点的 image[0]）——
+  // 蒙版已随决策 C 剥离出生成节点，不再存在"生成节点消费蒙版"的语义，独占约束随之失效；
+  // 图片节点本地编辑由合成 step 单步承载（onlyNodeId=image 节点时），天然独占。
   return { steps };
 }
 
