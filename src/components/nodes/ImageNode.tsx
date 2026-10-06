@@ -17,7 +17,8 @@ import { assetNameFromUpload, saveImageToModelLibrary } from "@/lib/assetSave";
 import { saveMaskDraft } from "@/lib/maskUpload";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
-import { NodeFrame } from "./NodeFrame";
+import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { NodeFrame, RunButton } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { MaskEditor } from "./MaskEditor";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
@@ -69,6 +70,7 @@ async function uploadFile(file: File): Promise<NormalizedUploadResponse> {
 export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
   const openViewer = useFlowStore((s) => s.openViewer);
+  const runImageEdit = useFlowStore((s) => s.runImageEdit);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
@@ -77,6 +79,12 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [libraryState, setLibraryState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [editingMask, setEditingMask] = useState(false);
+  // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
+  const editPromptEdit = useCoalescedTextEdit(
+    { kind: "node-data", nodeId: id, field: "editPrompt" },
+  );
+  const editPrompt = data.editPrompt ?? "";
+  const hasPrompt = editPrompt.trim().length > 0;
 
   // 作为参考图来源时的序号（派生视图，永不持久化）。
   const referenceCount = useFlowStore(
@@ -319,6 +327,42 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           >
             从素材库替换
           </button>
+        )}
+        {/* 65d：图片节点本地编辑面板 —— editPrompt + 蒙版重绘/整图编辑（契约 §3.3；模型由 server 按 mask 判定 §3.2） */}
+        {hasUpload && (
+          <div className="nodrag space-y-2" data-image-edit-panel={id}>
+            <label className="block space-y-1">
+              <span className="text-label text-[var(--gc-node-muted)]">修改描述</span>
+              <input
+                type="text"
+                value={editPrompt}
+                maxLength={500}
+                readOnly={readOnly}
+                placeholder="描述想怎么改这张图（必填，≤500 字）"
+                aria-label="修改描述"
+                {...editPromptEdit.bind}
+                className="w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-node-muted)] focus:border-gold/60 focus:outline-none disabled:opacity-40"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <RunButton
+                status={data.status}
+                label="蒙版重绘"
+                onClick={() => void runImageEdit(id, editPrompt)}
+                disabled={!hasMask || !hasPrompt || readOnly}
+                disabledReason={!hasMask ? "请先绘制蒙版" : !hasPrompt ? "请先填写修改描述" : undefined}
+                disabledLabel="蒙版重绘"
+              />
+              <RunButton
+                status={data.status}
+                label="整图编辑"
+                onClick={() => void runImageEdit(id, editPrompt)}
+                disabled={hasMask || !hasPrompt || readOnly}
+                disabledReason={hasMask ? "已有蒙版时请用蒙版重绘" : !hasPrompt ? "请先填写修改描述" : undefined}
+                disabledLabel="整图编辑"
+              />
+            </div>
+          </div>
         )}
         <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
           {hasUpload

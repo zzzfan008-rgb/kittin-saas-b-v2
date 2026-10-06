@@ -32,6 +32,7 @@ import {
   nodeSpecForKind,
   type Asset,
   type GeneratorNodeKind,
+  type ImageNodeData,
   type NodeKind,
   type WorkflowNodeData,
   type NodeRunStatus,
@@ -56,7 +57,6 @@ import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
-  isMaskImageZeroConsumer,
   isV8ConnectionValid,
   normalizeFlowForDocumentRead,
   readFlowDocumentForOpen,
@@ -85,13 +85,14 @@ import {
   applyRunEventToNode,
   normalizeRunEvent,
   requestedResultCount,
+  type ImageNodeUpdatedRunEvent,
   type NodeStatusRunEvent,
   type ResultNodeCreatedRunEvent,
   type RunEvent,
 } from "@/store/flowRunEvents";
 
 export { applyRunEventToNode, normalizeRunEvent, requestedResultCount } from "@/store/flowRunEvents";
-export type { NodeStatusRunEvent, ResultNodeCreatedRunEvent, RunEvent } from "@/store/flowRunEvents";
+export type { ImageNodeUpdatedRunEvent, NodeStatusRunEvent, ResultNodeCreatedRunEvent, RunEvent } from "@/store/flowRunEvents";
 
 export type FlowNode = Node<WorkflowNodeData>;
 export type ConnectedNodeDirection = "upstream" | "downstream";
@@ -181,7 +182,7 @@ export interface DocumentTarget {
 
 export type CoalescedTextEditDescriptor =
   | { kind: "project-name" }
-  | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" | "text" | "outputText" };
+  | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" | "text" | "outputText" | "editPrompt" };
 
 export interface CoalescedTextEditToken {
   readonly id: symbol;
@@ -291,6 +292,12 @@ export interface FlowState {
   updateNodeDataInTab: (target: DocumentTarget, id: string, patch: Record<string, unknown>) => void;
   setNodeStatus: (id: string, status: NodeRunStatus, error?: string) => void;
   runNode: (id: string) => Promise<void>;
+  /**
+   * 65d（契约 §3.3）：图片节点本地编辑（蒙版重绘/整图编辑）。onlyNodeId 指向 image 节点，
+   * server 物化合成 step 并以 image-node-updated 回写产物（原位替换 outputImages +
+   * 清 mask/maskSourceRef/featherRadius/editPrompt，契约 §3.4）。prompt 为编辑描述（≤500）。
+   */
+  runImageEdit: (id: string, prompt: string) => Promise<void>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
   /** 保存指定页签 id（关闭页签时静默保存非脏页签或丢弃前的保存）。 */
@@ -1520,20 +1527,6 @@ export function documentConnectionRejection(
   }
   if (handle === EDGE_HANDLE_FIRST_FRAME) {
     return "该生成节点最多接受 1 张首帧图片";
-  }
-  // 65b Q1 独占语义：带蒙版的图片节点只能服务一个生成节点的 image[0]
-  if (sourceKind === "image") {
-    const maskImage = document.nodes.find((n) => n.id === source.id);
-    if (maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
-        (maskImage.data as { mask?: string }).mask!.length > 0) {
-      if (isMaskImageZeroConsumer(document, source.id, target.id)) {
-        const usedBy = document.edges
-          .filter((e) => e.source === source.id && e.target !== target.id)
-          .map((e) => document.nodes.find((n) => n.id === e.target)?.data?.label ?? e.target)
-          .join("、");
-        return `该图片已带有蒙版，一次只能服务 1 个生成节点的参考图入口（当前已用于：${usedBy}）`;
-      }
-    }
   }
   return "该生成节点的参考图输入已达上限";
 }
@@ -2980,6 +2973,53 @@ export function applyResultNodeCreatedEventToTab(
 }
 
 /**
+ * 65d（契约 §1.4/§3.4）：`image-node-updated` 产物**原位替换**（决策 B，不留旧节点）。
+ * outputImages = urls；mask/maskSourceRef/featherRadius/editPrompt 全部置 undefined
+ * ——「蒙版一次性编辑动作」语义，与裁剪/抠图对齐。
+ *
+ * 写入走 commitDocumentMutationForTarget（三重绑定 + dirty/revision）；节点非 image、
+ * urls 为空或文档已被切换/关闭时 fail-closed 返回 false，不产生任何写入。
+ */
+export function applyImageNodeUpdatedEventToTab(
+  target: DocumentTarget,
+  event: ImageNodeUpdatedRunEvent,
+): boolean {
+  return commitDocumentMutationForTarget(target, (tab) => {
+    const node = tab.nodes.find((candidate) => candidate.id === event.nodeId);
+    if (!node || node.data.kind !== "image") return {};
+    const urls = event.urls.filter((url) => typeof url === "string" && url.trim().length > 0);
+    if (urls.length === 0) return {};
+    const data = node.data as ImageNodeData;
+    // 幂等：产物与四字段均已就位时不重复写文档（断线重连后服务端会重放事件）。
+    const alreadyApplied =
+      data.outputImages.length === urls.length &&
+      data.outputImages.every((url, index) => url === urls[index]) &&
+      data.mask === undefined &&
+      data.maskSourceRef === undefined &&
+      data.featherRadius === undefined &&
+      data.editPrompt === undefined;
+    if (alreadyApplied) return {};
+    return {
+      nodes: tab.nodes.map((candidate) =>
+        candidate.id === event.nodeId
+          ? {
+              ...candidate,
+              data: {
+                ...candidate.data,
+                outputImages: [...urls],
+                mask: undefined,
+                maskSourceRef: undefined,
+                featherRadius: undefined,
+                editPrompt: undefined,
+              } as WorkflowNodeData,
+            }
+          : candidate,
+      ),
+    };
+  });
+}
+
+/**
  * 运行态回写：只改生成节点的 status/error。
  *
  * v8（runtime.md §1/§3）：产物归结果节点（由 `result-node-created` 驱动创建），
@@ -3825,6 +3865,255 @@ export const useFlowStore = create<FlowState>()(
         }
       },
 
+      // 65d（契约 §3.3）：图片节点本地编辑 = 图片节点合成 run。onlyNodeId 指向 image 节点，
+      // server 物化合成 step（有 mask=sunburst / 无 mask=flare-vip，模型由 server 按契约 §3.2
+      // 固定判定，面板不提供模型选择），产物经 image-node-updated 原位回写 + 清 mask 四字段。
+      runImageEdit: async (id, prompt) => {
+        // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
+        if (getGenerationSafetyBlockReason()) return;
+        flushActiveTextEdit();
+        const target = selectActiveDocumentTarget(get());
+        const tabId = target.tabId;
+        const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
+        if (pendingSettlement) await pendingSettlement;
+        if (getGenerationSafetyBlockReason()) return;
+        const initialState = get();
+        const initialDocument = documentForTarget(initialState, target);
+        if (!initialDocument || initialState.activeTabId !== tabId) return;
+        if (initialDocument.readOnly) return;
+        const node = initialDocument.nodes.find((candidate) => candidate.id === id);
+        const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+        if (
+          !node ||
+          node.data.kind !== "image" ||
+          // 契约 §1.1：editPrompt 非空 + ≤500（前端 maxLength 双保险，action 入口 fail-closed）。
+          !trimmedPrompt ||
+          trimmedPrompt.length > 500 ||
+          isNodeRunActive(node.data.status) ||
+          initialState.recentResults.some((record) =>
+            record.projectId === initialDocument.projectId &&
+            record.nodeId === id &&
+            isNodeRunActive(record.status) &&
+            Boolean(record.runId),
+          )
+        ) return;
+
+        const preparationKey = runPreparationKey(target, id);
+        const submissionKey = runSubmissionKey(initialDocument.projectId, id);
+        if (runPreparations.has(preparationKey)) return;
+        runPreparations.add(preparationKey);
+        const localStartedAt = Date.now();
+        const recordId = nanoid(8);
+        const ambiguousClientRequestId = ambiguousRunRequestIds.get(submissionKey);
+        const clientRequestId = ambiguousClientRequestId ?? nanoid(16);
+        const retryingAmbiguousSubmission = ambiguousClientRequestId !== undefined;
+        // 合成 run 单张产出（契约 §4.2：batchSize=1）。
+        const requestedCount = 1;
+        let terminalRecorded = false;
+        let knownRunId: string | undefined;
+
+        // 先记录这次编辑操作，再请求后端；请求失败或页面刷新也不丢记录。
+        const initialRecord: RecentResult = {
+          id: recordId,
+          image: "",
+          nodeId: id,
+          nodeLabel: node.data.label,
+          kind: "image",
+          projectId: initialDocument.projectId,
+          projectName: initialDocument.projectName,
+          prompt: trimmedPrompt,
+          startedAt: localStartedAt,
+          status: "queued",
+          clientRequestId,
+          requestedCount,
+        };
+        set((state) => recentResultsPatch(state, trimRecentResults([
+            initialRecord,
+            ...initialState.recentResults,
+          ])));
+
+        try {
+          runWithoutHistory(() => {
+            updateTabNodes(set, target, (nodes) =>
+              nodes.map((candidate) =>
+                candidate.id === id
+                  ? {
+                    ...candidate,
+                    data: {
+                      ...candidate.data,
+                      status: "queued",
+                      error: undefined,
+                      // 编辑描述写进节点 data：server 合成判定门（契约 §1.3）读取提交流里的 editPrompt。
+                      editPrompt: trimmedPrompt,
+                    } as WorkflowNodeData,
+                  }
+                  : candidate,
+              ),
+            );
+          });
+          // 付费动作严格绑定点击时的不可变快照；保存期间发生编辑时服务端会以 409 拒绝旧快照。
+          const submissionSnapshot = documentForTarget(get(), target);
+          if (!submissionSnapshot) throw new Error("项目或节点已关闭，未调用生图服务");
+          const submissionDocument = createDocumentSnapshot(submissionSnapshot);
+          const submissionFlow = documentSnapshotToPersistedWorkflow(submissionDocument);
+          const saveResult = await saveTab(target);
+          if (!saveResult.ok) {
+            throw new Error(`项目保存失败，未调用生图服务：${saveResult.error ?? "未知错误"}`);
+          }
+          if (!submissionFlow.nodes.some((candidate) => candidate.id === id)) {
+            throw new Error("项目或节点已关闭，未调用生图服务");
+          }
+          let response: Response;
+          try {
+            response = await fetch("/api/run-plan", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nodes: submissionFlow.nodes,
+                edges: submissionFlow.edges,
+                onlyNodeId: id,
+                includeDownstream: false,
+                projectId: submissionSnapshot.projectId,
+                clientRequestId,
+              }),
+            });
+          } catch (error) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new AmbiguousRunSubmissionError(`生成请求已发出，但响应未送达：${message}`);
+          }
+          let payload: { runId?: string; error?: string };
+          try {
+            payload = await response.json() as { runId?: string; error?: string };
+          } catch {
+            if (response.ok) {
+              rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+              throw new AmbiguousRunSubmissionError("生成服务已接收请求，但返回内容无法确认");
+            }
+            payload = {};
+          }
+          if (
+            !response.ok &&
+            (response.status === 408 || (response.status === 409 && retryingAmbiguousSubmission))
+          ) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError(
+              `生成服务返回 HTTP ${response.status}，旧请求可能已创建任务但当前参数已变化`,
+            );
+          }
+          if (!response.ok && response.status < 500) clearAmbiguousRunRequest(submissionKey);
+          if (!response.ok && response.status >= 500) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError(
+              `生成服务返回 HTTP ${response.status}，无法确认是否已创建任务`,
+            );
+          }
+          if (response.ok && !payload.runId) {
+            rememberAmbiguousRunRequest(submissionKey, clientRequestId);
+            throw new AmbiguousRunSubmissionError("生成服务已接收请求，但未返回可确认的运行编号");
+          }
+          if (!response.ok || !payload.runId) {
+            throw new Error(apiErrorMessage(response.status, payload));
+          }
+          clearAmbiguousRunRequest(submissionKey);
+          knownRunId = payload.runId;
+
+          set((state) => recentResultsPatch(
+            state,
+            recentResultsUpdateById(state.recentResults, recordId, { runId: payload.runId }),
+          ));
+          runPreparations.delete(preparationKey);
+
+          const runStatus = await fetch(`/api/run-plan/${encodeURIComponent(payload.runId)}`);
+          if (!runStatus.ok) {
+            throw new Error(
+              runStatus.status === 404
+                ? "服务已重启或运行状态已丢失，请重新发起任务"
+                : `确认运行状态失败（HTTP ${runStatus.status}）`,
+            );
+          }
+
+          await consumeRunEvents(payload.runId, id, (event) => {
+            if (event.type === "image-node-updated") {
+              // 65d 决策 B：产物原位替换 image 节点 outputImages + 清 mask 四字段（契约 §3.4）。
+              if (event.nodeId !== id) return;
+              applyImageNodeUpdatedEventToTab(target, event);
+              set((state) => recentResultsPatch(
+                state,
+                recentResultsUpdateById(state.recentResults, recordId, {
+                  image: event.urls[0] ?? "",
+                  ...(event.model ? { model: event.model } : {}),
+                  ...(event.providerOutputSizes?.[0]
+                    ? { providerOutputSize: event.providerOutputSizes[0] as string }
+                    : {}),
+                }),
+              ));
+              return;
+            }
+            if (event.type !== "node-status" || event.nodeId !== id) return;
+            set((state) => recentResultsPatch(
+              state,
+              applyRunEventToRecentResults(state.recentResults, recordId, event),
+            ));
+            updateTabFromRunEvent(set, target, id, event);
+            if (isNodeRunTerminal(event.status)) terminalRecorded = true;
+          });
+        } catch (err) {
+          if (!terminalRecorded) {
+            const message = err instanceof Error ? err.message : String(err);
+            const isNetworkError =
+              err instanceof TypeError ||
+              err instanceof DOMException ||
+              (err instanceof Error && (
+                /network|fetch|ECONNREFUSED|timeout|socket/i.test(message)
+              ));
+
+            if (isNetworkError) {
+              const syncStalledMessage = knownRunId
+                ? `运行 ${knownRunId} 状态同步中断：${message}；请检查网络后点击「重新同步」`
+                : `状态同步中断：${message}；请检查网络后点击「重新同步」`;
+              set((state) => recentResultsPatch(
+                state,
+                recentResultsUpdateById(state.recentResults, recordId, {
+                  syncStalled: true,
+                  error: syncStalledMessage,
+                }),
+              ));
+              updateTabFromRunEvent(set, target, id, {
+                type: "node-status",
+                nodeId: id,
+                status: initialRecord.status as "error" | "cancelled" | "outcome_unknown",
+                error: syncStalledMessage,
+              });
+            } else {
+              const status: "retry_wait" | "outcome_unknown" | "error" = knownRunId
+                ? "retry_wait"
+                : err instanceof AmbiguousRunSubmissionError ? "outcome_unknown" : "error";
+              const safeMessage = knownRunId
+                ? `运行 ${knownRunId} 已创建，但状态同步中断：${message}；请刷新页面继续同步，勿重复提交`
+                : err instanceof AmbiguousRunSubmissionError
+                  ? `${message}；再次点击会使用同一请求号安全确认，请勿新建重复任务`
+                  : message;
+              const event: NodeStatusRunEvent = {
+                type: "node-status",
+                nodeId: id,
+                status,
+                error: safeMessage,
+                startedAt: localStartedAt,
+                ...(isNodeRunTerminal(status) ? { finishedAt: Date.now() } : {}),
+              };
+              set((state) => recentResultsPatch(
+                state,
+                applyRunEventToRecentResults(state.recentResults, recordId, event),
+              ));
+              updateTabFromRunEvent(set, target, id, event);
+            }
+          }
+        } finally {
+          runPreparations.delete(preparationKey);
+        }
+      },
+
       saveProject: async () => {
         // Capture the invoking tab before awaiting a real dragStop/cancel. A tab
         // switch must save the rolled-back source tab, never the new active tab.
@@ -4426,6 +4715,27 @@ export function resumeRecentResults(records: RecentResult[]): void {
               .tabs.find((candidate) => candidate.projectId === record.projectId);
             if (resultTab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
               applyResultNodeCreatedEventToTab(documentTarget(resultTab), event);
+            }
+            return;
+          }
+          if (event.type === "image-node-updated") {
+            // 65d：合成 run 的产物原位回写（契约 §3.4）；刷新恢复后同样按 latest-run 门禁应用。
+            if (event.nodeId !== record.nodeId) return;
+            useFlowStore.setState((state) => recentResultsPatch(
+              state,
+              recentResultsUpdateById(state.recentResults, record.id, {
+                image: event.urls[0] ?? "",
+                ...(event.model ? { model: event.model } : {}),
+                ...(event.providerOutputSizes?.[0]
+                  ? { providerOutputSize: event.providerOutputSizes[0] as string }
+                  : {}),
+              }),
+            ));
+            const editTab = useFlowStore
+              .getState()
+              .tabs.find((candidate) => candidate.projectId === record.projectId);
+            if (editTab && isLatestTrackedRun(useFlowStore.getState().recentResults, record)) {
+              applyImageNodeUpdatedEventToTab(documentTarget(editTab), event);
             }
             return;
           }

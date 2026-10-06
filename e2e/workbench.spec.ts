@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import sharp from "sharp";
 import { missingTextUpstreamNodeIds } from "../src/types/workflow";
 import { expect, test } from "./fixtures";
 
@@ -1391,4 +1392,205 @@ test("project tab close stays blocked with a readable reason while run history i
   await page.waitForTimeout(200);
   await expect(closeButton).toHaveCount(1);
   expect(dialogs).toEqual([]);
+});
+
+// ---------- 65d：图片节点本地编辑（蒙版重绘 / 整图编辑）合成 run ----------
+
+/** 64×64 实色 PNG：MaskEditor 画布尺寸 = 原图尺寸，涂抹需要真实像素面积。 */
+async function makeBaseImage(): Promise<Buffer> {
+  return sharp({ create: { width: 64, height: 64, channels: 3, background: "#5b7a99" } }).png().toBuffer();
+}
+
+interface ImageEditRunBody {
+  onlyNodeId?: string;
+  includeDownstream?: boolean;
+}
+
+test("image node local edit runs a synthetic run and swaps output in place", async ({ page }) => {
+  test.setTimeout(90_000);
+  // beforeEach 已落地 1 个 image 节点（startFirstProject）。
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+
+  // ---------- ① 上传基图：编辑面板出现（无蒙版 + 无描述 → 两按钮各自给出可读原因） ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  const promptInput = imageNode.getByLabel("修改描述");
+  await expect(promptInput).toBeVisible();
+  await expect(promptInput).toHaveAttribute("maxlength", "500");
+  const redrawButton = imageNode.getByRole("button", { name: "蒙版重绘" });
+  const wholeEditButton = imageNode.getByRole("button", { name: "整图编辑" });
+  await expect(redrawButton).toBeDisabled();
+  await expect(imageNode.getByText("请先绘制蒙版")).toBeVisible();
+  await expect(wholeEditButton).toBeDisabled();
+  await expect(imageNode.getByText("请先填写修改描述")).toBeVisible();
+
+  // ---------- ② 填描述 → 整图编辑可用；付费边界桩（只桩 /api/run-plan，保存走真实 server） ----------
+  await promptInput.fill("把背景改成米色");
+  await expect(wholeEditButton).toBeEnabled();
+
+  const runs: ImageEditRunBody[] = [];
+  const nodeIdByRun = new Map<string, string>();
+  let runSequence = 0;
+  await page.route("**/api/run-plan**", async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === "/api/run-plan" && request.method() === "POST") {
+      const body = request.postDataJSON() as ImageEditRunBody;
+      runs.push(body);
+      const runId = `e2e-image-edit-${++runSequence}`;
+      nodeIdByRun.set(runId, body.onlyNodeId ?? "");
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ runId, status: "queued" }),
+      });
+      return;
+    }
+    const match = pathname.match(/^\/api\/run-plan\/([^/]+)(\/events)?$/);
+    if (!match) {
+      await route.abort("blockedbyclient");
+      return;
+    }
+    const runId = decodeURIComponent(match[1]);
+    const nodeId = nodeIdByRun.get(runId);
+    if (!nodeId) throw new Error(`桩不认识的运行 ${runId}`);
+    if (match[2] === "/events") {
+      const now = Date.now();
+      const events = [
+        { seq: 1, type: "node-status", nodeId, status: "running", startedAt: now },
+        {
+          seq: 2,
+          type: "image-node-updated",
+          nodeId,
+          runId,
+          urls: [RESULTS_DENSITY_IMAGE],
+          model: "gpt-image-2.5-sunburst",
+          prompts: ["把背景改成米色"],
+          providerOutputSizes: [null],
+        },
+        {
+          seq: 3,
+          type: "node-status",
+          nodeId,
+          status: "success",
+          images: [RESULTS_DENSITY_IMAGE],
+          model: "gpt-image-2.5-sunburst",
+          prompts: ["把背景改成米色"],
+          startedAt: now,
+          finishedAt: now + 25,
+        },
+        { seq: 4, type: "done" },
+      ];
+      const body = events.map((event) => `id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`).join("");
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+        body,
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ id: runId, status: "running" }),
+    });
+  });
+
+  // ---------- ③ 画真蒙版：MaskEditor 涂抹 → 保存（真实 /api/files/mask 上传 + 项目认领） ----------
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  await imageToolbar.getByRole("button", { name: "蒙版" }).click();
+  const maskEditorHeader = page.getByText("局部修改", { exact: true });
+  await expect(maskEditorHeader).toBeVisible();
+  const saveMaskButton = page.getByRole("button", { name: "保存蒙版" });
+  await expect(saveMaskButton).toBeEnabled({ timeout: 20_000 });
+  // 蒙版 overlay canvas（原图 img 的相邻兄弟）；涂抹产生 Alpha（edit 模式 destination-out）。
+  const overlayCanvas = page.locator('img[alt="局部修改原图"] + canvas');
+  const canvasBox = await overlayCanvas.boundingBox();
+  expect(canvasBox, "蒙版编辑器画布必须可见可命中").not.toBeNull();
+  await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.3, canvasBox!.y + canvasBox!.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.7, canvasBox!.y + canvasBox!.height * 0.7, { steps: 12 });
+  await page.mouse.up();
+  const maskUploadPromise = page.waitForResponse(
+    (res) => res.url().includes("/api/files/mask") && res.request().method() === "POST",
+    { timeout: 15_000 },
+  ).catch(() => null);
+  await saveMaskButton.click();
+  const maskUpload = await maskUploadPromise;
+  expect(maskUpload, "保存蒙版必须走真实 /api/files/mask 上传").not.toBeNull();
+  expect(maskUpload?.ok(), `蒙版上传必须成功：HTTP ${maskUpload?.status()}`).toBeTruthy();
+  await expect(maskEditorHeader).toHaveCount(0); // 编辑器关闭
+
+  // 蒙版在位 → 按钮语义翻转（契约 §1.3：server 按 mask 判定模型）。
+  await expect(redrawButton).toBeEnabled();
+  await expect(wholeEditButton).toBeDisabled();
+  await expect(imageNode.getByText("已有蒙版时请用蒙版重绘")).toBeVisible();
+
+  // ---------- ④ 蒙版重绘：合成 run 载荷 + 原位替换 + 清 mask/editPrompt + 不新建结果节点 ----------
+  const runResponsePromise = page.waitForResponse(
+    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
+    { timeout: 8_000 },
+  ).catch(() => null);
+  await redrawButton.click();
+  const runResponse = await runResponsePromise;
+  expect(runResponse, "蒙版重绘必须由 UI 发起合成 run（POST /api/run-plan）").not.toBeNull();
+  expect(runResponse?.status()).toBe(202);
+  expect(runs, "恰好一次合成 run").toHaveLength(1);
+  expect(runs[0].onlyNodeId, "onlyNodeId 必须指向被编辑的 image 节点").toBe(imageNodeId);
+  expect(runs[0].includeDownstream, "合成 run 不得带下游").toBe(false);
+
+  await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
+  await expect(imageNode.getByAltText("已上传图片")).toHaveAttribute("src", RESULTS_DENSITY_IMAGE);
+  await expect(promptInput).toHaveValue("");
+  await expect(nodes).toHaveCount(1); // 画布不新建 result-image 节点（契约 §0-B）
+  const afterMaskRun = await page.evaluate(async (nodeId) => {
+    const storeModuleUrl = "/src/store/flowStore.ts";
+    const store = await import(/* @vite-ignore */ storeModuleUrl);
+    const state = store.useFlowStore.getState();
+    const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
+    const node = tab?.nodes.find((candidate: { id: string }) => candidate.id === nodeId);
+    const data = (node?.data ?? {}) as Record<string, unknown>;
+    return {
+      mask: data.mask,
+      maskSourceRef: data.maskSourceRef,
+      featherRadius: data.featherRadius,
+      editPrompt: data.editPrompt,
+      outputImages: data.outputImages,
+    };
+  }, imageNodeId);
+  expect(afterMaskRun.mask, "运行后 mask 必须清空").toBeUndefined();
+  expect(afterMaskRun.maskSourceRef, "运行后 maskSourceRef 必须清空").toBeUndefined();
+  expect(afterMaskRun.featherRadius, "运行后 featherRadius 必须清空").toBeUndefined();
+  expect(afterMaskRun.editPrompt, "运行后 editPrompt 必须清空").toBeUndefined();
+  expect(afterMaskRun.outputImages, "产物必须原位替换 outputImages").toEqual([RESULTS_DENSITY_IMAGE]);
+
+  // ---------- ⑤ 无蒙版路径：mask 已被运行清空 → 整图编辑可用，同一合成 run 形状 ----------
+  await promptInput.fill("整体提亮");
+  await expect(wholeEditButton).toBeEnabled();
+  const secondRunPromise = page.waitForResponse(
+    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
+    { timeout: 8_000 },
+  ).catch(() => null);
+  await wholeEditButton.click();
+  expect(await secondRunPromise, "整图编辑必须由 UI 发起合成 run").not.toBeNull();
+  expect(runs, "第二次编辑恰好再发一次合成 run").toHaveLength(2);
+  expect(runs[1].onlyNodeId).toBe(imageNodeId);
+  expect(runs[1].includeDownstream).toBe(false);
+  await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
+  await expect(promptInput).toHaveValue("");
+  await expect(nodes).toHaveCount(1);
 });

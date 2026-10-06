@@ -233,6 +233,12 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
         ...(fr !== undefined ? { featherRadius: fr } : {}),
+        // 65d：图片节点本地编辑提示词（蒙版重绘/整图编辑执行时传给模型）。
+        // 契约 §1.1：≤500 字符，前端 maxLength=500，投影层 clamp 兜底。
+        ...optionalString(
+          "editPrompt",
+          typeof data.editPrompt === "string" ? data.editPrompt.slice(0, 500) : undefined,
+        ),
       };
     }
     case "video":
@@ -300,7 +306,7 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt"],
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",
@@ -499,28 +505,6 @@ function incomingCount(document: DocumentGraphLike, targetId: string, handle: Ed
  * runtime.md §1（只有生成节点可运行）、§2.1（入边分区）、plan.md §2.2（禁止的边）。
  */
 
-/** 65b Q1 独占：maskSource 是否已是 otherTarget 的 image[0] 消费方（位精确）。 */
-export function isMaskImageZeroConsumer(
-  document: DocumentGraphLike,
-  sourceNodeId: string,
-  targetNodeId: string,
-): boolean {
-  return document.edges.some((e) =>
-    e.source === sourceNodeId &&
-    e.target !== targetNodeId &&
-    edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
-    edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME &&
-    // e 是其目标的 image[0]：该目标没有更早的 reference 入边
-    !document.edges.some((pe) =>
-      pe.target === e.target &&
-      pe.source !== sourceNodeId &&
-      edgeHandleOf(document, pe) !== EDGE_HANDLE_PROMPT &&
-      edgeHandleOf(document, pe) !== EDGE_HANDLE_FIRST_FRAME &&
-      document.edges.indexOf(pe) < document.edges.indexOf(e)
-    )
-  );
-}
-
 export function isV8ConnectionValid(document: DocumentGraphLike, connection: ConnectionLike): boolean {
   if (!connection.source || !connection.target || connection.source === connection.target) return false;
   const source = document.nodes.find((node) => node.id === connection.source);
@@ -551,25 +535,6 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
       isGeneratorNodeKind(document.nodes.find((node) => node.id === edge.target)?.data.kind)
     ))) return false;
     return incomingCount(document, target.id, EDGE_HANDLE_PROMPT) < targetSpec.inputs.prompt;
-  }
-  // 65b Q1 独占语义：带蒙版图片节点的 image[0] 位只能服务一个生成节点
-  // （server dag 单 mask 语义：仅 inputImages[0] 触发 mask-edit）。
-  // 规则：同一带 mask 图不能作两个生成节点的 image[0]；mixed consumption (g1[0]+g2[1]) 合法。
-  if (targetSpec.inputs.reference > 0 && sourceKind === "image") {
-    const maskImage = document.nodes.find((n) => n.id === source.id);
-    const hasMask = maskImage && typeof (maskImage.data as { mask?: string }).mask === "string" &&
-        (maskImage.data as { mask?: string }).mask!.length > 0;
-    if (hasMask) {
-      // 该边会成为 image[0] 仅当当前 target 尚无 reference 入边
-      const targetHasReference = document.edges.some((e) =>
-        e.target === target.id &&
-        edgeHandleOf(document, e) !== EDGE_HANDLE_PROMPT &&
-        edgeHandleOf(document, e) !== EDGE_HANDLE_FIRST_FRAME
-      );
-      if (!targetHasReference) {
-        if (isMaskImageZeroConsumer(document, source.id, target.id)) return false;
-      }
-    }
   }
   if (isResultNodeKind(targetKind) || isInputNodeKind(targetKind)) return false;
   const limit = handle === EDGE_HANDLE_FIRST_FRAME ? targetSpec.inputs.firstFrame : targetSpec.inputs.reference;
