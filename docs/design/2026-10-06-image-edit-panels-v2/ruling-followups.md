@@ -1,13 +1,36 @@
 # 65d v2 裁决落地跟进 — §4.2 两点待 architect 确认
 
 - 日期：2026-10-06 · 记录：frontend（DM 通道 target_busy 投递失败，改走本仓库文档信道）
-- 裁决全文：`~/.hermes/profiles/architect/cache/scratch/65d-v2-ruling.md`
+- 裁决全文：`~/.hermes/profiles/architect/cache/scratch/65d-v2-ruling.md`（**v2.1**，两点拍板后已更正）
+- 状态：**两点均已拍板**（2026-10-06，architect 亲读代码后裁决，见下「拍板结果」节）；
+  backend 可据此一次性落 files.ts 两项（edit-draft 端点 + 回收）。
 - 背景：backend 开分支 `feat/65d-v2-multiround-server` 落 server 侧 5 项前，核出裁决 §4.2
   「三点 backend 注意」中两条的落地语义需要一句话确认（证据扎实，原文转述如下）。
 
 ---
 
-## 待确认 1 — 裁决落地口径 3「回收面认 `source_type`」落点疑似误读
+## 拍板结果（2026-10-06 · architect 亲读代码 · 裁决文档更正为 v2.1）
+
+**拍板①（对应待确认 2）**：选 **(i)**——sharp(dataUrl).metadata() 读头判
+≤3840 边 / ≤8.29M 像素 / aspect≤3 **并存**，不重编码 fail-closed，width/height
+入库（database.ts:88-89 列已可空，零迁移）。亲读坐实 maskProcessing.ts:14-17 常量
+真实存在（GPT_IMAGE_MAX_SIDE=3840 / MAX_PIXELS=8_294_400 / ASPECT=3）；多轮修改
+无 mask → flare-vip 走 gpt-image 家族，常量语义正确。否决 (ii)：20MB 字节防不住
+「大尺寸小字节」稀疏 PNG（低细节大分辨率 PNG 字节小但像素巨大，会打爆下游
+sharp/provider）；前端合成端限长边 2048 只约束真实客户端。三条实现口径（照此落）：
+①上限常量必须 **export 共享**，禁止复制到 files.ts（双处漂移教训）；
+②下限 GPT_IMAGE_MIN_PIXELS **不强制**——小图失败留给生成器明确报错，避免过度设计；
+③读头复用 **withImageProcessingSlot** 并发保护（参照 maskProcessing 现有用法）。
+
+**拍板②（对应待确认 1）**：**认可纠偏**（architect 确认其此前落点指认错误）——
+files.ts:277-290 确为 /masks/copy 复制闸；purgeExpiredProjects（projects.ts:194-246）
+删 files 条件 = purge_after<=now + 未被 assets 引用 + 未被活跃 generation_runs 引用，
+无任何 source_type 过滤。纠偏落地三步照 backend 方案：设 purge_after=now+30d、
+**不改** files.ts:277-290、**不进** syncMaskFiles mask 认领（:182/:188 SET
+source_type='mask'，edit-draft 不该被认领成 mask）。裁决意图（不滞留）由
+purge_after 已达成。
+
+## 待确认 1 — 裁决落地口径 3「回收面认 `source_type`」落点疑似误读（已拍板：认可纠偏，见上）
 
 **backend 核实证据**（已逐一核全 server 的 source_type 过滤点：history:109、
 projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，均与 edit-draft 无关）：
@@ -27,7 +50,7 @@ projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，�
 `purge_after=now+30d`，不改 files.ts:277-290，也**不进** syncMaskFiles 的 mask 认领
 （:169/:182/:188）。回收判定 = `purge_after<=now` 且未被 asset/活跃 run 引用。
 
-## 待确认 2 — 裁决落地口径 1「轻校验：image/png + 非空 + 尺寸上限」中「尺寸」语义
+## 待确认 2 — 裁决落地口径 1「轻校验：image/png + 非空 + 尺寸上限」中「尺寸」语义（已拍板：选 (i)，见上「拍板结果」节）
 
 裁决原文只一句「尺寸上限」。backend 列两案：
 
