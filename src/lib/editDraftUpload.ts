@@ -2,7 +2,11 @@
 // 与 mask 端点（maskUpload.ts）的三点差异——裁决 §4.2 已钉死：
 //   ① 入参无 sourceRef（那是蒙版↔源图尺寸对照专用；edit-draft 是完整 RGB 合成图不需要）；
 //   ② server 不重编码（normalized=FALSE），字节即前端合成的 PNG；
-//   ③ 回收面认 source_type='edit-draft' 纳入无主回收。
+//   ③ 回收面认 source_type='edit-draft' 纳入无主回收（purge_after=30d）。
+// 传输与 maskUpload 同款：JSON {dataUrl, projectId, nodeId}（server files.ts /edit-draft
+// 读 req.body.dataUrl；express 只有 json 解析器，发 multipart FormData 会 400）。
+// server 轻校验：validateImageDataUrl + 强制 image/png + sharp 读头判尺寸上限
+//（≤GPT_IMAGE_MAX_SIDE 边 / ≤GPT_IMAGE_MAX_PIXELS 像素 / 宽高比 ≤3，不重编码）。
 // 前端只依赖返回的 URL（写进 ImageNodeData.editInputRef，dag primary = editInputRef ?? outputImages[0]）。
 
 const EDIT_DRAFT_ENDPOINT = "/api/files/edit-draft";
@@ -23,42 +27,28 @@ export interface EditDraftUploadParams {
   nodeId: string;
 }
 
-/** dataURL → Blob（复用 maskUpload 的字节化路径语义；失败即抛，由调用方转状态行）。 */
-function dataUrlToBlob(dataUrl: string): Blob {
-  const commaIndex = dataUrl.indexOf(",");
-  if (commaIndex < 0) throw new Error("合成图 dataURL 格式无效");
-  const meta = dataUrl.slice(0, commaIndex);
-  const payload = dataUrl.slice(commaIndex + 1);
-  const mimeType = /^data:([^;,]+)/.exec(meta)?.[1] ?? "image/png";
-  if (atob === undefined || btoa === undefined) throw new Error("当前浏览器不支持 dataURL 编码");
-  const binary = atob(payload);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mimeType });
-}
+type Fetcher = typeof fetch;
 
 /**
  * 上传多轮修改的合成图；成功返回 /api/files/ URL（写进 editInputRef）。
- * 失败抛错（含 413 超限提示），由面板状态行承接。
+ * 失败抛错（含 server 尺寸上限提示），由面板状态行承接。
  */
-export async function uploadEditDraft(params: EditDraftUploadParams): Promise<EditDraftUploadResult> {
+export async function uploadEditDraft(
+  params: EditDraftUploadParams,
+  fetcher: Fetcher = fetch,
+): Promise<EditDraftUploadResult> {
   const trimmedDataUrl = typeof params.dataUrl === "string" ? params.dataUrl.trim() : "";
   const trimmedProjectId = typeof params.projectId === "string" ? params.projectId.trim() : "";
   const trimmedNodeId = typeof params.nodeId === "string" ? params.nodeId.trim() : "";
   if (!trimmedDataUrl || !trimmedProjectId || !trimmedNodeId) {
     throw new Error("合成图上传参数缺失");
   }
-  const blob = dataUrlToBlob(trimmedDataUrl);
-  if (blob.size === 0) throw new Error("合成图内容为空");
 
-  const body = new FormData();
-  body.append("file", blob, "edit-draft.png");
-  body.append("projectId", trimmedProjectId);
-  body.append("nodeId", trimmedNodeId);
-
-  const response = await fetch(EDIT_DRAFT_ENDPOINT, { method: "POST", body });
+  const response = await fetcher(EDIT_DRAFT_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataUrl: trimmedDataUrl, projectId: trimmedProjectId, nodeId: trimmedNodeId }),
+  });
   if (!response.ok) {
     let message = `合成图上传失败（HTTP ${response.status}）`;
     try {
