@@ -11,10 +11,13 @@ import { MASK_REDRAW_MODEL_ID } from "../../src/types/imageModels";
 export const MAX_GPT_IMAGE_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_MASK_PIXELS = 40_000_000;
 const GPT_IMAGE_SIZE_MULTIPLE = 16;
-const GPT_IMAGE_MAX_SIDE = 3840;
+// 65d v2（architect 拍板①口径①）：以下三个上限常量被 routes/files.ts 的 edit-draft
+// 端点共享复用——export 共享、禁止复制到 files.ts，避免双处漂移。GPT_IMAGE_MIN_PIXELS
+// 不在编辑输入校验中强制（口径②：小图交给生成器明确报错，避免过度设计）。
+export const GPT_IMAGE_MAX_SIDE = 3840;
 const GPT_IMAGE_MIN_PIXELS = 655_360;
-const GPT_IMAGE_MAX_PIXELS = 8_294_400;
-const GPT_IMAGE_MAX_ASPECT_RATIO = 3;
+export const GPT_IMAGE_MAX_PIXELS = 8_294_400;
+export const GPT_IMAGE_MAX_ASPECT_RATIO = 3;
 const MAX_USER_FEATHER_RADIUS = 64;
 
 /**

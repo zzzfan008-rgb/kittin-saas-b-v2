@@ -12,7 +12,7 @@ import {
   normalizeImageRef, resolveToDataUrl, saveDataUrl, saveNormalizedUploadDataUrl, uploadsDir,
 } from "../lib/fileStore";
 import { ProviderError } from "../providers/base";
-import { ImageValidationError } from "../lib/imageValidation";
+import { ImageValidationError, validateImageDataUrl } from "../lib/imageValidation";
 import { requestUser } from "../lib/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne, transaction } from "../lib/database";
@@ -21,14 +21,24 @@ import {
   assertImageReferencesAccessible,
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
-import { validateMaskForSource } from "../lib/maskProcessing";
+import {
+  GPT_IMAGE_MAX_ASPECT_RATIO,
+  GPT_IMAGE_MAX_PIXELS,
+  GPT_IMAGE_MAX_SIDE,
+  validateMaskForSource,
+} from "../lib/maskProcessing";
+import { withImageProcessingSlot } from "../lib/imageProcessingLimit";
 import { MAX_WORKFLOW_NODES } from "../lib/workflowSchema";
+import sharp from "sharp";
 
 export const filesRouter = Router();
 
 const SAFE_PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_NODE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MASK_DRAFT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+// 65d v2 edit-draft 归档期（architect 拍板②：purge_after=now+30d，与 mask-draft 一致；
+// 裁决意图「不滞留」由 purge_after 达成，无需改回收面代码）。
+const EDIT_DRAFT_RETENTION_MS = MASK_DRAFT_RETENTION_MS;
 const MAX_MASK_COPY_REFS = MAX_WORKFLOW_NODES;
 
 type FileAccess = "public" | "private" | "denied";
@@ -176,6 +186,109 @@ filesRouter.post("/mask", asyncHandler(async (req, res) => {
       : error instanceof ProviderError || error instanceof ImageValidationError
         ? 400
         : 500;
+    res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+}));
+
+/**
+ * 65d v2 多轮修改：编辑输入图暂存（image edit 无蒙版时的合成输入，architect 拍板 §4.2）。
+ * 与 /mask 端点的差异：
+ *   ① 入参无 sourceRef（那是蒙版↔源图尺寸对照专用；edit-draft 是完整合成图不需要），
+ *      不走 validateMaskForSource；
+ *   ② 不重编码（saveDataUrl 原始字节落盘，normalized=FALSE）；只用 sharp 读头判尺寸；
+ *   ③ 尺寸按 GPT Image 家族上限 fail-closed（拍板①：≤3840 边 / ≤8.29M 像素 / 宽高比≤3
+ *      并存；共享常量自 maskProcessing 导入，禁止复制）。下限不强制——小图交给生成器
+ *      明确报错；
+ *   ④ 归档 purge_after=now+30d、source_type='edit-draft'：由 purgeExpiredProjects 无主
+ *      回收（拍板②：不改 /masks/copy 复制闸、不进 syncMaskFiles 认领，避免合成图被
+ *      误当蒙版复制或认领）。
+ */
+filesRouter.post("/edit-draft", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { dataUrl, projectId, nodeId } = req.body as {
+    dataUrl?: string;
+    projectId?: string;
+    nodeId?: string;
+  };
+  if (
+    typeof dataUrl !== "string" || !dataUrl ||
+    typeof projectId !== "string" || !SAFE_PROJECT_ID.test(projectId) ||
+    typeof nodeId !== "string" || !SAFE_NODE_ID.test(nodeId)
+  ) {
+    res.status(400).json({ error: "dataUrl, projectId and nodeId are required" });
+    return;
+  }
+  let saved: { id: string; url: string } | undefined;
+  let committed = false;
+  try {
+    // 轻校验：非空 + 严格 base64 + 签名一致（validateImageDataUrl）；编辑输入图是完整
+    // RGB 合成图（前端恒发 PNG），强制 PNG 与裁决「image/png + 非空」一致。
+    const image = validateImageDataUrl(dataUrl);
+    if (image.mime !== "image/png") {
+      throw new ImageValidationError("编辑输入图必须是 PNG 图片");
+    }
+    const dimensions = await withImageProcessingSlot(async () => {
+      const meta = await sharp(image.buffer, { animated: false, failOn: "error" }).metadata();
+      if (!meta.width || !meta.height) {
+        throw new ImageValidationError("无法读取编辑输入图尺寸");
+      }
+      const side = Math.max(meta.width, meta.height);
+      if (side > GPT_IMAGE_MAX_SIDE) {
+        throw new ImageValidationError(`编辑输入图边长超过上限（${GPT_IMAGE_MAX_SIDE}px），请先缩小`);
+      }
+      if (meta.width * meta.height > GPT_IMAGE_MAX_PIXELS) {
+        throw new ImageValidationError(`编辑输入图像素总量超过上限（${GPT_IMAGE_MAX_PIXELS}px），请先缩小`);
+      }
+      const aspect = Math.max(meta.width / meta.height, meta.height / meta.width);
+      if (aspect > GPT_IMAGE_MAX_ASPECT_RATIO) {
+        throw new ImageValidationError(`编辑输入图宽高比超过上限（${GPT_IMAGE_MAX_ASPECT_RATIO}:1），请先裁剪`);
+      }
+      return { width: meta.width, height: meta.height };
+    });
+    // saveDataUrl 原始字节落盘，不重编码（与裁决「不重编码、normalized=FALSE」一致）。
+    const stored = saveDataUrl(dataUrl);
+    saved = stored;
+    try {
+      const registered = await transaction(async (client) => {
+        if (!await lockActiveOwner(client, user.id)) return false;
+        const now = new Date();
+        await client.query(`
+          INSERT INTO files (
+            id, owner_id, source_type, project_id, node_id,
+            mime_type, width, height, byte_length, normalized,
+            created_at, purge_after
+          ) VALUES ($1, $2, 'edit-draft', $3, $4, 'image/png', $5, $6, $7, FALSE, $8, $9)
+        `, [
+          stored.id, user.id, projectId, nodeId,
+          dimensions.width, dimensions.height, image.buffer.byteLength,
+          now.toISOString(), new Date(now.getTime() + EDIT_DRAFT_RETENTION_MS).toISOString(),
+        ]);
+        return true;
+      });
+      if (!registered) {
+        deleteStoredImage(stored.id);
+        saved = undefined;
+        res.status(409).json({ error: "账号已停用或删除，不能继续保存编辑输入图" });
+        return;
+      }
+      committed = true;
+    } catch (error) {
+      deleteStoredImage(stored.id);
+      saved = undefined;
+      throw error;
+    }
+    res.json({
+      ...stored,
+      mimeType: "image/png",
+      width: dimensions.width,
+      height: dimensions.height,
+      byteLength: image.buffer.byteLength,
+    });
+  } catch (error) {
+    if (saved && !committed) deleteStoredImage(saved.id);
+    const status = error instanceof ProviderError || error instanceof ImageValidationError
+      ? 400
+      : 500;
     res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
   }
 }));

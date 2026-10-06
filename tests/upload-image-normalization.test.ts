@@ -683,6 +683,115 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
   }
 });
 
+await test("65d v2 edit-draft：无 sourceRef、原样落盘、尺寸 fail-closed、归档可回收", async () => {
+  const admin = await queryOne<{ id: string }>(
+    "SELECT id FROM users WHERE account_id = 'normalization-admin'",
+  );
+  assert.ok(admin);
+  const server = await startFilesServer(admin.id);
+  try {
+    // 成功夹具：小尺寸 PNG（压缩后字节小，能过 validateImageDataUrl 的 20MB 字节上限）。
+    const editBuffer = await sharp({
+      create: { width: 96, height: 64, channels: 3, background: "#445566" },
+    }).png({ compressionLevel: 0 }).toBuffer();
+    const editDataUrl = dataUrl("image/png", editBuffer);
+
+    // 缺 projectId / nodeId → 400，且不留文件。
+    const beforeFiles = fs.readdirSync(uploadsDir()).sort();
+    const missingBinding = await fetch(`${server.baseUrl}/api/files/edit-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: editDataUrl }),
+    });
+    assert.equal(missingBinding.status, 400);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeFiles);
+
+    // 成功：无 sourceRef、原始字节落盘（不重编码）、source_type='edit-draft'、purge_after 已设。
+    const accepted = await fetch(`${server.baseUrl}/api/files/edit-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: editDataUrl, projectId: "edit-project", nodeId: "edit-node" }),
+    });
+    if (accepted.status !== 200) {
+      throw new Error(`edit-draft 应返回 200：${await accepted.text()}`);
+    }
+    const editBody = await accepted.json() as {
+      id: string; url: string; mimeType: string; width: number; height: number; byteLength: number;
+    };
+    assert.equal(editBody.mimeType, "image/png");
+    assert.deepEqual([editBody.width, editBody.height], [96, 64]);
+    assert.deepEqual(
+      fs.readFileSync(path.join(uploadsDir(), editBody.id)),
+      editBuffer,
+      "edit-draft 必须原样落盘，不得重编码或改写字节",
+    );
+    assert.deepEqual(await queryOne<Record<string, unknown>>(`
+      SELECT owner_id, source_type, project_id, node_id, mime_type,
+             width, height, byte_length, normalized, purge_after IS NOT NULL AS expiring
+      FROM files WHERE id = $1
+    `, [editBody.id]), {
+      owner_id: admin.id,
+      source_type: "edit-draft",
+      project_id: "edit-project",
+      node_id: "edit-node",
+      mime_type: "image/png",
+      width: 96,
+      height: 64,
+      byte_length: editBuffer.byteLength,
+      normalized: false,
+      expiring: true,
+    });
+
+    // 尺寸上限 fail-closed（拍板①：边长 / 像素总量 / 宽高比三条并存）。默认压缩让实心大图
+    // 字节很小、能过字节上限，只触发对应维度规则；超限必须 400 且不留文件或数据库行。
+    const oversizedFixtures: Array<[string, Buffer]> = [
+      ["边长超限", await sharp({ create: { width: 3841, height: 1281, channels: 3, background: "white" } }).png().toBuffer()],
+      ["像素超限", await sharp({ create: { width: 2900, height: 2900, channels: 3, background: "white" } }).png().toBuffer()],
+      ["宽高比超限", await sharp({ create: { width: 3840, height: 1000, channels: 3, background: "white" } }).png().toBuffer()],
+    ];
+    for (const [label, buffer] of oversizedFixtures) {
+      const beforeRejectedFiles = fs.readdirSync(uploadsDir()).sort();
+      const beforeRejectedRows = (await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count;
+      const rejected = await fetch(`${server.baseUrl}/api/files/edit-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl: dataUrl("image/png", buffer), projectId: "edit-project", nodeId: "edit-node" }),
+      });
+      assert.equal(rejected.status, 400, `${label}应被拒绝：${await rejected.text()}`);
+      assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeRejectedFiles, `${label}不得留下文件`);
+      assert.equal((await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM files",
+      ))?.count, beforeRejectedRows, `${label}不得留下数据库行`);
+    }
+
+    // 非 PNG 拒绝（裁决「image/png + 非空」；前端恒发 PNG）。
+    const jpegBuffer = await sharp({
+      create: { width: 96, height: 64, channels: 3, background: "red" },
+    }).jpeg().toBuffer();
+    const beforeJpegFiles = fs.readdirSync(uploadsDir()).sort();
+    const jpegRejected = await fetch(`${server.baseUrl}/api/files/edit-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: dataUrl("image/jpeg", jpegBuffer), projectId: "edit-project", nodeId: "edit-node" }),
+    });
+    assert.equal(jpegRejected.status, 400);
+    assert.match(await jpegRejected.text(), /PNG/);
+    assert.deepEqual(fs.readdirSync(uploadsDir()).sort(), beforeJpegFiles);
+
+    // 回收面（拍板②）：edit-draft 走 purge_after 无主回收，不改回收面代码、不进蒙版认领。
+    await query("UPDATE files SET purge_after = $1 WHERE id = $2", [
+      new Date(Date.now() - 1_000).toISOString(), editBody.id,
+    ]);
+    await purgeExpiredProjects();
+    assert.equal(fs.existsSync(path.join(uploadsDir(), editBody.id)), false, "到期 edit-draft 必须被无主回收");
+    assert.equal(await queryOne("SELECT id FROM files WHERE id = $1", [editBody.id]), undefined);
+  } finally {
+    await server.close();
+  }
+});
+
 await test("Provider 调用前会标准化旧素材请求副本，失败时不会发起付费调用", async () => {
   const admin = await queryOne<{ id: string }>(
     "SELECT id FROM users WHERE account_id = 'normalization-admin'",
