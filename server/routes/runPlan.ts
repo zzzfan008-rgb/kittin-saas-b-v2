@@ -157,6 +157,29 @@ export function staticImageReferencesForPlan(plan: ExecutionPlan): ImageReferenc
   return references;
 }
 
+/**
+ * 65d §1.3：onlyNodeId 指向 image 节点时的蒙版重绘/整图编辑前置校验。
+ * 返回 400 错误文案；null = 放行（进入 dag.ts §3 合成 step 路径）。
+ * editPrompt 字段类型由 frontend 落 src/types（契约 §5 归属），此处用运行时守卫读取，
+ * 不依赖 ImageNodeData.editPrompt 类型——本 server 任务不被前端类型阻塞（Hermes 第四条路执行序 1）。
+ * 缺口 4：mask 非空但 editPrompt 空 → 400「请先填写修改描述」，不放行进 buildExecutionPlan。
+ */
+export function imageEditGate(
+  nodes: readonly { id: string; data: { [key: string]: unknown } }[],
+  onlyNodeId: string | undefined,
+): string | null {
+  if (!onlyNodeId) return null;
+  const img = nodes.find((node) => node.id === onlyNodeId);
+  if (!img || img.data.kind !== "image") return null;
+  const mask: unknown = img.data.mask;
+  const editPrompt: unknown = img.data.editPrompt;
+  const hasMask = typeof mask === "string" && mask.trim() !== "";
+  const hasPrompt = typeof editPrompt === "string" && editPrompt.trim() !== "";
+  if (!hasMask && !hasPrompt) return "既无蒙版也无编辑提示词";
+  if (hasMask && !hasPrompt) return "请先填写修改描述";
+  return null;
+}
+
 runPlanRouter.post("/", asyncHandler(async (req, res) => {
   const { nodes, edges, onlyNodeId, includeDownstream, projectId, clientRequestId } = req.body as {
     nodes?: unknown[];
@@ -202,6 +225,12 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
 
       // 执行语义必须与刚保存的项目一致；实际入队始终使用数据库中的计划与项目名称。
       const flow = validateAndMigrateFlow(JSON.parse(project.flow_json));
+      // 65d §1.3：onlyNodeId 指向 image 节点 → 蒙版重绘/整图编辑前置校验（缺口 4）。
+      // 不放行进 buildExecutionPlan（否则会撞 assertPlanInputs 的误导文案）。
+      const imageEditError = imageEditGate(flow.nodes, onlyNodeId);
+      if (imageEditError) {
+        return { status: "image_edit_invalid" as const, error: imageEditError };
+      }
       const planOptions = {
         onlyNodeId,
         includeDownstream: includeDownstream ?? false,
@@ -261,6 +290,8 @@ runPlanRouter.post("/", asyncHandler(async (req, res) => {
       res.status(409).json({ error: "画布尚未保存或已在其他位置更新，请保存后重试" });
     } else if (outcome.status === "empty") {
       res.status(400).json({ error: "workflow contains no executable nodes" });
+    } else if (outcome.status === "image_edit_invalid") {
+      res.status(400).json({ error: outcome.error });
     } else {
       res.status(202).json({ runId: outcome.runId, status: "queued" });
     }

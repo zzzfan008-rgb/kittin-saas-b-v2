@@ -274,7 +274,7 @@ function main() {
     assert.ok(!("operationMode" in (g.data as Record<string, unknown>)));
   });
 
-  for (const mode of ["generate", "edit", "mask-edit"] as const) {
+  for (const mode of ["generate", "edit"] as const) {
     ok(`v9：operationMode="${mode}" 通过`, () => {
       const result = validateAndMigrateFlow(flow(
         [textNode("t1"), imageNode("i1"), imageGeneratorNode("g1", { operationMode: mode })],
@@ -284,6 +284,18 @@ function main() {
       assert.equal((g.data as { operationMode?: string }).operationMode, mode);
     });
   }
+
+  // 65d §1.2：mask-edit 已剥离出生成节点（蒙版重绘改为图片节点本地编辑动作），
+  // image-generator case 拒收 operationMode="mask-edit"（GENERATOR_OPERATION_MODE_VALUES=[generate,edit]）。
+  ok("65d §1.2：image-generator operationMode=\"mask-edit\" 被拒绝", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageNode("i1"), imageGeneratorNode("g1", { operationMode: "mask-edit" })],
+        [promptEdge("e1", "t1", "g1"), referenceEdge("e2", "i1", "g1")],
+      )),
+      (e) => e instanceof WorkflowValidationError && /operationMode/.test(e.message),
+    );
+  });
 
   ok("v9：operationMode 非法值被拒绝", () => {
     assert.throws(
@@ -361,6 +373,71 @@ function main() {
     assert.equal(data.mask, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
     assert.equal(data.maskSourceRef, "/api/files/a.png");
     assert.equal(data.featherRadius, 12);
+  });
+
+  // ---------- 65d §1.1：image 节点 editPrompt（蒙版重绘面板编辑描述，<=500 字用户拍板定案）----------
+  ok("65d §1.1：image 节点 editPrompt 合法值 → 通过且保留", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), {
+        id: "i1", type: "image", position: { x: 0, y: 0 },
+        data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "把领口改成方领" },
+      }], [],
+    ));
+    const i = result.nodes.find((n) => n.id === "i1")!;
+    assert.equal((i.data as { editPrompt?: string }).editPrompt, "把领口改成方领");
+  });
+
+  ok("65d §1.1：image 节点 editPrompt 带首尾空白 → 存 trim 后值（与 imageEditGate/合成 step 语义一致）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+         data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "  把袖子改短  " } }],
+      [],
+    ));
+    const i = result.nodes.find((n) => n.id === "i1")!;
+    assert.equal((i.data as { editPrompt?: string }).editPrompt, "把袖子改短");
+  });
+
+  ok("65d §1.1：image 节点 editPrompt 纯空白 → 拒（trim 非空）", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+           data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "   " } }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /editPrompt/.test(e.message),
+    );
+  });
+
+  ok("65d §1.1：image 节点 editPrompt 恰 500 字 → 通过", () => {
+    const result = validateAndMigrateFlow(flow(
+      [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+         data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "x".repeat(500) } }],
+      [],
+    ));
+    const i = result.nodes.find((n) => n.id === "i1")!;
+    assert.equal((i.data as { editPrompt?: string }).editPrompt, "x".repeat(500));
+  });
+
+  ok("65d §1.1：image 节点 editPrompt 超 500 字 → 拒", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+           data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "x".repeat(501) } }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /editPrompt/.test(e.message),
+    );
+  });
+
+  ok("65d §1.1：image 节点 editPrompt 非字符串 → 拒", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+           data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: 42 } }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /editPrompt/.test(e.message),
+    );
   });
 
   ok("65a：image 节点 featherRadius 越界 → 拒（值校验随字段搬家）", () => {
