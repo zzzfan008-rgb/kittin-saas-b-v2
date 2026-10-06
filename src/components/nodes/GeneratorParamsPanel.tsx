@@ -54,8 +54,6 @@ const MEDIA_KIND: Record<GeneratorNodeKind, "image" | "video"> = {
   "video-generator": "video",
 };
 
-const SUNBURST_MODEL_ID = "gpt-image-2.5-sunburst" as string;
-
 const PARAM_LABELS: Record<string, string> = {
   aspectRatio: "画幅", size: "尺寸", imageSize: "分辨率档位",
   quality: "画质", outputFormat: "输出格式", width: "宽", height: "高",
@@ -136,40 +134,29 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const disabled = readOnly || running;
   const admission = usePromptRunAdmission(nodeId, data);
 
-  // 65b D2+Q3：自动推断 operationMode。
+  // 65d（决策 C 路线1）：mask-edit 推断已从生成节点剥离；operationMode 仅剩 generate/edit，
+  // 仍由 65b「参考图边自动推断」决定（契约 §3.5）。
   const inferredMode = useFlowStore(useShallow((s) => {
     const edges = selectActiveEdges(s);
     const nodes = selectActiveNodes(s);
     let hasRef = false;
-    let hasMask = false;
     for (const e of edges) {
       if (e.target !== nodeId) continue;
       if (!isPromptEdge(e) && e.targetHandle !== EDGE_HANDLE_FIRST_FRAME) {
         const src = nodes.find((n) => n.id === e.source);
-        if (src && src.data.kind === "image") {
-          hasRef = true;
-          if (typeof (src.data as { mask?: string }).mask === "string" &&
-              (src.data as { mask?: string }).mask!.length > 0) hasMask = true;
-        }
+        if (src && src.data.kind === "image") hasRef = true;
       }
     }
     if (mediaKind === "video") return hasRef ? ("edit" as const) : ("generate" as const);
-    if (hasMask) return "mask-edit" as const;
-    if (hasRef) return "edit" as const;
-    return "generate" as const;
+    return hasRef ? ("edit" as const) : ("generate" as const);
   }));
 
   const curOp = (data as ImageGeneratorNodeData).operationMode;
   if (curOp !== inferredMode) updateNodeData(nodeId, { operationMode: inferredMode });
 
-  // mask-edit → sunburst 锁定
-  const modelLocked = mediaKind === "image" && inferredMode === "mask-edit";
-  const effModel = modelLocked ? SUNBURST_MODEL_ID : (data.modelId ?? "");
-
-  // 用户语态状态提示
+  // 用户语态状态提示（仅 generate/edit 两分支，契约 §3.5）
   const opHint = (() => {
     if (mediaKind === "video") return inferredMode === "edit" ? "已接首帧 → 编辑模式" : "未接首帧 → 文生视频";
-    if (modelLocked) return "已涂蒙版 → 局部重绘";
     if (inferredMode === "edit") return "已接参考图 → 编辑模式";
     return "未接参考图 → 文生图";
   })();
@@ -187,10 +174,10 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     return { prompt, firstFrame: ff, reference: ref };
   }));
 
+  const effModel = data.modelId ?? "";
+
   const modelSel: SelectOption[] = mediaKind === "image"
-    ? (modelLocked
-        ? [{ value: SUNBURST_MODEL_ID, label: imageModelLabel(SUNBURST_MODEL_ID as Parameters<typeof imageModelLabel>[0]) }]
-        : GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) })))
+    ? GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) }))
     : VIDEO_MODEL_IDS.map((id) => ({ value: id, label: videoModelLabel(id) }));
 
   const options = (data.modelOptions ?? {}) as ImageModelOptions;
@@ -231,15 +218,9 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
       <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">{opHint}</p>
-      {modelLocked && (
-        <p className="text-label leading-relaxed text-[var(--gc-warn-text)]">
-          模型已锁定为 Sunburst（蒙版模式专用，不可切换）
-        </p>
-      )}
 
       <OptionSelect label="模型" value={effModel} options={modelSel}
-        disabled={disabled || modelLocked} onChange={patchModel}
-        hint={modelLocked ? "蒙版模式仅支持 Sunburst 模型" : undefined} />
+        disabled={disabled} onChange={patchModel} />
 
       <div className="grid grid-cols-2 gap-2">
         <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />

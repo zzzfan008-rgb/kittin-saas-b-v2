@@ -777,7 +777,8 @@ export interface ImageNodeUpdatedRunEvent {
   model: string;
   prompts: string[];
   providerOutputSizes: Array<string | null>;
-  failures?: Array<{ prompt: string; error: string }>;
+  /** 契约 §1.4：失败子项与 RunFailure 同构（prompt 可选），normalizeRunEvent 走 runFailures() 通路。 */
+  failures?: RunFailure[];
   runId: string;
   seq?: number;
 }

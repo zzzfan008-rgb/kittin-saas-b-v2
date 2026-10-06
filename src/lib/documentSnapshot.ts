@@ -233,6 +233,12 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
         ...(fr !== undefined ? { featherRadius: fr } : {}),
+        // 65d：图片节点本地编辑提示词（蒙版重绘/整图编辑执行时传给模型）。
+        // 契约 §1.1：≤500 字符，前端 maxLength=500，投影层 clamp 兜底。
+        ...optionalString(
+          "editPrompt",
+          typeof data.editPrompt === "string" ? data.editPrompt.slice(0, 500) : undefined,
+        ),
       };
     }
     case "video":
@@ -300,7 +306,7 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt"],
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",

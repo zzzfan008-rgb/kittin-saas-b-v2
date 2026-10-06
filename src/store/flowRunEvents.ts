@@ -1,4 +1,5 @@
 import type {
+  ImageNodeUpdatedRunEvent,
   NodeStatusRunEvent,
   ResultNodeCreatedRunEvent,
   RunEvent,
@@ -19,6 +20,7 @@ import type {
  *   前端不得本地凭空造结果节点（否则刷新/重连丢产物）。
  */
 export type {
+  ImageNodeUpdatedRunEvent,
   NodeStatusRunEvent,
   ResultNodeCreatedRunEvent,
   RunEvent,
@@ -91,6 +93,24 @@ export function normalizeRunEvent(value: unknown): RunEvent {
       mediaKind,
       urls: stringArray(raw.urls) ?? [],
       ...(nullableStringArray(raw.outputSizes) ? { outputSizes: nullableStringArray(raw.outputSizes) } : {}),
+      ...(seq !== undefined ? { seq } : {}),
+    };
+  }
+  if (raw.type === "image-node-updated") {
+    // 65d：图片节点本地编辑（蒙版重绘/整图编辑）产物回写。fail-closed：nodeId/runId 缺失即抛。
+    const nodeId = optionalString(raw.nodeId);
+    if (!nodeId) throw new Error("图片节点更新事件缺少节点标识");
+    const runId = optionalString(raw.runId);
+    if (!runId) throw new Error("图片节点更新事件缺少运行编号");
+    return {
+      type: "image-node-updated",
+      nodeId,
+      runId,
+      urls: stringArray(raw.urls) ?? [],
+      model: optionalString(raw.model) ?? "",
+      prompts: stringArray(raw.prompts) ?? [],
+      providerOutputSizes: nullableStringArray(raw.providerOutputSizes) ?? [],
+      ...(runFailures(raw.failures) ? { failures: runFailures(raw.failures) } : {}),
       ...(seq !== undefined ? { seq } : {}),
     };
   }
