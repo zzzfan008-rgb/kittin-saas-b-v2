@@ -1719,8 +1719,10 @@ await test("羽化宽度经图片节点透传 MaskEditor 并在 0–64 内钳制
   assert.doesNotMatch(panelSource, /<input[^>]*type="range"/);
   assert.doesNotMatch(imageNodeSource, /<input[^>]*type="range"/);
   assert.match(editorSource, /featherRadius\?: number/);
-  // 0–64 边界钳制（原 Slider 的 min/max 约束）现在由预览侧保证。
-  assert.match(editorSource, /Math\.max\(0, Math\.min\(64, Math\.round\(featherRadius\)\)\)/);
+  // 0–64 边界钳制（原 Slider 的 min/max 约束）现在由预览侧保证；
+  // 65d v2：上限收敛为 FEATHER_MAX 常量（=64），取消勾选时滑杆 0–64 可调。
+  assert.match(editorSource, /FEATHER_MAX = 64/);
+  assert.match(editorSource, /Math\.max\(0, Math\.min\(FEATHER_MAX, Math\.round\(featherRadius\)\)\)/);
   assert.match(editorSource, /adaptiveMaskFeatherRadius\(overlay\.width, overlay\.height, expansionRadius\)/);
 });
 
@@ -1835,7 +1837,7 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
     "utf8",
   );
-  // 65b：蒙版上传 pending 与原图校验随蒙版入口迁回 ImageNode.onSave 闭包。
+  // 65b：蒙版上传 pending 与原图校验随蒙版入口迁回 ImageNode（65d v2 收敛为 persistMaskDraft 回调）。
   const redrawSource = fs.readFileSync(
     new URL("../src/components/nodes/ImageNode.tsx", import.meta.url),
     "utf8",
@@ -1846,9 +1848,10 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
     new URL("../src/components/panels/TopBar.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(editorSource, /if \(!ready \|\| savingRef\.current\) return/);
-  assert.match(editorSource, /onClick=\{onClose\} disabled=\{saving\}/);
-  assert.match(editorSource, /aria-disabled=\{saving\}/);
+  assert.match(editorSource, /if \(savingRef\.current\) return/);
+  assert.match(editorSource, /if \(savingRef\.current \|\| running\) return/);
+  assert.match(editorSource, /onClick=\{onClose\}\s+disabled=\{saving\}/);
+  assert.match(editorSource, /aria-disabled=\{locked\}/);
   assert.match(editorSource, /loadGuardRef\.current\.invalidate\(\)/);
   assert.match(editorSource, /if \(!isCurrentLoad\(\)\) return/);
   assert.match(editorSource, /const snapshotLoadGuardRef = useRef\(createLatestMaskLoadGuard\(\)\)/);
@@ -1862,7 +1865,8 @@ await test("蒙版异步保存接线冻结编辑、校验最新原图并保持�
   assert.match(redrawSource, /outputImages\?\.\[0\] !== sourceRef/);
   // R-94：AGENTS.md §3 要求蒙版这类异步写入绑定发起页签的 tabId + projectId + documentEpoch。
   // 65b 实现已回到 updateNodeDataInTab(target, id, ...)，锁定不退化成裸 updateNodeData。
-  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: sourceRef, error: undefined \}\)/);
+  // 65d v2：commit 随蒙版写入 featherRadius（自适应=undefined，自定义=0–64）。
+  assert.match(redrawSource, /updateNodeDataInTab\(target, id, \{ mask: url, maskSourceRef: sourceRef, featherRadius, error: undefined \}\)/);
   assert.match(appSource, /shouldWarnBeforeWorkspaceUnload\(\{/);
   assert.match(appSource, /isWorkspaceUnloadWarningSuppressed\(\)/);
   assert.match(appSource, /window\.addEventListener\("beforeunload", warnBeforeUnload\)/);

@@ -239,6 +239,12 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
           "editPrompt",
           typeof data.editPrompt === "string" ? data.editPrompt.slice(0, 500) : undefined,
         ),
+        // 65d v2 多轮修改（裁决 §4.1）：本轮编辑输入图（edit-draft 合成图）。
+        // 与 mask 互斥（§4.4）；运行后清空。缺字段不落盘（optionalString 语义）。
+        ...optionalString(
+          "editInputRef",
+          typeof data.editInputRef === "string" ? data.editInputRef : undefined,
+        ),
       };
     }
     case "video":
@@ -306,7 +312,7 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt", "editInputRef"],
   video: ["kind", "label", "outputVideos"],
   "image-generator": [
     "kind", "label",
