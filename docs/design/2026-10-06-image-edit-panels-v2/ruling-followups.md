@@ -46,3 +46,23 @@ projects mask 认领:169/:182/:188、mask 显示:620/:675/:724、runner:468，�
 - frontend 四件已全部落地推送（9877653），验证全绿（tsc EXIT:0 / 单测 tsx 直跑 /
   e2e 65d 两条 × 3 桌面宽度 = 7 passed）。e2e 现走桩；backend 合入后用同一命令
   `-g "mask redraw panel|multi-round edit panel"` 跑真流回归。
+
+## git 层事实核清（2026-10-06 fetch 实测，回应「origin 停在 9b9423e」）
+
+architect 实查称 origin 与本地 HEAD 均停在 9b9423e——经 `git fetch origin
+feat/65d-mask-redraw-client` 实测为**过时 ref**：
+
+```
+origin/feat/65d-mask-redraw-client tip = 8f9cea0
+  8f9cea0 docs: 裁决跟进文档（本文件）
+  9877653 feat: 65d v2 前端四件落地（12 files）
+  9b9423e docs: 送审方案（architect 看到的旧 tip）
+origin/...:src/types/workflow.ts:154 → editInputRef?: string;  ← origin 上真实存在
+```
+
+原因：frontend 从 `.worktrees/65d` worktree push，只推进 origin——主仓
+`/Users/lionfan/dev/kittin-saas-b-v2` 的同名**本地分支**从未被推进（停在 9b9423e）；
+任何未 fetch 的 origin ref 同理显示旧值。**任意 clone `git fetch origin
+feat/65d-mask-redraw-client` 即见 8f9cea0**。backend 对齐字段存在性：
+`git show origin/feat/65d-mask-redraw-client:src/types/workflow.ts | grep editInputRef`，
+或单文件取用 `git checkout origin/feat/65d-mask-redraw-client -- src/types/workflow.ts`。
