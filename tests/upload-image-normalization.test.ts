@@ -234,6 +234,10 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
     assert.equal(maskBody.preserved, true);
     assert.equal(maskBody.mimeType, "image/png");
     assert.deepEqual([maskBody.width, maskBody.height], [96, 64]);
+    // 同构防护：mask 响应 url 与 edit-draft 同款 /api/files/<id>.png 形态（两者都展开
+    // saveDataUrl 结果；前端 maskUpload 用 ^/api/files/[^/?#]+\.png$ 校验，缺后缀即抛错）。
+    assert.match(maskBody.url, /^\/api\/files\/[^/?#]+\.png$/, "mask 响应 url 必须为 /api/files/<id>.png 形态");
+    assert.equal(maskBody.url, `/api/files/${maskBody.id}`, "mask 响应 url 必须对应落盘 id");
     const storedMask = fs.readFileSync(path.join(uploadsDir(), maskBody.id));
     assert.deepEqual(storedMask, maskBuffer, "蒙版不得缩放、重编码或改写 Alpha");
     assert.equal(
@@ -720,6 +724,17 @@ await test("65d v2 edit-draft：无 sourceRef、原样落盘、尺寸 fail-close
     };
     assert.equal(editBody.mimeType, "image/png");
     assert.deepEqual([editBody.width, editBody.height], [96, 64]);
+    // 响应契约锁定（orchestrator url 卡更正后放行的防回归断言）：edit-draft 200 响应必须自带
+    // url=/api/files/<id>.png——saveDataUrl 的 id 自带 .png（fileStore.ts `${nanoid(12)}.${ext}`），
+    // res.json 展开 ...stored 即完整路径；GET /:id 只 path.basename 不剥后缀。缺 url 会让前端
+    // editDraftUpload 抛「合成图上传响应缺少 url」（e2e 真因在前端桩；此断言锁 server 响应形状不回归）。
+    assert.match(editBody.url, /^\/api\/files\/[^/?#]+\.png$/, "edit-draft 响应 url 必须为 /api/files/<id>.png 形态");
+    assert.equal(editBody.url, `/api/files/${editBody.id}`, "edit-draft 响应 url 必须对应落盘 id");
+    assert.ok(
+      editBody.id && editBody.mimeType === "image/png"
+        && editBody.width > 0 && editBody.height > 0 && editBody.byteLength > 0,
+      "edit-draft 响应必须含完整字段 id/mimeType/width/height/byteLength",
+    );
     assert.deepEqual(
       fs.readFileSync(path.join(uploadsDir(), editBody.id)),
       editBuffer,
