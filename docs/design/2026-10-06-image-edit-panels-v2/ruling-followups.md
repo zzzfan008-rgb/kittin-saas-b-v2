@@ -107,3 +107,63 @@ origin/...:src/types/workflow.ts:154 → editInputRef?: string;  ← origin 上�
 feat/65d-mask-redraw-client` 即见 8f9cea0**。backend 对齐字段存在性：
 `git show origin/feat/65d-mask-redraw-client:src/types/workflow.ts | grep editInputRef`，
 或单文件取用 `git checkout origin/feat/65d-mask-redraw-client -- src/types/workflow.ts`。
+
+## 双半门禁首轮失败根因与修复（2026-10-07，e04dd18）
+
+architect 真流门禁结论：mask redraw PASS；multi-round FAIL（三视口全挂，
+e2e:1688 runResponse=null），失败页 alert：`flow.nodes[0].data.editInputRef:
+must be an image dataURL, local /api/files reference, or http(s) URL`。
+
+根因（已逐层核实）：e2e 桩 stubEditDraftUpload 返回 url
+`/api/files/edit-draft/e2e-composite.png`（**两段路径**）→ main@1119967 起
+workflowSchema.ts:146-147 optionalImageReference 校验 editInputRef，
+isLocalImageReference（server/lib/imageValidation.ts:80）只认**单段文件名**
+`/^\/api\/files\/[A-Za-z0-9_-]{1,128}\.(?:png|jpe?g|webp|gif)$/` → saveTab
+保存被拒 → runImageEdit throw「项目保存失败」→ run-plan 未发出 →
+runResponse=null。我分支 server 无此校验（随 PR#97 才进 main），故分支自测
+全绿是假绿——校验只存在于门禁 merge-sim（main + 前端半）。
+
+修复 e04dd18：桩 url 改 `/api/files/e2e-composite.png`（单段文件名+png），
+桩注释钉死该契约（写明正则与失败因果防回归）。正则复核实测：
+old two-segment=false / new single=true / server 真实产出形态
+（saveDataUrl `${nanoid(12)}.png`）=true。全宽门禁命令
+`npm run test:e2e -- -g "mask redraw panel|multi-round edit panel"` 复跑
+**7 passed**（3 视口 × 2 测试 + setup）。
+
+### 对 architect 报告的事实更正（重要）
+
+「server #97 的 edit-draft 响应只回 {ok, file_id, source_type} 无 url 字段，
+backend 需补 url」——**不成立于当前 main**：
+
+- PR #97 已 **MERGED**：mergeCommit 1119967（feat: 65d v2 多轮修改
+  editInputRef + edit-draft 端点），mergedAt 2026-10-07T03:28:07Z。
+- main files.ts:249 `const stored = saveDataUrl(dataUrl)`；:280-286
+  `res.json({ ...stored, mimeType, width, height, byteLength })`；
+  fileStore.ts:143 saveDataUrl 返回 `{ id, url: "/api/files/${id}" }`
+  → **响应含 url**（id 自带 .png，单段）。
+- main tip 1835791 已加契约锁定断言：
+  `assert.match(editBody.url, /^\/api\/files\/[^/?#]+\.png$/)` +
+  `assert.equal(editBody.url, /api/files/${editBody.id})`，该提交说明原话
+  「e2e 真因在前端桩；此断言锁 server 响应形状不回归」。
+
+故「backend 落地后前端零改动」的预设**成立且已兑现**：
+uploadEditDraft.ts 的 payload.url 期待与 main 响应逐字段对齐，前端零改动。
+architect 读到的 `{ok, file_id, source_type}` 形态应为 reset 舞步前旧链 SHA
+（或 merge 前 PR 分支态）——建议以 main tip 复核。
+
+### 去桩建议评估（architect：edit-draft 不打桩改打真端点）
+
+**建议缓行**，理由：①我分支 server 无 /edit-draft 端点（在 main 的 PR#97），
+去桩后分支本地 e2e 必 404，自验链断；②端点契约已由 main 单测双锁
+（1835791 响应形状 + upload-image-normalization 全链路），桩当前返回合规
+url 已足以让门禁 saveTab 校验通过。**推荐**：本轮门禁以修后桩重跑；
+去桩作为前端半与 main 合流后的增强项（届时端点在场，可真上传验证）。
+
+### 合流预警（归 orchestrator/reviewer 路由，非本轮动作）
+
+main 已含 f71de81（65d client 决策C路线1，10-6 19:19，动
+GeneratorParamsPanel/ImageNode/documentSnapshot/flowRunEvents/flowStore/
+workflow）——比我的 v2 四件更早的客户端半场。我分支与 main 在 4 文件冲突
+（e2e/workbench.spec.ts、ImageNode.tsx、documentSnapshot.ts、flowStore.ts），
+合流时以裁决 v2.1 为准取我侧；f71de81 中 GeneratorParamsPanel、
+flowRunEvents 的增量需逐条判断保留面。
