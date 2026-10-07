@@ -1516,7 +1516,7 @@ test("mask redraw panel: main action saves and runs without closing; output swap
 
   const rail = page.getByTestId("mask-redraw-rail");
   await expect(rail).toBeVisible();
-  await expect(rail.locator("strong", { hasText: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
+  await expect(rail.getByRole("heading", { name: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
   await expect(page.getByTestId("mask-editor-canvas")).toBeVisible();
 
   // 无蒙版 + 无描述：主按钮 disabled（fail-closed 前端态）；
@@ -1570,9 +1570,17 @@ test("mask redraw panel: main action saves and runs without closing; output swap
 
   // ---------- ③ 完成后面板不自动关（页内停留）：左图被新产物覆盖，显影中消失 ----------
   await expect(page.getByTestId("mask-redraw-developing")).toHaveCount(0);
+  // 65d 设计调整：完成态状态行不得停在提交期的「正在重绘…」。
+  await expect(page.getByTestId("mask-redraw-note")).toHaveText("重绘完成");
   await expect(rail).toBeVisible();
   await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
   await expect(imageNode.getByAltText("已上传图片")).toHaveAttribute("src", RESULTS_DENSITY_IMAGE);
+  // 设计调整：右栏下方「本次结果」预览位出缩略图，与左栏覆盖的是同一产物。
+  await expect(page.getByTestId("mask-redraw-result-preview")).toBeVisible();
+  await expect(page.getByTestId("mask-redraw-result-preview")).toHaveAttribute(
+    "src",
+    RESULTS_DENSITY_IMAGE,
+  );
 
   const afterMaskRun = await page.evaluate(async (nodeId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
@@ -1601,6 +1609,8 @@ test("mask redraw panel: main action saves and runs without closing; output swap
   // ---------- ④ 手动关闭（ESC）→ 蒙版态消失后「多轮修改」恢复可用（fail-closed 解除） ----------
   await page.keyboard.press("Escape");
   await expect(rail).toHaveCount(0);
+  // 65d 设计调整：Dialog 原语负责焦点恢复——关闭后焦点回到打开它的工具条按钮。
+  await expect(imageToolbar.getByRole("button", { name: "蒙版" })).toBeFocused();
   const multiEditButton = imageToolbar.getByRole("button", { name: "多轮修改" });
   await expect(multiEditButton).toBeEnabled();
 });

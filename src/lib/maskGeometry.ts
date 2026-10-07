@@ -47,3 +47,17 @@ export function adaptiveMaskFeatherRadius(width: number, height: number, expansi
   if (!Number.isFinite(shortEdge) || shortEdge < 64 || expansionRadius <= 0) return 0;
   return Math.max(4, Math.min(32, Math.round(Math.max(expansionRadius * 0.18, shortEdge * 0.006))));
 }
+
+/**
+ * 蒙版笔刷宽度换算（65d 设计调整）。
+ * 滑杆值取「屏幕像素」语义：乘「画布自然尺寸 / 显示尺寸」缩放比后落到画布坐标，
+ * 使同滑杆值在任意分辨率底图上视觉一致。旧实现直接把滑杆值当画布像素用，
+ * 换一张分辨率不同的底图，笔刷视觉粗细会差数倍。
+ * 退化路径：画布未布局（显示宽度为 0）或尺寸非法时返回原值，不放大。
+ */
+export function brushStrokeWidth(brushSize: number, canvasWidth: number, displayWidth: number): number {
+  if (!Number.isFinite(brushSize) || brushSize <= 0) return 0;
+  if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) return brushSize;
+  if (!Number.isFinite(displayWidth) || displayWidth <= 0) return brushSize;
+  return brushSize * (canvasWidth / displayWidth);
+}

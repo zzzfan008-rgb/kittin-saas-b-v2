@@ -86,3 +86,13 @@ export function makeColorChipFromHex(hex: string): string {
  * MultiRoundEditPanel 色块按钮共用——canvas fillStyle 需要具体 hex，不能用 CSS 变量。
  */
 export const MARK_COLOR_SWATCHES = ["#ff4d4f", "#ffd666", "#4096ff", "#ffffff"] as const;
+
+/**
+ * 65d 蒙版重绘页画布叠色（唯一事实源）。
+ * 与 MARK_COLOR_SWATCHES 同因：overlay/mask 两层 canvas 的 fillStyle 需要具体色值，
+ * 不能引用 CSS 变量——故以 TS 常量收敛，禁止在组件里再写裸 rgba 字面量。
+ * - selection：涂抹「修改区」高亮（红）
+ * - expansion：选区外的「融合延展区」高亮（金），预览与 drawSegment 共用同一值
+ */
+export const MASK_SELECTION_FILL = "rgba(239, 68, 68, 0.48)";
+export const MASK_EXPANSION_FILL = "rgba(245, 158, 11, 0.3)";
