@@ -167,3 +167,41 @@ workflow）——比我的 v2 四件更早的客户端半场。我分支与 main
 （e2e/workbench.spec.ts、ImageNode.tsx、documentSnapshot.ts、flowStore.ts），
 合流时以裁决 v2.1 为准取我侧；f71de81 中 GeneratorParamsPanel、
 flowRunEvents 的增量需逐条判断保留面。
+
+## 第二轮门禁：存在性闸推翻「缓行」，去桩修法落地（2026-10-07，2da64fd）
+
+architect merge-sim 第二轮（main 1835791 + tip 70d8a64）：mask.redraw 4
+passed；multi.round **仍 FAIL ×3**——单段桩（e04dd18）过了形态校验，挂点下移
+**存在性校验**：
+
+- 失败 alert：「云端草稿同步失败…画布包含**无权访问的图片**」；服务侧
+  「项目保存失败，未调用生图服务」。
+- 出处 server/lib/imageReferenceAccess.ts:29 `assertImageReferencesAccessible`：
+  递归收集 flow 内所有 `/api/files/` 引用 → 查 `files` 表真记录
+  （`WHERE id=ANY AND deleted_at IS NULL` + owner 校验）→ 桩 url 从未真上传
+  落库 → ImageReferenceAccessError → saveTab 拒 → run-plan 未发。
+- 我自验 7 passed 与门禁 FAIL 不矛盾：我分支 server 基线早于 #97，无此闸，
+  宽松环境下假 url 全过——**第二层假绿**（第一层是桩形态，已在首轮修掉）。
+
+**修法（裁决 v2.4，门禁负责人裁定）**：edit-draft 去桩打真端点升格为本轮
+阻断修法——任何假 url 形态再合规，没真落库就是死路。
+
+- 2da64fd：删除 stubEditDraftUpload；e2e 走生产链路——页面真点击 →
+  editComposite 合成 dataURL → uploadEditDraft 真 POST /api/files/edit-draft
+  （登录态）→ server 真落库返回真 url → editInputRef → saveTab 过形态闸+
+  存在性闸；/api/run-plan 仍桩拦（付费动作不真跑）。
+- 真上传通路先例：mask redraw 测试走真实 /api/files/mask（:1568 注释），
+  同环境登录态+真端点已验证。
+
+**merge-sim 态自验（关键教训固化：改动后必须基于含 #97/#98 的基线自验）**：
+本地临时分支 tmp-gate-sim = origin/main(1835791) 合入本分支（4 冲突文件
+以 --ours 取我侧，server 侧自动合入 #97 校验层）：
+
+- `tsc --noEmit` exit 0；
+- 全宽门禁命令 `-g "mask redraw panel|multi-round edit panel"` →
+  **7 passed（26.2s）**：mask.redraw ×3 视口 + multi.round ×3 视口 + setup，
+  multi.round 真上传落库 → 形态闸+存在性闸双过 → run-plan 桩正常发出。
+
+即去桩修法在**与 architect 门禁同构的环境**（main 真校验层 + 我的前端半）
+已实证通过。server 零改动（校验是正确安全闸）。分支 tip 2da64fd 等 architect
+第三轮门禁重跑确认。
