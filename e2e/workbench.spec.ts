@@ -1483,7 +1483,13 @@ async function stubRunPlanWithImageUpdate(page: Page, runs: ImageEditRunBody[]):
   });
 }
 
-/** 桩 /api/files/edit-draft（server 端点由 backend 契约实现，e2e 只验前端提交形状）。 */
+/**
+ * 桩 /api/files/edit-draft（server 端点由 backend 契约实现，e2e 只验前端提交形状）。
+ * 桩返回的 url 必须满足 server isLocalImageReference（imageValidation.ts：^/api/files/
+ * [A-Za-z0-9_-]{1,128}\.(png|jpe?g|webp|gif)$，单段文件名）——saveTab 会把 editInputRef
+ * 原样存进项目，main@1119967 起 workflowSchema 保存时校验它，两段路径会被 400 拒掉
+ *（首轮双半门禁 multi-round 三视口全挂的根因：桩 url 两段 → 保存被拒 → run-plan 未发出）。
+ */
 async function stubEditDraftUpload(page: Page): Promise<void> {
   await page.route("**/api/files/edit-draft", async (route) => {
     if (route.request().method() !== "POST") {
@@ -1493,7 +1499,7 @@ async function stubEditDraftUpload(page: Page): Promise<void> {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ url: "/api/files/edit-draft/e2e-composite.png" }),
+      body: JSON.stringify({ url: "/api/files/e2e-composite.png" }),
     });
   });
 }
