@@ -297,7 +297,11 @@ export interface FlowState {
    * server 物化合成 step 并以 image-node-updated 回写产物（原位替换 outputImages +
    * 清 mask/maskSourceRef/featherRadius/editPrompt，契约 §3.4）。prompt 为编辑描述（≤500）。
    */
-  runImageEdit: (id: string, prompt: string) => Promise<void>;
+  runImageEdit: (
+    id: string,
+    prompt: string,
+    opts?: { editInputRef?: string },
+  ) => Promise<void>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
   /** 保存指定页签 id（关闭页签时静默保存非脏页签或丢弃前的保存）。 */
@@ -2974,8 +2978,9 @@ export function applyResultNodeCreatedEventToTab(
 
 /**
  * 65d（契约 §1.4/§3.4）：`image-node-updated` 产物**原位替换**（决策 B，不留旧节点）。
- * outputImages = urls；mask/maskSourceRef/featherRadius/editPrompt 全部置 undefined
- * ——「蒙版一次性编辑动作」语义，与裁剪/抠图对齐。
+ * outputImages = urls；mask/maskSourceRef/featherRadius/editPrompt/editInputRef 全部置
+ * undefined ——「一次性编辑动作」语义（v2 §4.1：多轮修改的合成图引用也随产物替换清零，
+ * 新图成为下一轮底图），与裁剪/抠图对齐。
  *
  * 写入走 commitDocumentMutationForTarget（三重绑定 + dirty/revision）；节点非 image、
  * urls 为空或文档已被切换/关闭时 fail-closed 返回 false，不产生任何写入。
@@ -2990,14 +2995,15 @@ export function applyImageNodeUpdatedEventToTab(
     const urls = event.urls.filter((url) => typeof url === "string" && url.trim().length > 0);
     if (urls.length === 0) return {};
     const data = node.data as ImageNodeData;
-    // 幂等：产物与四字段均已就位时不重复写文档（断线重连后服务端会重放事件）。
+    // 幂等：产物与五字段均已就位时不重复写文档（断线重连后服务端会重放事件）。
     const alreadyApplied =
       data.outputImages.length === urls.length &&
       data.outputImages.every((url, index) => url === urls[index]) &&
       data.mask === undefined &&
       data.maskSourceRef === undefined &&
       data.featherRadius === undefined &&
-      data.editPrompt === undefined;
+      data.editPrompt === undefined &&
+      data.editInputRef === undefined;
     if (alreadyApplied) return {};
     return {
       nodes: tab.nodes.map((candidate) =>
@@ -3011,6 +3017,7 @@ export function applyImageNodeUpdatedEventToTab(
                 maskSourceRef: undefined,
                 featherRadius: undefined,
                 editPrompt: undefined,
+                editInputRef: undefined,
               } as WorkflowNodeData,
             }
           : candidate,
@@ -3868,7 +3875,7 @@ export const useFlowStore = create<FlowState>()(
       // 65d（契约 §3.3）：图片节点本地编辑 = 图片节点合成 run。onlyNodeId 指向 image 节点，
       // server 物化合成 step（有 mask=sunburst / 无 mask=flare-vip，模型由 server 按契约 §3.2
       // 固定判定，面板不提供模型选择），产物经 image-node-updated 原位回写 + 清 mask 四字段。
-      runImageEdit: async (id, prompt) => {
+      runImageEdit: async (id, prompt, opts) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
         if (getGenerationSafetyBlockReason()) return;
         flushActiveTextEdit();
@@ -3883,12 +3890,23 @@ export const useFlowStore = create<FlowState>()(
         if (initialDocument.readOnly) return;
         const node = initialDocument.nodes.find((candidate) => candidate.id === id);
         const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
+        // §4.4 三层 fail-closed 的最内层之外的 action 入口自检（面板禁用是第一层）：
+        // mask 与 editInputRef 并存会让 dag 的 primary 错误指向合成图污染 mask 路径，
+        // route 400 之外这里也拒绝，保证 store 入口语义自洽。
+        const trimmedEditInputRef = typeof opts?.editInputRef === "string" && opts.editInputRef.trim()
+          ? opts.editInputRef.trim()
+          : undefined;
+        const nodeHasMask = Boolean(
+          node && node.data.kind === "image" &&
+          typeof node.data.mask === "string" && node.data.mask.trim() !== "",
+        );
         if (
           !node ||
           node.data.kind !== "image" ||
           // 契约 §1.1：editPrompt 非空 + ≤500（前端 maxLength 双保险，action 入口 fail-closed）。
           !trimmedPrompt ||
           trimmedPrompt.length > 500 ||
+          (trimmedEditInputRef !== undefined && nodeHasMask) ||
           isNodeRunActive(node.data.status) ||
           initialState.recentResults.some((record) =>
             record.projectId === initialDocument.projectId &&
@@ -3945,6 +3963,10 @@ export const useFlowStore = create<FlowState>()(
                       error: undefined,
                       // 编辑描述写进节点 data：server 合成判定门（契约 §1.3）读取提交流里的 editPrompt。
                       editPrompt: trimmedPrompt,
+                      // 多轮修改（v2 §4.1）：本轮合成图写进节点 data，随 flow 保存进提交流，
+                      // dag 取 primary = editInputRef ?? outputImages[0]。蒙版路径显式置 undefined，
+                      // 防陈旧合成图引用残留（fail-closed）。
+                      editInputRef: trimmedEditInputRef,
                     } as WorkflowNodeData,
                   }
                   : candidate,

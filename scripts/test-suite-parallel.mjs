@@ -82,6 +82,8 @@ const TEST_FILES = [
   "tests/exact-generation.test.ts",
   "tests/upload-image-normalization.test.ts",
   "tests/mask-upload.test.ts",
+  // 65d v2：editDraftUpload JSON 传输契约（纯函数，不碰库）。
+  "tests/edit-draft-upload.test.ts",
   "tests/static-frontend.test.ts",
   "tests/sqlite-postgres-migration.test.ts",
   "tests/auth-storage.test.ts",

@@ -1,22 +1,60 @@
-import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+// 65d v2 蒙版重绘页（契约 v2 §2.2 + 架构师裁决）：
+// - 去顶栏，改为「左 stage（原图+涂抹层） + 右栏约 1/4 宽（clamp）」承载全部控件；
+//   标题「蒙版重绘」+ 关闭（✕/ESC）在右栏顶部。
+// - 主按钮「蒙版重绘」= 保存蒙版（真上传 /api/files/mask）+ 发起局部重绘 run，
+//   **不关闭面板**：运行期左栏切「显影中」动效，完成后结果覆盖左图（source 实时响应
+//   outputImages[0]），用户手动关闭。次按钮「保存蒙版」只存不执行。
+// - 羽化 v2：勾选式自适应（默认勾选 = 未定义 → server adaptiveMaskFeatherRadius）；
+//   取消勾选后滑杆 0–64 可调。提交时 featherRadius = 自适应 ? undefined : 滑杆值。
+// - 运行期与保存期画布锁定（pointer-events-none），错误显示在右栏状态行。
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { createLatestMaskLoadGuard } from "@/lib/maskUpload";
 import { adaptiveMaskExpansionRadius, adaptiveMaskFeatherRadius } from "@/lib/maskGeometry";
+import type { NodeRunStatus } from "@/types/workflow";
+import { isNodeRunActive } from "@/types/workflow";
+import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 
 interface MaskEditorProps {
+  /** 实时底图（data.outputImages[0]）：运行完成原位替换后本组件重置涂抹层。 */
   source: string;
   initialMask?: string;
-  /** 用户指定羽化宽度（px）。undefined = 沿用自适应羽化预览。 */
+  /** 已存羽化宽度（px）；undefined/非有限数 = 自适应（勾选态）。 */
   featherRadius?: number;
-  onSave: (mask: string) => void | Promise<void>;
+  /** editPrompt 渲染值（coalesced 通道当前值，由 ImageNode 持有 hook 传入）。 */
+  editPrompt: string;
+  /** textarea 事件绑定（IME/撤销安全）。 */
+  promptBind: ReturnType<typeof useCoalescedTextEdit>["bind"];
+  /** 节点运行状态：active 时左栏显影中 + 画布锁定。 */
+  runStatus: NodeRunStatus;
+  readOnly?: boolean;
+  /** 只保存蒙版（写 node data.mask/featherRadius），不执行。 */
+  onSaveDraft: (mask: string, featherRadius: number | undefined) => void | Promise<void>;
+  /** 保存蒙版 + 发起局部重绘 run（面板不关闭）。 */
+  onRun: (mask: string, featherRadius: number | undefined) => void | Promise<void>;
   onClose: () => void;
 }
 
 type BrushMode = "edit" | "preserve";
 const MAX_MASK_BYTES = 4 * 1024 * 1024;
 const MAX_HISTORY = 12;
+/** 羽化滑杆上限（与 maskGeometry.adaptiveMaskFeatherRadius 上界一致）。 */
+const FEATHER_MAX = 64;
+/** 自适应未勾选时的滑杆默认值（v1 行为中位值）。 */
+const FEATHER_DEFAULT = 32;
 
-export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose }: MaskEditorProps) {
+export function MaskEditor({
+  source,
+  initialMask,
+  featherRadius,
+  editPrompt,
+  promptBind,
+  runStatus,
+  readOnly = false,
+  onSaveDraft,
+  onRun,
+  onClose,
+}: MaskEditorProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -28,10 +66,22 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<BrushMode>("edit");
   const [brushSize, setBrushSize] = useState(80);
+  // 羽化 v2：勾选式自适应（默认开）；取消勾选后滑杆值生效。
+  const [featherEnabled, setFeatherEnabled] = useState(() => !(typeof featherRadius === "number" && Number.isFinite(featherRadius)));
+  const [featherValue, setFeatherValue] = useState(() =>
+    typeof featherRadius === "number" && Number.isFinite(featherRadius)
+      ? Math.max(0, Math.min(FEATHER_MAX, Math.round(featherRadius)))
+      : FEATHER_DEFAULT,
+  );
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+
+  const running = isNodeRunActive(runStatus);
+  const hasPrompt = editPrompt.trim().length > 0;
+  const locked = saving || running || readOnly;
 
   const renderOverlay = () => {
     const mask = maskRef.current;
@@ -76,10 +126,10 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
       ? { width: right - left + 1, height: bottom - top + 1 }
       : { width: 1, height: 1 };
     const expansionRadius = adaptiveMaskExpansionRadius(overlay.width, overlay.height, extent);
-    // 用户未指定时沿用自适应羽化；指定后按该值预览（0 = 硬边）。
-    const featherRadiusPreview = typeof featherRadius === "number" && Number.isFinite(featherRadius)
-      ? Math.max(0, Math.min(64, Math.round(featherRadius)))
-      : adaptiveMaskFeatherRadius(overlay.width, overlay.height, expansionRadius);
+    // 勾选自适应 → 沿用 adaptiveMaskFeatherRadius 预览；取消勾选 → 按滑杆值预览（0 = 硬边）。
+    const featherRadiusPreview = featherEnabled
+      ? adaptiveMaskFeatherRadius(overlay.width, overlay.height, expansionRadius)
+      : Math.max(0, Math.min(FEATHER_MAX, Math.round(featherValue)));
     if (expansionRadius > 0) {
       context.save();
       context.filter = `blur(${Math.max(2, Math.round((expansionRadius + featherRadiusPreview) / 2))}px)`;
@@ -160,8 +210,15 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
     setReady(true);
   };
 
+  // 最新闭包存入 ref：useLayoutEffect 只依赖触发值（source/initialMask/羽化值），
+  // 经 ref 调用当轮闭包（门禁 no-error-suppression：不得用抑制注释绕过依赖检查）。
+  const renderOverlayRef = useRef(renderOverlay);
+  renderOverlayRef.current = renderOverlay;
+  const initializeCanvasesRef = useRef(initializeCanvases);
+  initializeCanvasesRef.current = initializeCanvases;
+
   useLayoutEffect(() => {
-    // 同一组件实例可能因上游 Run 完成而收到新 source；先使旧 Image 回调失效。
+    // source 变化（运行完成换新图）或 initialMask 变化（清空）时使旧回调失效并重置。
     loadGuardRef.current.invalidate();
     snapshotLoadGuardRef.current.invalidate();
     drawingRef.current = false;
@@ -171,12 +228,17 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
     setUndoStack([]);
     setRedoStack([]);
     const image = imageRef.current;
-    if (image?.complete && image.naturalWidth && image.naturalHeight) initializeCanvases();
+    if (image?.complete && image.naturalWidth && image.naturalHeight) initializeCanvasesRef.current();
     return () => {
       loadGuardRef.current.invalidate();
       snapshotLoadGuardRef.current.invalidate();
     };
   }, [source, initialMask]);
+
+  // 羽化状态变化 → 重绘预览。
+  useLayoutEffect(() => {
+    renderOverlayRef.current();
+  }, [featherEnabled, featherValue]);
 
   const pointForEvent = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const canvas = overlayRef.current!;
@@ -213,7 +275,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!ready || savingRef.current) return;
+    if (!ready || locked) return;
     snapshotLoadGuardRef.current.invalidate();
     pushUndo();
     drawingRef.current = true;
@@ -224,7 +286,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const continueDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (savingRef.current || !drawingRef.current || !lastPointRef.current) return;
+    if (locked || !drawingRef.current || !lastPointRef.current) return;
     const point = pointForEvent(event);
     drawSegment(lastPointRef.current, point);
     lastPointRef.current = point;
@@ -237,7 +299,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const clearMask = () => {
-    if (savingRef.current) return;
+    if (locked) return;
     snapshotLoadGuardRef.current.invalidate();
     const mask = maskRef.current;
     if (!mask) return;
@@ -251,7 +313,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const invertMask = () => {
-    if (savingRef.current) return;
+    if (locked) return;
     snapshotLoadGuardRef.current.invalidate();
     const mask = maskRef.current;
     if (!mask) return;
@@ -272,7 +334,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const undo = () => {
-    if (savingRef.current) return;
+    if (locked) return;
     const snapshot = undoStack.at(-1);
     if (!snapshot) return;
     const current = captureMask();
@@ -282,7 +344,7 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
   };
 
   const redo = () => {
-    if (savingRef.current) return;
+    if (locked) return;
     const snapshot = redoStack.at(-1);
     if (!snapshot) return;
     const current = captureMask();
@@ -291,25 +353,37 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
     loadMaskSnapshot(snapshot);
   };
 
-  const save = async () => {
+  /** 提交羽化值：自适应 → undefined（server 按原图尺寸自适应）；自定义 → 0–64。 */
+  const resolvedFeatherRadius = (): number | undefined =>
+    featherEnabled ? undefined : Math.max(0, Math.min(FEATHER_MAX, Math.round(featherValue)));
+
+  const encodeMask = async () => {
     const mask = maskRef.current;
-    if (!mask || savingRef.current) return;
+    if (!mask) throw new Error("蒙版画布不可用");
     snapshotLoadGuardRef.current.invalidate();
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      mask.toBlob((value) => value ? resolve(value) : reject(new Error("蒙版编码失败")), "image/png");
+    });
+    if (blob.size > MAX_MASK_BYTES) throw new Error("蒙版 PNG 超过 4MB，请减少画布尺寸后重试");
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("蒙版读取失败"));
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  /** 次按钮：只保存蒙版（不执行）。 */
+  const saveDraft = async () => {
+    if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     setError(null);
+    setStatusNote(null);
     try {
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        mask.toBlob((value) => value ? resolve(value) : reject(new Error("蒙版编码失败")), "image/png");
-      });
-      if (blob.size > MAX_MASK_BYTES) throw new Error("蒙版 PNG 超过 4MB，请减少画布尺寸后重试");
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("蒙版读取失败"));
-        reader.readAsDataURL(blob);
-      });
-      await onSave(dataUrl);
+      const dataUrl = await encodeMask();
+      await onSaveDraft(dataUrl, resolvedFeatherRadius());
+      setStatusNote("已保存蒙版");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));
     } finally {
@@ -318,31 +392,52 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
     }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-100 flex flex-col bg-[var(--gc-shell)]">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--gc-border)] px-4">
-        <strong className="text-sm font-medium text-[var(--gc-text)]">局部修改</strong>
-        <span className="text-label text-[var(--gc-text-muted)]">GPT Image 2</span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <ToolbarButton label="撤销" disabled={saving || !undoStack.length} onClick={undo} />
-          <ToolbarButton label="重做" disabled={saving || !redoStack.length} onClick={redo} />
-          <ToolbarButton label="清空" disabled={saving} onClick={clearMask} />
-          <ToolbarButton label="反选" disabled={saving} onClick={invertMask} />
-          <button type="button" onClick={onClose} disabled={saving} className="ml-2 rounded-md border border-[var(--gc-border)] px-3 py-1.5 text-xs text-[var(--gc-text)] hover:border-[var(--gc-text-muted)] disabled:opacity-40">
-            关闭
-          </button>
-        </div>
-      </header>
+  /** 主按钮：保存蒙版 + 发起局部重绘 run（面板不关闭，等 image-node-updated 覆盖左图）。 */
+  const saveAndRun = async () => {
+    if (savingRef.current || running) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    setStatusNote(null);
+    try {
+      const dataUrl = await encodeMask();
+      await onRun(dataUrl, resolvedFeatherRadius());
+      setStatusNote("已保存蒙版，正在重绘…");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : String(saveError));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
 
-      <main className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[var(--gc-canvas)] p-4">
+  // ESC 关闭（保存/运行中忽略，防丢帧）。
+  useLayoutEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (savingRef.current) return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const disabledRun = !ready || locked || !hasPrompt || readOnly;
+  const disabledDraft = !ready || locked || readOnly;
+
+  return createPortal(
+    <div className="fixed inset-0 z-100 flex bg-black/70" data-panel="mask-redraw" role="dialog" aria-modal="true" aria-label="蒙版重绘">
+      {/* 左 stage：原图 + 涂抹层 + 运行期显影中 */}
+      <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4">
         <div className="relative inline-flex max-h-full max-w-full shadow-2xl shadow-black">
           <img
             ref={imageRef}
             src={source}
-            alt="局部修改原图"
+            alt="蒙版重绘原图"
             onLoad={initializeCanvases}
             onError={() => setError("无法读取原图")}
-            className="block max-h-[calc(100vh-132px)] max-w-[calc(100vw-32px)] select-none object-contain"
+            className="block max-h-[calc(100vh-32px)] max-w-[calc(100vw-320px)] select-none object-contain"
             draggable={false}
           />
           <canvas
@@ -351,38 +446,154 @@ export function MaskEditor({ source, initialMask, featherRadius, onSave, onClose
             onPointerMove={continueDrawing}
             onPointerUp={stopDrawing}
             onPointerCancel={stopDrawing}
-            aria-disabled={saving}
-            className={`absolute inset-0 h-full w-full touch-none ${ready && !saving ? "cursor-crosshair" : "cursor-wait"} ${saving ? "pointer-events-none" : ""}`}
+            aria-disabled={locked}
+            data-testid="mask-editor-canvas"
+            className={`absolute inset-0 h-full w-full touch-none ${ready && !locked ? "cursor-crosshair" : "cursor-wait"} ${locked ? "pointer-events-none" : ""}`}
           />
           <canvas ref={maskRef} className="hidden" />
+          {running ? (
+            <div
+              className="develop-overlay pointer-events-none absolute inset-0 z-10 overflow-hidden"
+              data-testid="mask-redraw-developing"
+            >
+              <div className="develop-gridlines" aria-hidden="true" />
+              <div className="develop-scanline" aria-hidden="true" />
+              <div className="develop-float">
+                <div className="develop-sigil" aria-hidden="true">
+                  <span>✦</span>
+                </div>
+                <div>显影中…</div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </main>
 
-      <footer className="flex min-h-16 shrink-0 items-center gap-4 border-t border-[var(--gc-border)] px-4 py-2">
-        <div className="flex rounded-md border border-[var(--gc-border)] p-0.5">
-          <ModeButton active={mode === "edit"} label="涂抹修改区" disabled={saving} onClick={() => setMode("edit")} />
-          <ModeButton active={mode === "preserve"} label="恢复保留区" disabled={saving} onClick={() => setMode("preserve")} />
-        </div>
-        <label className="flex min-w-56 items-center gap-2 text-label text-[var(--gc-text-muted)]">
-          笔刷 {brushSize}px
-          <input
-            type="range" min={8} max={300} step={4} value={brushSize}
-            onChange={(event) => setBrushSize(Number(event.target.value))}
+      {/* 右栏：约 1/4 宽（clamp），承载全部控件 */}
+      <aside
+        className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col border-l border-[var(--gc-border)] bg-[var(--gc-panel)]"
+        data-testid="mask-redraw-rail"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
+          <strong className="text-sm font-medium text-[var(--gc-text)]">蒙版重绘</strong>
+          <button
+            type="button"
+            onClick={onClose}
             disabled={saving}
-            className="accent-gold disabled:opacity-40"
-          />
-        </label>
-        <span className="text-label text-[var(--gc-text-muted)]">红色是修改中心，不是裁切框 · 新内容可在金色融合区内完整延展</span>
-        {error && <p className="min-w-0 flex-1 truncate text-body text-red-400" title={error}>{error}</p>}
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={!ready || saving}
-          className="ml-auto rounded-md bg-gold px-4 py-2 text-xs font-medium text-[var(--gc-accent-cta-ink)] disabled:opacity-40"
-        >
-          {saving ? "保存中…" : "保存蒙版"}
-        </button>
-      </footer>
+            aria-label="关闭"
+            title="关闭（ESC）"
+            data-testid="mask-redraw-close"
+            className="rounded-md border border-[var(--gc-border)] px-2.5 py-1.5 text-xs text-[var(--gc-text)] hover:border-[var(--gc-text-muted)] disabled:opacity-40"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+          {/* 绘画工具 */}
+          <section className="flex flex-col gap-3" aria-label="绘画工具">
+            <div className="flex rounded-md border border-[var(--gc-border)] p-0.5 self-start">
+              <ModeButton active={mode === "edit"} label="涂抹修改区" disabled={locked} onClick={() => setMode("edit")} />
+              <ModeButton active={mode === "preserve"} label="恢复保留区" disabled={locked} onClick={() => setMode("preserve")} />
+            </div>
+            <label className="flex items-center gap-2 text-label text-[var(--gc-text-muted)]">
+              笔刷
+              <input
+                type="range" min={8} max={300} step={4} value={brushSize}
+                onChange={(event) => setBrushSize(Number(event.target.value))}
+                disabled={locked}
+                className="min-w-0 flex-1 accent-gold disabled:opacity-40"
+              />
+              <span className="tabular-nums">{brushSize}px</span>
+            </label>
+            {/* 羽化行 v2：勾选式自适应 + 滑杆 */}
+            <div className="flex flex-col gap-1.5" aria-label="羽化">
+              <div className="flex items-center gap-2 text-label text-[var(--gc-text-muted)]">
+                <input
+                  type="checkbox"
+                  id={`mask-feather-adaptive-${source.slice(-24)}`}
+                  checked={featherEnabled}
+                  disabled={locked}
+                  onChange={(event) => setFeatherEnabled(event.currentTarget.checked)}
+                  data-testid="mask-redraw-feather"
+                  className="accent-gold"
+                />
+                <label htmlFor={`mask-feather-adaptive-${source.slice(-24)}`}>羽化 · 自适应</label>
+                <span className="ml-auto tabular-nums">
+                  {featherEnabled ? "自适应" : `${featherValue}px`}
+                </span>
+              </div>
+              <input
+                type="range" min={0} max={FEATHER_MAX} value={featherValue}
+                disabled={locked || featherEnabled}
+                aria-label="羽化宽度"
+                className="w-full accent-gold disabled:opacity-40"
+                onChange={(event) => {
+                  setFeatherEnabled(false);
+                  setFeatherValue(Number(event.target.value));
+                }}
+              />
+            </div>
+            <div className="flex gap-1">
+              <ToolbarButton label="撤销" disabled={locked || !undoStack.length} onClick={undo} />
+              <ToolbarButton label="重做" disabled={locked || !redoStack.length} onClick={redo} />
+              <ToolbarButton label="清空" disabled={locked} onClick={clearMask} />
+              <ToolbarButton label="反选" disabled={locked} onClick={invertMask} />
+            </div>
+          </section>
+
+          {/* 修改描述 */}
+          <section className="flex flex-col gap-1.5" aria-label="修改描述">
+            <label htmlFor="mask-redraw-prompt" className="text-xs font-medium text-[var(--gc-text)]">修改描述</label>
+            <textarea
+              id="mask-redraw-prompt"
+              value={editPrompt}
+              maxLength={500}
+              rows={4}
+              placeholder="描述红色区域如何修改，例如：把背景改成米色…"
+              className="rounded-md border border-[var(--gc-border)] bg-transparent px-2 py-1.5 text-sm text-[var(--gc-text)] outline-none focus:border-[var(--gc-text-muted)]"
+              {...promptBind}
+            />
+            <span className="text-right text-xs text-[var(--gc-text-muted)]">{editPrompt.length} / 500</span>
+          </section>
+
+          {/* 按钮区 */}
+          <section className="flex flex-col gap-2" aria-label="执行">
+            <button
+              type="button"
+              onClick={() => void saveAndRun()}
+              disabled={disabledRun}
+              title={!ready ? "图片还在载入" : locked ? "运行中，请稍候" : readOnly ? "只读项目内不能重绘" : !hasPrompt ? "请先填写修改描述" : ""}
+              data-testid="mask-redraw-run"
+              className="rounded-md bg-gold px-4 py-2 text-xs font-medium text-[var(--gc-accent-cta-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving ? "保存中…" : running ? "运行中…" : "蒙版重绘"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveDraft()}
+              disabled={disabledDraft}
+              data-testid="mask-redraw-save"
+              className="rounded-md border border-[var(--gc-border)] px-4 py-2 text-xs text-[var(--gc-text)] hover:border-[var(--gc-text-muted)] disabled:opacity-40"
+            >
+              {saving ? "保存中…" : "保存蒙版"}
+            </button>
+          </section>
+
+          {/* 状态行 + 说明 */}
+          <section className="flex flex-col gap-1" aria-live="polite">
+            {error ? (
+              <p className="text-xs text-red-400" role="alert" data-testid="mask-redraw-error">{error}</p>
+            ) : null}
+            {statusNote ? (
+              <p className="text-xs text-[var(--gc-text-muted)]" data-testid="mask-redraw-note">{statusNote}</p>
+            ) : null}
+            <p className="text-xs leading-relaxed text-[var(--gc-text-muted)]">
+              红色是修改中心，不是裁切框 · 新内容可在金色融合区内完整延展
+            </p>
+          </section>
+        </div>
+      </aside>
     </div>,
     document.body,
   );

@@ -1394,7 +1394,7 @@ test("project tab close stays blocked with a readable reason while run history i
   expect(dialogs).toEqual([]);
 });
 
-// ---------- 65d：图片节点本地编辑（蒙版重绘 / 整图编辑）合成 run ----------
+// ---------- 65d v2：蒙版重绘页 + 多轮修改专属页（架构师裁决；旧「整图编辑」内联入口退役） ----------
 
 /** 64×64 实色 PNG：MaskEditor 画布尺寸 = 原图尺寸，涂抹需要真实像素面积。 */
 async function makeBaseImage(): Promise<Buffer> {
@@ -1406,38 +1406,11 @@ interface ImageEditRunBody {
   includeDownstream?: boolean;
 }
 
-test("image node local edit runs a synthetic run and swaps output in place", async ({ page }) => {
-  test.setTimeout(90_000);
-  // beforeEach 已落地 1 个 image 节点（startFirstProject）。
-  const nodes = page.locator(".react-flow__node");
-  await expect(nodes).toHaveCount(1);
-  const imageNodeId = await nodeIdOfKind(page, "image");
-  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
-
-  // ---------- ① 上传基图：编辑面板出现（无蒙版 + 无描述 → 两按钮各自给出可读原因） ----------
-  await imageNode.getByLabel("上传图片").setInputFiles({
-    name: "base.png",
-    mimeType: "image/png",
-    buffer: await makeBaseImage(),
-  });
-  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-
-  const promptInput = imageNode.getByLabel("修改描述");
-  await expect(promptInput).toBeVisible();
-  await expect(promptInput).toHaveAttribute("maxlength", "500");
-  const redrawButton = imageNode.getByRole("button", { name: "蒙版重绘" });
-  const wholeEditButton = imageNode.getByRole("button", { name: "整图编辑" });
-  await expect(redrawButton).toBeDisabled();
-  await expect(imageNode.getByText("请先绘制蒙版")).toBeVisible();
-  await expect(wholeEditButton).toBeDisabled();
-  await expect(imageNode.getByText("请先填写修改描述")).toBeVisible();
-
-  // ---------- ② 填描述 → 整图编辑可用；付费边界桩（只桩 /api/run-plan，保存走真实 server） ----------
-  await promptInput.fill("把背景改成米色");
-  await expect(wholeEditButton).toBeEnabled();
-
-  const runs: ImageEditRunBody[] = [];
+/**
+ * 桩 /api/run-plan + SSE（image-node-updated 覆盖产物；契约 §0-B：合成 run 不新建结果节点）。
+ * 65d v2 契约：run-plan body 不带 editInputRef（server 从 node data 读），故桩只需记录形状。
+ */
+async function stubRunPlanWithImageUpdate(page: Page, runs: ImageEditRunBody[]): Promise<void> {
   const nodeIdByRun = new Map<string, string>();
   let runSequence = 0;
   await page.route("**/api/run-plan**", async (route) => {
@@ -1474,7 +1447,7 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
           runId,
           urls: [RESULTS_DENSITY_IMAGE],
           model: "gpt-image-2.5-sunburst",
-          prompts: ["把背景改成米色"],
+          prompts: ["e2e 编辑"],
           providerOutputSizes: [null],
         },
         {
@@ -1484,7 +1457,7 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
           status: "success",
           images: [RESULTS_DENSITY_IMAGE],
           model: "gpt-image-2.5-sunburst",
-          prompts: ["把背景改成米色"],
+          prompts: ["e2e 编辑"],
           startedAt: now,
           finishedAt: now + 25,
         },
@@ -1508,44 +1481,86 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
       body: JSON.stringify({ id: runId, status: "running" }),
     });
   });
+}
 
-  // ---------- ③ 画真蒙版：MaskEditor 涂抹 → 保存（真实 /api/files/mask 上传 + 项目认领） ----------
+/**
+ * 桩已移除（裁决 v2.4）：edit-draft 必须打真端点。server 存在性闸
+ * assertImageReferencesAccessible（imageReferenceAccess.ts）递归收集 flow 内
+ * /api/files/ 引用查 files 表真记录——任何假 url 形态再合规，没真落库就是死路
+ *（第二轮门禁实测：单段桩过了形态校验，挂存在性校验，run-plan 未发出）。
+ * 真链路：生产 uploadEditDraft 真 POST → server 真落库返回真 url → editInputRef
+ * 写入 node data → saveTab 过两道闸。/api/run-plan 仍桩拦（付费动作不真跑）。
+ */
+
+test("mask redraw panel: main action saves and runs without closing; output swaps in place", async ({ page }) => {
+  test.setTimeout(90_000);
+  // beforeEach 已落地 1 个 image 节点（startFirstProject）。
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+  const runs: ImageEditRunBody[] = [];
+
+  // ---------- ① 上传基图 → 工具条「蒙版」→ 蒙版重绘页（右栏约 1/4 宽整合控件） ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
   await selectCanvasNode(imageNode);
   const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
   await imageToolbar.getByRole("button", { name: "蒙版" }).click();
-  const maskEditorHeader = page.getByText("局部修改", { exact: true });
-  await expect(maskEditorHeader).toBeVisible();
-  const saveMaskButton = page.getByRole("button", { name: "保存蒙版" });
-  await expect(saveMaskButton).toBeEnabled({ timeout: 20_000 });
-  // 蒙版 overlay canvas（原图 img 的相邻兄弟）；涂抹产生 Alpha（edit 模式 destination-out）。
-  const overlayCanvas = page.locator('img[alt="局部修改原图"] + canvas');
+
+  const rail = page.getByTestId("mask-redraw-rail");
+  await expect(rail).toBeVisible();
+  await expect(rail.locator("strong", { hasText: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
+  await expect(page.getByTestId("mask-editor-canvas")).toBeVisible();
+
+  // 无蒙版 + 无描述：主按钮 disabled（fail-closed 前端态）；
+  // 「保存蒙版」保留 v1 语义——只存不执行，不要求修改描述。
+  const runButton = page.getByTestId("mask-redraw-run");
+  const saveButton = page.getByTestId("mask-redraw-save");
+  await expect(runButton).toBeDisabled();
+  await expect(saveButton).toBeEnabled();
+  // rail 内唯一 textbox（section/label 都叫「修改描述」，getByLabel 会命中两个元素）。
+  const promptInput = rail.getByRole("textbox");
+  await expect(promptInput).toHaveAttribute("maxlength", "500");
+  // 羽化勾选式：默认勾选 = 自适应（undefined），无独立滑杆常驻。
+  await expect(page.getByTestId("mask-redraw-feather")).toBeChecked();
+
+  // ---------- ② 填描述 + 涂抹 → 主按钮「蒙版重绘」= 保存 + 发起 run，面板不关 ----------
+  await promptInput.fill("把背景改成米色");
+  await stubRunPlanWithImageUpdate(page, runs);
+  await expect(runButton).toBeEnabled();
+  await expect(saveButton).toBeEnabled();
+
+  const overlayCanvas = page.getByTestId("mask-editor-canvas");
   const canvasBox = await overlayCanvas.boundingBox();
   expect(canvasBox, "蒙版编辑器画布必须可见可命中").not.toBeNull();
   await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.3, canvasBox!.y + canvasBox!.height * 0.3);
   await page.mouse.down();
   await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.7, canvasBox!.y + canvasBox!.height * 0.7, { steps: 12 });
   await page.mouse.up();
-  const maskUploadPromise = page.waitForResponse(
-    (res) => res.url().includes("/api/files/mask") && res.request().method() === "POST",
-    { timeout: 15_000 },
-  ).catch(() => null);
-  await saveMaskButton.click();
+
+  const maskUploadPromise = page
+    .waitForResponse(
+      (res) => res.url().includes("/api/files/mask") && res.request().method() === "POST",
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  const runResponsePromise = page
+    .waitForResponse(
+      (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
+      { timeout: 8_000 },
+    )
+    .catch(() => null);
+  await runButton.click();
   const maskUpload = await maskUploadPromise;
-  expect(maskUpload, "保存蒙版必须走真实 /api/files/mask 上传").not.toBeNull();
+  expect(maskUpload, "蒙版重绘必须先走真实 /api/files/mask 保存").not.toBeNull();
   expect(maskUpload?.ok(), `蒙版上传必须成功：HTTP ${maskUpload?.status()}`).toBeTruthy();
-  await expect(maskEditorHeader).toHaveCount(0); // 编辑器关闭
-
-  // 蒙版在位 → 按钮语义翻转（契约 §1.3：server 按 mask 判定模型）。
-  await expect(redrawButton).toBeEnabled();
-  await expect(wholeEditButton).toBeDisabled();
-  await expect(imageNode.getByText("已有蒙版时请用蒙版重绘")).toBeVisible();
-
-  // ---------- ④ 蒙版重绘：合成 run 载荷 + 原位替换 + 清 mask/editPrompt + 不新建结果节点 ----------
-  const runResponsePromise = page.waitForResponse(
-    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
-    { timeout: 8_000 },
-  ).catch(() => null);
-  await redrawButton.click();
   const runResponse = await runResponsePromise;
   expect(runResponse, "蒙版重绘必须由 UI 发起合成 run（POST /api/run-plan）").not.toBeNull();
   expect(runResponse?.status()).toBe(202);
@@ -1553,10 +1568,12 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
   expect(runs[0].onlyNodeId, "onlyNodeId 必须指向被编辑的 image 节点").toBe(imageNodeId);
   expect(runs[0].includeDownstream, "合成 run 不得带下游").toBe(false);
 
+  // ---------- ③ 完成后面板不自动关（页内停留）：左图被新产物覆盖，显影中消失 ----------
+  await expect(page.getByTestId("mask-redraw-developing")).toHaveCount(0);
+  await expect(rail).toBeVisible();
   await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
   await expect(imageNode.getByAltText("已上传图片")).toHaveAttribute("src", RESULTS_DENSITY_IMAGE);
-  await expect(promptInput).toHaveValue("");
-  await expect(nodes).toHaveCount(1); // 画布不新建 result-image 节点（契约 §0-B）
+
   const afterMaskRun = await page.evaluate(async (nodeId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
     const store = await import(/* @vite-ignore */ storeModuleUrl);
@@ -1569,6 +1586,7 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
       maskSourceRef: data.maskSourceRef,
       featherRadius: data.featherRadius,
       editPrompt: data.editPrompt,
+      editInputRef: data.editInputRef,
       outputImages: data.outputImages,
     };
   }, imageNodeId);
@@ -1576,21 +1594,211 @@ test("image node local edit runs a synthetic run and swaps output in place", asy
   expect(afterMaskRun.maskSourceRef, "运行后 maskSourceRef 必须清空").toBeUndefined();
   expect(afterMaskRun.featherRadius, "运行后 featherRadius 必须清空").toBeUndefined();
   expect(afterMaskRun.editPrompt, "运行后 editPrompt 必须清空").toBeUndefined();
+  expect(afterMaskRun.editInputRef, "蒙版路径不得残留 editInputRef").toBeUndefined();
   expect(afterMaskRun.outputImages, "产物必须原位替换 outputImages").toEqual([RESULTS_DENSITY_IMAGE]);
+  expect(nodes).toHaveCount(1); // 画布不新建 result-image 节点（契约 §0-B）
 
-  // ---------- ⑤ 无蒙版路径：mask 已被运行清空 → 整图编辑可用，同一合成 run 形状 ----------
-  await promptInput.fill("整体提亮");
-  await expect(wholeEditButton).toBeEnabled();
-  const secondRunPromise = page.waitForResponse(
-    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
-    { timeout: 8_000 },
-  ).catch(() => null);
-  await wholeEditButton.click();
-  expect(await secondRunPromise, "整图编辑必须由 UI 发起合成 run").not.toBeNull();
-  expect(runs, "第二次编辑恰好再发一次合成 run").toHaveLength(2);
-  expect(runs[1].onlyNodeId).toBe(imageNodeId);
-  expect(runs[1].includeDownstream).toBe(false);
-  await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
-  await expect(promptInput).toHaveValue("");
+  // ---------- ④ 手动关闭（ESC）→ 蒙版态消失后「多轮修改」恢复可用（fail-closed 解除） ----------
+  await page.keyboard.press("Escape");
+  await expect(rail).toHaveCount(0);
+  const multiEditButton = imageToolbar.getByRole("button", { name: "多轮修改" });
+  await expect(multiEditButton).toBeEnabled();
+});
+
+test("multi-round edit panel: marks compose into edit draft; rounds tracked in panel", async ({ page }) => {
+  test.setTimeout(90_000);
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+  const runs: ImageEditRunBody[] = [];
+
+  // ---------- ① 上传基图 → 无蒙版时工具条「多轮修改」可用 → 打开专属编辑页 ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  const multiEditButton = imageToolbar.getByRole("button", { name: "多轮修改" });
+  await expect(multiEditButton).toBeEnabled();
+  await multiEditButton.click();
+
+  const panel = page.getByTestId("multi-round-edit-panel");
+  const rail = page.getByTestId("multi-round-rail");
+  await expect(panel).toBeVisible();
+  await expect(rail.getByRole("heading", { name: "多轮修改" })).toBeVisible(); // 标题在右栏顶部
+  // 底图加载完成后标记层画布才有几何尺寸（img 未加载时容器高 0 → canvas hidden）。
+  await page.waitForFunction(() => {
+    const img = document.querySelector('img[alt="多轮修改底图"]') as HTMLImageElement | null;
+    return Boolean(img?.complete && img.naturalWidth > 0);
+  });
+  await expect(page.getByTestId("mark-layer-canvas")).toBeVisible(); // 图上标记层
+  await expect(page.getByTestId("multi-round-history")).toBeVisible();
+  // 面板内说明标记语义（裁决 §4.5：不改 image.edit，语义用提示文案达成）。
+  await expect(panel).toContainText("原图");
+
+  // rail 内唯一 textbox（section/label 都叫「修改描述」，getByLabel 会命中两个元素）。
+  const promptInput = rail.getByRole("textbox");
+  await expect(promptInput).toHaveAttribute("maxlength", "500");
+  const startButton = page.getByTestId("multi-round-start");
+  await expect(startButton).toBeDisabled(); // 无描述 → disabled（title 给原因）
+  await promptInput.fill("把标记处改成银色拉链");
+
+  // ---------- ② 画矩形标记 → 开始修改：真上传 edit-draft（生产链路落库）+ 合成 run ----------
+  await stubRunPlanWithImageUpdate(page, runs);
+  await rail.getByRole("button", { name: "矩形" }).click();
+  const editCanvas = page.getByTestId("mark-layer-canvas");
+  const box = await editCanvas.boundingBox();
+  expect(box, "多轮修改标记层画布必须可见可命中").not.toBeNull();
+  await page.mouse.move(box!.x + box!.width * 0.35, box!.y + box!.height * 0.35);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.6, box!.y + box!.height * 0.55, { steps: 8 });
+  await page.mouse.up();
+  await expect(startButton).toBeEnabled();
+
+  const draftPromise = page
+    .waitForResponse(
+      (res) => res.url().includes("/api/files/edit-draft") && res.request().method() === "POST",
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+  const runResponsePromise = page
+    .waitForResponse(
+      (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/run-plan",
+      { timeout: 8_000 },
+    )
+    .catch(() => null);
+  await startButton.click();
+  const draftUpload = await draftPromise;
+  expect(draftUpload, "提交必须先合成并上传 edit-draft").not.toBeNull();
+  expect(draftUpload?.ok(), `edit-draft 上传必须成功：HTTP ${draftUpload?.status()}`).toBeTruthy();
+  const runResponse = await runResponsePromise;
+  expect(runResponse, "多轮修改必须由 UI 发起合成 run").not.toBeNull();
+  expect(runResponse?.status()).toBe(202);
+  expect(runs, "恰好一次合成 run").toHaveLength(1);
+  expect(runs[0].onlyNodeId, "onlyNodeId 必须指向被编辑的 image 节点").toBe(imageNodeId);
+  expect(runs[0], "v2 契约：run-plan body 不带 editInputRef（server 从 node data 读）").not.toHaveProperty(
+    "editInputRef",
+  );
+
+  // ---------- ③ 完成：记录条出现「第 1 轮」，stage 切新产物，面板不关（多轮客户端自管理） ----------
+  await expect(page.getByTestId("multi-round-history").getByText("第 1 轮")).toBeVisible();
+  await expect(imageNode.getByAltText("已上传图片")).toHaveAttribute("src", RESULTS_DENSITY_IMAGE);
+  await expect(panel).toBeVisible();
+
+  const afterRun = await page.evaluate(async (nodeId) => {
+    const storeModuleUrl = "/src/store/flowStore.ts";
+    const store = await import(/* @vite-ignore */ storeModuleUrl);
+    const state = store.useFlowStore.getState();
+    const tab = state.tabs.find((candidate: { id: string }) => candidate.id === state.activeTabId);
+    const node = tab?.nodes.find((candidate: { id: string }) => candidate.id === nodeId);
+    const data = (node?.data ?? {}) as Record<string, unknown>;
+    return {
+      editPrompt: data.editPrompt,
+      editInputRef: data.editInputRef,
+      marks: data.marks,
+      outputImages: data.outputImages,
+    };
+  }, imageNodeId);
+  expect(afterRun.editPrompt, "运行后 editPrompt 必须清空").toBeUndefined();
+  expect(afterRun.editInputRef, "运行后 editInputRef 必须清空").toBeUndefined();
+  expect(afterRun.marks, "标记不得写入 node data（客户端自管理）").toBeUndefined();
+  expect(afterRun.outputImages, "产物必须原位替换 outputImages").toEqual([RESULTS_DENSITY_IMAGE]);
+  expect(nodes).toHaveCount(1); // 合成 run 不新建结果节点（契约 §0-B）
+
+  // ---------- ④ 手动关闭（ESC）→ 面板卸载，画布节点仍在 ----------
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(nodes).toHaveCount(1);
+});
+
+test("multi-round edit panel: mark undo/redo keeps stroke history consistent", async ({ page }) => {
+  // 回归护栏（reviewer PR #99 P2）：undo/redo 历史栈副作用曾写在 setState updater
+  // 内部 → React 延迟执行 updater 时 marksRef 已被改写 → future 收到错误值 →
+  // redo 恢复错误 marks。此测试用画布 dataURL 精确比对断言每一步的 marks 状态。
+  test.setTimeout(90_000);
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+
+  // ---------- ① 上传基图 → 打开多轮修改面板（同主流程） ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  await imageToolbar.getByRole("button", { name: "多轮修改" }).click();
+
+  const panel = page.getByTestId("multi-round-edit-panel");
+  const rail = page.getByTestId("multi-round-rail");
+  await expect(panel).toBeVisible();
+  await page.waitForFunction(() => {
+    const img = document.querySelector('img[alt="多轮修改底图"]') as HTMLImageElement | null;
+    return Boolean(img?.complete && img.naturalWidth > 0);
+  });
+  const markCanvas = page.getByTestId("mark-layer-canvas");
+  await expect(markCanvas).toBeVisible();
+
+  const undoButton = rail.getByRole("button", { name: "撤销标记" });
+  const redoButton = rail.getByRole("button", { name: "重做标记" });
+  await expect(undoButton).toBeDisabled(); // 无历史
+  await expect(redoButton).toBeDisabled();
+
+  const canvasState = () => markCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+  const blankState = await canvasState(); // 无标记的空画布基线
+
+  // ---------- ② 画两笔矩形标记（两笔才能暴露历史栈腐败：undo 推错值进 future） ----------
+  await rail.getByRole("button", { name: "矩形" }).click();
+  const box = await markCanvas.boundingBox();
+  expect(box, "多轮修改标记层画布必须可见可命中").not.toBeNull();
+  const drawRect = async (x1: number, y1: number, x2: number, y2: number) => {
+    await page.mouse.move(box!.x + box!.width * x1, box!.y + box!.height * y1);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * x2, box!.y + box!.height * y2, { steps: 8 });
+    await page.mouse.up();
+  };
+  await drawRect(0.1, 0.1, 0.3, 0.25);
+  await expect.poll(canvasState).not.toBe(blankState); // 第一笔已落画布
+  const stateOneMark = await canvasState();
+  await drawRect(0.6, 0.6, 0.8, 0.8);
+  await expect.poll(canvasState).not.toBe(stateOneMark); // 第二笔已落画布
+  const stateTwoMarks = await canvasState();
+  await expect(undoButton).toBeEnabled();
+
+  // ---------- ③ undo 一笔 → 画布精确回到第一笔；redo → 精确恢复两笔 ----------
+  await undoButton.click();
+  await expect.poll(canvasState).toBe(stateOneMark); // P2 核心断言：undo 后 marks 必须是被撤销前的历史值
+  await expect(redoButton).toBeEnabled();
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateTwoMarks); // redo 必须恢复完整两笔（腐败时此处会错）
+  await expect(undoButton).toBeEnabled();
+  await expect(redoButton).toBeDisabled(); // future 已弹空
+
+  // ---------- ④ undo 两笔 → 画布回空、undo 禁用；再 redo 两笔 → 逐级恢复 ----------
+  await undoButton.click();
+  await undoButton.click();
+  await expect.poll(canvasState).toBe(blankState); // 两笔全撤 → 空画布
+  await expect(undoButton).toBeDisabled();
+  await expect(redoButton).toBeEnabled();
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateOneMark);
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateTwoMarks);
+  await expect(redoButton).toBeDisabled();
+
+  // ---------- ⑤ ESC 关闭面板，画布节点仍在 ----------
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
   await expect(nodes).toHaveCount(1);
 });

@@ -51,6 +51,7 @@ export type NodeToolbarActionId =
   | "replace"
   | "preset-picker"
   | "mask"
+  | "multi-edit"
   | "run"
   | "preview"
   | "play"
@@ -75,11 +76,12 @@ const PLAY: NodeToolbarActionDefinition = { id: "play", label: "播放", icon: P
 const DOWNLOAD: NodeToolbarActionDefinition = { id: "download", label: "下载", icon: DownloadIcon };
 const AS_INPUT: NodeToolbarActionDefinition = { id: "as-input", label: "作为输入", icon: ArrowRightToLineIcon };
 
-const MASK: NodeToolbarActionDefinition = { id: "mask", label: "蒙版", icon: BrushIcon };
+const MASK: NodeToolbarActionDefinition = { id: "mask", label: "蒙版重绘", icon: BrushIcon };
+const MULTI_EDIT: NodeToolbarActionDefinition = { id: "multi-edit", label: "多轮修改", icon: SparklesIcon };
 /** v9 配置表（64 Phase 2 §6）；数组顺序即从左到右的渲染顺序。 */
 export const NODE_TOOLBAR_ACTIONS: Record<NodeKind, readonly NodeToolbarActionDefinition[]> = {
   text: [COLOR_TOOL, PRESET_PICKER, COPY],
-  image: [CROP, MATTING, MASK, COPY, REPLACE],
+  image: [MASK, MULTI_EDIT, CROP, MATTING, COPY, REPLACE],
   video: [COPY, REPLACE],
   "image-generator": [RUN, COPY],
   "video-generator": [RUN, COPY],
