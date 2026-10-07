@@ -23,8 +23,8 @@ import { MarkLayer } from "@/components/nodes/MarkLayer";
 import type { NodeRunStatus } from "@/types/workflow";
 import { isNodeRunActive } from "@/types/workflow";
 import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { MARK_COLOR_SWATCHES } from "@/lib/color/colorToken";
 
-const MARK_COLORS = ["#ff4d4f", "#ffd666", "#4096ff", "#ffffff"] as const;
 const MARK_TOOLS: readonly { tool: EditMarkTool; label: string; icon: typeof BrushIcon }[] = [
   { tool: "brush", label: "画笔", icon: BrushIcon },
   { tool: "arrow", label: "箭头", icon: ArrowUpRightIcon },
@@ -76,7 +76,7 @@ export function MultiRoundEditPanel({
   const [past, setPast] = useState<EditMark[][]>([]);
   const [future, setFuture] = useState<EditMark[][]>([]);
   const [tool, setTool] = useState<EditMarkTool>("brush");
-  const [color, setColor] = useState<string>(MARK_COLORS[0]);
+  const [color, setColor] = useState<string>(MARK_COLOR_SWATCHES[0]);
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -298,7 +298,7 @@ export function MultiRoundEditPanel({
             </div>
             <div className="flex items-center gap-2">
               <div className="flex gap-1" role="group" aria-label="标记颜色">
-                {MARK_COLORS.map((swatch) => (
+                {MARK_COLOR_SWATCHES.map((swatch) => (
                   <button
                     key={swatch}
                     type="button"

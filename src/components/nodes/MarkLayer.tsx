@@ -168,15 +168,20 @@ export function MarkLayer({
   }, [render, naturalWidth, naturalHeight]);
 
   // 底图变化（运行完成换新图）→ 清空标记（面板的会话历史条另行记录）。
+  // 最新 marks/onMarksChange 存入 ref：effect 只依赖触发值 baseSource（门禁
+  // no-error-suppression：不得用抑制注释绕过依赖检查）。
   const previousBaseRef = useRef(baseSource);
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
+  const onMarksChangeRef = useRef(onMarksChange);
+  onMarksChangeRef.current = onMarksChange;
   useEffect(() => {
     if (previousBaseRef.current !== baseSource) {
       previousBaseRef.current = baseSource;
-      if (marks.length > 0) onMarksChange([]);
+      if (marksRef.current.length > 0) onMarksChangeRef.current([]);
       setDrawState(null);
       setTextInput(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseSource]);
 
   const commitMark = useCallback(

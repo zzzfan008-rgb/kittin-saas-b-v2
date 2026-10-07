@@ -79,3 +79,10 @@ export function makeColorChipFromHex(hex: string): string {
   const name = nearestColorName(hex);
   return makeColorChip(hex, name);
 }
+
+/**
+ * 65d v2 多轮修改标记调色板（唯一事实源；契约测试 cards-58-60-61 禁止组件内裸 hex）。
+ * 取自 v2 设计稿标记色行（design-v2.html：红/黄/蓝/白），供 MarkLayer 烧录与
+ * MultiRoundEditPanel 色块按钮共用——canvas fillStyle 需要具体 hex，不能用 CSS 变量。
+ */
+export const MARK_COLOR_SWATCHES = ["#ff4d4f", "#ffd666", "#4096ff", "#ffffff"] as const;

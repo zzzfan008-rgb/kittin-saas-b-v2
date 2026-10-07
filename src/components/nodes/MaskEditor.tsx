@@ -210,6 +210,13 @@ export function MaskEditor({
     setReady(true);
   };
 
+  // 最新闭包存入 ref：useLayoutEffect 只依赖触发值（source/initialMask/羽化值），
+  // 经 ref 调用当轮闭包（门禁 no-error-suppression：不得用抑制注释绕过依赖检查）。
+  const renderOverlayRef = useRef(renderOverlay);
+  renderOverlayRef.current = renderOverlay;
+  const initializeCanvasesRef = useRef(initializeCanvases);
+  initializeCanvasesRef.current = initializeCanvases;
+
   useLayoutEffect(() => {
     // source 变化（运行完成换新图）或 initialMask 变化（清空）时使旧回调失效并重置。
     loadGuardRef.current.invalidate();
@@ -221,18 +228,16 @@ export function MaskEditor({
     setUndoStack([]);
     setRedoStack([]);
     const image = imageRef.current;
-    if (image?.complete && image.naturalWidth && image.naturalHeight) initializeCanvases();
+    if (image?.complete && image.naturalWidth && image.naturalHeight) initializeCanvasesRef.current();
     return () => {
       loadGuardRef.current.invalidate();
       snapshotLoadGuardRef.current.invalidate();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, initialMask]);
 
   // 羽化状态变化 → 重绘预览。
   useLayoutEffect(() => {
-    renderOverlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    renderOverlayRef.current();
   }, [featherEnabled, featherValue]);
 
   const pointForEvent = (event: ReactPointerEvent<HTMLCanvasElement>) => {
