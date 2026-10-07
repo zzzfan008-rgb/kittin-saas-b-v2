@@ -136,33 +136,45 @@ export function MultiRoundEditPanel({
 
   const marksRef = useRef(marks);
   marksRef.current = marks;
+  // 历史栈镜像 ref（与 marksRef 同步维护）：undo/redo/commit 在事件处理器内同步读写，
+  // setState 只镜像 ref 值 —— updater 保持纯函数（React 可能延迟执行 updater，
+  // 届时 marksRef 已被改写，副作用写进 updater 会腐败历史栈）。
+  const pastRef = useRef<EditMark[][]>(past);
+  pastRef.current = past;
+  const futureRef = useRef<EditMark[][]>(future);
+  futureRef.current = future;
 
   const commitMarks = useCallback((next: EditMark[]) => {
-    setPast((stack) => [...stack.slice(-49), marksRef.current]);
-    setFuture([]);
+    const currentMarks = marksRef.current;
+    pastRef.current = [...pastRef.current.slice(-49), currentMarks];
+    futureRef.current = [];
     marksRef.current = next;
+    setPast(pastRef.current);
+    setFuture(futureRef.current);
     setMarks(next);
   }, []);
 
   const undo = useCallback(() => {
-    setPast((stack) => {
-      if (stack.length === 0) return stack;
-      const previous = stack[stack.length - 1];
-      setFuture((f) => [...f, marksRef.current]);
-      marksRef.current = previous;
-      setMarks(previous);
-      return stack.slice(0, -1);
-    });
+    if (pastRef.current.length === 0) return;
+    const previous = pastRef.current[pastRef.current.length - 1];
+    const currentMarks = marksRef.current;
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, currentMarks];
+    marksRef.current = previous;
+    setPast(pastRef.current);
+    setFuture(futureRef.current);
+    setMarks(previous);
   }, []);
   const redo = useCallback(() => {
-    setFuture((stack) => {
-      if (stack.length === 0) return stack;
-      const next = stack[stack.length - 1];
-      setPast((p) => [...p, marksRef.current]);
-      marksRef.current = next;
-      setMarks(next);
-      return stack.slice(0, -1);
-    });
+    if (futureRef.current.length === 0) return;
+    const next = futureRef.current[futureRef.current.length - 1];
+    const currentMarks = marksRef.current;
+    futureRef.current = futureRef.current.slice(0, -1);
+    pastRef.current = [...pastRef.current, currentMarks];
+    marksRef.current = next;
+    setFuture(futureRef.current);
+    setPast(pastRef.current);
+    setMarks(next);
   }, []);
   const clearMarks = useCallback(() => {
     if (marksRef.current.length === 0) return;

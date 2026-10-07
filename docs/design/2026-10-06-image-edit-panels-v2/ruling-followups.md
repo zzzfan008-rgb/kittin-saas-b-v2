@@ -205,3 +205,21 @@ passed；multi.round **仍 FAIL ×3**——单段桩（e04dd18）过了形态校
 即去桩修法在**与 architect 门禁同构的环境**（main 真校验层 + 我的前端半）
 已实证通过。server 零改动（校验是正确安全闸）。分支 tip 2da64fd 等 architect
 第三轮门禁重跑确认。
+
+---
+
+## P3 留档（reviewer 终审 #99 · 非阻断 · 修法已定 · 不并入本 PR）
+
+- 日期：2026-10-07 · 来源：reviewer 对 a25728f 的终审 + gate:codex（1×P2 + 1×P3）
+- P2（MarkLayer undo/redo 副作用写进 setState updater → 历史栈腐败）已在本 PR
+  修复（pastRef/futureRef 镜像 + updater 纯函数化 + e2e 回归护栏），见
+  `src/components/nodes/MultiRoundEditPanel.tsx` undo/redo 与
+  `e2e/workbench.spec.ts`「mark undo/redo keeps stroke history consistent」。
+- **P3（本条留档，不并入 #99）**：MarkLayer 死参数 + 预览笔画粗细基准与成图
+  不一致 + 非 4:5 图形变。
+  - 现象：预览在 1200×1500 固定缓冲上画 stroke px，成图按原图尺寸画同样 px
+    （视觉差 ≈1.7×）；缓冲硬编码 1200×1500，非 4:5 底图被 CSS 拉伸形变。
+  - 修法已明确（reviewer 给定）：canvas 缓冲改用 image 自然尺寸/等比缩放；
+    lineWidth 换算 `strokeWidth * (canvas.width / naturalWidth)`；
+    MarkLayer 现有 naturalWidth/naturalHeight 两个死参数正为此准备。
+  - 处置：PR #99 合并后小修，不并入本 PR（reviewer 裁定）。

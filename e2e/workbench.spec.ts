@@ -1716,3 +1716,89 @@ test("multi-round edit panel: marks compose into edit draft; rounds tracked in p
   await expect(panel).toHaveCount(0);
   await expect(nodes).toHaveCount(1);
 });
+
+test("multi-round edit panel: mark undo/redo keeps stroke history consistent", async ({ page }) => {
+  // 回归护栏（reviewer PR #99 P2）：undo/redo 历史栈副作用曾写在 setState updater
+  // 内部 → React 延迟执行 updater 时 marksRef 已被改写 → future 收到错误值 →
+  // redo 恢复错误 marks。此测试用画布 dataURL 精确比对断言每一步的 marks 状态。
+  test.setTimeout(90_000);
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+
+  // ---------- ① 上传基图 → 打开多轮修改面板（同主流程） ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  await imageToolbar.getByRole("button", { name: "多轮修改" }).click();
+
+  const panel = page.getByTestId("multi-round-edit-panel");
+  const rail = page.getByTestId("multi-round-rail");
+  await expect(panel).toBeVisible();
+  await page.waitForFunction(() => {
+    const img = document.querySelector('img[alt="多轮修改底图"]') as HTMLImageElement | null;
+    return Boolean(img?.complete && img.naturalWidth > 0);
+  });
+  const markCanvas = page.getByTestId("mark-layer-canvas");
+  await expect(markCanvas).toBeVisible();
+
+  const undoButton = rail.getByRole("button", { name: "撤销标记" });
+  const redoButton = rail.getByRole("button", { name: "重做标记" });
+  await expect(undoButton).toBeDisabled(); // 无历史
+  await expect(redoButton).toBeDisabled();
+
+  const canvasState = () => markCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+  const blankState = await canvasState(); // 无标记的空画布基线
+
+  // ---------- ② 画两笔矩形标记（两笔才能暴露历史栈腐败：undo 推错值进 future） ----------
+  await rail.getByRole("button", { name: "矩形" }).click();
+  const box = await markCanvas.boundingBox();
+  expect(box, "多轮修改标记层画布必须可见可命中").not.toBeNull();
+  const drawRect = async (x1: number, y1: number, x2: number, y2: number) => {
+    await page.mouse.move(box!.x + box!.width * x1, box!.y + box!.height * y1);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * x2, box!.y + box!.height * y2, { steps: 8 });
+    await page.mouse.up();
+  };
+  await drawRect(0.1, 0.1, 0.3, 0.25);
+  await expect.poll(canvasState).not.toBe(blankState); // 第一笔已落画布
+  const stateOneMark = await canvasState();
+  await drawRect(0.6, 0.6, 0.8, 0.8);
+  await expect.poll(canvasState).not.toBe(stateOneMark); // 第二笔已落画布
+  const stateTwoMarks = await canvasState();
+  await expect(undoButton).toBeEnabled();
+
+  // ---------- ③ undo 一笔 → 画布精确回到第一笔；redo → 精确恢复两笔 ----------
+  await undoButton.click();
+  await expect.poll(canvasState).toBe(stateOneMark); // P2 核心断言：undo 后 marks 必须是被撤销前的历史值
+  await expect(redoButton).toBeEnabled();
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateTwoMarks); // redo 必须恢复完整两笔（腐败时此处会错）
+  await expect(undoButton).toBeEnabled();
+  await expect(redoButton).toBeDisabled(); // future 已弹空
+
+  // ---------- ④ undo 两笔 → 画布回空、undo 禁用；再 redo 两笔 → 逐级恢复 ----------
+  await undoButton.click();
+  await undoButton.click();
+  await expect.poll(canvasState).toBe(blankState); // 两笔全撤 → 空画布
+  await expect(undoButton).toBeDisabled();
+  await expect(redoButton).toBeEnabled();
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateOneMark);
+  await redoButton.click();
+  await expect.poll(canvasState).toBe(stateTwoMarks);
+  await expect(redoButton).toBeDisabled();
+
+  // ---------- ⑤ ESC 关闭面板，画布节点仍在 ----------
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(nodes).toHaveCount(1);
+});
