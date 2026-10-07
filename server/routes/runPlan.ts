@@ -175,6 +175,10 @@ export function imageEditGate(
   const editPrompt: unknown = img.data.editPrompt;
   const hasMask = typeof mask === "string" && mask.trim() !== "";
   const hasPrompt = typeof editPrompt === "string" && editPrompt.trim() !== "";
+  // 65d v2 §4.4 第二层：mask 与 editInputRef 互斥 → 400（前端面板禁用为第一层，dag DagError 兜底第三层）。
+  const editInputRef: unknown = img.data.editInputRef;
+  const hasEditInputRef = typeof editInputRef === "string" && editInputRef.trim() !== "";
+  if (hasMask && hasEditInputRef) return "蒙版与编辑输入图互斥，请清除蒙版后重试";
   if (!hasMask && !hasPrompt) return "既无蒙版也无编辑提示词";
   if (hasMask && !hasPrompt) return "请先填写修改描述";
   return null;

@@ -418,6 +418,28 @@ function main() {
     assert.equal((i.data as { editPrompt?: string }).editPrompt, "x".repeat(500));
   });
 
+  // ---------- 65d v2 §4.1：image 节点 editInputRef（本轮编辑输入图，/api/files 引用）----------
+  ok("65d v2 §4.1：image 节点 editInputRef 合法 /api/files 引用 → 通过且保留", () => {
+    const result = validateAndMigrateFlow(flow(
+      [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+         data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "再改一下", editInputRef: "/api/files/ed.png" } }],
+      [],
+    ));
+    const i = result.nodes.find((n) => n.id === "i1")!;
+    assert.equal((i.data as { editInputRef?: string }).editInputRef, "/api/files/ed.png");
+  });
+
+  ok("65d v2 §4.1：image 节点 editInputRef 非法引用 → 拒", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [{ id: "i1", type: "image", position: { x: 0, y: 0 },
+           data: { kind: "image", label: "图片", status: "idle", outputImages: ["/api/files/a.png"], editPrompt: "x", editInputRef: "not-a-ref" } }],
+        [],
+      )),
+      (e) => e instanceof WorkflowValidationError && /editInputRef/.test(e.message),
+    );
+  });
+
   ok("65d §1.1：image 节点 editPrompt 超 500 字 → 拒", () => {
     assert.throws(
       () => validateAndMigrateFlow(flow(

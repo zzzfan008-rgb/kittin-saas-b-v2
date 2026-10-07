@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-06T19:20:45.152Z",
+  "baseCommit": "f71de81fffd3495a70536e78016846fcf3c6222f",
+  "changeFingerprintSha256": "64dd6b367149cfa25cd3c00231f402896c2f3ff944f0ce305d0c2efe2c39c923",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "蒙版重绘与整图编辑 operationMode mask-edit edit 传给 API易 images 端点的参数契约 gpt-image-2.5-sunburst 与 gpt-image-2.5-flare-vip 模型调用差异",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/lib/workflowSchema.ts",
+    "server/routes/runPlan.ts",
+    "src/types/workflow.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/image-edit.md",
+      "title": "Image Edit API Reference",
+      "sha256": "89f3a46dffd9fdd2999a45d3e5ebcf30fb25311982900f9274f25e4659e2351b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "70685ec55a53fcd73fb8e81a4d028461b940984aea94dc8a010632be1c1166d8"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP Image Gen/Editing",
+      "sha256": "8a5c6e2e5724f0f31ffd5742b76c63bc6d6ea3535e59b792916ae36beaa9fa88"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-all/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "5433e68b470d7404b73bdb1a2244b0b7ea12d489572a6faacd26708e953797a1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2/overview.md",
+      "title": "GPT-Image-2.5 / 2 Image Generation/Edit",
+      "sha256": "b2e44610ddbfc99cc45592d873ec089756de773df25efe41824fa49714d00915"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/flux/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/flux/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/flux/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "1f78b49d8da07b618856d92d66e18ffa5454c2bd4bca253f81fdb1ba5acc7641"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/grok-imagine-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/grok-imagine-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/grok-imagine-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "9b1db8536088514189999e4b2a89e1648975a7f021f12f46cf5eda84e220c0e1"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/nano-banana-2-image/image-edit",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/nano-banana-2-image/image-edit.md",
+      "pageLocalPath": "pages/en/api-capabilities/nano-banana-2-image/image-edit.md",
+      "title": "Image Editing API Reference",
+      "sha256": "1b17b181ca03ad9b032b8852f97f59a375e3a61acf6c7836a6576beff2b49c64"
+    }
+  ],
+  "decisionSummary": "65d v2 多轮修改（image edit 无蒙版合成输入）。新增共享类型 ImageNodeData.editInputRef（本轮编辑输入图，与 mask 互斥，运行后清空；类型由 frontend 落 9877653，backend 单 hunk 复用）。server 侧按 architect 拍板（65d-v2-ruling.md v2.1）落地：① dag.ts 合成 step primary = editInputRef ?? outputImages[0]（inputImages/inputReferences/upstream 从 primary 派生，identity 校验与静态可达性天然覆盖）；对 mask 与 editInputRef 并存抛 DagError 互斥（第三层兜底）。② workflowSchema.ts image case 以 optionalImageReference 接受 editInputRef（风格对齐 maskSourceRef）。③ runPlan.ts imageEditGate：mask 与 editInputRef 同时出现返回 400（§4.4 第二层互斥，前端禁用为第一层）。合成 run 复用 generator 执行链，无 mask→operationMode=edit + modelId=gpt-image-2.5-flare-vip（DEFAULT_GENERATION_MODEL_ID），与 v1 一致：params 必含 prompt + inputTexts + 显式 modelId + syntheticEdit=true；editPrompt≤500 字；batchSize=1；合成 run 仅发 image-node-updated（C7 溯源硬规则，不发 result-node-created）。API易 请求参数契约（operationMode、modelId、prompt/输入图语义）与 v1 相同，本 v2 不改变向 API易 发送的请求形状，仅改变 server 内部合成路由与输入图来源。files.ts 新增 POST /api/files/edit-draft 与 maskProcessing 导出的 GPT Image 尺寸上限共享常量不属于 change-scope gated 路径（无 API易 模型/请求契约语义），由 purge_after 归档回收，无需本回执。",
+  "unresolvedChoices": []
+}

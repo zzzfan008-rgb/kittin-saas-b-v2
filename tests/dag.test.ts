@@ -525,6 +525,42 @@ function main() {
     assert.equal(plan.steps.length, 0);
   });
 
+  // ---------- 65d v2 §4.1：editInputRef（本轮编辑输入图，合成 step primary = editInputRef ?? outputImages[0]）----------
+  ok("65d v2 §4.1：image 节点带 editInputRef+editPrompt → 合成 step primary=editInputRef（inputImages/inputReferences/upstream 均派生）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", { editPrompt: "再改一下", editInputRef: "/api/files/ed.png" })],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    assert.equal(plan.steps.length, 1);
+    const step = plan.steps[0]!;
+    assert.deepEqual(step.inputImages, ["/api/files/ed.png"]);
+    assert.deepEqual(step.inputReferences, [{ imageRef: "/api/files/ed.png", order: 0, sourceNodeId: "i1" }]);
+    assert.deepEqual(step.upstream, [{ nodeId: "i1", images: ["/api/files/ed.png"] }]);
+    assert.equal(step.params.operationMode, "edit");
+    assert.equal(step.params.mask, undefined);
+  });
+
+  ok("65d v2 §4.1：无 editInputRef → primary 回落 outputImages[0]（向后兼容 v1）", () => {
+    const plan = buildExecutionPlan(
+      [imageWithEdit("i1", { editPrompt: "换个背景" })],
+      [],
+      { onlyNodeId: "i1" },
+    );
+    assert.deepEqual(plan.steps[0]!.inputImages, ["/api/files/a.png"]);
+  });
+
+  ok("65d v2 §4.1：mask 与 editInputRef 互斥 → DagError（§4.4 第三层兜底）", () => {
+    assert.throws(
+      () => buildExecutionPlan(
+        [imageWithEdit("i1", { mask: MASK_B64, editPrompt: "改领口", editInputRef: "/api/files/ed.png" })],
+        [],
+        { onlyNodeId: "i1" },
+      ),
+      (e) => e instanceof DagError && /蒙版与编辑输入图互斥/.test(String((e as Error).message)),
+    );
+  });
+
   console.log(`\n通过 ${passed} 项`);
 }
 

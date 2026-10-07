@@ -178,7 +178,15 @@ export function buildExecutionPlan(
       const editPrompt = typeof img.editPrompt === "string" ? img.editPrompt.trim() : "";
       if (editPrompt) {
         const mask = typeof img.mask === "string" && img.mask.trim() !== "" ? img.mask : undefined;
-        const primary = img.outputImages[0];
+        // 65d v2 §4.1：本轮编辑输入图（/api/files/ URL）。合成 step 的 primary =
+        // editInputRef ?? outputImages[0]；与 mask 互斥（§4.4 fail-closed 第三层兜底）。
+        const editInputRef = typeof img.editInputRef === "string" && img.editInputRef.trim() !== ""
+          ? img.editInputRef.trim()
+          : undefined;
+        if (mask && editInputRef) {
+          throw new DagError(`Node ${target.id} 蒙版与编辑输入图互斥，请清除蒙版后重试`);
+        }
+        const primary = editInputRef ?? img.outputImages[0];
         // §3.2：显式 modelId 对冲「删 carrierMask canonicalize 后无人落 sunburst」：
         // 有 mask=sunburst（官方蒙版重绘），无 mask=flare-vip（整图编辑定案）。
         const syntheticStep: NodeExecution = {
