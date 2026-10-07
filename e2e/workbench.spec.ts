@@ -1484,25 +1484,13 @@ async function stubRunPlanWithImageUpdate(page: Page, runs: ImageEditRunBody[]):
 }
 
 /**
- * 桩 /api/files/edit-draft（server 端点由 backend 契约实现，e2e 只验前端提交形状）。
- * 桩返回的 url 必须满足 server isLocalImageReference（imageValidation.ts：^/api/files/
- * [A-Za-z0-9_-]{1,128}\.(png|jpe?g|webp|gif)$，单段文件名）——saveTab 会把 editInputRef
- * 原样存进项目，main@1119967 起 workflowSchema 保存时校验它，两段路径会被 400 拒掉
- *（首轮双半门禁 multi-round 三视口全挂的根因：桩 url 两段 → 保存被拒 → run-plan 未发出）。
+ * 桩已移除（裁决 v2.4）：edit-draft 必须打真端点。server 存在性闸
+ * assertImageReferencesAccessible（imageReferenceAccess.ts）递归收集 flow 内
+ * /api/files/ 引用查 files 表真记录——任何假 url 形态再合规，没真落库就是死路
+ *（第二轮门禁实测：单段桩过了形态校验，挂存在性校验，run-plan 未发出）。
+ * 真链路：生产 uploadEditDraft 真 POST → server 真落库返回真 url → editInputRef
+ * 写入 node data → saveTab 过两道闸。/api/run-plan 仍桩拦（付费动作不真跑）。
  */
-async function stubEditDraftUpload(page: Page): Promise<void> {
-  await page.route("**/api/files/edit-draft", async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.continue();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ url: "/api/files/e2e-composite.png" }),
-    });
-  });
-}
 
 test("mask redraw panel: main action saves and runs without closing; output swaps in place", async ({ page }) => {
   test.setTimeout(90_000);
@@ -1661,9 +1649,8 @@ test("multi-round edit panel: marks compose into edit draft; rounds tracked in p
   await expect(startButton).toBeDisabled(); // 无描述 → disabled（title 给原因）
   await promptInput.fill("把标记处改成银色拉链");
 
-  // ---------- ② 画矩形标记 → 开始修改：合成 edit-draft + 合成 run ----------
+  // ---------- ② 画矩形标记 → 开始修改：真上传 edit-draft（生产链路落库）+ 合成 run ----------
   await stubRunPlanWithImageUpdate(page, runs);
-  await stubEditDraftUpload(page);
   await rail.getByRole("button", { name: "矩形" }).click();
   const editCanvas = page.getByTestId("mark-layer-canvas");
   const box = await editCanvas.boundingBox();
