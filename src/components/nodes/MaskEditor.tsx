@@ -533,7 +533,7 @@ export function MaskEditor({
           </Button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 touch-none">
           {/* 绘画工具 */}
           <section className="flex flex-col gap-3" aria-label="绘画工具">
             <div className="flex gap-0.5 self-start rounded-md border border-[var(--gc-border)] p-0.5" role="group" aria-label="涂抹模式">
