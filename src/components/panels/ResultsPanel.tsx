@@ -14,8 +14,7 @@ interface ResultsPanelProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  /** 点单个结果时打开「结果详情」弹窗。65d R-87 §3：ResultDetailDialog 已删除，此 prop 保留为可选（向后兼容）。 */
-  onOpenDetail?: (resultId: string) => void;
+  /** 点单个结果时打开 ImageViewer（65d R-87 §3：ResultDetailDialog 已删除）。 */
   className?: string;
 }
 
@@ -24,7 +23,6 @@ export function ResultsPanel({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
-  onOpenDetail,
   className,
 }: ResultsPanelProps) {
   // 生成历史是跨项目的全局记录；即使项目页签未恢复，也必须能在刷新后找回。
@@ -40,10 +38,11 @@ export function ResultsPanel({
   const resultActionClass =
     "rounded-sm px-1 py-1 text-label font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
-  // 65d R-87 §3：ResultDetailDialog 已删除；onOpenDetail 现在是可选的（ResultDetailDialog 未删除时的遗留调用点由 ImageViewer 承接）。
+  const openViewer = useFlowStore((s) => s.openViewer);
+  // 65d R-87 §3：ResultDetailDialog 已删除；点「查看详情」直接打开 ImageViewer。
   const openDetail = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
-    if (onOpenDetail) onOpenDetail(r.id);
+    openViewer({ url: thumbnailImageUrl(r.image), title: r.nodeLabel, resultId: r.id });
   };
 
   return (
