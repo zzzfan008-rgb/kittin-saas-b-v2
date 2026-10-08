@@ -4,7 +4,7 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
 import { saveImageAsAsset } from "@/lib/assetSave";
-import { selectActiveNodes } from "@/store/flowStore";
+import { continueWithResult, toggleResultCompare } from "@/lib/resultActions";
 import { nodeSpecForKind, nodeTitleForKind } from "@/types/workflow";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -303,24 +303,17 @@ export function ImageViewer() {
     window.setTimeout(() => void useFlowStore.getState().runNode(record.nodeId), 0);
   };
 
-  // 加入/取消对比
+  // 加入/取消对比（走共享 resultActions，与结果卡片同一实现）
   const toggleCompare = () => {
     if (!record) return;
-    useFlowStore.getState().toggleCompareId(record.id);
+    toggleResultCompare(record.id);
   };
 
-  // 设为输入
-  const continueWithResult = () => {
+  // 设为输入（走共享 resultActions，与结果卡片同一实现）
+  const handleContinueWithResult = () => {
     if (!record) return;
-    const state = useFlowStore.getState();
-    const tab = state.tabs.find((item) => item.id === state.activeTabId);
-    if (!tab || tab.readOnly) return;
-    const nodes = selectActiveNodes(state);
-    const minX = Math.min(0, ...nodes.map((n: { position: { x: number } }) => n.position.x));
-    state.addAssetNode(
-      { name: record.nodeLabel, image: record.image },
-      { x: minX - 320, y: nodes.length * 40 },
-    );
+    continueWithResult(record);
+    closeViewer();
   };
 
   const displayScale = Math.round(scale * 100);
@@ -507,7 +500,7 @@ export function ImageViewer() {
           {!activeTabReadOnly && (
             <button
               type="button"
-              onClick={continueWithResult}
+              onClick={handleContinueWithResult}
               disabled={!record}
               title={activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
               className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"

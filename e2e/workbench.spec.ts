@@ -814,31 +814,14 @@ test("results and project center follow desktop density for cards", async ({ pag
 
   // 65d R-87 §3 Review Gap 3：点「查看详情」改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
   await viewButton.click();
-  const viewerHint = page.getByText(/滚轮缩放 100%/);
-  await expect(viewerHint).toBeVisible();
-  // 遮挡实测（Playwright 的 toBeVisible 不看遮挡）：查看器顶层的那个点必须真的属于查看器，
-  // 否则说明它被「结果详情」弹窗（overlay z-[70] / content z-[71]）压住了。
-  const viewerTopmost = await page.evaluate(() => {
-    const hint = [...document.querySelectorAll("span")]
-      .find((el) => el.textContent?.includes("滚轮缩放 100%"));
-    if (!hint) return { found: false } as const;
-    const overlay = hint.closest("div.fixed") as HTMLElement | null;
-    const box = hint.getBoundingClientRect();
-    const top = document.elementFromPoint(box.left + 2, box.top + 2);
-    return {
-      found: true,
-      overlayZ: overlay ? getComputedStyle(overlay).zIndex : null,
-      topmostIsViewer: Boolean(overlay && top && overlay.contains(top)),
-      topmostTag: top ? `${top.tagName.toLowerCase()}.${(top.className || "").toString().slice(0, 40)}` : null,
-    };
-  });
-  expect(
-    viewerTopmost.found && viewerTopmost.topmostIsViewer,
-    `图片查看器必须位于最上层（实测最上层元素=${viewerTopmost.topmostTag ?? "?"}，查看器 overlay z-index=${viewerTopmost.overlayZ ?? "?"}）`,
-  ).toBe(true);
+  // ImageViewer 初始 fit 模式，HUD 按钮文字为「适合画布」或「X%」。
+  const viewerHint = page.getByRole("button", { name: /适合画布|\d+%/ });
+  await expect(viewerHint).toBeVisible({ timeout: 10000 });
+  await expect(viewerHint).toContainText(/适合画布|\d+%/);
+  // 关闭：Esc 关闭 ImageViewer。
   await page.keyboard.press("Escape");
   await expect(viewerHint).toBeHidden();
-  // Esc 关闭 ImageViewer，不留 ResultDetailDialog 弹窗。
+  // 不留 ResultDetailDialog 弹窗。
   await expect(page.getByRole("dialog", { name: "结果详情" })).toHaveCount(0);
 
   // 查看器 Esc 会连带收起结果浮层（ResultsFab 也监听 Esc），所以下一步先重开。

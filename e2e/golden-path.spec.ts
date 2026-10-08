@@ -392,7 +392,7 @@ test("an unverified starter no longer blocks run, and the run completes the isol
   const actionBar = resultCard.locator("div.absolute.inset-x-0.bottom-0");
   await expect(actionBar).toHaveClass(/grid-cols-2/);
   // 2026-09-25 第 5 批（ab68c16）：卡片上的动作按钮「查看」改成「查看详情」（文本仍是「查看」，
-  // title 变为「查看详情」），点它打开「结果详情」弹窗；图片查看器改由弹窗里的大图按钮进入。
+  // title 变为「查看详情」）；65d R-87 §3 起由 ImageViewer 直接承接大图查看。
   await expect(resultCard.locator('button[title="查看详情"]')).toBeVisible();
   await expect(resultCard.locator('button[title="加入对比"]')).toBeVisible();
   await expect(resultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
@@ -416,19 +416,14 @@ test("an unverified starter no longer blocks run, and the run completes the isol
     if (value) document.documentElement.setAttribute("data-theme", value);
   }, originalTheme);
 
-  // 2026-09-25 第 5 批：点「查看详情」先打开「结果详情」弹窗，图片查看器改由弹窗里的大图按钮进入。
+  // 65d R-87 §3：点「查看详情」直接打开 ImageViewer（结果详情弹窗已删除，大图区并入查看器）。
   await resultCard.locator('button[title="查看详情"]').click();
-  const detailDialog = page.getByRole("dialog", { name: "结果详情" });
-  await expect(detailDialog).toBeVisible();
-  await detailDialog.getByRole("button", { name: /查看 .* 大图/ }).click();
-  await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
+  const zoomHud = page.locator(".zoom-hud");
+  await expect(zoomHud).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByText(/滚轮缩放 100%/)).toHaveCount(0);
-  // Esc 可能只关掉查看器：确定性地收掉详情弹窗，避免后续点击被遮罩拦截（不用不自动等待的 isVisible）。
-  if (await page.getByRole("button", { name: "关闭结果详情" }).count() > 0) {
-    await page.getByRole("button", { name: "关闭结果详情" }).click();
-  }
-  await expect(detailDialog).toHaveCount(0);
+  await expect(zoomHud).toHaveCount(0);
+  // 确定性地确认不存在遗留的「结果详情」弹窗，避免后续点击被遮罩拦截。
+  await expect(page.getByRole("dialog", { name: "结果详情" })).toHaveCount(0);
 
   // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点 ----------
   // 查看器 Esc 会连同结果浮层一起收起（弹层语义），所以这里按需重开（用按钮的 ARIA 状态判断，

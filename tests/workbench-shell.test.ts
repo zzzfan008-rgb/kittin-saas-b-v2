@@ -183,8 +183,8 @@ assert.doesNotMatch(
   /<ReactFlowProvider[\s\S]*?<ResultsPanel/,
   "Results 不应再占用中心画布底部",
 );
-// 65d R-87 §3：ResultDetailDialog 已删除，结果卡片点击改由 ImageViewer 承接。
-assert.doesNotMatch(resultsPanelSource, /openViewer|openResultViewer\(r\)/, "结果面板本身不直接打开查看器，改由 ImageViewer 承接");
+// 65d R-87 §3：ResultDetailDialog 已删除，结果面板直接调用 openViewer 打开 ImageViewer。
+assert.match(resultsPanelSource, /openViewer/, "结果面板必须直接调用 openViewer（65d R-87 §3）");
 assert.match(appSource, /LazyAssetPickerOverlay/, "节点内的素材选择浮层必须继续保留");
 assert.doesNotMatch(nodeFrameSource, /onCancel|>\s*取消\s*</, "生成按钮不得再暴露取消入口");
 assert.doesNotMatch(flowStoreSource, /cancelNodeRun|\/api\/run-plan\/.*\/cancel/, "客户端不得保留任务取消模块");
