@@ -1726,6 +1726,54 @@ await test("羽化宽度经图片节点透传 MaskEditor 并在 0–64 内钳制
   assert.match(editorSource, /adaptiveMaskFeatherRadius\(overlay\.width, overlay\.height, expansionRadius\)/);
 });
 
+await test("蒙版笔刷宽度按屏幕像素归一化，换分辨率底图视觉一致且未布局时不放大", async () => {
+  const { brushStrokeWidth } = await import("../src/lib/maskGeometry");
+  // 滑杆值按屏幕像素：乘「画布自然尺寸 / 显示尺寸」缩放比。
+  // 4000px 底图显示 800px → 缩放 5；600px 底图显示 600px → 缩放 1。
+  assert.equal(brushStrokeWidth(80, 4000, 800), 400);
+  assert.equal(brushStrokeWidth(80, 600, 600), 80);
+  // 两块底图落回屏幕后的粗细一致：400*(800/4000) === 80*(600/600) === 80。
+  assert.equal(brushStrokeWidth(80, 4000, 800) * (800 / 4000), brushStrokeWidth(80, 600, 600) * (600 / 600));
+  // 退化：画布尚未布局（显示宽度 0）时退化为原值，不放大、不产生 NaN。
+  assert.equal(brushStrokeWidth(80, 4000, 0), 80);
+  assert.equal(brushStrokeWidth(80, 0, 0), 80);
+  // 非法输入 fail-closed 到 0，避免 lineWidth 为 NaN 让整条笔画静默不画。
+  assert.equal(brushStrokeWidth(Number.NaN, 4000, 800), 0);
+  assert.equal(brushStrokeWidth(0, 4000, 800), 0);
+});
+
+await test("蒙版重绘页控件走项目 shadcn 原语，不再手搓 Button/Slider/Checkbox", () => {
+  const editorSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
+    "utf8",
+  );
+  // 项目规则 §2：通用 UI 表面必须组合 src/components/ui 原语。
+  assert.match(editorSource, /import \{ Button \} from "@\/components\/ui\/button"/);
+  assert.match(editorSource, /import \{ Slider \} from "@\/components\/ui\/slider"/);
+  assert.match(editorSource, /import \{ Checkbox \} from "@\/components\/ui\/checkbox"/);
+  assert.match(editorSource, /import \{ Dialog, DialogContent, DialogTitle \} from "@\/components\/ui\/dialog"/);
+  // 手搓实现必须退场（历史教训：ModeButton/ToolbarButton 与姊妹面板视觉不一致）。
+  assert.doesNotMatch(editorSource, /function ToolbarButton/);
+  assert.doesNotMatch(editorSource, /function ModeButton/);
+  assert.doesNotMatch(editorSource, /<input[^>]*type="range"/);
+  assert.doesNotMatch(editorSource, /<input[^>]*type="checkbox"/);
+  // 完成态状态行：run 结束时按终态更新文案；失败态不得说成完成（fail-closed）。
+  assert.match(
+    editorSource,
+    /setStatusNote\(runStatus === "success" \? "重绘完成" : "重绘未完成，请查看节点状态"\)/,
+  );
+  // 结果预览位（右栏下方空白）：只在运行中或已有成功结果时出现；结果快照只在成功终态写入，
+  // 避免把运行期的旧底图当成结果展示。
+  // 标签语义（审查裁决 P2(b)）：快照只增不清，重试失败后仍展示上次成功图，故标「上次成功结果」，
+  // 不得残留把上次成功图标成「本次」结果的误导文案（注释可提及旧标签，标记形态必须清除）。
+  assert.match(editorSource, /aria-label="上次成功结果"/);
+  assert.match(editorSource, /data-testid="mask-redraw-result-label">上次成功结果</);
+  assert.match(editorSource, /alt="上次成功结果"/);
+  assert.doesNotMatch(editorSource, /aria-label="本次结果"|alt="本次重绘结果"|>本次结果</);
+  assert.match(editorSource, /data-testid="mask-redraw-result-preview"/);
+  assert.match(editorSource, /if \(runStatus === "success"\) setLastResultUrl\(source\)/);
+});
+
 await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点击", () => {
   const sourceRef = "/api/files/mask-source";
   useFlowStore.getState().openFlowTab({

@@ -17,6 +17,7 @@ import {
   Undo2Icon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { compositeEditImage, type EditMark, type EditMarkTool } from "@/lib/editComposite";
 import { uploadEditDraft } from "@/lib/editDraftUpload";
 import { MarkLayer } from "@/components/nodes/MarkLayer";
@@ -325,15 +326,17 @@ export function MultiRoundEditPanel({
               </div>
               <label className="ml-auto flex items-center gap-2 text-xs text-[var(--gc-node-text)]">
                 粗细
-                <input
-                  type="range"
+                <Slider
+                  value={[strokeWidth]}
                   min={1}
                   max={32}
-                  value={strokeWidth}
                   disabled={busy || readOnly}
                   aria-label="标记粗细"
+                  onValueChange={(value) => {
+                    const next = value[0];
+                    if (typeof next === "number") setStrokeWidth(next);
+                  }}
                   className="w-20"
-                  onChange={(event) => setStrokeWidth(Number(event.currentTarget.value))}
                 />
                 <span className="tabular-nums">{strokeWidth}px</span>
               </label>
@@ -367,10 +370,10 @@ export function MultiRoundEditPanel({
             />
             <span className="text-right text-xs text-[var(--gc-node-text)] opacity-60">{editPrompt.length} / 500</span>
             {hasMask ? (
-              <span className="text-xs text-amber-400">图片当前带有蒙版，请先清除蒙版或使用蒙版重绘</span>
+              <span className="text-xs text-[var(--gc-warn-text)]">图片当前带有蒙版，请先清除蒙版或使用蒙版重绘</span>
             ) : null}
             {error ? (
-              <span className="text-xs text-red-400" role="alert">{error}</span>
+              <span className="text-xs text-[var(--gc-status-error)]" role="alert">{error}</span>
             ) : null}
           </section>
 

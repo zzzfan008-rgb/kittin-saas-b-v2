@@ -1484,6 +1484,98 @@ async function stubRunPlanWithImageUpdate(page: Page, runs: ImageEditRunBody[]):
 }
 
 /**
+ * 一次成功、二次失败的合成 run 桩（PR #100 P2(b) 失败路径行为断言）：
+ * run#1 → image-node-updated + node-status(success)；run#2 → node-status(error)。
+ * 两次都走真实 POST /api/run-plan + SSE 消费路径，第二次真实进入失败终态。
+ */
+async function stubRunPlanSuccessThenError(page: Page, successUrl: string): Promise<void> {
+  const nodeIdByRun = new Map<string, string>();
+  let runSequence = 0;
+  await page.route("**/api/run-plan**", async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === "/api/run-plan" && request.method() === "POST") {
+      const body = request.postDataJSON() as ImageEditRunBody;
+      const runId = `e2e-image-edit-${++runSequence}`;
+      nodeIdByRun.set(runId, body.onlyNodeId ?? "");
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ runId, status: "queued" }),
+      });
+      return;
+    }
+    const match = pathname.match(/^\/api\/run-plan\/([^/]+)(\/events)?$/);
+    if (!match) {
+      await route.abort("blockedbyclient");
+      return;
+    }
+    const runId = decodeURIComponent(match[1]);
+    const nodeId = nodeIdByRun.get(runId);
+    if (!nodeId) throw new Error(`桩不认识的运行 ${runId}`);
+    if (match[2] !== "/events") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: runId, status: "running" }),
+      });
+      return;
+    }
+    const now = Date.now();
+    const isFirstRun = runId === "e2e-image-edit-1";
+    const events = isFirstRun
+      ? [
+          { seq: 1, type: "node-status", nodeId, status: "running", startedAt: now },
+          {
+            seq: 2,
+            type: "image-node-updated",
+            nodeId,
+            runId,
+            urls: [successUrl],
+            model: "gpt-image-2.5-sunburst",
+            prompts: ["e2e 编辑"],
+            providerOutputSizes: [null],
+          },
+          {
+            seq: 3,
+            type: "node-status",
+            nodeId,
+            status: "success",
+            images: [successUrl],
+            model: "gpt-image-2.5-sunburst",
+            prompts: ["e2e 编辑"],
+            startedAt: now,
+            finishedAt: now + 25,
+          },
+          { seq: 4, type: "done" },
+        ]
+      : [
+          { seq: 1, type: "node-status", nodeId, status: "running", startedAt: now },
+          {
+            seq: 2,
+            type: "node-status",
+            nodeId,
+            status: "error",
+            error: "e2e 模拟重绘失败",
+            startedAt: now,
+            finishedAt: now + 25,
+          },
+          { seq: 3, type: "done" },
+        ];
+    const body = events.map((event) => `id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`).join("");
+    await route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+      body,
+    });
+  });
+}
+
+/**
  * 桩已移除（裁决 v2.4）：edit-draft 必须打真端点。server 存在性闸
  * assertImageReferencesAccessible（imageReferenceAccess.ts）递归收集 flow 内
  * /api/files/ 引用查 files 表真记录——任何假 url 形态再合规，没真落库就是死路
@@ -1516,7 +1608,7 @@ test("mask redraw panel: main action saves and runs without closing; output swap
 
   const rail = page.getByTestId("mask-redraw-rail");
   await expect(rail).toBeVisible();
-  await expect(rail.locator("strong", { hasText: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
+  await expect(rail.getByRole("heading", { name: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
   await expect(page.getByTestId("mask-editor-canvas")).toBeVisible();
 
   // 无蒙版 + 无描述：主按钮 disabled（fail-closed 前端态）；
@@ -1570,9 +1662,17 @@ test("mask redraw panel: main action saves and runs without closing; output swap
 
   // ---------- ③ 完成后面板不自动关（页内停留）：左图被新产物覆盖，显影中消失 ----------
   await expect(page.getByTestId("mask-redraw-developing")).toHaveCount(0);
+  // 65d 设计调整：完成态状态行不得停在提交期的「正在重绘…」。
+  await expect(page.getByTestId("mask-redraw-note")).toHaveText("重绘完成");
   await expect(rail).toBeVisible();
   await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
   await expect(imageNode.getByAltText("已上传图片")).toHaveAttribute("src", RESULTS_DENSITY_IMAGE);
+  // 设计调整：右栏下方「本次结果」预览位出缩略图，与左栏覆盖的是同一产物。
+  await expect(page.getByTestId("mask-redraw-result-preview")).toBeVisible();
+  await expect(page.getByTestId("mask-redraw-result-preview")).toHaveAttribute(
+    "src",
+    RESULTS_DENSITY_IMAGE,
+  );
 
   const afterMaskRun = await page.evaluate(async (nodeId) => {
     const storeModuleUrl = "/src/store/flowStore.ts";
@@ -1601,8 +1701,78 @@ test("mask redraw panel: main action saves and runs without closing; output swap
   // ---------- ④ 手动关闭（ESC）→ 蒙版态消失后「多轮修改」恢复可用（fail-closed 解除） ----------
   await page.keyboard.press("Escape");
   await expect(rail).toHaveCount(0);
+  // 65d 设计调整：Dialog 原语负责焦点恢复——关闭后焦点回到打开它的工具条按钮。
+  await expect(imageToolbar.getByRole("button", { name: "蒙版" })).toBeFocused();
   const multiEditButton = imageToolbar.getByRole("button", { name: "多轮修改" });
   await expect(multiEditButton).toBeEnabled();
+});
+
+test("mask redraw panel: failed retry keeps last successful preview labeled as previous result", async ({ page }) => {
+  test.setTimeout(90_000);
+  // 回归护栏（reviewer PR #100 失败路径行为断言）：run 失败终态后预览位保留上次成功图，
+  // 标签为「上次成功结果」（裁决 P2(b)）——不得把上次成功图标成「本次结果」误导用户。
+  const nodes = page.locator(".react-flow__node");
+  await expect(nodes).toHaveCount(1);
+  const imageNodeId = await nodeIdOfKind(page, "image");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
+  // 成功产物用 64×64 实色 PNG：run#1 成功后底图被替换，仍需可涂抹以发起 run#2。
+  const successImage = `data:image/png;base64,${(await makeBaseImage()).toString("base64")}`;
+
+  // ---------- ① 上传基图 → 打开蒙版重绘页 ----------
+  await imageNode.getByLabel("上传图片").setInputFiles({
+    name: "base.png",
+    mimeType: "image/png",
+    buffer: await makeBaseImage(),
+  });
+  await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  await selectCanvasNode(imageNode);
+  const imageToolbar = imageNode.locator('[data-node-toolbar="image"]');
+  await imageToolbar.getByRole("button", { name: "蒙版" }).click();
+
+  const rail = page.getByTestId("mask-redraw-rail");
+  await expect(rail).toBeVisible();
+  const runButton = page.getByTestId("mask-redraw-run");
+  const promptInput = rail.getByRole("textbox");
+  await stubRunPlanSuccessThenError(page, successImage);
+
+  const paintMask = async () => {
+    const overlayCanvas = page.getByTestId("mask-editor-canvas");
+    const canvasBox = await overlayCanvas.boundingBox();
+    expect(canvasBox, "蒙版编辑器画布必须可见可命中").not.toBeNull();
+    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.3, canvasBox!.y + canvasBox!.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.7, canvasBox!.y + canvasBox!.height * 0.7, { steps: 12 });
+    await page.mouse.up();
+  };
+
+  // ---------- ② run#1 成功 → 预览位出现「上次成功结果」缩略图 ----------
+  await promptInput.fill("把背景改成米色");
+  await expect(runButton).toBeEnabled();
+  await paintMask();
+  await runButton.click();
+  await expect(page.getByTestId("mask-redraw-note")).toHaveText("重绘完成");
+  await expect(imageNode.getByLabel("状态：成功")).toBeVisible();
+  const preview = page.getByTestId("mask-redraw-result-preview");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("src", successImage);
+  await expect(page.getByTestId("mask-redraw-result-label")).toHaveText("上次成功结果");
+
+  // ---------- ③ run#2（重试）真实失败终态：保留上次成功图，标签仍「上次成功结果」 ----------
+  await promptInput.fill("再改成蓝色");
+  await expect(runButton).toBeEnabled();
+  await paintMask();
+  await runButton.click();
+  // 状态行按失败终态收口（不得停在提交期的「正在重绘…」）。
+  await expect(page.getByTestId("mask-redraw-note")).toHaveText("重绘未完成，请查看节点状态");
+  await expect(imageNode.getByLabel("状态：失败")).toBeVisible();
+  // 预览位保留展示，且仍是 run#1 的成功图（run#2 失败未产出新图）。
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("src", successImage);
+  await expect(page.getByTestId("mask-redraw-result-label")).toHaveText("上次成功结果");
+  // 失败态不得把上次成功图标成「本次结果」（旧误导文案）。
+  await expect(rail.getByText("本次结果")).toHaveCount(0);
 });
 
 test("multi-round edit panel: marks compose into edit draft; rounds tracked in panel", async ({ page }) => {
