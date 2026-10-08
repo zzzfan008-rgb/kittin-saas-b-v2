@@ -290,7 +290,7 @@ export function MultiRoundEditPanel({
           </Button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 touch-none">
           {/* 标记工具 */}
           <section className="flex flex-col gap-2" aria-label="标记工具">
             <div className="flex gap-1">
