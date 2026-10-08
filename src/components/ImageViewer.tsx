@@ -78,21 +78,72 @@ export function ImageViewer() {
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
-  // 每次打开新图时复位
+  // 每次打开新图时复位，用 computeFitScale 算初始值（不是写死 1）
   useEffect(() => {
     setScale(1);
     setIsFit(true);
     setPanOffset({ x: 0, y: 0 });
+    // 图片加载完成后算 fit scale（直接用 computeFitScale，避免依赖顺序问题）
+    const container = document.getElementById("viewer-image-area") as HTMLElement | null;
+    const imgEl = container?.querySelector("img") as HTMLImageElement | null;
+    if (container && imgEl) {
+      if (imgEl.complete && imgEl.naturalWidth > 0) {
+        const fitScale = Math.min(Math.max(Math.min(
+          (container.getBoundingClientRect().width - 32) / (imgEl.naturalWidth || 1),
+          (container.getBoundingClientRect().height - 32) / (imgEl.naturalHeight || 1),
+          1,
+        ), MIN_SCALE), MAX_SCALE);
+        setScale(fitScale);
+      } else {
+        imgEl.addEventListener("load", () => {
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const fitScale = Math.min(Math.max(Math.min(
+            (rect.width - 32) / (imgEl.naturalWidth || 1),
+            (rect.height - 32) / (imgEl.naturalHeight || 1),
+            1,
+          ), MIN_SCALE), MAX_SCALE);
+          setScale(fitScale);
+        }, { once: true });
+      }
+    }
   }, [viewer?.url]);
 
-  // 计算适合画布的缩放比
+  // 窗口 resize 时：fit 模式下重新计算
+  useEffect(() => {
+    if (!isFit) return;
+    let rafId: number;
+    const handler = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const container = document.getElementById("viewer-image-area") as HTMLElement | null;
+        const imgEl = container?.querySelector("img") as HTMLImageElement | null;
+        if (container && imgEl && imgEl.naturalWidth > 0) {
+          const rect = container.getBoundingClientRect();
+          const newScale = Math.min(Math.max(Math.min(
+            (rect.width - 32) / (imgEl.naturalWidth || 1),
+            (rect.height - 32) / (imgEl.naturalHeight || 1),
+            1,
+          ), MIN_SCALE), MAX_SCALE);
+          setScale(newScale);
+        }
+      });
+    };
+    window.addEventListener("resize", handler);
+    return () => {
+      window.removeEventListener("resize", handler);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isFit]);
+
+  // 计算适合画布的缩放比（结果 clamp 到 25%–400%，防止容器很大时算出的 scale 越界）
   const computeFitScale = useCallback((containerEl: HTMLElement, imgEl: HTMLImageElement) => {
     const rect = containerEl.getBoundingClientRect();
     const availW = rect.width - 32; // 留 padding
     const availH = rect.height - 32;
     const scaleX = availW / (imgEl.naturalWidth || 1);
     const scaleY = availH / (imgEl.naturalHeight || 1);
-    return Math.min(scaleX, scaleY, 1);
+    return Math.min(Math.max(Math.min(scaleX, scaleY, 1), MIN_SCALE), MAX_SCALE);
   }, []);
 
   // 适合画布模式
@@ -138,9 +189,16 @@ export function ImageViewer() {
       setIsFit(false);
       setPanOffset({ x: 0, y: 0 });
     } else {
-      fitImage(container, imgEl);
+      const fitScale = Math.min(Math.max(Math.min(
+        (container.getBoundingClientRect().width - 32) / (imgEl.naturalWidth || 1),
+        (container.getBoundingClientRect().height - 32) / (imgEl.naturalHeight || 1),
+        1,
+      ), MIN_SCALE), MAX_SCALE);
+      setScale(fitScale);
+      setIsFit(true);
+      setPanOffset({ x: 0, y: 0 });
     }
-  }, [isFit, fitImage]);
+  }, [isFit]);
 
   // 拖拽平移（> 适合画布时激活）
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

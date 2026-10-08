@@ -14,8 +14,8 @@ interface ResultsPanelProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  /** 点单个结果时打开「结果详情」弹窗（浮层与弹窗都由 ResultsFab 承载）。 */
-  onOpenDetail: (resultId: string) => void;
+  /** 点单个结果时打开「结果详情」弹窗。65d R-87 §3：ResultDetailDialog 已删除，此 prop 保留为可选（向后兼容）。 */
+  onOpenDetail?: (resultId: string) => void;
   className?: string;
 }
 
@@ -40,10 +40,10 @@ export function ResultsPanel({
   const resultActionClass =
     "rounded-sm px-1 py-1 text-label font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
-  // 点单个结果 = 打开「结果详情」弹窗（不再直接开图片查看器；查看器由弹窗里的大图进入）。
+  // 65d R-87 §3：ResultDetailDialog 已删除；onOpenDetail 现在是可选的（ResultDetailDialog 未删除时的遗留调用点由 ImageViewer 承接）。
   const openDetail = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
-    onOpenDetail(r.id);
+    if (onOpenDetail) onOpenDetail(r.id);
   };
 
   return (

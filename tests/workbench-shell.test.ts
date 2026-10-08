@@ -75,10 +75,6 @@ const railConfigSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/workbench/railConfig.tsx"),
   "utf8",
 );
-const resultDetailDialogSource = fs.readFileSync(
-  path.resolve(testRoot, "../src/components/panels/ResultDetailDialog.tsx"),
-  "utf8",
-);
 const canvasNodeActionsSource = fs.readFileSync(
   path.resolve(testRoot, "../src/components/panels/canvasNodeActions.ts"),
   "utf8",
@@ -157,16 +153,11 @@ assert.match(
   />\s*历史创作记录\s*<\/button>/,
   "画布右上角的入口必须以「历史创作记录」文字呈现（2026-09-25 决策 1），而不是示意图标",
 );
-// 2026-09-25 决策：点单个结果弹出「结果详情」（原内联在浮层下方的运行记录块已删除）。
-assert.match(
+// 2026-09-25 决策：点单个结果改由 ImageViewer 承接（ResultDetailDialog 已删除）。
+assert.doesNotMatch(
   resultsFabSource,
-  /<ResultsPanel[\s\S]*?onOpenDetail=\{setDetailResultId\}/,
-  "历史创作记录浮层必须把「点结果」接到结果详情弹窗",
-);
-assert.match(
-  resultsFabSource,
-  /<ResultDetailDialog[\s\S]*?resultId=\{detailResultId\}/,
-  "结果详情必须由受控弹窗承载（resultId=null 即关闭）",
+  /<ResultDetailDialog/,
+  "ResultsFab 不得再挂载 ResultDetailDialog（65d R-87 §3 已删除）",
 );
 assert.doesNotMatch(
   resultsFabSource,
@@ -192,14 +183,8 @@ assert.doesNotMatch(
   /<ReactFlowProvider[\s\S]*?<ResultsPanel/,
   "Results 不应再占用中心画布底部",
 );
-// 结果详情弹窗必须复用本地 shadcn Dialog，并保留结果能力（查看大图 / 对比 / 下载 / 设为输入）。
-assert.match(resultDetailDialogSource, /from "@\/components\/ui\/dialog"/, "结果详情必须使用本地 shadcn Dialog（居中弹窗）");
-assert.match(resultDetailDialogSource, /from "@\/lib\/resultActions"/, "结果详情必须与结果卡片共用同一套动作实现");
-assert.match(resultDetailDialogSource, /openResultViewer\(record\)/, "详情里必须能进入图片查看器（点大图，而不是打开详情时直接叠两层浮层）");
-assert.match(resultDetailDialogSource, /下载/, "结果详情不得丢失下载入口");
-assert.match(resultDetailDialogSource, /设为输入/, "结果详情不得丢失「设为输入」继续处理入口");
-assert.doesNotMatch(resultDetailDialogSource, /window\.(?:alert|confirm)\s*\(/, "结果详情不得用阻塞式浏览器弹窗反馈错误");
-assert.doesNotMatch(resultsPanelSource, /openViewer|openResultViewer\(r\)/, "结果卡片本身不再直接打开查看器，改由详情弹窗承接");
+// 65d R-87 §3：ResultDetailDialog 已删除，结果卡片点击改由 ImageViewer 承接。
+assert.doesNotMatch(resultsPanelSource, /openViewer|openResultViewer\(r\)/, "结果面板本身不直接打开查看器，改由 ImageViewer 承接");
 assert.match(appSource, /LazyAssetPickerOverlay/, "节点内的素材选择浮层必须继续保留");
 assert.doesNotMatch(nodeFrameSource, /onCancel|>\s*取消\s*</, "生成按钮不得再暴露取消入口");
 assert.doesNotMatch(flowStoreSource, /cancelNodeRun|\/api\/run-plan\/.*\/cancel/, "客户端不得保留任务取消模块");

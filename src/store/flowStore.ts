@@ -1573,7 +1573,7 @@ function documentForTarget(state: FlowState, target: DocumentTarget): ProjectTab
   return tab && matchesDocumentTarget(tab, target) ? tab : undefined;
 }
 
-function patchTab(
+export function patchTab(
   set: (partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>)) => unknown,
   tabId: string,
   patch: Partial<ProjectTab> | ((tab: ProjectTab) => Partial<ProjectTab>),
@@ -4132,6 +4132,28 @@ export const useFlowStore = create<FlowState>()(
             }
           }
         } finally {
+          // 65d R-87 §2.4 决策：无论成功/失败/网络错误/超时，都要清 mask 三字段。
+          // mask 在 run 提交前已写入 node.data（供 API 取值），清理在 finally 中执行。
+          // featherRadius/editPrompt/editInputRef 同清（编辑态残留字段）。
+          // 注意：只清 node data，文件本体（存储中的上传文件）由用户意图决定是否删，
+          // 当前决策为「只清 node data 引用，文件保留」。
+          runWithoutHistory(() => updateTabNodes(set, target, (nodes) =>
+            nodes.map((candidate) =>
+              candidate.id === id
+                ? {
+                    ...candidate,
+                    data: {
+                      ...candidate.data,
+                      mask: undefined,
+                      maskSourceRef: undefined,
+                      featherRadius: undefined,
+                      editPrompt: undefined,
+                      editInputRef: undefined,
+                    } as WorkflowNodeData,
+                  }
+                : candidate,
+            ),
+          ));
           runPreparations.delete(preparationKey);
         }
       },

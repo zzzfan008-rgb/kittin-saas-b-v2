@@ -647,7 +647,7 @@ export function MaskEditor({
           </section>
 
           {/* 按钮区 */}
-          <section className="flex flex-col gap-2" aria-label="执行">
+          <section className="flex flex-col gap-1.5" aria-label="执行">
             <Button
               type="button"
               onClick={() => void saveAndRun()}
@@ -658,16 +658,10 @@ export function MaskEditor({
             >
               {saving ? "保存中…" : running ? "运行中…" : "蒙版重绘"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void saveDraft()}
-              disabled={disabledDraft}
-              data-testid="mask-redraw-save"
-              className="border-[var(--gc-border)] px-4 py-2 text-xs text-[var(--gc-text)]"
-            >
-              {saving ? "保存中…" : "保存蒙版"}
-            </Button>
+            {/* 11px muted 副标题：每次提交自动保存蒙版（plan.md 按钮区决策） */}
+            <p className="text-center text-[11px] leading-snug text-[var(--gc-text-muted)]">
+              每次提交自动保存蒙版
+            </p>
           </section>
 
           {/* 状态行 + 说明 */}
