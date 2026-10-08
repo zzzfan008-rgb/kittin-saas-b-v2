@@ -2026,4 +2026,18 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
   assert.match(resultsPanelSource, /text-\[var\(--gc-media-overlay-text\)\]/);
 });
 
+await test("R-83 DialogContent base sm:max-w-sm 不穿透 MaskEditor 全屏分栏覆盖", () => {
+  // 验证 twMerge 行为：MaskEditor 的 className 覆盖串中必须包含 sm:max-w-none，
+  // 才能压制 DialogContent 基类的 sm:max-w-sm（384px）。若基类与覆盖串不在同一断点组
+  //（如 max-w-none vs sm:max-w-sm），twMerge 不会形成冲突，导致全屏被钳为 384px。
+  const editorSource = fs.readFileSync(
+    new URL("../src/components/nodes/MaskEditor.tsx", import.meta.url),
+    "utf8",
+  );
+  const dialogBase = "fixed top-1/2 left-1/2 z-50 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95";
+  assert.match(editorSource, /DialogContent[\s\S]{1,200}className="[^"]*sm:max-w-none[^"]*"/);
+  // 同时验证 img 不含裸 max-w-full（会在收缩型 flex item 内塌为 0）：
+  assert.doesNotMatch(editorSource, /img[\s\S]{1,200}className="[^"]*\bmax-w-full\b[^"]*"/);
+});
+
 console.log(`\n通过 ${passed} 项`);

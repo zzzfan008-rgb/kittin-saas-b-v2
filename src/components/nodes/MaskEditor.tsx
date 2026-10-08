@@ -463,7 +463,8 @@ export function MaskEditor({
         showCloseButton={false}
         overlayClassName="bg-black/70"
         // 全屏分栏：左 stage + 右栏；覆盖 DialogContent 默认的居中卡片形态。
-        className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
+        // R-83：sm:max-w-none 补全断点覆盖，防止 base sm:max-w-sm（384px）在小屏穿透。
+        className="top-0 left-0 flex h-dvh w-screen max-w-none sm:max-w-none translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
         data-panel="mask-redraw"
         aria-label="蒙版重绘"
       >
@@ -476,7 +477,9 @@ export function MaskEditor({
             alt="蒙版重绘原图"
             onLoad={initializeCanvases}
             onError={() => setError("无法读取原图")}
-            className="block max-h-[calc(100vh-32px)] max-w-full select-none object-contain"
+            // R-83：max-w-full 在收缩型 flex item 内百分比自引用会解析为 0 → 面板图塌缩。
+            // 对齐 MultiRoundEditPanel 已验证写法，用 viewport 绝对约束替代百分比。
+            className="block max-h-[calc(100vh-32px)] max-w-[calc(100vw-360px)] select-none object-contain"
             draggable={false}
           />
           <canvas
