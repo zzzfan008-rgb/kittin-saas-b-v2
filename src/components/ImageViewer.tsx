@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { selectActiveCompareIds, useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
 import { saveImageAsAsset } from "@/lib/assetSave";
+import { selectActiveNodes } from "@/store/flowStore";
+import { nodeSpecForKind, nodeTitleForKind } from "@/types/workflow";
 import { Checkbox } from "@/components/ui/checkbox";
-import { nodeSpecForKind } from "@/types/workflow";
 
-const MIN_SCALE = 1;
-const MAX_SCALE = 2;
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 4;
+const ZOOM_STEP = 0.1;
 
 export function ReferenceEvidenceList({
   images,
@@ -51,9 +53,8 @@ export function ReferenceEvidenceList({
 }
 
 /**
- * 全局图片查看器：单击任意图片弹出，
- * 滚轮缩放（1x ~ 2x），双击复位，Esc / 点击背景关闭。
- * 附带运行记录信息栏（来自最近生成的条目）。
+ * 全局图片查看器：滚轮缩放（25%–400%）、双击锚点切换、±按钮、拖拽平移、适合画布默认。
+ * 侧边栏从 ResultRecordDetail 迁移全部字段，并新增「节点类型」和「上游实际尺寸」。
  */
 export function ImageViewer() {
   const viewer = useFlowStore((s) => s.viewer);
@@ -63,56 +64,160 @@ export function ImageViewer() {
       : undefined
   ));
   const closeViewer = useFlowStore((s) => s.closeViewer);
-  /**
-   * 结果详情弹窗(z-71) 之上再叠查看器(z-80)。
-   * Base UI Dialog 的 Esc 处理在查看器打开时会丢给 document 级
-   * 键盘监听，由于查看器渲染在 Dialog 后，需要在这里最先响应
-   * Esc 以便「先关闭最上层」。
-   */
+  const compareIds = useFlowStore(selectActiveCompareIds);
+  const activeTabReadOnly = useFlowStore(
+    (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
+  );
+
+  // 缩放状态：scale 存储 0.25–4，isFit 表示当前处于"适合画布"锚点
+  const [scale, setScale] = useState(1);
+  const [isFit, setIsFit] = useState(true);
+  // panOffset：画布左上角相对容器中心的偏移（屏幕像素）
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  // 平移状态
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // 每次打开新图时复位
+  useEffect(() => {
+    setScale(1);
+    setIsFit(true);
+    setPanOffset({ x: 0, y: 0 });
+  }, [viewer?.url]);
+
+  // 计算适合画布的缩放比
+  const computeFitScale = useCallback((containerEl: HTMLElement, imgEl: HTMLImageElement) => {
+    const rect = containerEl.getBoundingClientRect();
+    const availW = rect.width - 32; // 留 padding
+    const availH = rect.height - 32;
+    const scaleX = availW / (imgEl.naturalWidth || 1);
+    const scaleY = availH / (imgEl.naturalHeight || 1);
+    return Math.min(scaleX, scaleY, 1);
+  }, []);
+
+  // 适合画布模式
+  const fitImage = useCallback((containerEl: HTMLElement, imgEl: HTMLImageElement) => {
+    const fitScale = computeFitScale(containerEl, imgEl);
+    setScale(fitScale);
+    setIsFit(true);
+    setPanOffset({ x: 0, y: 0 });
+  }, [computeFitScale]);
+
+  // 滚轮缩放（以指针为中心）
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const container = e.currentTarget as HTMLElement;
+    const imgEl = container.querySelector("img") as HTMLImageElement | null;
+    if (!imgEl) return;
+
+    const delta = -e.deltaY * 0.0015;
+    setScale((prev) => {
+      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev + delta * prev));
+      setIsFit(false);
+      return next;
+    });
+    // 缩放后重置平移
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    const container = document.getElementById("viewer-image-area");
+    if (!container || !viewer) return;
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [viewer, handleWheel]);
+
+  // 双击：切换适合画布 ↔ 100%
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const container = document.getElementById("viewer-image-area") as HTMLElement | null;
+    const imgEl = container?.querySelector("img") as HTMLImageElement | null;
+    if (!container || !imgEl) return;
+    if (isFit) {
+      setScale(1);
+      setIsFit(false);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      fitImage(container, imgEl);
+    }
+  }, [isFit, fitImage]);
+
+  // 拖拽平移（> 适合画布时激活）
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isFit) return; // 适合画布时不启动平移
+    e.stopPropagation();
+    isPanningRef.current = true;
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
+  }, [isFit, panOffset]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanningRef.current) return;
+    const dx = e.clientX - panStartRef.current.x;
+    const dy = e.clientY - panStartRef.current.y;
+    setPanOffset({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isPanningRef.current = false;
+  }, []);
+
+  // ± 按钮
+  const zoomIn = useCallback(() => {
+    setScale((prev) => Math.min(MAX_SCALE, prev + ZOOM_STEP));
+    setIsFit(false);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+  const zoomOut = useCallback(() => {
+    setScale((prev) => Math.max(MIN_SCALE, prev - ZOOM_STEP));
+    setIsFit(false);
+  }, []);
+
+  // 辅助
+  const generationSafetyBlockReason = useGenerationSafetyBlockReason();
+  const unsupportedKind = record !== undefined && !nodeSpecForKind(record.kind);
+  const comparing = record ? compareIds.includes(record.id) : false;
+
+  if (!viewer) return null;
+
+  const providerOriginals = record?.providerImages?.length
+    ? record.providerImages
+    : record?.providerImage ? [record.providerImage] : [];
+
+  const statusText: Record<string, string> = {
+    queued: "排队中", running: "生成中", retry_wait: "等待重试",
+    cancel_requested: "取消请求中", success: "成功", error: "失败",
+    outcome_unknown: "结果未知", cancelled: "已取消",
+  };
+  const statusColor: Record<string, string> = {
+    queued: "text-[var(--gc-status-queued)]",
+    running: "text-[var(--gc-status-running)]",
+    retry_wait: "text-[var(--gc-status-retry)]",
+    cancel_requested: "text-[var(--gc-status-retry)]",
+    success: "text-[var(--gc-status-success)]",
+    error: "text-[var(--gc-status-error)]",
+    outcome_unknown: "text-[var(--gc-status-unknown)]",
+    cancelled: "text-[var(--gc-status-idle)]",
+  };
+
+  // 键盘 Esc
   useEffect(() => {
     if (!viewer) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        closeViewer();
-      }
+      if (e.key === "Escape") { e.stopPropagation(); closeViewer(); }
     };
     document.addEventListener("keydown", onKeyDown, { capture: true });
     return () => document.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [viewer, closeViewer]);
-  const generationSafetyBlockReason = useGenerationSafetyBlockReason();
-  const unsupportedKind = record !== undefined && !nodeSpecForKind(record.kind);
-  const [scale, setScale] = useState(1);
-  const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  /** 勾选后保存到数字模特库（category="model"），否则收藏为参考素材。 */
-  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
 
-  // 每次打开新图时复位缩放与保存目标
+  // 保存资产
+  const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
+
   useEffect(() => {
     setScale(1);
     setAssetState("idle");
     setSaveToModelLibrary(false);
   }, [viewer?.url]);
-
-  // 滚轮缩放（原生监听，preventDefault 阻止页面滚动）
-  useEffect(() => {
-    const img = imgRef.current;
-    if (!img || !viewer) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      setScale((s) =>
-        Math.min(MAX_SCALE, Math.max(MIN_SCALE, s - e.deltaY * 0.0015)),
-      );
-    };
-    img.addEventListener("wheel", onWheel, { passive: false });
-    return () => img.removeEventListener("wheel", onWheel);
-  }, [viewer]);
-
-  if (!viewer) return null;
-  const providerOriginals = record?.providerImages?.length
-    ? record.providerImages
-    : record?.providerImage ? [record.providerImage] : [];
 
   const saveAsAsset = async () => {
     setAssetState("saving");
@@ -129,6 +234,7 @@ export function ImageViewer() {
     }
   };
 
+  // 重新生成
   const runAgain = () => {
     if (!record || generationSafetyBlockReason) return;
     const store = useFlowStore.getState();
@@ -139,48 +245,132 @@ export function ImageViewer() {
     window.setTimeout(() => void useFlowStore.getState().runNode(record.nodeId), 0);
   };
 
+  // 加入/取消对比
+  const toggleCompare = () => {
+    if (!record) return;
+    useFlowStore.getState().toggleCompareId(record.id);
+  };
+
+  // 设为输入
+  const continueWithResult = () => {
+    if (!record) return;
+    const state = useFlowStore.getState();
+    const tab = state.tabs.find((item) => item.id === state.activeTabId);
+    if (!tab || tab.readOnly) return;
+    const nodes = selectActiveNodes(state);
+    const minX = Math.min(0, ...nodes.map((n: { position: { x: number } }) => n.position.x));
+    state.addAssetNode(
+      { name: record.nodeLabel, image: record.image },
+      { x: minX - 320, y: nodes.length * 40 },
+    );
+  };
+
+  const displayScale = Math.round(scale * 100);
+  const hudLabel = isFit ? "适合画布" : `${displayScale}%`;
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-stretch bg-black/85"
       onClick={closeViewer}
     >
-      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-8">
-        <img
-          ref={imgRef}
-          src={viewer.url}
-          alt={viewer.title ?? "图片预览"}
+      {/* 左侧图片区 */}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        {/* 操作栏：±按钮 + 提示 */}
+        <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-label text-white/70">
+            <button type="button" onClick={zoomOut} disabled={scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
+            <span className="w-12 text-center text-xs">{isFit ? "适合画布" : `${displayScale}%`}</span>
+            <button type="button" onClick={zoomIn} disabled={scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
+          </div>
+          <span className="text-label text-white/50">
+            双击{hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
+          </span>
+        </div>
+
+        {/* 图片容器（滚轮 + 拖拽平移） */}
+        <div
+          id="viewer-image-area"
+          className="relative flex flex-1 items-center justify-center overflow-hidden p-8"
           onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => {
+          onDoubleClick={handleDoubleClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          style={{ cursor: isFit ? "default" : (isPanningRef.current ? "grabbing" : "grab") }}
+        >
+          <img
+            src={viewer.url}
+            alt={viewer.title ?? "图片预览"}
+            draggable={false}
+            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${scale})`,
+              transformOrigin: "center center",
+              transition: isPanningRef.current ? "none" : "transform 0.1s ease",
+            }}
+          />
+        </div>
+
+        {/* 缩放指示器 pill（右下角） */}
+        <button
+          type="button"
+          className="zoom-hud"
+          onClick={(e) => {
             e.stopPropagation();
-            setScale(1);
+            const container = document.getElementById("viewer-image-area") as HTMLElement | null;
+            const imgEl = container?.querySelector("img") as HTMLImageElement | null;
+            if (container && imgEl) fitImage(container, imgEl);
           }}
-          className="max-h-full max-w-full cursor-zoom-in rounded-lg object-contain shadow-2xl transition-transform duration-100"
-          style={{ transform: `scale(${scale})` }}
-          draggable={false}
-        />
+          title="点击适合画布"
+          aria-label={`当前缩放：${hudLabel}，点击适合画布`}
+        >
+          {hudLabel}
+        </button>
       </div>
-      <span className="absolute left-4 top-4 text-label text-[var(--gc-text-muted)]">
-        滚轮缩放 {Math.round(scale * 100)}%（最大 200%）· 双击复位 · Esc 关闭
-      </span>
-      <aside className="w-[400px] shrink-0 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)]/98 p-5" onClick={(e) => e.stopPropagation()}>
+
+      {/* 侧边栏 */}
+      <aside className="w-[420px] shrink-0 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)]/98 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
             <p className="mt-1 text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
           </div>
-          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">✕</button>
+          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]" aria-label="关闭">✕</button>
         </div>
+
+        {/* 从 ResultRecordDetail 迁移的字段 */}
         <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
           {[
-            ["状态", record?.status === "success" ? "成功" : record?.status === "error" ? "失败" : "生成中"],
+            ["状态", record ? <span className={statusColor[record.status] ?? ""}>{statusText[record.status] ?? record.status}</span> : "—"],
+            ["节点类型", record ? nodeTitleForKind(record.kind) : "—"],
             ["模型", record?.model ?? "—"],
             ["数量", record?.requestedCount ? `${record.successfulCount ?? 0}/${record.requestedCount}` : "—"],
+            ["上游实际尺寸", record?.providerOutputSize ?? "—"],
             ["服务请求", record?.providerRequests ?? "—"],
             ["开始时间", record?.startedAt ? new Date(record.startedAt).toLocaleString("zh-CN") : "—"],
             ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
           ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-[var(--gc-text-muted)]">{label}</dt><dd className="text-right text-[var(--gc-text)]">{value}</dd></div>)}
         </dl>
-        {(record?.prompt || viewer.prompt) && <div className="mt-4"><p className="text-label text-[var(--gc-text-muted)]">提示词</p><p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-body leading-relaxed text-[var(--gc-text)]">{record?.prompt ?? viewer.prompt}</p><button type="button" onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")} className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]">复制提示词</button></div>}
+
+        {/* 提示词 */}
+        {(record?.prompt || viewer.prompt) && (
+          <div className="mt-4">
+            <p className="text-label text-[var(--gc-text-muted)]">提示词</p>
+            <p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-body leading-relaxed text-[var(--gc-text)]">
+              {record?.prompt ?? viewer.prompt}
+            </p>
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")}
+              className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+            >
+              复制提示词
+            </button>
+          </div>
+        )}
+
+        {/* Provider 原图 */}
         {providerOriginals.length > 0 && (
           <div className="mt-4">
             <p className="text-label text-[var(--gc-text-muted)]">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
@@ -193,27 +383,58 @@ export function ImageViewer() {
             </div>
           </div>
         )}
+
+        {/* 参考图 */}
         {record?.referenceImages && record.referenceImages.length > 0 && (
           <ReferenceEvidenceList images={record.referenceImages} evidence={record.referenceInputs} />
         )}
-        {record?.parameters && Object.keys(record.parameters).length > 0 && <details className="mt-4 rounded-lg border border-[var(--gc-border)] p-3 text-label text-[var(--gc-text-muted)]"><summary className="cursor-pointer">生成参数</summary><pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre></details>}
-        {record?.error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-body text-red-300">{record.error}</div>}
+
+        {/* 生成参数折叠 */}
+        {record?.parameters && Object.keys(record.parameters).length > 0 && (
+          <details className="mt-4 rounded-lg border border-[var(--gc-border)] p-3 text-label text-[var(--gc-text-muted)]">
+            <summary className="cursor-pointer">生成参数</summary>
+            <pre className="mt-2 whitespace-pre-wrap break-all">{JSON.stringify(record.parameters, null, 2)}</pre>
+          </details>
+        )}
+
+        {/* 错误信息 */}
+        {record?.error && (
+          <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-body text-red-300">{record.error}</div>
+        )}
+
+        {/* 操作区 */}
         <div className="mt-5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleCompare}
+            disabled={!record}
+            className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:opacity-50"
+          >
+            {comparing ? "取消对比" : "加入对比"}
+          </button>
+          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
           <label className="mr-auto flex items-center gap-2 text-label text-[var(--gc-text)]">
             <Checkbox
               aria-label="存入数字模特库"
               checked={saveToModelLibrary}
               onCheckedChange={(checked) => {
                 setSaveToModelLibrary(checked === true);
-                // 保存目标变了，允许重新保存到另一个库
                 setAssetState("idle");
               }}
               className="border-[var(--gc-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
             />
             <span>存入数字模特库</span>
           </label>
-          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
-          <button type="button" onClick={() => void saveAsAsset()} disabled={assetState === "saving" || assetState === "saved"} className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:opacity-60">{assetState === "saving" ? "保存中…" : assetState === "saved" ? "已保存" : assetState === "error" ? "保存失败，重试" : saveToModelLibrary ? "存入数字模特库" : "收藏为资产"}</button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void saveAsAsset()}
+            disabled={assetState === "saving" || assetState === "saved"}
+            className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:opacity-60"
+          >
+            {assetState === "saving" ? "保存中…" : assetState === "saved" ? "已保存" : assetState === "error" ? "保存失败，重试" : saveToModelLibrary ? "存入数字模特库" : "收藏为资产"}
+          </button>
           {record && (
             <button
               type="button"
@@ -223,6 +444,17 @@ export function ImageViewer() {
               className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
+            </button>
+          )}
+          {!activeTabReadOnly && (
+            <button
+              type="button"
+              onClick={continueWithResult}
+              disabled={!record}
+              title={activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
+              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              设为输入
             </button>
           )}
         </div>
