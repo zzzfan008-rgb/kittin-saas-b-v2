@@ -18,21 +18,55 @@ function Slider({
   min = 0,
   max = 100,
   "aria-label": ariaLabel,
+  onValueChange,
+  onValueCommitted,
   ...props
 }: SliderProps) {
-  const values = React.useMemo(
-    () => value ?? defaultValue ?? [min],
-    [defaultValue, min, value],
+  // R-85 受控回写契约：base-ui 1.7.0 在「单 Thumb 受控」场景下，onValueChange
+  // 实际发出的 payload 是标量 number（而非 d.ts 声明的 number[]）。调用方按
+  // 声明类型取 value[0] 会得到 undefined，受控 setState 被守卫挡掉，表现为
+  // 真实鼠标拖动完全不生效（键盘/原生通道正常）。这里在原语层把标量/数组
+  // 两种 payload 归一化为 number[] 再向上抛出，修复所有受控调用方。
+  const normalizePayload = (payload: number[] | number): number[] =>
+    Array.isArray(payload) ? payload : [payload]
+
+  const handleValueChange = React.useCallback(
+    (payload: number[] | number, details: unknown) => {
+      onValueChange?.(normalizePayload(payload) as number[], details as never)
+    },
+    [onValueChange],
   )
+  const handleValueCommitted = React.useCallback(
+    (payload: number[] | number, details: unknown) => {
+      onValueCommitted?.(normalizePayload(payload) as number[], details as never)
+    },
+    [onValueCommitted],
+  )
+
+  // 受控/非受控二选一：受控时不得同时把 defaultValue 传给 Root
+  // （useControlled 首帧锁定模式，双传会遮蔽真实缺陷）。
+  const controlled = value !== undefined
+  // 按数值记忆化 value/defaultValue，保证「内容不变 => 引用稳定」，
+  // 避免调用方每次渲染新建数组触发不必要的 Root 内部同步。
+  const source = value ?? defaultValue
+  const sourceKey = source ? source.map((v) => Number(v)).join("|") : ""
+  const normalized = React.useMemo(
+    () => (source ? source.map((v) => Number(v)) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sourceKey],
+  )
+  const values = React.useMemo(() => normalized ?? [min], [normalized, min])
 
   return (
     <SliderPrimitive.Root
       data-slot="slider"
       aria-label={ariaLabel}
-      defaultValue={defaultValue}
-      value={value}
+      defaultValue={controlled ? undefined : normalized}
+      value={controlled ? normalized : undefined}
       min={min}
       max={max}
+      onValueChange={handleValueChange}
+      onValueCommitted={handleValueCommitted}
       className={cn(
         "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
         className,

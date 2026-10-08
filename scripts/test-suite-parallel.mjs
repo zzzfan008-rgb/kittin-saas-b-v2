@@ -104,6 +104,8 @@ const TEST_FILES = [
   "tests/result-export.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
+  // R-85：本地 shadcn Slider 受控回写契约护栏（纯源码断言，不碰库）。
+  "tests/ui-slider-controlled-contract.test.ts",
 
   // P0 清单修复（审计 2026-10-02）：以下 12 个测试文件此前只在盘上、从未被执行。
   "tests/asset-model-category.test.ts",
