@@ -1762,9 +1762,14 @@ await test("蒙版重绘页控件走项目 shadcn 原语，不再手搓 Button/S
     editorSource,
     /setStatusNote\(runStatus === "success" \? "重绘完成" : "重绘未完成，请查看节点状态"\)/,
   );
-  // 结果预览位（右栏下方空白）：只在运行中或已有结果时出现；结果快照只在成功终态写入，
+  // 结果预览位（右栏下方空白）：只在运行中或已有成功结果时出现；结果快照只在成功终态写入，
   // 避免把运行期的旧底图当成结果展示。
-  assert.match(editorSource, /aria-label="本次结果"/);
+  // 标签语义（审查裁决 P2(b)）：快照只增不清，重试失败后仍展示上次成功图，故标「上次成功结果」，
+  // 不得残留把上次成功图标成「本次」结果的误导文案（注释可提及旧标签，标记形态必须清除）。
+  assert.match(editorSource, /aria-label="上次成功结果"/);
+  assert.match(editorSource, /data-testid="mask-redraw-result-label">上次成功结果</);
+  assert.match(editorSource, /alt="上次成功结果"/);
+  assert.doesNotMatch(editorSource, /aria-label="本次结果"|alt="本次重绘结果"|>本次结果</);
   assert.match(editorSource, /data-testid="mask-redraw-result-preview"/);
   assert.match(editorSource, /if \(runStatus === "success"\) setLastResultUrl\(source\)/);
 });

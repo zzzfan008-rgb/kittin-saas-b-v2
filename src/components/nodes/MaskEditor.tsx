@@ -103,8 +103,10 @@ export function MaskEditor({
 
   // 完成态状态行 + 结果预览快照：run 结束时按终态更新文案（成功→「重绘完成」，
   // 其余→「重绘未完成」），否则停在提交期的「正在重绘…」误导用户。失败态不能说成完成。
-  // 成功时同时把此刻的 source 快照为右栏下方「本次结果」预览——source 实时响应
+  // 成功时把此刻的 source 快照为右栏下方「上次成功结果」预览——source 实时响应
   // outputImages[0]，运行期仍是旧图，故必须在终态这一刻取值（source 进依赖，非终态不覆盖）。
+  // 该快照只增不清（审查裁决 P2(b)）：重试失败后旧快照仍在，标签用「上次成功结果」而非
+  // 「本次结果」，信息保留但消除「本次产出」的误导。
   const wasRunningRef = useRef(false);
   useEffect(() => {
     if (wasRunningRef.current && !running) {
@@ -670,11 +672,13 @@ export function MaskEditor({
             </p>
           </section>
 
-          {/* 本次结果预览（右栏下方空白位）：运行期显示占位，结果返回后出缩略图。
+          {/* 上次成功结果预览（右栏下方空白位）：运行期显示占位，成功返回后出缩略图。
+              快照只增不清——重试失败时仍展示上次成功图，故标「上次成功结果」而非「本次结果」，
+              信息保留但消除「本次产出」的误导（审查裁决 P2(b)）。
               左栏仍按契约覆盖原图——此处只做页内可回看的结果位，不改变覆盖语义。 */}
           {running || lastResultUrl ? (
-            <section className="flex flex-col gap-2" aria-label="本次结果">
-              <span className="text-xs font-medium text-[var(--gc-text)]">本次结果</span>
+            <section className="flex flex-col gap-2" aria-label="上次成功结果">
+              <span className="text-xs font-medium text-[var(--gc-text)]" data-testid="mask-redraw-result-label">上次成功结果</span>
               {running ? (
                 <div
                   className="flex h-24 items-center justify-center rounded-md border border-dashed border-[var(--gc-border)] text-xs text-[var(--gc-text-muted)]"
@@ -685,7 +689,7 @@ export function MaskEditor({
               ) : (
                 <img
                   src={lastResultUrl ?? ""}
-                  alt="本次重绘结果"
+                  alt="上次成功结果"
                   data-testid="mask-redraw-result-preview"
                   className="h-24 w-full rounded-md border border-[var(--gc-border)] object-contain"
                 />
