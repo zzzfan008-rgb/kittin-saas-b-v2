@@ -50,7 +50,7 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 10 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 11 files/);
   assert.match(
     baseline.stdout,
     /\[vis-keyboard\].*VIS-07 键盘焦点环.*VIS-05 snapGrid 吸附/,
@@ -59,8 +59,15 @@ try {
   // VIS-07/05（本分支）、VIS-01 与 VIS-06（main 侧，PR #54/#55 合入）是三次独立的
   // 矩阵扩充，合并后四条守卫都必须保留：矩阵文件数 6 → 9 → 10
   // （vis-keyboard + vis01-shots + vis06-tokens + drawing）。
-  // 各分支各自把计数改成 7 或 8，git 视为同值/近值容易静默通过，故此处按合并态
-  // 真实文件数显式修正为 10，防止守卫漏掉任一批次新增的回归文件。
+  // R-84（2026-10-08）新增 mask-slider-drag.spec.ts（真实鼠标拖动滑杆回归），
+  // 矩阵文件数 10 → 11，故此处按合并态真实文件数显式修正为 11。
+  // 各分支各自把计数改成 7 或 8，git 视为同值/近值容易静默通过，故必须显式维护计数，
+  // 防止守卫漏掉任一批次新增的回归文件。
+  assert.match(
+    baseline.stdout,
+    /\[mask-slider-drag\].*蒙版重绘页两个滑杆的真实鼠标拖动/,
+    "R-84 real mouse drag regression must remain in the browser regression matrix",
+  );
   assert.match(
     baseline.stdout,
     /\[vis01\].*VIS-01 screenshot matrix/,

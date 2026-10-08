@@ -131,6 +131,21 @@ export default defineConfig({
       },
     },
     {
+      // R-84：蒙版重绘页两个滑杆（笔刷大小 / 羽化宽度）的**真实鼠标拖动**回归。
+      // 拖动用 page.mouse 的 down→move→up 真实输入通道（合成 PointerEvent 对 base-ui slider
+      // 的隐藏原生 <input type=range> 无效）；三档桌面宽度在用例内用 setViewportSize 覆盖
+      // （与 drawing.spec.ts 的 VIEWPORTS 写法一致）。与 workbench 系列共用同一账号，
+      // 故同样串行（workers 由 E2E_WORKERS 控制，默认 1）。
+      name: "mask-slider-drag",
+      testMatch: /mask-slider-drag\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
       name: "desktop-1024",
       testMatch: /workbench\.spec\.ts/,
       dependencies: ["setup"],
