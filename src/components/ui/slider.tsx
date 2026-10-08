@@ -46,15 +46,26 @@ function Slider({
   // 受控/非受控二选一：受控时不得同时把 defaultValue 传给 Root
   // （useControlled 首帧锁定模式，双传会遮蔽真实缺陷）。
   const controlled = value !== undefined
-  // 按数值记忆化 value/defaultValue，保证「内容不变 => 引用稳定」，
-  // 避免调用方每次渲染新建数组触发不必要的 Root 内部同步。
+  // 按数值内容稳定化 value/defaultValue：若新旧数组内容相同则复用同一引用，
+  // 避免调用方每次渲染新建数组导致 Root 内部不必要的同步（影响受控回写）。
   const source = value ?? defaultValue
   const sourceKey = source ? source.map((v) => Number(v)).join("|") : ""
-  const normalized = React.useMemo(
-    () => (source ? source.map((v) => Number(v)) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sourceKey],
-  )
+  // prevRef 必须先于 normalized 的 useMemo 声明（闭包捕获顺序）。
+  const prevRef = React.useRef<string | null>(null)
+  const normalized = React.useMemo(() => {
+    if (sourceKey !== "" && sourceKey !== prevRef.current) {
+      const next = source ? source.map((v) => Number(v)) : undefined
+      prevRef.current = sourceKey
+      return next
+    }
+    // 首次初始化或内容未变：建立基准键
+    if (prevRef.current === null) {
+      prevRef.current = sourceKey
+      return source ? source.map((v) => Number(v)) : undefined
+    }
+    // 内容未变，复用 undefined 由 values 的 fallback 处理
+    return undefined
+  }, [sourceKey])
   const values = React.useMemo(() => normalized ?? [min], [normalized, min])
 
   return (
