@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
 import { continueWithResult } from "@/lib/resultActions";
+import { useLightboxStore } from "@/store/lightboxStore";
 
 interface ResultsPanelProps {
   hasMore?: boolean;
@@ -39,6 +40,7 @@ export function ResultsPanel({
     "rounded-sm px-1 py-1 text-label font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
   const openViewer = useFlowStore((s) => s.openViewer);
+  const openLightbox = useLightboxStore((s) => s.open);
   // 65d R-87 §3：ResultDetailDialog 已删除；点「查看详情」直接打开 ImageViewer。
   const openDetail = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
@@ -136,10 +138,10 @@ export function ResultsPanel({
                         if (e.ctrlKey || e.metaKey) {
                           toggleCompareId(r.id);
                         } else {
-                          openDetail(r);
+                          openLightbox(thumbnailImageUrl(r.image), r.nodeLabel);
                         }
                       }}
-                      aria-label={`查看 ${r.nodeLabel}`}
+                      aria-label={`放大 ${r.nodeLabel}`}
                       className="absolute inset-0 h-full w-full cursor-zoom-in focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold"
                     >
                       <img

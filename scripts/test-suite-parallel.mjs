@@ -40,6 +40,10 @@ const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
  * 启动时由 assertManifestMatchesDisk 做 fail-closed 断言。
  */
 const TEST_FILES = [
+  // R-90 坐标映射契约（useImageZoom hook 核心数学）。
+  "tests/image-zoom-contract.test.ts",
+  // R-94 Lightbox store 最小行为契约。
+  "tests/lightbox-store.test.ts",
   // Select 可见性硬化契约（Phase 0）。
   "tests/select-visibility.test.ts",
   // 预设模板文本一致性锁定（64 Phase 2 裁决 B）。

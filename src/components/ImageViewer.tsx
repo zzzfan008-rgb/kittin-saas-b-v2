@@ -7,10 +7,7 @@ import { saveImageAsAsset } from "@/lib/assetSave";
 import { continueWithResult, toggleResultCompare } from "@/lib/resultActions";
 import { nodeSpecForKind, nodeTitleForKind } from "@/types/workflow";
 import { Checkbox } from "@/components/ui/checkbox";
-
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 4;
-const ZOOM_STEP = 0.1;
+import { useImageZoom, MIN_SCALE, MAX_SCALE } from "@/hooks/useImageZoom";
 
 export function ReferenceEvidenceList({
   images,
@@ -69,166 +66,10 @@ export function ImageViewer() {
     (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
   );
 
-  // 缩放状态：scale 存储 0.25–4，isFit 表示当前处于"适合画布"锚点
-  const [scale, setScale] = useState(1);
-  const [isFit, setIsFit] = useState(true);
-  // panOffset：画布左上角相对容器中心的偏移（屏幕像素）
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  // 平移状态
-  const isPanningRef = useRef(false);
-  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-
-  // 每次打开新图时复位，用 computeFitScale 算初始值（不是写死 1）
-  useEffect(() => {
-    setScale(1);
-    setIsFit(true);
-    setPanOffset({ x: 0, y: 0 });
-    // 图片加载完成后算 fit scale（直接用 computeFitScale，避免依赖顺序问题）
-    const container = document.getElementById("viewer-image-area") as HTMLElement | null;
-    const imgEl = container?.querySelector("img") as HTMLImageElement | null;
-    if (container && imgEl) {
-      if (imgEl.complete && imgEl.naturalWidth > 0) {
-        const fitScale = Math.min(Math.max(Math.min(
-          (container.getBoundingClientRect().width - 32) / (imgEl.naturalWidth || 1),
-          (container.getBoundingClientRect().height - 32) / (imgEl.naturalHeight || 1),
-          1,
-        ), MIN_SCALE), MAX_SCALE);
-        setScale(fitScale);
-      } else {
-        imgEl.addEventListener("load", () => {
-          if (!container) return;
-          const rect = container.getBoundingClientRect();
-          const fitScale = Math.min(Math.max(Math.min(
-            (rect.width - 32) / (imgEl.naturalWidth || 1),
-            (rect.height - 32) / (imgEl.naturalHeight || 1),
-            1,
-          ), MIN_SCALE), MAX_SCALE);
-          setScale(fitScale);
-        }, { once: true });
-      }
-    }
-  }, [viewer?.url]);
-
-  // 窗口 resize 时：fit 模式下重新计算
-  useEffect(() => {
-    if (!isFit) return;
-    let rafId: number;
-    const handler = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const container = document.getElementById("viewer-image-area") as HTMLElement | null;
-        const imgEl = container?.querySelector("img") as HTMLImageElement | null;
-        if (container && imgEl && imgEl.naturalWidth > 0) {
-          const rect = container.getBoundingClientRect();
-          const newScale = Math.min(Math.max(Math.min(
-            (rect.width - 32) / (imgEl.naturalWidth || 1),
-            (rect.height - 32) / (imgEl.naturalHeight || 1),
-            1,
-          ), MIN_SCALE), MAX_SCALE);
-          setScale(newScale);
-        }
-      });
-    };
-    window.addEventListener("resize", handler);
-    return () => {
-      window.removeEventListener("resize", handler);
-      cancelAnimationFrame(rafId);
-    };
-  }, [isFit]);
-
-  // 计算适合画布的缩放比（结果 clamp 到 25%–400%，防止容器很大时算出的 scale 越界）
-  const computeFitScale = useCallback((containerEl: HTMLElement, imgEl: HTMLImageElement) => {
-    const rect = containerEl.getBoundingClientRect();
-    const availW = rect.width - 32; // 留 padding
-    const availH = rect.height - 32;
-    const scaleX = availW / (imgEl.naturalWidth || 1);
-    const scaleY = availH / (imgEl.naturalHeight || 1);
-    return Math.min(Math.max(Math.min(scaleX, scaleY, 1), MIN_SCALE), MAX_SCALE);
-  }, []);
-
-  // 适合画布模式
-  const fitImage = useCallback((containerEl: HTMLElement, imgEl: HTMLImageElement) => {
-    const fitScale = computeFitScale(containerEl, imgEl);
-    setScale(fitScale);
-    setIsFit(true);
-    setPanOffset({ x: 0, y: 0 });
-  }, [computeFitScale]);
-
-  // 滚轮缩放（以指针为中心）
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const container = e.currentTarget as HTMLElement;
-    const imgEl = container.querySelector("img") as HTMLImageElement | null;
-    if (!imgEl) return;
-
-    const delta = -e.deltaY * 0.0015;
-    setScale((prev) => {
-      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev + delta * prev));
-      setIsFit(false);
-      return next;
-    });
-    // 缩放后重置平移
-    setPanOffset({ x: 0, y: 0 });
-  }, []);
-
-  useEffect(() => {
-    const container = document.getElementById("viewer-image-area");
-    if (!container || !viewer) return;
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [viewer, handleWheel]);
-
-  // 双击：切换适合画布 ↔ 100%
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const container = document.getElementById("viewer-image-area") as HTMLElement | null;
-    const imgEl = container?.querySelector("img") as HTMLImageElement | null;
-    if (!container || !imgEl) return;
-    if (isFit) {
-      setScale(1);
-      setIsFit(false);
-      setPanOffset({ x: 0, y: 0 });
-    } else {
-      const fitScale = Math.min(Math.max(Math.min(
-        (container.getBoundingClientRect().width - 32) / (imgEl.naturalWidth || 1),
-        (container.getBoundingClientRect().height - 32) / (imgEl.naturalHeight || 1),
-        1,
-      ), MIN_SCALE), MAX_SCALE);
-      setScale(fitScale);
-      setIsFit(true);
-      setPanOffset({ x: 0, y: 0 });
-    }
-  }, [isFit]);
-
-  // 拖拽平移（> 适合画布时激活）
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isFit) return; // 适合画布时不启动平移
-    e.stopPropagation();
-    isPanningRef.current = true;
-    panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
-  }, [isFit, panOffset]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanningRef.current) return;
-    const dx = e.clientX - panStartRef.current.x;
-    const dy = e.clientY - panStartRef.current.y;
-    setPanOffset({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    isPanningRef.current = false;
-  }, []);
-
-  // ± 按钮
-  const zoomIn = useCallback(() => {
-    setScale((prev) => Math.min(MAX_SCALE, prev + ZOOM_STEP));
-    setIsFit(false);
-    setPanOffset({ x: 0, y: 0 });
-  }, []);
-  const zoomOut = useCallback(() => {
-    setScale((prev) => Math.max(MIN_SCALE, prev - ZOOM_STEP));
-    setIsFit(false);
-  }, []);
+  // R-89 §D 缩放状态：共用 useImageZoom hook（MaskEditor + ImageViewer 共用同一实现）
+  const viewerContainerRef = useRef<HTMLDivElement>(null);
+  const viewerImgRef = useRef<HTMLImageElement>(null);
+  const zoom = useImageZoom({ containerRef: viewerContainerRef, wheelKey: viewer?.url, wheelRectRef: viewerImgRef });
 
   // 辅助
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();
@@ -272,7 +113,7 @@ export function ImageViewer() {
   const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
 
   useEffect(() => {
-    setScale(1);
+    zoom._setScale(1);
     setAssetState("idle");
     setSaveToModelLibrary(false);
   }, [viewer?.url]);
@@ -316,9 +157,6 @@ export function ImageViewer() {
     closeViewer();
   };
 
-  const displayScale = Math.round(scale * 100);
-  const hudLabel = isFit ? "适合画布" : `${displayScale}%`;
-
   return (
     <div
       className="fixed inset-0 z-[80] flex items-stretch bg-black/85"
@@ -329,36 +167,40 @@ export function ImageViewer() {
         {/* 操作栏：±按钮 + 提示 */}
         <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 py-3" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-label text-white/70">
-            <button type="button" onClick={zoomOut} disabled={scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
-            <span className="w-12 text-center text-xs">{isFit ? "适合画布" : `${displayScale}%`}</span>
-            <button type="button" onClick={zoomIn} disabled={scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
+            <button type="button" onClick={zoom.zoomOut} disabled={zoom.scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
+            <span className="w-12 text-center text-xs">{zoom.hudLabel}</span>
+            <button type="button" onClick={zoom.zoomIn} disabled={zoom.scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
           </div>
           <span className="text-label text-white/50">
-            双击{hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
+            双击{zoom.hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
           </span>
         </div>
 
         {/* 图片容器（滚轮 + 拖拽平移） */}
         <div
-          id="viewer-image-area"
+          ref={viewerContainerRef}
           className="relative flex flex-1 items-center justify-center overflow-hidden p-8"
           onClick={(e) => e.stopPropagation()}
-          onDoubleClick={handleDoubleClick}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          style={{ cursor: isFit ? "default" : (isPanningRef.current ? "grabbing" : "grab") }}
+          onDoubleClick={(e) => {
+            const imgEl = viewerContainerRef.current?.querySelector("img") as HTMLImageElement | null;
+            if (imgEl) zoom.handleDoubleClick(e, viewerContainerRef.current!, imgEl);
+          }}
+          onMouseDown={zoom.handleMouseDown}
+          onMouseMove={zoom.handleMouseMove}
+          onMouseUp={zoom.handleMouseUp}
+          onMouseLeave={zoom.handleMouseUp}
+          style={{ cursor: zoom.cursor }}
         >
           <img
+            ref={viewerImgRef}
             src={viewer.url}
             alt={viewer.title ?? "图片预览"}
             draggable={false}
             className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
             style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${scale})`,
+              transform: `translate(${zoom.panOffset.x}px, ${zoom.panOffset.y}px) scale(${zoom.scale})`,
               transformOrigin: "center center",
-              transition: isPanningRef.current ? "none" : "transform 0.1s ease",
+              transition: zoom.isPanningRef.current ? "none" : "transform 0.1s ease",
             }}
           />
         </div>
@@ -369,14 +211,13 @@ export function ImageViewer() {
           className="zoom-hud"
           onClick={(e) => {
             e.stopPropagation();
-            const container = document.getElementById("viewer-image-area") as HTMLElement | null;
-            const imgEl = container?.querySelector("img") as HTMLImageElement | null;
-            if (container && imgEl) fitImage(container, imgEl);
+            const imgEl = viewerContainerRef.current?.querySelector("img") as HTMLImageElement | null;
+            if (viewerContainerRef.current && imgEl) zoom.fitImage(viewerContainerRef.current, imgEl);
           }}
           title="点击适合画布"
-          aria-label={`当前缩放：${hudLabel}，点击适合画布`}
+          aria-label={`当前缩放：${zoom.hudLabel}，点击适合画布`}
         >
-          {hudLabel}
+          {zoom.hudLabel}
         </button>
       </div>
 

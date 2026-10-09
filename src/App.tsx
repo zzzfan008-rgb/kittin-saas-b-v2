@@ -42,6 +42,7 @@ import {
 } from "@/lib/overlayEvents";
 import { assetPickerCategoryForNode } from "@/lib/workflowMenuMapping";
 import { requestCanvasZoom } from "@/lib/keyboardShortcuts";
+import { Lightbox } from "@/components/Lightbox";
 
 const LazyCompareOverlay = lazy(() => import("@/components/CompareOverlay").then((module) => ({
   default: module.CompareOverlay,
@@ -409,6 +410,7 @@ function Workspace() {
           <LazyImageViewer />
         </Suspense>
       )}
+      <Lightbox />
       {assetPickerRequest && (
         <Suspense fallback={<OverlayLoadingStatus label="正在打开素材库…" />}>
           <LazyAssetPickerOverlay
