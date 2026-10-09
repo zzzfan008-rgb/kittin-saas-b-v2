@@ -258,21 +258,6 @@ export function MultiRoundEditPanel({
               strokeWidth={strokeWidth}
               disabled={busy || readOnly}
             />
-            {running ? (
-              <div
-                className="develop-overlay pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-lg"
-                data-testid="multi-round-developing"
-              >
-                <div className="develop-gridlines" aria-hidden="true" />
-                <div className="develop-scanline" aria-hidden="true" />
-                <div className="develop-float">
-                  <div className="develop-sigil" aria-hidden="true">
-                    <span>✦</span>
-                  </div>
-                  <div>显影中…</div>
-                </div>
-              </div>
-            ) : null}
           </div>
         ) : (
           <p className="text-sm text-[var(--gc-node-text)]">请先上传图片后再使用多轮修改</p>
@@ -398,6 +383,15 @@ export function MultiRoundEditPanel({
           </Button>
           {!busy && disabledReason ? (
             <p className="text-xs text-[var(--gc-node-text)] opacity-70">{disabledReason}</p>
+          ) : null}
+
+          {running ? (
+            <div
+              className="flex h-24 items-center justify-center rounded-md border border-dashed border-[var(--gc-border)] text-xs text-[var(--gc-text-muted)]"
+              data-testid="multi-round-result-pending"
+            >
+              显影中…
+            </div>
           ) : null}
 
           {/* 修改记录条 */}
