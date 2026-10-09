@@ -15,7 +15,7 @@
 // - 完成态状态行：run 结束时把「正在重绘…」更新为「重绘完成」（旧实现停在提交文案）。
 // - 画布叠色取 colorToken.ts 常量（canvas fillStyle 不能用 CSS 变量）。
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { EraserIcon, FlipHorizontal2Icon, Redo2Icon, Undo2Icon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -536,30 +536,32 @@ export function MaskEditor({
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 touch-none">
           {/* 绘画工具 */}
           <section className="flex flex-col gap-3" aria-label="绘画工具">
-            <div className="flex gap-0.5 self-start rounded-md border border-[var(--gc-border)] p-0.5" role="group" aria-label="涂抹模式">
-              <Button
+            <div className="flex gap-0.5 self-start" role="group" aria-label="涂抹模式">
+              <button
                 type="button"
-                variant={mode === "edit" ? "secondary" : "ghost"}
-                size="sm"
                 disabled={locked}
                 aria-pressed={mode === "edit"}
                 onClick={() => setMode("edit")}
+                className={`seg-item${mode === "edit" ? " seg-item--on" : ""}`}
               >
                 涂抹修改区
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant={mode === "preserve" ? "secondary" : "ghost"}
-                size="sm"
                 disabled={locked}
                 aria-pressed={mode === "preserve"}
                 onClick={() => setMode("preserve")}
+                className={`seg-item${mode === "preserve" ? " seg-item--on" : ""}`}
               >
                 恢复保留区
-              </Button>
+              </button>
             </div>
-            <div className="flex items-center gap-2 text-label text-[var(--gc-text-muted)]">
-              <span>笔刷</span>
+            <div className="flex flex-col gap-1.5" aria-label="笔刷">
+              <div className="flex items-center gap-1 text-label text-[var(--gc-text-muted)]">
+                <span>笔刷</span>
+                <span className="info-btn" title="在图片上按住拖动画出涂抹区域" aria-label="笔刷说明">ⓘ</span>
+                <span className="ml-auto tabular-nums">{brushSize}px</span>
+              </div>
               <Slider
                 aria-label="笔刷大小"
                 value={[brushSize]}
@@ -571,24 +573,26 @@ export function MaskEditor({
                   const next = value[0];
                   if (typeof next === "number") setBrushSize(next);
                 }}
-                className="min-w-0 flex-1"
+                className="w-full"
               />
-              <span className="tabular-nums">{brushSize}px</span>
             </div>
             {/* 羽化行 v2：勾选式自适应 + 滑杆 */}
             <div className="flex flex-col gap-1.5" aria-label="羽化">
-              <div className="flex items-center gap-2 text-label text-[var(--gc-text-muted)]">
+              <div className="flex items-center gap-1.5 text-label text-[var(--gc-text-muted)]">
                 <Checkbox
                   checked={featherEnabled}
                   disabled={locked}
                   aria-label="羽化 · 自适应"
                   data-testid="mask-redraw-feather"
                   onCheckedChange={(checked) => setFeatherEnabled(checked === true)}
-                  className="border-[var(--gc-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
+                  className="border-[var(--gc-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold shrink-0"
                 />
                 <span>羽化 · 自适应</span>
-                <span className="ml-auto tabular-nums">
-                  {featherEnabled ? "自适应" : `${featherValue}px`}
+                <span className="flex items-center gap-1">
+                  <span className="info-btn" title="羽化：控制蒙版边缘柔和程度；勾选「自适应」由系统自动计算" aria-label="羽化说明">ⓘ</span>
+                  <span className="ml-auto tabular-nums">
+                    {featherEnabled ? "自适应" : `${featherValue}px`}
+                  </span>
                 </span>
               </div>
               <Slider
@@ -607,19 +611,23 @@ export function MaskEditor({
                 className="w-full"
               />
             </div>
-            <div className="flex gap-1">
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="撤销" title="撤销" disabled={locked || !undoStack.length} onClick={undo}>
-                <Undo2Icon aria-hidden="true" />
-              </Button>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="重做" title="重做" disabled={locked || !redoStack.length} onClick={redo}>
-                <Redo2Icon aria-hidden="true" />
-              </Button>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="清空" title="清空" disabled={locked} onClick={clearMask}>
-                <EraserIcon aria-hidden="true" />
-              </Button>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="反选" title="反选" disabled={locked} onClick={invertMask}>
-                <FlipHorizontal2Icon aria-hidden="true" />
-              </Button>
+            <div className="tool-grid" role="group" aria-label="绘画操作">
+              <button type="button" aria-label="撤销" title="撤销 (Undo)" disabled={locked || !undoStack.length} onClick={undo} className="tool-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                <span>撤销</span>
+              </button>
+              <button type="button" aria-label="重做" title="重做 (Redo)" disabled={locked || !redoStack.length} onClick={redo} className="tool-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+                <span>重做</span>
+              </button>
+              <button type="button" aria-label="清空" title="清空蒙版 (Clear)" disabled={locked} onClick={clearMask} className="tool-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><polyline points="3 6 5 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                <span>清空</span>
+              </button>
+              <button type="button" aria-label="反选" title="反选蒙版 (Invert)" disabled={locked} onClick={invertMask} className="tool-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+                <span>反选</span>
+              </button>
             </div>
           </section>
 
@@ -639,7 +647,7 @@ export function MaskEditor({
           </section>
 
           {/* 按钮区 */}
-          <section className="flex flex-col gap-2" aria-label="执行">
+          <section className="flex flex-col gap-1.5" aria-label="执行">
             <Button
               type="button"
               onClick={() => void saveAndRun()}
@@ -650,16 +658,10 @@ export function MaskEditor({
             >
               {saving ? "保存中…" : running ? "运行中…" : "蒙版重绘"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void saveDraft()}
-              disabled={disabledDraft}
-              data-testid="mask-redraw-save"
-              className="border-[var(--gc-border)] px-4 py-2 text-xs text-[var(--gc-text)]"
-            >
-              {saving ? "保存中…" : "保存蒙版"}
-            </Button>
+            {/* 11px muted 副标题：每次提交自动保存蒙版（plan.md 按钮区决策） */}
+            <p className="text-center text-[11px] leading-snug text-[var(--gc-text-muted)]">
+              每次提交自动保存蒙版
+            </p>
           </section>
 
           {/* 状态行 + 说明 */}

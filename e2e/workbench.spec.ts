@@ -812,39 +812,17 @@ test("results and project center follow desktop density for cards", async ({ pag
   const resultsRect = await rect(resultsScroller);
   await expectInside(await rect(firstSuccessCard), resultsRect);
 
+  // 65d R-87 §3 Review Gap 3：点「查看详情」改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
   await viewButton.click();
-  const detailDialog = page.getByRole("dialog", { name: "结果详情" });
-  await expect(detailDialog).toBeVisible();
-  await detailDialog.getByRole("button", { name: /查看 .* 大图/ }).click();
-  const viewerHint = page.getByText(/滚轮缩放 100%/);
-  await expect(viewerHint).toBeVisible();
-  // 遮挡实测（Playwright 的 toBeVisible 不看遮挡）：查看器顶层的那个点必须真的属于查看器，
-  // 否则说明它被「结果详情」弹窗（overlay z-[70] / content z-[71]）压住了。
-  const viewerTopmost = await page.evaluate(() => {
-    const hint = [...document.querySelectorAll("span")]
-      .find((el) => el.textContent?.includes("滚轮缩放 100%"));
-    if (!hint) return { found: false } as const;
-    const overlay = hint.closest("div.fixed") as HTMLElement | null;
-    const box = hint.getBoundingClientRect();
-    const top = document.elementFromPoint(box.left + 2, box.top + 2);
-    return {
-      found: true,
-      overlayZ: overlay ? getComputedStyle(overlay).zIndex : null,
-      topmostIsViewer: Boolean(overlay && top && overlay.contains(top)),
-      topmostTag: top ? `${top.tagName.toLowerCase()}.${(top.className || "").toString().slice(0, 40)}` : null,
-    };
-  });
-  expect(
-    viewerTopmost.found && viewerTopmost.topmostIsViewer,
-    `图片查看器必须位于最上层（实测最上层元素=${viewerTopmost.topmostTag ?? "?"}，查看器 overlay z-index=${viewerTopmost.overlayZ ?? "?"}）`,
-  ).toBe(true);
+  // ImageViewer 初始 fit 模式，HUD 按钮文字为「适合画布」或「X%」。
+  const viewerHint = page.getByRole("button", { name: /适合画布|\d+%/ });
+  await expect(viewerHint).toBeVisible({ timeout: 10000 });
+  await expect(viewerHint).toContainText(/适合画布|\d+%/);
+  // 关闭：Esc 关闭 ImageViewer。
   await page.keyboard.press("Escape");
   await expect(viewerHint).toBeHidden();
-  // Esc 可能只关掉查看器：确定性地收掉详情弹窗，避免后续点击被遮罩拦截。
-  if (await page.getByRole("button", { name: "关闭结果详情" }).count() > 0) {
-    await page.getByRole("button", { name: "关闭结果详情" }).click();
-  }
-  await expect(detailDialog).toHaveCount(0);
+  // 不留 ResultDetailDialog 弹窗。
+  await expect(page.getByRole("dialog", { name: "结果详情" })).toHaveCount(0);
 
   // 查看器 Esc 会连带收起结果浮层（ResultsFab 也监听 Esc），所以下一步先重开。
   await openResults();
@@ -1611,12 +1589,10 @@ test("mask redraw panel: main action saves and runs without closing; output swap
   await expect(rail.getByRole("heading", { name: "蒙版重绘" })).toBeVisible(); // 标题在右栏顶部
   await expect(page.getByTestId("mask-editor-canvas")).toBeVisible();
 
-  // 无蒙版 + 无描述：主按钮 disabled（fail-closed 前端态）；
-  // 「保存蒙版」保留 v1 语义——只存不执行，不要求修改描述。
+  // 无蒙版 + 无描述：主按钮 disabled（fail-closed 前端态）。
+  // 65d R-87 §2.1 Review Gap 1：「保存蒙版」按钮已删除（蒙版随 run 自动保存）。
   const runButton = page.getByTestId("mask-redraw-run");
-  const saveButton = page.getByTestId("mask-redraw-save");
   await expect(runButton).toBeDisabled();
-  await expect(saveButton).toBeEnabled();
   // rail 内唯一 textbox（section/label 都叫「修改描述」，getByLabel 会命中两个元素）。
   const promptInput = rail.getByRole("textbox");
   await expect(promptInput).toHaveAttribute("maxlength", "500");
@@ -1627,7 +1603,6 @@ test("mask redraw panel: main action saves and runs without closing; output swap
   await promptInput.fill("把背景改成米色");
   await stubRunPlanWithImageUpdate(page, runs);
   await expect(runButton).toBeEnabled();
-  await expect(saveButton).toBeEnabled();
 
   const overlayCanvas = page.getByTestId("mask-editor-canvas");
   const canvasBox = await overlayCanvas.boundingBox();

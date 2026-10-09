@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import {
   beginMaskWork,
+  patchTab,
+  runWithoutHistory,
   selectActiveDocumentTarget,
   selectActiveProjectName,
   selectActiveReadOnly,
@@ -419,7 +421,27 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           promptBind={editPromptEdit.bind}
           runStatus={data.status}
           readOnly={readOnly}
-          onClose={() => setEditingMask(false)}
+          onClose={() => {
+            // 65d R-87 §2.4 补充决策：用户画了 mask 但没点重绘就关面板，下次打开会带残留蒙版。
+            // 决策：做——关闭时清 mask 三字段（node data 层；不删文件本体）。
+            const state = useFlowStore.getState();
+            const target = selectActiveDocumentTarget(state);
+            const tab = target ? selectDocumentForTab(state, target.tabId) : undefined;
+            if (!tab) { setEditingMask(false); return; }
+            const node = tab.nodes.find((n) => n.id === id) as (typeof tab.nodes)[number] | undefined;
+            if (node && (node.data as ImageNodeData).mask != null) {
+              runWithoutHistory(() =>
+                patchTab(useFlowStore.setState, target!.tabId, {
+                  nodes: tab.nodes.map((n) =>
+                    n.id !== id
+                      ? n
+                      : { ...n, data: { ...n.data, mask: undefined, maskSourceRef: undefined, featherRadius: undefined } },
+                  ),
+                }),
+              );
+            }
+            setEditingMask(false);
+          }}
           onSaveDraft={persistMaskDraft}
           onRun={async (mask, featherRadius) => {
             await persistMaskDraft(mask, featherRadius);

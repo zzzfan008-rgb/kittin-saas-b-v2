@@ -211,21 +211,16 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
       await openResults();
       await shot(`${tag}-2-results`);
 
-      // Detail dialog: view first success card.
+      // 65d R-87 §3：结果详情弹窗已删除，点「查看详情」直接打开 ImageViewer（大图区并入查看器）。
       const region = resultsDialog.getByRole("region", { name: "最近生成" });
       await region.locator('button[title="查看详情"]').first().click();
-      const detail = page.getByRole("dialog", { name: "结果详情" });
-      await expect(detail).toBeVisible();
-      await settle(detail);
-      await shot(`${tag}-3-detail`);
-
-      // Image viewer.
-      await detail.getByRole("button", { name: /查看 .* 大图/ }).click();
-      await expect(page.getByText(/滚轮缩放 100%/)).toBeVisible();
-      await shot(`${tag}-4-viewer`);
+      const zoomHud = page.locator(".zoom-hud");
+      await expect(zoomHud).toBeVisible();
+      await shot(`${tag}-3-viewer`);
       await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "关闭结果详情" }).click().catch(() => undefined);
-      await expect(detail).toHaveCount(0);
+      await expect(zoomHud).toHaveCount(0);
+      // 确认不存在遗留的「结果详情」弹窗。
+      await expect(page.getByRole("dialog", { name: "结果详情" })).toHaveCount(0);
 
       // Compare overlay: mark two success cards, then header compare button.
       await openResults();

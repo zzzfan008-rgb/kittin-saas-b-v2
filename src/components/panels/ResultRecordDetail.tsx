@@ -11,8 +11,8 @@ import { UnsupportedNodeKindNotice } from "../nodes/NodeFrame";
 /**
  * 单条「最近生成」结果的完整运行记录。
  *
- * 2026-09-25：本组件从 `InspectorPanel.tsx` 拆出，成为「结果详情」弹窗
- * （`ResultDetailDialog`）的主体内容；左侧 Dock 与其中的节点属性面板已一并移除。
+ * 2026-09-25：本组件从 `InspectorPanel.tsx` 拆出；65d R-87 §3 起「结果详情」弹窗已删除，
+ * 全部字段并入 ImageViewer 侧边栏展示，本组件保留作为字段定义的参照实现。
  */
 export function ResultRecordDetail({ resultId }: { resultId: string }) {
   const record = useFlowStore((s) => s.recentResults.find((r) => r.id === resultId));

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { selectActiveCompareIds, useFlowStore } from "@/store/flowStore";
+import { continueWithMask } from "@/lib/resultActions";
+import type { RecentResult } from "@/store/flowStore";
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString("zh-CN", {
@@ -20,10 +22,13 @@ export function CompareOverlay({
   const compareIds = useFlowStore(selectActiveCompareIds);
   const recentResults = useFlowStore((s) => s.recentResults);
   const clearCompare = useFlowStore((s) => s.clearCompare);
+  const activeTabReadOnly = useFlowStore(
+    (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
+  );
 
   const items = compareIds
-    .map((id) => recentResults.find((r) => r.id === id))
-    .filter((r): r is NonNullable<typeof r> => Boolean(r && r.status === "success" && r.image));
+    .map((id: string) => recentResults.find((r: RecentResult) => r.id === id))
+    .filter((r): r is RecentResult => Boolean(r && r.status === "success" && r.image));
 
   useEffect(() => {
     if (items.length < 2) onOpenChange(false);
@@ -57,7 +62,7 @@ export function CompareOverlay({
         </button>
       </div>
       <div className="flex min-h-0 flex-1 items-stretch justify-center gap-4 px-6 pb-6">
-        {items.map((r) => (
+        {items.map((r: RecentResult) => (
           <div
             key={r.id}
             className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--gc-border)] bg-[var(--gc-panel)]"
@@ -69,7 +74,7 @@ export function CompareOverlay({
                 className="max-h-full max-w-full object-contain"
               />
             </div>
-            <div className="shrink-0 space-y-1 border-t border-[var(--gc-border)] px-3 py-2.5">
+            <div className="shrink-0 space-y-2 border-t border-[var(--gc-border)] px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-xs font-medium text-[var(--gc-text)]">
                   {r.nodeLabel}
@@ -83,6 +88,18 @@ export function CompareOverlay({
                   {r.prompt}
                 </p>
               )}
+              {/* §E 对比视图沿用蒙版入口 */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => void continueWithMask(r)}
+                  disabled={activeTabReadOnly}
+                  title={activeTabReadOnly ? "当前项目只读" : "以该图片为蒙版新建蒙版重绘节点"}
+                  className="flex-1 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-accent)]/10 px-2 py-1 text-xs font-medium text-[var(--gc-accent)] transition-colors hover:border-[var(--gc-accent)] hover:bg-[var(--gc-accent)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  沿用蒙版
+                </button>
+              </div>
             </div>
           </div>
         ))}

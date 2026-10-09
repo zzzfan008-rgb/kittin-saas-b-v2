@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ResultsPanel } from "./ResultsPanel";
-import { ResultDetailDialog } from "./ResultDetailDialog";
 
 interface ResultsFabProps {
   hasMore?: boolean;
@@ -25,17 +24,15 @@ interface ResultsFabProps {
  */
 export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }: ResultsFabProps) {
   const [open, setOpen] = useState(false);
-  const [detailResultId, setDetailResultId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const toggle = () => setOpen((value) => !value);
 
-  // 点击浮层外部时关闭（不拦截面板内部交互）；结果详情弹窗打开时不关闭浮层。
+  // 点击浮层外部时关闭（不拦截面板内部交互）
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (detailResultId) return;
       const target = event.target as Node | null;
       if (!target) return;
       if (panelRef.current?.contains(target)) return;
@@ -43,8 +40,7 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
       setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      // Esc 先交给「结果详情」弹窗（Base UI 自带收起与焦点归还），浮层保持不动。
-      if (event.key === "Escape" && !detailResultId) setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -52,7 +48,7 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, detailResultId]);
+  }, [open]);
 
   return (
     <div className="pointer-events-none absolute right-4 top-4 z-30">
@@ -89,7 +85,6 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
                 hasMore={hasMore}
                 loadingMore={loadingMore}
                 onLoadMore={onLoadMore}
-                onOpenDetail={setDetailResultId}
                 className="h-full border-0"
               />
             </div>
@@ -97,12 +92,6 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
         )}
       </div>
 
-      <ResultDetailDialog
-        resultId={detailResultId}
-        onOpenChange={(next) => {
-          if (!next) setDetailResultId(null);
-        }}
-      />
     </div>
   );
 }

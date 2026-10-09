@@ -1998,13 +1998,13 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
     new URL("../src/components/panels/ResultsPanel.tsx", import.meta.url),
     "utf8",
   );
-  // 2026-09-25：卡片与「结果详情」弹窗共用同一套动作实现，避免两处漂移。
+  // 2026-09-25：卡片与查看器共用同一套动作实现，避免两处漂移。
   const resultActionsSource = fs.readFileSync(
     new URL("../src/lib/resultActions.ts", import.meta.url),
     "utf8",
   );
-  const resultDetailDialogSource = fs.readFileSync(
-    new URL("../src/components/panels/ResultDetailDialog.tsx", import.meta.url),
+  const imageViewerSource = fs.readFileSync(
+    new URL("../src/components/ImageViewer.tsx", import.meta.url),
     "utf8",
   );
   assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\}`\}/);
@@ -2014,12 +2014,16 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
   // 「设为输入」的写回与落点引导在共享模块里，卡片只负责触发。
   assert.match(resultActionsSource, /state\.addAssetNode\(\s*\{ name: result\.nodeLabel, image: result\.image \}/);
   assert.match(resultActionsSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);
-  // 结果详情弹窗必须保留同一组结果能力（查看大图 / 对比 / 下载 / 设为输入）。
-  assert.match(resultDetailDialogSource, /from "@\/lib\/resultActions"/);
-  assert.match(resultDetailDialogSource, /openResultViewer\(record\)/);
-  assert.match(resultDetailDialogSource, /设为输入/);
-  assert.match(resultDetailDialogSource, /下载/);
-  assert.doesNotMatch(resultsPanelSource, /openViewer/, "卡片本身不再直接打开查看器，改由详情弹窗进入");
+  // 65d R-87 §3：ResultDetailDialog 已删除——查看器必须直接承接同一组结果能力
+  //（查看大图主区 / 对比 / 下载 / 设为输入 / 完整运行记录字段）。
+  assert.match(imageViewerSource, /from "@\/lib\/resultActions"/);
+  assert.match(imageViewerSource, /设为输入/);
+  assert.match(imageViewerSource, /下载/);
+  assert.match(imageViewerSource, /加入对比|取消对比/);
+  // 从 ResultRecordDetail 迁移的完整记录字段（含 R-87 新增的节点类型与上游实际尺寸）。
+  assert.match(imageViewerSource, /节点类型/);
+  assert.match(imageViewerSource, /上游实际尺寸/);
+  assert.match(resultsPanelSource, /openViewer/, "卡片直接打开 ImageViewer（65d R-87 §3）");
   assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
   assert.match(resultsPanelSource, /r\.status !== "success"/);
   assert.match(resultsPanelSource, /grid-cols-2/);

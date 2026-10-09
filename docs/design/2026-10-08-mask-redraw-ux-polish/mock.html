@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>R-86 蒙版重绘 UX 改造 — 视觉 Mock · §A 选中态 / §B 说明文案 / §C 工具按钮 / §D 缩放交互</title>
+<style>
+/* ─── 三主题色板 ─────────────────────────────────────────────── */
+:root.dark {
+  --bg:          #101216;
+  --shell:       #1a1c22;
+  --canvas:      #16181d;
+  --panel:       #21242a;
+  --text:        #e8eaee;
+  --muted:       #9ba1a9;
+  --border:      #33373f;
+  --border-str:  #454a53;
+  --accent:      #B7F35A;
+  --accent-ink:  #131313;
+  --accent-deep: #4a7a17;
+  --node:        #ffffff;
+  --node-bd:     #e4e6ea;
+}
+:root.light {
+  --bg:          #f5f5f7;
+  --shell:       #ffffff;
+  --canvas:      #e8e8ed;
+  --panel:       #fafafa;
+  --text:        #1d1d1f;
+  --muted:       #6e6e73;
+  --border:      #d2d2d7;
+  --border-str:  #b8b8be;
+  --accent:      #0071e3;
+  --accent-ink:  #ffffff;
+  --accent-deep: #0048b0;
+  --node:        #ffffff;
+  --node-bd:     #e4e6ea;
+}
+:root.dim {
+  --bg:          #1a1c22;
+  --shell:       #21242a;
+  --canvas:      #16181d;
+  --panel:       #2b2f36;
+  --text:        #e8eaee;
+  --muted:       #9ba1a9;
+  --border:      #33373f;
+  --border-str:  #454a53;
+  --accent:      #B7F35A;
+  --accent-ink:  #131313;
+  --accent-deep: #4a7a17;
+  --node:        #2b2f36;
+  --node-bd:     #454a53;
+}
+
+/* ─── 基础 ───────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px;color:var(--text);background:var(--bg);
+  transition:background .2s,color .2s;
+  padding:24px 28px 40px;width:100%;
+}
+h1{font-size:16px;font-weight:600;margin-bottom:4px}
+.sub{color:var(--muted);font-size:12px;margin-bottom:22px}
+h2{font-size:13.5px;font-weight:600;margin:28px 0 10px;display:flex;align-items:center;gap:8px}
+h2 .n{display:inline-flex;width:19px;height:19px;border-radius:50%;background:var(--panel);color:var(--muted);border:1px solid var(--border);align-items:center;justify-content:center;font-size:11px;font-weight:600}
+
+/* ─── 主题切换 ──────────────────────────────────────────────── */
+.theme-bar{display:flex;gap:6px;margin-bottom:22px}
+.theme-btn{
+  font-size:11.5px;color:var(--muted);border:1px solid var(--border);
+  border-radius:6px;padding:4px 12px;background:transparent;cursor:pointer;
+  transition:all .15s;
+}
+.theme-btn:hover{color:var(--text);border-color:var(--border-str)}
+.theme-btn.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+/* ─── 卡片 ──────────────────────────────────────────────────── */
+.card{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.card-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;align-items:center;gap:8px}
+
+/* ─── §A 模式按钮（核心改造）────────────────────────────────── */
+.seg{display:flex;border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px}
+.seg-item{
+  flex:1;text-align:center;
+  font-size:11.5px;line-height:1;
+  padding:5px 0;
+  border-radius:5px;
+  color:var(--muted);background:transparent;
+  border:1px solid var(--border);
+  font-weight:400;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.seg-item:hover:not(.seg-item--on):not(:disabled){
+  background:rgba(183,243,90,.10);color:var(--text);
+  border-color:rgba(183,243,90,.35);
+}
+.seg-item--on{
+  background:var(--accent);color:var(--accent-ink);font-weight:600;
+  border:none;
+}
+/* 禁用：显式降色，保留边框可见性，不整体压暗 */
+.seg-item:disabled{
+  color:color-mix(in srgb, var(--text-muted) 40%, transparent);
+  border-style:dashed;
+  border-color:color-mix(in srgb, var(--border) 45%, transparent);
+  cursor:not-allowed;
+}
+.seg-item--on:disabled{
+  background:color-mix(in srgb, var(--accent) 40%, transparent);
+  color:color-mix(in srgb, var(--accent-ink) 40%, transparent);
+  border:none;
+}
+
+.seg-hint{margin-top:6px;font-size:10px;color:var(--muted);padding-left:4px}
+
+/* ─── §B 说明文案 ──────────────────────────────────────────── */
+.info-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:13px;height:13px;
+  font-size:10px;color:var(--muted);
+  border:1px solid var(--border);border-radius:50%;
+  cursor:default;
+  transition:color .15s,border-color .15s;
+  margin-left:4px;vertical-align:middle;
+}
+.info-btn:hover{color:var(--text);border-color:var(--border-str)}
+.info-row{display:flex;align-items:center;gap:6px}
+.info-row .lab{font-size:11px;color:var(--muted);letter-spacing:.04em;white-space:nowrap}
+
+/* ─── §C 工具按钮 ─────────────────────────────────────────── */
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tool-btn{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  font-size:11.5px;color:var(--muted);
+  border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;background:transparent;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.tool-btn:hover:not(:disabled){
+  background:rgba(183,243,90,.06);color:var(--text);
+}
+.tool-btn:disabled{
+  color:color-mix(in srgb, var(--muted) 40%, transparent);
+  border-style:dashed;
+  border-color:color-mix(in srgb, var(--border) 45%, transparent);
+  cursor:not-allowed;
+}
+.tool-btn svg{width:13px;height:13px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tool-btn.tool-btn--warn:hover:not(:disabled){background:rgba(239,68,68,.08);color:#ef4444}
+
+/* ─── 滑杆 ─────────────────────────────────────────────────── */
+.slide{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+.track{flex:1;height:3px;border-radius:2px;background:var(--border-str);position:relative}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent)}
+.track b{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.val{font-size:10.5px;min-width:34px;text-align:right}
+
+/* ─── 勾选框 ───────────────────────────────────────────────── */
+.cbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap;cursor:pointer}
+.cbox i{width:12px;height:12px;border-radius:3px;border:1px solid var(--border-str);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:9px;font-weight:700;color:transparent;transition:all .15s}
+.cbox.on{color:var(--accent)}
+.cbox.on i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+/* ─── §D 缩放交互（蒙版重绘页截屏） ────────────────────────── */
+.screen{display:flex;height:480px;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.stage{flex:1;min-width:0;background:var(--canvas);display:flex;align-items:center;justify-content:center;padding:18px;position:relative;overflow:hidden}
+.photo-wrap{
+  position:relative;height:100%;max-height:444px;aspect-ratio:4/5;
+  border-radius:4px;overflow:hidden;
+  box-shadow:0 18px 40px rgba(0,0,0,.5);
+  cursor:grab;
+}
+.photo-wrap:active{cursor:grabbing}
+.photo-wrap svg{display:block;width:100%;height:100%}
+.photo-wrap canvas.mask-layer{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;
+}
+
+/* 缩放指示器 */
+.zoom-hud{
+  position:absolute;bottom:10px;right:10px;
+  font-size:11px;color:var(--muted);
+  background:rgba(0,0,0,.48);border:1px solid var(--border);
+  border-radius:999px;padding:3px 10px;
+  cursor:pointer;transition:all .15s;
+  backdrop-filter:blur(4px);
+}
+.zoom-hud:hover{color:var(--text);border-color:var(--border-str)}
+
+/* 缩放控制条 */
+.zoom-bar{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.5);border:1px solid var(--border);
+  border-radius:999px;padding:4px 12px;
+  backdrop-filter:blur(4px);
+}
+.zoom-bar button{
+  width:20px;height:20px;border-radius:50%;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;line-height:1;
+  transition:all .15s;
+}
+.zoom-bar button:hover:not(:disabled){color:var(--text);border-color:var(--border-str)}
+.zoom-bar button:disabled{opacity:.35;cursor:not-allowed}
+.zoom-bar .z-val{font-size:11px;color:var(--muted);min-width:40px;text-align:center}
+
+/* rail */
+.rail{width:25%;min-width:238px;max-width:302px;background:var(--shell);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.rail-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--border);flex:none}
+.rail-title{font-size:13px;font-weight:600;letter-spacing:.02em}
+.x-btn{margin-left:auto;width:24px;height:24px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s}
+.x-btn:hover{color:var(--text);border-color:var(--border-str)}
+.rail-body{padding:12px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
+.sec{display:flex;flex-direction:column;gap:7px}
+.lab{font-size:11px;color:var(--muted);letter-spacing:.04em}
+
+/* 主按钮 */
+.cta{background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:12px;text-align:center;border-radius:7px;padding:8px 0;border:none;cursor:pointer;width:100%;transition:filter .15s}
+.cta:hover:not(:disabled){filter:brightness(.94)}
+.cta:active:not(:disabled){filter:brightness(.88)}
+.cta:disabled{opacity:.38;cursor:not-allowed;filter:none}
+
+/* 描述区 */
+.ta{border:1px solid var(--border);border-radius:7px;background:var(--canvas);padding:8px 9px;color:var(--text);font-size:11.5px;min-height:54px;resize:none;width:100%;font-family:inherit}
+.count{text-align:right;font-size:10.5px;color:var(--muted)}
+
+/* 状态行 */
+.status{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px}
+.status b{color:var(--text);font-weight:600}
+
+/* 蒙版覆盖层（模拟） */
+.ovl{position:absolute;inset:0;pointer-events:none}
+.ovl svg{width:100%;height:100%;display:block}
+
+/* ─── 说明标签 ─────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;color:var(--muted);border:1px solid var(--border);
+  border-radius:4px;padding:2px 6px;margin-bottom:4px;
+}
+.badge b{color:var(--accent);font-weight:600}
+
+/* ─── 颜色小圆点（主题色） ────────────────────────────────── */
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:2px}
+
+/* ─── 状态对比行 ───────────────────────────────────────────── */
+.compare{display:flex;gap:16px;margin-top:8px}
+.compare-item{flex:1;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.compare-item .ci-head{padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--border);background:var(--panel)}
+.compare-item .ci-body{padding:10px}
+
+/* ─── 交互图示 ─────────────────────────────────────────────── */
+.hint-box{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;margin-top:10px;
+}
+.hint-item{
+  border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+  background:var(--panel);
+}
+.hint-item h4{font-size:11.5px;font-weight:600;margin-bottom:4px}
+.hint-item p{font-size:11px;color:var(--muted);line-height:1.45}
+
+/* ─── 层级图 ─────────────────────────────────────────────── */
+.layer-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.layer-table th,.layer-table td{padding:6px 10px;border:1px solid var(--border);text-align:left}
+.layer-table th{background:var(--panel);color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.04em}
+.layer-table td code{font-size:11px;color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>R-86 蒙版重绘 UX 改造 — 视觉 Mock · 三主题</h1>
+<div class="sub">§A 选中态强化 / §B 说明文案 / §C 工具按钮文字化 / §D 原图缩放交互 · 真实色值 · 可直接在浏览器打开</div>
+
+<!-- ── 主题切换 ──────────────────────────────────────────── -->
+<div class="theme-bar">
+  <button class="theme-btn active" onclick="setTheme('dark')">曜黑·萤光绿</button>
+  <button class="theme-btn" onclick="setTheme('light')">简白·蓝</button>
+  <button class="theme-btn" onclick="setTheme('dim')">暗金·琥珀</button>
+</div>
+
+<!-- ═══════════ §A 模式按钮选中态 ════════════════════════════ -->
+<h2><span class="n">A</span>§A 模式按钮（涂抹修改区 / 恢复保留区）选中态强化</h2>
+<div class="card">
+  <div class="card-body">
+
+    <div>
+      <div class="badge"><b>推荐方案</b> — 四态完整规格</div>
+    </div>
+
+    <!-- 未选中 / 悬停 / 选中 / 禁用 四态并排 -->
+    <div class="compare">
+      <div class="compare-item">
+        <div class="ci-head" style="color:var(--muted)">① 未选中</div>
+        <div class="ci-body">
+          <div class="seg">
+            <button class="seg-item">涂抹修改区</button>
+            <button class="seg-item">恢复保留区</button>
+          </div>
+          <div class="seg-hint">transparent 背景 / muted 字 / 1px border / 字重 400</div>
+        </div>
+      </div>
+      <div class="compare-item">
+        <div class="ci-head" style="color:var(--muted)">② 悬停</div>
+        <div class="ci-body">
+          <div class="seg">
+            <button class="seg-item" style="background:rgba(183,243,90,.08);color:var(--text)">涂抹修改区</button>
+            <button class="seg-item">恢复保留区</button>
+          </div>
+          <div class="seg-hint">rgba(183,243,90,.08) 微亮 / 字色变亮</div>
+        </div>
+      </div>
+      <div class="compare-item">
+        <div class="ci-head" style="color:var(--accent)">③ 选中（当前状态）</div>
+        <div class="ci-body">
+          <div class="seg">
+            <button class="seg-item seg-item--on">涂抹修改区</button>
+            <button class="seg-item">恢复保留区</button>
+          </div>
+          <div class="seg-hint">--gc-accent 底 / --gc-accent-cta-ink 字 / 字重 600 / 无边框</div>
+        </div>
+      </div>
+      <div class="compare-item">
+        <div class="ci-head" style="color:var(--muted)">④ 禁用</div>
+        <div class="ci-body">
+          <div class="seg">
+            <button class="seg-item" disabled>涂抹修改区</button>
+            <button class="seg-item">恢复保留区</button>
+          </div>
+          <div class="seg-hint">opacity .4 / cursor not-allowed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 色盲冗余说明 -->
+    <div class="row" style="margin-top:6px">
+      <div class="badge" style="border-color:var(--accent-deep)"><span style="color:var(--accent)">■</span> 色盲冗余</div>
+      <span style="font-size:11.5px;color:var(--muted)">字重 600 + 实心底色构成双通道；若未来需更强保障，可额外加底部 2px 短线（当前不预设）</span>
+    </div>
+
+    <!-- 按钮区（删除「保存蒙版」，单一主行动） -->
+    <div>
+      <div class="badge"><b>按钮区</b> — 按用户第 2 条反馈：删除「保存蒙版」次按钮，改为单一主行动</div>
+      <div style="margin-top:8px">
+        <button class="cta" onclick="this.style.opacity='.38'">蒙版重绘</button>
+        <div class="seg-hint" style="margin-top:4px">有蒙版时正常可点；无蒙版时 disabled + 文案改为"请先涂抹蒙版"</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ §B 说明文案 ══════════════════════════════════ -->
+<h2><span class="n">B</span>§B 笔刷 / 羽化 说明文案方案</h2>
+<div class="card">
+  <div class="card-body">
+
+    <div>
+      <div class="badge"><b>推荐方案</b> — 标签右同行 + ⓘ tooltip；一句话功能说明，不重复控件名</div>
+    </div>
+
+    <!-- 笔刷行 -->
+    <div class="sec">
+      <div class="row">
+        <div class="lab">笔刷</div>
+        <div class="info-btn" title="在图片上按住拖动画出涂抹区域（红色覆盖区域）">?</div>
+        <div class="seg" style="flex:1">
+          <button class="seg-item seg-item--on">涂抹修改区</button>
+          <button class="seg-item">恢复保留区</button>
+        </div>
+        <div class="slide" style="flex:1">
+          <div class="track"><i style="width:26%"></i><b style="left:26%"></b></div>
+          <span class="val">80px</span>
+        </div>
+      </div>
+      <div class="info-row" style="padding-left:0">
+        <span class="lab">笔刷说明</span>
+        <span style="font-size:11px;color:var(--muted)">按住拖动画出需要 AI 修改的区域</span>
+      </div>
+    </div>
+
+    <!-- 羽化行 -->
+    <div class="sec">
+      <div class="row">
+        <div class="lab">羽化</div>
+        <div class="info-btn" title="控制蒙版边缘柔和程度。自适应由系统自动计算适合的边缘模糊半径">?</div>
+        <span class="cbox on"><i>✓</i>自适应</span>
+        <div class="slide" style="flex:1">
+          <div class="track"><i style="width:42%"></i><b style="left:42%"></b></div>
+          <span class="val" style="color:var(--accent)">自适应</span>
+        </div>
+      </div>
+      <div class="info-row">
+        <span class="lab">羽化说明</span>
+        <span style="font-size:11px;color:var(--muted)">数值越大边缘越柔和；拖滑杆自动取消「自适应」</span>
+      </div>
+    </div>
+
+    <!-- 交互提示 -->
+    <div class="hint-box">
+      <div class="hint-item">
+        <h4>☑ 自适应（默认）</h4>
+        <p>featherRadius=undefined，系统自动算边缘模糊半径，不写死数值</p>
+      </div>
+      <div class="hint-item">
+        <h4>拖动滑杆</h4>
+        <p>自动取消勾选，改为手动 0–64px 数值，实时生效</p>
+      </div>
+      <div class="hint-item">
+        <h4>再次勾选</h4>
+        <p>回到「自适应」模式，数值显示恢复为"自适应"</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ §C 工具按钮文字化 ════════════════════════════ -->
+<h2><span class="n">C</span>§C 四个工具按鈕（撤销/重做/清空/反选）文字化</h2>
+<div class="card">
+  <div class="card-body">
+
+    <div>
+      <div class="badge"><b>推荐形态</b> — 图标 + 中文并排，2×2 网格；清空/反选不算破坏性操作，无需二次确认</div>
+    </div>
+
+    <!-- 2×2 工具网格 -->
+    <div>
+      <div class="row" style="margin-bottom:4px">
+        <span class="lab">未点击</span>
+        <span style="font-size:11px;color:var(--muted)">（可用状态）</span>
+      </div>
+      <div class="tool-grid">
+        <button class="tool-btn">
+          <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+          撤销
+        </button>
+        <button class="tool-btn">
+          <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+          重做
+        </button>
+        <button class="tool-btn">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          清空
+        </button>
+        <button class="tool-btn">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 20v2"/><path d="M12 14v2"/><path d="M12 8v2"/><path d="M12 2v2"/></svg>
+          反选
+        </button>
+      </div>
+    </div>
+
+    <!-- 空历史 disabled -->
+    <div style="margin-top:10px">
+      <div class="row" style="margin-bottom:4px">
+        <span class="lab">无历史时</span>
+        <span style="font-size:11px;color:var(--muted)">（撤销/重做 disabled）</span>
+      </div>
+      <div class="tool-grid">
+        <button class="tool-btn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+          撤销
+        </button>
+        <button class="tool-btn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+          重做
+        </button>
+        <button class="tool-btn" disabled>
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+          清空
+        </button>
+        <button class="tool-btn">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 20v2"/><path d="M12 14v2"/><path d="M12 8v2"/><path d="M12 2v2"/></svg>
+          反选
+        </button>
+      </div>
+      <div class="seg-hint">撤销/重做在无历史时 opacity .38，cursor not-allowed；清空在无蒙版时也 disabled</div>
+    </div>
+
+    <!-- 判断说明 -->
+    <div class="row" style="margin-top:8px;gap:10px">
+      <div class="badge" style="border-color:#4a7a17;color:#4a7a17"><span>✓</span> 非破坏性判断</div>
+      <span style="font-size:11.5px;color:var(--muted)">清空/反选均在蒙版草稿内存中操作，无数据落盘风险；两者均可撤销，且不涉及服务端数据删除</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ §D 原图缩放交互 ═══════════════════════════════ -->
+<h2><span class="n">D</span>§D 原图缩放交互（仅图片放大，非整页）</h2>
+<div class="card">
+  <div class="card-body">
+
+    <div>
+      <div class="badge"><b>推荐组合</b> — 滚轮缩放（以指针为中心）+ 双击切换锚点 + 底部 ± 按钮</div>
+    </div>
+
+    <!-- 缩放蒙版重绘页演示 -->
+    <div class="screen">
+      <div class="stage">
+        <div class="photo-wrap" id="photoWrap" ondblclick="toggleZoom(this)">
+          <!-- 原图（模拟） -->
+          <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="phBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ded4c6"/><stop offset="1" stop-color="#b4a28b"/></linearGradient>
+              <linearGradient id="phCl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93a08b"/><stop offset="1" stop-color="#6d7c69"/></linearGradient>
+            </defs>
+            <rect width="400" height="500" fill="url(#phBg)"/>
+            <ellipse cx="200" cy="150" rx="52" ry="63" fill="#e9caa7"/>
+            <path d="M96 500c0-116 42-176 104-176s104 60 104 176z" fill="url(#phCl)"/>
+            <path d="M200 324c-30 0-54 14-68 38 21 17 45 25 68 25s47-8 68-25c-14-24-38-38-68-38z" fill="#cbb69c" opacity=".5"/>
+          </svg>
+          <!-- 蒙版层（同步缩放） -->
+          <div class="ovl">
+            <svg viewBox="0 0 400 500" style="position:absolute;inset:0;width:100%;height:100%">
+              <defs><filter id="softX" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="11"/></filter></defs>
+              <g filter="url(#softX)"><path d="M150 350c30-26 74-30 106-8 26 18 30 52 6 70-34 26-92 22-118-8-14-16-10-38 6-54z" fill="rgba(245,158,11,.28)"/></g>
+              <path d="M150 350c30-26 74-30 106-8 26 18 30 52 6 70-34 26-92 22-118-8-14-16-10-38 6-54z" fill="rgba(239,68,68,.44)"/>
+            </svg>
+          </div>
+          <!-- 缩放控制条 -->
+          <div class="zoom-bar">
+            <button onclick="zoomIn(this)">−</button>
+            <span class="z-val" id="zoomVal">适合画布</span>
+            <button onclick="zoomOut(this)">+</button>
+          </div>
+          <!-- 缩放 HUD -->
+          <div class="zoom-hud" onclick="resetZoom(this)" title="点击重置为适合画布">78%</div>
+        </div>
+      </div>
+      <aside class="rail">
+        <div class="rail-head"><span class="rail-title">蒙版重绘</span><button class="x-btn">✕</button></div>
+        <div class="rail-body">
+          <div class="sec">
+            <div class="lab">绘画工具</div>
+            <div class="seg">
+              <button class="seg-item seg-item--on">涂抹修改区</button>
+              <button class="seg-item">恢复保留区</button>
+            </div>
+            <div class="row">
+              <div class="lab">笔刷</div><div class="info-btn" title="按住拖动画出涂抹区域">?</div>
+              <div class="slide" style="flex:1"><div class="track"><i style="width:26%"></i><b style="left:26%"></b></div><span class="val">80px</span></div>
+            </div>
+            <div class="row">
+              <div class="lab">羽化</div><div class="info-btn" title="控制边缘柔和程度">?</div>
+              <span class="cbox on"><i>✓</i>自适应</span>
+              <div class="slide" style="flex:1"><div class="track"><i style="width:42%"></i><b style="left:42%"></b></div><span class="val">自适应</span></div>
+            </div>
+            <div class="tool-grid">
+              <button class="tool-btn">
+                <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>撤销
+              </button>
+              <button class="tool-btn">
+                <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>重做
+              </button>
+              <button class="tool-btn">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 6 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>清空
+              </button>
+              <button class="tool-btn">
+                <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 20v2"/><path d="M12 14v2"/><path d="M12 8v2"/><path d="M12 2v2"/></svg>反选
+              </button>
+            </div>
+          </div>
+          <div class="sec">
+            <div class="lab">修改描述</div>
+            <textarea class="ta" placeholder="描述想要修改的内容…">把口袋改成米色帆布，其余保持不变…</textarea>
+            <div class="count">22 / 500</div>
+            <button class="cta">蒙版重绘</button>
+          </div>
+          <div class="status">上次执行：<b>成功</b> · 结果已覆盖左侧图 · 可继续涂抹再执行</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 交互规格 -->
+    <div class="hint-box">
+      <div class="hint-item">
+        <h4>滚轮缩放</h4>
+        <p>以鼠标指针为中心缩放，步进 10%；缩放时蒙版层同步变换（坐标映射保持一致）</p>
+      </div>
+      <div class="hint-item">
+        <h4>双击切换</h4>
+        <p>在「适合画布 ↔ 100%」两个锚点间切换；连续双击可在两状态间快速切换</p>
+      </div>
+      <div class="hint-item">
+        <h4>± 按钮</h4>
+        <p>固定步进 ±10%，两端边界各停；点击缩放 HUD 重置为适合画布</p>
+      </div>
+    </div>
+
+    <!-- 层级关系表 -->
+    <div>
+      <div class="badge" style="margin-bottom:8px"><b>层级关系</b> — 蒙版层必须与底图同步缩放/平移</div>
+      <table class="layer-table">
+        <thead>
+          <tr><th>层</th><th>内容</th><th>随缩放变换</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Layer 0</td><td>底图（原图）</td><td><code>scale(zoom) translate(panX, panY)</code></td></tr>
+          <tr><td>Layer 1</td><td>蒙版重绘层（红/透明）</td><td><code>必须与底图完全一致的 transform</code></td></tr>
+          <tr><td>Layer 2</td><td>绘制中笔触预览</td><td><code>同底图</code></td></tr>
+          <tr><td>Layer 3</td><td>UI 控件（rail、关闭按钮等）</td><td><code>不变（固定 viewport）</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 坐标映射硬性要求 -->
+    <div style="background:var(--panel);border:1px solid var(--accent-deep);border-radius:8px;padding:12px">
+      <div style="font-size:11.5px;font-weight:600;color:var(--accent);margin-bottom:6px">⚠ 硬性要求：坐标映射契约（违反则画布错位）</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.55">
+        <code style="color:var(--text)">screenToImage(screenX, screenY)</code> = <code style="color:var(--text)">(screenX - rect.left - panOffset.x) / zoomScale</code><br>
+        蒙版 canvas 必须以<strong style="color:var(--text)">原图自然尺寸</strong>存储，显示时整体应用 <code style="color:var(--text)">transform: scale(zoomScale) translate(panOffset.x, panOffset.y)</code>，不可重新采样。
+      </div>
+    </div>
+
+    <!-- 缩放规格 -->
+    <div class="row" style="gap:12px">
+      <div class="badge"><b>缩放范围</b> 25%–400%</div>
+      <div class="badge"><b>步进</b> ±10%（滚轮/按钮）</div>
+      <div class="badge"><b>默认</b> 适合画布</div>
+      <div class="badge"><b>指示器</b> 右下角 pill + 底部 ± 按钮</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ 底部检查单 ═══════════════════════════════════ -->
+<h2><span class="n">✓</span>验收检查单</h2>
+<div class="card" style="border-color:var(--accent-deep)">
+  <div class="card-body" style="gap:8px">
+    <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px">四节规格已覆盖 · 以下为关键决策</div>
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <div class="badge" style="border-color:var(--accent-deep)"><span style="color:var(--accent)">A</span> 选中态用 --gc-accent 底 + --gc-accent-cta-ink 字，字重 600；shadcn secondary 不可复用</div>
+      <div class="badge" style="border-color:var(--accent-deep)"><span style="color:var(--accent)">B</span> 标签右同行 + ⓘ tooltip；各一句功能说明</div>
+      <div class="badge" style="border-color:var(--accent-deep)"><span style="color:var(--accent)">C</span> 图标+中文并排，2×2；清空/反选非破坏性，无需确认</div>
+      <div class="badge" style="border-color:var(--accent-deep)"><span style="color:var(--accent)">D</span> 滚轮+双击切换+±按钮；蒙版层同步变换；坐标映射三链完整</div>
+    </div>
+    <div class="badge" style="border-color:#4a7a17;color:#4a7a17;margin-top:4px"><span>✓</span> 删除「保存蒙版」次按钮，改为单一主行动</div>
+  </div>
+</div>
+
+<script>
+/* ─── 主题切换 ─────────────────────────────────────────────── */
+function setTheme(t) {
+  document.documentElement.className = t;
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+/* 默认 */
+document.documentElement.className = 'dark';
+
+/* ─── 缩放状态机 ───────────────────────────────────────────── */
+let zoomPct = 100;
+let fitMode = true;
+let scale = 1;
+const MIN = 0.25, MAX = 4, STEP = 0.10;
+
+const wrap = document.getElementById('photoWrap');
+const zVal = document.getElementById('zoomVal');
+
+function applyZoom() {
+  if (!wrap) return;
+  if (fitMode) {
+    wrap.style.transform = '';
+    zVal.textContent = '适合画布';
+    document.querySelector('.zoom-hud').textContent = '78%';
+  } else {
+    const pct = Math.round(scale * 100);
+    wrap.style.transform = `scale(${scale})`;
+    zVal.textContent = pct + '%';
+    document.querySelector('.zoom-hud').textContent = pct + '%';
+  }
+}
+
+function toggleZoom(el) {
+  if (fitMode) {
+    fitMode = false;
+    scale = 1;
+  } else {
+    fitMode = true;
+  }
+  applyZoom();
+}
+
+function zoomIn(btn) {
+  if (fitMode) { fitMode = false; scale = 1; }
+  scale = Math.min(MAX, scale - STEP);
+  applyZoom();
+  event.stopPropagation();
+}
+function zoomOut(btn) {
+  if (fitMode) { fitMode = false; scale = 1; }
+  scale = Math.max(MIN, scale + STEP);
+  applyZoom();
+  event.stopPropagation();
+}
+function resetZoom(el) {
+  fitMode = true;
+  applyZoom();
+  event.stopPropagation();
+}
+
+/* 滚轮缩放（以鼠标为中心）——示意实现 */
+wrap && wrap.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  if (fitMode) { fitMode = false; scale = 1; }
+  const delta = e.deltaY < 0 ? STEP : -STEP;
+  scale = Math.min(MAX, Math.max(MIN, scale + delta));
+  applyZoom();
+}, { passive: false });
+</script>
+</body>
+</html>

@@ -25,6 +25,38 @@ export function openResultViewer(result: RecentResult): void {
   });
 }
 
+/**
+ * §E 把该结果作为图片节点添加到画布（复用 result.image 为 outputImages[0]），
+ * 并选中该节点使其自动打开 MaskEditor 编辑页。
+ * 用户可在蒙版编辑页继续「保存蒙版」或「保存+重绘」。
+ */
+export function continueWithMask(result: RecentResult): void {
+  const state = useFlowStore.getState();
+  const tab = state.tabs.find((item) => item.id === state.activeTabId);
+  if (!tab || tab.readOnly) return;
+
+  const nodes = selectActiveNodes(state);
+  const minX = Math.min(0, ...nodes.map((n) => n.position.x));
+
+  // 用 addAssetNode 复用现有逻辑（写 outputImages[0]）
+  const nodeId = state.addAssetNode(
+    { name: result.nodeLabel, image: result.image },
+    { x: minX - 360, y: nodes.length * 40 },
+  );
+  if (!nodeId) return;
+
+  // 选中该节点，触发 ImageNode 的 editingMask=true（用户看到蒙版编辑页）
+  useFlowStore.setState((s) => ({
+    tabs: s.tabs.map((t) =>
+      t.id === tab.id
+        ? { ...t, selectedNodeIds: [nodeId], selectedNodeId: nodeId }
+        : t,
+    ),
+  }));
+
+  requestCanvasLanding({ tabId: tab.id, nodeId, fitView: false });
+}
+
 /** 把该结果作为素材节点放回画布左侧（继续加工），并引导落点。 */
 export function continueWithResult(result: RecentResult): void {
   const state = useFlowStore.getState();
