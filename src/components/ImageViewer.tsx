@@ -179,6 +179,7 @@ export function ImageViewer() {
         {/* 图片容器（滚轮 + 拖拽平移） */}
         <div
           ref={viewerContainerRef}
+          id="viewer-image-area"
           className="relative flex flex-1 items-center justify-center overflow-hidden p-8"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => {
