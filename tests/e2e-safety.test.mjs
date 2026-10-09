@@ -50,7 +50,7 @@ try {
 
   const baseline = listTests();
   assert.equal(baseline.status, 0, `${baseline.stdout}\n${baseline.stderr}`);
-  assert.match(baseline.stdout, /Total: \d+ tests in 11 files/);
+  assert.match(baseline.stdout, /Total: \d+ tests in 12 files/);
   assert.match(
     baseline.stdout,
     /\[vis-keyboard\].*VIS-07 键盘焦点环.*VIS-05 snapGrid 吸附/,
@@ -67,6 +67,18 @@ try {
     baseline.stdout,
     /\[mask-slider-drag\].*蒙版重绘页两个滑杆的真实鼠标拖动/,
     "R-84 real mouse drag regression must remain in the browser regression matrix",
+  );
+  // R-88（2026-10-09）新增 r87-ux.spec.ts（R-87 查看器缩放契约 + 两页合并验收），
+  // 矩阵文件数 11 → 12，故此处按合并态真实文件数显式修正为 12。
+  assert.match(
+    baseline.stdout,
+    /\[r87-ux\].*result card opens the viewer directly/,
+    "R-88 viewer/sidebar merge acceptance must remain in the browser regression matrix",
+  );
+  assert.match(
+    baseline.stdout,
+    /\[r87-ux\].*viewer zoom contract/,
+    "R-88 viewer zoom contract must remain in the browser regression matrix",
   );
   assert.match(
     baseline.stdout,

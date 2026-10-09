@@ -44,10 +44,21 @@ const FEATHER: SliderContract = { name: "羽化宽度", min: 0, max: 64, step: 1
 const RATIO_HIGH = 0.85;
 const RATIO_LOW = 0.15;
 /**
- * 值 ↔ 轨道比例的允许误差。按下点在 thumb 上时 base-ui 记住按下点与 thumb 圆心的偏移
- * （≤ 7px），换算成比例约 0.01；0.06 远小于「值没变（比例差 ~0.7）」和「值跑飞」的差别。
+ * 值 ↔ 轨道比例的允许误差（**比例维，唯一容差来源**）。
+ * 按下点在 thumb 上时 base-ui 记住按下点与 thumb 圆心的偏移（≤ 7px），换算成比例约 0.01；
+ * 0.06 远小于「值没变（比例差 ~0.7）」和「值跑飞」的差别。
+ *
+ * R-88：原先另有一条 `expected ± step×2` 的**值域**窗口（笔刷 ±8px / 羽化 ±2px），
+ * 在 CI run 37824118259 上真实抖动为 268 vs 期望 256（+3 step = 12px）而误报。
+ * 拖动落点与轨道命中比例的误差本质是**比例维**（轨道像素宽度的亚像素差 + thumb 锚点偏移），
+ * 不是「step 数」维——把值域窗口改成由比例容差换算，两个维度就一致了。
  */
 const RATIO_TOLERANCE = 0.06;
+
+/** 把比例容差换算成值域容差（同一维度，故两者不会互相矛盾）。 */
+function valueToleranceFromRatio(contract: SliderContract): number {
+  return RATIO_TOLERANCE * (contract.max - contract.min);
+}
 
 function expectedValue(contract: SliderContract, ratio: number): number {
   const raw = contract.min + (contract.max - contract.min) * ratio;
@@ -91,6 +102,7 @@ async function expectDragChangesValue(
 ): Promise<number> {
   const { from, to, direction } = options;
   const expected = expectedValue(contract, to);
+  const tolerance = valueToleranceFromRatio(contract);
   const arrow = direction === "increase" ? "增大" : "减小";
 
   await dragTrack(page, root, to);
@@ -102,10 +114,11 @@ async function expectDragChangesValue(
   } else {
     expect(moved, `${contract.name}：拖回轨道 ${to} 处应${arrow}，实测 ${from} → ${moved}`).toBeLessThan(from);
   }
-  expect(moved, `${contract.name}：拖到轨道 ${to} 处应落在 ${expected} 附近，实测 ${moved}`)
-    .toBeGreaterThanOrEqual(expected - contract.step * 2);
-  expect(moved, `${contract.name}：拖到轨道 ${to} 处应落在 ${expected} 附近，实测 ${moved}`)
-    .toBeLessThanOrEqual(expected + contract.step * 2);
+  // 值域窗口与比例容差同源（valueToleranceFromRatio），不再用固定 step 数——见 RATIO_TOLERANCE 注释。
+  expect(moved, `${contract.name}：拖到轨道 ${to} 处应落在 ${expected} 附近（±${tolerance.toFixed(1)}），实测 ${moved}`)
+    .toBeGreaterThanOrEqual(expected - tolerance);
+  expect(moved, `${contract.name}：拖到轨道 ${to} 处应落在 ${expected} 附近（±${tolerance.toFixed(1)}），实测 ${moved}`)
+    .toBeLessThanOrEqual(expected + tolerance);
   expect(
     Math.abs(valueRatio(contract, moved) - to),
     `${contract.name}：值必须与轨道命中比例对应，实测值 ${moved}（比例 ${valueRatio(contract, moved).toFixed(3)}），期望 ${to}`,

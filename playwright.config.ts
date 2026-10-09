@@ -146,6 +146,18 @@ export default defineConfig({
       },
     },
     {
+      // R-88：R-87 新交互的 e2e 验收（§D 查看器缩放契约 + §E 两页合并）。
+      // 与工作台系列共用同一账号（单设备会话），故同样串行（workers 默认 1）。
+      name: "r87-ux",
+      testMatch: /r87-ux\.spec\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
       name: "desktop-1024",
       testMatch: /workbench\.spec\.ts/,
       dependencies: ["setup"],
