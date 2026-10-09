@@ -556,11 +556,12 @@ export function MaskEditor({
                 恢复保留区
               </button>
             </div>
-            <div className="flex items-center gap-2 text-label text-[var(--gc-text-muted)]">
-              <span className="flex items-center gap-1">
+            <div className="flex flex-col gap-1.5" aria-label="笔刷">
+              <div className="flex items-center gap-1 text-label text-[var(--gc-text-muted)]">
                 <span>笔刷</span>
                 <span className="info-btn" title="在图片上按住拖动画出涂抹区域" aria-label="笔刷说明">ⓘ</span>
-              </span>
+                <span className="ml-auto tabular-nums">{brushSize}px</span>
+              </div>
               <Slider
                 aria-label="笔刷大小"
                 value={[brushSize]}
@@ -572,9 +573,8 @@ export function MaskEditor({
                   const next = value[0];
                   if (typeof next === "number") setBrushSize(next);
                 }}
-                className="min-w-0 flex-1"
+                className="w-full"
               />
-              <span className="tabular-nums">{brushSize}px</span>
             </div>
             {/* 羽化行 v2：勾选式自适应 + 滑杆 */}
             <div className="flex flex-col gap-1.5" aria-label="羽化">
