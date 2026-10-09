@@ -113,7 +113,7 @@ export function ImageViewer() {
   const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
 
   useEffect(() => {
-    zoom._setScale(1);
+    zoom.resetScale(1);
     setAssetState("idle");
     setSaveToModelLibrary(false);
   }, [viewer?.url]);

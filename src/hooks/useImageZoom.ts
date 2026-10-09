@@ -52,6 +52,10 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
   const [isFit, setIsFit] = useState(true);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
+  // ref 镜像：解决闭包陷阱——快速连发时 handler 仍读到最新 scale/pan
+  const scaleRef = useRef(scale);
+  const panRef = useRef(panOffset);
+
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const prevImageKeyRef = useRef<string | null>(null);
@@ -84,6 +88,8 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
     setScale(fitScale);
     setIsFit(true);
     setPanOffset({ x: 0, y: 0 });
+    scaleRef.current = fitScale;
+    panRef.current = { x: 0, y: 0 };
   }, [computeFitScale]);
 
   // 打开新图时复位（监听 imageKey = src）
@@ -100,6 +106,8 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
         setScale(fitScale);
         setIsFit(true);
         setPanOffset({ x: 0, y: 0 });
+        scaleRef.current = fitScale;
+        panRef.current = { x: 0, y: 0 };
       }
     }
   }, [computeFitScale, resetOnNewImage]);
@@ -114,23 +122,27 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
     e.preventDefault();
     // 缓存 rect，± 按钮读取它计算锚点
     lastWheelRectRef.current = rectBefore;
-    const sOld = scale;
+    const sOld = scaleRef.current;
     const sNew = Math.min(MAX_SCALE, Math.max(MIN_SCALE, sOld - e.deltaY * 0.0015 * sOld));
     if (sNew === sOld) return;
+    const panOld = panRef.current;
     // rectBefore = 变换后的实时 DOMRect（已含 translate(panOffset) + scale*origin）
     //   rectBefore.left = B + panOffset.x   B = 未变换布局常量（transformOrigin="0 0" 时）
     // 布局常量 B = rectBefore.left - panOffset.x（反推未变换布局位置）
-    const Bx = rectBefore.left - panOffset.x;
-    const By = rectBefore.top - panOffset.y;
+    const Bx = rectBefore.left - panOld.x;
+    const By = rectBefore.top - panOld.y;
     // 指针在变换前的局部坐标（锚定后 local 值不变）
     const localX = (e.clientX - rectBefore.left) / sOld;
     const localY = (e.clientY - rectBefore.top) / sOld;
     const panNewX = e.clientX - Bx - localX * sNew;
     const panNewY = e.clientY - By - localY * sNew;
-    setScale((prev) => sNew);
+    setScale(sNew);
     setIsFit(false);
     setPanOffset({ x: panNewX, y: panNewY });
-  }, [scale, panOffset]);
+    // 同步写 ref：后续事件同一 tick 内就能读到新值（解决闭包覆盖）
+    scaleRef.current = sNew;
+    panRef.current = { x: panNewX, y: panNewY };
+  }, []);
 
   // 双击切换适合画布 ↔ 100%
   const handleDoubleClick = useCallback((
@@ -143,11 +155,15 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
       setScale(1);
       setIsFit(false);
       setPanOffset({ x: 0, y: 0 });
+      scaleRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
     } else {
       const fitScale = computeFitScale(containerEl, imgEl);
       setScale(fitScale);
       setIsFit(true);
       setPanOffset({ x: 0, y: 0 });
+      scaleRef.current = fitScale;
+      panRef.current = { x: 0, y: 0 };
     }
   }, [isFit, computeFitScale]);
 
@@ -156,8 +172,8 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
     if (isFit) return;
     e.stopPropagation();
     isPanningRef.current = true;
-    panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
-  }, [isFit, panOffset]);
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX: panRef.current.x, panY: panRef.current.y };
+  }, [isFit]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanningRef.current) return;
@@ -166,6 +182,7 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
     const newPanX = panStartRef.current.panX + dx;
     const newPanY = panStartRef.current.panY + dy;
     setPanOffset({ x: newPanX, y: newPanY });
+    panRef.current = { x: newPanX, y: newPanY };
     // 同步更新 lastWheelRectRef：拖拽后 zoomIn/Out 应以当前视图中心为锚点
     const el = (wheelRectRef ?? containerRef)?.current;
     if (el) lastWheelRectRef.current = el.getBoundingClientRect();
@@ -178,32 +195,38 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
   // ± 按钮：以最近滚轮的 rect（viewport）为锚点，保持该 viewport 中心对准同一 stage 位置
   // 若无滚轮记录则以 viewport 宽度 1024 为默认值（兼容 fit 态）
   const zoomIn = useCallback(() => {
-    const sOld = scale;
+    const sOld = scaleRef.current;
     const sNew = Math.min(MAX_SCALE, sOld + ZOOM_STEP);
     if (sNew === sOld) return;
+    const panOld = panRef.current;
     const rect = lastWheelRectRef.current ?? { left: 0, top: 0, width: 1024, height: 768 };
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const panNewX = (panOffset.x - centerX) * (sNew / sOld) + centerX;
-    const panNewY = (panOffset.y - centerY) * (sNew / sOld) + centerY;
+    const panNewX = (panOld.x - centerX) * (sNew / sOld) + centerX;
+    const panNewY = (panOld.y - centerY) * (sNew / sOld) + centerY;
     setScale(sNew);
     setIsFit(false);
     setPanOffset({ x: panNewX, y: panNewY });
-  }, [scale, panOffset]);
+    scaleRef.current = sNew;
+    panRef.current = { x: panNewX, y: panNewY };
+  }, []);
 
   const zoomOut = useCallback(() => {
-    const sOld = scale;
+    const sOld = scaleRef.current;
     const sNew = Math.max(MIN_SCALE, sOld - ZOOM_STEP);
     if (sNew === sOld) return;
+    const panOld = panRef.current;
     const rect = lastWheelRectRef.current ?? { left: 0, top: 0, width: 1024, height: 768 };
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const panNewX = (panOffset.x - centerX) * (sNew / sOld) + centerX;
-    const panNewY = (panOffset.y - centerY) * (sNew / sOld) + centerY;
+    const panNewX = (panOld.x - centerX) * (sNew / sOld) + centerX;
+    const panNewY = (panOld.y - centerY) * (sNew / sOld) + centerY;
     setScale(sNew);
     setIsFit(false);
     setPanOffset({ x: panNewX, y: panNewY });
-  }, [scale, panOffset]);
+    scaleRef.current = sNew;
+    panRef.current = { x: panNewX, y: panNewY };
+  }, []);
 
   // 坐标换算（plan.md §D 核心）
   // rect 来自 getBoundingClientRect()，已含 transform 效果，
@@ -275,5 +298,13 @@ export function useImageZoom(options: UseImageZoomOptions = {}) {
     // 直接 setter（供外部 resize handler 调用）
     _setScale: setScale,
     _setIsFit: setIsFit,
+    // resetScale：setScale + 清 pan + 同步两 ref（ImageViewer 新图时调用）
+    resetScale: (v = 1) => {
+      setScale(v);
+      setIsFit(v === 1);
+      setPanOffset({ x: 0, y: 0 });
+      scaleRef.current = v;
+      panRef.current = { x: 0, y: 0 };
+    },
   };
 }
