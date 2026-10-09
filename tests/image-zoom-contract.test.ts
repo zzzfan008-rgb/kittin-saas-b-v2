@@ -1,54 +1,33 @@
 /**
- * R-90 坐标映射契约测试（useImageZoom hook 核心数学）。
+ * R-99 useImageZoom 核心语义测试（中心缩放，无指针锚点数学）。
  *
  * 覆盖：
- * 1. 互逆性：screenToImage(imageToScreen(p)) ≈ p（任意 scale/pan/rect）
- * 2. 平移后落点（P0 回归锚）：scale=2, pan=(100,50), rect=(left=140,top=90,w=400,h=300)
- * 3. 滚轮锚点（P1 锚）：指针位置 × sOld→sNew，锚图像素坐标不变（X + Y 双轴）
- * 4. 边界：scale 钳在 0.25–4；fit 态 pan=0 落点正确
+ * 1. nextWheelScale：单次调用、25%/400% clamp
+ * 2. fold：用 deltaY=400 连 fold 120 次，必须严格停在 0.25（红→绿锁本次 bug）
+ * 3. ZOOM_STEP：1 → +0.1×2 → -0.1 = 1.1
  *
  * 运行：
  *   node node_modules/tsx/dist/cli.mjs tests/image-zoom-contract.test.ts
  */
 import assert from "node:assert/strict";
+import { MIN_SCALE, MAX_SCALE, ZOOM_STEP } from "../src/hooks/useImageZoom";
 
-// ── 核心坐标映射（useImageZoom.ts 的纯数学副本）──────────────────────────────
-// rect = DOMRect（已含 CSS transform 的效果）
-// screenToImage：屏幕 → 原图像素
-function screenToImage(sx: number, sy: number, rect: { left: number; top: number }, scale: number) {
-  return {
-    x: (sx - rect.left) / scale,
-    y: (sy - rect.top) / scale,
-  };
+// ── 纯函数（useImageZoom hook 内 wheel/zoomIn/zoomOut 的数学）───────────────
+
+/** 滚轮缩放：delta = -deltaY * 0.0015 */
+function nextWheelScale(prev: number, deltaY: number): number {
+  const delta = -deltaY * 0.0015;
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev + delta * prev));
 }
-// imageToScreen：原图像素 → 屏幕
-function imageToScreen(ix: number, iy: number, rect: { left: number; top: number }, scale: number) {
-  return {
-    x: ix * scale + rect.left,
-    y: iy * scale + rect.top,
-  };
+
+/** zoomIn（清 pan） */
+function nextZoomIn(prev: number): number {
+  return Math.min(MAX_SCALE, prev + ZOOM_STEP);
 }
-// handleWheel 锚点计算（配合 transformOrigin:"0 0"）
-// rectBefore = 变换后的实时 DOMRect（已含 translate(panOld) + scale*origin）
-//   rectBefore.left = B + panOld    B = 未变换布局常量（transformOrigin="0 0" 时）
-// panOld = 当前 panOffset.x/y（变换前 rect 的pan 吸收量）
-// 返回 panNew：绝对值，直接替换 panOffset
-function wheelPanNew(
-  e: { clientX: number; clientY: number; deltaY: number },
-  rectBefore: { left: number; top: number },
-  panOld: { x: number; y: number },
-  sOld: number,
-) {
-  const sNew = Math.min(4, Math.max(0.25, sOld - e.deltaY * 0.0015 * sOld));
-  if (sNew === sOld) return { sNew, panNew: { x: panOld.x, y: panOld.y } };
-  // 布局常量 B = rectBefore.left - panOld.x（反推未变换布局位置）
-  const Bx = rectBefore.left - panOld.x;
-  const By = rectBefore.top - panOld.y;
-  const localX = (e.clientX - rectBefore.left) / sOld;
-  const localY = (e.clientY - rectBefore.top) / sOld;
-  const panNewX = e.clientX - Bx - localX * sNew;
-  const panNewY = e.clientY - By - localY * sNew;
-  return { sNew, panNew: { x: panNewX, y: panNewY } };
+
+/** zoomOut（不清 pan） */
+function nextZoomOut(prev: number): number {
+  return Math.max(MIN_SCALE, prev - ZOOM_STEP);
 }
 
 // ── 辅助 ───────────────────────────────────────────────────────────────────
@@ -69,134 +48,82 @@ function ok(name: string, fn: () => Promise<void> | void): void {
     });
 }
 
-function makeRect(left: number, top: number, width: number, height: number) {
-  return { left, top, right: left + width, bottom: top + height, width, height, x: left, y: top };
-}
-
 // ── 测试 ───────────────────────────────────────────────────────────────────
-console.log("R-90 坐标映射契约测试");
+console.log("R-99 useImageZoom 中心缩放契约测试");
 
-// 1. 互逆性
-ok("互逆性：pan=0, scale=1", async () => {
-  const rect = makeRect(100, 50, 400, 300);
-  const original = { x: 120, y: 80 };
-  const screen = imageToScreen(original.x, original.y, rect, 1);
-  const back = screenToImage(screen.x, screen.y, rect, 1);
-  assert(Math.abs(back.x - original.x) < 0.001);
-  assert(Math.abs(back.y - original.y) < 0.001);
+// 1. 单次调用 clamp
+ok("nextWheelScale：单次放大 clamp 到 4", async () => {
+  // deltaY=-3000 → delta=4.5, prev+delta*prev = 1+4.5 = 5.5 → clamp 4
+  const r = nextWheelScale(1, -3000);
+  assert.strictEqual(r, MAX_SCALE);
 });
 
-ok("互逆性：pan≠0, scale=2.5", async () => {
-  // pan=200 => rect.left 包含 pan，所以只测 rect 抽象
-  const rect = makeRect(200, 100, 400, 300);
-  const original = { x: 55.5, y: 33.3 };
-  const screen = imageToScreen(original.x, original.y, rect, 2.5);
-  const back = screenToImage(screen.x, screen.y, rect, 2.5);
-  assert(Math.abs(back.x - original.x) < 0.001);
-  assert(Math.abs(back.y - original.y) < 0.001);
+ok("nextWheelScale：单次缩小 clamp 到 0.25", async () => {
+  // deltaY=3000 → delta=-4.5, 1-4.5 = -3.5 → clamp 0.25
+  const r = nextWheelScale(1, 3000);
+  assert.strictEqual(r, MIN_SCALE);
 });
 
-ok("互逆性：pan≠0, scale=0.5（最小）", async () => {
-  const rect = makeRect(80, 70, 200, 150);
-  const original = { x: 300, y: 200 };
-  const screen = imageToScreen(original.x, original.y, rect, 0.5);
-  const back = screenToImage(screen.x, screen.y, rect, 0.5);
-  assert(Math.abs(back.x - original.x) < 0.001);
-  assert(Math.abs(back.y - original.y) < 0.001);
+ok("nextWheelScale：边界不变化时不触发 setScale", async () => {
+  // prev=MIN_SCALE=0.25, deltaY=10 → delta=-0.015, 0.25-0.00375=0.24625 → clamp 0.25
+  // Math.max(0.25, 0.24625) = 0.25，等于 prev，不应 setScale
+  // 用 Math.min(Math.max(...), prev) 检测
+  const r = nextWheelScale(MIN_SCALE, 10);
+  assert.strictEqual(r, MIN_SCALE);
 });
 
-// 2. 平移后落点（P0 回归锚）
-ok("平移后落点：scale=2, pan=(100,50), rect=(140,90,400,300)", async () => {
-  // stage: translate(100,50) scale(2), transformOrigin:"0 0"
-  // rect.left = 未变换左上角屏幕位置 = 140（不含 pan，因为 origin="0 0"）
-  // rect.top  = 90
-  // 变换后 rect.left 实际包含 pan，但公式不在乎——它直接用 rect.left
-  const rect = makeRect(140, 90, 400, 300);
-  const scale = 2;
-  // 屏幕点 (200, 180) 应映射到原图
-  const img = screenToImage(200, 180, rect, scale);
-  // 期望：x = (200-140)/2 = 30, y = (180-90)/2 = 45
-  assert(Math.abs(img.x - 30) < 0.001, `x: expected 30, got ${img.x}`);
-  assert(Math.abs(img.y - 45) < 0.001, `y: expected 45, got ${img.y}`);
-  // 验证图像素→屏幕逆映射
-  const screen = imageToScreen(img.x, img.y, rect, scale);
-  assert(Math.abs(screen.x - 200) < 0.001);
-  assert(Math.abs(screen.y - 180) < 0.001);
+// 2. fold 连续缩放（红→绿锁本次 bug）
+ok("fold：deltaY=400 连 120 次，停在严格 0.25", async () => {
+  // deltaY=400 → delta=-0.6 → factor = 0.4
+  // 第1次：4 → 4*0.4 = 1.6
+  // 第2次：1.6 → 1.6*0.4 = 0.64
+  // 第3次：0.64 → clamp 0.25（已到底）
+  // 后续 117 次恒为 0.25
+  let s = 4;
+  for (let i = 0; i < 120; i++) {
+    s = nextWheelScale(s, 400);
+  }
+  // 必须严格等于 0.25（不是 0.2499... 或 0.26）
+  assert.strictEqual(
+    s,
+    MIN_SCALE,
+    `fold 120 次后 scale 应严格等于 ${MIN_SCALE}，实际 ${s}`,
+  );
 });
 
-// 3. 滚轮锚点（P1 锚）
-ok("滚轮锚点：指针(300) 下 sOld=1→sNew=1.999，原图像素坐标不变", async () => {
-  // rectBefore = 变换后 rect（B=0, panOld=0）
-  const rectBefore = makeRect(0, 0, 600, 400);
-  const sOld = 1;
-  const pointer = 300; // 屏幕 x
-  // sOld=1: 指针下的原图 x = (300 - 0) / 1 = 300
-  const result = wheelPanNew({ clientX: pointer, clientY: 0, deltaY: -666 }, rectBefore, { x: 0, y: 0 }, sOld);
-  // deltaY=-666 × 0.0015 = -0.999, sOld - (-0.999) = 1.999
-  assert(Math.abs(result.sNew - 1.999) < 0.001, `sNew: expected ~1.999, got ${result.sNew}`);
-  // 验证锚点：sNew=1.999, localX=300
-  // panNew = 300 - 0 - 300*1.999 = -299.7
-  assert(Math.abs(result.panNew.x - (-299.7)) < 0.01, `panNew.x: expected ~-299.7, got ${result.panNew.x}`);
-  // y 不应变化
-  assert(Math.abs(result.panNew.y - 0) < 0.01);
-  // 验证：新 rect.left = C + panNew = -299.7，屏幕 pointer=300 下原图 x 仍为 300
-  // 新局部 = (300 - (-299.7)) / 1.999 = 599.7 / 1.999 ≈ 300 ✓
-});
-
-ok("滚轮锚点：连续两次缩放，锚点保持", async () => {
-  const rect0 = makeRect(0, 0, 800, 600);
+// 3. ZOOM_STEP 叠加
+ok("ZOOM_STEP：1 → +0.1 → +0.1 → -0.1 = 1.1", async () => {
   const s0 = 1;
-  const pointerX = 400;
-  const pointerY = 250;
-  // 第一次：1 → ~2，panOld=0
-  const r1 = wheelPanNew({ clientX: pointerX, clientY: pointerY, deltaY: -666 }, rect0, { x: 0, y: 0 }, s0);
-  // r1.panNew 是绝对值（直接替换 panOffset）
-  // 变换后 rect1.left = B + r1.panNew.x，B=0（布局常量） → rect1.left = r1.panNew.x
-  const rect1 = makeRect(r1.panNew.x, r1.panNew.y, 800, 600);
-  // 第二次：~2 → ~4，传入 panOld = r1.panNew
-  const r2 = wheelPanNew({ clientX: pointerX, clientY: pointerY, deltaY: -666 }, rect1, r1.panNew, r1.sNew);
-  // r2.panNew 是绝对值，rect2.left = r2.panNew.x
-  const rect2 = makeRect(r2.panNew.x, r2.panNew.y, 800, 600);
-  // 验证：pointer=400 下原图锚 x 仍应为 400
-  const anchor = screenToImage(pointerX, pointerY, rect2, r2.sNew);
-  assert(Math.abs(anchor.x - 400) < 0.01, `anchor x: expected 400, got ${anchor.x}`);
-  assert(Math.abs(anchor.y - 250) < 0.01, `anchor y: expected 250, got ${anchor.y}`);
+  const s1 = nextZoomIn(s0);       // 1 + 0.1 = 1.1
+  const s2 = nextZoomIn(s1);       // 1.1 + 0.1 = 1.2
+  const s3 = nextZoomOut(s2);      // 1.2 - 0.1 = 1.1
+  assert(Math.abs(s1 - 1.1) < 0.0001, `s1: expected 1.1, got ${s1}`);
+  assert(Math.abs(s2 - 1.2) < 0.0001, `s2: expected 1.2, got ${s2}`);
+  assert(Math.abs(s3 - 1.1) < 0.0001, `s3: expected 1.1, got ${s3}`);
 });
 
-// 4. 边界
-ok("边界：scale clamp 到 [0.25, 4]", async () => {
-  const rect = makeRect(0, 0, 600, 400);
-  // deltaY 正数（向下滚 = 缩小），sOld=0.25 时应不变化
-  const r1 = wheelPanNew({ clientX: 300, clientY: 200, deltaY: 1000 }, rect, { x: 0, y: 0 }, 0.25);
-  assert(r1.sNew === 0.25, "should not go below MIN_SCALE");
-  // deltaY 负数（向上滚 = 放大），sOld=4 时应不变化
-  const r2 = wheelPanNew({ clientX: 300, clientY: 200, deltaY: -1000 }, rect, { x: 0, y: 0 }, 4);
-  assert(r2.sNew === 4, "should not go above MAX_SCALE");
+ok("ZOOM_STEP：边界 clamp", async () => {
+  // MIN + zoomOut → 不变
+  const atMin = nextZoomOut(MIN_SCALE);
+  assert.strictEqual(atMin, MIN_SCALE);
+  // MAX + zoomIn → 不变
+  const atMax = nextZoomIn(MAX_SCALE);
+  assert.strictEqual(atMax, MAX_SCALE);
 });
 
-ok("滚轮锚点：Y 轴连续两次缩放，Y 锚点保持（clientY=250）", async () => {
-  // 验证 Y 轴同样被锚定，不会每次滚轮跳回 0
-  const rect0 = makeRect(0, 0, 800, 600);
-  const s0 = 1;
-  const pointerX = 400;
-  const pointerY = 250;
-  const r1 = wheelPanNew({ clientX: pointerX, clientY: pointerY, deltaY: -666 }, rect0, { x: 0, y: 0 }, s0);
-  const rect1 = makeRect(r1.panNew.x, r1.panNew.y, 800, 600);
-  const r2 = wheelPanNew({ clientX: pointerX, clientY: pointerY, deltaY: -666 }, rect1, r1.panNew, r1.sNew);
-  const rect2 = makeRect(r2.panNew.x, r2.panNew.y, 800, 600);
-  // Y 锚点应保持 250（两次都不跳回 0）
-  const anchor = screenToImage(pointerX, pointerY, rect2, r2.sNew);
-  assert(Math.abs(anchor.x - 400) < 0.01, `anchor x: expected 400, got ${anchor.x}`);
-  assert(Math.abs(anchor.y - 250) < 0.01, `anchor y: expected 250, got ${anchor.y}`);
-});
-
-ok("fit 态：scale≈1, pan=0, 屏幕点映射正确", async () => {
-  const rect = makeRect(200, 150, 400, 300);
-  const scale = 1;
-  // 未变换 rect.left = 200
-  const img = screenToImage(300, 250, rect, scale);
-  assert(Math.abs(img.x - 100) < 0.001, `x: expected 100, got ${img.x}`);
-  assert(Math.abs(img.y - 100) < 0.001, `y: expected 100, got ${img.y}`);
+// 4. 中间值连续性
+ok("连续放大/缩小路径正确", async () => {
+  let s = 1;
+  // 放大到接近 MAX
+  for (let i = 0; i < 30; i++) {
+    s = nextZoomIn(s);
+  }
+  assert(s > 3 && s <= MAX_SCALE, `接近 MAX: ${s}`);
+  // 缩小回接近 MIN
+  for (let i = 0; i < 30; i++) {
+    s = nextZoomOut(s);
+  }
+  assert(s < 1 && s >= MIN_SCALE, `接近 MIN: ${s}`);
 });
 
 // ── 等待完成 ────────────────────────────────────────────────────────────────

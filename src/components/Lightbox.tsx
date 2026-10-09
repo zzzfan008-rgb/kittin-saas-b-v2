@@ -15,11 +15,9 @@ export function Lightbox() {
   const close = useLightboxStore((s) => s.close);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const zoom = useImageZoom({
     containerRef,
     wheelKey: item?.src,
-    wheelRectRef: imgRef,
   });
 
   // 打开新图时：挂载即 fit（图片加载完成后算 fit scale）
@@ -27,8 +25,9 @@ export function Lightbox() {
   useEffect(() => {
     if (!item) return;
     const container = containerRef.current;
-    const imgEl = imgRef.current;
-    if (!container || !imgEl) return;
+    if (!container) return;
+    const imgEl = container.querySelector("img") as HTMLImageElement | null;
+    if (!imgEl) return;
     const applyFit = () => fitImage(container, imgEl);
     if (imgEl.complete && imgEl.naturalWidth > 0) {
       applyFit();
@@ -118,7 +117,7 @@ export function Lightbox() {
         className="relative flex h-full w-full items-center justify-center overflow-hidden p-8"
         onDoubleClick={(e) => {
           e.stopPropagation();
-          const imgEl = imgRef.current;
+          const imgEl = containerRef.current?.querySelector("img") as HTMLImageElement | null;
           if (imgEl && containerRef.current) {
             zoom.handleDoubleClick(e, containerRef.current, imgEl);
           }
@@ -130,7 +129,6 @@ export function Lightbox() {
         style={{ cursor: zoom.cursor }}
       >
         <img
-          ref={imgRef}
           src={item.src}
           alt={item.alt ?? "图片放大预览"}
           draggable={false}
@@ -150,7 +148,7 @@ export function Lightbox() {
         className="zoom-hud"
         onClick={(e) => {
           e.stopPropagation();
-          const imgEl = imgRef.current;
+          const imgEl = containerRef.current?.querySelector("img") as HTMLImageElement | null;
           if (containerRef.current && imgEl) {
             zoom.fitImage(containerRef.current, imgEl);
           }

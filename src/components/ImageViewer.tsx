@@ -68,8 +68,7 @@ export function ImageViewer() {
 
   // R-89 §D 缩放状态：共用 useImageZoom hook（MaskEditor + ImageViewer 共用同一实现）
   const viewerContainerRef = useRef<HTMLDivElement>(null);
-  const viewerImgRef = useRef<HTMLImageElement>(null);
-  const zoom = useImageZoom({ containerRef: viewerContainerRef, wheelKey: viewer?.url, wheelRectRef: viewerImgRef });
+  const zoom = useImageZoom({ containerRef: viewerContainerRef, wheelKey: viewer?.url });
 
   // 辅助
   const generationSafetyBlockReason = useGenerationSafetyBlockReason();
@@ -193,7 +192,6 @@ export function ImageViewer() {
           style={{ cursor: zoom.cursor }}
         >
           <img
-            ref={viewerImgRef}
             src={viewer.url}
             alt={viewer.title ?? "图片预览"}
             draggable={false}
