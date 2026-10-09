@@ -27,6 +27,7 @@ import {
   brushStrokeWidth,
 } from "@/lib/maskGeometry";
 import { MASK_EXPANSION_FILL, MASK_SELECTION_FILL } from "@/lib/color/colorToken";
+import { useLightboxStore } from "@/store/lightboxStore";
 import type { NodeRunStatus } from "@/types/workflow";
 import { isNodeRunActive } from "@/types/workflow";
 import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -98,6 +99,7 @@ export function MaskEditor({
   const [lastResultUrl, setLastResultUrl] = useState<string | null>(null);
 
   const running = isNodeRunActive(runStatus);
+  const openLightbox = useLightboxStore((s) => s.open);
   const hasPrompt = editPrompt.trim().length > 0;
   const locked = saving || running || readOnly;
 
@@ -493,21 +495,6 @@ export function MaskEditor({
             className={`absolute inset-0 h-full w-full touch-none ${ready && !locked ? "cursor-crosshair" : "cursor-wait"} ${locked ? "pointer-events-none" : ""}`}
           />
           <canvas ref={maskRef} className="hidden" />
-          {running ? (
-            <div
-              className="develop-overlay pointer-events-none absolute inset-0 z-10 overflow-hidden"
-              data-testid="mask-redraw-developing"
-            >
-              <div className="develop-gridlines" aria-hidden="true" />
-              <div className="develop-scanline" aria-hidden="true" />
-              <div className="develop-float">
-                <div className="develop-sigil" aria-hidden="true">
-                  <span>✦</span>
-                </div>
-                <div>显影中…</div>
-              </div>
-            </div>
-          ) : null}
         </div>
       </main>
 
@@ -692,12 +679,19 @@ export function MaskEditor({
                   显影中…
                 </div>
               ) : (
-                <img
-                  src={lastResultUrl ?? ""}
-                  alt="上次成功结果"
-                  data-testid="mask-redraw-result-preview"
-                  className="h-24 w-full rounded-md border border-[var(--gc-border)] object-contain"
-                />
+                <button
+                  type="button"
+                  onClick={() => lastResultUrl && openLightbox(lastResultUrl, "上次成功结果")}
+                  className="h-24 w-full cursor-zoom-in rounded-md border border-[var(--gc-border)] p-0"
+                  aria-label="放大查看上次成功结果"
+                >
+                  <img
+                    src={lastResultUrl ?? ""}
+                    alt="上次成功结果"
+                    data-testid="mask-redraw-result-preview"
+                    className="h-full w-full rounded-md object-contain"
+                  />
+                </button>
               )}
             </section>
           ) : null}

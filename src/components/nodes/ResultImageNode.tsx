@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveNodes, selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
+import { useLightboxStore } from "@/store/lightboxStore";
 import type { ResultImageNodeData } from "@/types/workflow";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
@@ -15,7 +16,7 @@ import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
  */
 export function ResultImageNode({ id, data, selected }: NodeProps<Node<ResultImageNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
-  const openViewer = useFlowStore((s) => s.openViewer);
+  const openLightbox = useLightboxStore((s) => s.open);
   const sourceLabel = useFlowStore(
     (s) => selectActiveNodes(s).find((node) => node.id === data.sourceGeneratorId)?.data.label,
   );
@@ -27,8 +28,8 @@ export function ResultImageNode({ id, data, selected }: NodeProps<Node<ResultIma
 
   const preview = useCallback(() => {
     if (!hasProduct) return;
-    openViewer({ url: images[0], title: data.label });
-  }, [data.label, hasProduct, images, openViewer]);
+    openLightbox(images[0], data.label);
+  }, [data.label, hasProduct, images, openLightbox]);
 
   const download = useCallback(() => {
     if (!hasProduct) return;

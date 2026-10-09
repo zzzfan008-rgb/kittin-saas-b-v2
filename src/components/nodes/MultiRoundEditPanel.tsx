@@ -21,6 +21,7 @@ import { Slider } from "@/components/ui/slider";
 import { compositeEditImage, type EditMark, type EditMarkTool } from "@/lib/editComposite";
 import { uploadEditDraft } from "@/lib/editDraftUpload";
 import { MarkLayer } from "@/components/nodes/MarkLayer";
+import { useLightboxStore } from "@/store/lightboxStore";
 import type { NodeRunStatus } from "@/types/workflow";
 import { isNodeRunActive } from "@/types/workflow";
 import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -87,6 +88,7 @@ export function MultiRoundEditPanel({
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
   const running = isNodeRunActive(runStatus);
+  const openLightbox = useLightboxStore((s) => s.open);
   const hasPrompt = editPrompt.trim().length > 0;
   const busy = pending || running;
 
@@ -232,12 +234,19 @@ export function MultiRoundEditPanel({
           // 对齐 MaskEditor 已验证布局：容器 inline-flex，img 用 viewport 绝对约束
           //（max-w-full 在收缩型 flex item 内百分比自引用会解析为 0 → 面板图塌缩）。
           <div className="relative inline-flex max-h-full max-w-full shadow-2xl shadow-black">
-            <img
-              src={baseSource}
-              alt="多轮修改底图"
-              className="block max-h-[calc(100vh-64px)] max-w-[calc(100vw-360px)] rounded-lg object-contain"
-              draggable={false}
-            />
+            <button
+              type="button"
+              onClick={() => baseSource && openLightbox(baseSource, "多轮修改底图")}
+              className="cursor-zoom-in p-0"
+              aria-label="放大查看多轮修改底图"
+            >
+              <img
+                src={baseSource}
+                alt="多轮修改底图"
+                className="block max-h-[calc(100vh-64px)] max-w-[calc(100vw-360px)] rounded-lg object-contain"
+                draggable={false}
+              />
+            </button>
             <MarkLayer
               baseSource={baseSource}
               naturalWidth={naturalSize.width}
@@ -249,21 +258,6 @@ export function MultiRoundEditPanel({
               strokeWidth={strokeWidth}
               disabled={busy || readOnly}
             />
-            {running ? (
-              <div
-                className="develop-overlay pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-lg"
-                data-testid="multi-round-developing"
-              >
-                <div className="develop-gridlines" aria-hidden="true" />
-                <div className="develop-scanline" aria-hidden="true" />
-                <div className="develop-float">
-                  <div className="develop-sigil" aria-hidden="true">
-                    <span>✦</span>
-                  </div>
-                  <div>显影中…</div>
-                </div>
-              </div>
-            ) : null}
           </div>
         ) : (
           <p className="text-sm text-[var(--gc-node-text)]">请先上传图片后再使用多轮修改</p>
@@ -391,6 +385,15 @@ export function MultiRoundEditPanel({
             <p className="text-xs text-[var(--gc-node-text)] opacity-70">{disabledReason}</p>
           ) : null}
 
+          {running ? (
+            <div
+              className="flex h-24 items-center justify-center rounded-md border border-dashed border-[var(--gc-border)] text-xs text-[var(--gc-text-muted)]"
+              data-testid="multi-round-result-pending"
+            >
+              显影中…
+            </div>
+          ) : null}
+
           {/* 修改记录条 */}
           <section className="mt-auto flex flex-col gap-2 border-t border-[var(--gc-node-border)] pt-3" aria-label="修改记录">
             <span className="text-xs font-medium text-[var(--gc-node-text)]">修改记录</span>
@@ -401,8 +404,15 @@ export function MultiRoundEditPanel({
                   className={`relative h-14 w-14 overflow-hidden rounded border ${index === history.length - 1 ? "border-[var(--gc-node-text)]" : "border-[var(--gc-node-border)]"}`}
                   title={entry.label}
                 >
-                  <img src={entry.url} alt={entry.label} className="size-full object-cover" draggable={false} />
-                  <figcaption className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px] text-white">
+                  <button
+                    type="button"
+                    onClick={() => openLightbox(entry.url, entry.label)}
+                    className="block size-full cursor-zoom-in p-0"
+                    aria-label={`放大查看${entry.label}`}
+                  >
+                    <img src={entry.url} alt={entry.label} className="size-full object-cover" draggable={false} />
+                  </button>
+                  <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px] text-white">
                     {entry.label}
                   </figcaption>
                 </figure>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import { useLightboxStore } from "@/store/lightboxStore";
 import { thumbnailImageUrl } from "@/lib/images";
 
 interface ImageGridProps {
@@ -9,9 +9,9 @@ interface ImageGridProps {
   renderAction?: (url: string, index: number) => ReactNode;
 }
 
-/** 生成结果缩略图网格（单击弹出全局查看器，滚轮缩放） */
+/** 生成结果缩略图网格（单击弹出全局 Lightbox 放大，滚轮缩放） */
 export function ImageGrid({ images, empty = "暂无生成结果", renderAction }: ImageGridProps) {
-  const openViewer = useFlowStore((s) => s.openViewer);
+  const openLightbox = useLightboxStore((s) => s.open);
   const safeImages = Array.isArray(images)
     ? images.filter((image): image is string => typeof image === "string" && image.length > 0)
     : [];
@@ -33,7 +33,7 @@ export function ImageGrid({ images, empty = "暂无生成结果", renderAction }
         >
           <button
             type="button"
-            onClick={() => openViewer({ url, title: `生成结果 ${i + 1}` })}
+            onClick={() => openLightbox(url, `生成结果 ${i + 1}`)}
             className="block w-full"
           >
             <img
