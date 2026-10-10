@@ -245,7 +245,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className="nopan relative rounded-[10px] border-[3px] border-[var(--gc-node-border)] p-[3px]">
+          <div className="nopan relative rounded-[10px] border-[3px] border-[var(--gc-node-border)]">
             <div className="relative block w-full cursor-grab overflow-hidden rounded-[8px] active:cursor-grabbing">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
