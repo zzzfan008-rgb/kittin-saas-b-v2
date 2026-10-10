@@ -132,8 +132,6 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
         }
       >
         <label className="block space-y-1">
-          <span className="text-[11px] text-[var(--gc-node-muted)]">提示词正文</span>
-
           {/* 颜色 chips 展示区（在 textarea 上方） */}
           {chips.length > 0 && (
             <ColorChipList chips={chips} onDelete={handleDeleteChip} />
@@ -150,15 +148,6 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             className={`${promptChipClass} resize-none`}
           />
         </label>
-        {selected && (
-          <div
-            role="tooltip"
-            className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
-          >
-            连到生成节点的 prompt 输入决定生成内容
-            <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
-          </div>
-        )}
         {colorToolOpen && (
           <ColorToolPanel
             onConfirm={insertColor}
