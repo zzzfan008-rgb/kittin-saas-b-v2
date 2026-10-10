@@ -97,6 +97,8 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
         status={data.status}
         error={data.error}
         selected={selected}
+        frameless
+        nodeKind="text"
         toolbar={
           <NodeToolbar
             kind="text"
@@ -148,9 +150,15 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             className={`${promptChipClass} resize-none`}
           />
         </label>
-        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-          连到生成节点的 prompt 输入决定生成内容
-        </p>
+        {selected && (
+          <div
+            role="tooltip"
+            className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
+          >
+            连到生成节点的 prompt 输入决定生成内容
+            <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
+          </div>
+        )}
         {colorToolOpen && (
           <ColorToolPanel
             onConfirm={insertColor}
