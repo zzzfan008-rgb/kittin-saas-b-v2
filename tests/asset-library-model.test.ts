@@ -132,11 +132,18 @@ assert.deepEqual(
   0,
   "不得再内联 renderFileInput（改由「从本地上传」按钮触发，input 不再覆盖图片）",
 );
-assert.match(imageNodeSource, /type="file"/, "必须有隐藏的本地文件选择 input");
-assert.match(imageNodeSource, /从本地上传/, "必须新增「从本地上传」按钮");
-assert.match(imageNodeSource, /fileInputRef\.current\?\.click\(\)/, "「从本地上传」按钮必须程序化点击 file input");
+assert.doesNotMatch(imageNodeSource, /type="file"/, "file input 必须迁到 ReplaceImageDialog（节点内不再内联）");
+assert.match(imageNodeSource, /ReplaceImageDialog/, "必须通过 ReplaceImageDialog 承载「替换」统一弹窗");
+assert.match(imageNodeSource, /replaceMenuOpen/, "「替换」工具条按钮必须打开统一弹窗");
 assert.doesNotMatch(imageNodeSource, /cursor-zoom-in|单击查看大图/, "点图片不得再触发放大");
 assert.doesNotMatch(imageNodeSource, /点击 \/ 拖拽 \/ Ctrl\+V/, "空槽位不得再提示「点击」触发");
+
+// R-107：ReplaceImageDialog 是统一弹窗，第一张卡片=本地上传（与素材卡片同尺寸）
+const replaceDialogSource = read("src/components/panels/ReplaceImageDialog.tsx");
+assert.match(replaceDialogSource, /从本地上传/, "统一弹窗必须有「从本地上传」入口");
+assert.match(replaceDialogSource, /type="file"/, "统一弹窗必须内嵌 file input");
+assert.match(replaceDialogSource, /aspect-square w-full bg-\[var\(--gc-control\)\] object-cover/, "素材卡片尺寸必须固定为 aspect-square + object-cover");
+assert.match(replaceDialogSource, /grid-cols-4 gap-2\.5/, "统一弹窗网格必须 4 列");
 
 // 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
 assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");

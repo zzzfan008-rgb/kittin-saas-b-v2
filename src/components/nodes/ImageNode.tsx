@@ -15,10 +15,10 @@ import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
 import { saveMaskDraft } from "@/lib/maskUpload";
-import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
+import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
 import { MaskEditor } from "./MaskEditor";
 import { MultiRoundEditPanel } from "./MultiRoundEditPanel";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
@@ -75,6 +75,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [dragOver, setDragOver] = useState(false);
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
+  const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
   const editPromptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "editPrompt" },
@@ -181,34 +182,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     return () => document.removeEventListener("paste", onPaste);
   }, [handleFile, readOnly, selected]);
 
-  const openAssetPicker = useCallback(() => {
-    const detail: AssetPickerRequest = {
-      target: selectActiveDocumentTarget(useFlowStore.getState()),
-      nodeId: id,
-    };
-    window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail }));
-  }, [id]);
-
   const hasUpload = data.outputImages.length > 0;
   const hasMask = typeof data.mask === "string" && data.mask.length > 0;
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInput = (
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept="image/*"
-      multiple={false}
-      disabled={readOnly}
-      tabIndex={-1}
-      aria-label={hasUpload ? "重新上传图片" : "上传图片"}
-      className="nodrag nopan pointer-events-none absolute h-0 w-0 opacity-0"
-      onChange={(event) => {
-        void handleFile(event.target.files?.[0]);
-        event.target.value = "";
-      }}
-    />
-  );
 
   return (
     <>
@@ -260,10 +235,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               },
               replace: {
                 onSelect: () => {
-                  const input = document.querySelector<HTMLInputElement>(
-                    `.react-flow__node[data-id="${CSS.escape(id)}"] input[type="file"]`,
-                  );
-                  input?.click();
+                  setReplaceMenuOpen(true);
                 },
                 disabled: readOnly,
                 disabledReason: "只读项目不能替换图片",
@@ -311,46 +283,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             </span>
           </div>
         )}
-        {!hasUpload && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={readOnly}
-              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-            >
-              从本地上传
-            </button>
-            <button
-              type="button"
-              onClick={openAssetPicker}
-              disabled={readOnly}
-              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-            >
-              从素材库替换
-            </button>
-          </div>
-        )}
-        {hasUpload && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={readOnly}
-              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-            >
-              从本地上传
-            </button>
-            <button
-              type="button"
-              onClick={openAssetPicker}
-              disabled={readOnly}
-              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-            >
-              从素材库替换
-            </button>
-          </div>
-        )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
         {hasUpload ? (
           selected ? (
@@ -369,8 +301,30 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           </p>
         )}
       </NodeFrame>
-      {fileInput}
       <Handle type="source" position={Position.Right} title="输出图片" />
+
+      {replaceMenuOpen && (
+        <ReplaceImageDialog
+          nodeId={id}
+          nodeLabel={data.label}
+          readOnly={readOnly}
+          onUpload={handleFile}
+          onPickFromLibrary={(url) => {
+            const target = selectActiveDocumentTarget(useFlowStore.getState());
+            if (!target) return;
+            updateNodeDataInTab(target, id, {
+              outputImages: [url],
+              status: "success",
+              error: undefined,
+              mask: undefined,
+              maskSourceRef: undefined,
+              featherRadius: undefined,
+            });
+            setReplaceMenuOpen(false);
+          }}
+          onClose={() => setReplaceMenuOpen(false)}
+        />
+      )}
 
       {/* 蒙版编辑器（65b：蒙版入口从生成节点面板迁入图片节点） */}
       {/* 蒙版重绘页（65d v2）：右栏约 1/4 宽整合控件；主按钮=保存+重绘且不关闭面板，
