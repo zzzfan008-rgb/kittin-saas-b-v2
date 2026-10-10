@@ -39,6 +39,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
+  const [inputActive, setInputActive] = useState(false);
   const presetOptions = useMemo(() =>
     listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
   []);
@@ -137,7 +138,10 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             <ColorChipList chips={chips} onDelete={handleDeleteChip} />
           )}
 
-          {/* textarea：正文内容（chips 标记符在渲染时被 ColorChipList 提取显示） */}
+          {/* textarea：正文内容（chips 标记符在渲染时被 ColorChipList 提取显示）
+              - 未聚焦：无 nodrag（单击=选中节点，按住=拖动节点）；
+              - 双击：聚焦进入编辑（加 nodrag 防止输入时误拖动）；
+              - 失焦：退出编辑态，恢复可拖动。 */}
           <textarea
             ref={textareaRef}
             value={data.text}
@@ -145,7 +149,14 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             rows={7}
             readOnly={readOnly}
             placeholder="写这段正文要表达什么：款式、场景、材质、要求…"
-            className={`${promptChipClass} resize-none`}
+            onDoubleClick={() => {
+              if (readOnly) return;
+              setInputActive(true);
+              textareaRef.current?.focus();
+            }}
+            onFocus={() => setInputActive(true)}
+            onBlur={() => setInputActive(false)}
+            className={`${promptChipClass.replace("nodrag", "")} resize-none ${inputActive ? "nodrag" : ""}`}
           />
         </label>
         {colorToolOpen && (
