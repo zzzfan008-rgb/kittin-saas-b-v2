@@ -149,6 +149,10 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             rows={7}
             readOnly={readOnly}
             placeholder="写这段正文要表达什么：款式、场景、材质、要求…"
+            onMouseDown={(event) => {
+              // 未进入编辑态时拦截默认聚焦：单击=选中/拖动节点，双击才聚焦编辑
+              if (!inputActive) event.preventDefault();
+            }}
             onDoubleClick={() => {
               if (readOnly) return;
               setInputActive(true);
