@@ -128,15 +128,15 @@ assert.equal(
 assert.doesNotMatch(imageNodeSource, /存入数字模特库/, "图片节点不得再内联「存入数字模特库」勾选");
 assert.doesNotMatch(imageNodeSource, /saveImageToModelLibrary/, "图片节点不得再直接调用入库（用户已删除该入口）");
 assert.deepEqual(
-  (imageNodeSource.match(/renderFileInput\("/g) ?? []).length,
-  2,
-  "文件选择器必须在「空槽位」与「已有图片」两种形态下都存在（否则工具条「替换」是死按钮）",
+  (imageNodeSource.match(/renderFileInput\(/g) ?? []).length,
+  0,
+  "不得再内联 renderFileInput（改由「从本地上传」按钮触发，input 不再覆盖图片）",
 );
-assert.match(
-  imageNodeSource,
-  /tabIndex=\{variant === "replace" \? -1 : undefined\}/,
-  "已有图片时隐藏选择器不得新增不可见的 Tab 停靠点",
-);
+assert.match(imageNodeSource, /type="file"/, "必须有隐藏的本地文件选择 input");
+assert.match(imageNodeSource, /从本地上传/, "必须新增「从本地上传」按钮");
+assert.match(imageNodeSource, /fileInputRef\.current\?\.click\(\)/, "「从本地上传」按钮必须程序化点击 file input");
+assert.doesNotMatch(imageNodeSource, /cursor-zoom-in|单击查看大图/, "点图片不得再触发放大");
+assert.doesNotMatch(imageNodeSource, /点击 \/ 拖拽 \/ Ctrl\+V/, "空槽位不得再提示「点击」触发");
 
 // 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
 assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");

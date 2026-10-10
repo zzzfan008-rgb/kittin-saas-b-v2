@@ -128,7 +128,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
               selected ? "ring-2 ring-gold" : ""
             }`}
           >
-            <div className="absolute right-full top-2 z-20 mr-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5">
+            <div className="absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5">
               <StatusDot status={status} />
               {editing ? (
                 <input
@@ -154,11 +154,11 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
                       setEditing(false);
                     }
                   }}
-                  className="nodrag w-24 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-[11px] text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+                  className="nodrag w-24 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
                 />
               ) : (
                 <span
-                  className={`truncate text-[11px] font-medium tracking-wide text-[var(--gc-text)] ${nodeId ? "cursor-text" : ""}`}
+                  className={`truncate text-xs font-medium tracking-wide text-[var(--gc-text)] ${nodeId ? "cursor-text" : ""}`}
                   title={nodeId ? `双击改名（当前：${title}）` : undefined}
                   onDoubleClick={
                     nodeId

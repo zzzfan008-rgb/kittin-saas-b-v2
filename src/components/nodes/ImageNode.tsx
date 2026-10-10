@@ -192,17 +192,17 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const hasUpload = data.outputImages.length > 0;
   const hasMask = typeof data.mask === "string" && data.mask.length > 0;
 
-  const renderFileInput = (variant: "slot" | "replace") => (
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInput = (
     <input
+      ref={fileInputRef}
       type="file"
       accept="image/*"
       multiple={false}
       disabled={readOnly}
-      tabIndex={variant === "replace" ? -1 : undefined}
+      tabIndex={-1}
       aria-label={hasUpload ? "重新上传图片" : "上传图片"}
-      className={`nodrag nopan absolute inset-0 h-full w-full cursor-pointer opacity-0 ${
-        variant === "replace" ? "z-0" : "z-10"
-      }`}
+      className="nodrag nopan pointer-events-none absolute h-0 w-0 opacity-0"
       onChange={(event) => {
         void handleFile(event.target.files?.[0]);
         event.target.value = "";
@@ -283,7 +283,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 className={`w-full bg-[var(--gc-node-inner)] object-contain ${hasUpload ? "block max-h-56" : "max-h-40"}`}
               />
             </div>
-            {renderFileInput("replace")}
             <OrdinalBadgeSlot nodeId={id} />
           </div>
         ) : (
@@ -298,30 +297,59 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               setDragOver(false);
               void handleFile(event.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
+            className={`nodrag nopan relative flex aspect-[4/3] cursor-default flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
               dragOver
                 ? "border-gold bg-gold/8 text-gold"
-                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)]"
             }`}
           >
-            {renderFileInput("slot")}
             <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
             <span className="pointer-events-none text-label leading-relaxed opacity-50">
-              点击 / 拖拽 / Ctrl+V
+              拖拽到此处
             </span>
           </div>
         )}
+        {!hasUpload && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={readOnly}
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
+            >
+              从本地上传
+            </button>
+            <button
+              type="button"
+              onClick={openAssetPicker}
+              disabled={readOnly}
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
+            >
+              从素材库替换
+            </button>
+          </div>
+        )}
         {hasUpload && (
-          <button
-            type="button"
-            onClick={openAssetPicker}
-            disabled={readOnly}
-            className="w-full rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-          >
-            从素材库替换
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={readOnly}
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
+            >
+              从本地上传
+            </button>
+            <button
+              type="button"
+              onClick={openAssetPicker}
+              disabled={readOnly}
+              className="flex-1 rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
+            >
+              从素材库替换
+            </button>
+          </div>
         )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
         {hasUpload ? (
@@ -341,6 +369,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           </p>
         )}
       </NodeFrame>
+      {fileInput}
       <Handle type="source" position={Position.Right} title="输出图片" />
 
       {/* 蒙版编辑器（65b：蒙版入口从生成节点面板迁入图片节点） */}
