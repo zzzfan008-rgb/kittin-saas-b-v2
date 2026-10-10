@@ -156,7 +156,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             }}
             onFocus={() => setInputActive(true)}
             onBlur={() => setInputActive(false)}
-            className={`${promptChipClass.replace("nodrag", "")} resize-none ${inputActive ? "nodrag" : ""}`}
+            className={`${promptChipClass.replace("nodrag", "")} resize-none ${inputActive ? "nodrag cursor-text" : "cursor-grab active:cursor-grabbing"}`}
           />
         </label>
         {colorToolOpen && (
