@@ -81,11 +81,13 @@ interface NodeFrameProps {
   nodeId?: string;
   /** 节点卡正上方 8px 的工具条槽位（v8 plan.md §3.2）；由各 kind 通过 NodeToolbar 提供。 */
   toolbar?: ReactNode;
+  /** 无边框模式：渲染为纯内容 + 左上角名称徽标（名称仍可双击改名），内容自身带边框 */
+  frameless?: boolean;
   children: ReactNode;
 }
 
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
-export function NodeFrame({ title, status, error, selected, nodeId, toolbar, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, children }: NodeFrameProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);
@@ -106,6 +108,69 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, chi
   return (
     <div className="gc-node-root relative w-[var(--gc-node-width)]">
       {toolbar}
+      {frameless ? (
+        <>
+          <div
+            className={`gc-node-card relative w-full rounded-xl transition-shadow ${
+              selected ? "ring-2 ring-gold" : ""
+            }`}
+          >
+            <div className="absolute left-1.5 top-1.5 z-20 flex items-center gap-1.5 rounded-md bg-black/55 px-1.5 py-0.5 backdrop-blur-[2px]">
+              <StatusDot status={status} />
+              {editing ? (
+                <input
+                  value={draft}
+                  autoFocus
+                  {...labelEdit.bind}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    labelEdit.updateValue(event.target.value);
+                  }}
+                  onBlur={() => {
+                    if (cancelledRef.current) {
+                      cancelledRef.current = false;
+                      return;
+                    }
+                    commit();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
+                    if (e.key === "Escape") {
+                      cancelledRef.current = true;
+                      labelEdit.cancel();
+                      setEditing(false);
+                    }
+                  }}
+                  className="nodrag w-28 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-[11px] text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+                />
+              ) : (
+                <span
+                  className={`max-w-[140px] truncate text-[11px] font-medium tracking-wide text-white/95 ${nodeId ? "cursor-text" : ""}`}
+                  title={nodeId ? "双击改名" : undefined}
+                  onDoubleClick={
+                    nodeId
+                      ? (e) => {
+                          e.stopPropagation();
+                          cancelledRef.current = false;
+                          setDraft(title);
+                          setEditing(true);
+                        }
+                      : undefined
+                  }
+                >
+                  {title}
+                </span>
+              )}
+            </div>
+            {children}
+          </div>
+          {error && (
+            <div className="mt-2 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-body leading-relaxed text-red-400">
+              {error}
+            </div>
+          )}
+        </>
+      ) : (
       <div
         className={`gc-node-card w-full rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
           selected ? "border-gold" : "border-[var(--gc-node-border)]"
@@ -166,6 +231,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, chi
         </div>
       )}
       </div>
+      )}
     </div>
   );
 }

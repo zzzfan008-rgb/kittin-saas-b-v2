@@ -284,6 +284,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         status={data.status}
         error={data.error}
         selected={selected}
+        frameless={hasUpload}
         toolbar={
           <NodeToolbar
             kind="image"
@@ -336,7 +337,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className="nodrag relative overflow-hidden rounded-[10px] border border-[var(--gc-node-border)]">
+          <div className={`nodrag relative overflow-hidden rounded-[10px] ${hasUpload ? "" : "border border-[var(--gc-node-border)]"}`}>
             <button
               type="button"
               className="relative z-10 block w-full cursor-zoom-in"
@@ -348,7 +349,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 loading="lazy"
                 decoding="async"
                 alt="已上传图片"
-                className="max-h-40 w-full bg-[var(--gc-node-inner)] object-contain"
+                className={`w-full bg-[var(--gc-node-inner)] object-contain ${hasUpload ? "block max-h-56" : "max-h-40"}`}
               />
             </button>
             {renderFileInput("replace")}
