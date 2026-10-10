@@ -245,8 +245,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className={`nodrag relative overflow-hidden rounded-[10px] ${hasUpload ? "" : "border border-[var(--gc-node-border)]"}`}>
-            <div className="relative block w-full">
+          <div className={`nopan relative overflow-hidden rounded-[10px] ${hasUpload ? "" : "border border-[var(--gc-node-border)]"}`}>
+            <div className="relative block w-full cursor-grab active:cursor-grabbing">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
                 loading="lazy"

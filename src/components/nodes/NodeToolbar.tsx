@@ -124,7 +124,7 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
-        {definitions.map((definition) => {
+        {definitions.map((definition, index) => {
           const binding = actions?.[definition.id];
           const disabled = binding?.disabled ?? binding?.onSelect === undefined;
           const label = binding?.label ?? definition.label;
@@ -198,12 +198,46 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
           // -- 普通按钮 --
           if (textOnly) {
             return (
-              <Tooltip key={definition.id}>
+              <div key={definition.id} className="flex items-center gap-1">
+                {index > 0 && (
+                  <span className="h-4 w-px shrink-0 bg-[var(--gc-node-border,var(--gc-border))]" aria-hidden="true" />
+                )}
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={label}
+                      disabled={disabled}
+                      title={disabled ? `${label}：${disabledReason}` : label}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        binding?.onSelect?.();
+                      }}
+                      className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
+                    >
+                      {label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    {disabled ? `${label}：${disabledReason}` : label}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          }
+          return (
+            <div key={definition.id} className="flex items-center gap-0.5">
+              {index > 0 && (
+                <span className="h-4 w-px shrink-0 bg-[var(--gc-node-border,var(--gc-border))]" aria-hidden="true" />
+              )}
+              <Tooltip>
                 <TooltipTrigger render={<span className="inline-flex" />}>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
                     aria-label={label}
                     disabled={disabled}
                     title={disabled ? `${label}：${disabledReason}` : label}
@@ -211,40 +245,16 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
                       event.stopPropagation();
                       binding?.onSelect?.();
                     }}
-                    className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
+                    className="text-[var(--gc-node-text)]"
                   >
-                    {label}
+                    <Icon aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" sideOffset={6}>
                   {disabled ? `${label}：${disabledReason}` : label}
                 </TooltipContent>
               </Tooltip>
-            );
-          }
-          return (
-            <Tooltip key={definition.id}>
-              <TooltipTrigger render={<span className="inline-flex" />}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={label}
-                  disabled={disabled}
-                  title={disabled ? `${label}：${disabledReason}` : label}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    binding?.onSelect?.();
-                  }}
-                  className="text-[var(--gc-node-text)]"
-                >
-                  <Icon aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={6}>
-                {disabled ? `${label}：${disabledReason}` : label}
-              </TooltipContent>
-            </Tooltip>
+            </div>
           );
         })}
       </div>
