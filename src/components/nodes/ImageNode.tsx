@@ -245,14 +245,14 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className="nopan relative rounded-[10px] border-[3px] border-[var(--gc-node-border)]">
-            <div className="relative block w-full cursor-grab overflow-hidden rounded-[8px] active:cursor-grabbing">
+          <div className="nopan relative rounded-[10px] border-[7px] border-[var(--gc-node-border)]">
+            <div className="relative block w-full cursor-grab overflow-hidden rounded-[4px] active:cursor-grabbing">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
                 loading="lazy"
                 decoding="async"
                 alt="已上传图片"
-                className="w-full bg-[var(--gc-node-inner)] object-contain"
+                className="w-full object-contain"
               />
             </div>
             <OrdinalBadgeSlot nodeId={id} />
