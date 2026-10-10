@@ -120,7 +120,7 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
         aria-orientation="horizontal"
         data-node-toolbar={kind}
         className={`nodrag nopan absolute bottom-full left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
-        style={{ marginBottom: "calc(var(--gc-node-toolbar-gap, 8px) + 24px)" }}
+        style={{ marginBottom: "calc(var(--gc-node-toolbar-gap, 8px) + 31px)" }}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
