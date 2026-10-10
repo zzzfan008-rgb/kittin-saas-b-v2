@@ -123,24 +123,10 @@ assert.equal(
   "空白来源说明不得进入请求体",
 );
 
-// ---------- 6b. 上传入口（ImageNode）：勾选后上传图同时进数字模特库 ----------
-assert.match(imageNodeSource, /存入数字模特库/, "图片节点的上传入口必须有「存入数字模特库」选项");
-assert.match(
-  imageNodeSource,
-  /aria-label="存入数字模特库"/,
-  "勾选控件必须有可访问名称",
-);
-assert.match(
-  imageNodeSource,
-  /from "@\/components\/ui\/checkbox"/,
-  "勾选控件必须复用本地 shadcn Checkbox",
-);
-assert.match(
-  imageNodeSource,
-  /if \(saveToModelLibrary\) void storeToModelLibrary\(upload\.url, file\.name, requestId\)/,
-  "入库必须在本张图上传成功之后触发，并带上文件名与请求号",
-);
-assert.match(imageNodeSource, /saveImageToModelLibrary\(/, "入库必须走分类单一事实源 saveImageToModelLibrary");
+// ---------- 6b. 上传入口（ImageNode）：用户决策删除「存入数字模特库」勾选（R-101 Comment 3）----------
+// 用户批注：「这个要删除掉」——ImageNode 不再内联入库入口；仅素材库/数字模特库自身保留入库路径。
+assert.doesNotMatch(imageNodeSource, /存入数字模特库/, "图片节点不得再内联「存入数字模特库」勾选");
+assert.doesNotMatch(imageNodeSource, /saveImageToModelLibrary/, "图片节点不得再直接调用入库（用户已删除该入口）");
 assert.deepEqual(
   (imageNodeSource.match(/renderFileInput\("/g) ?? []).length,
   2,
@@ -151,22 +137,6 @@ assert.match(
   /tabIndex=\{variant === "replace" \? -1 : undefined\}/,
   "已有图片时隐藏选择器不得新增不可见的 Tab 停靠点",
 );
-
-// 入库三态必须可见，且入库失败不得污染已成功的上传结果。
-const librarySaveSource = imageNodeSource.slice(
-  imageNodeSource.indexOf("const storeToModelLibrary = useCallback("),
-  imageNodeSource.indexOf("const handleFile = useCallback("),
-);
-assert.ok(librarySaveSource.length > 0, "必须存在独立的入库函数");
-assert.match(librarySaveSource, /setLibraryState\("saving"\)/, "入库中必须可见");
-assert.match(librarySaveSource, /setLibraryState\("saved"\)/, "入库成功必须可见");
-assert.match(librarySaveSource, /setLibraryState\("error"\)/, "入库失败必须落到失败态");
-assert.doesNotMatch(
-  librarySaveSource,
-  /updateNodeDataInTab/,
-  "入库失败不得把已经成功的上传改写成节点失败态",
-);
-assert.match(imageNodeSource, /role="status"/, "入库状态必须通过 status 语义暴露给读屏");
 
 // 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
 assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");

@@ -104,9 +104,11 @@ export interface NodeToolbarProps {
   kind: NodeKind;
   selected?: boolean;
   actions?: Partial<Record<NodeToolbarActionId, NodeToolbarActionBinding>>;
+  /** 纯文字按钮（无图标），button 更宽、文字不换行 */
+  textOnly?: boolean;
 }
 
-export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
+export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeToolbarProps) {
   const definitions = NODE_TOOLBAR_ACTIONS[kind];
   if (!selected || !definitions || definitions.length === 0) return null;
 
@@ -117,7 +119,7 @@ export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
         aria-label={`${nodeTitleForKind(kind)}工具栏`}
         aria-orientation="horizontal"
         data-node-toolbar={kind}
-        className="nodrag nopan absolute bottom-full left-1/2 z-20 mb-[var(--gc-node-toolbar-gap)] flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-[var(--gc-node-border)] bg-[var(--gc-node-header)] p-0.5 shadow-lg shadow-black/30"
+        className={`nodrag nopan absolute bottom-full left-1/2 z-20 mb-[var(--gc-node-toolbar-gap)] flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border)] bg-[var(--gc-node-header)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
@@ -193,6 +195,32 @@ export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
           }
 
           // -- 普通按钮 --
+          if (textOnly) {
+            return (
+              <Tooltip key={definition.id}>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={label}
+                    disabled={disabled}
+                    title={disabled ? `${label}：${disabledReason}` : label}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      binding?.onSelect?.();
+                    }}
+                    className="h-7 whitespace-nowrap px-2.5 text-[11px] font-medium text-[var(--gc-node-text)]"
+                  >
+                    {label}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  {disabled ? `${label}：${disabledReason}` : label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
           return (
             <Tooltip key={definition.id}>
               <TooltipTrigger render={<span className="inline-flex" />}>

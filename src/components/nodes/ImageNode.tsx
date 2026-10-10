@@ -5,7 +5,6 @@ import {
   patchTab,
   runWithoutHistory,
   selectActiveDocumentTarget,
-  selectActiveProjectName,
   selectActiveReadOnly,
   selectDocumentForTab,
   selectNodeInputImages,
@@ -16,9 +15,7 @@ import { useLightboxStore } from "@/store/lightboxStore";
 import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
-import { assetNameFromUpload, saveImageToModelLibrary } from "@/lib/assetSave";
 import { saveMaskDraft } from "@/lib/maskUpload";
-import { Checkbox } from "@/components/ui/checkbox";
 import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { NodeFrame } from "./NodeFrame";
@@ -34,7 +31,6 @@ import { duplicateNode } from "./nodeDuplicate";
  * 只做上传 / 展示 / 作为参考图来源，**不含**模型、画幅、数量与运行按钮；
  * 全部生成语义归 image-generator（生成层）。
  * 工具条：[裁剪] [抠图] [蒙版] [复制] [替换]。
- * 上传入口可勾选「存入数字模特库」。
  */
 
 interface NormalizedUploadResponse {
@@ -79,9 +75,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
-  const [libraryState, setLibraryState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
@@ -145,27 +138,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     }),
   );
 
-  const storeToModelLibrary = useCallback(
-    async (image: string, fileName: string, requestId: number) => {
-      setLibraryState("saving");
-      setLibraryError(null);
-      try {
-        await saveImageToModelLibrary({
-          name: assetNameFromUpload(fileName, data.label),
-          image,
-          sourceNote: `来自项目「${selectActiveProjectName(useFlowStore.getState())}」的图片上传`,
-        });
-        if (requestId !== uploadRequestRef.current) return;
-        setLibraryState("saved");
-      } catch (err) {
-        if (requestId !== uploadRequestRef.current) return;
-        setLibraryError(err instanceof Error ? err.message : String(err));
-        setLibraryState("error");
-      }
-    },
-    [data.label],
-  );
-
   const handleFile = useCallback(
     async (file: File | undefined | null) => {
       if (readOnly || !file || !file.type.startsWith("image/")) return;
@@ -184,7 +156,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           maskSourceRef: undefined,
           featherRadius: undefined,
         });
-        if (saveToModelLibrary) void storeToModelLibrary(upload.url, file.name, requestId);
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -193,7 +164,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         if (requestId === uploadRequestRef.current) setUploading(false);
       }
     },
-    [id, readOnly, saveToModelLibrary, storeToModelLibrary, updateNodeDataInTab],
+    [id, readOnly, updateNodeDataInTab],
   );
 
   // Ctrl+V 粘贴（节点被选中时生效）
@@ -241,41 +212,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     />
   );
 
-  const modelLibraryOption = (
-    <div className="nodrag nopan flex items-center justify-between gap-2 text-label text-[var(--gc-node-muted)]">
-      <label className="flex items-center gap-2">
-        <Checkbox
-          aria-label="存入数字模特库"
-          checked={saveToModelLibrary}
-          disabled={readOnly}
-          onCheckedChange={(checked) => {
-            setSaveToModelLibrary(checked === true);
-            setLibraryState("idle");
-            setLibraryError(null);
-          }}
-          className="border-[var(--gc-node-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
-        />
-        <span>上传时存入数字模特库</span>
-      </label>
-      {libraryState !== "idle" && (
-        <span
-          role="status"
-          aria-live="polite"
-          title={libraryError ?? undefined}
-          className={
-            libraryState === "error"
-              ? "text-[var(--gc-warn-text)]"
-              : libraryState === "saved"
-                ? "text-gold"
-                : undefined
-          }
-        >
-          {libraryState === "saving" ? "存入中…" : libraryState === "saved" ? "已存入" : "存入失败"}
-        </span>
-      )}
-    </div>
-  );
-
   return (
     <>
       <NodeFrame
@@ -285,10 +221,12 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         error={data.error}
         selected={selected}
         frameless={hasUpload}
+        nodeKind="image"
         toolbar={
           <NodeToolbar
             kind="image"
             selected={selected}
+            textOnly
             actions={{
               crop: {
                 disabled: true,
@@ -382,7 +320,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             </span>
           </div>
         )}
-        {modelLibraryOption}
         {hasUpload && (
           <button
             type="button"
@@ -394,12 +331,22 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           </button>
         )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
-        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-          {hasUpload
-            ? "作为参考图来源：连到生成节点的 reference 输入"
-            : "上传图片后可作为参考图来源；生成请用生图节点"}
-          {referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}
-        </p>
+        {hasUpload ? (
+          selected ? (
+            <div
+              role="tooltip"
+              className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
+            >
+              作为参考图来源：连到生成节点的 reference 输入
+              {referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}
+              <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
+            </div>
+          ) : null
+        ) : (
+          <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
+            上传图片后可作为参考图来源；生成请用生图节点
+          </p>
+        )}
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
 

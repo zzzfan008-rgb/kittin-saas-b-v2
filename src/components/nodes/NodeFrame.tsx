@@ -6,6 +6,7 @@ import {
   type NodeRunStatus,
 } from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
+import { useFlowStore } from "@/store/flowStore";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 import { Button } from "@/components/ui/button";
@@ -83,11 +84,23 @@ interface NodeFrameProps {
   toolbar?: ReactNode;
   /** 无边框模式：渲染为纯内容 + 左上角名称徽标（名称仍可双击改名），内容自身带边框 */
   frameless?: boolean;
+  /** 节点类型 + 创建序号（frameless 模式渲染为「图1」式徽标） */
+  nodeKind?: NodeKind;
   children: ReactNode;
 }
 
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
-export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, children }: NodeFrameProps) {
+  const kindOrdinal = useFlowStore((s) => {
+    if (!nodeId || !nodeKind) return null;
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    if (!tab) return null;
+    const sameKind = tab.nodes.filter((n) => n.type === nodeKind);
+    const idx = sameKind.findIndex((n) => n.id === nodeId);
+    return idx >= 0 ? idx + 1 : null;
+  });
+  const badgePrefix = nodeKind === "image" ? "图" : nodeKind === "video" ? "视" : nodeKind === "text" ? "文" : null;
+  const badgeText = frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);
@@ -115,7 +128,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
               selected ? "ring-2 ring-gold" : ""
             }`}
           >
-            <div className="absolute left-1.5 top-1.5 z-20 flex items-center gap-1.5 rounded-md bg-black/55 px-1.5 py-0.5 backdrop-blur-[2px]">
+            <div className="absolute right-full top-2 z-20 mr-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5">
               <StatusDot status={status} />
               {editing ? (
                 <input
@@ -141,12 +154,12 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
                       setEditing(false);
                     }
                   }}
-                  className="nodrag w-28 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-[11px] text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+                  className="nodrag w-24 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-[11px] text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
                 />
               ) : (
                 <span
-                  className={`max-w-[140px] truncate text-[11px] font-medium tracking-wide text-white/95 ${nodeId ? "cursor-text" : ""}`}
-                  title={nodeId ? "双击改名" : undefined}
+                  className={`truncate text-[11px] font-medium tracking-wide text-[var(--gc-text)] ${nodeId ? "cursor-text" : ""}`}
+                  title={nodeId ? `双击改名（当前：${title}）` : undefined}
                   onDoubleClick={
                     nodeId
                       ? (e) => {
@@ -158,7 +171,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
                       : undefined
                   }
                 >
-                  {title}
+                  {badgeText}
                 </span>
               )}
             </div>
