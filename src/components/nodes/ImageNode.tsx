@@ -11,7 +11,6 @@ import {
   useFlowStore,
 } from "@/store/flowStore";
 import { useShallow } from "zustand/react/shallow";
-import { useLightboxStore } from "@/store/lightboxStore";
 import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
@@ -69,7 +68,6 @@ async function uploadFile(file: File): Promise<NormalizedUploadResponse> {
 
 export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
-  const openLightbox = useLightboxStore((s) => s.open);
   const runImageEdit = useFlowStore((s) => s.runImageEdit);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const uploadRequestRef = useRef(0);
@@ -276,12 +274,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
       >
         {hasUpload ? (
           <div className={`nodrag relative overflow-hidden rounded-[10px] ${hasUpload ? "" : "border border-[var(--gc-node-border)]"}`}>
-            <button
-              type="button"
-              className="relative z-10 block w-full cursor-zoom-in"
-              title="单击查看大图"
-              onClick={() => openLightbox(data.outputImages[0], data.label)}
-            >
+            <div className="relative block w-full">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
                 loading="lazy"
@@ -289,7 +282,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 alt="已上传图片"
                 className={`w-full bg-[var(--gc-node-inner)] object-contain ${hasUpload ? "block max-h-56" : "max-h-40"}`}
               />
-            </button>
+            </div>
             {renderFileInput("replace")}
             <OrdinalBadgeSlot nodeId={id} />
           </div>
