@@ -358,7 +358,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               role="tooltip"
               className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
             >
-              作为参考图来源：连到生成节点的 reference 输入
+              作为参考图来源：连到生成节点的「参考图」输入
               {referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}
               <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
             </div>

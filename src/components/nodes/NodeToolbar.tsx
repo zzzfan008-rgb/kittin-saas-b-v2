@@ -119,7 +119,8 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
         aria-label={`${nodeTitleForKind(kind)}工具栏`}
         aria-orientation="horizontal"
         data-node-toolbar={kind}
-        className={`nodrag nopan absolute bottom-full left-1/2 z-20 mb-[var(--gc-node-toolbar-gap)] flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border)] bg-[var(--gc-node-header)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
+        className={`nodrag nopan absolute bottom-full left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
+        style={{ marginBottom: "calc(var(--gc-node-toolbar-gap, 8px) + 7px)" }}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
@@ -210,7 +211,7 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
                       event.stopPropagation();
                       binding?.onSelect?.();
                     }}
-                    className="h-7 whitespace-nowrap px-2.5 text-[11px] font-medium text-[var(--gc-node-text)]"
+                    className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
                   >
                     {label}
                   </Button>
