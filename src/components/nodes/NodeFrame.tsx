@@ -86,11 +86,13 @@ interface NodeFrameProps {
   frameless?: boolean;
   /** 节点类型 + 创建序号（frameless 模式渲染为「图1」式徽标） */
   nodeKind?: NodeKind;
+  /** 覆盖徽标文案（如空槽位显示「请上传图片」）；优先级高于序号徽标 */
+  badgeLabel?: string;
   children: ReactNode;
 }
 
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
-export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, badgeLabel, children }: NodeFrameProps) {
   const kindOrdinal = useFlowStore((s) => {
     if (!nodeId || !nodeKind) return null;
     const tab = s.tabs.find((t) => t.id === s.activeTabId);
@@ -100,7 +102,7 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
     return idx >= 0 ? idx + 1 : null;
   });
   const badgePrefix = nodeKind === "image" ? "图" : nodeKind === "video" ? "视" : nodeKind === "text" ? "文" : null;
-  const badgeText = frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title;
+  const badgeText = badgeLabel ?? (frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);

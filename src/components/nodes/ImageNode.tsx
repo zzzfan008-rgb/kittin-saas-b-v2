@@ -193,8 +193,9 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         status={data.status}
         error={data.error}
         selected={selected}
-        frameless={hasUpload}
+        frameless
         nodeKind="image"
+        badgeLabel={hasUpload ? undefined : "请上传图片"}
         toolbar={
           <NodeToolbar
             kind="image"
@@ -259,6 +260,9 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           </div>
         ) : (
           <div
+            onDoubleClick={() => {
+              if (!readOnly) setReplaceMenuOpen(true);
+            }}
             onDragOver={(event) => {
               event.preventDefault();
               setDragOver(true);
@@ -269,37 +273,37 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               setDragOver(false);
               void handleFile(event.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative flex aspect-[4/3] cursor-default flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
-              dragOver
-                ? "border-gold bg-gold/8 text-gold"
-                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)]"
-            }`}
+            title="双击上传或从素材库选择"
+            className="nopan relative cursor-grab rounded-[4px] bg-[var(--gc-accent)] p-[3px] active:cursor-grabbing"
           >
-            <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
-              {uploading ? "素材处理中…" : "IMAGE · 槽位"}
-            </span>
-            <span className="pointer-events-none text-label leading-relaxed opacity-50">
-              拖拽到此处
-            </span>
+            <div
+              className={`relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border border-dashed text-center transition-colors ${
+                dragOver
+                  ? "border-[var(--gc-accent)] bg-[var(--gc-node-inner)] text-[var(--gc-accent)]"
+                  : "border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] text-[var(--gc-node-muted)]"
+              }`}
+            >
+              <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
+                {uploading ? "素材处理中…" : "IMAGE · 槽位"}
+              </span>
+              <span className="pointer-events-none text-label leading-relaxed opacity-50">
+                拖拽或双击上传图片
+              </span>
+            </div>
           </div>
         )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
-        {hasUpload ? (
-          selected ? (
-            <div
-              role="tooltip"
-              className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
-            >
-              作为参考图来源：连到生成节点的「参考图」输入
-              {referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}
-              <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
-            </div>
-          ) : null
-        ) : (
-          <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-            上传图片后可作为参考图来源；生成请用生图节点
-          </p>
-        )}
+        {selected ? (
+          <div
+            role="tooltip"
+            className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
+          >
+            {hasUpload
+              ? `作为参考图来源：连到生成节点的「参考图」输入${referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}`
+              : "上传图片后可作为参考图来源；生成请用生图节点"}
+            <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
+          </div>
+        ) : null}
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
 
