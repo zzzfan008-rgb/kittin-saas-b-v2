@@ -246,7 +246,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className="nopan relative rounded-[4px] bg-[var(--gc-accent)] p-[3px]">
+          <div className="nopan relative rounded-[4px] bg-[var(--gc-accent)] p-[2px]">
             <div className="relative block w-full cursor-grab overflow-hidden rounded-[4px] active:cursor-grabbing">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
@@ -274,22 +274,18 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               void handleFile(event.dataTransfer.files?.[0]);
             }}
             title="双击上传或从素材库选择"
-            className="nopan relative cursor-grab rounded-[4px] bg-[var(--gc-accent)] p-[3px] active:cursor-grabbing"
+            className={`nopan relative flex aspect-[4/3] w-full cursor-grab flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border-2 border-dashed bg-[var(--gc-node-inner)] text-center transition-colors active:cursor-grabbing ${
+              dragOver
+                ? "border-solid border-[var(--gc-accent)] text-[var(--gc-accent)]"
+                : "border-[var(--gc-accent)] text-[var(--gc-node-muted)]"
+            }`}
           >
-            <div
-              className={`relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border border-dashed text-center transition-colors ${
-                dragOver
-                  ? "border-[var(--gc-accent)] bg-[var(--gc-node-inner)] text-[var(--gc-accent)]"
-                  : "border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] text-[var(--gc-node-muted)]"
-              }`}
-            >
-              <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
-                {uploading ? "素材处理中…" : "IMAGE · 槽位"}
-              </span>
-              <span className="pointer-events-none text-label leading-relaxed opacity-50">
-                拖拽或双击上传图片
-              </span>
-            </div>
+            <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
+              {uploading ? "素材处理中…" : "IMAGE · 槽位"}
+            </span>
+            <span className="pointer-events-none text-label leading-relaxed opacity-50">
+              拖拽或双击上传图片
+            </span>
           </div>
         )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
