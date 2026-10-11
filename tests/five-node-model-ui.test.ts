@@ -92,7 +92,10 @@ test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运�
   assert.match(html, /aria-label="模型"/);
   assert.match(html, /aria-label="画幅"/);
   assert.match(html, /aria-label="模型参数"/);
-  assert.match(html, /参考图 0 张 · 提示词 0 条/);
+  // 端口行 + 来源胶囊取代底部统计行：两行端口（提示词/参考图）未接线时值列均为「未连接」
+  assert.match(html, /data-handleid="prompt"/);
+  assert.match(html, /data-handleid="reference"/);
+  assert.equal((html.match(/未连接/g) ?? []).length, 2);
   assert.match(html, /未接参考图 → 文生图/);
   assert.match(html, /生成暂不可用|尚不可运行/);
   assert.match(html, /disabled/);
@@ -150,8 +153,9 @@ test("生视频节点：提示词 / 首帧接线回显与 adaptive 画幅来自�
   const html = render(node);
   // 65b：视频操作模式由接线自动推断（无 aria-label="操作" 下拉）
   assert.match(html, /未接首帧 → 文生视频/);
-  // 视频侧接线回显是「提示词 M 条 · 首帧已接/未接」，不是参考图张数。
-  assert.match(html, /提示词 0 条 · 首帧未接/);
+  // 视频侧端口行为 提示词 / 首帧图；未接线时值列为「未连接」（底部统计行已并入端口胶囊）。
+  assert.match(html, /data-handleid="first-frame"/);
+  assert.equal((html.match(/未连接/g) ?? []).length, 2);
   assert.match(html, /未接首帧 → 文生视频/);
   // 首尾帧任务必须 adaptive（C6）：画幅选项来自视频契约。
   assert.match(html, /adaptive/);
