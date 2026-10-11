@@ -4,6 +4,7 @@ import { isNodeRunActive, type VideoGeneratorNodeData } from "@/types/workflow";
 import { Developing, NodeFrame, STATUS_TEXT } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { GeneratorParamsPanel } from "./GeneratorParamsPanel";
+import { NodePort } from "./NodePort";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
 
 /**
@@ -11,8 +12,8 @@ import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
  * 操作 + 模型/画幅/模型参数面板（时长与运动由契约给出，plan.md T2）+ 运行；
  * 不承载任何媒体展示（产物归 result-video）。
  * 工具条：[运行] [复制]。
+ * 左侧端口：提示词 / 首帧图（带文字标签，常显）。
  *
- * 入边：prompt（文本节点）与 first-frame（图片 / 图片结果节点，0–1 条）。
  * T4 裁定：本版禁止 video / result-video → video-generator 的 reference 边（schema 层拒绝）。
  */
 export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoGeneratorNodeData>>) {
@@ -23,8 +24,6 @@ export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoG
 
   return (
     <>
-      <Handle type="target" position={Position.Left} id="prompt" style={{ top: "20%" }} title="提示词（文本节点）" />
-      <Handle type="target" position={Position.Left} id="first-frame" style={{ top: "60%" }} title="首帧图片（0–1 条）" />
       <NodeFrame
         nodeId={id}
         title={data.label}
@@ -50,7 +49,15 @@ export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoG
           />
         }
       >
-        <GeneratorParamsPanel nodeId={id} data={data} />
+        <div className="flex gap-3">
+          <div className="flex shrink-0 flex-col justify-center gap-6 py-1">
+            <NodePort type="target" id="prompt" label="提示词" />
+            <NodePort type="target" id="first-frame" label="首帧图" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <GeneratorParamsPanel nodeId={id} data={data} />
+          </div>
+        </div>
         {running && <Developing />}
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出视频" />
