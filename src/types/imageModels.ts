@@ -178,6 +178,41 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
   "21:9": "2048x864",
 };
 
+/**
+ * VIP 系模型按画幅的三档像素尺寸（取值全部来自契约 sizes 清单，顺序=快速/标准/高清档；
+ * 标准档 = VIP_SIZE_BY_RATIO 的既有默认）。供生成节点「尺寸」参数选择。
+ */
+export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: string; size: string }[]>> = {
+  "1:1": [{ tier: "快速", size: "1280x1280" }, { tier: "标准", size: "2048x2048" }, { tier: "高清", size: "2880x2880" }],
+  "2:3": [{ tier: "快速", size: "848x1280" }, { tier: "标准", size: "1360x2048" }, { tier: "高清", size: "2336x3520" }],
+  "3:2": [{ tier: "快速", size: "1280x848" }, { tier: "标准", size: "2048x1360" }, { tier: "高清", size: "3520x2336" }],
+  "3:4": [{ tier: "快速", size: "960x1280" }, { tier: "标准", size: "1536x2048" }, { tier: "高清", size: "2480x3312" }],
+  "4:3": [{ tier: "快速", size: "1280x960" }, { tier: "标准", size: "2048x1536" }, { tier: "高清", size: "3312x2480" }],
+  "4:5": [{ tier: "快速", size: "1024x1280" }, { tier: "标准", size: "1632x2048" }, { tier: "高清", size: "2560x3216" }],
+  "5:4": [{ tier: "快速", size: "1280x1024" }, { tier: "标准", size: "2048x1632" }, { tier: "高清", size: "3216x2560" }],
+  "9:16": [{ tier: "快速", size: "720x1280" }, { tier: "标准", size: "1152x2048" }, { tier: "高清", size: "2160x3840" }],
+  "16:9": [{ tier: "快速", size: "1280x720" }, { tier: "标准", size: "2048x1152" }, { tier: "高清", size: "3840x2160" }],
+  "21:9": [{ tier: "快速", size: "1280x544" }, { tier: "标准", size: "2048x864" }, { tier: "高清", size: "3840x1632" }],
+};
+
+/**
+ * 「尺寸」参数选项：仅 VIP 系（sunburst-vip / flare-vip，画幅↔像素尺寸映射族）提供，
+ * 其他模型（gemini 的 imageSize 等由契约 recommendedOptions 自带档位）返回 undefined。
+ * 首项 auto = 不传 size（网关默认，等价当前未触碰画幅时的行为）。
+ */
+export function imageSizeTierOptions(
+  modelId: ImageModelId,
+  aspectRatio: string,
+): { value: string; label: string }[] | undefined {
+  if (modelId !== "gpt-image-2.5-flare-vip" && modelId !== "gpt-image-2.5-sunburst-vip") return undefined;
+  const tiers = VIP_SIZE_TIERS_BY_RATIO[aspectRatio];
+  if (!tiers) return undefined;
+  return [
+    { value: "auto", label: "自动（默认）" },
+    ...tiers.map((t) => ({ value: t.size, label: `${t.tier} · ${t.size.replace("x", "×")}` })),
+  ];
+}
+
 const FLUX_DIMENSIONS_BY_RATIO: Record<string, { width: number; height: number }> = {
   "1:1": { width: 2048, height: 2048 },
   "2:3": { width: 1360, height: 2040 },
