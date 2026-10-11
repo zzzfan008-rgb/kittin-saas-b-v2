@@ -428,7 +428,11 @@ export function isVideoSourceKind(kind: NodeKind | undefined): boolean {
   return kind === "video" || kind === "result-video";
 }
 
-/** INV-1：每个生成节点必须存在 ≥1 条来自 text 节点的 prompt 边。 */
+/**
+ * 找出没有 text 提示词上游的生成节点（原 INV-1）。
+ * 注意：这不再是保存硬闸（未接线项目允许保存），仅供客户端非阻断 warning；
+ * 真正的提示词前置检查在运行时（server/engine/dag.ts）。
+ */
 export function missingTextUpstreamNodeIds(
   nodes: readonly GraphNodeLike[],
   edges: readonly GraphEdgeLike[],
