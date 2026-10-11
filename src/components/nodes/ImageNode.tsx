@@ -193,9 +193,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         status={data.status}
         error={data.error}
         selected={selected}
-        frameless
+        frameless={hasUpload}
         nodeKind="image"
-        badgeLabel={hasUpload ? undefined : "请上传图片"}
         toolbar={
           <NodeToolbar
             kind="image"
