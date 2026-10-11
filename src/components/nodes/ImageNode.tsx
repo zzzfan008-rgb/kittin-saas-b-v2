@@ -22,7 +22,7 @@ import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
 import { MaskEditor } from "./MaskEditor";
 import { MultiRoundEditPanel } from "./MultiRoundEditPanel";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
-import { useReferenceOrdinal } from "./ReferenceOrdinals";
+import { useReferenceOrdinals } from "./ReferenceOrdinals";
 import { duplicateNode } from "./nodeDuplicate";
 
 /**
@@ -273,12 +273,13 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               void handleFile(event.dataTransfer.files?.[0]);
             }}
             title="双击上传或从素材库选择"
-            className={`nopan relative flex aspect-[4/3] w-full cursor-grab flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border-2 border-dashed bg-[var(--gc-node-inner)] text-center transition-colors active:cursor-grabbing ${
+            className={`nopan relative flex aspect-[4/3] w-full cursor-grab flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border-2 border-dashed bg-[var(--gc-node-inner)] text-center transition-colors ${
               dragOver
                 ? "border-solid border-[var(--gc-accent)] text-[var(--gc-accent)]"
                 : "border-[var(--gc-accent)] text-[var(--gc-node-muted)]"
             }`}
           >
+            <OrdinalBadgeSlot nodeId={id} />
             <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
@@ -414,8 +415,18 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   );
 }
 
+/**
+ * 参考图序号徽标簇：连线后常显（不依赖选中态）。同一源连多个生成节点时每个目标一个徽标；
+ * 位置在图片框右上角（图N = 模型看到的参考图N，与参考图序号一致）。
+ */
 function OrdinalBadgeSlot({ nodeId }: { nodeId: string }) {
-  const ordinal = useReferenceOrdinal(nodeId);
-  if (ordinal === null) return null;
-  return <RefOrdinalBadge ordinal={ordinal} />;
+  const assignments = useReferenceOrdinals(nodeId);
+  if (!assignments) return null;
+  return (
+    <div className="pointer-events-none absolute right-2 top-2 z-[3] flex gap-1">
+      {assignments.map((assignment) => (
+        <RefOrdinalBadge key={assignment.targetId} ordinal={assignment.ordinal} />
+      ))}
+    </div>
+  );
 }

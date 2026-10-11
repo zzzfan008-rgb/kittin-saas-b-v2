@@ -578,6 +578,38 @@ export function selectReferenceOrdinals(
   return ordinals;
 }
 
+export interface ReferenceOrdinalAssignment {
+  /** 在该目标生成节点入边序列中的序号（1 起，= 模型看到的参考图N） */
+  ordinal: number;
+  /** 目标生成节点 id */
+  targetId: string;
+}
+
+/**
+ * 全画布参考图序号（不依赖选中态）：为每个图片源节点汇总「它在各生成节点上的参考图序号」。
+ * 序号按目标分组、各自从 1 起、随 edges 数组顺序——与 dag/runner 实际拼装参考图的顺序一致。
+ * 同一源图连多个生成节点时返回多个 assignment（各目标一个序号）。永不持久化。
+ */
+export function selectAllReferenceOrdinals(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): ReadonlyMap<string, ReferenceOrdinalAssignment[]> {
+  const result = new Map<string, ReferenceOrdinalAssignment[]>();
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  // 按目标分组编号（每个生成节点的入边序列各自从 1 起）。
+  const nextOrdinalByTarget = new Map<string, number>();
+  for (const edge of edges) {
+    if (!isReferenceEdge(edge)) continue;
+    if (!isImageSourceKind(kindById.get(edge.source))) continue;
+    const ordinal = nextOrdinalByTarget.get(edge.target) ?? 1;
+    nextOrdinalByTarget.set(edge.target, ordinal + 1);
+    const list = result.get(edge.source) ?? [];
+    list.push({ ordinal, targetId: edge.target });
+    result.set(edge.source, list);
+  }
+  return result;
+}
+
 // ---------- 节点注册表（前端渲染 + 引擎共用）----------
 export interface NodeSpec {
   kind: NodeKind;
