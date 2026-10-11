@@ -19,7 +19,7 @@ import type { TextNodeData } from "@/types/workflow";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { ColorToolPanel } from "./ColorToolPanel";
-import { ColorChipList } from "./ColorChip";
+import { ColorChip, type ColorChipEntry } from "./ColorChip";
 import { duplicateNode } from "./nodeDuplicate";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import {
@@ -56,16 +56,42 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   /** 从正文解析所有颜色 chip。 */
   const chips = useMemo(() => parseColorChips(data.text ?? ""), [data.text]);
 
+  /** 阅读视图的渲染段：正文切片 + 内联 chip（chip 位于原 {{color:…}} 标记符的位置）。 */
+  const richSegments = useMemo(() => {
+    const text = data.text ?? "";
+    const segments: Array<
+      | { key: string; kind: "text"; text: string }
+      | { key: string; kind: "chip"; chip: ColorChipEntry }
+    > = [];
+    let last = 0;
+    chips.forEach((chip, i) => {
+      if (chip.index > last) {
+        segments.push({ key: `t-${i}`, kind: "text", text: text.slice(last, chip.index) });
+      }
+      segments.push({ key: `c-${i}`, kind: "chip", chip });
+      last = chip.index + chip.length;
+    });
+    if (last < text.length) segments.push({ key: "t-end", kind: "text", text: text.slice(last) });
+    return segments;
+  }, [data.text, chips]);
+
   /** 是否已有正文（决定白卡空态 / frameless 有内容态）。 */
   const hasText = (data.text ?? "").trim().length > 0;
 
-  /** 高度自适应：内容撑开（上限 TEXTAREA_MAX_HEIGHT 后内部滚动）；空态由 min-height 兜底。 */
+  /** 进入编辑态时聚焦 textarea（阅读视图双击触发）。 */
   useEffect(() => {
+    if (inputActive) textareaRef.current?.focus();
+  }, [inputActive]);
+
+  /** 高度自适应：内容撑开（上限 TEXTAREA_MAX_HEIGHT 后内部滚动）；空态由 min-height 兜底。
+   *  仅编辑态测量（阅读视图高度由内容自然撑开）。 */
+  useEffect(() => {
+    if (!inputActive) return;
     const element = textareaRef.current;
     if (!element) return;
     element.style.height = "auto";
     element.style.height = `${Math.min(element.scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
-  }, [data.text]);
+  }, [data.text, inputActive]);
 
   /** 删除一个 chip：移除原文中的标记符，同步 flush。 */
   const handleDeleteChip = useCallback(
@@ -91,6 +117,8 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
       textEdit.updateValue(next);
       textEdit.flush();
       setColorToolOpen(false);
+      // 插入后回到编辑态并聚焦（阅读视图下 textarea 处于隐藏挂载态，需先切回编辑态）。
+      setInputActive(true);
       window.setTimeout(() => {
         const element = textareaRef.current;
         if (!element) return;
@@ -153,17 +181,53 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             inputActive ? "shadow-[0_0_0_2px_color-mix(in_srgb,var(--gc-accent)_45%,transparent)]" : ""
           }`}
         >
-          {/* 颜色 chips 展示区（有 chip 时置于正文上方） */}
-          {chips.length > 0 && (
-            <div className="px-3 pt-2">
-              <ColorChipList chips={chips} onDelete={handleDeleteChip} />
+          {/* 阅读视图（未编辑）：正文 + 内联颜色 chip——chip 渲染在原 {{color:…}} 标记符的位置，
+              不再单独展示原始代码；双击进入编辑（编辑态显示原始代码以便修改），失焦回到阅读视图。 */}
+          {!inputActive ? (
+            <div
+              role="textbox"
+              aria-readonly="true"
+              aria-label="提示词正文（双击或回车进入编辑）"
+              tabIndex={0}
+              className={`max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-[2px] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
+                hasText ? "min-h-[44px]" : "min-h-[88px]"
+              }`}
+              onDoubleClick={() => {
+                if (readOnly) return;
+                setInputActive(true);
+              }}
+              onKeyDown={(event) => {
+                if (readOnly) return;
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  setInputActive(true);
+                }
+              }}
+            >
+              {hasText ? (
+                richSegments.map((segment) =>
+                  segment.kind === "chip" ? (
+                    <ColorChip
+                      key={segment.key}
+                      hex={segment.chip.hex}
+                      name={segment.chip.name}
+                      index={segment.chip.index}
+                      length={segment.chip.length}
+                      onDelete={readOnly ? undefined : handleDeleteChip}
+                    />
+                  ) : (
+                    <span key={segment.key}>{segment.text}</span>
+                  ),
+                )
+              ) : (
+                <span className="text-[var(--gc-node-muted)]">{"TEXT · 槽位\n双击输入正文"}</span>
+              )}
             </div>
-          )}
+          ) : null}
 
-          {/* textarea：正文内容（chips 标记符在渲染时被 ColorChipList 提取显示）
-              - 未聚焦：无 nodrag（单击=选中节点，按住=拖动节点）；
-              - 双击：聚焦进入编辑（加 nodrag 防止输入时误拖动）；
-              - 失焦：退出编辑态，恢复可拖动。 */}
+          {/* textarea：编辑态正文（未编辑时保持挂载但隐藏——e2e 计数与预设写入断言依赖它在 DOM 中）
+              - 双击阅读视图进入编辑（加 nodrag 防止输入时误拖动）；
+              - 失焦：退出编辑态，恢复可拖动的阅读视图。 */}
           <textarea
             ref={textareaRef}
             value={data.text}
@@ -184,7 +248,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             onBlur={() => setInputActive(false)}
             className={`w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
               hasText ? "min-h-[44px]" : "min-h-[88px]"
-            } ${inputActive ? "nodrag cursor-text" : "cursor-grab active:cursor-grabbing"}`}
+            } ${inputActive ? "nodrag cursor-text" : "hidden"}`}
           />
         </div>
         {colorToolOpen && (
