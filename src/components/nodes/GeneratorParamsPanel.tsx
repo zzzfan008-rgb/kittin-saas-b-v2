@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Handle, Position } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import {
   selectActiveEdges,
@@ -125,6 +126,51 @@ function ParamControl({ name, value, options, disabled, onChange }: {
 
 export interface GeneratorParamsPanelProps { nodeId: string; data: GeneratorNodeData; }
 
+interface UpstreamSource { edgeId: string; label: string; }
+
+/** 输入端口行：圆点在 label 列内（position:static 文档流，RF 按实测盒位算锚点），值列=来源胶囊 */
+function UpstreamPortRow({ id, label, sources, disabled, onDisconnect }: {
+  id: string;
+  label: string;
+  sources: UpstreamSource[];
+  disabled: boolean;
+  onDisconnect: (edgeId: string) => void;
+}) {
+  return (
+    <div className="flex min-h-[34px] items-center gap-2">
+      <span className="flex h-7 w-20 shrink-0 items-center gap-1 text-label text-[var(--gc-node-muted)]">
+        <Handle
+          type="target"
+          position={Position.Left}
+          id={id}
+          style={{ position: "static", transform: "none" }}
+          className="size-2.5 shrink-0 rounded-full"
+        />
+        {label}
+      </span>
+      {sources.length === 0 ? (
+        <span className="text-label text-[var(--gc-node-muted)]">未连接</span>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+          {sources.map((s) => (
+            <button
+              key={s.edgeId}
+              type="button"
+              disabled={disabled}
+              className="nodrag gc-upstream-chip"
+              title={disabled ? "只读项目不能断开连线" : `点击断开与「${s.label}」的连线`}
+              onClick={() => onDisconnect(s.edgeId)}
+            >
+              <span className="truncate">{s.label}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps) {
   const mediaKind = MEDIA_KIND[data.kind as GeneratorNodeKind];
   const readOnly = useFlowStore(selectActiveReadOnly);
@@ -161,18 +207,32 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     return "未接参考图 → 文生图";
   })();
 
-  const wiring = useFlowStore(useShallow((s) => {
+  // 输入端口（方案 A+胶囊）：端口即参数面板前两行；已连线=上游来源胶囊（accent 高亮，
+  // 点击断开该条边）；未连线=灰字「未连接」。边判定与上方 inferredMode/wiring 同源。
+  const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
+  // 注意：useShallow 只做一层 Object.is 比较，必须返回扁平原始值字段（新数组/对象引用会引发无限重渲染）。
+  const upstream = useFlowStore(useShallow((s) => {
     const edges = selectActiveEdges(s);
     const nodes = selectActiveNodes(s);
-    let prompt = 0, ff = 0, ref = 0;
+    const prompt: string[] = [];
+    const media: string[] = [];
     for (const e of edges) {
       if (e.target !== nodeId) continue;
-      if (isPromptEdge(e) && nodes.find((n) => n.id === e.source)?.data.kind === "text") prompt++;
-      else if (e.targetHandle === EDGE_HANDLE_FIRST_FRAME) ff++;
-      else { const sk = nodes.find((n) => n.id === e.source)?.data.kind; if (sk === "image" || sk === "result-image") ref++; }
+      const src = nodes.find((n) => n.id === e.source);
+      if (!src) continue;
+      const item = `${e.id}::${String(src.data.label ?? src.data.kind)}`;
+      if (isPromptEdge(e) && src.data.kind === "text") prompt.push(item);
+      else if (mediaKind === "video" ? e.targetHandle === EDGE_HANDLE_FIRST_FRAME
+        : (src.data.kind === "image" || src.data.kind === "result-image")) {
+        media.push(item);
+      }
     }
-    return { prompt, firstFrame: ff, reference: ref };
+    return { prompt: prompt.join("|"), media: media.join("|") };
   }));
+  const toSources = (joined: string): UpstreamSource[] =>
+    joined ? joined.split("|").map((v) => { const i = v.indexOf("::"); return { edgeId: v.slice(0, i), label: v.slice(i + 2) }; }) : [];
+  const promptSources = toSources(upstream.prompt);
+  const mediaSources = toSources(upstream.media);
 
   const effModel = data.modelId ?? "";
 
@@ -219,6 +279,12 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     <div className="space-y-3" data-generator-panel={nodeId}>
       <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">{opHint}</p>
 
+      <UpstreamPortRow id="prompt" label="提示词" sources={promptSources} disabled={disabled}
+        onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
+      <UpstreamPortRow id={mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference"}
+        label={mediaKind === "video" ? "首帧图" : "参考图"} sources={mediaSources} disabled={disabled}
+        onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
+
       <OptionSelect label="模型" value={effModel} options={modelSel}
         disabled={disabled} onChange={patchModel} />
 
@@ -243,12 +309,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           <p key={w} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">⚠ {w}（仍可运行）</p>
         ))}
       </section>
-
-      <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-        {mediaKind === "image"
-          ? `参考图 ${wiring.reference} 张 · 提示词 ${wiring.prompt} 条`
-          : `提示词 ${wiring.prompt} 条 · 首帧${wiring.firstFrame > 0 ? "已接" : "未接"}`}
-      </p>
 
       <RunButton status={data.status} onClick={() => void runNode(nodeId)}
         label={data.status === "success" ? "重新运行" : "运行"}

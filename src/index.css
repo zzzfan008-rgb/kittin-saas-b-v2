@@ -627,6 +627,32 @@ body {
 }
 
 /* shadcn/Base UI 直接桥接到现有 data-theme 语义，不引入第二套主题状态。 */
+
+/* 生成器节点：已接入上游来源胶囊（accent 高亮，点击断开该边） */
+.gc-upstream-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  max-width: 100%;
+  padding: 0 7px;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--gc-accent-deep);
+  background: color-mix(in srgb, var(--gc-accent) 14%, var(--gc-node-main));
+  border: 1px solid color-mix(in srgb, var(--gc-accent) 55%, transparent);
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+button.gc-upstream-chip { cursor: pointer; }
+button.gc-upstream-chip:hover {
+  background: color-mix(in srgb, var(--gc-accent) 28%, var(--gc-node-main));
+  border-color: var(--gc-accent);
+}
+button.gc-upstream-chip:disabled { cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .gc-upstream-chip { transition: none; }
+}
 @theme inline {
   --font-heading: inherit;
   --font-mono: var(--gc-font-mono);
