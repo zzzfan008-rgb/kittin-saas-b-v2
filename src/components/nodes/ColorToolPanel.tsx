@@ -5,7 +5,7 @@
  * - 预设色来自 token label，自定义色匹配内置中文颜色字典。
  * - onConfirm 改为插入 chip 字符串（由调用方写入正文）。
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   COLOR_TOKEN_RE,
@@ -67,6 +67,24 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
   );
   const [selected, setSelected] = useState<string | undefined>(() => presets[0]?.hex);
   const [customHex, setCustomHex] = useState<string>("#000000");
+  const colorInputRef = useRef<HTMLInputElement | null>(null);
+
+  /** 原生取色器提交 = 确认：系统取色面板里「双击选色」或「吸色器点选」关闭面板时
+   *  触发原生 change（区别于拖动中的 input 事件），此时直接把颜色插入正文，无需再点确定。
+   *  手动 hex 输入框不走此路径（仍用确定按钮）。 */
+  useEffect(() => {
+    const element = colorInputRef.current;
+    if (!element) return;
+    const commit = () => {
+      const hex = element.value.toUpperCase();
+      if (!isValidHex(hex)) return;
+      setCustomHex(hex);
+      setSelected(undefined);
+      onConfirm(makeColorChipFromHex(hex));
+    };
+    element.addEventListener("change", commit);
+    return () => element.removeEventListener("change", commit);
+  }, [onConfirm]);
 
   /** 当前选中的 hex（优先自定义输入，其次预设选中） */
   const currentHex = selected ?? customHex;
@@ -129,8 +147,10 @@ export function ColorToolPanel({ onConfirm, onClose }: ColorToolPanelProps) {
       <label className="flex items-center gap-2 text-[11px] text-[var(--gc-node-muted)]">
         <span>自定义</span>
         <input
+          ref={colorInputRef}
           type="color"
           aria-label="自定义颜色"
+          title="双击选色或用吸色器点选后直接插入"
           value={customHex}
           onChange={(event) => {
             setCustomHex(event.target.value.toUpperCase());
