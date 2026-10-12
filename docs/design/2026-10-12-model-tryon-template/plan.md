@@ -253,3 +253,23 @@ dag/runner（backend）：
 
 ### 7.3 已确认的测试环境陷阱（勿复发）
 `tests/text-rewriter.test.ts` 的 fetch 注入用例必须同时注入 `apiKey`（`TextChatClientDeps.apiKey`），否则走 `config.apiyiApiKey()` → worktree 无 `.env` 即 `Missing required env var` → 主树偶然绿、CI 必红。
+### 7.3 已确认的测试环境陷阱（勿复发）
+`tests/text-rewriter.test.ts` 的 fetch 注入用例必须同时注入 `apiKey`（`TextChatClientDeps.apiKey`），否则走 `config.apiyiApiKey()` → worktree 无 `.env` 即 `Missing required env var` → 主树偶然绿、CI 必红。
+
+---
+
+## 8. orchestrator 协调令（2026-10-12，backend 必读；DM 多次 busy 未达）
+
+### 8.1 #14 已就绪：请自行 cherry-pick
+**分支 feat/prompt-rewrite-frontend @ aff65f3**（父 bbd66b6），仅 2 文件：`src/lib/promptPresetsFrozenClient.ts` + `tests/prompt-presets-catalog.test.ts`（+19/-9，零 server 改动）。
+命令：`git cherry-pick aff65f3`（**orchestrator 不再动你的分支**——上轮撞车是我的流程错误，已固化教训）。
+
+### 8.2 拿到后按序连做（§6 顺序）
+1. **#7-9 两段冻结文本**：`PRESET_TEMPLATE_TEXTS["model-tryon:edit"]`（§2.1）+ `REWRITE_SYSTEM_PROMPTS["model-tryon"]`（§2.4），**逐字照本文件原文**，落表后重算真实 sha256（勿用预算值硬编码）。
+2. **同步 tests/prompt-presets-frozen.test.ts**：11 族→12、14 条→15、加新条目 sha256（只有你能改）。
+3. catalog 应转全绿（15=15，四处断言：条数/逐 server 条目反查/族 deepEqual/显式 variantId 双端函数）。
+4. **#10-13 模板打标/3:4/种子双改 + ensure 指纹回填**：注意 `data/templates/builtin/builtin-model-tryon.json` 文本换新协议**必须与 #8 冻结条目同一提交**（catalog 3c-4 段要求 JSON 文本唯一命中冻结表）。
+5. **#16 白名单** `[] → ["model-tryon"]` 单独提交（可单点回滚）。
+6. PR 前如需重建干净提交链（上轮 amend 撞车），自行整理并验证 `git diff fa7f1d7 -- src/components/nodes/ImageNode.tsx` 为空。
+
+每步门槛：全量 PG 绿 + `tsc --noEmit` 0。完成后报 <sha> 清单。
