@@ -295,3 +295,19 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
 1. **已批准先行落地全部不依赖 familyId 白名单的部分**：config(apiyiTextModelId/aiTextTimeoutMs)、server/lib/textChat.ts、REWRITE_SYSTEM_PROMPTS（§3 逐字）+ rewriteSystemPrompt、textRewriter 核心（familyId optional、命中→default）、✨按钮路由 POST /api/text/rewrite、model-contracts.json textModels 节（对齐既有 src/types/textModels.ts 体系）、及 §6 中不依赖白名单的全部测试。
 2. **runner 运行时白名单门控 + §6-f 暂缓**：familyId 无来源（v9 删 variant 属实，已核实），机制待用户拍板（候选：E=冻结协议文本前缀匹配 / A=节点加 familyId 字段 / C=运行时改写延后）。**禁止自行发明 family 来源机制。**
 3. 出图模型替换 §10 按既有排队任务在改写层交付后接续。
+
+## 12. 门禁 FAIL 修复任务（reviewer gate:codex，2026-10-12；DM busy 以此为准）
+
+基线：主分支 `fix/r100-comments-1-3` 最新 `79908d4`（改写层已 merge d477dfe）。**新修复请基于 79908d4 开新分支**（旧 feat/prompt-rewrite-backend 已改名 tmp-rewrite 停在 merge 提交，勿继续在其上叠加）。
+
+### 12.1 P2：runner 自动改写未接入（dead code）
+现状（已核实）：`server/engine/runner.ts` 无任何 rewrite 调用；`rewriteUserPrompt` 仅 POST /api/text/rewrite 消费；`isRewriteEnabledFamily` 零调用。dag.ts:375 已透传 `step.params.familyId`（仅 image-generator）。
+实现 runner.ts:241-246 插入（userPrompt 算得后、taskPrompt 拼装前）：
+- 仅 image-generator；`isRewriteEnabledFamily(step.params.familyId)` 真且 userPrompt 非空 → `await rewriteUserPrompt(userPrompt,{kind:step.kind,mode:operationMode,familyId:step.params.familyId})`，用 outcome.text；
+- fail-closed 在 rewriteUserPrompt 内部，调用方不 try/catch；不命中/空→原文（零行为变化）；
+- 每 run ≤1 次改写（测试锁）；不回写 data，只进 taskPrompt/run 快照。
+测试：命中改写进 taskPrompt / family 缺失或非白名单不调通道 / 通道抛错用原文不阻断 / 空 prompt 跳过 / ≤1 次。
+
+### 12.2 知识门：src/types/imageModels.ts 缺凭证（历史遗漏）
+d73aa26（尺寸三档，早于本批合入）改了该 gated 文件但未出 receipt，guard --base origin/main --head HEAD 红。
+修法：对 imageModels.ts 做零行为小改（补 JSDoc/提常量）使其成为 uncommitted change → `npm run docs:apiyi:lookup --query "gpt-image-2.5-flare-vip / sunburst-vip 输出像素尺寸 sizes 清单与 quality 取值" --paths src/types/imageModels.ts --receipt docs/ai/apiyi/consultations/vip-size-tiers.json --decision "VIP 系尺寸三档像素值取自 model-contracts sizes 清单；3:4=1536x2048；仅 flare-vip/sunburst-vip 提供档位"` → 与 runner 修复提交 → guard（base 新分支基点，head HEAD）必须同时覆盖 imageModels.ts 与 runner.ts。
