@@ -829,3 +829,116 @@ const buildDoc = (edges: Array<{ source: string; target: string }>) => ({
   const doc = buildDoc([{ source: "mi", target: "g1" }]);
   assert.equal(isV8ConnectionValid(doc, { source: "mi", target: "g2", sourceHandle: null, targetHandle: null }), true, "65d mask[g1:0] + g2:0 → valid（独占已删）");
 }
+
+// ---------- familyId 打标（契约 2026-10-12-model-tryon-template §1.1/§1.3）----------
+
+const familyGen = (data: Record<string, unknown>) => ({
+  id: "fg",
+  type: "image-generator",
+  position: { x: 0, y: 0 },
+  data: {
+    kind: "image-generator",
+    label: "生图",
+    modelId: "gpt-image-2.5-sunburst",
+    aspectRatio: "3:4",
+    batchSize: 1,
+    ...data,
+  },
+});
+const familyVideoGen = {
+  id: "vfg",
+  type: "video-generator",
+  position: { x: 0, y: 0 },
+  data: { kind: "video-generator", label: "生视频", modelId: "doubao-seedance-2-5-260628", aspectRatio: "adaptive" },
+};
+
+// 1. image-generator familyId 非空时原样投影（trim），落盘闸不视为契约外字段。
+{
+  const snap = createDocumentSnapshot({
+    projectName: "族",
+    nodes: [familyGen({ familyId: "model-tryon" })],
+    edges: [],
+  });
+  const d = snap.nodes[0]!.data;
+  if (d.kind !== "image-generator") throw new Error("投影节点非 image-generator");
+  assert.equal(d.familyId, "model-tryon", "familyId 必须原样投影");
+  assert.deepEqual(unprojectedDocumentFields(d), [], "familyId 必须在 image-generator 允许字段内");
+  // 落盘往返保留
+  const wire = documentSnapshotToPersistedWorkflow(snap);
+  assert.equal((wire.nodes[0]!.data as { familyId?: string }).familyId, "model-tryon", "落盘 wire 必须保留 familyId");
+}
+
+// 2. 空白 familyId 不写文档（窄化写入，不写空串）；undefined 也省略。
+{
+  for (const bad of ["", "   "]) {
+    const snap = createDocumentSnapshot({
+      projectName: "空",
+      nodes: [familyGen({ familyId: bad })],
+      edges: [],
+    });
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(snap.nodes[0]!.data, "familyId"),
+      false,
+      "空白 familyId 必须省略（不写空串）",
+    );
+  }
+  const snap = createDocumentSnapshot({
+    projectName: "无",
+    nodes: [familyGen({})],
+    edges: [],
+  });
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(snap.nodes[0]!.data, "familyId"),
+    false,
+    "undefined familyId 必须省略（fail-closed）",
+  );
+}
+
+// 3. 前后空格 trim；落盘 wire 为 trim 后值。
+{
+  const snap = createDocumentSnapshot({
+    projectName: "trim",
+    nodes: [familyGen({ familyId: "  model-tryon  " })],
+    edges: [],
+  });
+  const d = snap.nodes[0]!.data as { familyId?: string };
+  assert.equal(d.familyId, "model-tryon", "familyId 投影必须 trim");
+}
+
+// 4. video-generator 不投影 familyId（即便携带也剥离——契约 §1.4）。
+{
+  const snap = createDocumentSnapshot({
+    projectName: "video",
+    // 手造脏输入：video-generator 带 familyId
+    nodes: [{ ...familyVideoGen, data: { ...familyVideoGen.data, familyId: "model-tryon" } }],
+    edges: [],
+  });
+  const d = snap.nodes[0]!.data as Record<string, unknown>;
+  if (d.kind !== "video-generator") throw new Error("投影节点非 video-generator");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(d, "familyId"),
+    false,
+    "video-generator 不得投影 familyId（§1.4）",
+  );
+}
+
+// 5. 保存→重开端到端：落盘 wire 再经 readFlowDocumentForOpen 打开，familyId 仍在（契约 §1.3 核心担忧）。
+{
+  const wire = documentSnapshotToPersistedWorkflow(
+    createDocumentSnapshot({
+      projectName: "往返",
+      nodes: [familyGen({ familyId: "model-tryon" })],
+      edges: [],
+    }),
+  );
+  const reopened = readFlowDocumentForOpen(wire);
+  const gen = reopened.flow.nodes.find((n) => n.data.kind === "image-generator");
+  assert.ok(gen, "重开文档必须含 image-generator");
+  assert.equal(
+    (gen!.data as { familyId?: string }).familyId,
+    "model-tryon",
+    "保存重开后 familyId 必须保留（否则白名单永久 miss）",
+  );
+}
+
+console.log("通过 familyId 投影 5 项（image 投影/空白省略/trim/video 不投影/保存重开往返）");
