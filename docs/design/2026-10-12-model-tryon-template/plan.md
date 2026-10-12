@@ -329,3 +329,25 @@ dag/runner（backend）：
 
 ### 10.3 完成标准
 改测试 → `templates-v8` + 全量 PG 全绿 → `tsc --noEmit` 0 → 单提交（信息注明「familyId 落位修正（data 顶层，不进 modelOptions）+ 模板指纹回填 + 垃圾字段清除 + 回归断言」）→ 报 <sha>。
+### 10.2 仍未完成（自述已做，磁盘未做）
+1. `tests/templates-v8.test.ts:123/128` 仍是**旧口径**（注释「modelOptions 额外含 familyId」+ 断言 `data.modelOptions?.familyId`）→ 该测试当前**红**。
+   应改为：断言 `data.familyId === "model-tryon"`（data 顶层）+ 断言 modelOptions **不含** familyId（`assert.ok(!("familyId" in (data.modelOptions ?? {})))`）。这是拦住本 bug 的回归断言。
+2. 上述改动尚未提交（`git status`：templates.ts / builtin-model-tryon.json 仍为 M）。
+3. untracked `scratch/` 目录：提交前清掉，勿带进分支。
+
+### 10.3 完成标准
+改测试 → `templates-v8` + 全量 PG 全绿 → `tsc --noEmit` 0 → 单提交（信息注明「familyId 落位修正（data 顶层，不进 modelOptions）+ 模板指纹回填 + 垃圾字段清除 + 回归断言」）→ 报 <sha>。
+
+---
+
+## 11. 收尾三件事（orchestrator 2026-10-12；终检已通过，DM busy 以本文档为准）
+
+终检结论：HEAD=3de25e7 通过（tsc 0、PG 80/80、三条回归断言在、代码定义与 JSON 一致）。剩：
+
+1. **清 untracked `scratch/`**（仍在磁盘）——提交前删除，勿带进分支。`git status` 最终应只剩两份契约 docs（untracked 参考副本，不提交）。
+2. **重建干净提交链**：现链 222175d 与 1d3a9a2 两条同信息（a11y hunk 折进后者）。合并为按域清晰的提交（「改写层零依赖」与「a11y 修复」各自归属）；重建后验证：
+   - `git diff fa7f1d7 -- src/components/nodes/ImageNode.tsx` 为空（内容与主树一致）
+   - 全量 PG 仍 80/80
+3. **统一 familyId 面知识门 receipt**：覆盖 src/types/workflow.ts + server/engine/dag.ts + server/lib/workflowSchema.ts 三个 gated 文件，guard 闭环。
+
+完成后报：`git log --oneline` 全量 + 全量测试尾部 + guard 状态。
