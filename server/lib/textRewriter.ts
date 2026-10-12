@@ -28,7 +28,7 @@ import {
  * 全局关闭（fail-closed 安全）；落标就绪后改为 ["model-tryon"] 启用。空白名单下运行时
  * 改写自然跳过，不影响 ✨按钮与出图主链。
  */
-export const REWRITE_ENABLED_FAMILIES: readonly string[] = [];
+export const REWRITE_ENABLED_FAMILIES: readonly string[] = ["model-tryon"];
 
 /** §4 成本口径：一次 run 最多 1 次改写调用（runner 内计数断言，§6-f）。 */
 export const MAX_REWRITE_CALLS_PER_RUN = 1;

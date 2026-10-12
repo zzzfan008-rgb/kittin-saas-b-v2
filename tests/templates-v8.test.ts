@@ -31,8 +31,8 @@ const GENERATOR_KINDS = new Set(["image-generator", "video-generator"]);
 const RESULT_KINDS = new Set(["result-image", "result-video"]);
 
 /** 每模板期望：text 节点预设（family, mode）+ generator operationMode（+ batchSize 覆盖）。 */
-const EXPECTED: Record<string, { preset: readonly [string, string]; operationMode: string; batchSize?: number }> = {
-  "builtin-model-tryon": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
+const EXPECTED: Record<string, { preset: readonly [string, string]; operationMode: string; batchSize?: number; aspectRatio?: string; familyId?: string }> = {
+  "builtin-model-tryon": { preset: ["model-tryon", "edit"], operationMode: "edit", aspectRatio: "3:4", familyId: "model-tryon" },
   "builtin-pose": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
   "builtin-background-swap": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
   "builtin-lookbook": { preset: ["fashion-lookbook", "edit"], operationMode: "edit", batchSize: 2 },
@@ -115,17 +115,19 @@ function main() {
           const data = node.data as {
             modelId?: string; operationMode?: string; aspectRatio?: string;
             batchSize?: number; modelOptions?: Record<string, unknown>;
-            promptVariantId?: unknown;
+            promptVariantId?: unknown; familyId?: string;
           };
           assert.equal(data.modelId, DEFAULT_GENERATION_MODEL_ID, `${tpl.id}/${node.id} modelId`);
           assert.equal(data.operationMode, expected.operationMode, `${tpl.id}/${node.id} operationMode`);
-          assert.equal(data.aspectRatio, "1:1", `${tpl.id}/${node.id} aspectRatio`);
+          // C7：aspectRatio 走模板定义（v9 裁决 C）；modelOptions 为契约推荐默认。
+          // familyId 是 data 顶层字段（dag.ts extractParams 从 data.familyId 透传），不得进 modelOptions。
+          assert.equal(data.aspectRatio, expected.aspectRatio ?? "1:1", `${tpl.id}/${node.id} aspectRatio`);
           assert.equal(data.batchSize, expected.batchSize ?? 1, `${tpl.id}/${node.id} batchSize`);
-          assert.deepEqual(
-            data.modelOptions,
-            defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, "1:1"),
-            `${tpl.id}/${node.id} modelOptions 应为契约推荐默认`,
-          );
+          const baseOptions = defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, expected.aspectRatio ?? "1:1");
+          assert.equal(data.modelOptions?.quality, baseOptions.quality, `${tpl.id}/${node.id} modelOptions.quality`);
+          assert.equal(data.modelOptions?.familyId, undefined, `${tpl.id}/${node.id} familyId 不得放进 modelOptions`);
+          assert.equal(data.familyId, expected.familyId, `${tpl.id}/${node.id} data.familyId`);
+          assert.ok(!("generator" in data), `${tpl.id}/${node.id} 不得携带历史垃圾字段 generator`);
           assert.ok(!("promptVariantId" in data), `${tpl.id}/${node.id} 不得携带 promptVariantId`);
         } else if (node.type === "video-generator") {
           const data = node.data as {

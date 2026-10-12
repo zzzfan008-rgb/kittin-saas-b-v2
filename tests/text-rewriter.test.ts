@@ -171,11 +171,11 @@ ok("d: 400 request_rejected → 不重试（只调用 1 次）", async () => {
 });
 
 // e. system prompt 选型
-ok("e: familyId undefined/未知 → default；命中覆盖表 → 该条", async () => {
+ok("e: familyId undefined/未知 → default；model-tryon 命中专用覆盖条", async () => {
   assert.equal(rewriteSystemPrompt(undefined), REWRITE_SYSTEM_PROMPTS.default);
   assert.equal(rewriteSystemPrompt("not-a-family"), REWRITE_SYSTEM_PROMPTS.default);
-  // 首期仅 default 一条；未来新增 family 条目时此断言随冻结快照扩展。
-  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS), ["default"]);
+  assert.equal(rewriteSystemPrompt("model-tryon"), REWRITE_SYSTEM_PROMPTS["model-tryon"]);
+  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS), ["default", "model-tryon"]);
 });
 
 ok("e: default system prompt 含三铁律硬约束句与禁负资产词清单", async () => {
@@ -213,11 +213,11 @@ ok("g: 请求体 model=gemini-3.8-flash、reasoning_effort=medium，不含 minim
   assert.ok(!("thinking_config" in captured!), "不得出现任何思考关闭配置");
 });
 
-// 白名单 / 成本常量（过渡态：familyId 落标前白名单为空 = 运行时自动改写全局关闭，plan §2.3/§5）
-ok("白名单：过渡态为空集合（familyId 落标后改 [model-tryon]）；isRewriteEnabledFamily 全 false", async () => {
-  assert.deepEqual([...REWRITE_ENABLED_FAMILIES], []);
-  assert.equal(isRewriteEnabledFamily("model-tryon"), false, "空白名单期即使传 model-tryon 也不改写（fail-closed）");
-  assert.equal(isRewriteEnabledFamily("fashion-lookbook"), false);
+// 白名单 / 成本常量（familyId 已落标，白名单启用 ["model-tryon"]，plan §2.3/§5）
+ok("白名单：model-tryon 已启用；isRewriteEnabledFamily 符合预期", async () => {
+  assert.deepEqual([...REWRITE_ENABLED_FAMILIES], ["model-tryon"]);
+  assert.equal(isRewriteEnabledFamily("model-tryon"), true, "model-tryon 在白名单内，应启用改写");
+  assert.equal(isRewriteEnabledFamily("fashion-lookbook"), false, "fashion-lookbook 不在白名单");
   assert.equal(isRewriteEnabledFamily(undefined), false);
   assert.equal(MAX_REWRITE_CALLS_PER_RUN, 1);
 });

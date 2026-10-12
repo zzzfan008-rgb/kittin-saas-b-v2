@@ -13,6 +13,7 @@
 import { Router } from "express";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { config } from "../config";
 import { writeJsonAtomicSync } from "../lib/atomicJson";
 import { validateAndMigrateFlow, WorkflowValidationError } from "../lib/workflowSchema";
@@ -29,6 +30,7 @@ import {
 import {
   DEFAULT_GENERATION_MODEL_ID,
   defaultImageModelOptions,
+  type ImageModelOptions,
 } from "../../src/types/imageModels";
 import {
   DEFAULT_VIDEO_MODEL_ID,
@@ -75,6 +77,10 @@ function imageNode(id: string, x: number, y: number, label: string): PersistedWo
 
 interface ImageGeneratorOptions {
   batchSize?: BatchSize;
+  /** 模板来源族 id（如 "model-tryon"）；运行时提示词改写白名单门控。缺省=不参与自动改写。 */
+  familyId?: string;
+  /** 画幅比例；缺省="1:1"。 */
+  aspectRatio?: string;
 }
 
 function imageGeneratorNode(
@@ -86,9 +92,10 @@ function imageGeneratorNode(
   options: ImageGeneratorOptions = {},
 ): PersistedWorkflowNode {
   // v9（64 Phase 1 C7）：variant 绑定删除；显式 modelId + operationMode + 契约默认参数
-  //（aspectRatio 1:1 / batchSize 1，拍板③）；modelOptions 走契约推荐默认（裁决 C）。
-  const aspectRatio = "1:1";
+  //（batchSize 1，拍板③）；modelOptions 走契约推荐默认（裁决 C）；aspectRatio 走模板定义。
+  const aspectRatio = options.aspectRatio ?? "1:1";
   const batchSize = options.batchSize ?? 1;
+  const modelOptions: ImageModelOptions = { ...defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio) };
   return {
     id,
     type: "image-generator",
@@ -99,9 +106,12 @@ function imageGeneratorNode(
       status: "idle",
       operationMode,
       modelId: DEFAULT_GENERATION_MODEL_ID,
-      modelOptions: defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
+      modelOptions,
       aspectRatio,
       batchSize,
+      // familyId 是节点 data 顶层字段（src/types/workflow.ts ImageGeneratorNodeData），
+      // dag.ts extractParams 从 data.familyId 透传到 step.params；不得放进 modelOptions。
+      ...(options.familyId ? { familyId: options.familyId } : {}),
     },
   };
 }
@@ -147,10 +157,10 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("tryon-requirement", 0, -170, "试穿要求", requirePresetText("fashion-lookbook", "edit")),
+          textNode("tryon-requirement", 0, -170, "试穿要求", requirePresetText("model-tryon", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("model", 0, 210, "数字模特"),
-          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit"),
+          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit", { familyId: "model-tryon", aspectRatio: "3:4" }),
         ],
         edges: [
           edge("e-tryon-prompt", "tryon-requirement", "tryon-gen", "prompt"),
@@ -453,7 +463,47 @@ function builtinTemplateIsReadable(filePath: string): boolean {
   }
 }
 
-/** 启动时补齐新增模板；保留可读旧版本，并用当前定义修复损坏或不兼容的内置文件。 */
+/**
+ * 内容指纹的语义规范形（plan 2026-10-12-model-tryon-template §1.5）：
+ * - 递归排序对象键（键顺序无语义）；数组保序（节点/边顺序是 DAG 语义）；
+ * - 剥离 thumbnail（响应态字段：磁盘存本地引用、响应改 URL，不参与模板内容判定）。
+ * 不得直接比文件字节——格式化差异/thumbnail 都会造成假阳性。
+ */
+function canonicalBuiltinTemplateShape(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalBuiltinTemplateShape);
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      if (key === "thumbnail") continue;
+      out[key] = canonicalBuiltinTemplateShape((value as Record<string, unknown>)[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function builtinTemplateFingerprint(value: unknown): string {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalBuiltinTemplateShape(value)))
+    .digest("hex");
+}
+
+/** 磁盘内置模板解析后的内容指纹是否与代码权威定义一致；解析失败按不一致处理（触发回填）。 */
+function builtinTemplateFingerprintMatches(filePath: string, expected: WorkflowTemplate): boolean {
+  try {
+    return builtinTemplateFingerprint(readTemplateFile(filePath)) === builtinTemplateFingerprint(expected);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 启动时收敛内置模板到代码权威定义（builtinTemplates()）：
+ * - 文件缺失/损坏/不兼容 → 写入；
+ * - 可读但内容指纹不一致（git pull 后 tracked JSON 更新、或持久卷磁盘 JSON 陈旧）→ 覆盖回填。
+ * 内置目录无用户数据（「我的模板」功能已取消），覆盖安全。不做指纹回填会让已部署环境
+ * 拉新版本后永久读到旧模板（plan §1.5）。
+ */
 export function ensureBuiltinTemplates(): void {
   // v8 重写后退役的 v7 内置模板文件：id 已不存在于 builtinTemplates()，结构也不兼容
   // （旧 image 节点五合一 vs v8 输入/生成分层），必须显式删除，避免 GET /api/templates
@@ -472,7 +522,8 @@ export function ensureBuiltinTemplates(): void {
   }
   for (const tpl of builtinTemplates()) {
     const filePath = templatePath(tpl.id);
-    if (!fs.existsSync(filePath) || !builtinTemplateIsReadable(filePath)) {
+    // 缺失/不可读 → 写入；可读但内容指纹与代码定义不一致 → 覆盖回填（§1.5）。
+    if (!fs.existsSync(filePath) || !builtinTemplateIsReadable(filePath) || !builtinTemplateFingerprintMatches(filePath, tpl)) {
       writeJsonAtomicSync(filePath, tpl);
     }
   }
