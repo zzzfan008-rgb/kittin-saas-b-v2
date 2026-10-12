@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "createdAt": "2026-10-12T06:13:23.153Z",
-  "baseCommit": "d477dfe4b9e9e2b5f9c8e6e3a8d7c6f0e1d2c3b4a5968778899aabbccddeeff00",
-  "changeFingerprintSha256": "a4f8c7d2e3b1f6a0c5d8e2f4b7a3c9d1e5f6a8b2c4d6e7f8a9b0c1d2e3f4a5b6c",
+  "baseCommit": "1295c3d5062191562ed8220e65e7e24cb64112a4",
+  "changeFingerprintSha256": "b9dcacfacf0e1545a29321fdc0a4611105184611c2a3be41c2d6411206022a2a",
   "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
   "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
   "query": "gemini-3.8-flash 提示词改写 chat completions 工作流 family 白名单 运行时",
