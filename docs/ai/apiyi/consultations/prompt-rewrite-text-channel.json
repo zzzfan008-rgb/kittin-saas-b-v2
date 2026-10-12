@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-12T05:36:13.871Z",
+  "baseCommit": "2e6fee9e74e9ceacd25209cebc3caeb3e6968c0f",
+  "changeFingerprintSha256": "640ba529976085cf193c45fbe8c1cb515c87998b86863dd669755a3fbb840677",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "gemini-3.8-flash OpenAI 兼容 chat completions reasoning_effort medium 思考控制 文本模型",
+  "affectedPaths": [
+    "docs/ai/apiyi/model-contracts.json",
+    "server/config.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 兼容模式调用",
+      "sha256": "bb3737ffdded8fa58f6af6bdcb3a90eca04cd27b09a2b13d65cd1910a06683a9"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions Compatible Mode",
+      "sha256": "d2325c6660d0d2140d432a2bf0996ebc30d859a96c76a0f328c6a23d2de5d8d6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ru/api-capabilities/openai/compatible.md",
+      "title": "Режим совместимости OpenAI Chat Completions",
+      "sha256": "70c44e098c4702577de6848f03129714bd20c942062d7cd304a096c692d3086c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 相容模式呼叫",
+      "sha256": "09a489e352081dbbc20e42631f8f85522da2cc8f596513b1fb78f0c166b00cba"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ja/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 互換モード",
+      "sha256": "97b282ab2fa552c646808707689a2c03ae6ae391845fb5aa2b7e11b6a61645e0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ko/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 호환 모드",
+      "sha256": "0f72dddabafb485eab2e8c35e1c278dbfb639d7d9056316930b3059b9fcda816"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/chat-latest-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/news/chat-latest-launch.md",
+      "pageLocalPath": "pages/en/news/chat-latest-launch.md",
+      "title": "OpenAI chat-latest Launches: Always Tracks ChatGPT's Default Instant Model",
+      "sha256": "58adbb881a135c010a3b1a7a9bc6d39f63cc5f7df94e5df299ba2a7d202cbd27"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/chat-latest-launch",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/news/chat-latest-launch.md",
+      "pageLocalPath": "pages/news/chat-latest-launch.md",
+      "title": "OpenAI chat-latest 上线：始终指向最新 ChatGPT Instant 模型",
+      "sha256": "716195660a7a4256196a6d15b50ba12098ce794cb27fa32f5bfc17925fd10add"
+    }
+  ],
+  "decisionSummary": "提示词改写层文本通道（2026-10-12 拍板，plan.md §1-9）：新建 OpenAI 兼容薄客户端 POST {base}/v1/chat/completions，复用 config.apiyiApiKey() 无新密钥；模型固定 gemini-3.8-flash（APIYI_TEXT_MODEL_ID 可覆盖）；思考控制固定 reasoning_effort=medium（有效值 low/medium/high），禁止 minimal（OpenAI 兼容端 200 但参数被静默忽略、思考照常计入输出计费）、禁止 thinkingBudget（Gemini 原生端关闭机制，与 medium 语义矛盾）；temperature 0.4、max_tokens 512、超时 20s（AI_TEXT_TIMEOUT_MS）；错误语义 transport/429/5xx 可重试 1 次（文本便宜幂等，与出图不重试相反），400/401/403 与坏响应不重试；任何改写失败 fail-closed 回退原文。事实依据：KB 快照 2026-09-18 已含 gemini-3-8-flash/overview 页（SHA 60ad49ed），定价 $0.75/$3.75 每 1M tokens，default/svip 分组可用。model-contracts.json 新增顶层 textModels 节（独立于出图 models[] 九模型契约，不参与 contractHash）。",
+  "unresolvedChoices": []
+}

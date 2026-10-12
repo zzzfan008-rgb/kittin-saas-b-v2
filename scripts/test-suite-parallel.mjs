@@ -128,8 +128,12 @@ const TEST_FILES = [
   // 64 Phase 1（backend C1-C7）：冻结提示词常量快照 + runner taskPrompt 组装回归（纯逻辑，非碰库）。
   "tests/prompt-presets-frozen.test.ts",
   "tests/runner-task-prompt.test.ts",
+  // 提示词改写层（2026-10-12）：textChat 通道 + textRewriter fail-closed/重试/请求体契约（纯单元，不碰库）。
+  "tests/text-rewriter.test.ts",
   // 64 Phase 1 C7：templates-v8.test.ts 已重写为 v9 快照断言（处置落地），从 EXCLUDED 摘除重新登记。
   "tests/templates-v8.test.ts",
+  // 提示词改写层（2026-10-12）：补全按钮路由契约（碰库 → SERIAL）。
+  "tests/text-rewrite-route.test.ts",
 ];
 
 /**
@@ -162,6 +166,8 @@ const SERIAL_TEST_FILES = new Set([
   "tests/asset-model-category.test.ts",
   "tests/openai-mask-test.test.ts",
   "tests/performance-baseline.test.ts",
+  // 提示词改写层（2026-10-12）：补全按钮路由契约（resetPostgresTestDatabase，碰库串行）。
+  "tests/text-rewrite-route.test.ts",
 ]);
 
 const tsxCli = join(repoRoot, "node_modules/tsx/dist/cli.mjs");

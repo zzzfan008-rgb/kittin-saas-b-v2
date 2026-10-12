@@ -156,6 +156,26 @@ function main() {
     });
   }
 
+  // 2026-10-12 model-tryon A 机制（plan §4-5）：extractParams 把 data.familyId 透传到
+  // step.params，供 runner 运行时改写白名单门控；只透传不校验，缺省不注入（窄化）。
+  ok("familyId：image-generator data.familyId 透传到 step.params", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "试穿要求"), imageGeneratorNode("g1", undefined, { familyId: "model-tryon" })],
+      [edge("t1", "g1")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.equal(g1.params.familyId, "model-tryon");
+  });
+
+  ok("familyId：缺省时 step.params 不含该键（窄化，不注入空值）", () => {
+    const plan = buildExecutionPlan(
+      [textNode("t1", "设计一套现代女装"), imageGeneratorNode("g1")],
+      [edge("t1", "g1")],
+    );
+    const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
+    assert.ok(!("familyId" in g1.params));
+  });
+
   ok("C4：params 零 variant 字段残留（promptVariantId/promptFamilyId/contractHash/evaluationVersion/parameterProfileId/postprocessVersion）", () => {
     // 即使脏 data 携带旧字段，extractParams 也绝不注入（64 C4：variant 五字段注入删除）。
     const forged = imageGeneratorNode("g1", undefined, {

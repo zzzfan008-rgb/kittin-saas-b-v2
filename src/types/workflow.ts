@@ -174,6 +174,13 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
   batchSize: BatchSize; // 1 | 2 | 4 | 8
+  /**
+   * 工作流族标识（模板实例化时落标，如 "model-tryon"）。
+   * 用途：运行时提示词改写白名单门控（见 2026-10-12-prompt-rewrite/plan.md §2.3）。
+   * 可选：手动新建节点与历史文档为 undefined；undefined 不触发任何族专属行为（fail-closed）。
+   * 仅 image-generator 携带；video-generator 本期不使用（裁定 §1.4）。
+   */
+  familyId?: string;
 }
 
 export interface VideoGeneratorNodeData extends BaseNodeData {

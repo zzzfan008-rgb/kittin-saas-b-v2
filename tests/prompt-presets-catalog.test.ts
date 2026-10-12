@@ -72,8 +72,8 @@ for (const [key, entry] of Object.entries(PRESET_TEMPLATE_TEXTS)) {
 
 console.log(`  ✓ ${serverKeys.length} 条冻结 binding 与 server 逐字一致`);
 
-// ===== 11 族 family 覆盖 =====
-console.log("\n--- 11 族覆盖 ---");
+// ===== 12 族 family 覆盖 =====
+console.log("\n--- 12 族覆盖 ---");
 assert.deepEqual(
   [...FROZEN_PROMPT_FAMILY_IDS].sort(),
   [...FROZEN_PRESET_FAMILY_IDS].sort(),
@@ -132,6 +132,7 @@ const TEST_VARIANT_IDS = [
   "video-animate.doubao-seedance-2-5-260628.edit.v1",
   "prompt-polish.gpt-image-2.5-flare-vip.edit.v1",
   "prompt-generate.gpt-image-2.5-flare-vip.generate.v1",
+  "model-tryon.gpt-image-2.5-flare-vip.edit.v1",
 ];
 for (const variantId of TEST_VARIANT_IDS) {
   const clientResult = frozenPromptBindingForVariantId(variantId);

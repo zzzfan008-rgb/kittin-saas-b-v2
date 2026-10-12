@@ -370,6 +370,9 @@ function extractParams(data: WorkflowNodeData): Record<string, unknown> {
         aspectRatio: data.aspectRatio,
         batchSize: data.batchSize,
         modelOptions: { ...(data.modelOptions as Record<string, unknown>) },
+        // 2026-10-12 model-tryon A 机制：族标识只透传不校验（保存期 schema 已校验）。
+        // runner 据此做运行时提示词改写白名单门控（plan §2.3/§4-5）；缺省不注入。
+        ...(data.familyId ? { familyId: data.familyId } : {}),
       };
     }
     case "video-generator":

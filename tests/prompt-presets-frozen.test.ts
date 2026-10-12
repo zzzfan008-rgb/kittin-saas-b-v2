@@ -13,6 +13,8 @@ import {
   frozenPromptBindingForVariantId,
   modeSystemText,
   presetTemplateText,
+  REWRITE_SYSTEM_PROMPTS,
+  rewriteSystemPrompt,
 } from "../server/lib/promptPresetsFrozen";
 
 let passed = 0;
@@ -60,12 +62,14 @@ const PRESET_TEMPLATE_TEXTS_SHA256: Record<string, string> = {
   "video-animate:edit": "03eb58ffd8e4111fac6adf82cc525e5e34438e40411a997e62e5d61c2032d213",
   "prompt-polish:edit": "2294316dfc5aa23cb63ea9baa80e6d924982bc001422957765aa1f2aa2031f51",
   "prompt-generate:generate": "55996590129a4b56e2a84e470411db7319b4be570d8dfd75a6bdeb0af02e17b8",
+  "model-tryon:edit": "b593e8b92a9112dfbe1e9d8c633d23c54d67590214d07e100a631364c0ea9b8a",
 };
 
 const EXPECTED_FAMILY_IDS = [
   "fashion-lookbook", "commerce-hero", "design-sheet", "upscale",
   "print-extract", "print-mutate", "fabric-recolor",
   "mask-local-edit", "video-animate", "prompt-polish", "prompt-generate",
+  "model-tryon",
 ];
 
 const EXPECTED_PRESET_KEYS = [
@@ -75,13 +79,14 @@ const EXPECTED_PRESET_KEYS = [
   "upscale:edit", "print-extract:edit", "print-mutate:edit", "fabric-recolor:edit",
   "mask-local-edit:mask-edit", "video-animate:edit",
   "prompt-polish:edit", "prompt-generate:generate",
+  "model-tryon:edit",
 ];
 
-ok("键集合：FROZEN_PRESET_FAMILY_IDS 与快照一致（11 族）", () => {
+ok("键集合：FROZEN_PRESET_FAMILY_IDS 与快照一致（12 族）", () => {
   assert.deepEqual([...FROZEN_PRESET_FAMILY_IDS], EXPECTED_FAMILY_IDS);
 });
 
-ok("键集合：PRESET_TEMPLATE_TEXTS 与快照一致（14 条）", () => {
+ok("键集合：PRESET_TEMPLATE_TEXTS 与快照一致（15 条）", () => {
   assert.deepEqual(Object.keys(PRESET_TEMPLATE_TEXTS), EXPECTED_PRESET_KEYS);
 });
 
@@ -145,6 +150,32 @@ ok("frozenPromptBindingForVariantId：未知族 / 坏 id / 非法 mode → undef
   assert.equal(frozenPromptBindingForVariantId("garbage"), undefined);
   assert.equal(frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare-vip.restyle.v1"), undefined);
   assert.equal(frozenPromptBindingForVariantId(""), undefined);
+});
+
+// 快照：提示词改写层 REWRITE_SYSTEM_PROMPTS 每条文本 sha256（2026-10-12 拍板，逐字冻结）。
+const REWRITE_SYSTEM_PROMPTS_SHA256: Record<string, string> = {
+  "default": "c43357148a16b64ab9bbd94fd75ac0568048a008612b94375fcc296c235a5beb",
+  "model-tryon": "72768654c3df481d46a18468f9f6b561c2e7363da1ff61ca5ae8707971ed01f8",
+};
+
+ok("键集合：REWRITE_SYSTEM_PROMPTS 与快照一致（default + model-tryon）", () => {
+  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS).sort(), Object.keys(REWRITE_SYSTEM_PROMPTS_SHA256).sort());
+});
+
+for (const [key, expected] of Object.entries(REWRITE_SYSTEM_PROMPTS_SHA256)) {
+  ok(`快照：REWRITE_SYSTEM_PROMPTS["${key}"] 文本 hash 锁定（拍板逐字，不得改措辞）`, () => {
+    assert.equal(sha256(REWRITE_SYSTEM_PROMPTS[key]), expected);
+  });
+}
+
+ok("rewriteSystemPrompt：undefined/未知族落 default；model-tryon 命中专用条（保护冻结协议）", () => {
+  assert.equal(rewriteSystemPrompt(undefined), REWRITE_SYSTEM_PROMPTS.default);
+  assert.equal(rewriteSystemPrompt("not-a-family"), REWRITE_SYSTEM_PROMPTS.default);
+  assert.equal(rewriteSystemPrompt("model-tryon"), REWRITE_SYSTEM_PROMPTS["model-tryon"]);
+  assert.match(REWRITE_SYSTEM_PROMPTS["model-tryon"], /冻结协议部分必须逐字原样保留/);
+  for (const banned of ["8K", "杰作", "大师级", "完美光线", "超高清"]) {
+    assert.match(REWRITE_SYSTEM_PROMPTS.default, new RegExp(banned));
+  }
 });
 
 console.log(`\n${passed} 通过`);
