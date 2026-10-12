@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-12T09:34:47.184Z",
+  "baseCommit": "6c4141ce154fd89d05cc06f1db419e5cb5ee1707",
+  "changeFingerprintSha256": "b08e25235f8691d818075e6d75f8f6c1f847249f99be6ba35ab9b09addbcd9f8",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "gpt-image-2.5-flare-vip 与 gpt-image-2.5-sunburst-vip 支持的输出像素尺寸 sizes 清单（1:1/2:3/3:4/4:3/4:5/5:4/9:16/16:9/21:9 各画幅），3:4 对应 1536x2048",
+  "affectedPaths": [
+    "src/types/imageModels.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/archive",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/live/archive.md",
+      "pageLocalPath": "pages/en/live/archive.md",
+      "title": "Live Updates Archive",
+      "sha256": "d5aaa6b66fbd9090ca2d43820f444e04058a991939d5b485c01a0234a1b71bf0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/archive",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/live/archive.md",
+      "pageLocalPath": "pages/live/archive.md",
+      "title": "实时动态归档",
+      "sha256": "d13ce69c24c5a700120e8ca53a694e94f3dda444a7c94bca1f7b88dcf59adac9"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP Image Gen/Editing",
+      "sha256": "8a5c6e2e5724f0f31ffd5742b76c63bc6d6ea3535e59b792916ae36beaa9fa88"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP 生图/编辑",
+      "sha256": "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP 画像生成／編集",
+      "sha256": "7c06154cce4ee428dce178ffe6c04836f5146ca6e6012f73780b2d2f9d29179b"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ko/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP 이미지 생성/편집",
+      "sha256": "abdb5bd2c97f2fb0c38c32ae54e92e1d560fa2aca1c036a88e576d21d17dd686"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/ru/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP: генерация/редактирование изображений",
+      "sha256": "66322b3dc7f5902388548caa0f4f25502e6668d42e5f046553ade40a4e8ea7f0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/gpt-image-2-vip/overview",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/gpt-image-2-vip/overview.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/gpt-image-2-vip/overview.md",
+      "title": "GPT-Image-2.5-VIP 生圖/編輯",
+      "sha256": "411239272b4a43db1b6bb4addc10a2fabbd77d253377941055824915757f268d"
+    }
+  ],
+  "decisionSummary": "VIP 系（flare-vip/sunburst-vip）尺寸三档像素值全部取自 model-contracts.json sizes 清单；标准档=VIP_SIZE_BY_RATIO 既有默认（3:4=1536x2048）；仅这两个 VIP 模型提供快速/标准/高三档，其他模型走契约 recommendedOptions",
+  "unresolvedChoices": []
+}

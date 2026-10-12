@@ -179,8 +179,13 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
 };
 
 /**
- * VIP 系模型按画幅的三档像素尺寸（取值全部来自契约 sizes 清单，顺序=快速/标准/高清档；
- * 标准档 = VIP_SIZE_BY_RATIO 的既有默认）。供生成节点「尺寸」参数选择。
+ * VIP 系模型按画幅的三档像素尺寸（快速 / 标准 / 高清）。
+ *
+ * 取值来源：docs/ai/apiyi/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
+ * docs/ai/apiyi/consultations/vip-size-tiers.json 的咨询凭证）；标准档与
+ * VIP_SIZE_BY_RATIO 的既有默认一致（如 3:4 = 1536x2048）。
+ * 仅 gpt-image-2.5-flare-vip / gpt-image-2.5-sunburst-vip 提供该三档选择
+ * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。
  */
 export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: string; size: string }[]>> = {
   "1:1": [{ tier: "快速", size: "1280x1280" }, { tier: "标准", size: "2048x2048" }, { tier: "高清", size: "2880x2880" }],
