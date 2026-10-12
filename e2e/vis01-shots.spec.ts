@@ -177,9 +177,15 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
   await expect(page.locator(".react-flow__edge")).toHaveCount(0);
 
-  // Locate the image node via its file input (only the image input node has one).
-  const imageNode = page.locator(".react-flow__node")
-    .filter({ has: page.getByLabel("上传图片") }).first();
+  // 图片节点锚点：上传入口是无图空槽位里的隐藏 file input（9cebe44 A 案），上传成功后
+  // 空槽位被图片取代、该 input 随之消失 —— 不能把它当惰性 locator 的节点锚（会失配）。
+  // 先在上传前读出承载节点的 data-id，再用 testid 做稳定锚（与 mask-slider/r87 同一手法）。
+  const uploadInput = page.getByLabel("上传图片").first();
+  const imageNodeId = await uploadInput.evaluate(
+    (el) => el.closest(".react-flow__node")?.getAttribute("data-id") ?? null,
+  );
+  if (!imageNodeId) throw new Error("找不到承载「上传图片」的图片节点");
+  const imageNode = page.getByTestId(`rf__node-${imageNodeId}`);
   const png = await sharp({ create: { width: 160, height: 200, channels: 3, background: "#7a6a52" } })
     .png().toBuffer();
   await imageNode.getByLabel("上传图片").setInputFiles({ name: "a.png", mimeType: "image/png", buffer: png });

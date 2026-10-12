@@ -194,7 +194,9 @@ async function openMaskPage(page: Page): Promise<{
   await expect(imageNode.getByAltText("已上传图片")).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
-  const header = imageNode.locator(".gc-node-header");
+  // R-123 frameless：上传后进入有图态，标题改挂节点上方徽标（NodeFrame.tsx:138
+  // `data-node-badge`）；无图白卡态仍是 `.gc-node-header`。两态互斥，用选择器列表兼容。
+  const header = imageNode.locator(".gc-node-header, [data-node-badge]").first();
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await imageNode.locator("[data-node-toolbar]").count() > 0) break;
     await header.click();

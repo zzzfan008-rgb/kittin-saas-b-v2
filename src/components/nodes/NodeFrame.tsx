@@ -135,7 +135,10 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
         }
       >
         {frameless ? (
-          <div className="absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5">
+          <div
+            data-node-badge
+            className="absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5"
+          >
             <StatusDot status={status} />
             {editing ? (
               <input
