@@ -303,3 +303,29 @@ dag/runner（backend）：
 3. 全量 PG 绿 + tsc 0 后提交并报 <sha>。
 
 补齐这一项即可交 reviewer 门禁。
+后果：已部署环境磁盘 JSON 为旧内容且「可读」→ 永不回填 → 拉新版本后模板仍是旧协议文本、无 familyId、1:1 画幅；git pull 与持久卷两条路径都收敛不到代码定义，本批改造在真实部署上等于未生效。
+
+要求：
+1. 按 §1.5 实现内容指纹回填（序列化为稳定 JSON 的 sha256 vs 磁盘文件解析后的**规范形**比对；不得比文件字节；thumbnail 等响应态字段不参与）；
+2. 测试：陈旧可读 JSON（缺 familyId / 旧文本）→ ensure 后回填为代码定义；内容一致的 JSON 不被无谓重写；
+3. 全量 PG 绿 + tsc 0 后提交并报 <sha>。
+
+补齐这一项即可交 reviewer 门禁。
+
+---
+
+## 10. orchestrator 第3轮核验（2026-10-12；DM busy，以本文档为准）
+
+### 10.1 已修好（读磁盘核实）
+- `server/routes/templates.ts:114` familyId 落 **data 顶层**（`...(options.familyId ? { familyId: options.familyId } : {})`），modelOptions 不再携带。
+- `data/templates/builtin/builtin-model-tryon.json`：垃圾字段 `generator` 已清除；data keys 干净、familyId 顶层。
+- 代码定义与 JSON 一致。
+
+### 10.2 仍未完成（自述已做，磁盘未做）
+1. `tests/templates-v8.test.ts:123/128` 仍是**旧口径**（注释「modelOptions 额外含 familyId」+ 断言 `data.modelOptions?.familyId`）→ 该测试当前**红**。
+   应改为：断言 `data.familyId === "model-tryon"`（data 顶层）+ 断言 modelOptions **不含** familyId（`assert.ok(!("familyId" in (data.modelOptions ?? {})))`）。这是拦住本 bug 的回归断言。
+2. 上述改动尚未提交（`git status`：templates.ts / builtin-model-tryon.json 仍为 M）。
+3. untracked `scratch/` 目录：提交前清掉，勿带进分支。
+
+### 10.3 完成标准
+改测试 → `templates-v8` + 全量 PG 全绿 → `tsc --noEmit` 0 → 单提交（信息注明「familyId 落位修正（data 顶层，不进 modelOptions）+ 模板指纹回填 + 垃圾字段清除 + 回归断言」）→ 报 <sha>。
