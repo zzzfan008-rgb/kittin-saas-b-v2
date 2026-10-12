@@ -200,3 +200,37 @@ export function presetTemplateText(familyId: string, mode: ImageOperationMode): 
 }
 
 export const IMAGE_OPERATION_MODE_VALUES_SNAPSHOT: readonly string[] = IMAGE_OPERATION_MODE_VALUES;
+
+// ---------- 提示词改写层系统文本（2026-10-12 拍板，逐字冻结；测试 sha256 锁定，不得改措辞）----------
+/**
+ * 改写 system prompt 归属冻结表（与 MODE_SYSTEM_TEXT 并列，不复用 PRESET_TEMPLATE_TEXTS——
+ * 后者是「内置模板 text 节点正文」，语义不同）。文本为 2026-10-12 用户拍板定稿，含三铁律
+ * （不覆盖用户原话 / 只补全六要素 / 前后自洽）与禁负资产词清单；tests/prompt-presets-frozen.test.ts
+ * 以 sha256 快照锁定键集合与各条文本，任何改动都会被拦下（fail-closed）。
+ *
+ * 后续如需 model-tryon 专用条目，按同一铁律结构新增 `"model-tryon": …`（覆盖默认），
+ * 同样逐字冻结 + 评审，不得在落地时临时撰写。
+ */
+export const REWRITE_SYSTEM_PROMPTS: Readonly<Record<string, string>> = {
+  // 默认改写提示词（无 family 命中时用；首期 model-tryon 未提供专用条目前亦用此条）
+  "default": `你是一位服装视觉提示词的结构化优化编辑。你的唯一任务是在严格遵从用户要求的前提下，把用户输入优化为一段结构完整、可直接用于服装出图模型的中文提示词。
+
+铁律（最高优先级，违反即失败）：
+1. 用户明确写出的所有要求——包括服装品类、款式、颜色、面料、人物动作、姿势、表情、场景、环境、构图、风格等任何具体指令——必须原样保留，逐字不得删除、替换、弱化、否定或改写其含义；用户要求是最高优先级。
+2. 你只做结构化补全与扩写：围绕主体、环境、光线、镜头、色调、构图六个维度补充用户没有提及但与用户要求不冲突的合理细节；严禁新增任何与用户输入相矛盾或改变用户意图的设定（例如用户写红色就不得改成别的颜色，用户写室内就不得加室外）。
+3. 输出必须前后自洽：补全的各要素之间、补全内容与用户原话之间不得自相矛盾；若某个六要素按用户描述本就不适用（如纯色背景无环境细节），不要硬凑。
+
+输出格式：只输出一段连续的中文正文，不要解释、不要分点、不要 Markdown 标题或列表符号。禁止使用「8K」「杰作」「大师级」「完美光线」「超高清」等无信息量的夸大词；不要添加文字、Logo、水印相关描述（除非用户明确要求图中文字）。`,
+};
+
+/**
+ * 按 familyId 选改写 system prompt：命中覆盖表 → 该条；否则 "default"。
+ * familyId 为 undefined / 未注册时一律落到 "default"（首期仅 default 一条，fail-closed）。
+ */
+export function rewriteSystemPrompt(familyId: string | undefined): string {
+  if (familyId !== undefined) {
+    const hit = REWRITE_SYSTEM_PROMPTS[familyId];
+    if (typeof hit === "string") return hit;
+  }
+  return REWRITE_SYSTEM_PROMPTS.default;
+}

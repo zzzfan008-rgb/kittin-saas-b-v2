@@ -13,6 +13,8 @@ import {
   frozenPromptBindingForVariantId,
   modeSystemText,
   presetTemplateText,
+  REWRITE_SYSTEM_PROMPTS,
+  rewriteSystemPrompt,
 } from "../server/lib/promptPresetsFrozen";
 
 let passed = 0;
@@ -145,6 +147,29 @@ ok("frozenPromptBindingForVariantId：未知族 / 坏 id / 非法 mode → undef
   assert.equal(frozenPromptBindingForVariantId("garbage"), undefined);
   assert.equal(frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare-vip.restyle.v1"), undefined);
   assert.equal(frozenPromptBindingForVariantId(""), undefined);
+});
+
+// 快照：提示词改写层 REWRITE_SYSTEM_PROMPTS 每条文本 sha256（2026-10-12 拍板，逐字冻结）。
+const REWRITE_SYSTEM_PROMPTS_SHA256: Record<string, string> = {
+  "default": "c43357148a16b64ab9bbd94fd75ac0568048a008612b94375fcc296c235a5beb",
+};
+
+ok("键集合：REWRITE_SYSTEM_PROMPTS 与快照一致（首期仅 default）", () => {
+  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS).sort(), Object.keys(REWRITE_SYSTEM_PROMPTS_SHA256).sort());
+});
+
+for (const [key, expected] of Object.entries(REWRITE_SYSTEM_PROMPTS_SHA256)) {
+  ok(`快照：REWRITE_SYSTEM_PROMPTS["${key}"] 文本 hash 锁定（拍板逐字，不得改措辞）`, () => {
+    assert.equal(sha256(REWRITE_SYSTEM_PROMPTS[key]), expected);
+  });
+}
+
+ok("rewriteSystemPrompt：未命中/undefined 落 default；default 含禁负资产词清单", () => {
+  assert.equal(rewriteSystemPrompt(undefined), REWRITE_SYSTEM_PROMPTS.default);
+  assert.equal(rewriteSystemPrompt("model-tryon"), REWRITE_SYSTEM_PROMPTS.default);
+  for (const banned of ["8K", "杰作", "大师级", "完美光线", "超高清"]) {
+    assert.match(REWRITE_SYSTEM_PROMPTS.default, new RegExp(banned));
+  }
 });
 
 console.log(`\n${passed} 通过`);

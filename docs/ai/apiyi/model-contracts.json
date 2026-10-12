@@ -29,6 +29,27 @@
     "ambiguousTransportFailure": "outcome_unknown",
     "persistTemporaryUrlsImmediately": true
   },
+  "textModels": {
+    "schemaNote": "提示词改写层文本通道（2026-10-12 拍板）。OpenAI 兼容 chat-completions，与出图 models[] 独立：不参与出图 contractHash / expectedGatewayModelIds 九模型校验。",
+    "endpoint": "/v1/chat/completions",
+    "protocol": "openai-compatible",
+    "defaultModelId": "gemini-3.8-flash",
+    "groups": ["default", "svip"],
+    "reasoningEffort": "medium",
+    "forbiddenParams": ["minimal", "thinkingBudget"],
+    "temperature": 0.4,
+    "maxTokens": 512,
+    "timeoutMs": 20000,
+    "maxRetries": 1,
+    "retryableErrorCodes": ["text_transport_error", "text_rate_limited", "text_upstream_error"],
+    "pricingPerMillionTokens": { "inputUsd": 0.75, "outputUsd": 3.75, "thinkingBilledAsOutput": true },
+    "evidence": {
+      "docUrl": "https://docs.apiyi.com/en/api-capabilities/gemini-3-8-flash/overview",
+      "snapshotPageSha256": "60ad49edb28ee9dc13c72e7cefc2ed120ba97a3d65f80b7dc43624069a22fbbe",
+      "knowledgeBaseSnapshot": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+      "claims": "OpenAI-compatible POST /v1/chat/completions; reasoning_effort 有效值 low/medium/high；minimal 在 OpenAI 兼容端 200 但被静默忽略仍计思考费（禁用）；thinkingBudget:0 为原生端完全关闭机制（本通道不用）；定价 $0.75/$3.75。"
+    }
+  },
   "inputNormalization": {
     "acceptedMimeTypes": [
       "image/png",
