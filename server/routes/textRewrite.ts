@@ -75,9 +75,9 @@ export function resolveDownstreamGenerator(
       typeof rawMode === "string" && IMAGE_OPERATION_MODES.has(rawMode)
         ? rawMode as ImageOperationMode
         : "generate";
-    // familyId：v9 生成节点暂无持久家族字段（见 text-rewriter 白名单说明）。
-    // 若未来 data 新增 familyId（templateId 衍生），在此读 string 透传；现在恒 undefined → default prompt。
-    const rawFamily = data.familyId ?? data.promptFamilyId;
+    // familyId：v9 生成节点的模板来源族字段（schema 已校验、快照投影落盘）。
+    // 只读 v9 正式字段；promptFamilyId 是 v7 死字段，运行时数据里不会再有（C8 豁免面外禁止引用）。
+    const rawFamily = data.familyId;
     const familyId = typeof rawFamily === "string" && rawFamily.trim() !== "" ? rawFamily : undefined;
     return { kind: target.type as "image-generator" | "video-generator", mode, ...(familyId ? { familyId } : {}) };
   }
