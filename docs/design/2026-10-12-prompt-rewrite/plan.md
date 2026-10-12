@@ -99,19 +99,23 @@ type TextChatCompletionResult = {
 
 插入点：`runner.ts:241`（`userPrompt` 算得之后、`:246` 拼装之前）。
 
-触发条件（**已拍板：仅 family 白名单**，见 §7-2）：`userPrompt 非空` 且 `familyId ∈ REWRITE_ENABLED_FAMILIES`（首期 `= ["model-tryon"]`）。
+**familyId 来源（2026-10-12 裁定，见 §7-2）**：v9 已删 variant 六字段，`ImageGeneratorNodeData` 当前无 familyId（仅 kind/operationMode/modelId/modelOptions/aspectRatio/batchSize），运行时 step 亦无 family 上下文。**白名单门控依赖 familyId，必须新增结构标识**——裁定采用 **A 机制：生成节点 data 新增可选 `familyId?: string`，模板实例化时落标**（`builtin-model-tryon` → `familyId:"model-tryon"` 等）。来源不是「从 promptVariantId 解析」（v9 已无 variant），也不是「从 text 正文反推族」（否决，理由见 §7-2）。
+
+触发条件：`userPrompt 非空` 且 `step 对应生成节点 data.familyId ∈ REWRITE_ENABLED_FAMILIES`。
 
 ```
-userPrompt 非空 且 familyId ∈ REWRITE_ENABLED_FAMILIES
+userPrompt 非空 且 data.familyId ∈ REWRITE_ENABLED_FAMILIES
   → rewritten = await textRewriter.rewrite(userPrompt, { kind, mode, familyId })
     → 成功且非空：taskPrompt 用 rewritten 作 userPrompt
     → 失败/空/超时：taskPrompt 用原始 userPrompt（fail-closed）
-userPrompt 空 或 familyId 不在白名单 → 跳过改写，直接用原文
+userPrompt 空 / familyId 缺失 / 不在白名单 → 跳过改写，直接用原文
 ```
 
 改写结果**不进 modeSystemText**（system text 是冻结出图协议文本，语义不同）；改写只作用于 userPrompt 段。
 
-白名单只约束「运行时自动改写」入口；`✨ 帮我补全` 按钮是用户手动触发，**不受白名单限制**（任意 text 节点均可点）。
+白名单只约束「运行时自动改写」入口；`✨ 帮我补全` 按钮是用户手动触发、族无关，**不受白名单限制**（任意 text 节点均可点，family 缺失 → 用 default 改写提示词）。
+
+**过渡态（familyId 落标未就绪前）**：`REWRITE_ENABLED_FAMILIES` 初始设为 `[]`（空集合 = 运行时自动改写全局关闭，fail-closed 安全），等 familyId 落标（A 机制，建议与「模板协议重写」任务合并同批落地）就绪后改为 `["model-tryon"]` 启用。空白名单下运行时改写自然跳过，不影响 ✨按钮与出图主链。
 
 ---
 
@@ -175,7 +179,8 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
 | 文本模型 id / 超时配置 | `server/config.ts`（`apiyiTextModelId`、`aiTextTimeoutMs`） | backend |
 | 改写 system prompt | `server/lib/promptPresetsFrozen.ts` 新增 `REWRITE_SYSTEM_PROMPTS` | backend |
 | 运行时自动改写 | `server/engine/runner.ts:241-246`（userPrompt 计算后、拼装前） | backend |
-| 运行时改写 family 白名单 | `server/lib/textRewriter.ts` 常量 `REWRITE_ENABLED_FAMILIES = ["model-tryon"]`（首期） | backend |
+| 运行时改写 family 白名单 | `server/lib/textRewriter.ts` 常量 `REWRITE_ENABLED_FAMILIES`（初始 `[]`，familyId 落标后改 `["model-tryon"]`） | backend |
+| familyId 落标（A 机制，跨端） | ① `src/types/workflow.ts:165` `ImageGeneratorNodeData` 新增 `familyId?: string`；② `server/lib/workflowSchema.ts:57` `GENERATION_FIELDS` 加 `"familyId"`；③ `src/lib/documentSnapshot.ts:319` 投影白名单加 `"familyId"`；④ 模板定义 `builtin-model-tryon`/`builtin-digital-model` 实例化时写入 `data.familyId`（`src/lib/workflowMenuMapping.ts:36` 映射的 templateId 对应模板） | frontend 首落类型，backend 同步字段清单 |
 | 文本通道契约进 runtime contract | `docs/ai/apiyi/model-contracts.json` 新增顶层 `textModels` 节（`{ endpoint:"/v1/chat/completions", defaultModelId, timeoutMs, maxRetries }`） | backend |
 | 补全按钮 UI | `src/components/nodes/TextNode.tsx:167` textarea 右下角（shadcn 原语 + 图标 + 标题；`disabled: readOnly`） | frontend |
 | 补全客户端 | 新建 `src/lib/textRewriteClient.ts`（fetch `/api/text/rewrite`，拿 `rewritten` 写回 text 节点，走 `useCoalescedTextEdit` + flush 可 undo） | frontend |
@@ -194,6 +199,7 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
 - d. 重试预算：mock 失败 1 次后成功 → 通过；连续失败 2 次 → 放弃并回退；
 - e. system prompt 选型：familyId 命中/未命中 → 对应 prompt 文本；system prompt 含「不得删除/替换/改写」约束句与禁负资产词清单（行为级验收样例）；
 - f. `MAX_REWRITE_CALLS_PER_RUN=1`：runner 集成单测 mock 计数，断言一次 run 至多 1 次改写调用。
+- f2. familyId 白名单判定（A 机制就绪后）：mock step 携带 `data.familyId="model-tryon"` + 非空 prompt → 断言改写被调用；`familyId` 缺失 / 不在白名单 / 空白名单 `[]` → 断言改写**不**被调用且原文直通。
 - g. 文本请求体断言（gemini-3.8-flash 思考控制）：mock fetch 捕获请求体，断言 `model==="gemini-3.8-flash"` 且 `reasoning_effort==="medium"`，且**不含** `"minimal"` 与 `thinkingBudget`（防止误写静默忽略参数或完全关闭）。
 
 路由契约测试（`tests/text-rewrite-route.test.ts`，隔离 PostgreSQL runner）：
@@ -213,7 +219,13 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
    - 若落地改走 Gemini 原生端点 `/v1beta/models/gemini-3.8-flash:generateContent`，对应参数为 `generationConfig.thinkingConfig.thinkingLevel:"medium"`（同样**不得写 minimal**：原生端传 minimal 直接 400 `THINKING_LEVEL_MINIMAL`，更不得写 thinkingBudget:0 与 medium 语义矛盾）；
    - 定价 $0.75/$3.75 每 1M tokens（输入/输出含思考）；结构化输出两端均支持（OpenAI json_schema / 原生 responseSchema，实测逐字节相同），本期不使用（改写输出为自由连续正文）。
    - 落地前 backend 仍须 `docs:apiyi:search` + `docs:apiyi:lookup`（留 receipt）复核后写入 `model-contracts.json` 新增 `textModels` 节。
-2. **运行时自动改写首期范围 = 仅 `model-tryon` 白名单**（`REWRITE_ENABLED_FAMILIES = ["model-tryon"]`，runner 触发处过滤；验证一轮效果后按打磨节奏放开）。`✨` 补全按钮不受白名单限制。
+2. **运行时自动改写首期范围 = 仅 `model-tryon` 白名单**（验证一轮效果后按打磨节奏放开）；`✨` 补全按钮不受白名单限制。
+
+   **familyId 来源裁定（2026-10-12，backend 落地硬冲突核实后）**：v9 已删 variant，`ImageGeneratorNodeData`/运行时 step 均无 familyId。三候选评估——
+   - **A（推荐）**：生成节点 data 新增可选 `familyId?: string`，模板实例化落标（`builtin-model-tryon`→`"model-tryon"`）。忠实、显式、可机检、向前兼容；跨端面 = workflow.ts 类型 + workflowSchema.ts:57 字段清单 + documentSnapshot.ts:319 投影 + 模板定义打标（4 处，均为「加一个可选字段」机械改动）。与「模板协议重写」任务解耦（familyId 是纯标识，不依赖协议文本内容）。
+   - **B（否决）**：运行时对照 text 正文是否以冻结族协议文本开头反推 family。否决理由：① `model-tryon` 协议文本当前**不存在**（`FROZEN_PRESET_FAMILY_IDS` 无此族，依赖「模板协议重写」先行落地，硬串行）；② family 是结构语义，从用户可编辑自由文本反推不可靠——用户删改协议文本或手动建节点（不用模板）则永远 miss、运行时改写静默失效；③ 协议文本重写即前缀变更，匹配逻辑双重维护。
+   - **C（兜底）**：运行时自动改写延后到二期，本期只交 ✨按钮。用户拍板的是 A+B 两入口，延后需用户认可。
+   - **落地安排**：本期（prompt-rewrite）交 ✨按钮 + 文本通道 + 改写核心（族无关部分）；`REWRITE_ENABLED_FAMILIES` 初始 `[]`（运行时改写关闭）；familyId 落标（A）与「模板协议重写」合并同批落地后就绪，届时白名单改 `["model-tryon"]`。若用户不接受 A 跨端面，则选 C。
 3. **改写结果写回**：补全按钮 = 写回 text 节点（`useCoalescedTextEdit` + flush，可 undo）；运行时自动改写 = 只进本次 run 快照，**不回写**（不静默改用户正文）。
 4. **评估证据**：不独立保存「改写前/后」对照字段（run 快照已含最终 taskPrompt，自然计入）。
 
