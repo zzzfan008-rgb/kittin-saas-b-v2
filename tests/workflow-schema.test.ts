@@ -142,6 +142,80 @@ function main() {
     );
   });
 
+  // 2026-10-12 model-tryon A 机制：image-generator 可选 familyId（模板实例化落标）。
+  ok("familyId：image-generator 带合法非空字符串 → 保留；缺省 → data 不含该键", () => {
+    const withFamily = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageGeneratorNode("g1", { familyId: "model-tryon" })],
+      [promptEdge("e1", "t1", "g1")],
+    ));
+    const dataWith = withFamily.nodes.find((n) => n.id === "g1")?.data as Record<string, unknown>;
+    assert.equal(dataWith.familyId, "model-tryon");
+
+    const noFamily = validateAndMigrateFlow(flow(
+      [textNode("t2"), imageGeneratorNode("g2")],
+      [promptEdge("e2", "t2", "g2")],
+    ));
+    const dataNo = noFamily.nodes.find((n) => n.id === "g2")?.data as Record<string, unknown>;
+    assert.ok(!("familyId" in dataNo), "缺省 familyId 不得写入空键（窄化投影）");
+  });
+
+  for (const bad of ["", "   "]) {
+    ok(`familyId：image-generator 带空串/纯空白（${JSON.stringify(bad)}）→ fail`, () => {
+      assert.throws(
+        () => validateAndMigrateFlow(flow(
+          [textNode("t1"), imageGeneratorNode("g1", { familyId: bad })],
+          [promptEdge("e1", "t1", "g1")],
+        )),
+        (e: unknown) => e instanceof WorkflowValidationError && /familyId/.test(e.message),
+      );
+    });
+  }
+
+  ok("familyId：非字符串（number）→ fail", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageGeneratorNode("g1", { familyId: 123 })],
+        [promptEdge("e1", "t1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /familyId/.test(e.message),
+    );
+  });
+
+  ok("familyId：输入节点 text/image 携带 → fail（GENERATION_FIELDS 反向清单）", () => {
+    const textWithFamily: Record<string, unknown> = {
+      ...textNode("t1"),
+      data: { ...(textNode("t1").data as Record<string, unknown>), familyId: "model-tryon" },
+    };
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textWithFamily, imageGeneratorNode("g1")],
+        [promptEdge("e1", "t1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /输入节点不得携带生成语义字段/.test(e.message),
+    );
+
+    const imageWithFamily: Record<string, unknown> = {
+      ...imageNode("i1"),
+      data: { ...imageNode("i1").data, familyId: "model-tryon" },
+    };
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [imageWithFamily, imageGeneratorNode("g1")],
+        [referenceEdge("e2", "i1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /输入节点不得携带生成语义字段/.test(e.message),
+    );
+  });
+
+  ok("familyId：video-generator 携带 → 静默剥离不报错（本期 video 不使用 familyId）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), videoGeneratorNode("v1", { familyId: "model-tryon" })],
+      [promptEdge("e1", "t1", "v1")],
+    ));
+    const data = result.nodes.find((n) => n.id === "v1")?.data as Record<string, unknown>;
+    assert.ok(!("familyId" in data), "video-generator 的 familyId 必须被白名单重建剥离");
+  });
+
   ok("C7：result-image sourceGeneratorId 命中非生成节点被拒绝", () => {
     assert.throws(
       () => validateAndMigrateFlow(flow([textNode("t1"), imageGeneratorNode("g1"), resultImageNode("r1", "t1")], [promptEdge("e1", "t1", "g1")])),

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-12T06:13:23.153Z",
+  "baseCommit": "3166e5a3bf16ca12add9e8087feb5e706662a8eb",
+  "changeFingerprintSha256": "46dc9e156c47363743b012e81c8b69dc0e22b33da63b485e8eb9193b8c7a9b2b",
+  "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
+  "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
+  "query": "gemini-3.8-flash 提示词改写 chat completions 工作流 family 白名单 运行时",
+  "affectedPaths": [
+    "server/engine/dag.ts",
+    "server/lib/workflowSchema.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-reference/chat/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-reference/chat/chat-completions.md",
+      "pageLocalPath": "pages/en/api-reference/chat/chat-completions.md",
+      "title": "Chat Completions",
+      "sha256": "41496c681aead0226a649d3183b08d6d6c08b13a2f9933a818f0ca9a87361ac3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-reference/chat/chat-completions",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-reference/chat/chat-completions.md",
+      "pageLocalPath": "pages/api-reference/chat/chat-completions.md",
+      "title": "Chat Completions",
+      "sha256": "ae5685e713e982547ce42b9d5156019fb9f2f81756325c8b0723dd6f95856491"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 兼容模式调用",
+      "sha256": "bb3737ffdded8fa58f6af6bdcb3a90eca04cd27b09a2b13d65cd1910a06683a9"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/en/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/en/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions Compatible Mode",
+      "sha256": "d2325c6660d0d2140d432a2bf0996ebc30d859a96c76a0f328c6a23d2de5d8d6"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ru/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ru/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ru/api-capabilities/openai/compatible.md",
+      "title": "Режим совместимости OpenAI Chat Completions",
+      "sha256": "70c44e098c4702577de6848f03129714bd20c942062d7cd304a096c692d3086c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/zh-Hant/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/zh-Hant/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 相容模式呼叫",
+      "sha256": "09a489e352081dbbc20e42631f8f85522da2cc8f596513b1fb78f0c166b00cba"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ja/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ja/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 互換モード",
+      "sha256": "97b282ab2fa552c646808707689a2c03ae6ae391845fb5aa2b7e11b6a61645e0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/openai/compatible",
+      "snapshotRelativePath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/ko/api-capabilities/openai/compatible.md",
+      "pageLocalPath": "pages/ko/api-capabilities/openai/compatible.md",
+      "title": "OpenAI Chat Completions 호환 모드",
+      "sha256": "0f72dddabafb485eab2e8c35e1c278dbfb639d7d9056316930b3059b9fcda816"
+    }
+  ],
+  "decisionSummary": "model-tryon A 机制 familyId 字段的服务端契约面（docs/design/2026-10-12-model-tryon-template/plan.md §1.2/§4-5）：①workflowSchema GENERATION_FIELDS 追加 familyId（输入节点 text/image/video 携带即 fail 的反向清单同步生效），image-generator case 以 optionalString(nonEmpty) 解析并窄化返回（有值才写），video-generator 不读不带（白名单重建静默剥离）；②dag.extractParams 的 image-generator 分支把 data.familyId 只透传不校验地带入 step.params（缺省不注入），供 runner 运行时提示词改写白名单门控。改动不触及任何 API易 网关模型 id/端点/请求参数/付费准入/重试语义——familyId 是纯工作流结构标识；文本通道模型 gemini-3.8-flash、reasoning_effort=medium、禁 minimal/thinkingBudget 等 API易 契约事实由同期 receipt prompt-rewrite-text-channel 覆盖。过渡态 REWRITE_ENABLED_FAMILIES=[]，runner 尚 不消费 familyId，故本批为纯加法、零运行时行为变化（familyId 能存能透传但不触发任何改写）。",
+  "unresolvedChoices": []
+}
