@@ -277,3 +277,9 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
 5. **知识门（落地硬前提）**：backend 落地前必须 `docs:apiyi:lookup` 核实 `gemini-nano-banana-2.1` overview 完整参数页（端点 /14 比例 / 尺寸 1K-4K / 默认思考），留 receipt 写 `docs/ai/apiyi/consultations/`，再改 `model-contracts.json`；contractHash 与 9 处 `expectedGatewayModelIds` 全表数组走既有语义信封校验重算（`imageModels.ts:93-100` 加载即校验，改错即模块加载抛错，fail-closed 防线）。
 
 落地顺序（backend 照做）：① lookup 留 receipt → ② imageModels.ts:10 + model-contracts.json 条目（含删 512、hash 重算）→ ③ apiyi.ts 三处 case → ④ imageModels.ts:291 宽高比归一 + providerPromptRenderer.ts:40 + aiDiagnostics.ts:91-92 → ⑤ retiredImageModels.ts 加旧 id → ⑥ tests/ 同步（§10.2-9 清单）→ ⑦ `npm run check` + `tsc --noEmit` + 相关测试 + `npm run gate:codex -- --base origin/main` 全绿。
+
+## 11. 落地指令补充（orchestrator 2026-10-12，backend 必读）
+
+1. **已批准先行落地全部不依赖 familyId 白名单的部分**：config(apiyiTextModelId/aiTextTimeoutMs)、server/lib/textChat.ts、REWRITE_SYSTEM_PROMPTS（§3 逐字）+ rewriteSystemPrompt、textRewriter 核心（familyId optional、命中→default）、✨按钮路由 POST /api/text/rewrite、model-contracts.json textModels 节（对齐既有 src/types/textModels.ts 体系）、及 §6 中不依赖白名单的全部测试。
+2. **runner 运行时白名单门控 + §6-f 暂缓**：familyId 无来源（v9 删 variant 属实，已核实），机制待用户拍板（候选：E=冻结协议文本前缀匹配 / A=节点加 familyId 字段 / C=运行时改写延后）。**禁止自行发明 family 来源机制。**
+3. 出图模型替换 §10 按既有排队任务在改写层交付后接续。
