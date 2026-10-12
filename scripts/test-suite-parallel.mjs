@@ -88,6 +88,8 @@ const TEST_FILES = [
   "tests/mask-upload.test.ts",
   // 65d v2：editDraftUpload JSON 传输契约（纯函数，不碰库）。
   "tests/edit-draft-upload.test.ts",
+  // 提示词改写客户端契约（POST /api/text/rewrite，纯函数，不碰库）。
+  "tests/text-rewrite-client.test.ts",
   "tests/static-frontend.test.ts",
   "tests/sqlite-postgres-migration.test.ts",
   "tests/auth-storage.test.ts",

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -63,6 +65,102 @@ test("文本节点：工具条动作齐全（含预设下拉），正文可编�
   const unselected = render(node, false);
   assert.doesNotMatch(unselected, /role="toolbar"/);
   assert.match(unselected, /一件棉质白衬衫/);
+});
+
+test("文本节点：「帮我补全」按钮有正文时可点，空正文禁用并提示", () => {
+  const nodeWithText = {
+    id: "text-rewrite-1",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text: "一条红色连衣裙" },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-with-text",
+    projectName: "有正文",
+    nodes: [nodeWithText],
+    edges: [],
+  });
+  const html = render(nodeWithText);
+  // 按钮存在，带 ✨ 图标（SparklesIcon 渲染为 svg）和「帮我补全」文案。
+  assert.match(html, /data-testid="text-rewrite-button"/, "缺少帮我补全按钮");
+  assert.match(html, /帮我补全/);
+  // 有正文时按钮不禁用（无 disabled="" 属性；注意 class 里的 disabled: 前缀是 Tailwind 伪类）。
+  const buttonTag = html.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(buttonTag, "按钮标签必须可定位");
+  assert.ok(!/disabled=""/.test(buttonTag), "有正文时按钮不应禁用");
+  // 提示挂在外层 span（disabled 按钮不触发 hover，title 必须在可 hover 的包装元素上）。
+  const wrapTag = html.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(wrapTag, "按钮外层包装 span 必须存在");
+  assert.match(wrapTag, /title="AI 补全提示词"/, "有正文时 title 为 AI 补全提示词");
+  assert.match(wrapTag, /nodrag/, "包装元素必须 nodrag 防拖动");
+
+  // 空正文节点：按钮禁用且包装 title 提示「先写点要求再补全」。
+  const emptyNode = {
+    id: "text-rewrite-empty",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text: "" },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-empty",
+    projectName: "空正文",
+    nodes: [emptyNode],
+    edges: [],
+  });
+  const emptyHtml = render(emptyNode);
+  const emptyButtonTag = emptyHtml.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(emptyButtonTag, "空正文也应有按钮");
+  assert.match(emptyButtonTag, /disabled=""/, "空正文时按钮必须禁用");
+  const emptyWrapTag = emptyHtml.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(emptyWrapTag, "空正文也应有包装 span");
+  assert.match(emptyWrapTag, /先写点要求再补全/, "空正文 title 必须提示先写要求");
+});
+
+test("文本节点：只读项目中「帮我补全」按钮禁用（源码接线断言；SSR useSyncExternalStore 不反映 store 变更）", () => {
+  // SSR 下 zustand 钩子固定读 server snapshot（默认非只读），无法通过 renderToStaticMarkup
+  // 验证只读态；此处用源码接线断言锁定 disabled/title/handler 三处 readOnly 门控，
+  // 行为由 e2e 只读项目用例覆盖。
+  const source = readFileSync(
+    fileURLToPath(new URL("../src/components/nodes/TextNode.tsx", import.meta.url)),
+    "utf8",
+  );
+  // 按钮 disabled 表达式含 readOnly
+  assert.match(
+    source,
+    /disabled=\{readOnly \|\| rewriting \|\| !hasText\}/,
+    "按钮 disabled 必须含 readOnly 门控",
+  );
+  // title 文案含只读提示
+  assert.match(source, /只读项目不能改写提示词/);
+  // handler 首行门控 readOnly
+  assert.match(
+    source,
+    /if \(readOnly \|\| rewriting \|\| !projectId\) return/,
+    "handleRewrite 必须门控 readOnly",
+  );
+  // 成功写回走 updateValue+flush（与预设写入同款，可 undo）
+  assert.match(
+    source,
+    /textEdit\.updateValue\(result\.rewritten\)/,
+    "成功改写必须走 textEdit.updateValue",
+  );
+  assert.match(
+    source,
+    /textEdit\.flush\(\)/,
+    "成功改写必须 flush（落历史栈，可 undo）",
+  );
+  // null 守卫：rewritten === null 时不写回（静默保持原文）
+  assert.match(
+    source,
+    /if \(result\.rewritten !== null\)/,
+    "rewritten 为 null 时不得写回",
+  );
+  // catch 块静默（不弹错、不覆盖原文）
+  assert.match(
+    source,
+    /catch \{\s*\/\/ 网络错误\/403\/400 → 静默降级，保持原文\s*\}/,
+    "网络/HTTP 错误必须静默降级",
+  );
 });
 
 test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运行闸门按兼容判定", () => {

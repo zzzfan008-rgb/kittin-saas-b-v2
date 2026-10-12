@@ -14,7 +14,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
-import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
+import { SparklesIcon, LoaderCircleIcon } from "lucide-react";
+import { selectActiveReadOnly, selectActiveProjectId, useFlowStore } from "@/store/flowStore";
 import type { TextNodeData } from "@/types/workflow";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
@@ -22,6 +23,8 @@ import { ColorToolPanel } from "./ColorToolPanel";
 import { ColorChip, type ColorChipEntry } from "./ColorChip";
 import { duplicateNode } from "./nodeDuplicate";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
+import { rewritePromptText } from "@/lib/textRewriteClient";
+import { Button } from "@/components/ui/button";
 import {
   parseColorChips,
   removeColorChip,
@@ -42,6 +45,7 @@ const TEXTAREA_MAX_HEIGHT = 320;
  */
 export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
+  const projectId = useFlowStore(selectActiveProjectId);
   const textEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "text" },
     { multiline: true },
@@ -49,6 +53,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
   const [inputActive, setInputActive] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
   const presetOptions = useMemo(() =>
     listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
   []);
@@ -130,6 +135,36 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
     [data.text, textEdit, readOnly],
   );
 
+  /** 「✨ 帮我补全」：调用改写服务，成功写回正文（可 undo），失败静默保持原文。 */
+  const handleRewrite = useCallback(async () => {
+    if (readOnly || rewriting || !projectId) return;
+    // 优先读 textarea 即时值（含未 flush 的键入）；阅读态回退 data.text。
+    const current = (textareaRef.current?.value ?? data.text ?? "").trim();
+    if (!current) return; // 空正文：按钮已禁用，此为防御性静默返回
+    setRewriting(true);
+    try {
+      const result = await rewritePromptText({ text: current, projectId, nodeId: id });
+      if (result.rewritten !== null) {
+        textEdit.updateValue(result.rewritten);
+        textEdit.flush();
+      }
+      // rewritten === null → 静默降级，保持原文（不弹错）
+    } catch {
+      // 网络错误/403/400 → 静默降级，保持原文
+    } finally {
+      setRewriting(false);
+    }
+  }, [data.text, textEdit, readOnly, rewriting, projectId, id]);
+
+  /** 按钮（禁用态）不触发 hover，title 放外层 span 才能在悬停时显示提示。 */
+  const rewriteTitle = readOnly
+    ? "只读项目不能改写提示词"
+    : rewriting
+      ? "正在补全…"
+      : !hasText
+        ? "先写点要求再补全"
+        : "AI 补全提示词";
+
   return (
     <>
       <NodeFrame
@@ -189,7 +224,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
               aria-readonly="true"
               aria-label="提示词正文（双击或回车进入编辑）"
               tabIndex={0}
-              className={`max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-[2px] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
+              className={`max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-[2px] px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
                 hasText ? "min-h-[44px]" : "min-h-[88px]"
               }`}
               onDoubleClick={() => {
@@ -246,10 +281,35 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             }}
             onFocus={() => setInputActive(true)}
             onBlur={() => setInputActive(false)}
-            className={`w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
+            className={`w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
               hasText ? "min-h-[44px]" : "min-h-[88px]"
             } ${inputActive ? "nodrag cursor-text" : "hidden"}`}
           />
+
+          {/* 「✨ 帮我补全」按钮——槽位右下角，阅读/编辑两态均可见（nodrag 防拖动）。
+              空正文/只读禁用；disabled 按钮不触发 hover，故 title 挂外层 span 才能显示
+              「先写点要求再补全」等提示；请求中显示 loading。 */}
+          <span
+            className="nodrag absolute right-1.5 bottom-1.5 inline-flex"
+            title={rewriteTitle}
+            data-testid="text-rewrite-wrap"
+          >
+            <Button
+              variant="outline"
+              size="xs"
+              data-testid="text-rewrite-button"
+              disabled={readOnly || rewriting || !hasText}
+              onClick={handleRewrite}
+              className="h-6 gap-0.5 border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-1.5 text-[11px] opacity-90 hover:opacity-100"
+            >
+              {rewriting ? (
+                <LoaderCircleIcon className="size-3 animate-spin" />
+              ) : (
+                <SparklesIcon className="size-3" />
+              )}
+              <span>{rewriting ? "补全中" : "帮我补全"}</span>
+            </Button>
+          </span>
         </div>
         {colorToolOpen && (
           <ColorToolPanel

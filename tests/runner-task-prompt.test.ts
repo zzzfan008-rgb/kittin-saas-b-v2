@@ -6,12 +6,41 @@
  * - edit = 用户文本 + 参考图列表（image.edit 系统文本为空，编辑协议文本随预设模板进正文）
  * - 裸 API 回归：params.prompt 直发
  * - C6：Provider 请求不携带 variant 绑定字段
+ * - 提示词改写集成（runner 自动改写 §1.4 + §7-3）
  * 运行：node node_modules/tsx/dist/cli.mjs tests/runner-task-prompt.test.ts
  */
 import assert from "node:assert/strict";
 import sharp from "sharp";
 import type { AIProvider, ImageGenRequest, ImageGenResult, NodeExecution } from "../src/types/workflow";
 import { executeStep } from "../server/engine/runner";
+
+// 改写集成：executeStep 的 rewriteDeps.chatCompletion 注入 mock。
+// 绕过了 undici dispatcher + fetch 层，直接 mock chatCompletion 结果。
+let rewriteCallCount = 0;
+
+function mockChatCompletion(rewrittenText: string) {
+  rewriteCallCount = 0;
+  return {
+    chatCompletion: async () => {
+      rewriteCallCount += 1;
+      return {
+        content: rewrittenText,
+        finishReason: "stop",
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      };
+    },
+  };
+}
+
+function mockChatCompletionError() {
+  rewriteCallCount = 0;
+  return {
+    chatCompletion: async () => {
+      rewriteCallCount += 1;
+      throw new Error("channel unavailable");
+    },
+  };
+}
 
 let passed = 0;
 function ok(name: string, fn: () => void | Promise<void>): Promise<void> | void {
@@ -166,6 +195,124 @@ async function main() {
     }), [], () => fakeProvider(calls));
     assert.equal(calls[0].request.prompt, "正文");
     assert.equal(calls[0].request.operationMode, "generate");
+  });
+
+  // ===== 提示词改写集成（runner 自动改写 §1.4 + §7-3）=====
+
+  await ok("改写集成：familyId=model-tryon + 非空 prompt → taskPrompt 含改写文本", async () => {
+    const calls: CapturedCall[] = [];
+    const deps = mockChatCompletion("简洁商业白色连衣裙正面展示");
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        inputTexts: ["白色连衣裙"],
+        familyId: "model-tryon",
+      }),
+      [],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1, "应发出 provider 请求");
+    assert.ok(
+      calls[0].request.prompt.includes("简洁商业白色连衣裙正面展示"),
+      `taskPrompt 应含改写文本，实际: ${calls[0].request.prompt.slice(0, 80)}`,
+    );
+    assert.equal(rewriteCallCount, 1, "每 run 最多 1 次改写调用");
+  });
+
+  await ok("改写集成：familyId 缺失（undefined）→ 不调用通道，原文进 taskPrompt", async () => {
+    const calls: CapturedCall[] = [];
+    const deps = mockChatCompletion("should-not-be-called");
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        inputTexts: ["一件白色连衣裙"],
+        // 无 familyId
+      }),
+      [],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].request.prompt, "一件白色连衣裙", "familyId 缺失时应用原文");
+    assert.equal(rewriteCallCount, 0, "familyId 缺失不应调用改写通道");
+  });
+
+  await ok("改写集成：familyId 非 model-tryon（不在白名单）→ 不调用通道", async () => {
+    const calls: CapturedCall[] = [];
+    const deps = mockChatCompletion("should-not-be-called");
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        inputTexts: ["电商主图"],
+        familyId: "fashion-lookbook",
+      }),
+      [],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].request.prompt, "电商主图");
+    assert.equal(rewriteCallCount, 0, "非白名单 familyId 不应调用改写通道");
+  });
+
+  await ok("改写集成：非空 prompt 但 familyId 缺失 → 不调用改写通道", async () => {
+    // 原文通过 mock 验证 rewriteCallCount === 0；runner API 本身要求 non-empty prompt（空时报"节点 image 没有可发送的提示词"）。
+    const calls: CapturedCall[] = [];
+    const deps = mockChatCompletion("should-not-be-called");
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        inputTexts: ["一件白色连衣裙"], // 非空 prompt
+        // 无 familyId
+      }),
+      [],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].request.prompt, "一件白色连衣裙");
+    assert.equal(rewriteCallCount, 0, "familyId 缺失不应调用改写通道");
+  });
+
+  await ok("改写集成：通道抛错（reject）→ 降级用原文，不阻断 provider", async () => {
+    const originalText = "一件白色连衣裙";
+    const deps = mockChatCompletionError();
+    const calls: CapturedCall[] = [];
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        inputTexts: [originalText],
+        familyId: "model-tryon",
+      }),
+      [],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1, "provider 仍应被调用");
+    assert.equal(calls[0].request.prompt, originalText, "通道 5xx 时用原文降级");
+  });
+
+  await ok("改写集成：operationMode=edit 时同样生效", async () => {
+    const calls: CapturedCall[] = [];
+    const deps = mockChatCompletion("将服装模特展示");
+    await executeStep(
+      imageStep({
+        modelId: "gpt-image-2.5-flare-vip",
+        operationMode: "edit",
+        inputTexts: ["把这件衣服穿到模特身上"],
+        familyId: "model-tryon",
+      }, [PNG_DATA_URL]),
+      [PNG_DATA_URL],
+      () => fakeProvider(calls),
+      { rewriteDeps: deps },
+    );
+    assert.equal(calls.length, 1);
+    assert.ok(
+      calls[0].request.prompt.includes("将服装模特展示"),
+      `edit 模式改写后 taskPrompt: ${calls[0].request.prompt.slice(0, 80)}`,
+    );
+    assert.equal(rewriteCallCount, 1);
   });
 
   console.log(`\n${passed} 通过`);

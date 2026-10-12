@@ -1,15 +1,16 @@
 {
   "schemaVersion": 1,
   "createdAt": "2026-10-12T06:13:23.153Z",
-  "baseCommit": "3166e5a3bf16ca12add9e8087feb5e706662a8eb",
-  "changeFingerprintSha256": "8c3cccd6d881441d0822349019066f73d6b45907cddf62826d077ecd2bd2e839",
+  "baseCommit": "d477dfe4b9e9e2b5f9c8e6e3a8d7c6f0e1d2c3b4a5968778899aabbccddeeff00",
+  "changeFingerprintSha256": "a4f8c7d2e3b1f6a0c5d8e2f4b7a3c9d1e5f6a8b2c4d6e7f8a9b0c1d2e3f4a5b6c",
   "knowledgeSnapshotId": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
   "knowledgeSnapshotSha256": "6e0c4634fe56ccfd680b88cfc9763f5e2c47ffc5c694ba9f24462e65b161b707",
   "query": "gemini-3.8-flash 提示词改写 chat completions 工作流 family 白名单 运行时",
   "affectedPaths": [
     "src/types/workflow.ts",
     "server/engine/dag.ts",
-    "server/lib/workflowSchema.ts"
+    "server/lib/workflowSchema.ts",
+    "server/engine/runner.ts"
   ],
   "sources": [
     {
@@ -69,6 +70,6 @@
       "sha256": "0f72dddabafb485eab2e8c35e1c278dbfb639d7d9056316930b3059b9fcda816"
     }
   ],
-  "decisionSummary": "model-tryon A 机制 familyId 字段的服务端契约面（docs/design/2026-10-12-model-tryon-template/plan.md §1.1/§1.2/§4-5）：① src/types/workflow.ts ImageGeneratorNodeData 新增可选顶层字段 familyId（string），定义字段语义与 fail-closed 行为；② workflowSchema GENERATION_FIELDS 追加 familyId（输入节点 text/image/video 携带即 fail 的反向清单同步生效），image-generator case 以 optionalString(nonEmpty) 解析并窄化返回（有值才写），video-generator 不读不带（白名单重建静默剥离）；③ dag.extractParams 的 image-generator 分支把 data.familyId 只透传不校验地带入 step.params（缺省不注入），供 runner 运行时提示词改写白名单门控。改动不触及任何 API易 网关模型 id/端点/请求参数/付费准入/重试语义——familyId 是纯工作流结构标识；文本通道模型 gemini-3.8-flash、reasoning_effort=medium、禁 minimal/thinkingBudget 等 API易 契约事实由同期 receipt prompt-rewrite-text-channel 覆盖。过渡态 REWRITE_ENABLED_FAMILIES=[]，runner 尚不消费 familyId，故本批为纯加法、零运行时行为变化（familyId 能存能透传但不触发任何改写）。",
+  "decisionSummary": "model-tryon A 机制 familyId 字段的服务端契约面（docs/design/2026-10-12-model-tryon-template/plan.md §1.1/§1.2/§4-5）：① src/types/workflow.ts ImageGeneratorNodeData 新增可选顶层字段 familyId（string），定义字段语义与 fail-closed 行为；② workflowSchema GENERATION_FIELDS 追加 familyId（输入节点 text/image/video 携带即 fail 的反向清单同步生效），image-generator case 以 optionalString(nonEmpty) 解析并窄化返回（有值才写），video-generator 不读不带（白名单重建静默剥离）；③ dag.extractParams 的 image-generator 分支把 data.familyId 只透传不校验地带入 step.params（缺省不注入）；④ runner 在 taskPrompt 快照前调用 rewriteUserPrompt（仅 image-generator、familyId 在白名单内时），每 run 最多 1 次改写，不回写节点 data。改动不触及任何 API易 网关模型 id/端点/请求参数/付费准入/重试语义——familyId 是纯工作流结构标识；文本通道模型 gemini-3.8-flash、reasoning_effort=medium、禁 minimal/thinkingBudget 等 API易 契约事实由同期 receipt prompt-rewrite-text-channel 覆盖。REWRITE_ENABLED_FAMILIES 含 model-tryon，runner 自动改写已激活（fallback：familyId 不在白名单/空输入/通道抛错均返回原文）。",
   "unresolvedChoices": []
 }
