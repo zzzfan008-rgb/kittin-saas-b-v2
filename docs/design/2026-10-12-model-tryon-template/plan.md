@@ -273,3 +273,33 @@ dag/runner（backend）：
 6. PR 前如需重建干净提交链（上轮 amend 撞车），自行整理并验证 `git diff fa7f1d7 -- src/components/nodes/ImageNode.tsx` 为空。
 
 每步门槛：全量 PG 绿 + `tsc --noEmit` 0。完成后报 <sha> 清单。
+### 8.2 拿到后按序连做（§6 顺序）
+1. **#7-9 两段冻结文本**：`PRESET_TEMPLATE_TEXTS["model-tryon:edit"]`（§2.1）+ `REWRITE_SYSTEM_PROMPTS["model-tryon"]`（§2.4），**逐字照本文件原文**，落表后重算真实 sha256（勿用预算值硬编码）。
+2. **同步 tests/prompt-presets-frozen.test.ts**：11 族→12、14 条→15、加新条目 sha256（只有你能改）。
+3. catalog 应转全绿（15=15，四处断言：条数/逐 server 条目反查/族 deepEqual/显式 variantId 双端函数）。
+4. **#10-13 模板打标/3:4/种子双改 + ensure 指纹回填**：注意 `data/templates/builtin/builtin-model-tryon.json` 文本换新协议**必须与 #8 冻结条目同一提交**（catalog 3c-4 段要求 JSON 文本唯一命中冻结表）。
+5. **#16 白名单** `[] → ["model-tryon"]` 单独提交（可单点回滚）。
+6. PR 前如需重建干净提交链（上轮 amend 撞车），自行整理并验证 `git diff fa7f1d7 -- src/components/nodes/ImageNode.tsx` 为空。
+
+每步门槛：全量 PG 绿 + `tsc --noEmit` 0。完成后报 <sha> 清单。
+
+---
+
+## 9. orchestrator 终检结论（2026-10-12；DM busy 未达，指令以此文档为准）
+
+### 9.1 通过项（orchestrator 独立复跑/比对，非采信自述）
+- `tsc --noEmit` 0；PG 全量 **80/80**。
+- 两段冻结文本与 §2.1/§2.4 **逐字一致**（按代码块抽取 + sha256：preset 404 字符 `b593e8b9…`、rewrite 451 字符 `72768654…`）。
+- `data/templates/builtin/builtin-model-tryon.json` 与代码定义一致（text sha `b593e8b9…`、familyId=model-tryon、aspectRatio=3:4）。
+- `server/routes/templates.ts:157/160` 打标 + requirePresetText("model-tryon","edit") 到位；`textRewriter.ts:31` 白名单 `["model-tryon"]` 已开。
+
+### 9.2 必补缺口：ensureBuiltinTemplates 指纹回填（§1.5 未落地）
+`server/routes/templates.ts:470-484` 现仍是「文件缺失/不可读才写入」，**未做内容指纹比对**。
+后果：已部署环境磁盘 JSON 为旧内容且「可读」→ 永不回填 → 拉新版本后模板仍是旧协议文本、无 familyId、1:1 画幅；git pull 与持久卷两条路径都收敛不到代码定义，本批改造在真实部署上等于未生效。
+
+要求：
+1. 按 §1.5 实现内容指纹回填（序列化为稳定 JSON 的 sha256 vs 磁盘文件解析后的**规范形**比对；不得比文件字节；thumbnail 等响应态字段不参与）；
+2. 测试：陈旧可读 JSON（缺 familyId / 旧文本）→ ensure 后回填为代码定义；内容一致的 JSON 不被无谓重写；
+3. 全量 PG 绿 + tsc 0 后提交并报 <sha>。
+
+补齐这一项即可交 reviewer 门禁。
