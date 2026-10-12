@@ -143,8 +143,16 @@ export function createTextRewriteRouter(deps: TextRewriteRouterDeps = {}): Route
     }
 
     // ---- 改写；任何失败降级 200 + null（绝不 5xx 阻断）。每次请求解析注入点（测试可替换）。----
+    // HTTP 边界自持 fail-closed：rewriteUserPrompt 内部已吞错，但注入点（deps.rewrite/测试替身）
+    // 可能 reject——此处再兜一层，保证路由头「绝不 5xx」的承诺不依赖被调方实现。
     const rewrite = deps.rewrite ?? rewriteUserPrompt;
-    const outcome = await rewrite(text, context);
+    let outcome;
+    try {
+      outcome = await rewrite(text, context);
+    } catch {
+      res.json({ rewritten: null, skipped: true });
+      return;
+    }
     if (outcome.rewritten) {
       res.json({ rewritten: outcome.text });
       return;

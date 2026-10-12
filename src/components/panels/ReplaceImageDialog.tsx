@@ -247,6 +247,7 @@ export function ReplaceImageDialog({
                   type="button"
                   onClick={() => onPickFromLibrary(asset.image)}
                   title={asset.name}
+                  disabled={readOnly}
                   className={cardBaseClass}
                 >
                   <img

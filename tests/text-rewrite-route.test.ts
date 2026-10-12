@@ -183,6 +183,16 @@ await test("改写失败/跳过 → 200 {rewritten:null,skipped:true}（绝不 5
   assert.equal(r.body.skipped, true);
 });
 
+await test("注入的 rewrite 自身 reject（HTTP 边界兜底）→ 仍 200 skipped，绝不 5xx", async () => {
+  rewriteDeps.rewrite = async (): Promise<RewriteOutcome> => {
+    throw new Error("注入替身崩溃（模拟边界外异常）");
+  };
+  const r = await call("/api/text/rewrite", { user: "owner", body: { text: "原文", projectId: "rw-proj" } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.rewritten, null);
+  assert.equal(r.body.skipped, true);
+});
+
 server.close();
 await query(`DELETE FROM projects WHERE id = 'rw-proj'`);
 await query(`DELETE FROM users WHERE id IN ('rw-owner', 'rw-other')`);
