@@ -132,7 +132,17 @@ assert.deepEqual(
   0,
   "不得再内联 renderFileInput（改由「从本地上传」按钮触发，input 不再覆盖图片）",
 );
-assert.doesNotMatch(imageNodeSource, /type="file"/, "file input 必须迁到 ReplaceImageDialog（节点内不再内联）");
+// 2026-10-12 用户拍板 A 案：保留双击/Enter 替换弹窗交互，同时允许一个**隐藏** file input 作为
+// a11y 直传路径与 e2e setInputFiles 锚点（可见上传入口仍必须是 ReplaceImageDialog）。
+const hiddenFileInputs = (imageNodeSource.match(/type="file"/g) ?? []).length;
+assert.ok(hiddenFileInputs <= 1, `节点内最多保留 1 个隐藏 file input（实际 ${hiddenFileInputs}）`);
+if (hiddenFileInputs === 1) {
+  assert.match(
+    imageNodeSource,
+    /type="file"[\s\S]{0,400}?className="pointer-events-none absolute h-0 w-0 opacity-0"/,
+    "节点内 file input 必须隐藏（不可见上传入口）",
+  );
+}
 assert.match(imageNodeSource, /ReplaceImageDialog/, "必须通过 ReplaceImageDialog 承载「替换」统一弹窗");
 assert.match(imageNodeSource, /replaceMenuOpen/, "「替换」工具条按钮必须打开统一弹窗");
 assert.doesNotMatch(imageNodeSource, /cursor-zoom-in|单击查看大图/, "点图片不得再触发放大");

@@ -287,6 +287,22 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             }}
           >
             <OrdinalBadgeSlot nodeId={id} />
+            {/* 用户拍板（2026-10-12，A 案）：保留双击/Enter 打开替换弹窗的交互，同时在此保留一个
+                隐藏原生 file input —— 提供 a11y 直传路径与 Playwright setInputFiles 锚点。
+                它不是「可见上传入口」（可见入口仍是弹窗），故不违背 R-101「节点内不得内联可见上传控件」。 */}
+            <input
+              type="file"
+              accept="image/*"
+              multiple={false}
+              disabled={readOnly}
+              tabIndex={-1}
+              aria-label="上传图片"
+              className="pointer-events-none absolute h-0 w-0 opacity-0"
+              onChange={(event) => {
+                void handleFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
             <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
