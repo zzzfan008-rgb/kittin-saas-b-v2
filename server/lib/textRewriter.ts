@@ -20,10 +20,15 @@ import {
 } from "./textChat";
 
 /**
- * 运行时自动改写的 family 白名单（§7-2 拍板：首期仅 model-tryon；验证一轮效果后按打磨节奏放开）。
- * 只约束「运行时自动改写」入口；`✨` 补全按钮是用户手动触发，不受此限。
+ * 运行时自动改写的 family 白名单（§7-2 拍板：首期仅 model-tryon；验证一轮效果后放开）。
+ * 只约束「运行时自动改写」入口；`✨` 补全按钮是用户手动触发、族无关，不受此限。
+ *
+ * 过渡态（plan.md §2.3/§5）：familyId 落标（A 机制：ImageGeneratorNodeData.familyId +
+ * workflowSchema 字段清单 + 模板打标）就绪前，白名单初始为**空集合** = 运行时自动改写
+ * 全局关闭（fail-closed 安全）；落标就绪后改为 ["model-tryon"] 启用。空白名单下运行时
+ * 改写自然跳过，不影响 ✨按钮与出图主链。
  */
-export const REWRITE_ENABLED_FAMILIES = ["model-tryon"] as const;
+export const REWRITE_ENABLED_FAMILIES: readonly string[] = [];
 
 /** §4 成本口径：一次 run 最多 1 次改写调用（runner 内计数断言，§6-f）。 */
 export const MAX_REWRITE_CALLS_PER_RUN = 1;

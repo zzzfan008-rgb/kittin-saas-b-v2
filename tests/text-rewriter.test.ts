@@ -213,10 +213,10 @@ ok("g: 请求体 model=gemini-3.8-flash、reasoning_effort=medium，不含 minim
   assert.ok(!("thinking_config" in captured!), "不得出现任何思考关闭配置");
 });
 
-// 白名单 / 成本常量
-ok("白名单：首期仅 model-tryon；✨ 按钮判定与运行时判定分离", async () => {
-  assert.deepEqual([...REWRITE_ENABLED_FAMILIES], ["model-tryon"]);
-  assert.equal(isRewriteEnabledFamily("model-tryon"), true);
+// 白名单 / 成本常量（过渡态：familyId 落标前白名单为空 = 运行时自动改写全局关闭，plan §2.3/§5）
+ok("白名单：过渡态为空集合（familyId 落标后改 [model-tryon]）；isRewriteEnabledFamily 全 false", async () => {
+  assert.deepEqual([...REWRITE_ENABLED_FAMILIES], []);
+  assert.equal(isRewriteEnabledFamily("model-tryon"), false, "空白名单期即使传 model-tryon 也不改写（fail-closed）");
   assert.equal(isRewriteEnabledFamily("fashion-lookbook"), false);
   assert.equal(isRewriteEnabledFamily(undefined), false);
   assert.equal(MAX_REWRITE_CALLS_PER_RUN, 1);
