@@ -132,7 +132,7 @@ export function ReplaceImageDialog({
   };
 
   const cardBaseClass =
-    "overflow-hidden rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-hover)] text-left transition-colors hover:border-gold/60";
+    "overflow-hidden rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-hover)] text-left transition-colors hover:border-gold/60 disabled:opacity-40";
 
   return (
     <div
