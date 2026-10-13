@@ -90,6 +90,8 @@ const TEST_FILES = [
   "tests/edit-draft-upload.test.ts",
   // 提示词改写客户端契约（POST /api/text/rewrite，纯函数，不碰库）。
   "tests/text-rewrite-client.test.ts",
+  // 「帮我补全」先保存再改写编排（纯逻辑依赖注入，无 DOM 不碰库）。
+  "tests/text-rewrite-flow.test.ts",
   "tests/static-frontend.test.ts",
   "tests/sqlite-postgres-migration.test.ts",
   "tests/auth-storage.test.ts",

@@ -24,6 +24,7 @@ import { ColorChip, type ColorChipEntry } from "./ColorChip";
 import { duplicateNode } from "./nodeDuplicate";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { rewritePromptText } from "@/lib/textRewriteClient";
+import { runPromptRewriteFlow } from "@/lib/textRewriteFlow";
 import { Button } from "@/components/ui/button";
 import {
   parseColorChips,
@@ -54,6 +55,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const [colorToolOpen, setColorToolOpen] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   const [rewriting, setRewriting] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
   const presetOptions = useMemo(() =>
     listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
   []);
@@ -135,26 +137,32 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
     [data.text, textEdit, readOnly],
   );
 
-  /** 「✨ 帮我补全」：调用改写服务，成功写回正文（可 undo），失败静默保持原文。 */
+  /** 「✨ 帮我补全」：先保存（草稿否则 404）→ 调用改写 → 写回正文（可 undo）或透出错。
+   *  编排逻辑在 textRewriteFlow.ts（纯逻辑可单测），本处只做 store/state 适配。 */
   const handleRewrite = useCallback(async () => {
     if (readOnly || rewriting || !projectId) return;
     // 优先读 textarea 即时值（含未 flush 的键入）；阅读态回退 data.text。
     const current = (textareaRef.current?.value ?? data.text ?? "").trim();
     if (!current) return; // 空正文：按钮已禁用，此为防御性静默返回
-    setRewriting(true);
-    try {
-      const result = await rewritePromptText({ text: current, projectId, nodeId: id });
-      if (result.rewritten !== null) {
-        textEdit.updateValue(result.rewritten);
-        textEdit.flush();
-      }
-      // rewritten === null → 静默降级，保持原文（不弹错）
-    } catch {
-      // 网络错误/403/400 → 静默降级，保持原文
-    } finally {
-      setRewriting(false);
-    }
+    await runPromptRewriteFlow(
+      { text: current, projectId, nodeId: id },
+      {
+        saveProject: () => useFlowStore.getState().saveProject(),
+        rewrite: (args) => rewritePromptText(args),
+        commit: (text) => {
+          textEdit.updateValue(text);
+          textEdit.flush();
+        },
+        setError: setRewriteError,
+        setBusy: setRewriting,
+      },
+    );
   }, [data.text, textEdit, readOnly, rewriting, projectId, id]);
+
+  /** 文本变更即清除上一次改写错误（下次点击也会在 flow 起点 setError(null)）。 */
+  useEffect(() => {
+    setRewriteError(null);
+  }, [data.text]);
 
   /** 按钮（禁用态）不触发 hover，title 放外层 span 才能在悬停时显示提示。 */
   const rewriteTitle = readOnly
@@ -310,6 +318,16 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
               <span>{rewriting ? "补全中" : "帮我补全"}</span>
             </Button>
           </span>
+          {/* 改写错误透出行（不再静默吞 404/403/网络等）。截断防超宽，全文在 title。 */}
+          {rewriteError ? (
+            <span
+              className="nodrag pointer-events-none absolute right-1.5 bottom-8 max-w-[170px] truncate text-[10px] leading-tight text-destructive"
+              data-testid="text-rewrite-error"
+              title={rewriteError}
+            >
+              {rewriteError}
+            </span>
+          ) : null}
         </div>
         {colorToolOpen && (
           <ColorToolPanel

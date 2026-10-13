@@ -138,10 +138,21 @@ test("文本节点：只读项目中「帮我补全」按钮禁用（源码接�
     /if \(readOnly \|\| rewriting \|\| !projectId\) return/,
     "handleRewrite 必须门控 readOnly",
   );
-  // 成功写回走 updateValue+flush（与预设写入同款，可 undo）
+  // P1 核心：先保存再走改写（编排在 textRewriteFlow，本处确认组件接了 runPromptRewriteFlow）
   assert.match(
     source,
-    /textEdit\.updateValue\(result\.rewritten\)/,
+    /runPromptRewriteFlow\(/,
+    "改写必须走 textRewriteFlow 编排（先保存防草稿 404）",
+  );
+  assert.match(
+    source,
+    /saveProject: \(\) => useFlowStore\.getState\(\)\.saveProject\(\)/,
+    "必须经过 saveProject 先保存（防项目 404）",
+  );
+  // 成功写回走 updateValue+flush（commit 回调内，与预设写入同款，可 undo）
+  assert.match(
+    source,
+    /textEdit\.updateValue\(text\)/,
     "成功改写必须走 textEdit.updateValue",
   );
   assert.match(
@@ -149,17 +160,22 @@ test("文本节点：只读项目中「帮我补全」按钮禁用（源码接�
     /textEdit\.flush\(\)/,
     "成功改写必须 flush（落历史栈，可 undo）",
   );
-  // null 守卫：rewritten === null 时不写回（静默保持原文）
+  // 错误不再静默吞：透出到 text-rewrite-error 展示位
   assert.match(
     source,
-    /if \(result\.rewritten !== null\)/,
-    "rewritten 为 null 时不得写回",
+    /data-testid="text-rewrite-error"/,
+    "必须渲染改写错误透出行（不再静默 404/403）",
   );
-  // catch 块静默（不弹错、不覆盖原文）
   assert.match(
     source,
-    /catch \{\s*\/\/ 网络错误\/403\/400 → 静默降级，保持原文\s*\}/,
-    "网络/HTTP 错误必须静默降级",
+    /setError: setRewriteError/,
+    "flow 的 setError 必须接组件 state（文案透出）",
+  );
+  // 文本变更即清除上一次错误
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*setRewriteError\(null\);\s*\}, \[data\.text\]\)/,
+    "文本变更必须清除上一次改写错误",
   );
 });
 
