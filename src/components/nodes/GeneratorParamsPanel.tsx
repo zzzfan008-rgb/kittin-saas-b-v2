@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -19,15 +19,17 @@ import {
 } from "@/types/workflow";
 import {
   GENERATION_IMAGE_MODEL_IDS,
-  VIP_SIZE_TIERS_BY_RATIO,
+  VIP_SIZE_DEFAULT_TIER_INDEX,
   defaultImageModelOptions,
   getImageModelContract,
   imageAspectRatioOptions,
   imageModelLabel,
   imageModelOptionsForAspectRatio,
   imageModelOptionsWarnings,
+  imagePromptSizePrefixOptions,
   imageSizeTierOptions,
   isImageModelId,
+  vipSizeTiersForRatio,
   type ImageModelOptions,
 } from "@/types/imageModels";
 import {
@@ -251,6 +253,8 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? imageModelOptionsWarnings(effModel, options)
     : mediaKind === "video" ? videoModelOptionsWarnings(effModel as VideoModelId, options) : [];
   const declaredKeys = Object.keys(recommended);
+  /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.5-all）都有专属控件，不在此重复。 */
+  const renderParamKeys = declaredKeys.filter((k) => k !== "aspectRatio" && k !== "promptSizePrefix");
 
   const aspectRatioOptions = mediaKind === "image" && isImageModelId(effModel)
     ? imageAspectRatioOptions(effModel).map((r) => ({ value: r, label: r }))
@@ -271,14 +275,13 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const patchAspect = (ar: string) => {
     if (mediaKind === "image" && isImageModelId(effModel)) {
       const next = imageModelOptionsForAspectRatio(effModel, options, ar);
-      // 尺寸档位联动：「自动」（未设置 size）切换画幅后保持自动；已选档位保留同档
-      // （快速/标准/高清）；未知 size 值交给契约默认（函数内已置标准档）。
-      const curSize = typeof options.size === "string" ? options.size : undefined;
-      if (curSize === undefined) {
-        delete next.size;
-      } else {
-        const curTiers = VIP_SIZE_TIERS_BY_RATIO[data.aspectRatio ?? ""];
-        const nextTiers = VIP_SIZE_TIERS_BY_RATIO[ar];
+      // 尺寸档位联动：VIP 系已选档位保留同档（快速/标准/高清）；未设置或非法 size 落到新画幅
+      // 的标准档（imageModelOptionsForAspectRatio 内已置标准档）。面板已无「自动」项，
+      // 故不再有「保持自动」的分支。
+      const curSize = typeof options.size === "string" && options.size ? options.size : undefined;
+      if (curSize) {
+        const curTiers = vipSizeTiersForRatio(effModel, data.aspectRatio ?? "");
+        const nextTiers = vipSizeTiersForRatio(effModel, ar);
         const idx = curTiers?.findIndex((t) => t.size === curSize) ?? -1;
         if (idx >= 0 && nextTiers?.[idx]) next.size = nextTiers[idx].size;
       }
@@ -288,11 +291,32 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     }
   };
 
+  const effectiveAspectRatio = data.aspectRatio || "1:1";
+
   /** 「尺寸」参数（仅 VIP 系模型；其他模型的档位由契约参数区自带）。 */
   const sizeTierOptions = mediaKind === "image" && isImageModelId(effModel)
-    ? imageSizeTierOptions(effModel, data.aspectRatio ?? "")
+    ? imageSizeTierOptions(effModel, effectiveAspectRatio)
     : undefined;
-  const curSizeValue = typeof options.size === "string" && options.size ? options.size : "auto";
+  /** VIP 尺寸默认档（标准档）——面板删除「自动」项后未设置/非法 size 的展示与落点。 */
+  const vipDefaultSizeValue = sizeTierOptions?.[VIP_SIZE_DEFAULT_TIER_INDEX]?.value;
+  const curSizeValue = sizeTierOptions && typeof options.size === "string" && sizeTierOptions.some((o) => o.value === options.size)
+    ? options.size
+    : vipDefaultSizeValue ?? "";
+  // VIP 系不允许留空 size（面板已无「自动」项）：旧卡片缺 size 或值已失效时写回标准档，
+  // 避免请求体缺 size → multipart 端拼出 size="undefined" 被上游判为参数不支持。
+  const vipSizeWriteBack = sizeTierOptions && !sizeTierOptions.some((o) => o.value === options.size)
+    ? vipDefaultSizeValue
+    : undefined;
+  useEffect(() => {
+    if (disabled || !vipSizeWriteBack) return;
+    updateNodeData(nodeId, { modelOptions: { ...options, size: vipSizeWriteBack } });
+  }, [disabled, nodeId, options, updateNodeData, vipSizeWriteBack]);
+
+  /** 「尺寸」参数（仅 gpt-image-2.5-all：唯一可控尺寸的手段是拼在 prompt 最前的尺寸前缀）。 */
+  const promptSizeOptions = mediaKind === "image" && isImageModelId(effModel)
+    ? imagePromptSizePrefixOptions(effModel)
+    : undefined;
+  const curPromptSizeValue = typeof options.promptSizePrefix === "string" ? options.promptSizePrefix : "";
 
   const setParam = (k: string, n: string | number) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });
 
@@ -310,7 +334,16 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         disabled={disabled} onChange={patchModel} />
 
       <div className="grid grid-cols-2 gap-2">
-        <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
+        {promptSizeOptions ? (
+          // gpt-image-2.5-all 既不接受 size 也不接受画幅参数，尺寸只能靠 prompt 前缀控制
+          // （契约 recommendedOptions.promptSizePrefix），故画幅位换成尺寸前缀下拉。
+          <OptionSelect label="尺寸" value={curPromptSizeValue} options={promptSizeOptions} disabled={disabled}
+            onChange={(v) => updateNodeData(nodeId, {
+              modelOptions: { ...options, promptSizePrefix: v === "" ? undefined : v },
+            })} />
+        ) : (
+          <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
+        )}
         {mediaKind === "image" && (
           <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
             options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
@@ -320,16 +353,14 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
       {sizeTierOptions && (
         <OptionSelect label="尺寸" value={curSizeValue} options={sizeTierOptions} disabled={disabled}
-          onChange={(v) => updateNodeData(nodeId, {
-            modelOptions: { ...options, size: v === "auto" ? undefined : v },
-          })} />
+          onChange={(v) => updateNodeData(nodeId, { modelOptions: { ...options, size: v } })} />
       )}
 
       <section aria-label="模型参数" className="space-y-1">
-        {declaredKeys.length === 0 && (
+        {renderParamKeys.length === 0 && (
           <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">当前模型没有可调参数。</p>
         )}
-        {declaredKeys.filter((k) => k !== "aspectRatio").map((k) => (
+        {renderParamKeys.map((k) => (
           <ParamControl key={k} name={k} value={options[k]} options={paramOpts[k] ?? []} disabled={disabled}
             onChange={(n) => setParam(k, n)} />
         ))}

@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { maskRedrawReadiness } from "./lib/maskRedraw";
 import { shouldWarnBeforeWorkspaceUnload } from "../src/lib/workspaceUnload";
-import { imageModelAspectRatioPatch } from "../src/types/imageModels";
+import {
+  VIP_SIZE_DEFAULT_TIER_INDEX,
+  getImageModelContract,
+  imageAspectRatioOptions,
+  imageModelAspectRatioPatch,
+  imageModelOptionsForAspectRatio,
+  imagePromptSizePrefixOptions,
+  imageSizeTierOptions,
+} from "../src/types/imageModels";
 import { resolveTargetHandle } from "../src/lib/documentSnapshot";
 import type { Edge } from "@xyflow/react";
 import {
@@ -1487,6 +1495,51 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
     imageNodeSource,
     /modelOptions:\s*\{/,
     "输入节点不得内联编辑原生参数（v8：参数在生成节点内联面板）",
+  );
+});
+
+await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 尺寸档表无「自动」/ -all 尺寸前缀）", () => {
+  // ① VIP×2 画幅补齐为契约 10 比例：此前面板硬编码 5 比例，10 比例 × 3 档里 15 档永远不可达。
+  const vipRatios = imageAspectRatioOptions("gpt-image-2.5-flare-vip");
+  assert.equal(vipRatios.length, 10, "VIP 画幅必须与契约 aspectRatios 的 10 比例一致");
+  assert.deepEqual(
+    vipRatios,
+    getImageModelContract("gpt-image-2.5-flare-vip").aspectRatios,
+    "VIP 画幅下拉必须直接取自契约，不得再硬编码子集",
+  );
+  assert.equal(imageAspectRatioOptions("gpt-image-2.5-sunburst-vip").length, 10, "两个 VIP 模型画幅必须一致");
+
+  // ② 尺寸档表不再有「自动」项；且画幅联动填充的默认尺寸必须等于尺寸控件的默认档（同一契约来源）。
+  for (const ratio of vipRatios) {
+    const tiers = imageSizeTierOptions("gpt-image-2.5-flare-vip", ratio);
+    assert.equal(tiers?.length, 3, `${ratio} 必须有快速/标准/高清三档`);
+    assert.ok(!tiers!.some((option) => option.value === "auto"), `${ratio} 不得再有「自动」项`);
+    assert.equal(
+      imageModelOptionsForAspectRatio("gpt-image-2.5-flare-vip", {}, ratio).size,
+      tiers![VIP_SIZE_DEFAULT_TIER_INDEX].value,
+      `${ratio} 画幅联动填充的默认尺寸必须等于尺寸控件的默认档`,
+    );
+  }
+  assert.equal(imageSizeTierOptions("gemini-3.1-flash-image", "1:1"), undefined, "非 VIP 模型不得出现专属尺寸控件");
+
+  // ③ gpt-image-2.5-all：不接受 size，尺寸唯一手段是 prompt 前缀，标签需带实测分辨率。
+  const prefixOptions = imagePromptSizePrefixOptions("gpt-image-2.5-all");
+  assert.equal(prefixOptions?.length, 9, "-all 尺寸前缀 = 「不指定」+ 文档 8 档");
+  assert.equal(prefixOptions![0].value, "", "首项必须是不指定（模型自适应）");
+  assert.ok(
+    prefixOptions!.slice(1).every((option) => /\d+×\d+/.test(option.label)),
+    "-all 前缀标签必须带实测分辨率",
+  );
+  assert.deepEqual(
+    prefixOptions!.slice(1).map((option) => option.value),
+    getImageModelContract("gpt-image-2.5-all").recommendedOptions!.promptSizePrefix!.examples,
+    "-all 前缀取值必须直接取自契约",
+  );
+  assert.equal(imagePromptSizePrefixOptions("gpt-image-2.5-flare-vip"), undefined, "尺寸前缀控件只属于 -all");
+  assert.deepEqual(
+    imageModelOptionsForAspectRatio("gpt-image-2.5-all", { promptSizePrefix: "横版 16:9" }, "3:4"),
+    { promptSizePrefix: "横版 16:9" },
+    "-all 的参数联动不得丢掉尺寸前缀",
   );
 });
 

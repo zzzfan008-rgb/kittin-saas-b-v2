@@ -253,6 +253,83 @@ async function main(): Promise<void> {
       }
     });
 
+    await test("gpt-image-2.5-flare-vip 缺 size 的 multipart 编辑不发送 size=undefined", async () => {
+      // R-101 回归：面板删除「自动」项后 size 由 UI 统一填默认档，但历史卡片仍可能缺 size。
+      // String(undefined) 会写出字面量 "undefined"，上游按「参数不支持」回 4xx —— 必须不发。
+      const captures: Array<{ url: string; init?: RequestInit }> = [];
+      const restoreFetch = installFetchMock((input, init) => {
+        captures.push({ url: String(input), init });
+        return Response.json(pngPayload(white));
+      });
+      try {
+        await apiyiProviders["gpt-image-2.5-flare-vip"].edit({
+          prompt: "融合参考图",
+          operationMode: "edit",
+          referenceImages: [white],
+          modelOptions: {},
+        });
+        const form = captures[0].init?.body as FormData;
+        assert.equal(form.get("size"), null, "缺 size 时不得写出字面量 \"undefined\"");
+        assert.equal(form.get("quality"), "high");
+        assert.equal(form.get("model"), "gpt-image-2.5-flare-vip");
+      } finally {
+        restoreFetch();
+      }
+    });
+
+    await test("gpt-image-2.5-all 的尺寸前缀拼在 prompt 最前且不重复拼接", async () => {
+      const captures: Array<{ url: string; init?: RequestInit }> = [];
+      const restoreFetch = installFetchMock((input, init) => {
+        captures.push({ url: String(input), init });
+        return Response.json(pngPayload(white));
+      });
+      try {
+        await apiyiProviders["gpt-image-2.5-all"].generate({
+          prompt: "一只猫",
+          operationMode: "generate",
+          modelOptions: { promptSizePrefix: "横版 16:9" },
+        });
+        assert.deepEqual(jsonBody(captures[0].init), {
+          model: "gpt-image-2.5-all",
+          prompt: "横版 16:9，一只猫",
+        });
+
+        await apiyiProviders["gpt-image-2.5-all"].generate({
+          prompt: "一只猫",
+          operationMode: "generate",
+          modelOptions: {},
+        });
+        assert.deepEqual(jsonBody(captures[1].init), {
+          model: "gpt-image-2.5-all",
+          prompt: "一只猫",
+        });
+
+        await apiyiProviders["gpt-image-2.5-all"].generate({
+          prompt: "横版 16:9，一只猫",
+          operationMode: "generate",
+          modelOptions: { promptSizePrefix: "横版 16:9" },
+        });
+        assert.equal(
+          jsonBody(captures[2].init).prompt,
+          "横版 16:9，一只猫",
+          "提示词里已写过前缀时不得重复拼接",
+        );
+
+        await apiyiProviders["gpt-image-2.5-all"].edit({
+          prompt: "加一顶帽子",
+          operationMode: "edit",
+          referenceImages: [white],
+          modelOptions: { promptSizePrefix: "竖屏 9:16" },
+        });
+        const form = captures[3].init?.body as FormData;
+        assert.equal(captures[3].url, "https://gateway.example/v1/images/edits");
+        assert.equal(form.get("prompt"), "竖屏 9:16，加一顶帽子");
+        assert.equal(form.get("size"), null, "gpt-image-2.5-all 不接受 size");
+      } finally {
+        restoreFetch();
+      }
+    });
+
     await test("gpt-image-2.5-sunburst 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
       let calls = 0;
       const capturedForms: FormData[] = [];

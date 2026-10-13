@@ -51,6 +51,18 @@ function requestOptions(modelId: ImageModelId, req: ImageGenRequest): ImageModel
   return (req.modelOptions ?? defaultImageModelOptions(modelId, req.aspectRatio)) as ImageModelOptions;
 }
 
+/**
+ * `gpt-image-2.5-all` 唯一可控尺寸的通道：把「提示词 → 实测分辨率」对照表里的前缀拼在 prompt 最前
+ * （官方文档与快照 llms-full.txt:4671 的写法 `横版 16:9，一只猫…`；不传前缀时由模型自适应）。
+ * 值域由契约 recommendedOptions.promptSizePrefix 约束、UI 只提供其中选项；这里再幂等去重，
+ * 避免用户已在提示词开头写过该前缀时被拼两遍。
+ */
+function promptWithSizePrefix(prompt: string, options: ImageModelOptions): string {
+  const prefix = typeof options.promptSizePrefix === "string" ? options.promptSizePrefix.trim() : "";
+  if (!prefix || prompt.trimStart().startsWith(prefix)) return prompt;
+  return `${prefix}，${prompt}`;
+}
+
 function referenceData(req: ImageGenRequest, modelId: ImageModelId): string[] {
   const structuredError = referenceInputsError(req);
   if (structuredError) {
@@ -457,7 +469,7 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
       response = await fetchApiyi(modelId, contract.generation.path, () => ({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
-        body: JSON.stringify({ model: upstreamModelId(modelId), prompt: req.prompt }),
+        body: JSON.stringify({ model: upstreamModelId(modelId), prompt: promptWithSizePrefix(req.prompt, options) }),
       }));
       return parseApiyiImageResult(response, async () => ({
         images: await parseOpenAiImages(await readJson(response, modelId), modelId, { maxImages: 1 }),
@@ -561,7 +573,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
       response = await fetchApiyi(modelId, contract.edit.path, () => {
         const form = new UndiciFormData();
         form.append("model", upstreamModelId(modelId));
-        form.append("prompt", req.prompt);
+        form.append("prompt", promptWithSizePrefix(req.prompt, options));
         appendImages(form, refs, modelId);
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;
       });
@@ -576,7 +588,10 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
         const form = new UndiciFormData();
         form.append("model", upstreamModelId(modelId));
         form.append("prompt", req.prompt);
-        form.append("size", String(options.size));
+        // 只在确有意值时上报 size：String(undefined) 会写出字面量 "undefined"，
+        // 上游按「参数不支持」回 4xx，而 JSON 端口会忽略 undefined —— 故此缺陷只藏在
+        // multipart 分支（与 :546 sunburst 的既有写法保持一致）。
+        if (options.size !== undefined) form.append("size", String(options.size));
         form.append("quality", String(options.quality ?? "high"));
         appendImages(form, refs, modelId);
         return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;

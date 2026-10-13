@@ -201,20 +201,73 @@ export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: s
 };
 
 /**
+ * VIP 系（sunburst-vip / flare-vip）的尺寸档表；非 VIP 模型或未知画幅返回 undefined。
+ * 「尺寸」控件与画幅联动填充共用同一查表口，避免两处各写一份档位判断。
+ */
+export function vipSizeTiersForRatio(
+  modelId: ImageModelId,
+  aspectRatio: string,
+): readonly { tier: string; size: string }[] | undefined {
+  if (modelId !== "gpt-image-2.5-flare-vip" && modelId !== "gpt-image-2.5-sunburst-vip") return undefined;
+  return VIP_SIZE_TIERS_BY_RATIO[aspectRatio];
+}
+
+/** VIP 尺寸默认档（标准档）在档表中的下标——面板删除「自动」项后未设置/非法 size 的落点。 */
+export const VIP_SIZE_DEFAULT_TIER_INDEX = 1;
+
+/** VIP 尺寸默认档位像素值；非 VIP 模型或未知画幅返回 undefined。 */
+export function vipDefaultSize(modelId: ImageModelId, aspectRatio: string): string | undefined {
+  return vipSizeTiersForRatio(modelId, aspectRatio)?.[VIP_SIZE_DEFAULT_TIER_INDEX]?.size;
+}
+
+/**
  * 「尺寸」参数选项：仅 VIP 系（sunburst-vip / flare-vip，画幅↔像素尺寸映射族）提供，
  * 其他模型（gemini 的 imageSize 等由契约 recommendedOptions 自带档位）返回 undefined。
- * 首项 auto = 不传 size（网关默认，等价当前未触碰画幅时的行为）。
+ * 不再提供「自动（默认）」项：VIP 的 auto 与不传 size 等价，而删除该项后统一显式选档
+ * （未设置时由 vipDefaultSize 落到标准档），从源头避免 multipart 端把 String(undefined)
+ * 写成字面量 "undefined" 触发上游 4xx。
  */
 export function imageSizeTierOptions(
   modelId: ImageModelId,
   aspectRatio: string,
 ): { value: string; label: string }[] | undefined {
-  if (modelId !== "gpt-image-2.5-flare-vip" && modelId !== "gpt-image-2.5-sunburst-vip") return undefined;
-  const tiers = VIP_SIZE_TIERS_BY_RATIO[aspectRatio];
+  const tiers = vipSizeTiersForRatio(modelId, aspectRatio);
   if (!tiers) return undefined;
+  return tiers.map((t) => ({ value: t.size, label: `${t.tier} · ${t.size.replace("x", "×")}` }));
+}
+
+/**
+ * `gpt-image-2.5-all` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
+ * 值域取契约 recommendedOptions.promptSizePrefix.examples；标签附实测分辨率，来源为
+ * 经审查的官方文档快照
+ * docs/ai/apiyi/site/snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/sources/llms-full.txt:4619-4628
+ * （「经过验证的『提示词 → 实际分辨率』对照表」）。首项空值 = 不拼前缀，模型自适应
+ * （同快照 :8647 记录 1:1 ≈ 1254×1254，快照 :4674 警示自适应允许少量像素偏差）。
+ */
+const PROMPT_SIZE_PREFIX_RESOLUTION: Readonly<Record<string, string>> = {
+  "横版 16:9": "1672×941",
+  "竖屏 9:16": "941×1672",
+  "4:3": "1448×1086",
+  "3:4": "1086×1448",
+  "3:2 尺寸": "1536×1024",
+  "2:3 尺寸": "1024×1536",
+  "2:5 竖屏": "793×1983",
+  "5:2 横屏": "1983×793",
+};
+
+/** 提示词尺寸前缀下拉选项；契约未声明 promptSizePrefix 的模型返回 undefined。 */
+export function imagePromptSizePrefixOptions(
+  modelId: ImageModelId,
+): { value: string; label: string }[] | undefined {
+  const examples = getImageModelContract(modelId).recommendedOptions?.promptSizePrefix?.examples ?? [];
+  const prefixes = examples.map(String);
+  if (prefixes.length === 0) return undefined;
   return [
-    { value: "auto", label: "自动（默认）" },
-    ...tiers.map((t) => ({ value: t.size, label: `${t.tier} · ${t.size.replace("x", "×")}` })),
+    { value: "", label: "不指定（模型自适应）" },
+    ...prefixes.map((prefix) => {
+      const resolution = PROMPT_SIZE_PREFIX_RESOLUTION[prefix];
+      return { value: prefix, label: resolution ? `${prefix} (${resolution})` : prefix };
+    }),
   ];
 }
 
