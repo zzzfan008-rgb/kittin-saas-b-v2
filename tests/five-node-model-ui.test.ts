@@ -116,6 +116,44 @@ test("文本节点：「帮我补全」按钮有正文时可点，空正文禁�
   assert.match(emptyWrapTag, /先写点要求再补全/, "空正文 title 必须提示先写要求");
 });
 
+test("文本节点：协议模板锚点后无补充时「帮我补全」禁用并提示填补充（P1 §4 A 案）", () => {
+  const ANCHOR = "用户补充要求（如为空则忽略本行）：";
+  const protocolOnly = {
+    id: "text-rewrite-protocol",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "text",
+      label: "模特试穿",
+      status: "idle",
+      // 404 字冻结协议 + 锚点行，锚点后无补充（模板刚打开的真实形态）。
+      text: `AI 换装模特试穿。……冻结协议……\n${ANCHOR}`,
+    },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-protocol-only",
+    projectName: "协议无补充",
+    nodes: [protocolOnly],
+    edges: [],
+  });
+  const html = render(protocolOnly);
+  const buttonTag = html.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(buttonTag, "协议节点也应有按钮");
+  assert.match(buttonTag, /disabled=""/, "锚点后无补充时按钮必须禁用（不发请求、不静默）");
+  const wrapTag = html.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(wrapTag, "包装 span 必须存在");
+  assert.match(wrapTag, /填写补充内容/, "title 必须提示先在补充位填写");
+
+  // 锚点后一旦有补充 → 恢复可点
+  const withSupplement = {
+    ...protocolOnly,
+    data: { ...protocolOnly.data, text: `AI 换装模特试穿。……协议……\n${ANCHOR}红色背景，戴墨镜` },
+  } as unknown as FlowNode;
+  const filledHtml = render(withSupplement);
+  const filledButton = filledHtml.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(filledButton && !/disabled=""/.test(filledButton), "锚点后有补充时按钮必须可点");
+});
+
 test("文本节点：只读项目中「帮我补全」按钮禁用（源码接线断言；SSR useSyncExternalStore 不反映 store 变更）", () => {
   // SSR 下 zustand 钩子固定读 server snapshot（默认非只读），无法通过 renderToStaticMarkup
   // 验证只读态；此处用源码接线断言锁定 disabled/title/handler 三处 readOnly 门控，
@@ -124,11 +162,11 @@ test("文本节点：只读项目中「帮我补全」按钮禁用（源码接�
     fileURLToPath(new URL("../src/components/nodes/TextNode.tsx", import.meta.url)),
     "utf8",
   );
-  // 按钮 disabled 表达式含 readOnly
+  // 按钮 disabled 表达式含 readOnly 与资格门控（空正文/锚点后无补充）
   assert.match(
     source,
-    /disabled=\{readOnly \|\| rewriting \|\| !hasText\}/,
-    "按钮 disabled 必须含 readOnly 门控",
+    /disabled=\{readOnly \|\| rewriting \|\| !rewriteGate\.eligible\}/,
+    "按钮 disabled 必须含 readOnly 与 rewriteGate 门控",
   );
   // title 文案含只读提示
   assert.match(source, /只读项目不能改写提示词/);

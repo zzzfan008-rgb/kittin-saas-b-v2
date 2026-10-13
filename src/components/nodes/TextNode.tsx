@@ -25,6 +25,7 @@ import { duplicateNode } from "./nodeDuplicate";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { rewritePromptText } from "@/lib/textRewriteClient";
 import { runPromptRewriteFlow } from "@/lib/textRewriteFlow";
+import { rewriteEligibility } from "@/lib/rewriteEligibility";
 import { Button } from "@/components/ui/button";
 import {
   parseColorChips,
@@ -85,6 +86,13 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   /** 是否已有正文（决定白卡空态 / frameless 有内容态）。 */
   const hasText = (data.text ?? "").trim().length > 0;
 
+  /**
+   * 补全资格（P1 §4 A 案）：协议模板含补充位锚点时，锚点后无补充段则无事可补——
+   * 与 server splitRewriteInput 的 empty_supplement 判定同口径，前端提前禁用并提示，
+   * 避免发请求后静默「点了没反应」。无锚点普通正文非空即可。
+   */
+  const rewriteGate = useMemo(() => rewriteEligibility(data.text ?? ""), [data.text]);
+
   /** 进入编辑态时聚焦 textarea（阅读视图双击触发）。 */
   useEffect(() => {
     if (inputActive) textareaRef.current?.focus();
@@ -143,7 +151,9 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
     if (readOnly || rewriting || !projectId) return;
     // 优先读 textarea 即时值（含未 flush 的键入）；阅读态回退 data.text。
     const current = (textareaRef.current?.value ?? data.text ?? "").trim();
-    if (!current) return; // 空正文：按钮已禁用，此为防御性静默返回
+    // 双保险：按钮已按 rewriteGate 禁用；此处再挡空正文与「锚点后无补充」。
+    if (rewriteEligibility(current).reason === "empty_text") return;
+    if (rewriteEligibility(current).reason === "empty_supplement") return;
     await runPromptRewriteFlow(
       { text: current, projectId, nodeId: id },
       {
@@ -169,9 +179,11 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
     ? "只读项目不能改写提示词"
     : rewriting
       ? "正在补全…"
-      : !hasText
+      : rewriteGate.reason === "empty_text"
         ? "先写点要求再补全"
-        : "AI 补全提示词";
+        : rewriteGate.reason === "empty_supplement"
+          ? "请先在「用户补充要求：」后填写补充内容再补全"
+          : "AI 补全提示词";
 
   return (
     <>
@@ -306,7 +318,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
               variant="outline"
               size="xs"
               data-testid="text-rewrite-button"
-              disabled={readOnly || rewriting || !hasText}
+              disabled={readOnly || rewriting || !rewriteGate.eligible}
               onClick={handleRewrite}
               className="h-6 gap-0.5 border-[var(--gc-border)] bg-[var(--gc-node-inner)] px-1.5 text-[11px] opacity-90 hover:opacity-100"
             >

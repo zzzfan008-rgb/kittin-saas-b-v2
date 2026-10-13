@@ -92,6 +92,8 @@ const TEST_FILES = [
   "tests/text-rewrite-client.test.ts",
   // 「帮我补全」先保存再改写编排（纯逻辑依赖注入，无 DOM 不碰库）。
   "tests/text-rewrite-flow.test.ts",
+  // 「帮我补全」资格判定：锚点后无补充段前端禁用（纯函数不碰库）。
+  "tests/rewrite-eligibility.test.ts",
   "tests/static-frontend.test.ts",
   "tests/sqlite-postgres-migration.test.ts",
   "tests/auth-storage.test.ts",
