@@ -24,6 +24,9 @@ const SUPPLEMENT = "红色针织开衫搭配米色阔腿裤，模特站在城市
 
 const HEAD_KEY = "参考图1=服装，是唯一的服装来源";
 const TAIL_KEY = "用户补充要求（如为空则忽略本行）：";
+// 协议词只允许出现在代码回填的协议段（锚点前），模型生成的补充段（锚点后）一个都不许有
+//（P1 缺陷：整段 system prompt 致模型自编协议且角色反转）。
+const PROTOCOL_VOCAB = ["参考图1", "参考图2", "AI 换装", "AI 换装模特试穿", "3:4", "竖版"];
 
 async function main() {
   const apiKey = process.env.APIYI_API_KEY;
@@ -64,7 +67,7 @@ async function main() {
   console.log(`[SMOKE] 输出长度：${outcome.text.length} 字（输入 ${input.length} 字）`);
 
   const failures = [];
-  if (!outcome.rewritten) {
+  if (!outcome.rewritten && outcome.reason && outcome.reason !== "empty_supplement") {
     failures.push(`改写未生效（reason=${outcome.reason}）——截断/过短防线可能误伤，需人工核验`);
   }
   if (!outcome.text.includes(HEAD_KEY)) {
@@ -75,6 +78,19 @@ async function main() {
   }
   if (outcome.text.length < input.length) {
     failures.push(`输出（${outcome.text.length}）短于输入（${input.length}）`);
+  }
+  // 语义检查（P1 缺陷修复）：切分出锚点后的模型补充段，逐词核对协议词
+  const tailIndex = outcome.text.indexOf(TAIL_KEY);
+  if (tailIndex !== -1) {
+    const modelPart = outcome.text.slice(tailIndex + TAIL_KEY.length);
+    console.log(`\n[SMOKE] 锚点后模型生成补充段（${modelPart.length} 字）：\n${modelPart}`);
+    for (const word of PROTOCOL_VOCAB) {
+      if (modelPart.includes(word)) {
+        failures.push(`补充段混入协议词「${word}」——模型在自编协议（应只扩写用户补充要求）`);
+      }
+    }
+  } else {
+    failures.push("输出中找不到锚点，无法做语义检查（补充段隔离校验）");
   }
 
   if (failures.length > 0) {

@@ -11,7 +11,7 @@
 import type { NodeKind } from "../../src/types/workflow";
 import type { ImageOperationMode } from "../../src/types/imageOperations";
 import { config } from "../config";
-import { rewriteSystemPrompt } from "./promptPresetsFrozen";
+import { rewriteSystemPrompt, REWRITE_SYSTEM_PROMPTS } from "./promptPresetsFrozen";
 import {
   createTextChatCompletion,
   TextRewriteError,
@@ -121,7 +121,14 @@ export async function rewriteUserPrompt(
   }
   const rewriteTarget = protocol === "" ? original : supplement;
   const chatCompletion = deps.chatCompletion ?? createTextChatCompletion;
-  const systemPrompt = rewriteSystemPrompt(context.familyId);
+  // system prompt 形态必须与实际输入形态匹配（P1 缺陷修复）：锚点切分命中时改写器只收
+  // 补充段，用「补充段专用」条目（协议不在消息内、不得复述/自创协议）；否则整段改写走原条目。
+  const supplementPromptKey = protocol === "" ? undefined : `${context.familyId ?? "default"}-supplement`;
+  const supplementPrompt =
+    supplementPromptKey !== undefined
+      ? (REWRITE_SYSTEM_PROMPTS as Readonly<Record<string, string>>)[supplementPromptKey]
+      : undefined;
+  const systemPrompt = supplementPrompt ?? rewriteSystemPrompt(context.familyId);
   try {
     const result = await chatCompletion({
       model: deps.modelId ?? config.apiyiTextModelId(),

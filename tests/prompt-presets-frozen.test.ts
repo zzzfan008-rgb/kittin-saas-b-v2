@@ -156,9 +156,11 @@ ok("frozenPromptBindingForVariantId：未知族 / 坏 id / 非法 mode → undef
 const REWRITE_SYSTEM_PROMPTS_SHA256: Record<string, string> = {
   "default": "c43357148a16b64ab9bbd94fd75ac0568048a008612b94375fcc296c235a5beb",
   "model-tryon": "72768654c3df481d46a18468f9f6b561c2e7363da1ff61ca5ae8707971ed01f8",
+  // 补充段专用条目（2026-10-12 P1 缺陷修复：锚点切分后改写器只收补充段）
+  "model-tryon-supplement": "f4095e5491cef31b0909128609bb037f968088d1f1496addf4030b1ed9b11858",
 };
 
-ok("键集合：REWRITE_SYSTEM_PROMPTS 与快照一致（default + model-tryon）", () => {
+ok("键集合：REWRITE_SYSTEM_PROMPTS 与快照一致（default + model-tryon + model-tryon-supplement）", () => {
   assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS).sort(), Object.keys(REWRITE_SYSTEM_PROMPTS_SHA256).sort());
 });
 

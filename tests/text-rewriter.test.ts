@@ -39,6 +39,8 @@ function ok(name: string, fn: () => void | Promise<void>): void {
 }
 
 const defaultContext: RewriteContext = { kind: "image-generator", mode: "edit" };
+// 补充段专用条目按 familyId 命中：model-tryon 族锚点输入用（P1 缺陷修复）
+const modelTryonContext: RewriteContext = { kind: "image-generator", mode: "edit", familyId: "model-tryon" };
 
 // 文本通道传输层测试必须注入 apiKey/baseUrl：createTextChatCompletion 生产默认读
 // config.apiyiApiKey()（无 .env/无 APIYI_API_KEY 的 CI 会 throw required），单测不得依赖环境密钥。
@@ -178,7 +180,7 @@ ok("e: familyId undefined/未知 → default；model-tryon 命中专用覆盖条
   assert.equal(rewriteSystemPrompt(undefined), REWRITE_SYSTEM_PROMPTS.default);
   assert.equal(rewriteSystemPrompt("not-a-family"), REWRITE_SYSTEM_PROMPTS.default);
   assert.equal(rewriteSystemPrompt("model-tryon"), REWRITE_SYSTEM_PROMPTS["model-tryon"]);
-  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS), ["default", "model-tryon"]);
+  assert.deepEqual(Object.keys(REWRITE_SYSTEM_PROMPTS), ["default", "model-tryon", "model-tryon-supplement"]);
 });
 
 ok("e: default system prompt 含三铁律硬约束句与禁负资产词清单", async () => {
@@ -283,13 +285,15 @@ ok("i: 锚点后为空 → empty_supplement 跳过且不调通道", async () => 
   assert.equal(calls, 0);
 });
 
-ok("i: 含锚点输入 → 改写器只收 supplement，协议段原样回填为前缀", async () => {
+ok("i: 含锚点输入 → 改写器只收 supplement，system 用补充段专用条目，协议段原样回填为前缀", async () => {
   let capturedUser = "";
+  let capturedSystem = "";
   const protocolText = `AI 换装模特试穿。严格按参考图序号使用输入图片。\n${REWRITE_SUPPLEMENT_ANCHOR}`;
   const supplement = "一位穿红色长裙的女性站在室内落地窗前，柔和自然光";
-  const outcome = await rewriteUserPrompt(`${protocolText}${supplement}`, defaultContext, {
+  const outcome = await rewriteUserPrompt(`${protocolText}${supplement}`, modelTryonContext, {
     chatCompletion: async (args) => {
       capturedUser = args.messages[1].content as string;
+      capturedSystem = args.messages[0].content as string;
       return {
         content: "一位穿红色长裙的女性站在室内落地窗前，柔和自然光，中景镜头浅色调",
         finishReason: "stop",
@@ -298,6 +302,8 @@ ok("i: 含锚点输入 → 改写器只收 supplement，协议段原样回填为
     },
   });
   assert.equal(capturedUser, supplement, "进改写器的只有锚点后的补充段");
+  assert.ok(capturedSystem.includes("补充要求片段"), "system 必须是补充段专用条目（P1 缺陷：整段条目致模型自编协议）");
+  assert.ok(!capturedSystem.includes("输出完整正文"), "system 不得再要求输出完整协议正文（切分后输入只有补充段）");
   assert.equal(outcome.rewritten, true);
   assert.ok(outcome.text.startsWith(protocolText), "协议段必须逐字回填在输出前缀");
   assert.ok(outcome.text.includes("中景镜头浅色调"));

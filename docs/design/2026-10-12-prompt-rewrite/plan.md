@@ -116,6 +116,8 @@ type TextChatCompletionResult = {
 
 **前端契约不变**：API 请求体（`text` 字段）无需变化；响应解析无需变化；唯一新增语义是 `reason:"empty_supplement"`（锚点后空白）。
 
+**切分后改写器输入只有补充段（P1 缺陷修复，2026-10-12）**：锚点切分命中时，进改写器的 user message 只是 supplement（协议不在消息内）；system prompt 改用「补充段专用」条目 `REWRITE_SYSTEM_PROMPTS["model-tryon-supplement"]`——明确告知模型只收补充片段、只扩写 2-4 句结构化提示、不得复述或自创协议（不得出现「AI 换装」「参考图1/2」「3:4 竖版」等协议词汇）。原整段条目（`model-tryon`）继续用于无锚点输入。两套并存的「保护协议」机制收敛为只信代码拼接（协议前缀由服务端逐字回填），不再依赖模型自觉。
+
 ### 2.3 运行时自动改写（无独立路由，runner 内）
 
 插入点：`runner.ts:241`（`userPrompt` 算得之后、`:246` 拼装之前）。
