@@ -447,10 +447,10 @@ for (const model of knowledge.models) {
 }
 
 const reviewedDriftHashes = new Map([
-  ["apiyi-gpt-image-2-vip-overview", "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66"],
-  ["apiyi-gemini-overview", "d3469a7e4587c9b23582e3e461c30364bf1af0a58f8118171bc0e010dd2be844"],
-  ["apiyi-flux-overview", "1fc1c26bcaebc3de7d81e0bba95f457537babf223bf99a3a7cc32a90745984e3"],
-  ["apiyi-seedream-overview", "63865a7a093865a85c9aa594b9c605a0677b34a263bfffd69a33b45ec6d2fc52"],
+  ["apiyi-gpt-image-2-vip-overview", "fa55bbeb13928bdbb7fd51cf243c0f038147bcccf7b5780aa7ffb7698266cbda"],
+  ["apiyi-gemini-overview", "eab4963c32d8a88544e54893d377b7a4a52a11134edc09cfcad1bbd922728eca"],
+  ["apiyi-flux-overview", "23df4f5be137712d9b830a459b259e3147a53dc44a7634634e39bc2cf0eafbd4"],
+  ["apiyi-seedream-overview", "aa4d154188ddfa2f3cd89a42b22c633ec0dcf93b382d9ec0bd1a13b4074e13b7"],
 ]);
 for (const [sourceId, expectedHash] of reviewedDriftHashes) {
   assert.equal(sources.sources.find((source: { sourceId: string }) => source.sourceId === sourceId)?.sha256, expectedHash);
