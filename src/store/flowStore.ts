@@ -142,6 +142,40 @@ import {
   type RecentResult,
   type SaveState,
 } from "./flowDocument";
+import {
+  DOCUMENT_HISTORY_LIMIT,
+  documentMutationChanged,
+  preserveNodeRuntimeAndTransients,
+  sameDocumentEdges,
+  sameDocumentNodes,
+  sameTemporalDocument,
+  temporalDocument,
+  type DocumentMutation,
+  type FlowTemporalState,
+  type HistoryTransactionOutcome,
+  type HistoryTransactionSettledCallback,
+  type HistoryTransactionToken,
+  type TabTemporalHistory,
+} from "./flowHistory";
+
+type FlowSet = (
+  partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>),
+) => unknown;
+export {
+  DOCUMENT_HISTORY_LIMIT,
+  documentMutationChanged,
+  preserveNodeRuntimeAndTransients,
+  sameDocumentEdges,
+  sameDocumentNodes,
+  sameTemporalDocument,
+  temporalDocument,
+  type DocumentMutation,
+  type FlowTemporalState,
+  type HistoryTransactionOutcome,
+  type HistoryTransactionSettledCallback,
+  type HistoryTransactionToken,
+  type TabTemporalHistory,
+};
 export {
   COALESCED_TEXT_EDIT_IDLE_MS,
   DEFAULT_PROJECT_NAME,
@@ -275,22 +309,6 @@ export interface FlowState {
   redo: () => void;
 }
 
-type FlowSet = (
-  partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>),
-) => unknown;
-
-type FlowTemporalState = Pick<ProjectTab, "projectName" | "nodes" | "edges">;
-
-type DocumentMutation =
-  | Partial<ProjectTab>
-  | ((tab: ProjectTab) => Partial<ProjectTab>);
-
-export type HistoryTransactionToken = symbol;
-type HistoryTransactionOutcome = "ended" | "cancelled";
-type HistoryTransactionSettledCallback = (
-  outcome: HistoryTransactionOutcome,
-  token: HistoryTransactionToken,
-) => void;
 
 interface DeferredHistoryTransactionAction {
   runOnCancel: boolean;
@@ -314,7 +332,6 @@ let activeHistoryTransaction: ActiveHistoryTransaction | null = null;
 let recordHistoryEntry: (pastState: FlowTemporalState, currentState: FlowTemporalState) => void = () => undefined;
 let flushDeferredTabSessionPersistence = (): void => undefined;
 let flushPendingTabSessionPersistence = (): boolean => true;
-const DOCUMENT_HISTORY_LIMIT = 50;
 
 interface ActiveTextEdit {
   token: CoalescedTextEditToken;
@@ -329,10 +346,6 @@ interface ActiveTextEdit {
 let activeTextEdit: ActiveTextEdit | null = null;
 let finalizingTextEdit = false;
 
-interface TabTemporalHistory {
-  pastStates: FlowTemporalState[];
-  futureStates: FlowTemporalState[];
-}
 
 /** zundo 只挂在活动文档上；非活动页签的内存历史在切页时显式换入换出。 */
 const temporalHistoryByTab = new Map<string, TabTemporalHistory>();
@@ -446,123 +459,6 @@ export function runWithoutHistory<T>(run: () => T): T {
   }
 }
 
-const TRANSIENT_NODE_KEYS = new Set([
-  "selected",
-  "dragging",
-  "measured",
-  "width",
-  "height",
-]);
-
-const PRESERVED_NODE_TRANSIENT_KEYS = ["dragging", "measured", "width", "height"] as const;
-
-function preserveNodeRuntimeAndTransients(
-  target: FlowNode,
-  current?: FlowNode,
-  options?: { preserveDragging?: boolean },
-): FlowNode {
-  if (!current) return target;
-  const next = {
-    ...target,
-    data: {
-      ...target.data,
-      status: current.data.status,
-      error: current.data.error,
-    } as WorkflowNodeData,
-  };
-  const nextRecord = next as unknown as Record<string, unknown>;
-  const currentRecord = current as unknown as Record<string, unknown>;
-  for (const key of PRESERVED_NODE_TRANSIENT_KEYS) {
-    if (key === "dragging" && options?.preserveDragging === false) continue;
-    if (Object.prototype.hasOwnProperty.call(currentRecord, key)) nextRecord[key] = currentRecord[key];
-    else delete nextRecord[key];
-  }
-  return next;
-}
-
-const DOCUMENT_NODE_SHELL_EXCLUDED_KEYS = new Set([
-  ...TRANSIENT_NODE_KEYS,
-  "id",
-  "type",
-  "position",
-  "data",
-]);
-
-const RUNTIME_NODE_DATA_KEYS = new Set(["status", "error"]);
-
-function sameRecordValues(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-  excludedKeys: ReadonlySet<string>,
-): boolean {
-  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
-  for (const key of keys) {
-    if (excludedKeys.has(key)) continue;
-    const leftValue = left[key];
-    const rightValue = right[key];
-    if (Object.is(leftValue, rightValue)) continue;
-    if (JSON.stringify(leftValue) !== JSON.stringify(rightValue)) return false;
-  }
-  return true;
-}
-
-function sameDocumentNode(left: FlowNode, right: FlowNode): boolean {
-  if (left === right) return true;
-  if (
-    left.id !== right.id ||
-    left.type !== right.type ||
-    left.position.x !== right.position.x ||
-    left.position.y !== right.position.y
-  ) return false;
-  if (!sameRecordValues(
-    left as unknown as Record<string, unknown>,
-    right as unknown as Record<string, unknown>,
-    DOCUMENT_NODE_SHELL_EXCLUDED_KEYS,
-  )) return false;
-  if (left.data === right.data) return true;
-  return sameRecordValues(
-    left.data as unknown as Record<string, unknown>,
-    right.data as unknown as Record<string, unknown>,
-    RUNTIME_NODE_DATA_KEYS,
-  );
-}
-
-function documentEdgeValue(edge: Edge): unknown {
-  const { selected: _selected, ...documentEdge } = edge;
-  return documentEdge;
-}
-
-function sameDocumentNodes(left: FlowNode[], right: FlowNode[]): boolean {
-  if (left === right) return true;
-  if (left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index += 1) {
-    if (!sameDocumentNode(left[index], right[index])) return false;
-  }
-  return true;
-}
-
-function sameDocumentEdges(left: Edge[], right: Edge[]): boolean {
-  if (left === right) return true;
-  if (left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] === right[index]) continue;
-    if (JSON.stringify(documentEdgeValue(left[index])) !== JSON.stringify(documentEdgeValue(right[index]))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function sameTemporalDocument(left: FlowTemporalState, right: FlowTemporalState): boolean {
-  return left.projectName === right.projectName &&
-    sameDocumentNodes(left.nodes, right.nodes) &&
-    sameDocumentEdges(left.edges, right.edges);
-}
-
-function temporalDocument(tab: ProjectTab): FlowTemporalState {
-  return { projectName: tab.projectName, nodes: tab.nodes, edges: tab.edges };
-}
-
 function stashActiveTemporalHistory(tabId: string): void {
   const temporalState = useFlowStore.temporal.getState();
   if (temporalState.pastStates.length === 0 && temporalState.futureStates.length === 0) {
@@ -596,12 +492,6 @@ function recordInactiveTabHistory(
   });
 }
 
-function documentMutationChanged(tab: ProjectTab, patch: Partial<ProjectTab>): boolean {
-  if (patch.projectName !== undefined && patch.projectName !== tab.projectName) return true;
-  if (patch.nodes !== undefined && !sameDocumentNodes(tab.nodes, patch.nodes)) return true;
-  if (patch.edges !== undefined && !sameDocumentEdges(tab.edges, patch.edges)) return true;
-  return false;
-}
 
 function captureTransactionPositionChanges(
   transaction: ActiveHistoryTransaction,
