@@ -13,8 +13,8 @@ interface ColorChipProps {
   hex: string;
   /** 显示名称；若省略则从字典就近匹配 */
   name?: string;
-  /** 删除回调（传入 chip 在原文中的起始位置和长度） */
-  onDelete: (index: number, length: number) => void;
+  /** 删除回调（传入 chip 在原文中的起始位置和长度）；不传则不渲染删除按钮（如只读态） */
+  onDelete?: (index: number, length: number) => void;
   /** chip 在原文中的起始位置 */
   index: number;
   /** chip 完整匹配长度 */

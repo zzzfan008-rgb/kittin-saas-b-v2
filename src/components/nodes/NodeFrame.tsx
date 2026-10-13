@@ -6,6 +6,7 @@ import {
   type NodeRunStatus,
 } from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
+import { useFlowStore } from "@/store/flowStore";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 import { Button } from "@/components/ui/button";
@@ -81,11 +82,27 @@ interface NodeFrameProps {
   nodeId?: string;
   /** 节点卡正上方 8px 的工具条槽位（v8 plan.md §3.2）；由各 kind 通过 NodeToolbar 提供。 */
   toolbar?: ReactNode;
+  /** 无边框模式：渲染为纯内容 + 左上角名称徽标（名称仍可双击改名），内容自身带边框 */
+  frameless?: boolean;
+  /** 节点类型 + 创建序号（frameless 模式渲染为「图1」式徽标） */
+  nodeKind?: NodeKind;
+  /** 覆盖徽标文案（如空槽位显示「请上传图片」）；优先级高于序号徽标 */
+  badgeLabel?: string;
   children: ReactNode;
 }
 
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
-export function NodeFrame({ title, status, error, selected, nodeId, toolbar, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, badgeLabel, children }: NodeFrameProps) {
+  const kindOrdinal = useFlowStore((s) => {
+    if (!nodeId || !nodeKind) return null;
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    if (!tab) return null;
+    const sameKind = tab.nodes.filter((n) => n.type === nodeKind);
+    const idx = sameKind.findIndex((n) => n.id === nodeId);
+    return idx >= 0 ? idx + 1 : null;
+  });
+  const badgePrefix = nodeKind === "image" ? "图" : nodeKind === "video" ? "视" : nodeKind === "text" ? "文" : null;
+  const badgeText = badgeLabel ?? (frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);
@@ -106,65 +123,130 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, chi
   return (
     <div className="gc-node-root relative w-[var(--gc-node-width)]">
       {toolbar}
+      {/* 内容槽位：frameless 与白卡共用同一 DOM 结构——children 始终位于同一位置，
+          frameless 切换（如文本节点空↔有内容）不重挂载 children，文本框编辑焦点不丢。 */}
       <div
-        className={`gc-node-card w-full rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
-          selected ? "border-gold" : "border-[var(--gc-node-border)]"
-        }`}
+        className={
+          frameless
+            ? "gc-frameless relative w-full"
+            : `gc-node-card w-full rounded-xl border bg-[var(--gc-node-main)] shadow-xl shadow-black/40 transition-colors ${
+                selected ? "border-gold" : "border-[var(--gc-node-border)]"
+              }`
+        }
       >
-      <div className="gc-node-header flex items-center gap-2 rounded-t-xl border-b border-[var(--gc-node-border)] bg-[var(--gc-node-header)] px-3 py-2">
-        <StatusDot status={status} />
-        {editing ? (
-          <input
-            value={draft}
-            autoFocus
-            {...labelEdit.bind}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              labelEdit.updateValue(event.target.value);
-            }}
-            onBlur={() => {
-              if (cancelledRef.current) {
-                cancelledRef.current = false;
-                return;
-              }
-              commit();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
-              if (e.key === "Escape") {
-                cancelledRef.current = true;
-                labelEdit.cancel();
-                setEditing(false);
-              }
-            }}
-            className="nodrag min-w-0 flex-1 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
-          />
-        ) : (
-          <span
-            className={`truncate text-xs font-medium tracking-wide text-[var(--gc-node-text)] ${nodeId ? "cursor-text" : ""}`}
-            title={nodeId ? "双击改名" : undefined}
-            onDoubleClick={
-              nodeId
-                ? () => {
+        {frameless ? (
+          <div
+            data-node-badge
+            className="absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-1.5 py-0.5"
+          >
+            <StatusDot status={status} />
+            {editing ? (
+              <input
+                value={draft}
+                autoFocus
+                {...labelEdit.bind}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  labelEdit.updateValue(event.target.value);
+                }}
+                onBlur={() => {
+                  if (cancelledRef.current) {
                     cancelledRef.current = false;
-                    setDraft(title);
-                    setEditing(true);
+                    return;
                   }
-                : undefined
+                  commit();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
+                  if (e.key === "Escape") {
+                    cancelledRef.current = true;
+                    labelEdit.cancel();
+                    setEditing(false);
+                  }
+                }}
+                className="nodrag w-24 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+              />
+            ) : (
+              <span
+                className={`truncate text-xs font-medium tracking-wide text-[var(--gc-text)] ${nodeId ? "cursor-text" : ""}`}
+                title={nodeId ? `双击改名（当前：${title}）` : undefined}
+                onDoubleClick={
+                  nodeId
+                    ? (e) => {
+                        e.stopPropagation();
+                        cancelledRef.current = false;
+                        setDraft(title);
+                        setEditing(true);
+                      }
+                    : undefined
+                }
+              >
+                {badgeText}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="gc-node-header flex items-center gap-2 rounded-t-xl border-b border-[var(--gc-node-border)] bg-[var(--gc-node-header)] px-3 py-2">
+            <StatusDot status={status} />
+            {editing ? (
+              <input
+                value={draft}
+                autoFocus
+                {...labelEdit.bind}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  labelEdit.updateValue(event.target.value);
+                }}
+                onBlur={() => {
+                  if (cancelledRef.current) {
+                    cancelledRef.current = false;
+                    return;
+                  }
+                  commit();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
+                  if (e.key === "Escape") {
+                    cancelledRef.current = true;
+                    labelEdit.cancel();
+                    setEditing(false);
+                  }
+                }}
+                className="nodrag min-w-0 flex-1 rounded-sm border border-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-1.5 py-0.5 text-xs text-[var(--gc-node-text)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden"
+              />
+            ) : (
+              <span
+                className={`truncate text-xs font-medium tracking-wide text-[var(--gc-node-text)] ${nodeId ? "cursor-text" : ""}`}
+                title={nodeId ? "双击改名" : undefined}
+                onDoubleClick={
+                  nodeId
+                    ? () => {
+                        cancelledRef.current = false;
+                        setDraft(title);
+                        setEditing(true);
+                      }
+                    : undefined
+                }
+              >
+                {title}
+              </span>
+            )}
+          </div>
+        )}
+        <div className={frameless ? "contents" : "gc-node-body space-y-3 p-3"}>
+          {children}
+        </div>
+        {error && (
+          <div
+            className={
+              frameless
+                ? "mt-2 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-body leading-relaxed text-red-400"
+                : "mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-body leading-relaxed text-red-400"
             }
           >
-            {title}
-          </span>
+            {error}
+          </div>
         )}
-      </div>
-      <div className="gc-node-body space-y-3 p-3">
-        {children}
-      </div>
-      {error && (
-        <div className="mx-3 mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-2 py-1.5 text-body leading-relaxed text-red-400">
-          {error}
-        </div>
-      )}
       </div>
     </div>
   );
@@ -272,10 +354,3 @@ export function Developing() {
 
 export const inputClass =
   "nodrag w-full rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 py-1.5 text-xs text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:outline-hidden";
-
-/** V4 可灵 chip 提示词板：左侧 accent 引用条 + 边框，与输入框明确区分（非禁用态语义）。
- *  R-50 P1-3：亮 accent（--gc-node-accent）在白卡上仅 1.19–1.31:1，焦点边框改用
- *  行动色深档 --gc-accent-deep（三主题 on #ffffff 实测 5.14 / 5.57 / 5.41:1 ≥3:1）；
- *  静息左条保留亮 accent 作为 chip 身份标识，focus 时维持全亮。 */
-export const promptChipClass =
-  "nodrag w-full rounded-[10px] border border-[var(--gc-node-border)] border-l-[3px] border-l-[var(--gc-node-accent)] bg-[var(--gc-node-inner)] px-3 py-2.5 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:border-[var(--gc-accent-deep)] focus:border-l-[var(--gc-node-accent)] focus:outline-hidden";

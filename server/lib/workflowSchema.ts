@@ -52,9 +52,13 @@ const MASK_DATA_URL_CONTRACT = (() => {
  * v9+（65b Q3 后端 canonicalize 补口面）：mask-edit 与 gpt-image-2.5-sunburst 的
  * 双向唯一绑定（apiyi.ts:419/422）由运行链 dag.ts 注入面执行——schema 只管蒙版
  * 字段归属与值校验，不掺和运行时 modelId 的蒙版配对（配对是 plan 物化层职责）。
+ * v9+（2026-10-12 model-tryon A 机制）：familyId 为 image-generator 可选族标识
+ * （模板实例化落标，如 "model-tryon"，运行时改写白名单门控用）。追加进本清单后，
+ * text/image/video 输入节点携带 familyId 会被 fail（生成语义字段不得下沉到输入层）；
+ * video-generator 返回体不含该字段，携带时白名单重建静默剥离（见 image-generator case）。
  */
 const GENERATION_FIELDS = [
-  "modelId", "operationMode", "modelOptions", "aspectRatio", "batchSize",
+  "modelId", "operationMode", "modelOptions", "aspectRatio", "batchSize", "familyId",
 ] as const;
 
 export class WorkflowValidationError extends Error {
@@ -298,6 +302,11 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       validateModelOptionsShape(raw.modelOptions, path);
       const aspectRatio = oneOf(raw.aspectRatio, ASPECT_RATIOS, `${path}.aspectRatio`);
       const batchSize = oneOf(raw.batchSize, BATCH_SIZES, `${path}.batchSize`);
+      // 2026-10-12 model-tryon A 机制：familyId 可选（模板实例化落标），非空字符串、长度沿用
+      // MAX_TEXT_LENGTH；不做封闭枚举（族是模板目录开集）。缺省 = undefined = 无族专属行为。
+      const familyId = raw.familyId === undefined
+        ? undefined
+        : stringValue(raw.familyId, `${path}.familyId`, { nonEmpty: true });
       // 65a：蒙版三字段已搬到 image 节点。存量文档（v9 早期试探期草稿）在生成节点
       // 携带的三字段在此静默丢弃（Q4 裁决 A：DB 实查恰 1 个 0-runs 草稿，mask 资产
       // 仍在可重涂；不报错不迁移）——返回对象是白名单重建，天然只含契约字段。
@@ -310,6 +319,7 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         ...(raw.modelOptions !== undefined ? { modelOptions: { ...raw.modelOptions as Record<string, unknown> } } : {}),
         aspectRatio,
         batchSize,
+        ...(familyId !== undefined ? { familyId } : {}),
         ...withError({}),
       } as WorkflowNodeData;
     }
@@ -494,7 +504,8 @@ function validateEdge(value: unknown, index: number): PersistedWorkflowEdge {
   return result;
 }
 
-/** v9 图级校验：边 handle 类型 + INV-1/INV-2/INV-3 + C7（data-model.md §7 / runtime.md §2.1）。 */
+/** v9 图级校验：边 handle 类型 + INV-2/INV-3 + C7（data-model.md §7 / runtime.md §2.1）。
+ * 注：原 INV-1（生成节点必须有 prompt 上游）已废止为保存硬闸，未接线项目允许保存。 */
 function validateV9Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflowEdge[]): PersistedWorkflow {
   const nodeIds = new Set<string>();
   for (const node of nodes) {
@@ -545,14 +556,8 @@ function validateV9Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflow
     }
   }
 
-  // INV-1：每个生成节点必须有 ≥1 条 text→该节点的 prompt 入边。
-  for (const node of nodes) {
-    if (!isGeneratorNodeKind(node.type)) continue;
-    const hasPrompt = edges.some((edge) => edge.target === node.id && edge.targetHandle === "prompt");
-    if (!hasPrompt) {
-      fail("flow.nodes", `「${node.data.label}」需要至少一个上游文本节点提供提示词`);
-    }
-  }
+  // INV-1（已废止为保存硬闸）：允许保存未接线的项目（草稿可后补连线）；
+  // 运行时的提示词前置检查见 engine/dag.ts，客户端 documentSnapshot 仅报非阻断 warning。
 
   // INV-2：单个 text 节点最多连接 1 个生成节点（runtime.md §2.1）。
   const generatorTargetsByText = new Map<string, number>();

@@ -1,7 +1,8 @@
 /**
  * v8 schema 校验 + 迁移回归测试（R-85，纯逻辑，不调真实 API/DB）。
  * 覆盖：C2-C7 可机检约束（data-model.md §7）、边 handle 类型校验（prompt/reference/first-frame、
- * T4 视频 reference 禁止）、INV-1/INV-2/INV-3、v7→v8 迁移（M1-M8，migration.md）。
+ * T4 视频 reference 禁止）、INV-2/INV-3（INV-1 已废止为保存硬闸：未接线草稿允许保存，
+ * 运行时提示词前置检查在 engine/dag.ts）、v7→v8 迁移（M1-M8，migration.md）。
  * 运行：node node_modules/tsx/dist/cli.mjs tests/workflow-schema.test.ts
  */
 import assert from "node:assert/strict";
@@ -141,6 +142,80 @@ function main() {
     );
   });
 
+  // 2026-10-12 model-tryon A 机制：image-generator 可选 familyId（模板实例化落标）。
+  ok("familyId：image-generator 带合法非空字符串 → 保留；缺省 → data 不含该键", () => {
+    const withFamily = validateAndMigrateFlow(flow(
+      [textNode("t1"), imageGeneratorNode("g1", { familyId: "model-tryon" })],
+      [promptEdge("e1", "t1", "g1")],
+    ));
+    const dataWith = withFamily.nodes.find((n) => n.id === "g1")?.data as Record<string, unknown>;
+    assert.equal(dataWith.familyId, "model-tryon");
+
+    const noFamily = validateAndMigrateFlow(flow(
+      [textNode("t2"), imageGeneratorNode("g2")],
+      [promptEdge("e2", "t2", "g2")],
+    ));
+    const dataNo = noFamily.nodes.find((n) => n.id === "g2")?.data as Record<string, unknown>;
+    assert.ok(!("familyId" in dataNo), "缺省 familyId 不得写入空键（窄化投影）");
+  });
+
+  for (const bad of ["", "   "]) {
+    ok(`familyId：image-generator 带空串/纯空白（${JSON.stringify(bad)}）→ fail`, () => {
+      assert.throws(
+        () => validateAndMigrateFlow(flow(
+          [textNode("t1"), imageGeneratorNode("g1", { familyId: bad })],
+          [promptEdge("e1", "t1", "g1")],
+        )),
+        (e: unknown) => e instanceof WorkflowValidationError && /familyId/.test(e.message),
+      );
+    });
+  }
+
+  ok("familyId：非字符串（number）→ fail", () => {
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textNode("t1"), imageGeneratorNode("g1", { familyId: 123 })],
+        [promptEdge("e1", "t1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /familyId/.test(e.message),
+    );
+  });
+
+  ok("familyId：输入节点 text/image 携带 → fail（GENERATION_FIELDS 反向清单）", () => {
+    const textWithFamily: Record<string, unknown> = {
+      ...textNode("t1"),
+      data: { ...(textNode("t1").data as Record<string, unknown>), familyId: "model-tryon" },
+    };
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [textWithFamily, imageGeneratorNode("g1")],
+        [promptEdge("e1", "t1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /输入节点不得携带生成语义字段/.test(e.message),
+    );
+
+    const imageWithFamily: Record<string, unknown> = {
+      ...imageNode("i1"),
+      data: { ...imageNode("i1").data, familyId: "model-tryon" },
+    };
+    assert.throws(
+      () => validateAndMigrateFlow(flow(
+        [imageWithFamily, imageGeneratorNode("g1")],
+        [referenceEdge("e2", "i1", "g1")],
+      )),
+      (e: unknown) => e instanceof WorkflowValidationError && /输入节点不得携带生成语义字段/.test(e.message),
+    );
+  });
+
+  ok("familyId：video-generator 携带 → 静默剥离不报错（本期 video 不使用 familyId）", () => {
+    const result = validateAndMigrateFlow(flow(
+      [textNode("t1"), videoGeneratorNode("v1", { familyId: "model-tryon" })],
+      [promptEdge("e1", "t1", "v1")],
+    ));
+    const data = result.nodes.find((n) => n.id === "v1")?.data as Record<string, unknown>;
+    assert.ok(!("familyId" in data), "video-generator 的 familyId 必须被白名单重建剥离");
+  });
+
   ok("C7：result-image sourceGeneratorId 命中非生成节点被拒绝", () => {
     assert.throws(
       () => validateAndMigrateFlow(flow([textNode("t1"), imageGeneratorNode("g1"), resultImageNode("r1", "t1")], [promptEdge("e1", "t1", "g1")])),
@@ -190,10 +265,10 @@ function main() {
     );
   });
 
-  ok("INV-1：image-generator 无 text 上游被拒绝", () => {
-    assert.throws(
+  ok("INV-1（已废止为保存硬闸）：image-generator 无 text 上游在保存层通过", () => {
+    // 未接线草稿允许保存（草稿可后补连线）；运行时提示词前置检查在 engine/dag.ts。
+    assert.doesNotThrow(
       () => validateAndMigrateFlow(flow([imageNode("i1"), imageGeneratorNode("g1")], [referenceEdge("e1", "i1", "g1")])),
-      (e) => e instanceof WorkflowValidationError && /上游文本节点/.test(e.message),
     );
   });
 
@@ -525,7 +600,7 @@ function main() {
     assert.equal((t.data as { text: string }).text, "用户自己写的提示词");
   });
 
-  ok("C2 迁移态三：v8 generator 无上游 text → 丢弃绑定（text 不填、mode 不写）", () => {
+  ok("C2 迁移态三：v8 generator 无上游 text → 绑定剥离 + mode 物化（text 不填）", () => {
     const v8 = flow(
       [
         imageNode("i1"),
@@ -534,12 +609,14 @@ function main() {
       [referenceEdge("e2", "i1", "g1")],
       8,
     );
-    // INV-1 要求生成节点必须有 prompt 入边——无上游 text 的图本来就被 INV-1 拒绝，
-    // 此处验证迁移不抛出与绑定相关的错误；INV-1 拒绝是既有不变量（原样保留）。
-    assert.throws(
-      () => validateAndMigrateFlow(v8),
-      (e) => e instanceof WorkflowValidationError && /上游文本节点/.test(e.message),
-    );
+    // INV-1 已废止为保存硬闸（未接线草稿允许保存）；此处验证迁移语义本身：
+    // 绑定剥离、已知变体的 mode 物化（v8 由 variant 携带 mode）、无上游 text 可填故 text 不填。
+    const result = validateAndMigrateFlow(v8);
+    const g = result.nodes.find((n) => n.id === "g1")!;
+    const d = g.data as Record<string, unknown>;
+    assert.equal(d.operationMode, "edit"); // mode 物化（保持 v8 运行语义）
+    assert.ok(!("promptVariantId" in d)); // 绑定剥离
+    assert.equal(result.nodes.filter((n) => n.type === "text").length, 0); // text 不填（无上游 text 节点）
   });
 
   ok("C2 迁移：未知 variantId → 绑定静默丢弃（text 不填、mode 不写）", () => {

@@ -11,8 +11,8 @@ import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
  * 操作 + 模型/画幅/模型参数面板（时长与运动由契约给出，plan.md T2）+ 运行；
  * 不承载任何媒体展示（产物归 result-video）。
  * 工具条：[运行] [复制]。
+ * 输入端口（提示词 / 首帧图）融合在参数面板前两行，见 GeneratorParamsPanel。
  *
- * 入边：prompt（文本节点）与 first-frame（图片 / 图片结果节点，0–1 条）。
  * T4 裁定：本版禁止 video / result-video → video-generator 的 reference 边（schema 层拒绝）。
  */
 export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoGeneratorNodeData>>) {
@@ -23,8 +23,6 @@ export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoG
 
   return (
     <>
-      <Handle type="target" position={Position.Left} id="prompt" style={{ top: "20%" }} title="提示词（文本节点）" />
-      <Handle type="target" position={Position.Left} id="first-frame" style={{ top: "60%" }} title="首帧图片（0–1 条）" />
       <NodeFrame
         nodeId={id}
         title={data.label}

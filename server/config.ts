@@ -74,6 +74,11 @@ export const config = {
   /** AI 调用超时（中转站网关限制，可配） */
   aiTimeoutMs: (fallback = 300_000) => Number(process.env.AI_TIMEOUT_MS ?? fallback),
 
+  /** 提示词改写文本通道模型 id（OpenAI 兼容 chat-completions）。 */
+  apiyiTextModelId: () => (process.env.APIYI_TEXT_MODEL_ID ?? "gemini-3.8-flash").trim() || "gemini-3.8-flash",
+  /** 文本通道超时（改写是出图前轻量增强，独立更短超时；环境变量 AI_TEXT_TIMEOUT_MS）。 */
+  aiTextTimeoutMs: (fallback = 20_000) => Number(process.env.AI_TEXT_TIMEOUT_MS ?? fallback),
+
   /** API易完整 JSON 尾部卡住时的安全收尾开关；显式 false/0/off 可回退旧行为。 */
   apiyiTailStallSalvageEnabled: () => {
     const value = (process.env.APIYI_TAIL_STALL_SALVAGE ?? "true").trim().toLowerCase();

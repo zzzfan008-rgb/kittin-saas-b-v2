@@ -176,7 +176,9 @@ async function activeDocument(page: Page): Promise<ActiveDocument> {
 
 /** 选中画布节点（工具条仅选中态渲染），以工具条出现为准，容忍页签落地首帧吞掉的一次点击。 */
 async function selectCanvasNode(node: ReturnType<Page["locator"]>): Promise<void> {
-  const header = node.locator(".gc-node-header");
+  // R-123 frameless：有图态标题在节点上方徽标（NodeFrame.tsx:138 `data-node-badge`），
+  // 无图白卡态仍是 `.gc-node-header`。两态互斥，用选择器列表一次兼容，不按位置/class 猜结构。
+  const header = node.locator(".gc-node-header, [data-node-badge]").first();
   await expect(header).toBeVisible();
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await node.locator("[data-node-toolbar]").count() > 0) return;

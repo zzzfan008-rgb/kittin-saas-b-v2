@@ -93,7 +93,9 @@ async function openEmptyFirstScreen(page: Page): Promise<void> {
 
 async function selectCanvasNode(page: Page, testId: string): Promise<void> {
   const node = page.getByTestId(testId);
-  const header = node.locator(".gc-node-header");
+  // R-123 frameless：有图态标题在节点上方徽标（NodeFrame.tsx:138 `data-node-badge`），
+  // 无图白卡态仍是 `.gc-node-header`。两态互斥，用选择器列表一次兼容，不按位置/class 猜结构。
+  const header = node.locator(".gc-node-header, [data-node-badge]").first();
   await expect(header).toBeVisible();
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await node.locator("[data-node-toolbar]").count() > 0) return;

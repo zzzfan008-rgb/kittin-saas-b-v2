@@ -123,50 +123,37 @@ assert.equal(
   "空白来源说明不得进入请求体",
 );
 
-// ---------- 6b. 上传入口（ImageNode）：勾选后上传图同时进数字模特库 ----------
-assert.match(imageNodeSource, /存入数字模特库/, "图片节点的上传入口必须有「存入数字模特库」选项");
-assert.match(
-  imageNodeSource,
-  /aria-label="存入数字模特库"/,
-  "勾选控件必须有可访问名称",
-);
-assert.match(
-  imageNodeSource,
-  /from "@\/components\/ui\/checkbox"/,
-  "勾选控件必须复用本地 shadcn Checkbox",
-);
-assert.match(
-  imageNodeSource,
-  /if \(saveToModelLibrary\) void storeToModelLibrary\(upload\.url, file\.name, requestId\)/,
-  "入库必须在本张图上传成功之后触发，并带上文件名与请求号",
-);
-assert.match(imageNodeSource, /saveImageToModelLibrary\(/, "入库必须走分类单一事实源 saveImageToModelLibrary");
+// ---------- 6b. 上传入口（ImageNode）：用户决策删除「存入数字模特库」勾选（R-101 Comment 3）----------
+// 用户批注：「这个要删除掉」——ImageNode 不再内联入库入口；仅素材库/数字模特库自身保留入库路径。
+assert.doesNotMatch(imageNodeSource, /存入数字模特库/, "图片节点不得再内联「存入数字模特库」勾选");
+assert.doesNotMatch(imageNodeSource, /saveImageToModelLibrary/, "图片节点不得再直接调用入库（用户已删除该入口）");
 assert.deepEqual(
-  (imageNodeSource.match(/renderFileInput\("/g) ?? []).length,
-  2,
-  "文件选择器必须在「空槽位」与「已有图片」两种形态下都存在（否则工具条「替换」是死按钮）",
+  (imageNodeSource.match(/renderFileInput\(/g) ?? []).length,
+  0,
+  "不得再内联 renderFileInput（改由「从本地上传」按钮触发，input 不再覆盖图片）",
 );
-assert.match(
-  imageNodeSource,
-  /tabIndex=\{variant === "replace" \? -1 : undefined\}/,
-  "已有图片时隐藏选择器不得新增不可见的 Tab 停靠点",
-);
+// 2026-10-12 用户拍板 A 案：保留双击/Enter 替换弹窗交互，同时允许一个**隐藏** file input 作为
+// a11y 直传路径与 e2e setInputFiles 锚点（可见上传入口仍必须是 ReplaceImageDialog）。
+const hiddenFileInputs = (imageNodeSource.match(/type="file"/g) ?? []).length;
+assert.ok(hiddenFileInputs <= 1, `节点内最多保留 1 个隐藏 file input（实际 ${hiddenFileInputs}）`);
+if (hiddenFileInputs === 1) {
+  assert.match(
+    imageNodeSource,
+    /type="file"[\s\S]{0,400}?className="pointer-events-none absolute h-0 w-0 opacity-0"/,
+    "节点内 file input 必须隐藏（不可见上传入口）",
+  );
+}
+assert.match(imageNodeSource, /ReplaceImageDialog/, "必须通过 ReplaceImageDialog 承载「替换」统一弹窗");
+assert.match(imageNodeSource, /replaceMenuOpen/, "「替换」工具条按钮必须打开统一弹窗");
+assert.doesNotMatch(imageNodeSource, /cursor-zoom-in|单击查看大图/, "点图片不得再触发放大");
+assert.doesNotMatch(imageNodeSource, /点击 \/ 拖拽 \/ Ctrl\+V/, "空槽位不得再提示「点击」触发");
 
-// 入库三态必须可见，且入库失败不得污染已成功的上传结果。
-const librarySaveSource = imageNodeSource.slice(
-  imageNodeSource.indexOf("const storeToModelLibrary = useCallback("),
-  imageNodeSource.indexOf("const handleFile = useCallback("),
-);
-assert.ok(librarySaveSource.length > 0, "必须存在独立的入库函数");
-assert.match(librarySaveSource, /setLibraryState\("saving"\)/, "入库中必须可见");
-assert.match(librarySaveSource, /setLibraryState\("saved"\)/, "入库成功必须可见");
-assert.match(librarySaveSource, /setLibraryState\("error"\)/, "入库失败必须落到失败态");
-assert.doesNotMatch(
-  librarySaveSource,
-  /updateNodeDataInTab/,
-  "入库失败不得把已经成功的上传改写成节点失败态",
-);
-assert.match(imageNodeSource, /role="status"/, "入库状态必须通过 status 语义暴露给读屏");
+// R-107：ReplaceImageDialog 是统一弹窗，第一张卡片=本地上传（与素材卡片同尺寸）
+const replaceDialogSource = read("src/components/panels/ReplaceImageDialog.tsx");
+assert.match(replaceDialogSource, /从本地上传/, "统一弹窗必须有「从本地上传」入口");
+assert.match(replaceDialogSource, /type="file"/, "统一弹窗必须内嵌 file input");
+assert.match(replaceDialogSource, /aspect-square w-full bg-\[var\(--gc-control\)\] object-cover/, "素材卡片尺寸必须固定为 aspect-square + object-cover");
+assert.match(replaceDialogSource, /grid-cols-4 gap-2\.5/, "统一弹窗网格必须 4 列");
 
 // 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
 assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");

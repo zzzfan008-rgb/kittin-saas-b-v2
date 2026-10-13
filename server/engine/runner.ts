@@ -32,6 +32,7 @@ import { ProviderError, publicProviderErrorMessage, toDataUrl } from "../provide
 import { generateExactImages } from "../providers/exact";
 import { getVideoProvider, type VideoGenRequest, type VideoProvider } from "../providers/videoProvider";
 import { normalizeImageRef } from "../lib/fileStore";
+import { isRewriteEnabledFamily, rewriteUserPrompt } from "../lib/textRewriter";
 import {
   isLocalImageReference,
   isRemoteImageReference,
@@ -129,6 +130,12 @@ export interface ExecuteStepOptions {
   videoPollInitialDelayMs?: number;
   videoPollIntervalMs?: number;
   videoPollTimeoutMs?: number;
+  /** 测试注入：rewriteUserPrompt 依赖项（可注入 mock chatCompletion，绕 undici dispatcher）。 */
+  rewriteDeps?: {
+    chatCompletion?: (args: {
+      model: string; messages: Array<{ role: "system" | "user"; content: string }>;
+    }) => Promise<{ content: string; finishReason: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }>;
+  };
 }
 
 function fallbackReferenceSources(step: NodeExecution, inputImages: string[]): ReferenceImageSource[] {
@@ -243,7 +250,25 @@ async function executeImageGeneratorStep(
     ? inputTexts.join("\n\n")
     : (typeof step.params.prompt === "string" ? step.params.prompt : "");
   // 裁决 E：taskPrompt = 冻结系统文本 + 用户正文（generate 系统文本为空串 = 裸 API 行为零回归）。
-  const taskPrompt = `${modeSystemText(step.kind, operationMode)}\n\n${userPrompt}`.trim();
+  // §1.4 + §7-3：仅 image-generator、familyId 在白名单内时，在 taskPrompt 快照前改写用户正文。
+  // fail-closed 由 rewriteUserPrompt 内部保证：非白名单/空输入/通道抛错均返回原文（outcome.text === userPrompt）。
+  // 每 run 最多 1 次：image-generator 单步天然一次；不写节点 data，仅进本次 taskPrompt。
+  let effectiveUserPrompt: string = userPrompt;
+  if (
+    step.kind === "image-generator"
+    && isRewriteEnabledFamily(step.params.familyId as string | undefined)
+    && userPrompt.trim().length > 0
+  ) {
+    const outcome = await rewriteUserPrompt(
+      userPrompt,
+      { kind: step.kind, mode: operationMode, familyId: step.params.familyId as string | undefined },
+      options.rewriteDeps,
+    );
+    if (outcome.rewritten) {
+      effectiveUserPrompt = outcome.text;
+    }
+  }
+  const taskPrompt = `${modeSystemText(step.kind, operationMode)}\n\n${effectiveUserPrompt}`.trim();
 
   const inputReferenceSources = options.referenceSources !== undefined
     ? options.referenceSources.map((reference) => ({ ...reference }))

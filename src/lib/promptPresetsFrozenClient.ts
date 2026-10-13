@@ -2,7 +2,7 @@
  * 客户端冻结 variantId→binding 表（64 Phase 3a 裁决 b）。
  *
  * 镜像 server/lib/promptPresetsFrozen.ts 的 frozenPromptBindingForVariantId
- * + PRESET_TEMPLATE_TEXTS（全量 11 族，14 条预设模板文本），
+ * + PRESET_TEMPLATE_TEXTS（全量 12 族，15 条预设模板文本），
  * 供 src/lib/documentSnapshot.ts v8→v9 客户端迁移消费。
  *
  * 文本与 server PRESET_TEMPLATE_TEXTS 逐字一致，
@@ -25,7 +25,7 @@ const LQ = () => "\u201C";   // 「
 const RQ = () => "\u201D";   // 」
 const ELLIP = () => "\u2026\u2026";  // ……
 
-// ---------- 全量 11 族预设模板文本（与 server/lib/promptPresetsFrozen.ts PRESET_TEMPLATE_TEXTS 逐字一致）----------
+// ---------- 全量 12 族预设模板文本（与 server/lib/promptPresetsFrozen.ts PRESET_TEMPLATE_TEXTS 逐字一致）----------
 
 const FASHION_LOOKBOOK_GENERATE =
   `GPT Image 2 VIP 写实穿搭生成。创建单人全身 3:4 品牌 Lookbook：平视机位、中远景、约 50mm 视角，人物完整入镜、主体居中并留呼吸空间；动作自然，可有轻微行走或衣摆运动，但不得摆拍僵硬。
@@ -95,7 +95,14 @@ const PROMPT_GENERATE_GENERATE =
 3. 使用中文输出，避免英文术语堆砌；句法简洁、可读性强。
 4. 不要生成任何解释、Markdown 标题或列表符号；只输出一段连续正文。`;
 
-/** 14 条预设模板文本（familyId:mode → FrozenPromptBinding）。与 server 同源同值。 */
+// model-tryon:edit（双图模特试穿冻结协议，2026-10-12 §2.1 逐字定稿；该族无 generate 条目）。
+// 结尾「用户补充要求（如为空则忽略本行）：」为用户补充位，text 节点用户在其后追加。
+const MODEL_TRYON_EDIT =
+  `AI 换装模特试穿。严格按参考图序号使用输入图片，不得跨图挪用：参考图1=服装，是唯一的服装来源；参考图2=模特，是唯一的人物身份来源（长相、发型、肤色、身材、姿势）。把参考图1的服装完整穿到参考图2的模特身上：忠实还原服装的版型、颜色、花型、面料质感、缝线、闭合方式与五金细节；保留模特本人的面部特征、发型、肤色、身材比例与姿势，只更换身上服装，不改变人物身份，不融合两张脸或两件衣服。
+输出 3:4 单人全身竖版：人物完整入镜、头脚不裁切，服装与身体贴合自然，褶皱、垂坠与遮挡关系可信；默认平视机位、约 50mm、柔和均匀光线、干净中性背景。仅在不与用户要求和参考图冲突的前提下，补全主体、环境、光线、镜头、色调、构图六个维度的合理细节；不得新增用户未要求的人物、道具、文字、Logo 或水印。禁止使用「8K」「杰作」「大师级」「完美光线」「超高清」等无信息量夸大词。
+用户补充要求（如为空则忽略本行）：`;
+
+/** 15 条预设模板文本（familyId:mode → FrozenPromptBinding）。与 server 同源同值。 */
 const FROZEN_PROMPT_BINDING_MAP: Readonly<Record<string, FrozenPromptBinding>> = {
   "fashion-lookbook:generate": { familyId: "fashion-lookbook", mode: "generate", text: FASHION_LOOKBOOK_GENERATE },
   "fashion-lookbook:edit": { familyId: "fashion-lookbook", mode: "edit", text: FASHION_LOOKBOOK_EDIT },
@@ -111,6 +118,7 @@ const FROZEN_PROMPT_BINDING_MAP: Readonly<Record<string, FrozenPromptBinding>> =
   "video-animate:edit": { familyId: "video-animate", mode: "edit", text: VIDEO_ANIMATE_EDIT },
   "prompt-polish:edit": { familyId: "prompt-polish", mode: "edit", text: PROMPT_POLISH_EDIT },
   "prompt-generate:generate": { familyId: "prompt-generate", mode: "generate", text: PROMPT_GENERATE_GENERATE },
+  "model-tryon:edit": { familyId: "model-tryon", mode: "edit", text: MODEL_TRYON_EDIT },
 };
 
 // ---------- variantId 解析 ----------
@@ -141,7 +149,7 @@ export function frozenPromptText(familyId: string, mode: ImageOperationMode): st
   return FROZEN_PROMPT_BINDING_MAP[`${familyId}:${mode}`]?.text;
 }
 
-/** 全量 11 族 familyId 列表（快照锁定用）。 */
+/** 全量 12 族 familyId 列表（快照锁定用）。 */
 export const FROZEN_PROMPT_FAMILY_IDS = [
   "fashion-lookbook",
   "commerce-hero",
@@ -154,7 +162,8 @@ export const FROZEN_PROMPT_FAMILY_IDS = [
   "video-animate",
   "prompt-polish",
   "prompt-generate",
+  "model-tryon",
 ] as const;
 
-/** 冻结表条目数（14 = 全量 PRESET_TEMPLATE_TEXTS）。 */
-export const FROZEN_PROMPT_ENTRY_COUNT = Object.keys(FROZEN_PROMPT_BINDING_MAP).length; // 14
+/** 冻结表条目数（15 = 全量 PRESET_TEMPLATE_TEXTS）。 */
+export const FROZEN_PROMPT_ENTRY_COUNT = Object.keys(FROZEN_PROMPT_BINDING_MAP).length; // 15

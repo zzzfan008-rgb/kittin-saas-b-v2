@@ -3,6 +3,7 @@ import {
   selectActiveSelectedResultId,
   useFlowStore,
 } from "@/store/flowStore";
+import { useLayoutEffect, useRef } from "react";
 import { OPEN_COMPARE_EVENT } from "@/lib/overlayEvents";
 import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ interface ResultsPanelProps {
   onLoadMore?: () => void;
   /** 点单个结果时打开 ImageViewer（65d R-87 §3：ResultDetailDialog 已删除）。 */
   className?: string;
+  /** 固定可见行数（3 列网格）；列表高度 = 行数 × 行高，超出部分出右侧滚动条自由滚动。 */
+  rowsVisible?: number;
 }
 
 /** 「历史创作记录」浮层里的跨项目结果列表（3 列缩略图，可继续加载）。 */
@@ -25,6 +28,7 @@ export function ResultsPanel({
   loadingMore = false,
   onLoadMore,
   className,
+  rowsVisible,
 }: ResultsPanelProps) {
   // 生成历史是跨项目的全局记录；即使项目页签未恢复，也必须能在刷新后找回。
   const recentResults = useFlowStore((s) => s.recentResults);
@@ -46,6 +50,22 @@ export function ResultsPanel({
     setSelectedResultId(r.id);
     openViewer({ url: thumbnailImageUrl(r.image), title: r.nodeLabel, resultId: r.id });
   };
+
+  // rowsVisible：首行实测行高 → 固定列表视口高度（行数 × 行高），右侧滚动条自由滚动。
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!rowsVisible) return;
+    const scroller = scrollerRef.current;
+    const grid = gridRef.current;
+    if (!scroller || !grid) return;
+    const row = grid.firstElementChild as HTMLElement | null;
+    if (!row) return;
+    const styles = getComputedStyle(grid);
+    const rowH = row.getBoundingClientRect().height;
+    const gap = parseFloat(styles.rowGap || styles.gap || "0") || 0;
+    scroller.style.maxHeight = `${rowsVisible * rowH + (rowsVisible - 1) * gap + 24}px`;
+  }, [rowsVisible, recentResults.length]);
 
   return (
     <section
@@ -72,13 +92,16 @@ export function ResultsPanel({
           )}
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div
+        ref={scrollerRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
+      >
           {recentResults.length === 0 ? (
             <p className="py-3 text-center text-label text-[var(--gc-text-muted)]">
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div ref={gridRef} className="grid grid-cols-3 gap-2">
               {recentResults.map((r) =>
                 isNodeRunActive(r.status) ? (
                   <button

@@ -10,6 +10,7 @@ import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
  * v9 生成层生图节点（64 Phase 2 §6.2）：
  * 操作 + 模型/画幅/尺寸/批次/模型参数面板 + 运行；不承载任何媒体展示（产物归 result-image）。
  * 工具条：[运行] [复制]。
+ * 输入端口（提示词 / 参考图）融合在参数面板前两行，见 GeneratorParamsPanel。
  */
 export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageGeneratorNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
@@ -19,8 +20,6 @@ export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageG
 
   return (
     <>
-      <Handle type="target" position={Position.Left} id="prompt" style={{ top: "20%" }} title="提示词（文本节点）" />
-      <Handle type="target" position={Position.Left} id="reference" style={{ top: "60%" }} title="参考图（图片 / 图片结果节点）" />
       <NodeFrame
         nodeId={id}
         title={data.label}

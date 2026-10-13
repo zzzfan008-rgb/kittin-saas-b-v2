@@ -174,6 +174,13 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
   batchSize: BatchSize; // 1 | 2 | 4 | 8
+  /**
+   * 工作流族标识（模板实例化时落标，如 "model-tryon"）。
+   * 用途：运行时提示词改写白名单门控（见 2026-10-12-prompt-rewrite/plan.md §2.3）。
+   * 可选：手动新建节点与历史文档为 undefined；undefined 不触发任何族专属行为（fail-closed）。
+   * 仅 image-generator 携带；video-generator 本期不使用（裁定 §1.4）。
+   */
+  familyId?: string;
 }
 
 export interface VideoGeneratorNodeData extends BaseNodeData {
@@ -428,7 +435,11 @@ export function isVideoSourceKind(kind: NodeKind | undefined): boolean {
   return kind === "video" || kind === "result-video";
 }
 
-/** INV-1：每个生成节点必须存在 ≥1 条来自 text 节点的 prompt 边。 */
+/**
+ * 找出没有 text 提示词上游的生成节点（原 INV-1）。
+ * 注意：这不再是保存硬闸（未接线项目允许保存），仅供客户端非阻断 warning；
+ * 真正的提示词前置检查在运行时（server/engine/dag.ts）。
+ */
 export function missingTextUpstreamNodeIds(
   nodes: readonly GraphNodeLike[],
   edges: readonly GraphEdgeLike[],
@@ -572,6 +583,38 @@ export function selectReferenceOrdinals(
     }
   }
   return ordinals;
+}
+
+export interface ReferenceOrdinalAssignment {
+  /** 在该目标生成节点入边序列中的序号（1 起，= 模型看到的参考图N） */
+  ordinal: number;
+  /** 目标生成节点 id */
+  targetId: string;
+}
+
+/**
+ * 全画布参考图序号（不依赖选中态）：为每个图片源节点汇总「它在各生成节点上的参考图序号」。
+ * 序号按目标分组、各自从 1 起、随 edges 数组顺序——与 dag/runner 实际拼装参考图的顺序一致。
+ * 同一源图连多个生成节点时返回多个 assignment（各目标一个序号）。永不持久化。
+ */
+export function selectAllReferenceOrdinals(
+  nodes: readonly GraphNodeLike[],
+  edges: readonly GraphEdgeLike[],
+): ReadonlyMap<string, ReferenceOrdinalAssignment[]> {
+  const result = new Map<string, ReferenceOrdinalAssignment[]>();
+  const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
+  // 按目标分组编号（每个生成节点的入边序列各自从 1 起）。
+  const nextOrdinalByTarget = new Map<string, number>();
+  for (const edge of edges) {
+    if (!isReferenceEdge(edge)) continue;
+    if (!isImageSourceKind(kindById.get(edge.source))) continue;
+    const ordinal = nextOrdinalByTarget.get(edge.target) ?? 1;
+    nextOrdinalByTarget.set(edge.target, ordinal + 1);
+    const list = result.get(edge.source) ?? [];
+    list.push({ ordinal, targetId: edge.target });
+    result.set(edge.source, list);
+  }
+  return result;
 }
 
 // ---------- 节点注册表（前端渲染 + 引擎共用）----------

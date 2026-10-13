@@ -64,6 +64,11 @@ export type DocumentNodeData =
       batchSize: number;
       modelOptions?: ImageModelOptions;
       operationMode?: ImageOperationMode;
+      /**
+       * 工作流族标识（模板实例化落标，如 "model-tryon"），保存重开后仍参与运行时
+       * 改写白名单门控；无值省略（不写空串）。undefined=fail-closed 不触发族行为。
+       */
+      familyId?: string;
       mask?: string;
       maskSourceRef?: string;
       featherRadius?: number;
@@ -261,6 +266,13 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
           : 1,
         ...(data.modelOptions !== undefined ? { modelOptions: cloneScalarRecord(data.modelOptions) } : {}),
         ...operationModeField(data),
+        // familyId 窄化写入：trim 后非空 string 才落文档（不写空串），保存重开后白名单门控不失效（契约 §1.3）。
+        ...optionalString(
+          "familyId",
+          typeof data.familyId === "string" && data.familyId.trim()
+            ? data.familyId.trim()
+            : undefined,
+        ),
       };
     }
     case "video-generator":
@@ -317,7 +329,7 @@ const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   "image-generator": [
     "kind", "label",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
-    "operationMode",
+    "operationMode", "familyId",
   ],
   "video-generator": [
     "kind", "label",

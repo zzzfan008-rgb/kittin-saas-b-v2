@@ -18,6 +18,7 @@ import { usageRouter } from "./routes/usage";
 import { tutorialsRouter } from "./routes/tutorials";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
+import { createTextRewriteRouter } from "./routes/textRewrite";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
 import { migrateLegacyData } from "./lib/legacyMigration";
@@ -38,6 +39,9 @@ app.use(express.json({ limit: "50mb" }));
 
 const aiRateLimit = createRateLimitMiddleware();
 const loginRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests: 10 });
+// 提示词改写补全按钮：per-IP 时间窗 20 次/分钟（契约 §4，参考 aiRateLimit 形态；比出图通道宽，
+// 文本便宜但仍防滥用）。
+const textRewriteRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests: 20 });
 const aiDiagnosticsRouter = createAiDiagnosticsRouter(aiRateLimit);
 app.get("/api/health", (_req, res) => res.json({ ok: true, status: "alive" }));
 
@@ -108,6 +112,7 @@ app.use("/api/history", historyRouter);
 app.use("/api/usage", usageRouter);
 app.use("/api/tutorials", tutorialsRouter);
 app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
+app.use("/api/text", textRewriteRateLimit, createTextRewriteRouter());
 app.use("/api", (_req, res) => res.status(404).json({ error: "API not found" }));
 
 // 生产模式：完整模式必须有前端构建；API_ONLY=true 可显式跳过前端托管。

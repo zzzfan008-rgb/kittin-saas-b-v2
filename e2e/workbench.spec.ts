@@ -425,7 +425,9 @@ async function startBuiltinTemplate(page: Page, name: string): Promise<void> {
  * 「工具条是否已渲染」为准重试，而不是盲等固定时长。
  */
 async function selectCanvasNode(node: Locator): Promise<void> {
-  const header = node.locator(".gc-node-header");
+  // R-123 frameless：有图态标题在节点上方徽标（NodeFrame.tsx:138 `data-node-badge`），
+  // 无图白卡态仍是 `.gc-node-header`。两态互斥，用选择器列表一次兼容，不按位置/class 猜结构。
+  const header = node.locator(".gc-node-header, [data-node-badge]").first();
   await expect(header).toBeVisible();
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await node.locator("[data-node-toolbar]").count() > 0) return;
@@ -455,8 +457,10 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
   // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
   await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
-  // v9 模板默认画幅 1:1（server/routes/templates.ts 拍板③：aspectRatio "1:1" / batchSize 1）。
-  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
+  // R-100 本批：model-tryon 模板画幅改为 3:4 —— server/routes/templates.ts:163
+  // imageGeneratorNode("tryon-gen", …, { familyId: "model-tryon", aspectRatio: "3:4" })；
+  // 同文件 :96 的通用默认仍是 "1:1"（该模板不用它）。实测 combobox 收到 "3:4"。
+  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
   // v9 面板把 v8 的「数量」改名为「批次」。
   await expect(generator.getByRole("combobox", { name: "批次" })).toContainText("1");
   const params = generator.getByRole("region", { name: "模型参数" });

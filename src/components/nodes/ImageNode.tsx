@@ -5,28 +5,24 @@ import {
   patchTab,
   runWithoutHistory,
   selectActiveDocumentTarget,
-  selectActiveProjectName,
   selectActiveReadOnly,
   selectDocumentForTab,
   selectNodeInputImages,
   useFlowStore,
 } from "@/store/flowStore";
 import { useShallow } from "zustand/react/shallow";
-import { useLightboxStore } from "@/store/lightboxStore";
 import type { ImageNodeData } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
-import { assetNameFromUpload, saveImageToModelLibrary } from "@/lib/assetSave";
 import { saveMaskDraft } from "@/lib/maskUpload";
-import { Checkbox } from "@/components/ui/checkbox";
-import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
+import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
 import { MaskEditor } from "./MaskEditor";
 import { MultiRoundEditPanel } from "./MultiRoundEditPanel";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
-import { useReferenceOrdinal } from "./ReferenceOrdinals";
+import { useReferenceOrdinals } from "./ReferenceOrdinals";
 import { duplicateNode } from "./nodeDuplicate";
 
 /**
@@ -34,7 +30,6 @@ import { duplicateNode } from "./nodeDuplicate";
  * 只做上传 / 展示 / 作为参考图来源，**不含**模型、画幅、数量与运行按钮；
  * 全部生成语义归 image-generator（生成层）。
  * 工具条：[裁剪] [抠图] [蒙版] [复制] [替换]。
- * 上传入口可勾选「存入数字模特库」。
  */
 
 interface NormalizedUploadResponse {
@@ -73,17 +68,14 @@ async function uploadFile(file: File): Promise<NormalizedUploadResponse> {
 
 export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
-  const openLightbox = useLightboxStore((s) => s.open);
   const runImageEdit = useFlowStore((s) => s.runImageEdit);
   const readOnly = useFlowStore(selectActiveReadOnly);
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
-  const [libraryState, setLibraryState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
+  const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
   const editPromptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "editPrompt" },
@@ -145,27 +137,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     }),
   );
 
-  const storeToModelLibrary = useCallback(
-    async (image: string, fileName: string, requestId: number) => {
-      setLibraryState("saving");
-      setLibraryError(null);
-      try {
-        await saveImageToModelLibrary({
-          name: assetNameFromUpload(fileName, data.label),
-          image,
-          sourceNote: `来自项目「${selectActiveProjectName(useFlowStore.getState())}」的图片上传`,
-        });
-        if (requestId !== uploadRequestRef.current) return;
-        setLibraryState("saved");
-      } catch (err) {
-        if (requestId !== uploadRequestRef.current) return;
-        setLibraryError(err instanceof Error ? err.message : String(err));
-        setLibraryState("error");
-      }
-    },
-    [data.label],
-  );
-
   const handleFile = useCallback(
     async (file: File | undefined | null) => {
       if (readOnly || !file || !file.type.startsWith("image/")) return;
@@ -184,7 +155,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           maskSourceRef: undefined,
           featherRadius: undefined,
         });
-        if (saveToModelLibrary) void storeToModelLibrary(upload.url, file.name, requestId);
       } catch (err) {
         if (requestId !== uploadRequestRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -193,7 +163,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         if (requestId === uploadRequestRef.current) setUploading(false);
       }
     },
-    [id, readOnly, saveToModelLibrary, storeToModelLibrary, updateNodeDataInTab],
+    [id, readOnly, updateNodeDataInTab],
   );
 
   // Ctrl+V 粘贴（节点被选中时生效）
@@ -212,69 +182,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     return () => document.removeEventListener("paste", onPaste);
   }, [handleFile, readOnly, selected]);
 
-  const openAssetPicker = useCallback(() => {
-    const detail: AssetPickerRequest = {
-      target: selectActiveDocumentTarget(useFlowStore.getState()),
-      nodeId: id,
-    };
-    window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail }));
-  }, [id]);
-
   const hasUpload = data.outputImages.length > 0;
   const hasMask = typeof data.mask === "string" && data.mask.length > 0;
-
-  const renderFileInput = (variant: "slot" | "replace") => (
-    <input
-      type="file"
-      accept="image/*"
-      multiple={false}
-      disabled={readOnly}
-      tabIndex={variant === "replace" ? -1 : undefined}
-      aria-label={hasUpload ? "重新上传图片" : "上传图片"}
-      className={`nodrag nopan absolute inset-0 h-full w-full cursor-pointer opacity-0 ${
-        variant === "replace" ? "z-0" : "z-10"
-      }`}
-      onChange={(event) => {
-        void handleFile(event.target.files?.[0]);
-        event.target.value = "";
-      }}
-    />
-  );
-
-  const modelLibraryOption = (
-    <div className="nodrag nopan flex items-center justify-between gap-2 text-label text-[var(--gc-node-muted)]">
-      <label className="flex items-center gap-2">
-        <Checkbox
-          aria-label="存入数字模特库"
-          checked={saveToModelLibrary}
-          disabled={readOnly}
-          onCheckedChange={(checked) => {
-            setSaveToModelLibrary(checked === true);
-            setLibraryState("idle");
-            setLibraryError(null);
-          }}
-          className="border-[var(--gc-node-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
-        />
-        <span>上传时存入数字模特库</span>
-      </label>
-      {libraryState !== "idle" && (
-        <span
-          role="status"
-          aria-live="polite"
-          title={libraryError ?? undefined}
-          className={
-            libraryState === "error"
-              ? "text-[var(--gc-warn-text)]"
-              : libraryState === "saved"
-                ? "text-gold"
-                : undefined
-          }
-        >
-          {libraryState === "saving" ? "存入中…" : libraryState === "saved" ? "已存入" : "存入失败"}
-        </span>
-      )}
-    </div>
-  );
 
   return (
     <>
@@ -284,10 +193,13 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         status={data.status}
         error={data.error}
         selected={selected}
+        frameless={hasUpload}
+        nodeKind="image"
         toolbar={
           <NodeToolbar
             kind="image"
             selected={selected}
+            textOnly
             actions={{
               crop: {
                 disabled: true,
@@ -323,10 +235,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               },
               replace: {
                 onSelect: () => {
-                  const input = document.querySelector<HTMLInputElement>(
-                    `.react-flow__node[data-id="${CSS.escape(id)}"] input[type="file"]`,
-                  );
-                  input?.click();
+                  setReplaceMenuOpen(true);
                 },
                 disabled: readOnly,
                 disabledReason: "只读项目不能替换图片",
@@ -336,26 +245,23 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         }
       >
         {hasUpload ? (
-          <div className="nodrag relative overflow-hidden rounded-[10px] border border-[var(--gc-node-border)]">
-            <button
-              type="button"
-              className="relative z-10 block w-full cursor-zoom-in"
-              title="单击查看大图"
-              onClick={() => openLightbox(data.outputImages[0], data.label)}
-            >
+          <div className="nopan relative rounded-[4px] bg-[var(--gc-accent)] p-[2px]">
+            <div className="relative block w-full cursor-grab overflow-hidden rounded-[4px] active:cursor-grabbing">
               <img
                 src={thumbnailImageUrl(data.outputImages[0])}
                 loading="lazy"
                 decoding="async"
                 alt="已上传图片"
-                className="max-h-40 w-full bg-[var(--gc-node-inner)] object-contain"
+                className="w-full object-contain"
               />
-            </button>
-            {renderFileInput("replace")}
+            </div>
             <OrdinalBadgeSlot nodeId={id} />
           </div>
         ) : (
           <div
+            onDoubleClick={() => {
+              if (!readOnly) setReplaceMenuOpen(true);
+            }}
             onDragOver={(event) => {
               event.preventDefault();
               setDragOver(true);
@@ -366,41 +272,82 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               setDragOver(false);
               void handleFile(event.dataTransfer.files?.[0]);
             }}
-            className={`nodrag nopan relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-[10px] border bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
+            title="双击上传或从素材库选择"
+            className={`nopan relative flex aspect-[4/3] w-full cursor-grab flex-col items-center justify-center gap-2 overflow-hidden rounded-[4px] border-2 border-dashed bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
               dragOver
-                ? "border-gold bg-gold/8 text-gold"
-                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-text-muted)]"
+                ? "border-solid border-[var(--gc-accent)] text-[var(--gc-accent)]"
+                : "border-[var(--gc-accent)] text-[var(--gc-node-muted)]"
             }`}
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !readOnly) {
+                event.preventDefault();
+                setReplaceMenuOpen(true);
+              }
+            }}
           >
-            {renderFileInput("slot")}
+            <OrdinalBadgeSlot nodeId={id} />
+            {/* 用户拍板（2026-10-12，A 案）：保留双击/Enter 打开替换弹窗的交互，同时在此保留一个
+                隐藏原生 file input —— 提供 a11y 直传路径与 Playwright setInputFiles 锚点。
+                它不是「可见上传入口」（可见入口仍是弹窗），故不违背 R-101「节点内不得内联可见上传控件」。 */}
+            <input
+              type="file"
+              accept="image/*"
+              multiple={false}
+              disabled={readOnly}
+              tabIndex={-1}
+              aria-label="上传图片"
+              className="pointer-events-none absolute h-0 w-0 opacity-0"
+              onChange={(event) => {
+                void handleFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
             <span className="pointer-events-none font-mono text-label tracking-wider opacity-70">
               {uploading ? "素材处理中…" : "IMAGE · 槽位"}
             </span>
             <span className="pointer-events-none text-label leading-relaxed opacity-50">
-              点击 / 拖拽 / Ctrl+V
+              拖拽或双击上传图片
             </span>
           </div>
         )}
-        {modelLibraryOption}
-        {hasUpload && (
-          <button
-            type="button"
-            onClick={openAssetPicker}
-            disabled={readOnly}
-            className="w-full rounded-md border border-[var(--gc-node-border)] py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-40"
-          >
-            从素材库替换
-          </button>
-        )}
         {/* 65d v2：本地编辑控件全部迁入专属编辑页（蒙版重绘页 / 多轮修改页），节点上不再内联。 */}
-        <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">
-          {hasUpload
-            ? "作为参考图来源：连到生成节点的 reference 输入"
-            : "上传图片后可作为参考图来源；生成请用生图节点"}
-          {referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}
-        </p>
+        {selected ? (
+          <div
+            role="tooltip"
+            className="nodrag absolute left-3 top-[calc(100%+10px)] z-20 w-60 rounded-xl rounded-tl-sm border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] px-3 py-2 text-label leading-relaxed text-[var(--gc-text)] shadow-lg shadow-black/30"
+          >
+            {hasUpload
+              ? `作为参考图来源：连到生成节点的「参考图」输入${referenceCount > 0 ? `（已被 ${referenceCount} 处引用）` : ""}`
+              : "上传图片后可作为参考图来源；生成请用生图节点"}
+            <span className="absolute -top-[5px] left-4 size-2.5 rotate-45 border-l border-t border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)]" />
+          </div>
+        ) : null}
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
+
+      {replaceMenuOpen && (
+        <ReplaceImageDialog
+          nodeId={id}
+          nodeLabel={data.label}
+          readOnly={readOnly}
+          onUpload={handleFile}
+          onPickFromLibrary={(url) => {
+            const target = selectActiveDocumentTarget(useFlowStore.getState());
+            if (!target) return;
+            updateNodeDataInTab(target, id, {
+              outputImages: [url],
+              status: "success",
+              error: undefined,
+              mask: undefined,
+              maskSourceRef: undefined,
+              featherRadius: undefined,
+            });
+            setReplaceMenuOpen(false);
+          }}
+          onClose={() => setReplaceMenuOpen(false)}
+        />
+      )}
 
       {/* 蒙版编辑器（65b：蒙版入口从生成节点面板迁入图片节点） */}
       {/* 蒙版重绘页（65d v2）：右栏约 1/4 宽整合控件；主按钮=保存+重绘且不关闭面板，
@@ -491,8 +438,18 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   );
 }
 
+/**
+ * 参考图序号徽标簇：连线后常显（不依赖选中态）。同一源连多个生成节点时每个目标一个徽标；
+ * 位置在图片框右上角（图N = 模型看到的参考图N，与参考图序号一致）。
+ */
 function OrdinalBadgeSlot({ nodeId }: { nodeId: string }) {
-  const ordinal = useReferenceOrdinal(nodeId);
-  if (ordinal === null) return null;
-  return <RefOrdinalBadge ordinal={ordinal} />;
+  const assignments = useReferenceOrdinals(nodeId);
+  if (!assignments) return null;
+  return (
+    <div className="pointer-events-none absolute right-2 top-2 z-[3] flex gap-1">
+      {assignments.map((assignment) => (
+        <RefOrdinalBadge key={assignment.targetId} ordinal={assignment.ordinal} />
+      ))}
+    </div>
+  );
 }

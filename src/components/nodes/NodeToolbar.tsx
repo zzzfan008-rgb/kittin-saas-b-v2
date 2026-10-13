@@ -104,9 +104,11 @@ export interface NodeToolbarProps {
   kind: NodeKind;
   selected?: boolean;
   actions?: Partial<Record<NodeToolbarActionId, NodeToolbarActionBinding>>;
+  /** 纯文字按钮（无图标），button 更宽、文字不换行 */
+  textOnly?: boolean;
 }
 
-export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
+export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeToolbarProps) {
   const definitions = NODE_TOOLBAR_ACTIONS[kind];
   if (!selected || !definitions || definitions.length === 0) return null;
 
@@ -117,11 +119,12 @@ export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
         aria-label={`${nodeTitleForKind(kind)}工具栏`}
         aria-orientation="horizontal"
         data-node-toolbar={kind}
-        className="nodrag nopan absolute bottom-full left-1/2 z-20 mb-[var(--gc-node-toolbar-gap)] flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-[var(--gc-node-border)] bg-[var(--gc-node-header)] p-0.5 shadow-lg shadow-black/30"
+        className={`nodrag nopan absolute bottom-full left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
+        style={{ marginBottom: "calc(var(--gc-node-toolbar-gap, 8px) + 31px)" }}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
       >
-        {definitions.map((definition) => {
+        {definitions.map((definition, index) => {
           const binding = actions?.[definition.id];
           const disabled = binding?.disabled ?? binding?.onSelect === undefined;
           const label = binding?.label ?? definition.label;
@@ -193,29 +196,65 @@ export function NodeToolbar({ kind, selected, actions }: NodeToolbarProps) {
           }
 
           // -- 普通按钮 --
+          if (textOnly) {
+            return (
+              <div key={definition.id} className="flex items-center gap-1">
+                {index > 0 && (
+                  <span className="h-4 w-px shrink-0 bg-[var(--gc-node-border,var(--gc-border))]" aria-hidden="true" />
+                )}
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={label}
+                      disabled={disabled}
+                      title={disabled ? `${label}：${disabledReason}` : label}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        binding?.onSelect?.();
+                      }}
+                      className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
+                    >
+                      {label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    {disabled ? `${label}：${disabledReason}` : label}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          }
           return (
-            <Tooltip key={definition.id}>
-              <TooltipTrigger render={<span className="inline-flex" />}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={label}
-                  disabled={disabled}
-                  title={disabled ? `${label}：${disabledReason}` : label}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    binding?.onSelect?.();
-                  }}
-                  className="text-[var(--gc-node-text)]"
-                >
-                  <Icon aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={6}>
-                {disabled ? `${label}：${disabledReason}` : label}
-              </TooltipContent>
-            </Tooltip>
+            <div key={definition.id} className="flex items-center gap-0.5">
+              {index > 0 && (
+                <span className="h-4 w-px shrink-0 bg-[var(--gc-node-border,var(--gc-border))]" aria-hidden="true" />
+              )}
+              <Tooltip>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={label}
+                    disabled={disabled}
+                    title={disabled ? `${label}：${disabledReason}` : label}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      binding?.onSelect?.();
+                    }}
+                    className="text-[var(--gc-node-text)]"
+                  >
+                    <Icon aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  {disabled ? `${label}：${disabledReason}` : label}
+                </TooltipContent>
+              </Tooltip>
+            </div>
           );
         })}
       </div>

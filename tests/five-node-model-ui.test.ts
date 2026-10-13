@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -65,6 +67,156 @@ test("文本节点：工具条动作齐全（含预设下拉），正文可编�
   assert.match(unselected, /一件棉质白衬衫/);
 });
 
+test("文本节点：「帮我补全」按钮有正文时可点，空正文禁用并提示", () => {
+  const nodeWithText = {
+    id: "text-rewrite-1",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text: "一条红色连衣裙" },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-with-text",
+    projectName: "有正文",
+    nodes: [nodeWithText],
+    edges: [],
+  });
+  const html = render(nodeWithText);
+  // 按钮存在，带 ✨ 图标（SparklesIcon 渲染为 svg）和「帮我补全」文案。
+  assert.match(html, /data-testid="text-rewrite-button"/, "缺少帮我补全按钮");
+  assert.match(html, /帮我补全/);
+  // 有正文时按钮不禁用（无 disabled="" 属性；注意 class 里的 disabled: 前缀是 Tailwind 伪类）。
+  const buttonTag = html.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(buttonTag, "按钮标签必须可定位");
+  assert.ok(!/disabled=""/.test(buttonTag), "有正文时按钮不应禁用");
+  // 提示挂在外层 span（disabled 按钮不触发 hover，title 必须在可 hover 的包装元素上）。
+  const wrapTag = html.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(wrapTag, "按钮外层包装 span 必须存在");
+  assert.match(wrapTag, /title="AI 补全提示词"/, "有正文时 title 为 AI 补全提示词");
+  assert.match(wrapTag, /nodrag/, "包装元素必须 nodrag 防拖动");
+
+  // 空正文节点：按钮禁用且包装 title 提示「先写点要求再补全」。
+  const emptyNode = {
+    id: "text-rewrite-empty",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: { kind: "text", label: "提示词", status: "idle", text: "" },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-empty",
+    projectName: "空正文",
+    nodes: [emptyNode],
+    edges: [],
+  });
+  const emptyHtml = render(emptyNode);
+  const emptyButtonTag = emptyHtml.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(emptyButtonTag, "空正文也应有按钮");
+  assert.match(emptyButtonTag, /disabled=""/, "空正文时按钮必须禁用");
+  const emptyWrapTag = emptyHtml.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(emptyWrapTag, "空正文也应有包装 span");
+  assert.match(emptyWrapTag, /先写点要求再补全/, "空正文 title 必须提示先写要求");
+});
+
+test("文本节点：协议模板锚点后无补充时「帮我补全」禁用并提示填补充（P1 §4 A 案）", () => {
+  const ANCHOR = "用户补充要求（如为空则忽略本行）：";
+  const protocolOnly = {
+    id: "text-rewrite-protocol",
+    type: "text",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "text",
+      label: "模特试穿",
+      status: "idle",
+      // 404 字冻结协议 + 锚点行，锚点后无补充（模板刚打开的真实形态）。
+      text: `AI 换装模特试穿。……冻结协议……\n${ANCHOR}`,
+    },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "rewrite-protocol-only",
+    projectName: "协议无补充",
+    nodes: [protocolOnly],
+    edges: [],
+  });
+  const html = render(protocolOnly);
+  const buttonTag = html.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(buttonTag, "协议节点也应有按钮");
+  assert.match(buttonTag, /disabled=""/, "锚点后无补充时按钮必须禁用（不发请求、不静默）");
+  const wrapTag = html.match(/<span[^>]*data-testid="text-rewrite-wrap"[^>]*>/)?.[0];
+  assert.ok(wrapTag, "包装 span 必须存在");
+  assert.match(wrapTag, /填写补充内容/, "title 必须提示先在补充位填写");
+
+  // 锚点后一旦有补充 → 恢复可点
+  const withSupplement = {
+    ...protocolOnly,
+    data: { ...protocolOnly.data, text: `AI 换装模特试穿。……协议……\n${ANCHOR}红色背景，戴墨镜` },
+  } as unknown as FlowNode;
+  const filledHtml = render(withSupplement);
+  const filledButton = filledHtml.match(/<button[^>]*data-testid="text-rewrite-button"[^>]*>/)?.[0];
+  assert.ok(filledButton && !/disabled=""/.test(filledButton), "锚点后有补充时按钮必须可点");
+});
+
+test("文本节点：只读项目中「帮我补全」按钮禁用（源码接线断言；SSR useSyncExternalStore 不反映 store 变更）", () => {
+  // SSR 下 zustand 钩子固定读 server snapshot（默认非只读），无法通过 renderToStaticMarkup
+  // 验证只读态；此处用源码接线断言锁定 disabled/title/handler 三处 readOnly 门控，
+  // 行为由 e2e 只读项目用例覆盖。
+  const source = readFileSync(
+    fileURLToPath(new URL("../src/components/nodes/TextNode.tsx", import.meta.url)),
+    "utf8",
+  );
+  // 按钮 disabled 表达式含 readOnly 与资格门控（空正文/锚点后无补充）
+  assert.match(
+    source,
+    /disabled=\{readOnly \|\| rewriting \|\| !rewriteGate\.eligible\}/,
+    "按钮 disabled 必须含 readOnly 与 rewriteGate 门控",
+  );
+  // title 文案含只读提示
+  assert.match(source, /只读项目不能改写提示词/);
+  // handler 首行门控 readOnly
+  assert.match(
+    source,
+    /if \(readOnly \|\| rewriting \|\| !projectId\) return/,
+    "handleRewrite 必须门控 readOnly",
+  );
+  // P1 核心：先保存再走改写（编排在 textRewriteFlow，本处确认组件接了 runPromptRewriteFlow）
+  assert.match(
+    source,
+    /runPromptRewriteFlow\(/,
+    "改写必须走 textRewriteFlow 编排（先保存防草稿 404）",
+  );
+  assert.match(
+    source,
+    /saveProject: \(\) => useFlowStore\.getState\(\)\.saveProject\(\)/,
+    "必须经过 saveProject 先保存（防项目 404）",
+  );
+  // 成功写回走 updateValue+flush（commit 回调内，与预设写入同款，可 undo）
+  assert.match(
+    source,
+    /textEdit\.updateValue\(text\)/,
+    "成功改写必须走 textEdit.updateValue",
+  );
+  assert.match(
+    source,
+    /textEdit\.flush\(\)/,
+    "成功改写必须 flush（落历史栈，可 undo）",
+  );
+  // 错误不再静默吞：透出到 text-rewrite-error 展示位
+  assert.match(
+    source,
+    /data-testid="text-rewrite-error"/,
+    "必须渲染改写错误透出行（不再静默 404/403）",
+  );
+  assert.match(
+    source,
+    /setError: setRewriteError/,
+    "flow 的 setError 必须接组件 state（文案透出）",
+  );
+  // 文本变更即清除上一次错误
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*setRewriteError\(null\);\s*\}, \[data\.text\]\)/,
+    "文本变更必须清除上一次改写错误",
+  );
+});
+
 test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运行闸门按兼容判定", () => {
   const node = {
     id: "image-generator-1",
@@ -92,7 +244,10 @@ test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运�
   assert.match(html, /aria-label="模型"/);
   assert.match(html, /aria-label="画幅"/);
   assert.match(html, /aria-label="模型参数"/);
-  assert.match(html, /参考图 0 张 · 提示词 0 条/);
+  // 端口行 + 来源胶囊取代底部统计行：两行端口（提示词/参考图）未接线时值列均为「未连接」
+  assert.match(html, /data-handleid="prompt"/);
+  assert.match(html, /data-handleid="reference"/);
+  assert.equal((html.match(/未连接/g) ?? []).length, 2);
   assert.match(html, /未接参考图 → 文生图/);
   assert.match(html, /生成暂不可用|尚不可运行/);
   assert.match(html, /disabled/);
@@ -150,8 +305,9 @@ test("生视频节点：提示词 / 首帧接线回显与 adaptive 画幅来自�
   const html = render(node);
   // 65b：视频操作模式由接线自动推断（无 aria-label="操作" 下拉）
   assert.match(html, /未接首帧 → 文生视频/);
-  // 视频侧接线回显是「提示词 M 条 · 首帧已接/未接」，不是参考图张数。
-  assert.match(html, /提示词 0 条 · 首帧未接/);
+  // 视频侧端口行为 提示词 / 首帧图；未接线时值列为「未连接」（底部统计行已并入端口胶囊）。
+  assert.match(html, /data-handleid="first-frame"/);
+  assert.equal((html.match(/未连接/g) ?? []).length, 2);
   assert.match(html, /未接首帧 → 文生视频/);
   // 首尾帧任务必须 adaptive（C6）：画幅选项来自视频契约。
   assert.match(html, /adaptive/);

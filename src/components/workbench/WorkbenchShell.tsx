@@ -311,21 +311,24 @@ function HistoryRail() {
               className="h-[21px] w-[21px]"
               fill="none"
               stroke="currentColor"
-              strokeWidth={1.8}
+              strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
             >
               {i === 0 ? (
-                // undo
-                <path d="M3 7v6h6" />
+                // undo：左指半圈箭头（顺时针弧 + 左箭头）
+                <>
+                  <path d="M3 12a9 9 0 1 0 9-9" />
+                  <path d="M3 3v6h6" />
+                </>
               ) : (
-                // redo
-                <path d="M21 7v6h-6" />
+                // redo：右指半圈箭头（逆时针弧 + 右箭头）
+                <>
+                  <path d="M21 12a9 9 0 1 1-9-9" />
+                  <path d="M21 3v6h-6" />
+                </>
               )}
-              <path
-                d={i === 0 ? "M3 13A9 9 0 1 0 5.5 6.3" : "M21 13A9 9 0 1 1 18.5 6.3"}
-              />
             </svg>
           </TooltipTrigger>
           <TooltipContent side="right" className="z-50">
