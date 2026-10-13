@@ -295,7 +295,8 @@ async function main() {
 
   await ok("改写集成：operationMode=edit 时同样生效", async () => {
     const calls: CapturedCall[] = [];
-    const deps = mockChatCompletion("将服装模特展示");
+    // mock 输出必须 ≥ 输入长度×0.8（textRewriter 截断防线，P1），故用等长扩写文本。
+    const deps = mockChatCompletion("把这件衣服穿到模特身上，柔和室内光线");
     await executeStep(
       imageStep({
         modelId: "gpt-image-2.5-flare-vip",
@@ -309,7 +310,7 @@ async function main() {
     );
     assert.equal(calls.length, 1);
     assert.ok(
-      calls[0].request.prompt.includes("将服装模特展示"),
+      calls[0].request.prompt.includes("把这件衣服穿到模特身上，柔和室内光线"),
       `edit 模式改写后 taskPrompt: ${calls[0].request.prompt.slice(0, 80)}`,
     );
     assert.equal(rewriteCallCount, 1);

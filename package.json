@@ -26,6 +26,7 @@
     "test": "node scripts/test-with-postgres.mjs",
     "test:e2e": "node scripts/e2e-with-postgres.mjs",
     "test:e2e:production": "node scripts/e2e-production-smoke.mjs",
+    "test:smoke:rewrite": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs scripts/rewrite-smoke.mjs",
     "test:e2e:run": "playwright test",
     "gate:codex": "node scripts/codex-gate.mjs",
     "gate:receipt:verify": "node scripts/gate-receipt-verify.mjs",

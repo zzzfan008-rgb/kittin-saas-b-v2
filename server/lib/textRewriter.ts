@@ -46,6 +46,39 @@ export interface RewriteContext {
   familyId?: string;
 }
 
+/**
+ * model-tryon 冻结协议的「用户补充位」锚点行（P1 契约增量 §2.2-a，2026-10-12 拍板）。
+ * 节点正文 = 冻结协议 + 本行 + 用户补充内容。改写时按本锚点切分：
+ * 协议段（锚点行含本身）原样保留并作为输出前缀回填；只把锚点后的用户补充内容交给改写器。
+ * 锚点后为空 → 无事可补，返回 skipped（reason: "empty_supplement"）。
+ */
+export const REWRITE_SUPPLEMENT_ANCHOR = "用户补充要求（如为空则忽略本行）：";
+
+/**
+ * 截断/残缺输出检测阈值：输出长度 < 输入长度 × 0.8 视为残缺，回退原文（reason: "too_short"）。
+ * 依据 P1 实测：max_tokens=512 截断时 gemini 报 finish_reason="stop" 而非 "length"，
+ * 单靠 finish_reason 漏检；长度比是兜底防线（改写是扩写/补全，正常输出不应显著短于输入）。
+ */
+export const REWRITE_MIN_OUTPUT_RATIO = 0.8;
+
+/** 改写输入切分结果：protocol = 协议段（含锚点行，原样保留）；supplement = 锚点后用户补充内容。 */
+export interface RewriteSplit {
+  protocol: string;
+  supplement: string;
+}
+
+/**
+ * 按补充位锚点切分改写输入（P1 §4：协议段只读保护）。
+ * 文本不含锚点 → { protocol: "", supplement: 全文 }（非协议模板走整段改写，现行为不变）。
+ * 含锚点：protocol 含锚点行在内的前缀（末尾换行保留原样）；supplement 为锚点行之后的剩余内容。
+ */
+export function splitRewriteInput(text: string): RewriteSplit {
+  const anchorIndex = text.indexOf(REWRITE_SUPPLEMENT_ANCHOR);
+  if (anchorIndex === -1) return { protocol: "", supplement: text };
+  const anchorEnd = anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length;
+  return { protocol: text.slice(0, anchorEnd), supplement: text.slice(anchorEnd) };
+}
+
 export interface RewriteOutcome {
   /** 最终可用提示词：改写成功 = 改写文；否则 = 原文（fail-closed）。 */
   text: string;
@@ -65,6 +98,12 @@ export interface RewriteDeps {
 /**
  * 改写一条用户提示词。空输入跳过（不调用通道）；其余任何失败/空结果回退原文。
  * 返回的 `text` 恒为可直接使用的提示词——调用方无需关心是否改写成功。
+ *
+ * P1 契约增量（2026-10-12，plan.md §2.2-a / §2.3-a）：
+ * - **协议段只读保护**：输入含补充位锚点（REWRITE_SUPPLEMENT_ANCHOR）时，协议段（含锚点行）
+ *   原样保留作为输出前缀；只有锚点后的用户补充内容进改写器。锚点后为空 → skipped。
+ * - **截断/残缺检测**：finish_reason="length" 或输出长度 < 输入长度 × REWRITE_MIN_OUTPUT_RATIO
+ *   → 视为失败回退原文（reason: "truncated" / "too_short"），绝不写回半句话。
  */
 export async function rewriteUserPrompt(
   userPrompt: string,
@@ -75,6 +114,12 @@ export async function rewriteUserPrompt(
   if (original.trim() === "") {
     return { text: original, rewritten: false, reason: "empty_prompt" };
   }
+  // 协议段只读保护：按补充位锚点切分，只改写用户补充段（P1 §4）。
+  const { protocol, supplement } = splitRewriteInput(original);
+  if (protocol !== "" && supplement.trim() === "") {
+    return { text: original, rewritten: false, reason: "empty_supplement" };
+  }
+  const rewriteTarget = protocol === "" ? original : supplement;
   const chatCompletion = deps.chatCompletion ?? createTextChatCompletion;
   const systemPrompt = rewriteSystemPrompt(context.familyId);
   try {
@@ -82,14 +127,24 @@ export async function rewriteUserPrompt(
       model: deps.modelId ?? config.apiyiTextModelId(),
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: original },
+        { role: "user", content: rewriteTarget },
       ],
     });
     const rewritten = result.content;
     if (typeof rewritten !== "string" || rewritten.trim() === "") {
       return { text: original, rewritten: false, reason: "empty_result" };
     }
-    return { text: rewritten, rewritten: true };
+    // 截断检测 ①：finish_reason="length" → 输出不完整，回退原文（P1 实测 stop 漏检的互补防线）。
+    if (result.finishReason === "length") {
+      return { text: original, rewritten: false, reason: "truncated" };
+    }
+    // 截断检测 ②：输出显著短于输入 → 残缺（512 事故实测 finish_reason 报 "stop" 但只剩半句）。
+    if (rewritten.trim().length < rewriteTarget.trim().length * REWRITE_MIN_OUTPUT_RATIO) {
+      return { text: original, rewritten: false, reason: "too_short" };
+    }
+    // 协议段原样回填为输出前缀（结构保证，替代"依赖模型自觉逐字保留协议"）。
+    const finalText = protocol === "" ? rewritten : protocol + rewritten.trim();
+    return { text: finalText, rewritten: true };
   } catch (error) {
     // fail-closed：吞掉一切错误并回退原文，绝不阻断出图（§2.3/§4）。
     const reason = error instanceof TextRewriteError ? error.code : "unknown_error";

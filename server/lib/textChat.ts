@@ -28,7 +28,12 @@ export interface TextChatCompletionArgs {
   reasoningEffort?: TextReasoningEffort;
   /** 默认 0.4（改写要确定性，低于 chat 默认 1）。 */
   temperature?: number;
-  /** 默认 512（改写输出是中文提示词，够用）。 */
+  /**
+   * 默认 2048。注意这是 output 总预算，gemini-3.8-flash 默认开深度思考且思考
+   * token 计入 output（API易快照 overview 原文「思考 tokens 計入輸出計費」）：
+   * medium 档在长协议改写下思考可烧 ~480 token，512 会让正文只剩零头且
+   * finish_reason 仍报 "stop"（P1 实测半句话事故）。2048 = 思考余量 + 正文上限。
+   */
   maxTokens?: number;
   /** 默认 config.aiTextTimeoutMs()。 */
   timeoutMs?: number;
@@ -136,7 +141,8 @@ async function attemptOnce(args: TextChatCompletionArgs, deps: Required<Pick<Tex
     // 契约固定：reasoning_effort 有效值 low/medium/high，默认 medium；绝不写 minimal / thinkingBudget。
     reasoning_effort: args.reasoningEffort ?? "medium",
     temperature: args.temperature ?? 0.4,
-    max_tokens: args.maxTokens ?? 512,
+    // max_tokens 是 output 总预算（含思考 token），默认 2048，见 TextChatCompletionArgs.maxTokens 注释。
+    max_tokens: args.maxTokens ?? 2048,
     stream: false,
   };
   const timeoutMs = args.timeoutMs ?? config.aiTextTimeoutMs();
