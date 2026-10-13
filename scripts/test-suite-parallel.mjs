@@ -110,6 +110,8 @@ const TEST_FILES = [
   "tests/flow-history.test.ts",
   "tests/text-edit-coalescing.test.ts",
   "tests/selection-consistency.test.ts",
+  // defaultProjectName 同日去重接线（createBlankTab / fresh 替换，纯 store 不碰库）。
+  "tests/default-project-name.test.ts",
   "tests/project-tabs.test.ts",
   "tests/result-export.test.ts",
   "tests/verify-bundle-budget.test.ts",

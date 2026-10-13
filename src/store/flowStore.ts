@@ -1819,6 +1819,9 @@ function newTab(opts?: {
   /** 已由服务端载入；即使内容为空，也不是首次未保存项目。 */
   persisted?: boolean;
   lifecycle?: ProjectLifecycle;
+  /** 默认命名去重依据：现有页签的项目名清单（同日多个按 -2/-3 递增）。
+   *  仅在未显式传 projectName 时生效；缺省 []（无去重）。 */
+  takenNames?: Iterable<string>;
 }): ProjectTab {
   const markDirty = opts?.markDirty ?? false;
   const persisted = opts?.persisted === true && !markDirty;
@@ -1826,7 +1829,7 @@ function newTab(opts?: {
   return {
     id: nanoid(10),
     projectId: opts?.projectId ?? nanoid(10),
-    projectName: opts?.projectName ?? defaultProjectName(),
+    projectName: opts?.projectName ?? defaultProjectName(opts?.takenNames),
     readOnly: opts?.readOnly ?? false,
     nodes: selection.nodes,
     edges: opts?.edges ?? [],
@@ -3336,7 +3339,8 @@ export const useFlowStore = create<FlowState>()(
       createBlankTab: () => {
         flushActiveTextEdit();
         cancelHistoryTransaction();
-        const tab = newTab();
+        // 同日连续新建去重：把现有页签名作为 takenNames，第二个得「未命名-YYYY-MM-DD-2」。
+        const tab = newTab({ takenNames: get().tabs.map((t) => t.projectName) });
         const state = get();
         // 空工作区（tabs=[]）没有可暂存的旧历史
         if (state.tabs.length > 0) stashActiveTemporalHistory(state.activeTabId);
@@ -4404,7 +4408,10 @@ export function replaceAbandonedInitialDraftWithFreshLocalTab(tabId: string): Pr
   const state = useFlowStore.getState();
   const index = state.tabs.findIndex((tab) => tab.id === tabId);
   if (index < 0 || projectTabLifecycle(state.tabs[index]) !== "initial_draft") return undefined;
-  const fresh = newTab();
+  // 用「除被替换页签外」的现有名去重——被替换草稿自己的名字即将作废，不应参与占用。
+  const fresh = newTab({
+    takenNames: state.tabs.filter((tab) => tab.id !== tabId).map((tab) => tab.projectName),
+  });
   const tabs = [...state.tabs];
   tabs[index] = fresh;
   runWithoutHistory(() => useFlowStore.setState({
