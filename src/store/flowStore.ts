@@ -157,6 +157,16 @@ import {
   type HistoryTransactionToken,
   type TabTemporalHistory,
 } from "./flowHistory";
+import {
+  readTextEditValue,
+  textEditDescriptorKey,
+  textEditPatch,
+} from "./flowTextEdit";
+export {
+  readTextEditValue,
+  textEditDescriptorKey,
+  textEditPatch,
+};
 
 type FlowSet = (
   partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>),
@@ -1194,45 +1204,6 @@ function patchDocumentTarget(
     return typeof patch === "function" ? patch(tab) : patch;
   });
   return matched;
-}
-
-function textEditDescriptorKey(descriptor: CoalescedTextEditDescriptor): string {
-  return descriptor.kind === "project-name"
-    ? "project-name"
-    : JSON.stringify(["node-data", descriptor.nodeId, descriptor.field]);
-}
-
-function readTextEditValue(
-  tab: ProjectTab,
-  descriptor: CoalescedTextEditDescriptor,
-): { value: string; fieldExisted: boolean } | null {
-  if (descriptor.kind === "project-name") {
-    return { value: tab.projectName, fieldExisted: true };
-  }
-  const node = tab.nodes.find((candidate) => candidate.id === descriptor.nodeId);
-  if (!node) return null;
-  const fieldExisted = Object.prototype.hasOwnProperty.call(node.data, descriptor.field);
-  const value = node.data[descriptor.field];
-  return { value: typeof value === "string" ? value : "", fieldExisted };
-}
-
-function textEditPatch(
-  tab: ProjectTab,
-  descriptor: CoalescedTextEditDescriptor,
-  value: string,
-  fieldExisted = true,
-): Partial<ProjectTab> {
-  if (descriptor.kind === "project-name") return { projectName: value };
-  let matched = false;
-  const nodes = tab.nodes.map((node) => {
-    if (node.id !== descriptor.nodeId) return node;
-    matched = true;
-    const data = { ...node.data } as WorkflowNodeData & Record<string, unknown>;
-    if (fieldExisted) data[descriptor.field] = value;
-    else delete data[descriptor.field];
-    return { ...node, data };
-  });
-  return matched ? { nodes } : {};
 }
 
 function clearTextEditTimer(edit: ActiveTextEdit): void {
