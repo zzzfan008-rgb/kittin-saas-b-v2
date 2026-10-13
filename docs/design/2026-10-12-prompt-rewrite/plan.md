@@ -95,6 +95,27 @@ type TextChatCompletionResult = {
 - 若带 `nodeId`：服务端在 project 的 `flow.nodes` 中定位该 text 节点 → 找其 `prompt` 出边指向的 `image-generator`/`video-generator` 节点 → 取 `kind` + `operationMode` + `promptVariantId`（解析 familyId）。找不到下游 → 用默认上下文（`kind=image` 通用服装改写）。
 - 若不带 `nodeId`：默认上下文。
 
+
+#### §2.2-a 协议段只读保护（锚点切分，2026-10-12 P1 事故修复）
+
+**背景（P1 半句话事故）**：`max_tokens=512` 时 gemini-3.8-flash 深度思考（思考 token 计入 output 预算）烧掉约 480 token，正文只剩 25 字但 `finish_reason` 仍 `"stop"`，服务端无截断检测导致半句话被写回数据库。
+
+**服务端锚点切分行为**（`server/lib/textRewriter.ts:splitRewriteInput`）：
+- 按锚点 `用户补充要求（如为空则忽略本行）：` 切分输入文本
+  - `protocol = text.slice(0, anchorEnd)` —— 含锚点行的完整协议段前缀，**一字不改动写结果前缀**
+  - `supplement = 锚点后内容`
+- 若输入不含锚点（非 model-tryon 族）：`protocol=""`，`supplement=全文`，走整段改写（现行为不变）
+- 若锚点后 supplement 空白：返回 `{rewritten:false, reason:"empty_supplement"}`，**不调文本通道**，前端按 rewritten:false 处理
+
+**截断/残缺输出检测**（`server/lib/textRewriter.ts:rewriteUserPrompt`）：
+- `finish_reason === "length"` → `{rewritten:false, reason:"truncated"}`，回退原文
+- `content.length < input.length × 0.8` → `{rewritten:false, reason:"too_short"}`，回退原文（防 `finish_reason="stop"` 但正文残缺的漏检情形）
+- 两种情形均保证 `rewritten:false`，绝不写回半句
+
+**max_tokens 默认值**：`server/lib/textChat.ts:139` 默认 `2048`（output 总预算含思考 token；medium 档约 480 token 思考，2048 足够 404 字协议 + 补充段改写）。
+
+**前端契约不变**：API 请求体（`text` 字段）无需变化；响应解析无需变化；唯一新增语义是 `reason:"empty_supplement"`（锚点后空白）。
+
 ### 2.3 运行时自动改写（无独立路由，runner 内）
 
 插入点：`runner.ts:241`（`userPrompt` 算得之后、`:246` 拼装之前）。
