@@ -1,0 +1,550 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-13T08:32:27.078Z",
+  "mode": "review-candidate-only",
+  "baselineCapturedAt": "2026-09-02T05:02:00Z",
+  "baselineContractHash": "130b0c05580047c5d2b3a146fc8074e20b7e578fe11b8abb8ca04d83b623d2f6",
+  "productionFilesModified": false,
+  "automaticContractUpdateAllowed": false,
+  "changes": [
+    {
+      "sourceId": "apiyi-gpt-image-2-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md",
+      "oldSha256": "2c91629dced4429d69901985232644d058397c99940bed931e776ef5a4765e54",
+      "candidateSha256": "12051716fe8d05c0d689165bc60398accce6893bd43e45d60bea46b5b60bf0b3",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:22 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md",
+      "oldSha256": "f5d330c454b5a1db6e9ba94260298d0fddabc15d14a54ee8bdd225311cd9be0d",
+      "candidateSha256": "f8fb91508784b27cadd4c253303463e1f7bfbb1fc2899476379b6de92a773ccc",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:22 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "edit-endpoint",
+        "reference-fields",
+        "forbidden-input-fidelity"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-mask",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md",
+      "oldSha256": "33924a0effb12bc86432e27a419fe365fe4997deb6b56eca4936dcf17174bb5e",
+      "candidateSha256": "6dc2284c797340db0c9b4eb171f606d405f54313a49be8f65fe2281cbe316a5b",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:22 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "alpha-mask-semantics",
+        "mask-dimension-match",
+        "mask-size-limit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-transparent-background",
+      "markdownUrl": "https://docs.apiyi.com/faq/image-transparent-background.md",
+      "oldSha256": "298c40e4b10f5e59844e7d7c1d0cb574af1da72beb09deefaff34fb5e608c446",
+      "candidateSha256": "fd17167d70c2a201a4c8df2cb83501d86a5075d332c1b56deac7c54b1bcdcd89",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:22 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "transparent-output-format",
+        "alpha-validation"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview.md",
+      "oldSha256": "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66",
+      "candidateSha256": "fa55bbeb13928bdbb7fd51cf243c0f038147bcccf7b5780aa7ffb7698266cbda",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:22 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "apiyi-exclusive-route",
+        "thirty-size-values",
+        "single-output"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image.md",
+      "oldSha256": "d401937aa35853a773d42717042803df628f1d7243f10b9525bd032f34020fe1",
+      "candidateSha256": "c5dabb97698987e05b366671fc1001d1acfcb92efeab55536e9d36a4bc4d63ba",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "generation-endpoint",
+        "size-enum",
+        "forbidden-quality-n-aspect-ratio"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-vip-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit.md",
+      "oldSha256": "66e7644327d9d790c12a4bed1786dfb488d4824450489d6a81b25cd626fbcc6e",
+      "candidateSha256": "254baf1be3368cc6977ae27f90bef8cfc2e4f65f72f0315670d5c5f1ab618d43",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2",
+        "gpt-image-2.5-sunburst",
+        "gpt-image-2.5-flare"
+      ],
+      "semanticReviewChecklist": [
+        "multipart-edit",
+        "ordered-references",
+        "eight-reference-limit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gemini-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/overview.md",
+      "oldSha256": "d3469a7e4587c9b23582e3e461c30364bf1af0a58f8118171bc0e010dd2be844",
+      "candidateSha256": "eab4963c32d8a88544e54893d377b7a4a52a11134edc09cfcad1bbd922728eca",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-image-preview",
+        "nano-banana-2-image"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-aliases",
+        "fourteen-aspect-ratios",
+        "image-size-enum"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gemini-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/text-to-image.md",
+      "oldSha256": "8e81a7cb72d03886f7901c47ad8201db3d255259e6b29fec7b292f32ac4bdc28",
+      "candidateSha256": "f0adb664021cff44b88d3050ddec4ec07299e5b177580cfb978482edcf3b180f",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-image-preview"
+      ],
+      "semanticReviewChecklist": [
+        "generate-content-endpoint",
+        "image-config",
+        "http-200-without-image"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gemini-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/image-edit.md",
+      "oldSha256": "5f4a0420bd9b6456710d8d0c1104055cefe510c28b84595b394bdacc8961b35d",
+      "candidateSha256": "aa36bffdc43b4c62da9967753279306d2355ade8aa7e0ac9a032d27583907b16",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-image-preview"
+      ],
+      "semanticReviewChecklist": [
+        "inline-data-references",
+        "ordered-role-description",
+        "multi-image-edit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-flux-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/overview.md",
+      "oldSha256": "1fc1c26bcaebc3de7d81e0bba95f457537babf223bf99a3a7cc32a90745984e3",
+      "candidateSha256": "23df4f5be137712d9b830a459b259e3147a53dc44a7634634e39bc2cf0eafbd4",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:23 GMT"
+      },
+      "affectedModelAliases": [
+        "flux-2-pro",
+        "FLUX.2 Pro"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "four-megapixel-boundary",
+        "temporary-url"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-flux-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/text-to-image.md",
+      "oldSha256": "88903c60516204c85952f8cd3f1b903a10f4d55c8333d514cc2a4b00088d2246",
+      "candidateSha256": "a18d483179d7412528f52abbd6f61cf8c5e6d489f7f92611c662f377b2dab3fc",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "flux-2-pro"
+      ],
+      "semanticReviewChecklist": [
+        "generation-endpoint",
+        "dimension-multiple",
+        "output-format"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-flux-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/image-edit.md",
+      "oldSha256": "8a8ad4925413776607d3d684c8438d7bf293c845d326fc7aab08b9e8fc3f0ec3",
+      "candidateSha256": "3183f5e421e9b5a272d9d4acef12e0aaecffcd99c1a6e8359575606d4e2eae95",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "flux-2-pro"
+      ],
+      "semanticReviewChecklist": [
+        "ordered-input-image-fields",
+        "eight-reference-limit",
+        "first-reference-aspect"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-seedream-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview.md",
+      "oldSha256": "63865a7a093865a85c9aa594b9c605a0677b34a263bfffd69a33b45ec6d2fc52",
+      "candidateSha256": "aa4d154188ddfa2f3cd89a42b22c633ec0dcf93b382d9ec0bd1a13b4074e13b7",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "seedream-5-0-260128",
+        "Seedream 5.0"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "2k-3k-size-policy",
+        "actual-output-size"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-seedream-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/text-to-image.md",
+      "oldSha256": "3301ab095fef5c3fc5369538671a68cf5a957fdb77084cc9dc94a4df2fb9a23a",
+      "candidateSha256": "b39d9a4300e25eee1a9ab51228677a5b3482a623e39aa6a34a8a846c37d245f9",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "seedream-5-0-260128"
+      ],
+      "semanticReviewChecklist": [
+        "generation-endpoint",
+        "watermark-disabled",
+        "sequential-output-disabled"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-seedream-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit.md",
+      "oldSha256": "80934bf8a852e07a24e78dd86ba75f31b3f4e574b9158a1edf59ac348605915f",
+      "candidateSha256": "211721f7eb7c44fefa0e93a717570862b906cad361435246cd6593fd37bfb3f8",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "seedream-5-0-260128"
+      ],
+      "semanticReviewChecklist": [
+        "ordered-image-array",
+        "gateway-reference-limit",
+        "no-native-aspect-ratio"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-image-best-practices",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices.md",
+      "oldSha256": "c561a3191bcd1be14be14fe51a0823aba063dcd6cc1955032f09030daedf73cc",
+      "candidateSha256": "843b51404f748b036d166b55dcfddbf6dbc4ef826e4e77d81677e9cbbb6a1154",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:24 GMT"
+      },
+      "affectedModelAliases": [
+        "*"
+      ],
+      "semanticReviewChecklist": [
+        "input-normalization",
+        "temporary-url-persistence",
+        "error-handling"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-image-async-queue",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-async-queue.md",
+      "oldSha256": "d17d4154af3f4cfb5df4e0972a4b26f69be47ca0643773dcdb76d14b423e42d5",
+      "candidateSha256": "10c784ebbcea6579ea896da1e1ec4b13fb7d71fc0bb1101867e0b84f51045207",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:25 GMT"
+      },
+      "affectedModelAliases": [
+        "*"
+      ],
+      "semanticReviewChecklist": [
+        "synchronous-provider-call",
+        "business-queue-ownership",
+        "ambiguous-outcome"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-all-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview.md",
+      "oldSha256": "6330d4e1ffb445817a8f2988e0704729e16dd0cbcc472e63b26cd6827cd0b5e9",
+      "candidateSha256": "04f5c3377f8884525668879958d3322bbc9ee009777556451c52601f41bbe3cf",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:25 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-all",
+        "gpt-image-2.5-all"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "no-size-quality-n-aspect-ratio",
+        "single-output"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-all-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/text-to-image.md",
+      "oldSha256": "2aad7d4711c4bed7b4a931785d0959718d2931cbef57bc5b9027fddc5415e075",
+      "candidateSha256": "9b2734ec47b1db645e8eab2059279ac9db1798bcded5e4796f38843c2080a431",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:25 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-all",
+        "gpt-image-2.5-all"
+      ],
+      "semanticReviewChecklist": [
+        "generation-endpoint",
+        "forbidden-size-quality-n-aspect-ratio",
+        "response-format"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-gpt-image-2-all-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/image-edit.md",
+      "oldSha256": "18eec6285235dd4b607091c00e8ffc56ddacb584b2c48667cbda9b285b030cbf",
+      "candidateSha256": "d9f01d72f6cfef80b985dc7e9f3b8736c27bf8d2a9a31ba89e8904c3a40ae413",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:25 GMT"
+      },
+      "affectedModelAliases": [
+        "gpt-image-2-all",
+        "gpt-image-2.5-all"
+      ],
+      "semanticReviewChecklist": [
+        "multipart-edit",
+        "repeated-image-field",
+        "no-size"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-pro-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview.md",
+      "oldSha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406",
+      "candidateSha256": "607fb7d006a6dc67a8e0063d2ffe2cc76a318a9b008975351327afc868023794",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3-pro-image-preview",
+        "gemini-3-pro-image",
+        "nano-banana-pro-image"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "ten-aspect-ratios",
+        "1k-2k-4k-image-size"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-pro-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/text-to-image.md",
+      "oldSha256": "5adbf6584972ee5df461e81f0cbe4fd3eaf32db2703e25584fa6a5fde6b31da3",
+      "candidateSha256": "c0919d673c0d4202452adb4182b9f3a91263a5bcea0788be290431bb37e933ad",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3-pro-image-preview",
+        "gemini-3-pro-image"
+      ],
+      "semanticReviewChecklist": [
+        "generate-content-endpoint",
+        "image-config"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-pro-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit.md",
+      "oldSha256": "95db353eddfc000cf696fe92338a1a9d2b08a513958176a1d10f99a517700cc7",
+      "candidateSha256": "32d1e53f1125a200e8c53e790f2fdd8aa00dfe8511a566e49a7da568ef18abc7",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3-pro-image-preview",
+        "gemini-3-pro-image"
+      ],
+      "semanticReviewChecklist": [
+        "inline-data-references",
+        "multi-image-edit"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-lite-overview",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/overview.md",
+      "oldSha256": "64ddee2dd8a225e3ce40c852f778e928bea3bb808dcf47cdcef89ffed61aac27",
+      "candidateSha256": "5803e83c38c5350e3c87e035b509bb9085ef06d7e16be704d441f9f3d761ecee",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-lite-image",
+        "nano-banana-lite-image"
+      ],
+      "semanticReviewChecklist": [
+        "gateway-model-id",
+        "fourteen-aspect-ratios",
+        "1k-only-image-size"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-lite-generate",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/text-to-image.md",
+      "oldSha256": "7d6216fafab8410d9815713acd29a28280e94d60329cf8f42bd75d6b024b25d7",
+      "candidateSha256": "2308201f6206c451d92cdb9fdc44df5c0c19e49a42ded83e87deee13d6700a4d",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-lite-image"
+      ],
+      "semanticReviewChecklist": [
+        "generate-content-endpoint",
+        "image-config",
+        "1k-only"
+      ],
+      "reviewStatus": "needs-human-review"
+    },
+    {
+      "sourceId": "apiyi-nano-banana-lite-edit",
+      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/image-edit.md",
+      "oldSha256": "59ca352bcdd62314d777e36ff465a3c81d3a03d5af31c6712f77262c147db53f",
+      "candidateSha256": "87d68321f7d10b499297524f705b8ce7bbba6000ef109fcff78b530228175286",
+      "candidateHttpMetadata": {
+        "etag": null,
+        "lastModified": "Tue, 13 Oct 2026 08:32:26 GMT"
+      },
+      "affectedModelAliases": [
+        "gemini-3.1-flash-lite-image"
+      ],
+      "semanticReviewChecklist": [
+        "inline-data-references",
+        "multi-image-edit"
+      ],
+      "reviewStatus": "needs-human-review"
+    }
+  ],
+  "failures": [],
+  "requiredNextStep": "Review each semantic claim, update the curated contract explicitly, then rerun all affected evaluations."
+}

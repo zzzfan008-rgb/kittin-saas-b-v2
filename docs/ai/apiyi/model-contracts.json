@@ -78,7 +78,7 @@
     {
       "id": "gpt-image-2.5-sunburst",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:7d8f66ec92ec53ac60a68a8ebd5d805aead90dd8b0013877bb2b785b6c30c94d",
+      "contractHash": "sha256:ddf9f7636e68c87afd59a2c644502b9d9febe5cdf9285c41f3cf2091de1e1502",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -178,7 +178,7 @@
     {
       "id": "gpt-image-2.5-all",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:87cdbc16dcf2e1f5f62ec2c3e7e86bdc58c5f6c44a560db95105ffbac0800054",
+      "contractHash": "sha256:01666bbb0415c74d728c78c7dd2d7adf6ad7cc7af2fbd0027e458dc7308e8fba",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -236,7 +236,7 @@
     {
       "id": "gpt-image-2.5-sunburst-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:1da7f49f417ab5b97197022be0464c4305a185265aa911e38336def91c895618",
+      "contractHash": "sha256:52d1891e65c432238b08ccc82d42d6700c33ee51a633d60bfebc1601f27fb604",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -345,7 +345,7 @@
     {
       "id": "gpt-image-2.5-flare-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:a8f527c666d0f8833470c39975ea4fa757350ab83bf9b10d158847d0e39993d3",
+      "contractHash": "sha256:e270609abaea551dc4321299126fa94f12d252e385e1dfb7f013af79b9320d08",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -454,7 +454,7 @@
     {
       "id": "gemini-3-pro-image-preview",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:c0ffeb30211869e4d1ef6c9e5b62a3b85aad54450369f7d4573a1ebd050c4704",
+      "contractHash": "sha256:e7af3abcc9964f122998ed87014720c71a569183472856fc972a30694eebf957",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -532,7 +532,7 @@
     {
       "id": "gemini-3.1-flash-lite-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:b24cd590b4fb401f54abeb0d22b87422292bf43f2bcff5d04b2653c06064d5fa",
+      "contractHash": "sha256:6e3b9a7005fbe2e3f31b7780b1699ae6bb351dd5a4194fa9af6bfa10b4b1ce82",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -607,7 +607,7 @@
     {
       "id": "gemini-3.1-flash-image",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:2db9196de4b00e367ca9f80b79c3f3d0fe06d80011864c5bfe86113dd38ef4cb",
+      "contractHash": "sha256:e7ca2cb855a7cc8414daf70cfbb5499fd9a990fecb40705f442fdf598943ceb2",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -691,7 +691,7 @@
     {
       "id": "flux-2-pro",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:16afc141e1388331d7934b81b656da657ec45d1edf5975c9bdf9d79e4bbf472a",
+      "contractHash": "sha256:7f8b42f9202e50ce0115946ddebf0c447970aaad05100e60600f7064da02f3d1",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -761,7 +761,7 @@
     {
       "id": "seedream-5-0-260128",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:fb38d0dc8be29b1ca9e365135ed9ed5819a480a39f9d830749d3343423f9e9a2",
+      "contractHash": "sha256:82f9f195afba788495922cdb98f2ba1475fd766b6c8b6603d64df6d2cd853129",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
