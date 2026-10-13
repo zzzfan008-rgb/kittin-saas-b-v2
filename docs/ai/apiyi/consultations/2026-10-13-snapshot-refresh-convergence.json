@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-13T08:40:41.415Z",
+  "baseCommit": "1295c3d5062191562ed8220e65e7e24cb64112a4",
+  "changeFingerprintSha256": "441e89a2f10eaf9f8612deeab1a580ea84179ae483f40b15c67d537aad92ba43",
+  "knowledgeSnapshotId": "2026-10-13T05-30-11.372Z-a4cb45623fa08286",
+  "knowledgeSnapshotSha256": "a4cb45623fa082869fa1b09d6989cd86f1504942b5887df1a1c2e626e41f2ad7",
+  "query": "API易 docs.apiyi.com 2026-10-13 快照基线刷新与精选来源契约指纹收敛",
+  "affectedPaths": [
+    "docs/ai/apiyi/candidates/apiyi-refresh-2026-10-13T08-32-27.078Z.json",
+    "docs/ai/apiyi/model-contracts.json",
+    "docs/ai/apiyi/site/current.json",
+    "docs/ai/apiyi/sources.json"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/index.md",
+      "pageLocalPath": "pages/index.md",
+      "title": "API易 - 企业级 AI 大模型 API 中转站",
+      "sha256": "bdb72bb0ec222493a6edd6f45b4da3ded17036902d6b4e70a6201e827fb0fef3"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/zh-Hant.md",
+      "pageLocalPath": "pages/zh-Hant.md",
+      "title": "API易 - 企業級 AI 大模型 API 中轉站",
+      "sha256": "ac79fa9309a12758fdcabef27ba66d7a13a8495691022077aa04ca460c4f6580"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/agent/updream",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/scenarios/agent/updream.md",
+      "pageLocalPath": "pages/scenarios/agent/updream.md",
+      "title": "Updream 接入 API易",
+      "sha256": "08e121eb00af60d2950ba5f5841340dd2e4563ddf6ee787be89830f023f0bf39"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/scenarios/agent/updream",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/zh-Hant/scenarios/agent/updream.md",
+      "pageLocalPath": "pages/zh-Hant/scenarios/agent/updream.md",
+      "title": "Updream 接入 API易",
+      "sha256": "217bbd666d61f1d4d49edff04087729942c8cc579fa6f498546860ba6c6bcb30"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/news/qwen-3-6-opensource-launch",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/news/qwen-3-6-opensource-launch.md",
+      "pageLocalPath": "pages/news/qwen-3-6-opensource-launch.md",
+      "title": "Qwen3.6 开源双模上线：API易官转托管 · 免租卡",
+      "sha256": "e7b4c97d8b1a3dbbe8ec0e097ba861ef852b8d07731b79780931f49c03fe9e83"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/server-location",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/faq/server-location.md",
+      "pageLocalPath": "pages/faq/server-location.md",
+      "title": "API易的服务器在哪里？应该选择什么服务器？",
+      "sha256": "8e5d19f9fb305df68946df574f992114045a96c88b01ee102fb6e821708efb97"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/zh-Hant/faq/server-location",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/zh-Hant/faq/server-location.md",
+      "pageLocalPath": "pages/zh-Hant/faq/server-location.md",
+      "title": "API易的伺服器在哪裡？應該選擇什麼伺服器？",
+      "sha256": "003ab87def4936097ab69e3079dc856166de9fd08309ced284226c32ed035c37"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/faq/balance-validity-period",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/faq/balance-validity-period.md",
+      "pageLocalPath": "pages/faq/balance-validity-period.md",
+      "title": "API易的余额会过期吗？余额有效期是多久？",
+      "sha256": "295a59dfb2270ba866b3a91e90589f904a1f7542a484af41a7b04ff21589282e"
+    }
+  ],
+  "decisionSummary": "快照基线 2026-09-18(2799页)→2026-10-13(3057页)：current.json 指针指向新 snapshotId；27 个精选来源 sha256 按 candidate report 对齐；9 模型 contractHash 按语义信封重算（server 零改动纯指纹对齐）；expectedGatewayModelIds 9 项均在新网关 /v1/models 实测导出中存在",
+  "unresolvedChoices": []
+}

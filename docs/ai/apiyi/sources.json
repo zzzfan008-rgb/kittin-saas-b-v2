@@ -71,7 +71,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md",
       "localDocument": "models/gpt-image-2.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "2c91629dced4429d69901985232644d058397c99940bed931e776ef5a4765e54",
+      "sha256": "12051716fe8d05c0d689165bc60398accce6893bd43e45d60bea46b5b60bf0b3",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -92,7 +92,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md",
       "localDocument": "models/gpt-image-2.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "f5d330c454b5a1db6e9ba94260298d0fddabc15d14a54ee8bdd225311cd9be0d",
+      "sha256": "f8fb91508784b27cadd4c253303463e1f7bfbb1fc2899476379b6de92a773ccc",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -113,7 +113,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md",
       "localDocument": "models/gpt-image-2.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "33924a0effb12bc86432e27a419fe365fe4997deb6b56eca4936dcf17174bb5e",
+      "sha256": "6dc2284c797340db0c9b4eb171f606d405f54313a49be8f65fe2281cbe316a5b",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -134,7 +134,7 @@
       "markdownUrl": "https://docs.apiyi.com/faq/image-transparent-background.md",
       "localDocument": "models/gpt-image-2.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "298c40e4b10f5e59844e7d7c1d0cb574af1da72beb09deefaff34fb5e608c446",
+      "sha256": "fd17167d70c2a201a4c8df2cb83501d86a5075d332c1b56deac7c54b1bcdcd89",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -154,7 +154,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview.md",
       "localDocument": "models/gpt-image-2-vip.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "c7b1ba1dc392d2fe7f0d1033a5ffd09f6cbd6bf9e310b7d36bba5665ed87ad66",
+      "sha256": "fa55bbeb13928bdbb7fd51cf243c0f038147bcccf7b5780aa7ffb7698266cbda",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -175,7 +175,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image.md",
       "localDocument": "models/gpt-image-2-vip.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "d401937aa35853a773d42717042803df628f1d7243f10b9525bd032f34020fe1",
+      "sha256": "c5dabb97698987e05b366671fc1001d1acfcb92efeab55536e9d36a4bc4d63ba",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -196,7 +196,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit.md",
       "localDocument": "models/gpt-image-2-vip.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "66e7644327d9d790c12a4bed1786dfb488d4824450489d6a81b25cd626fbcc6e",
+      "sha256": "254baf1be3368cc6977ae27f90bef8cfc2e4f65f72f0315670d5c5f1ab618d43",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -217,7 +217,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/overview.md",
       "localDocument": "models/gemini-3.1-flash-image.md",
       "capturedAt": "2026-09-02T05:01:06Z",
-      "sha256": "d3469a7e4587c9b23582e3e461c30364bf1af0a58f8118171bc0e010dd2be844",
+      "sha256": "eab4963c32d8a88544e54893d377b7a4a52a11134edc09cfcad1bbd922728eca",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:06 GMT",
       "modelAliases": [
@@ -238,7 +238,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/text-to-image.md",
       "localDocument": "models/gemini-3.1-flash-image.md",
       "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "8e81a7cb72d03886f7901c47ad8201db3d255259e6b29fec7b292f32ac4bdc28",
+      "sha256": "f0adb664021cff44b88d3050ddec4ec07299e5b177580cfb978482edcf3b180f",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
       "modelAliases": [
@@ -258,7 +258,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/image-edit.md",
       "localDocument": "models/gemini-3.1-flash-image.md",
       "capturedAt": "2026-09-02T05:01:08Z",
-      "sha256": "5f4a0420bd9b6456710d8d0c1104055cefe510c28b84595b394bdacc8961b35d",
+      "sha256": "aa36bffdc43b4c62da9967753279306d2355ade8aa7e0ac9a032d27583907b16",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:08 GMT",
       "modelAliases": [
@@ -278,7 +278,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/overview.md",
       "localDocument": "models/flux-2-pro.md",
       "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "1fc1c26bcaebc3de7d81e0bba95f457537babf223bf99a3a7cc32a90745984e3",
+      "sha256": "23df4f5be137712d9b830a459b259e3147a53dc44a7634634e39bc2cf0eafbd4",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
       "modelAliases": [
@@ -298,7 +298,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/text-to-image.md",
       "localDocument": "models/flux-2-pro.md",
       "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "88903c60516204c85952f8cd3f1b903a10f4d55c8333d514cc2a4b00088d2246",
+      "sha256": "a18d483179d7412528f52abbd6f61cf8c5e6d489f7f92611c662f377b2dab3fc",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
       "modelAliases": [
@@ -317,7 +317,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/image-edit.md",
       "localDocument": "models/flux-2-pro.md",
       "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "8a8ad4925413776607d3d684c8438d7bf293c845d326fc7aab08b9e8fc3f0ec3",
+      "sha256": "3183f5e421e9b5a272d9d4acef12e0aaecffcd99c1a6e8359575606d4e2eae95",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
       "modelAliases": [
@@ -336,7 +336,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview.md",
       "localDocument": "models/seedream-5-0-260128.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "63865a7a093865a85c9aa594b9c605a0677b34a263bfffd69a33b45ec6d2fc52",
+      "sha256": "aa4d154188ddfa2f3cd89a42b22c633ec0dcf93b382d9ec0bd1a13b4074e13b7",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -356,7 +356,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/text-to-image.md",
       "localDocument": "models/seedream-5-0-260128.md",
       "capturedAt": "2026-09-02T05:01:08Z",
-      "sha256": "3301ab095fef5c3fc5369538671a68cf5a957fdb77084cc9dc94a4df2fb9a23a",
+      "sha256": "b39d9a4300e25eee1a9ab51228677a5b3482a623e39aa6a34a8a846c37d245f9",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:08 GMT",
       "modelAliases": [
@@ -375,7 +375,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit.md",
       "localDocument": "models/seedream-5-0-260128.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "80934bf8a852e07a24e78dd86ba75f31b3f4e574b9158a1edf59ac348605915f",
+      "sha256": "211721f7eb7c44fefa0e93a717570862b906cad361435246cd6593fd37bfb3f8",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -394,7 +394,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices.md",
       "localDocument": "input-image-normalization.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "c561a3191bcd1be14be14fe51a0823aba063dcd6cc1955032f09030daedf73cc",
+      "sha256": "843b51404f748b036d166b55dcfddbf6dbc4ef826e4e77d81677e9cbbb6a1154",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -413,7 +413,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-async-queue.md",
       "localDocument": "async-runtime.md",
       "capturedAt": "2026-09-02T05:01:10Z",
-      "sha256": "d17d4154af3f4cfb5df4e0972a4b26f69be47ca0643773dcdb76d14b423e42d5",
+      "sha256": "10c784ebbcea6579ea896da1e1ec4b13fb7d71fc0bb1101867e0b84f51045207",
       "etag": null,
       "lastModified": "Wed, 02 Sep 2026 05:01:10 GMT",
       "modelAliases": [
@@ -432,7 +432,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview.md",
       "localDocument": "models/gpt-image-2.5-all.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "6330d4e1ffb445817a8f2988e0704729e16dd0cbcc472e63b26cd6827cd0b5e9",
+      "sha256": "04f5c3377f8884525668879958d3322bbc9ee009777556451c52601f41bbe3cf",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -452,7 +452,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/text-to-image.md",
       "localDocument": "models/gpt-image-2.5-all.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "2aad7d4711c4bed7b4a931785d0959718d2931cbef57bc5b9027fddc5415e075",
+      "sha256": "9b2734ec47b1db645e8eab2059279ac9db1798bcded5e4796f38843c2080a431",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -472,7 +472,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/image-edit.md",
       "localDocument": "models/gpt-image-2.5-all.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "18eec6285235dd4b607091c00e8ffc56ddacb584b2c48667cbda9b285b030cbf",
+      "sha256": "d9f01d72f6cfef80b985dc7e9f3b8736c27bf8d2a9a31ba89e8904c3a40ae413",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -492,7 +492,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview.md",
       "localDocument": "models/nano-banana-pro-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "d574ed3b7839bc035dcdca76cfc85cf68e1ed69cbf2476ad11972193d7556406",
+      "sha256": "607fb7d006a6dc67a8e0063d2ffe2cc76a318a9b008975351327afc868023794",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -513,7 +513,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/text-to-image.md",
       "localDocument": "models/nano-banana-pro-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "5adbf6584972ee5df461e81f0cbe4fd3eaf32db2703e25584fa6a5fde6b31da3",
+      "sha256": "c0919d673c0d4202452adb4182b9f3a91263a5bcea0788be290431bb37e933ad",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -532,7 +532,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit.md",
       "localDocument": "models/nano-banana-pro-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "95db353eddfc000cf696fe92338a1a9d2b08a513958176a1d10f99a517700cc7",
+      "sha256": "32d1e53f1125a200e8c53e790f2fdd8aa00dfe8511a566e49a7da568ef18abc7",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -551,7 +551,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/overview.md",
       "localDocument": "models/nano-banana-lite-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "64ddee2dd8a225e3ce40c852f778e928bea3bb808dcf47cdcef89ffed61aac27",
+      "sha256": "5803e83c38c5350e3c87e035b509bb9085ef06d7e16be704d441f9f3d761ecee",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -571,7 +571,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/text-to-image.md",
       "localDocument": "models/nano-banana-lite-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "7d6216fafab8410d9815713acd29a28280e94d60329cf8f42bd75d6b024b25d7",
+      "sha256": "2308201f6206c451d92cdb9fdc44df5c0c19e49a42ded83e87deee13d6700a4d",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
@@ -590,7 +590,7 @@
       "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/image-edit.md",
       "localDocument": "models/nano-banana-lite-image.md",
       "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "59ca352bcdd62314d777e36ff465a3c81d3a03d5af31c6712f77262c147db53f",
+      "sha256": "87d68321f7d10b499297524f705b8ce7bbba6000ef109fcff78b530228175286",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
