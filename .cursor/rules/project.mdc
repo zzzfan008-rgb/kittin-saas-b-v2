@@ -1,0 +1,21 @@
+---
+description: Garment Canvas project contract — read AGENTS.md first
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# Project contract
+
+`AGENTS.md` is the single source of truth. Read it before any code change.
+
+Key invariants:
+
+- Desktop-only, min width `1024px`; primary acceptance `1280px` / `1440px`.
+- `main` is protected. Required checks on the exact head:
+  `static`, `unit`, `e2e`, `production-smoke`, `code-intelligence`.
+- Node.js `>= 24.20.0`. PostgreSQL 18 is production truth; SQLite is legacy-import only.
+- Stack versions follow `package.json` / `package-lock.json` and
+  `docs/reference/tech-stack-official-docs.md` (Vite 6, TS 5.9, Express 4, React 19).
+- Do not touch `.env`, `data/`, `dist*/`, uploads, or dumps.
+- Plans are reviewed before code. Do not start coding an unsettled plan.
