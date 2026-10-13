@@ -332,3 +332,15 @@ export function rewriteSystemPrompt(familyId: string | undefined): string; // �
 ### 12.2 知识门：src/types/imageModels.ts 缺凭证（历史遗漏）
 d73aa26（尺寸三档，早于本批合入）改了该 gated 文件但未出 receipt，guard --base origin/main --head HEAD 红。
 修法：对 imageModels.ts 做零行为小改（补 JSDoc/提常量）使其成为 uncommitted change → `npm run docs:apiyi:lookup --query "gpt-image-2.5-flare-vip / sunburst-vip 输出像素尺寸 sizes 清单与 quality 取值" --paths src/types/imageModels.ts --receipt docs/ai/apiyi/consultations/vip-size-tiers.json --decision "VIP 系尺寸三档像素值取自 model-contracts sizes 清单；3:4=1536x2048；仅 flare-vip/sunburst-vip 提供档位"` → 与 runner 修复提交 → guard（base 新分支基点，head HEAD）必须同时覆盖 imageModels.ts 与 runner.ts。
+
+### §2.2-b 空补充的前端反馈（orchestrator 拍板 A 案，2026-10-12）
+
+背景：model-tryon 模板打开后正文 = 404 字协议 + 锚点 + **锚点后空白**；用户直接点 ✨ → 服务端 skipped → 若前端静默则「点了没反应」以协议模板形态复发（frontend 实况上报，orchestrator 读磁盘核实成立）。
+
+拍板 **A 案（前端本地检测，零契约改动）**：
+1. `src/lib/textRewriteFlow.ts`（或 TextNode）发 fetch 前检测：正文含锚点 `用户补充要求（如为空则忽略本行）：` 且锚点后 `.trim()===""` → **不发请求**，直接返回带 hint 的结果；
+2. TextNode 展示明确提示（复用 `data-testid="text-rewrite-error"` 区域），文案：「先在『用户补充要求：』后写点内容，再点补全」；
+3. 单测：空补充不发 fetch + 提示可见；有补充正常发；无锚点文本（非协议模板）不受影响照常发；
+4. 锚点常量前端侧同源声明（不能 import server 代码），注释标明与 server `REWRITE_SUPPLEMENT_ANCHOR` 同源。
+
+注：route 对外形状确认为 `{rewritten: string|null, skipped?: true}`（backend 早期 DM 把内部 `{text,rewritten:boolean,reason}` 误述为 wire 形状，**以 route 源码为准**；frontend 无兼容改动）。
