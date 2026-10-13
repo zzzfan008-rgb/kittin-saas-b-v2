@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-13T14:52:00.566Z",
+  "baseCommit": "2db218c848dbb14e1846361944ac7b504f36e9f4",
+  "changeFingerprintSha256": "300564796a6d755a3402c84d0d8d27aa92ed44e1e7e31b030bab1e3eeda66d8f",
+  "knowledgeSnapshotId": "2026-10-13T05-30-11.372Z-a4cb45623fa08286",
+  "knowledgeSnapshotSha256": "a4cb45623fa082869fa1b09d6989cd86f1504942b5887df1a1c2e626e41f2ad7",
+  "query": "gpt-image-2.5-flare-vip 与 gpt-image-2.5-sunburst-vip 支持的画幅比例与输出尺寸档位（快速 标准 高清），gpt-image-2.5-all 用提示词前缀控制输出分辨率",
+  "affectedPaths": [
+    "docs/ai/apiyi/model-contracts.json",
+    "server/providers/apiyi.ts",
+    "src/types/imageModels.ts"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All 生图/编辑",
+      "sha256": "04f5c3377f8884525668879958d3322bbc9ee009777556451c52601f41bbe3cf"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/gpt-image-2-5-vip-series-launch",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/live/2026-09/gpt-image-2-5-vip-series-launch.md",
+      "pageLocalPath": "pages/en/live/2026-09/gpt-image-2-5-vip-series-launch.md",
+      "title": "gpt-image-2.5-vip Reverse Series Is Live, gpt-image-2.5-all Alongside",
+      "sha256": "14694872d9682bd1c4e5cb503d23bab27322b4e138605a4b829d71bfa9071446"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/live/2026-09/gpt-image-2-5-vip-series-launch",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/live/2026-09/gpt-image-2-5-vip-series-launch.md",
+      "pageLocalPath": "pages/live/2026-09/gpt-image-2-5-vip-series-launch.md",
+      "title": "gpt-image-2.5-vip 系列官逆上线，gpt-image-2.5-all 同步上线",
+      "sha256": "c58e1c4d34cffb667de30022fe0986d606b86ec9f03906312bc514cc3128ab41"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/en/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All Image Gen/Editing",
+      "sha256": "5ea450edd8fe6b595c48e943d025dd7da06182f68737fe568896c00ba87cee7a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-09/gpt-image-2-5-all-alternative",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/live/2026-09/gpt-image-2-5-all-alternative.md",
+      "pageLocalPath": "pages/en/live/2026-09/gpt-image-2-5-all-alternative.md",
+      "title": "gpt-image-2-all Is Already the gpt-image-2.5-all Reverse Route, a Same-Price Option When -vip Fluctuates",
+      "sha256": "009e59662532c5ad08f469ad6bfdc18b3be7a028ff560a14d6288179b6b03921"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-10/gpt-image-2-all-price-cut",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/live/2026-10/gpt-image-2-all-price-cut.md",
+      "pageLocalPath": "pages/en/live/2026-10/gpt-image-2-all-price-cut.md",
+      "title": "gpt-image-2-all and gpt-image-2.5-all cut to $0.025 per image",
+      "sha256": "4da14cf7541920948f175f9bf2966ec6eef3ef83ffed05acb79f77aab1757385"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ja/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/ja/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All 画像生成/編集",
+      "sha256": "095f1ed9df12bc1a737a1bedaedb5bbe6114fc2986528592be03e8c37bd59508"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/ko/api-capabilities/gpt-image-2-all/overview",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/ko/api-capabilities/gpt-image-2-all/overview.md",
+      "pageLocalPath": "pages/ko/api-capabilities/gpt-image-2-all/overview.md",
+      "title": "GPT-Image-2.5-All 이미지 생성/편집",
+      "sha256": "62a05bf371aa5da24389dad7fd131f2f5222c97a1c44fea3619cd2518b32e789"
+    }
+  ],
+  "decisionSummary": "VIP 系（flare-vip/sunburst-vip）与 gpt-image-2.5-all 的面板参数按本地文档与契约核对结论修正：① 两个 VIP 模型的画幅比例按文档 10 比例（1:1 2:3 3:2 3:4 4:3 4:5 5:4 9:16 16:9 21:9）注入契约 aspectRatios 并由面板直接消费，取代此前的 5 比例硬编码子集；② 面板尺寸不再提供 自动 项，改为显式三档（快速/标准/高清），缺省与非法值统一落标准档，避免不传 size 时 multipart 端拼出字面量 undefined 被上游判为参数不支持；③ 服务端 multipart 仅在 options.size 有定义时上报 size；④ gpt-image-2.5-all 不接受 size 与画幅参数，尺寸唯一手段是文档给出的 提示词前缀到实测分辨率 对照表，前缀由服务端幂等拼接到 prompt 最前。",
+  "unresolvedChoices": []
+}
