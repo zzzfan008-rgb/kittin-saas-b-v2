@@ -80,6 +80,8 @@ export function ImageViewer() {
   const providerOriginals = record?.providerImages?.length
     ? record.providerImages
     : record?.providerImage ? [record.providerImage] : [];
+  // 视频记录（video-generator 跑出的 mp4）：主区用 video 播放，不走图片缩放链。
+  const isVideoRecord = record?.kind === "video-generator" || /\.mp4($|[?#])/i.test(viewer?.url ?? "");
 
   const statusText: Record<string, string> = {
     queued: "排队中", running: "生成中", retry_wait: "等待重试",
@@ -191,17 +193,28 @@ export function ImageViewer() {
           onMouseLeave={zoom.handleMouseUp}
           style={{ cursor: zoom.cursor }}
         >
-          <img
-            src={viewer.url}
-            alt={viewer.title ?? "图片预览"}
-            draggable={false}
-            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
-            style={{
-              transform: `translate(${zoom.panOffset.x}px, ${zoom.panOffset.y}px) scale(${zoom.scale})`,
-              transformOrigin: "center center",
-              transition: zoom.isPanningRef.current ? "none" : "transform 0.1s ease",
-            }}
-          />
+          {isVideoRecord ? (
+            <video
+              src={viewer.url}
+              controls
+              autoPlay
+              muted
+              playsInline
+              className="max-h-full max-w-full rounded-lg shadow-2xl"
+            />
+          ) : (
+            <img
+              src={viewer.url}
+              alt={viewer.title ?? "图片预览"}
+              draggable={false}
+              className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+              style={{
+                transform: `translate(${zoom.panOffset.x}px, ${zoom.panOffset.y}px) scale(${zoom.scale})`,
+                transformOrigin: "center center",
+                transition: zoom.isPanningRef.current ? "none" : "transform 0.1s ease",
+              }}
+            />
+          )}
         </div>
 
         {/* 缩放指示器 pill（右下角） */}

@@ -260,17 +260,17 @@ export function MultiRoundEditPanel({
             />
           </div>
         ) : (
-          <p className="text-sm text-[var(--gc-node-text)]">请先上传图片后再使用多轮修改</p>
+          <p className="text-sm text-[var(--gc-text)]">请先上传图片后再使用多轮修改</p>
         )}
       </div>
 
       {/* 右栏：约 1/4 宽（clamp），纵向滚动 */}
       <aside
-        className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col border-l border-[var(--gc-node-border)] bg-[var(--gc-node-header)]"
+        className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col border-l border-[var(--gc-border)] bg-[var(--gc-panel)]"
         data-testid="multi-round-rail"
       >
-        <div className="flex items-center justify-between border-b border-[var(--gc-node-border)] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[var(--gc-node-text)]">多轮修改</h2>
+        <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
+          <h2 className="text-sm font-medium text-[var(--gc-text)]">多轮修改</h2>
           <Button
             type="button"
             variant="ghost"
@@ -279,6 +279,7 @@ export function MultiRoundEditPanel({
             title="关闭（ESC）"
             data-testid="multi-round-close"
             onClick={onClose}
+            className="border border-[var(--gc-border)] text-[var(--gc-text)]"
           >
             <span aria-hidden="true">✕</span>
           </Button>
@@ -312,13 +313,13 @@ export function MultiRoundEditPanel({
                     aria-label={`颜色 ${swatch}`}
                     aria-pressed={color === swatch}
                     disabled={busy || readOnly}
-                    className={`size-5 rounded-full border ${color === swatch ? "border-[var(--gc-node-text)] ring-1 ring-[var(--gc-node-text)]" : "border-[var(--gc-node-border)]"}`}
+                    className={`size-5 rounded-full border ${color === swatch ? "border-[var(--gc-text)] ring-1 ring-[var(--gc-text)]" : "border-[var(--gc-border)]"}`}
                     style={{ backgroundColor: swatch }}
                     onClick={() => setColor(swatch)}
                   />
                 ))}
               </div>
-              <label className="ml-auto flex items-center gap-2 text-xs text-[var(--gc-node-text)]">
+              <label className="ml-auto flex items-center gap-2 text-xs text-[var(--gc-text)]">
                 粗细
                 <Slider
                   value={[strokeWidth]}
@@ -350,7 +351,7 @@ export function MultiRoundEditPanel({
 
           {/* 修改描述 · 第 N 轮 */}
           <section className="flex flex-col gap-1.5" aria-label="修改描述">
-            <label htmlFor={`multi-round-prompt-${nodeId}`} className="text-xs font-medium text-[var(--gc-node-text)]">
+            <label htmlFor={`multi-round-prompt-${nodeId}`} className="text-xs font-medium text-[var(--gc-text)]">
               修改描述 · 第 {Math.max(1, history.length)} 轮
             </label>
             <textarea
@@ -359,10 +360,10 @@ export function MultiRoundEditPanel({
               maxLength={500}
               rows={4}
               placeholder="描述本轮修改，例如：把背景改成米色…"
-              className="rounded-md border border-[var(--gc-node-border)] bg-transparent px-2 py-1.5 text-sm text-[var(--gc-node-text)] outline-none focus:border-[var(--gc-node-text)]"
+              className="rounded-md border border-[var(--gc-border)] bg-transparent px-2 py-1.5 text-sm text-[var(--gc-text)] outline-none focus:border-[var(--gc-text)]"
               {...promptBind}
             />
-            <span className="text-right text-xs text-[var(--gc-node-text)] opacity-60">{editPrompt.length} / 500</span>
+            <span className="text-right text-xs text-[var(--gc-text)] opacity-60">{editPrompt.length} / 500</span>
             {hasMask ? (
               <span className="text-xs text-[var(--gc-warn-text)]">图片当前带有蒙版，请先清除蒙版或使用蒙版重绘</span>
             ) : null}
@@ -382,7 +383,7 @@ export function MultiRoundEditPanel({
             {pending ? "处理中…" : running ? "运行中…" : "开始修改"}
           </Button>
           {!busy && disabledReason ? (
-            <p className="text-xs text-[var(--gc-node-text)] opacity-70">{disabledReason}</p>
+            <p className="text-xs text-[var(--gc-text)] opacity-70">{disabledReason}</p>
           ) : null}
 
           {running ? (
@@ -395,13 +396,13 @@ export function MultiRoundEditPanel({
           ) : null}
 
           {/* 修改记录条 */}
-          <section className="mt-auto flex flex-col gap-2 border-t border-[var(--gc-node-border)] pt-3" aria-label="修改记录">
-            <span className="text-xs font-medium text-[var(--gc-node-text)]">修改记录</span>
+          <section className="mt-auto flex flex-col gap-2 border-t border-[var(--gc-border)] pt-3" aria-label="修改记录">
+            <span className="text-xs font-medium text-[var(--gc-text)]">修改记录</span>
             <div className="flex flex-wrap gap-2" data-testid="multi-round-history">
               {history.map((entry, index) => (
                 <figure
                   key={`${entry.label}-${entry.url}`}
-                  className={`relative h-14 w-14 overflow-hidden rounded border ${index === history.length - 1 ? "border-[var(--gc-node-text)]" : "border-[var(--gc-node-border)]"}`}
+                  className={`relative h-14 w-14 overflow-hidden rounded border ${index === history.length - 1 ? "border-[var(--gc-text)]" : "border-[var(--gc-border)]"}`}
                   title={entry.label}
                 >
                   <button

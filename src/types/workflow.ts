@@ -120,6 +120,8 @@ export interface BaseNodeData {
   label: string;
   status: NodeRunStatus;
   error?: string;
+  /** 用户拖拽调整的节点宽度（200–640px，仅 text/image/video；缺省走 --gc-node-width）。 */
+  nodeWidth?: number;
   [key: string]: unknown;
 }
 

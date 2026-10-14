@@ -21,7 +21,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useFlowStore } from "@/store/flowStore";
+import {
+  selectActiveDocumentTarget,
+  selectActivePrimarySelectedNodeId,
+  useFlowStore,
+} from "@/store/flowStore";
+import {
+  OPEN_ASSET_PICKER_EVENT,
+  type AssetPickerRequest,
+} from "@/lib/overlayEvents";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { Button } from "@/components/ui/button";
 import {
@@ -386,7 +394,22 @@ export function WorkbenchShell({ children }: WorkbenchShellProps) {
         return;
       }
       if (item.needsNodeContext) {
-        setWorkflowStatus({ kind: "pending", message: "先在画布上选中一个节点，再选择资产" });
+        // 「从资产库选择」：需选中一个图片上传节点；选中后派发选择器事件，
+        // 由 App 宿主的 AssetPickerOverlay 承接（写回该节点的 outputImages）。
+        const state = useFlowStore.getState();
+        const nodeId = selectActivePrimarySelectedNodeId(state);
+        const node = nodeId
+          ? state.tabs.find((tab) => tab.id === state.activeTabId)?.nodes.find((n) => n.id === nodeId)
+          : undefined;
+        if (!node || node.data.kind !== "image") {
+          setWorkflowStatus({ kind: "pending", message: "先在画布上选中一个图片节点，再选择资产" });
+          return;
+        }
+        const request: AssetPickerRequest = {
+          target: selectActiveDocumentTarget(state),
+          nodeId: node.id,
+        };
+        window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail: request }));
         return;
       }
       const binding = WORKFLOW_MENU_MAPPING[item.id];

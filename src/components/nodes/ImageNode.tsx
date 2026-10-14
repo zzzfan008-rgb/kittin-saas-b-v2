@@ -16,7 +16,8 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { apiErrorMessage } from "@/lib/apiErrors";
 import { saveMaskDraft } from "@/lib/maskUpload";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
-import { NodeFrame } from "./NodeFrame";
+import { NodeFrame,
+  useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
 import { MaskEditor } from "./MaskEditor";
@@ -70,6 +71,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
   const runImageEdit = useFlowStore((s) => s.runImageEdit);
   const readOnly = useFlowStore(selectActiveReadOnly);
+  const nodeResize = useNodeResizeWidth(id);
   const uploadRequestRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -189,6 +191,10 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
     <>
       <NodeFrame
         nodeId={id}
+        resizable={!readOnly}
+        nodeWidth={typeof data.nodeWidth === "number" ? data.nodeWidth : undefined}
+        onResizeWidth={nodeResize.onResizeWidth}
+        onResizeWidthEnd={nodeResize.onResizeWidthEnd}
         title={data.label}
         status={data.status}
         error={data.error}

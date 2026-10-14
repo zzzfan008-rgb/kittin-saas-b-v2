@@ -208,6 +208,12 @@ export function normalizeSessionNode(value: unknown): FlowNode | undefined {
   // aspectRatio/batchSize/mask/outputText…）。先统一清空生成字段，再按 v8 分层重新填入，
   // 保证会话恢复出来的文档形状本身就是 v8（不依赖保存时的投影兜底）。
   for (const key of SESSION_GENERATION_FIELDS) delete data[key];
+  // 用户拖拽宽度随会话恢复（非法值丢弃，不污染 data）。
+  if (typeof input.nodeWidth === "number" && Number.isFinite(input.nodeWidth)) {
+    data.nodeWidth = Math.max(200, Math.min(640, Math.round(input.nodeWidth)));
+  } else {
+    delete data.nodeWidth;
+  }
 
   switch (kind) {
     case "text":

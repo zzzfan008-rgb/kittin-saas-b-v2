@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
 import type { VideoNodeData } from "@/types/workflow";
-import { NodeFrame } from "./NodeFrame";
+import { NodeFrame,
+  useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { duplicateNode } from "./nodeDuplicate";
 
@@ -19,6 +20,7 @@ const VIDEO_UPLOAD_UNAVAILABLE_REASON = "暂不可用：视频上传接口尚未
 
 export function VideoNode({ id, data, selected }: NodeProps<Node<VideoNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
+  const nodeResize = useNodeResizeWidth(id);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const video = data.outputVideos[0];
@@ -32,6 +34,10 @@ export function VideoNode({ id, data, selected }: NodeProps<Node<VideoNodeData>>
     <>
       <NodeFrame
         nodeId={id}
+        resizable={!readOnly}
+        nodeWidth={typeof data.nodeWidth === "number" ? data.nodeWidth : undefined}
+        onResizeWidth={nodeResize.onResizeWidth}
+        onResizeWidthEnd={nodeResize.onResizeWidthEnd}
         title={data.label}
         status={data.status}
         error={data.error}

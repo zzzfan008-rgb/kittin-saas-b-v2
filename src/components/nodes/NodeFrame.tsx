@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import { NodeResizer, type ResizeParams } from "@xyflow/react";
 import {
   isNodeRunActive,
   nodeTitleForKind,
@@ -6,7 +7,7 @@ import {
   type NodeRunStatus,
 } from "@/types/workflow";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
-import { useFlowStore } from "@/store/flowStore";
+import { runWithoutHistory, useFlowStore } from "@/store/flowStore";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { nodeProductPolicy } from "@/lib/nodeProductPolicy";
 import { Button } from "@/components/ui/button";
@@ -88,11 +89,31 @@ interface NodeFrameProps {
   nodeKind?: NodeKind;
   /** 覆盖徽标文案（如空槽位显示「请上传图片」）；优先级高于序号徽标 */
   badgeLabel?: string;
+  /** 可调宽度：传入后选中时出现缩放角标，宽度持久化进 data.nodeWidth（200–640px） */
+  resizable?: boolean;
+  nodeWidth?: number;
+  /** 拖动中实时回调（父级用 runWithoutHistory 写，免历史刷屏）；松手回调走正常历史 */
+  onResizeWidth?: (width: number) => void;
+  onResizeWidthEnd?: (width: number) => void;
   children: ReactNode;
 }
 
+/** 可调宽度 hook（text/image/video）：拖动中免历史实时写，松手记一次历史；自动 clamp 200–640。 */
+export function useNodeResizeWidth(nodeId: string) {
+  const updateNodeData = useFlowStore((s) => s.updateNodeData);
+  const clamp = (width: number) => Math.max(200, Math.min(640, Math.round(width)));
+  return {
+    onResizeWidth: (width: number) => {
+      runWithoutHistory(() => updateNodeData(nodeId, { nodeWidth: clamp(width) }));
+    },
+    onResizeWidthEnd: (width: number) => {
+      updateNodeData(nodeId, { nodeWidth: clamp(width) });
+    },
+  };
+}
+
 /** 节点通用卡片框架：标题栏（双击改名） + 状态点 + 内容区 + 正上方工具条槽位 */
-export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, badgeLabel, children }: NodeFrameProps) {
+export function NodeFrame({ title, status, error, selected, nodeId, toolbar, frameless = false, nodeKind, badgeLabel, resizable = false, nodeWidth, onResizeWidth, onResizeWidthEnd, children }: NodeFrameProps) {
   const kindOrdinal = useFlowStore((s) => {
     if (!nodeId || !nodeKind) return null;
     const tab = s.tabs.find((t) => t.id === s.activeTabId);
@@ -121,7 +142,19 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
   };
 
   return (
-    <div className="gc-node-root relative w-[var(--gc-node-width)]">
+    <div
+      className="gc-node-root relative w-[var(--gc-node-width)]"
+      style={typeof nodeWidth === "number" && Number.isFinite(nodeWidth) ? { width: nodeWidth } : undefined}
+    >
+      {resizable && (onResizeWidth || onResizeWidthEnd) ? (
+        <NodeResizer
+          isVisible={selected === true}
+          minWidth={200}
+          maxWidth={640}
+          onResize={onResizeWidth ? (_, params: ResizeParams) => onResizeWidth(Math.round(params.width)) : undefined}
+          onResizeEnd={onResizeWidthEnd ? (_, params: ResizeParams) => onResizeWidthEnd(Math.round(params.width)) : undefined}
+        />
+      ) : null}
       {toolbar}
       {/* 内容槽位：frameless 与白卡共用同一 DOM 结构——children 始终位于同一位置，
           frameless 切换（如文本节点空↔有内容）不重挂载 children，文本框编辑焦点不丢。 */}

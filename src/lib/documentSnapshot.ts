@@ -52,9 +52,9 @@ import {
  * 模式改由 operationMode 归节点 data（64 裁决 A）。
  */
 export type DocumentNodeData =
-  | { kind: "text"; label: string; text: string }
-  | { kind: "image"; label: string; outputImages: string[] }
-  | { kind: "video"; label: string; outputVideos: string[] }
+  | { kind: "text"; label: string; text: string; nodeWidth?: number }
+  | { kind: "image"; label: string; outputImages: string[]; nodeWidth?: number }
+  | { kind: "video"; label: string; outputVideos: string[]; nodeWidth?: number }
   | {
       kind: "image-generator";
       label: string;
@@ -193,6 +193,12 @@ function optionalIndex(value: unknown): number | undefined {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
+/** 用户拖拽节点宽度（200–640px）：非法值丢弃，不写库。 */
+function optionalNodeWidth(value: unknown): { nodeWidth: number } | Record<string, never> {
+  if (typeof value !== "number" || !Number.isFinite(value)) return {};
+  return { nodeWidth: Math.max(200, Math.min(640, Math.round(value))) };
+}
+
 function cloneScalarRecord(value: unknown): ImageModelOptions | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
   const result: ImageModelOptions = {};
@@ -226,7 +232,7 @@ function operationModeField(data: WorkflowNodeData): { operationMode?: ImageOper
 export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
   switch (data.kind) {
     case "text":
-      return { kind: "text", label: data.label, text: stringOrEmpty(data.text) };
+      return { kind: "text", label: data.label, text: stringOrEmpty(data.text), ...optionalNodeWidth(data.nodeWidth) };
     case "image": {
       const fr = typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
         ? Math.max(0, Math.min(64, Math.round(data.featherRadius)))
@@ -235,6 +241,7 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
         kind: "image",
         label: data.label,
         outputImages: stringList(data.outputImages),
+        ...optionalNodeWidth(data.nodeWidth),
         ...optionalString("mask", typeof data.mask === "string" ? data.mask : undefined),
         ...optionalString("maskSourceRef", typeof data.maskSourceRef === "string" ? data.maskSourceRef : undefined),
         ...(fr !== undefined ? { featherRadius: fr } : {}),
@@ -253,7 +260,7 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
       };
     }
     case "video":
-      return { kind: "video", label: data.label, outputVideos: stringList(data.outputVideos) };
+      return { kind: "video", label: data.label, outputVideos: stringList(data.outputVideos), ...optionalNodeWidth(data.nodeWidth) };
     case "image-generator": {
       // 65a+65b (Q4 裁决 A)：mask 三字段已迁至 image 节点；存量 generator 蒙版静默丢弃。
       return {
@@ -323,9 +330,9 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  * 输入层不得带生成字段（C2），生成层不得带产物字段（C3），结果层只得带产物 + 溯源。
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
-  text: ["kind", "label", "text"],
-  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt", "editInputRef"],
-  video: ["kind", "label", "outputVideos"],
+  text: ["kind", "label", "text", "nodeWidth"],
+  image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt", "editInputRef", "nodeWidth"],
+  video: ["kind", "label", "outputVideos", "nodeWidth"],
   "image-generator": [
     "kind", "label",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
