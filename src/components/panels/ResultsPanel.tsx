@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
 import { continueWithResult } from "@/lib/resultActions";
-import { useLightboxStore } from "@/store/lightboxStore";
 
 interface ResultsPanelProps {
   hasMore?: boolean;
@@ -18,11 +17,11 @@ interface ResultsPanelProps {
   onLoadMore?: () => void;
   /** 点单个结果时打开 ImageViewer（65d R-87 §3：ResultDetailDialog 已删除）。 */
   className?: string;
-  /** 固定可见行数（3 列网格）；列表高度 = 行数 × 行高，超出部分出右侧滚动条自由滚动。 */
+  /** 固定可见行数（4 列网格 × 6 行）；列表高度 = 行数 × 行高，超出部分滚轮滚动自动加载更多。 */
   rowsVisible?: number;
 }
 
-/** 「历史创作记录」浮层里的跨项目结果列表（3 列缩略图，可继续加载）。 */
+/** 「历史创作记录」浮层里的跨项目结果列表（4 列缩略图，滚轮到底自动加载）。 */
 export function ResultsPanel({
   hasMore = false,
   loadingMore = false,
@@ -44,16 +43,26 @@ export function ResultsPanel({
     "rounded-sm px-1 py-1 text-label font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
 
   const openViewer = useFlowStore((s) => s.openViewer);
-  const openLightbox = useLightboxStore((s) => s.open);
   // 65d R-87 §3：ResultDetailDialog 已删除；点「查看详情」直接打开 ImageViewer。
   const openDetail = (r: (typeof recentResults)[number]) => {
     setSelectedResultId(r.id);
-    openViewer({ url: thumbnailImageUrl(r.image), title: r.nodeLabel, resultId: r.id });
+    // 查看器直接用原图 URL（r.image 即服务端 /api/files 原图），不用缩略图代理。
+    openViewer({ url: r.image, title: r.nodeLabel, resultId: r.id });
   };
+  const isVideoRecord = (r: (typeof recentResults)[number]) =>
+    r.kind === "video-generator" || /\.mp4($|[?#])/i.test(r.image);
 
   // rowsVisible：首行实测行高 → 固定列表视口高度（行数 × 行高），右侧滚动条自由滚动。
   const scrollerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  // 滚轮无限加载：接近底部自动拉下一页，不用点按钮。
+  const maybeLoadMore = () => {
+    if (!hasMore || loadingMore || !onLoadMore) return;
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const remain = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (remain < 320) onLoadMore();
+  };
   useLayoutEffect(() => {
     if (!rowsVisible) return;
     const scroller = scrollerRef.current;
@@ -66,6 +75,11 @@ export function ResultsPanel({
     const gap = parseFloat(styles.rowGap || styles.gap || "0") || 0;
     scroller.style.maxHeight = `${rowsVisible * rowH + (rowsVisible - 1) * gap + 24}px`;
   }, [rowsVisible, recentResults.length]);
+
+  // 内容不足一屏时也补一页，避免首屏不满 4×6 却要手动点。
+  useLayoutEffect(() => {
+    maybeLoadMore();
+  });
 
   return (
     <section
@@ -94,6 +108,7 @@ export function ResultsPanel({
       </div>
       <div
         ref={scrollerRef}
+        onScroll={maybeLoadMore}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
       >
           {recentResults.length === 0 ? (
@@ -101,7 +116,7 @@ export function ResultsPanel({
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
-            <div ref={gridRef} className="grid grid-cols-3 gap-2">
+            <div ref={gridRef} className="grid grid-cols-4 gap-2">
               {recentResults.map((r) =>
                 isNodeRunActive(r.status) ? (
                   <button
@@ -161,19 +176,30 @@ export function ResultsPanel({
                         if (e.ctrlKey || e.metaKey) {
                           toggleCompareId(r.id);
                         } else {
-                          openLightbox(thumbnailImageUrl(r.image), r.nodeLabel);
+                          // 主点击进详情页（与「查看」一致），不再只弹轻量灯箱。
+                          openDetail(r);
                         }
                       }}
-                      aria-label={`放大 ${r.nodeLabel}`}
+                      aria-label={`查看 ${r.nodeLabel} 详情`}
                       className="absolute inset-0 h-full w-full cursor-zoom-in focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold"
                     >
-                      <img
-                        src={r.thumbnail ?? thumbnailImageUrl(r.image)}
-                        alt={r.nodeLabel}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                      />
+                      {isVideoRecord(r) ? (
+                        <video
+                          src={r.image}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={r.thumbnail ?? thumbnailImageUrl(r.image)}
+                          alt={r.nodeLabel}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      )}
                     </button>
                     {compareIds.includes(r.id) && (
                       <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-meta-en font-bold text-[var(--gc-accent-cta-ink)]">
@@ -233,15 +259,10 @@ export function ResultsPanel({
                   </article>
                 ),
               )}
-              {hasMore && onLoadMore && (
-                <button
-                  type="button"
-                  onClick={onLoadMore}
-                  disabled={loadingMore}
-                  className={`${resultCardClass} rounded-md border border-dashed border-(--gc-border) text-label text-(--gc-text-muted) hover:border-(--gc-accent) hover:text-(--gc-accent) disabled:opacity-50`}
-                >
-                  {loadingMore ? "加载中…" : "加载更多"}
-                </button>
+              {loadingMore && (
+                <div className={`${resultCardClass} flex items-center justify-center rounded-md border border-dashed border-[var(--gc-border)] text-label text-[var(--gc-text-muted)]`}>
+                  加载中…
+                </div>
               )}
             </div>
           )}

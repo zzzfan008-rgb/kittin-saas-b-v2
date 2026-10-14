@@ -345,7 +345,7 @@ export interface FlowState {
     id: string,
     prompt: string,
     opts?: { editInputRef?: string },
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
   /** 保存指定页签 id（关闭页签时静默保存非脏页签或丢弃前的保存）。 */
@@ -2860,17 +2860,17 @@ export const useFlowStore = create<FlowState>()(
       // 固定判定，面板不提供模型选择），产物经 image-node-updated 原位回写 + 清 mask 四字段。
       runImageEdit: async (id, prompt, opts) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
-        if (getGenerationSafetyBlockReason()) return;
+        if (getGenerationSafetyBlockReason()) return false;
         flushActiveTextEdit();
         const target = selectActiveDocumentTarget(get());
         const tabId = target.tabId;
         const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
         if (pendingSettlement) await pendingSettlement;
-        if (getGenerationSafetyBlockReason()) return;
+        if (getGenerationSafetyBlockReason()) return false;
         const initialState = get();
         const initialDocument = documentForTarget(initialState, target);
-        if (!initialDocument || initialState.activeTabId !== tabId) return;
-        if (initialDocument.readOnly) return;
+        if (!initialDocument || initialState.activeTabId !== tabId) return false;
+        if (initialDocument.readOnly) return false;
         const node = initialDocument.nodes.find((candidate) => candidate.id === id);
         const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
         // §4.4 三层 fail-closed 的最内层之外的 action 入口自检（面板禁用是第一层）：
@@ -2897,11 +2897,11 @@ export const useFlowStore = create<FlowState>()(
             isNodeRunActive(record.status) &&
             Boolean(record.runId),
           )
-        ) return;
+        ) return false;
 
         const preparationKey = runPreparationKey(target, id);
         const submissionKey = runSubmissionKey(initialDocument.projectId, id);
-        if (runPreparations.has(preparationKey)) return;
+        if (runPreparations.has(preparationKey)) return false;
         runPreparations.add(preparationKey);
         const localStartedAt = Date.now();
         const recordId = nanoid(8);
@@ -2912,6 +2912,7 @@ export const useFlowStore = create<FlowState>()(
         const requestedCount = 1;
         let terminalRecorded = false;
         let knownRunId: string | undefined;
+        let runSubmitted = false;
 
         // 先记录这次编辑操作，再请求后端；请求失败或页面刷新也不丢记录。
         const initialRecord: RecentResult = {
@@ -2963,7 +2964,9 @@ export const useFlowStore = create<FlowState>()(
           const submissionFlow = documentSnapshotToPersistedWorkflow(submissionDocument);
           const saveResult = await saveTab(target);
           if (!saveResult.ok) {
-            throw new Error(`项目保存失败，未调用生图服务：${saveResult.error ?? "未知错误"}`);
+            // 保存失败不抛错走通用 catch（catch 会写 node error + finally 清编辑态，
+            // 不污染 editPrompt）；直接返回 false 让面板提示用户，运行视为未发起。
+            return false;
           }
           if (!submissionFlow.nodes.some((candidate) => candidate.id === id)) {
             throw new Error("项目或节点已关闭，未调用生图服务");
@@ -3028,6 +3031,7 @@ export const useFlowStore = create<FlowState>()(
             recentResultsUpdateById(state.recentResults, recordId, { runId: payload.runId }),
           ));
           runPreparations.delete(preparationKey);
+          runSubmitted = true;
 
           const runStatus = await fetch(`/api/run-plan/${encodeURIComponent(payload.runId)}`);
           if (!runStatus.ok) {
@@ -3138,6 +3142,7 @@ export const useFlowStore = create<FlowState>()(
             ),
           ));
           runPreparations.delete(preparationKey);
+          return runSubmitted;
         }
       },
 
@@ -3479,6 +3484,7 @@ if (typeof window !== "undefined") {
   let forceRetryPending = false;
   let idleHandle: number | null = null;
   let debounceHandle: number | null = null;
+  let serverAutosaveHandle: number | null = null;
 
   const tabMarker = (tab: ProjectTab): string => [
     tab.projectId,
@@ -3658,6 +3664,34 @@ if (typeof window !== "undefined") {
     if (!ranSynchronously) debounceHandle = handle;
   };
 
+  /**
+   * 服务端自动保存：任何历史动作（编辑/撤销/连线/节点增删）落 dirty 后，
+   * debounce 2.5s 把已落库过的页签写回数据库，不再等用户手动点保存。
+   * 只存已保存过的页签（hasBeenPersisted：首存建项目仍走显式保存）、
+   * 跳过只读/运行中/保存中；失败走 saveTab 既有语义（saveState error + 可重试）。
+   * 可见页才跑：node 单测无 document，天然跳过，不污染断言。
+   */
+  const SERVER_AUTOSAVE_DEBOUNCE_MS = 2500;
+  const runServerAutosave = async (): Promise<void> => {
+    if (isProjectTabSessionPersistenceSuspended()) return;
+    if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+    const state = useFlowStore.getState();
+    for (const tab of state.tabs) {
+      if (tab.readOnly || !tab.dirty || !tab.hasBeenPersisted || tab.saveState !== "idle") continue;
+      if (tab.nodes.some((node) => isNodeRunActive(node.data.status))) continue;
+      await useFlowStore.getState().saveTabById(tab.id);
+    }
+  };
+  const scheduleServerAutosave = (): void => {
+    if (isProjectTabSessionPersistenceSuspended()) return;
+    if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+    if (serverAutosaveHandle !== null) window.clearTimeout(serverAutosaveHandle);
+    serverAutosaveHandle = window.setTimeout(() => {
+      serverAutosaveHandle = null;
+      void runServerAutosave();
+    }, SERVER_AUTOSAVE_DEBOUNCE_MS);
+  };
+
   flushDeferredTabSessionPersistence = () => {
     if (activeHistoryTransaction) {
       tabSessionPersistenceDeferred = true;
@@ -3682,6 +3716,7 @@ if (typeof window !== "undefined") {
       return;
     }
     scheduleTabSessionPersistence();
+    scheduleServerAutosave();
   });
 
   const initialState = useFlowStore.getState();

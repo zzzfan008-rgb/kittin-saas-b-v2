@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useConnection } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import {
+  isDocumentConnectionValid,
   selectActiveEdges,
   selectActiveNodes,
   selectActiveReadOnly,
@@ -101,10 +102,60 @@ function OptionSelect({ label, value, options, disabled, placeholder, onChange, 
   );
 }
 
+/** 分段 pills：2–4 个短选项时比下拉更直观（quality/imageSize/outputFormat）；多选项回落下拉。 */
+function SegmentedParam({ name, value, options, disabled, onSelect }: {
+  name: string;
+  value: string | number | boolean | undefined;
+  options: readonly ParamOption[];
+  disabled?: boolean;
+  onSelect: (v: string | number | boolean) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1" role="group" aria-label={paramLabel(name)}>
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            disabled={disabled || o.disabled}
+            aria-pressed={active}
+            title={o.label || String(o.value)}
+            onClick={() => onSelect(o.value)}
+            className={`nodrag rounded-md border px-2 py-1 text-[11px] transition-colors ${
+              active
+                ? "border-[var(--gc-accent)] bg-[var(--gc-accent)]/15 text-[var(--gc-node-text)]"
+                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-accent)]/50 hover:text-[var(--gc-node-text)]"
+            } disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            {o.label || String(o.value)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 选项少且短时用 pills，否则用下拉（阈值：≤4 项且标签总长 ≤12 字）。 */
+function shouldSegmentOptions(options: readonly ParamOption[]): boolean {
+  if (options.length < 2 || options.length > 4) return false;
+  return options.every((o) => !o.disabled) &&
+    options.reduce((n, o) => n + (o.label || String(o.value)).length, 0) <= 12;
+}
+
 function ParamControl({ name, value, options, disabled, onChange }: {
   name: string; value: string | number | boolean | undefined;
-  options: readonly ParamOption[]; disabled?: boolean; onChange: (n: string | number) => void;
+  options: readonly ParamOption[]; disabled?: boolean; onChange: (n: string | number | boolean) => void;
 }) {
+  const segmented = shouldSegmentOptions(options);
+  if (segmented) {
+    return (
+      <div className="flex min-h-[34px] flex-col gap-1.5">
+        <span className="text-label text-[var(--gc-node-muted)]" title={name}>{paramLabel(name)}</span>
+        <SegmentedParam name={name} value={value} options={options} disabled={disabled} onSelect={onChange} />
+      </div>
+    );
+  }
   return (
     <label className="flex min-h-[34px] items-center gap-2">
       <span className="w-20 shrink-0 truncate text-label text-[var(--gc-node-muted)]" title={name}>{paramLabel(name)}</span>
@@ -134,13 +185,26 @@ export interface GeneratorParamsPanelProps { nodeId: string; data: GeneratorNode
 interface UpstreamSource { edgeId: string; label: string; }
 
 /** 输入端口行：圆点在 label 列内（position:static 文档流，RF 按实测盒位算锚点），值列=来源胶囊 */
-function UpstreamPortRow({ id, label, sources, disabled, onDisconnect }: {
+/** 拖线中的落点状态：idle 平时 / valid 可落下高亮 / invalid 不可落 */
+export type PortDropState = "idle" | "valid" | "invalid";
+
+function UpstreamPortRow({ id, label, sources, disabled, dropState, onDisconnect }: {
   id: string;
   label: string;
   sources: UpstreamSource[];
   disabled: boolean;
+  /** 拖线高亮：valid 高亮、可落；idle 且未连接时熄灭 */
+  dropState?: PortDropState;
   onDisconnect: (edgeId: string) => void;
 }) {
+  const connected = sources.length > 0;
+  const dotClass = dropState === "valid"
+    ? "size-2.5 shrink-0 rounded-full bg-[var(--gc-accent)] ring-2 ring-[var(--gc-accent)] ring-offset-1 ring-offset-transparent scale-125"
+    : dropState === "invalid"
+      ? "size-2.5 shrink-0 rounded-full opacity-30"
+      : connected
+        ? "size-2.5 shrink-0 rounded-full"
+        : "size-2.5 shrink-0 rounded-full opacity-30";
   return (
     <div className="flex min-h-[34px] items-center gap-2">
       <span className="flex h-7 w-20 shrink-0 items-center gap-1 text-label text-[var(--gc-node-muted)]">
@@ -149,7 +213,7 @@ function UpstreamPortRow({ id, label, sources, disabled, onDisconnect }: {
           position={Position.Left}
           id={id}
           style={{ position: "static", transform: "none" }}
-          className="size-2.5 shrink-0 rounded-full"
+          className={dotClass}
         />
         {label}
       </span>
@@ -239,6 +303,24 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const promptSources = toSources(upstream.prompt);
   const mediaSources = toSources(upstream.media);
 
+  // 拖线落点高亮：拖线进行中时，用文档连线规则逐端口判定可落性；
+  // 合法落点高亮（accent），其余保持熄灭。平时未连接端口熄灭（见 UpstreamPortRow）。
+  const connection = useConnection();
+  const dropStateFor = (targetHandle: string): PortDropState => {
+    if (!connection.inProgress) return "idle";
+    const fromNodeId = connection.fromNode?.id;
+    if (!fromNodeId || fromNodeId === nodeId) return "invalid";
+    const state = useFlowStore.getState();
+    const document = state.tabs.find((tab) => tab.id === state.activeTabId);
+    if (!document) return "invalid";
+    return isDocumentConnectionValid(document, {
+      source: fromNodeId,
+      target: nodeId,
+      sourceHandle: connection.fromHandle?.id ?? null,
+      targetHandle,
+    }) ? "valid" : "invalid";
+  };
+
   const effModel = data.modelId ?? "";
 
   const modelSel: SelectOption[] = mediaKind === "image"
@@ -318,16 +400,18 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     : undefined;
   const curPromptSizeValue = typeof options.promptSizePrefix === "string" ? options.promptSizePrefix : "";
 
-  const setParam = (k: string, n: string | number) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });
+  const setParam = (k: string, n: string | number | boolean) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });
 
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
       <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">{opHint}</p>
 
       <UpstreamPortRow id="prompt" label="提示词" sources={promptSources} disabled={disabled}
+        dropState={dropStateFor("prompt")}
         onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
       <UpstreamPortRow id={mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference"}
         label={mediaKind === "video" ? "首帧图" : "参考图"} sources={mediaSources} disabled={disabled}
+        dropState={dropStateFor(mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference")}
         onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
 
       <OptionSelect label="模型" value={effModel} options={modelSel}

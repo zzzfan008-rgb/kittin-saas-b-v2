@@ -17,7 +17,8 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { SparklesIcon, LoaderCircleIcon } from "lucide-react";
 import { selectActiveReadOnly, selectActiveProjectId, useFlowStore } from "@/store/flowStore";
 import type { TextNodeData } from "@/types/workflow";
-import { NodeFrame } from "./NodeFrame";
+import { NodeFrame,
+  useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { ColorToolPanel } from "./ColorToolPanel";
 import { ColorChip, type ColorChipEntry } from "./ColorChip";
@@ -47,6 +48,7 @@ const TEXTAREA_MAX_HEIGHT = 320;
  */
 export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) {
   const readOnly = useFlowStore(selectActiveReadOnly);
+  const nodeResize = useNodeResizeWidth(id);
   const projectId = useFlowStore(selectActiveProjectId);
   const textEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "text" },
@@ -189,6 +191,10 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
     <>
       <NodeFrame
         nodeId={id}
+        resizable={!readOnly}
+        nodeWidth={typeof data.nodeWidth === "number" ? data.nodeWidth : undefined}
+        onResizeWidth={nodeResize.onResizeWidth}
+        onResizeWidthEnd={nodeResize.onResizeWidthEnd}
         title={data.label}
         status={data.status}
         error={data.error}

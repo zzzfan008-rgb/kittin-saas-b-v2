@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  selectActiveNodes,
+  selectActivePrimarySelectedNodeId,
   useFlowStore,
 } from "@/store/flowStore";
 import type { Asset } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
+import { canvasNodeClickPosition } from "@/components/panels/canvasNodeActions";
+import { requestCanvasLanding } from "@/lib/canvasLanding";
 import type { AssetPickerCategory, AssetPickerRequest } from "@/lib/overlayEvents";
 
 const CATEGORY_TABS = [
@@ -96,12 +100,36 @@ export function AssetPickerOverlay({
   }, [request, load]);
 
   const pick = (asset: Asset) => {
-    // v8：图片输入节点以 outputImages 承载上传图（R8 上传位语义），
-    // 选择素材等同一次上传；不再写 v7 的 imageUrl 字段。
-    updateNodeDataInTab(request.target, request.nodeId, {
+    // 有写回目标 = 选中节点后打开：素材等同一次上传（R8 上传位语义）。
+    if (request.target && request.nodeId) {
+      updateNodeDataInTab(request.target, request.nodeId, {
+        outputImages: [asset.image],
+        status: "success",
+        error: undefined,
+      });
+      onRequestChange(null);
+      return;
+    }
+    // 浏览模式（左侧直接打开）：新建图片节点承载该素材，不弹上传框。
+    const state = useFlowStore.getState();
+    const position = canvasNodeClickPosition(
+      selectActiveNodes(state),
+      selectActivePrimarySelectedNodeId(state),
+    );
+    const nodeId = state.addNode("image", position);
+    if (!nodeId) {
+      setError("当前项目只读或没有打开的画布，不能新建节点");
+      return;
+    }
+    useFlowStore.getState().updateNodeData(nodeId, {
       outputImages: [asset.image],
       status: "success",
       error: undefined,
+    });
+    requestCanvasLanding({
+      tabId: useFlowStore.getState().activeTabId,
+      nodeId,
+      fitView: false,
     });
     onRequestChange(null);
   };

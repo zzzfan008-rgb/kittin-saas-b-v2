@@ -78,7 +78,7 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
             role="dialog"
             aria-label="历史创作记录"
             ref={panelRef}
-            className="mt-2 flex w-[560px] flex-col overflow-hidden rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_16px_40px_rgba(0,0,0,.35)]"
+            className="mt-2 flex w-[640px] flex-col overflow-hidden rounded-2xl border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-[0_0_0_.5px_rgba(0,0,0,.06),0_16px_40px_rgba(0,0,0,.35)]"
           >
             <div className="min-h-0 flex-1">
               <ResultsPanel
@@ -86,7 +86,7 @@ export function ResultsFab({ hasMore = false, loadingMore = false, onLoadMore }:
                 loadingMore={loadingMore}
                 onLoadMore={onLoadMore}
                 className="h-full border-0"
-                rowsVisible={3}
+                rowsVisible={6}
               />
             </div>
           </div>
