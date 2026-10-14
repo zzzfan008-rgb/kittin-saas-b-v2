@@ -864,7 +864,7 @@ test("results and project center follow desktop density for cards", async ({ pag
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
     }).toPass({ timeout: 20_000 });
     await openResults();
-    await expectGridColumns(resultsGrid, 3);
+    await expectGridColumns(resultsGrid, 4);
 
     await page.getByRole("button", { name: "打开项目中心" }).click();
     const center = page.getByRole("dialog", { name: "项目中心" });
