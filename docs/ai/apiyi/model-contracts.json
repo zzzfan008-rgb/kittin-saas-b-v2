@@ -178,7 +178,7 @@
     {
       "id": "gpt-image-2.5-all",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:01666bbb0415c74d728c78c7dd2d7adf6ad7cc7af2fbd0027e458dc7308e8fba",
+      "contractHash": "sha256:e33094387efa9163c0d88b49359ebc5229eba5b63f3515e3d1e62c7d48f55cab",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -231,12 +231,25 @@
         ],
         "maxImages": 1
       },
-      "recommendedOptions": {}
+      "recommendedOptions": {
+        "promptSizePrefix": {
+          "examples": [
+            "横版 16:9",
+            "竖屏 9:16",
+            "4:3",
+            "3:4",
+            "3:2 尺寸",
+            "2:3 尺寸",
+            "2:5 竖屏",
+            "5:2 横屏"
+          ]
+        }
+      }
     },
     {
       "id": "gpt-image-2.5-sunburst-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:52d1891e65c432238b08ccc82d42d6700c33ee51a633d60bfebc1601f27fb604",
+      "contractHash": "sha256:14f213ff98793ed83f76b77894f3e2ad884f1c05680904e90bbec5a50f00d9e5",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -308,6 +321,18 @@
         "3840x2160",
         "3840x1632"
       ],
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
       "qualityValues": [
         "auto",
         "low",
@@ -345,7 +370,7 @@
     {
       "id": "gpt-image-2.5-flare-vip",
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e270609abaea551dc4321299126fa94f12d252e385e1dfb7f013af79b9320d08",
+      "contractHash": "sha256:5eba620cd204b3507b8d9401b92acd41a4356b219a16bb429cacfc474a3ede4d",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
         "reviewedExportSha256": null,
@@ -416,6 +441,18 @@
         "2160x3840",
         "3840x2160",
         "3840x1632"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
       ],
       "qualityValues": [
         "auto",
