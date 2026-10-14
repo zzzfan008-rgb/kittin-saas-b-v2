@@ -70,8 +70,8 @@ assert.notEqual(lockOfA, createDatabaseLockName({ databaseUrl: dbC }), "differen
 assert.throws(() => createDatabaseLockName({}), /database URL is required/);
 
 assert.deepEqual(
-  resolveRequestedTestFiles(["tests/authorization.test.ts"], { repoRoot }),
-  [realpathSync(join(repoRoot, "tests/authorization.test.ts"))],
+  resolveRequestedTestFiles(["tests/authorization-assets.test.ts"], { repoRoot }),
+  [realpathSync(join(repoRoot, "tests/authorization-assets.test.ts"))],
   "the runner must resolve an explicit focused test inside the repository test directory",
 );
 assert.throws(
