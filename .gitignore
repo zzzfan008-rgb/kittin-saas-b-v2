@@ -56,3 +56,6 @@ test-*.png
 test-*.jpg
 shot-*.png
 button-animation-demos.html
+
+# Local Cursor config (machine-specific, never commit)
+.cursor/
