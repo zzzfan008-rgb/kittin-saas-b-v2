@@ -92,11 +92,18 @@ export function MarkLayer({
         }
       } else if (mark.tool === "text") {
         const anchorPoint = pixel(points[0]);
-        ctx.font = `600 ${Math.max(12, ctx.lineWidth * 3)}px system-ui, sans-serif`;
+        // A 案（与 editComposite 同口径）：正常字重 + 无描边 + 半透明衬底。
+        const previewFontSize = Math.max(12, ctx.lineWidth * 3);
+        ctx.font = `400 ${previewFontSize}px system-ui, sans-serif`;
         ctx.textBaseline = "middle";
         const text = mark.text ?? "";
-        ctx.lineWidth = Math.max(1, (mark.strokeWidth || 8) / 2);
-        ctx.strokeText(text, anchorPoint.x, anchorPoint.y);
+        const pad = Math.ceil(previewFontSize * 0.25);
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+        ctx.beginPath();
+        ctx.roundRect(anchorPoint.x - pad, anchorPoint.y - previewFontSize / 2 - pad, textWidth + pad * 2, previewFontSize + pad * 2, pad);
+        ctx.fill();
+        ctx.fillStyle = mark.color;
         ctx.fillText(text, anchorPoint.x, anchorPoint.y);
       } else {
         const start = pixel(points[0]);
@@ -168,8 +175,9 @@ export function MarkLayer({
   }, [render, naturalWidth, naturalHeight]);
 
   // 底图变化（运行完成换新图）→ 清空标记（面板的会话历史条另行记录）。
-  // 最新 marks/onMarksChange 存入 ref：effect 只依赖触发值 baseSource（门禁
-  // no-error-suppression：不得用抑制注释绕过依赖检查）。
+  // 最新 marks 存入 ref；onMarksChange 直接依赖（父级 commitMarks 是空依赖 useCallback，
+  // 引用稳定，不会引发 effect 误触发；用 ref 存回调反而让 effect 闭包拿到旧 marks，
+  // commitMark 提交旧快照 → 父级 setMarks 触发本组件重渲染 → 同 tick 内 textInput 被覆盖丢失）。
   const previousBaseRef = useRef(baseSource);
   const marksRef = useRef(marks);
   marksRef.current = marks;
@@ -178,18 +186,17 @@ export function MarkLayer({
   useEffect(() => {
     if (previousBaseRef.current !== baseSource) {
       previousBaseRef.current = baseSource;
-      if (marksRef.current.length > 0) onMarksChangeRef.current([]);
+      if (marksRef.current.length > 0) onMarksChange([]);
       setDrawState(null);
       setTextInput(null);
     }
-  }, [baseSource]);
+  }, [baseSource, onMarksChange]);
 
-  const commitMark = useCallback(
-    (mark: EditMark) => {
-      onMarksChange([...marks, mark]);
-    },
-    [marks, onMarksChange],
-  );
+  // commitMark 用 ref 读最新 marks + 回调：handlePointerDown 是 pointer 事件闭包，
+  // 若依赖 marks 则每次敲标记都换回调引用；这里保持引用稳定，读 ref 拿最新值。
+  const commitMark = useCallback((mark: EditMark) => {
+    onMarksChangeRef.current([...marksRef.current, mark]);
+  }, []);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -271,7 +278,9 @@ export function MarkLayer({
       />
       {textInput ? (
         <input
-          autoFocus
+          // 注意：禁止 autoFocus。autoFocus 会在同一 tick 内触发 focusin→(mousedown 目标切换)→blur，
+          // blur 的 commitText 把 input 卸载，React 丢弃 pointerdown 的 setTextInput 更新。
+          // 用户点画布本就是为了输入，input 出现后手动点一次即聚焦，无需自动抢焦。
           value={textInput.value}
           onChange={(event) => setTextInput({ ...textInput, value: event.target.value })}
           onBlur={commitText}

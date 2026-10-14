@@ -50,6 +50,8 @@ export interface MarkDrawContext {
   ): void;
   fillText(text: string, x: number, y: number): void;
   strokeText(text: string, x: number, y: number): void;
+  measureText(text: string): { width: number };
+  roundRect(x: number, y: number, w: number, h: number, radii: number): void;
   closePath(): void;
   set lineWidth(value: number);
   set strokeStyle(value: string);
@@ -108,12 +110,17 @@ export function drawMarks(
     if (mark.tool === "text") {
       const anchor = pointToPixel(points[0], width, height);
       const fontSize = Math.max(12, strokeWidth * 3);
-      ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+      // A 案：正常字重 + 无描边 + 半透明衬底，保证干净可读。
+      ctx.font = `400 ${fontSize}px system-ui, sans-serif`;
       ctx.textBaseline = "middle";
       const text = mark.text ?? "";
-      // 文字描边 + 填充，保证在任意底色上可读。
-      ctx.lineWidth = Math.max(1, strokeWidth / 2);
-      ctx.strokeText(text, anchor.x, anchor.y);
+      const pad = Math.ceil(fontSize * 0.25);
+      const textWidth = ctx.measureText(text).width;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+      ctx.beginPath();
+      ctx.roundRect(anchor.x - pad, anchor.y - fontSize / 2 - pad, textWidth + pad * 2, fontSize + pad * 2, pad);
+      ctx.fill();
+      ctx.fillStyle = mark.color;
       ctx.fillText(text, anchor.x, anchor.y);
       ctx.restore();
       continue;

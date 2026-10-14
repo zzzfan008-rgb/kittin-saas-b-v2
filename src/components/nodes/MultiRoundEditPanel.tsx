@@ -17,6 +17,16 @@ import {
   Undo2Icon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { compositeEditImage, type EditMark, type EditMarkTool } from "@/lib/editComposite";
 import { uploadEditDraft } from "@/lib/editDraftUpload";
@@ -51,8 +61,11 @@ export interface MultiRoundEditPanelProps {
   readFreshPrompt: () => string;
   /** 节点运行状态（active 时左栏显影中 + 标记层锁定）。 */
   runStatus: NodeRunStatus;
-  /** 提交：面板已完成合成+上传，把 editInputRef URL 交给 ImageNode 发合成 run。 */
-  onRun: (editInputRef: string) => void;
+  /** 提交：面板已完成合成+上传，把 editInputRef URL 交给 ImageNode 发合成 run。
+   * 返回 true=运行已提交（状态会流转），false=被门禁拒绝（面板需提示用户）。 */
+  onRun: (editInputRef: string) => Promise<boolean> | boolean;
+  /** 用户从修改记录选中某一轮 → 确认覆盖到节点（写回 outputImages）。 */
+  onApplyRound: (url: string) => void;
   onClose: () => void;
 }
 
@@ -72,6 +85,7 @@ export function MultiRoundEditPanel({
   readFreshPrompt,
   runStatus,
   onRun,
+  onApplyRound,
   onClose,
 }: MultiRoundEditPanelProps) {
   const [marks, setMarks] = useState<EditMark[]>([]);
@@ -82,6 +96,8 @@ export function MultiRoundEditPanel({
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 待确认覆盖的记录条（AlertDialog 受控打开）。
+  const [applyCandidate, setApplyCandidate] = useState<HistoryEntry | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>(() =>
     baseSource ? [{ label: "原图", url: baseSource }] : [],
   );
@@ -103,7 +119,9 @@ export function MultiRoundEditPanel({
     if (!baseSource) return;
     setHistory((current) => {
       if (current[current.length - 1]?.url === baseSource) return current;
-      return [...current, { label: `第 ${current.length} 轮`, url: baseSource }];
+      // 只保留「原图 + 最近 3 轮」：旧轮自动淘汰，避免记录条无限增长。
+      const next = [...current, { label: `第 ${current.length} 轮`, url: baseSource }];
+      return next.length > 4 ? [next[0], ...next.slice(-3)] : next;
     });
   }, [baseSource]);
 
@@ -197,7 +215,11 @@ export function MultiRoundEditPanel({
     try {
       const composite = await compositeEditImage(baseSource, marksRef.current);
       const draft = await uploadEditDraft({ dataUrl: composite.dataUrl, projectId, nodeId });
-      onRun(draft.url);
+      // 运行真发出了才算开始：门禁拒绝（进行中任务/额度/只读）时直接报错，不静默。
+      const submitted = await onRun(draft.url);
+      if (!submitted) {
+        setError("本次修改未能发起：可能有进行中的任务、额度不足或项目只读，请稍后重试");
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -289,20 +311,25 @@ export function MultiRoundEditPanel({
           {/* 标记工具 */}
           <section className="flex flex-col gap-2" aria-label="标记工具">
             <div className="flex gap-1">
-              {MARK_TOOLS.map(({ tool: markTool, label, icon: Icon }) => (
-                <Button
-                  key={markTool}
-                  type="button"
-                  variant={tool === markTool ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  aria-label={label}
-                  title={label}
-                  disabled={busy || readOnly}
-                  onClick={() => setTool(markTool)}
-                >
-                  <Icon aria-hidden="true" />
-                </Button>
-              ))}
+              {MARK_TOOLS.map(({ tool: markTool, label, icon: Icon }) => {
+                const active = tool === markTool;
+                return (
+                  <Button
+                    key={markTool}
+                    type="button"
+                    variant={active ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    aria-label={label}
+                    title={label}
+                    aria-pressed={active}
+                    disabled={busy || readOnly}
+                    onClick={() => setTool(markTool)}
+                    className={active ? "bg-[var(--gc-accent)]/20 text-[var(--gc-text)] ring-1 ring-[var(--gc-accent)]" : undefined}
+                  >
+                    <Icon aria-hidden="true" />
+                  </Button>
+                );
+              })}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex gap-1" role="group" aria-label="标记颜色">
@@ -399,29 +426,62 @@ export function MultiRoundEditPanel({
           <section className="mt-auto flex flex-col gap-2 border-t border-[var(--gc-border)] pt-3" aria-label="修改记录">
             <span className="text-xs font-medium text-[var(--gc-text)]">修改记录</span>
             <div className="flex flex-wrap gap-2" data-testid="multi-round-history">
-              {history.map((entry, index) => (
-                <figure
-                  key={`${entry.label}-${entry.url}`}
-                  className={`relative h-14 w-14 overflow-hidden rounded border ${index === history.length - 1 ? "border-[var(--gc-text)]" : "border-[var(--gc-border)]"}`}
-                  title={entry.label}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openLightbox(entry.url, entry.label)}
-                    className="block size-full cursor-zoom-in p-0"
-                    aria-label={`放大查看${entry.label}`}
+              {history.map((entry, index) => {
+                const isCurrent = index === history.length - 1;
+                return (
+                  <figure
+                    key={`${entry.label}-${entry.url}`}
+                    className={`relative h-14 w-14 overflow-hidden rounded border ${isCurrent ? "border-[var(--gc-text)]" : "border-[var(--gc-border)]"}`}
+                    title={isCurrent ? `${entry.label}（当前底图）` : `${entry.label}（点击覆盖到节点）`}
                   >
-                    <img src={entry.url} alt={entry.label} className="size-full object-cover" draggable={false} />
-                  </button>
-                  <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px] text-white">
-                    {entry.label}
-                  </figcaption>
-                </figure>
-              ))}
+                    <button
+                      type="button"
+                      disabled={isCurrent || busy || readOnly}
+                      onClick={() => setApplyCandidate(entry)}
+                      className="block size-full cursor-pointer p-0 disabled:cursor-default"
+                      aria-label={isCurrent ? `${entry.label}（当前底图）` : `选用${entry.label}覆盖到节点`}
+                    >
+                      <img src={entry.url} alt={entry.label} className="size-full object-cover" draggable={false} />
+                    </button>
+                    <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 text-center text-[9px] text-white">
+                      {entry.label}
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
           </section>
         </div>
       </aside>
+
+      {/* 选用某一轮覆盖到节点：二次确认，确认后写回并自动关闭面板 */}
+      <AlertDialog
+        open={applyCandidate !== null}
+        onOpenChange={(open) => {
+          if (!open) setApplyCandidate(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>覆盖到节点？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将「{applyCandidate?.label}」的图片覆盖到画布节点上，当前底图将被替换。此操作可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (applyCandidate) onApplyRound(applyCandidate.url);
+                setApplyCandidate(null);
+                onClose();
+              }}
+            >
+              确认覆盖
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>,
     document.body,
   );

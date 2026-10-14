@@ -429,13 +429,30 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               ?.nodes.find((node) => node.id === id)?.data as ImageNodeData | undefined)?.editPrompt ?? "";
           }}
           runStatus={data.status}
+          onApplyRound={(url) => {
+            // 记录条回写：覆盖 outputImages 并清编辑残留（与产物原位替换同语义）；
+            // 面板在确认后自动关闭（onClose 由面板侧调用）。
+            const target = selectActiveDocumentTarget(useFlowStore.getState());
+            if (!target) return;
+            updateNodeDataInTab(target, id, {
+              outputImages: [url],
+              status: "success",
+              error: undefined,
+              mask: undefined,
+              maskSourceRef: undefined,
+              featherRadius: undefined,
+              editPrompt: undefined,
+              editInputRef: undefined,
+            });
+          }}
           onRun={(editInputRef) => {
             // flush 后从 store 读最新 editPrompt，作为合成 run 的 editPrompt。
+            // 返回提交结果：面板据此判断运行是否真的发出（门禁拒绝时面板提示，不静默）。
             editPromptEdit.flush();
             const current = useFlowStore.getState();
             const fresh = (selectDocumentForTab(current, selectActiveDocumentTarget(current).tabId)
               ?.nodes.find((node) => node.id === id)?.data as ImageNodeData | undefined)?.editPrompt ?? "";
-            void runImageEdit(id, fresh.trim(), { editInputRef });
+            return runImageEdit(id, fresh.trim(), { editInputRef });
           }}
           onClose={() => setEditingMulti(false)}
         />
