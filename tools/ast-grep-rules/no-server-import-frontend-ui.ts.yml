@@ -1,0 +1,15 @@
+id: no-server-import-frontend-ui
+language: TypeScript
+severity: error
+message: 后端（server/）不得 import 前端 UI/状态层（src/components、src/store、src/hooks）：共享契约只允许 src/types 与 src/lib 纯模块；把组件或 store 拖进服务端会污染 bundle 边界并制造隐性循环（对应 depcruise server-must-not-import-frontend-ui）。
+note: |
+  允许的替代：src/types/* 类型契约，或 src/lib 下无副作用纯函数（promptRunAdmission、referenceInputs、providerPromptRenderer、referenceEvidence、maskGeometry）与 src/tutorials/tutorialContract。
+  当前代码库零匹配 —— 该规则用于阻止新引入。
+files:
+  - server/**/*.ts
+rule:
+  pattern: |
+    import $IMPORTS from "$PATH"
+constraints:
+  PATH:
+    regex: ^(\.\./\.\./src/(components|store|hooks)/|@/components/|@/store/|@/hooks/)

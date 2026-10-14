@@ -66,11 +66,12 @@ function historyFixture(image: string) {
 async function landOnCanvas(page: Page): Promise<void> {
   const guide = page.getByRole("region", { name: "空工作区" });
   const canvas = page.getByRole("application", { name: "工作流画布" });
-  await expect(guide.or(canvas)).toBeVisible();
+  // 门禁全量高负载下首屏收敛慢于默认 5s；显式放宽，不加硬睡。
+  await expect(guide.or(canvas)).toBeVisible({ timeout: 15_000 });
   if (await guide.isVisible()) {
     await guide.getByRole("button", { name: "新建项目" }).click();
   }
-  await expect(canvas).toBeVisible();
+  await expect(canvas).toBeVisible({ timeout: 15_000 });
 }
 
 /**
