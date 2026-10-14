@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Handle, Position, useConnection } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -68,18 +68,29 @@ const PARAM_LABELS: Record<string, string> = {
 function paramLabel(k: string) { return PARAM_LABELS[k] ?? k; }
 function paramText(v: unknown) { return v === undefined || v === null ? "" : String(v); }
 
+/** 参数下拉横向偏移：弹窗左缘 = 所在节点右缘外 7px。
+ * 触发器有全宽（模型/尺寸）与半格（画幅/批次）两种宽度，写死数值必在某种宽度下
+ * 落进节点内；定位时实时量触发器→节点右缘距离（屏幕像素，天然跟随缩放）。 */
+function nodeOutsideOffset(trigger: HTMLElement | null): number {
+  const triggerBox = trigger?.getBoundingClientRect();
+  const nodeBox = trigger?.closest(".react-flow__node")?.getBoundingClientRect();
+  if (!triggerBox || !nodeBox) return 17;
+  return Math.max(0, nodeBox.right - triggerBox.right) + 7;
+}
+
 interface SelectOption { value: string; label: string; disabled?: boolean; }
 
 function OptionSelect({ label, value, options, disabled, placeholder, onChange, ariaLabel, hint }: {
   label: string; value: string; options: readonly SelectOption[]; disabled?: boolean;
   placeholder?: string; onChange: (n: string) => void; ariaLabel?: string; hint?: string;
 }) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   return (
     <label className="block min-w-0 space-y-1">
       <span className="text-label text-[var(--gc-node-muted)]">{label}</span>
       <Select value={value} disabled={disabled}
         onValueChange={(n) => { if (typeof n === "string") onChange(n); }}>
-        <SelectTrigger aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-[11px]">
+        <SelectTrigger ref={triggerRef} aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-[11px]">
           <SelectValue placeholder={placeholder ?? "未选择"}>
             {(sel) => {
               const cur = typeof sel === "string" ? sel : "";
@@ -89,7 +100,16 @@ function OptionSelect({ label, value, options, disabled, placeholder, onChange, 
           </SelectValue>
         </SelectTrigger>
         {/* 参数下拉统一在参数右侧弹出、与参数顶部对齐（用户裁决） */}
-        <SelectPortal><SelectPositioner side="right" align="start"><SelectPopup>
+        <SelectPortal><SelectPositioner
+          side="right"
+          align="start"
+          // Base UI 默认按“选中项与触发器文本对齐”摆弹窗（alignItemWithTrigger=true），
+          // 会覆盖 side/align 导致弹窗压住节点：参数下拉必须固定右侧顶部。
+          alignItemWithTrigger={false}
+          // 忽略 React Flow 视口（overflow:hidden 限幅祖先）导致的误 flip。
+          collisionBoundary={typeof document === "undefined" ? undefined : document.body}
+          sideOffset={() => nodeOutsideOffset(triggerRef.current)}
+        ><SelectPopup>
           <SelectList>
             {options.map((o) => (
               <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
@@ -147,6 +167,7 @@ function ParamControl({ name, value, options, disabled, onChange }: {
   name: string; value: string | number | boolean | undefined;
   options: readonly ParamOption[]; disabled?: boolean; onChange: (n: string | number | boolean) => void;
 }) {
+  const paramTriggerRef = useRef<HTMLButtonElement | null>(null);
   const segmented = shouldSegmentOptions(options);
   if (segmented) {
     return (
@@ -165,10 +186,16 @@ function ParamControl({ name, value, options, disabled, onChange }: {
           if (found) { onChange(found.value as string | number); return; }
           if (typeof n === "string" || typeof n === "number" || typeof n === "boolean") onChange(n);
         }}>
-        <SelectTrigger aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-[11px]">
+        <SelectTrigger ref={paramTriggerRef} aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-[11px]">
           <SelectValue placeholder="默认">{(sel) => paramText(sel) || "默认"}</SelectValue>
         </SelectTrigger>
-        <SelectPortal><SelectPositioner side="right" align="start"><SelectPopup>
+        <SelectPortal><SelectPositioner
+          side="right"
+          align="start"
+          alignItemWithTrigger={false}
+          collisionBoundary={typeof document === "undefined" ? undefined : document.body}
+          sideOffset={() => nodeOutsideOffset(paramTriggerRef.current)}
+        ><SelectPopup>
           <SelectList>
             {options.map((o) => (
               <SelectItem key={String(o.value)} value={o.value} disabled={o.disabled}>{o.label || String(o.value)}</SelectItem>
