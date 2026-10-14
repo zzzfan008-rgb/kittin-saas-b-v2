@@ -11,8 +11,9 @@ export const OPEN_PROJECT_CENTER_EVENT = "garment:open-project-center";
 export type AssetPickerCategory = Asset["category"] | "all";
 
 export interface AssetPickerRequest {
-  target: DocumentTarget;
-  nodeId: string;
+  /** 写回目标；缺省 = 浏览模式，选中素材后新建图片节点承载。 */
+  target?: DocumentTarget;
+  nodeId?: string;
   /**
    * 打开时预选的分类。调用方显式给出时优先；缺省由节点 id 的映射提示推导
    * （`assetPickerCategoryForNode`，见 asset-library-model.md §6）。

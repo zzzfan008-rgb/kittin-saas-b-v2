@@ -394,21 +394,16 @@ export function WorkbenchShell({ children }: WorkbenchShellProps) {
         return;
       }
       if (item.needsNodeContext) {
-        // 「从资产库选择」：需选中一个图片上传节点；选中后派发选择器事件，
-        // 由 App 宿主的 AssetPickerOverlay 承接（写回该节点的 outputImages）。
+        // 「从资产库选择」：直接打开资产库，不要求先选节点。
+        // 选中图片节点时打开 = 写回该节点；未选中 = 浏览模式，选素材后新建图片节点承载。
         const state = useFlowStore.getState();
         const nodeId = selectActivePrimarySelectedNodeId(state);
         const node = nodeId
           ? state.tabs.find((tab) => tab.id === state.activeTabId)?.nodes.find((n) => n.id === nodeId)
           : undefined;
-        if (!node || node.data.kind !== "image") {
-          setWorkflowStatus({ kind: "pending", message: "先在画布上选中一个图片节点，再选择资产" });
-          return;
-        }
-        const request: AssetPickerRequest = {
-          target: selectActiveDocumentTarget(state),
-          nodeId: node.id,
-        };
+        const request: AssetPickerRequest = node && node.data.kind === "image"
+          ? { target: selectActiveDocumentTarget(state), nodeId: node.id }
+          : {};
         window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail: request }));
         return;
       }

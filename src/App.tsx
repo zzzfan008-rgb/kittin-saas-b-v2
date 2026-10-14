@@ -227,7 +227,7 @@ function Workspace() {
     const openCompare = () => setCompareOpen(true);
     const openAssetPicker = (event: Event) => {
       const request = (event as CustomEvent<AssetPickerRequest>).detail;
-      if (request?.target && request.nodeId) setAssetPickerRequest(request);
+      if (request) setAssetPickerRequest(request);
     };
     window.addEventListener(OPEN_COMPARE_EVENT, openCompare);
     window.addEventListener(OPEN_ASSET_PICKER_EVENT, openAssetPicker);
@@ -415,7 +415,11 @@ function Workspace() {
         <Suspense fallback={<OverlayLoadingStatus label="正在打开素材库…" />}>
           <LazyAssetPickerOverlay
             request={assetPickerRequest}
-            initialCategory={assetPickerCategoryForNode(assetPickerRequest.nodeId)}
+            initialCategory={
+              assetPickerRequest.nodeId
+                ? assetPickerCategoryForNode(assetPickerRequest.nodeId)
+                : "all"
+            }
             onRequestChange={setAssetPickerRequest}
           />
         </Suspense>
