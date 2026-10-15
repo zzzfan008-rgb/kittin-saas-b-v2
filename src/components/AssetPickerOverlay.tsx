@@ -9,28 +9,19 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { canvasNodeClickPosition } from "@/components/panels/canvasNodeActions";
 import { requestCanvasLanding } from "@/lib/canvasLanding";
 import type { AssetPickerCategory, AssetPickerRequest } from "@/lib/overlayEvents";
+import {
+  ASSET_EMPTY_HINT,
+  ASSET_LEVEL1,
+  ASSET_LEVEL2,
+  normalizeLeaf,
+  type AssetLeafId,
+  type AssetLevel1Id,
+} from "@/lib/assetTaxonomy";
 
-const CATEGORY_TABS = [
-  ["all", "全部"],
-  ["print", "印花"],
-  ["fabric", "面料"],
-  ["reference", "参考"],
-  ["model", "数字模特"],
-] as const;
+/** 一页 5 列 × 6 行 = 30；滚轮到底自动拉下一页。 */
+const PAGE_SIZE = 30;
 
-type CategoryFilter = (typeof CATEGORY_TABS)[number][0];
-
-const PAGE_SIZE = 20;
-
-const EMPTY_HINT: Record<CategoryFilter, string> = {
-  all: "暂无素材，可在印花提取节点中「存为素材」",
-  print: "暂无印花素材，可在印花提取节点中「存为素材」",
-  fabric: "暂无面料素材",
-  reference: "暂无参考素材，可在图片查看器中「收藏为资产」",
-  model: "暂无数字模特，可在图片查看器中「存入数字模特库」",
-};
-
-/** 素材库选择浮层：按分类筛选 + 名称搜索，选中后写回目标图片上传节点 */
+/** 资产库选择浮层：两级分类 + 名称搜索，选中后写回目标图片上传节点 */
 export function AssetPickerOverlay({
   request,
   initialCategory,
@@ -42,8 +33,19 @@ export function AssetPickerOverlay({
   onRequestChange: (request: AssetPickerRequest | null) => void;
 }) {
   const updateNodeDataInTab = useFlowStore((s) => s.updateNodeDataInTab);
-  const resolvedInitialCategory = request.initialCategory ?? initialCategory ?? "all";
-  const [category, setCategory] = useState<CategoryFilter>(resolvedInitialCategory);
+  const resolvedInitialLeaf = normalizeLeaf(request.initialCategory ?? initialCategory);
+  const [level1, setLevel1] = useState<AssetLevel1Id>(() =>
+    (Object.keys(ASSET_LEVEL2) as AssetLevel1Id[]).find((l1) =>
+      ASSET_LEVEL2[l1].some((leaf) => leaf.id === resolvedInitialLeaf),
+    ) ?? "design",
+  );
+  const [leaf, setLeaf] = useState<AssetLeafId>(resolvedInitialLeaf);
+  const pickLeaf = (next: AssetLeafId) => {
+    setLeaf(next);
+    for (const l1 of ASSET_LEVEL1) {
+      if (ASSET_LEVEL2[l1.id].some((item) => item.id === next)) { setLevel1(l1.id); break; }
+    }
+  };
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -51,11 +53,25 @@ export function AssetPickerOverlay({
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  // 管理模式：多选 + 改名/删除/上传
+  const [managing, setManaging] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadToHistoryRef = useRef(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   // 同一个浮层实例被指向另一个节点时，预选分类跟随新请求；用户手动切换不被覆盖。
   useEffect(() => {
-    setCategory((current) => (current === resolvedInitialCategory ? current : resolvedInitialCategory));
-  }, [resolvedInitialCategory]);
+    setLeaf((current) => {
+      if (current === resolvedInitialLeaf) return current;
+      pickLeaf(resolvedInitialLeaf);
+      return resolvedInitialLeaf;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedInitialLeaf]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -73,9 +89,12 @@ export function AssetPickerOverlay({
     setError(null);
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
-      if (category !== "all") params.set("category", category);
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      const res = await fetch(`/api/assets?${params}`);
+      const history = leaf === "history";
+      if (!history) {
+        params.set("category", leaf);
+        if (debouncedSearch) params.set("search", debouncedSearch);
+      }
+      const res = await fetch(history ? `/api/assets/history-uploads?${params}` : `/api/assets?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page = (await res.json()) as Asset[];
       if (!Array.isArray(page)) throw new Error("素材数据格式无效");
@@ -92,12 +111,26 @@ export function AssetPickerOverlay({
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [category, debouncedSearch]);
+  }, [leaf, debouncedSearch]);
 
   // 打开、切换分类或搜索词变化时都从第一页重新拉取
   useEffect(() => {
     void load(0);
   }, [request, load]);
+
+  // 滚轮到底自动拉下一页（5×6 固定视口）
+  const maybeLoadMore = () => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !hasMore || loading) return;
+    const remain = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (remain < 320) void load(assets.length);
+  };
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (scroller.scrollHeight <= scroller.clientHeight + 48) maybeLoadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
 
   const pick = (asset: Asset) => {
     // 有写回目标 = 选中节点后打开：素材等同一次上传（R8 上传位语义）。
@@ -134,17 +167,131 @@ export function AssetPickerOverlay({
     onRequestChange(null);
   };
 
+  const toggleSelect = (asset: Asset) => {
+    if (asset.canManage === false) return;
+    setSelectedIds((current) =>
+      current.includes(asset.id) ? current.filter((id) => id !== asset.id) : [...current, asset.id],
+    );
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  // 新增：本地文件 → 当前类目建资产；上传：本地文件 → 历史素材（仅 files）。
+  const handleUploadFiles = async (files: FileList | null, toHistoryOnly: boolean) => {
+    if (!files || files.length === 0) return;
+    setNotice(null);
+    setError(null);
+    try {
+      for (const file of Array.from(files)) {
+        const dataUrl = await readFileAsDataUrl(file);
+        const up = await fetch("/api/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        });
+        const saved = (await up.json().catch(() => ({}))) as { url?: string; error?: string };
+        if (!up.ok || !saved.url) throw new Error(saved.error || `上传失败 HTTP ${up.status}`);
+        if (!toHistoryOnly && leaf !== "history") {
+          const base = file.name.split(/[\\/]/).pop() ?? "";
+          const name = (base.replace(/\.[^.]*$/, "").replace(/\s+/g, " ").trim() || "未命名素材").slice(0, 60);
+          const created = await fetch("/api/assets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, category: leaf, image: saved.url }),
+          });
+          if (!created.ok) {
+            const detail = (await created.json().catch(() => ({}))) as { error?: string };
+            throw new Error(detail.error || `建资产失败 HTTP ${created.status}`);
+          }
+        }
+      }
+      if (toHistoryOnly && leaf !== "history") {
+        setNotice("已上传到历史素材");
+      } else {
+        await load(0);
+      }
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const startRename = () => {
+    const target = assets.find((a) => a.id === selectedIds[0]);
+    if (!target || selectedIds.length !== 1) return;
+    setRenameValue(target.id.startsWith("upload-") ? "" : target.name);
+    setRenaming(true);
+  };
+
+  const commitRename = async () => {
+    const id = selectedIds[0];
+    const name = renameValue.trim();
+    if (!id || !name) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/assets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(detail.error || `改名失败 HTTP ${res.status}`);
+      }
+      setAssets((current) => current.map((a) => (a.id === id ? { ...a, name } : a)));
+      setRenaming(false);
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    setError(null);
+    const failures: string[] = [];
+    for (const id of selectedIds) {
+      try {
+        const history = id.startsWith("upload-");
+        const res = await fetch(
+          history ? `/api/files/${id.slice("upload-".length)}` : `/api/assets/${id}`,
+          { method: "DELETE" },
+        );
+        if (!res.ok) {
+          const detail = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(detail.error || `HTTP ${res.status}`);
+        }
+      } catch (err) {
+        failures.push(`${id}：${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    setSelectedIds([]);
+    setRenaming(false);
+    await load(0);
+    if (failures.length > 0) setError(`部分删除失败：${failures.join("；")}`);
+  };
+
+  const selectedAssets = assets.filter((a) => selectedIds.includes(a.id));
+  const renameTarget = selectedAssets.length === 1 ? selectedAssets[0] : undefined;
+  const canRename = !!renameTarget && !renameTarget.id.startsWith("upload-") && renameTarget.canManage !== false;
+  const uploadable = leaf !== "refvideo" && leaf !== "audio";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs"
       onClick={() => onRequestChange(null)}
     >
       <div
-        className="flex max-h-[80vh] w-[min(680px,90vw)] flex-col rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)]"
+        className="flex h-[min(700px,88vh)] w-[min(760px,92vw)] flex-col rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
-          <span className="text-xs font-medium tracking-widest text-[var(--gc-text-muted)]">从素材库选择</span>
+          <span className="text-xs font-medium tracking-widest text-[var(--gc-text-muted)]">资产库</span>
           <button
             type="button"
             onClick={() => onRequestChange(null)}
@@ -154,33 +301,163 @@ export function AssetPickerOverlay({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-[var(--gc-border)] px-4 py-2.5">
-          <div className="flex gap-1">
-            {CATEGORY_TABS.map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setCategory(key)}
-                className={`rounded-sm border px-2 py-1 text-label transition-colors ${
-                  category === key
-                    ? "border-gold/60 text-gold"
-                    : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="space-y-2 border-b border-[var(--gc-border)] px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1" role="tablist" aria-label="资产大类">
+              {ASSET_LEVEL1.map((l1) => (
+                <button
+                  key={l1.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={level1 === l1.id}
+                  onClick={() => {
+                    setLevel1(l1.id);
+                    const first = ASSET_LEVEL2[l1.id][0];
+                    // 无子类的一级（历史素材）直接落到同名叶子
+                    setLeaf(first ? first.id : "history");
+                  }}
+                  className={`rounded-sm border px-2 py-1 text-label font-medium transition-colors ${
+                    level1 === l1.id
+                      ? "border-gold/60 text-gold"
+                      : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+                  }`}
+                >
+                  {l1.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setManaging((on) => !on); setSelectedIds([]); }}
+              aria-pressed={managing}
+              title="管理素材：多选、改名、删除、上传"
+              className={`ml-auto rounded-sm border px-2 py-1 text-label transition-colors ${
+                managing
+                  ? "border-gold/60 text-gold"
+                  : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+              }`}
+            >
+              {managing ? "完成" : "管理"}
+            </button>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索素材名称"
+              className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
+            />
           </div>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索素材名称"
-            className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
-          />
+          <div className="flex items-center gap-2">
+            {ASSET_LEVEL2[level1].length > 0 ? (
+              <div className="flex gap-1" role="tablist" aria-label="资产子类">
+                {ASSET_LEVEL2[level1].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={leaf === item.id}
+                    onClick={() => setLeaf(item.id)}
+                    className={`rounded-sm border px-2 py-1 text-label transition-colors ${
+                      leaf === item.id
+                        ? "border-gold/60 text-gold"
+                        : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-label text-[var(--gc-text-muted)]">全部历史上传（新的在前）</span>
+            )}
+            <span className="ml-auto text-label text-[var(--gc-text-muted)]">
+              在「{leaf === "history" ? "历史素材" : (ASSET_LEVEL2[level1].find((item) => item.id === leaf)?.label ?? "")}」中搜索
+            </span>
+          </div>
+          {managing && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--gc-border)] pt-2">
+              {uploadable && leaf !== "history" && (
+                <button
+                  type="button"
+                  onClick={() => { uploadToHistoryRef.current = false; fileInputRef.current?.click(); }}
+                  className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
+                >
+                  新增
+                </button>
+              )}
+              {uploadable && (
+                <button
+                  type="button"
+                  onClick={() => { uploadToHistoryRef.current = true; fileInputRef.current?.click(); }}
+                  className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
+                >
+                  上传
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={startRename}
+                disabled={!canRename}
+                title={leaf === "history" ? "历史素材不支持改名" : selectedIds.length !== 1 ? "选中单个素材后改名" : "修改名称"}
+                className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                修改名称
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteSelected()}
+                disabled={selectedIds.length === 0}
+                title={selectedIds.length === 0 ? "先点选素材" : `删除选中的 ${selectedIds.length} 项`}
+                className="rounded-sm border border-red-900/60 px-2 py-1 text-label text-red-400 hover:border-red-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                删除{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}
+              </button>
+              {renaming && (
+                <span className="flex items-center gap-1">
+                  <input
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void commitRename(); }}
+                    placeholder="新名称"
+                    maxLength={60}
+                    className="w-40 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] focus:border-gold/60 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void commitRename()}
+                    disabled={!renameValue.trim()}
+                    className="rounded-sm border border-gold/60 px-2 py-1 text-label text-gold disabled:opacity-40"
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(false)}
+                    className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+                  >
+                    取消
+                  </button>
+                </span>
+              )}
+              {notice && <span className="text-label text-[var(--gc-text-muted)]">{notice}</span>}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                tabIndex={-1}
+                aria-label="上传本地图片"
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
+                onChange={(e) => {
+                  void handleUploadFiles(e.target.files, uploadToHistoryRef.current);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollerRef} onScroll={maybeLoadMore} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           {error && (
             <div className="py-6 text-center">
               <p className="text-body text-[var(--gc-text-muted)]">素材服务暂不可用（{error}）</p>
@@ -198,40 +475,67 @@ export function AssetPickerOverlay({
           )}
           {!error && !loading && assets.length === 0 && (
             <p className="py-6 text-center text-label text-[var(--gc-text-muted)]">
-              {debouncedSearch ? "没有匹配的素材" : EMPTY_HINT[category]}
+              {debouncedSearch && leaf !== "history" ? "没有匹配的素材" : ASSET_EMPTY_HINT[leaf]}
             </p>
           )}
           {assets.length > 0 && (
-            <div className="grid grid-cols-4 gap-2.5">
-              {assets.map((asset) => (
+            <div className="grid grid-cols-5 gap-2.5">
+              {assets.map((asset) => {
+                const selected = selectedIds.includes(asset.id);
+                const locked = asset.canManage === false;
+                return (
                 <button
                   key={asset.id}
                   type="button"
-                  onClick={() => pick(asset)}
-                  title={asset.name}
-                  className="overflow-hidden rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel-hover)] text-left transition-colors hover:border-gold/60"
+                  onClick={() => (managing ? toggleSelect(asset) : pick(asset))}
+                  title={managing ? (locked ? "无权管理" : asset.name) : asset.name}
+                  aria-pressed={managing ? selected : undefined}
+                  className={`relative overflow-hidden rounded-md border text-left transition-colors ${
+                    selected
+                      ? "border-gold ring-2 ring-gold/70"
+                      : "border-[var(--gc-border)] hover:border-gold/60"
+                  } bg-[var(--gc-panel-hover)]`}
                 >
-                  <img
-                    src={asset.thumbnail ?? thumbnailImageUrl(asset.image)}
-                    alt={asset.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="aspect-square w-full bg-[var(--gc-control)] object-cover"
-                  />
-                  <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">{asset.name}</div>
+                  {selected && (
+                    <>
+                      <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 bg-white/10" />
+                      <span aria-hidden="true" className="absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-meta-en font-bold text-[var(--gc-accent-cta-ink)]">✓</span>
+                    </>
+                  )}
+                  {leaf === "refvideo" ? (
+                    <video
+                      src={asset.image}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="aspect-square w-full bg-[var(--gc-control)] object-cover"
+                    />
+                  ) : leaf === "audio" ? (
+                    <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 bg-[var(--gc-control)] text-[var(--gc-text-muted)]">
+                      <span aria-hidden="true" className="text-xl">♪</span>
+                      <span className="px-1 text-center text-label">语音</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={asset.thumbnail ?? thumbnailImageUrl(asset.image)}
+                      alt={asset.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="aspect-square w-full bg-[var(--gc-control)] object-cover"
+                    />
+                  )}
+                  <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">{
+                    asset.id.startsWith("upload-")
+                      ? `本地上传 ${new Date(asset.createdAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+                      : asset.name
+                  }</div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
-          {hasMore && (
-            <button
-              type="button"
-              onClick={() => void load(assets.length)}
-              disabled={loading}
-              className="mt-2.5 w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-50"
-            >
-              {loading ? "加载中…" : "加载更多素材"}
-            </button>
+          {loading && assets.length > 0 && (
+            <p className="py-3 text-center text-label text-[var(--gc-text-muted)]">加载中…</p>
           )}
         </div>
       </div>

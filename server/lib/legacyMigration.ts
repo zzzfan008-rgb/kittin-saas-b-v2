@@ -62,7 +62,7 @@ export async function migrateLegacyData(): Promise<void> {
         try {
           const raw = JSON.parse(fs.readFileSync(path.join(assets, file), "utf-8")) as Record<string, unknown>;
           if (typeof raw.id !== "string" || typeof raw.name !== "string" ||
-              !["print", "fabric", "reference"].includes(String(raw.category)) ||
+              !["print", "fabric", "garment"].includes(String(raw.category)) ||
               typeof raw.image !== "string" || !isLocalImageReference(raw.image)) continue;
           const note = typeof raw.sourceNote === "string" ? raw.sourceNote : null;
           const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : now;
@@ -111,7 +111,7 @@ export async function migrateLegacyData(): Promise<void> {
         if (!existing) {
           await client.query(`
             INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
-            VALUES ($1, NULL, 'global', $2, 'reference', $3, $4, $5)
+            VALUES ($1, NULL, 'global', $2, 'garment', $3, $4, $5)
           `, [nanoid(10), `历史素材-${path.parse(id).name}`, image, LEGACY_PLACEHOLDER_NOTE, now]);
         }
       }

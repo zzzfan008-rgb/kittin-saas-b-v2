@@ -369,7 +369,7 @@ await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 
   // ② 尺寸档表不再有「自动」项；且画幅联动填充的默认尺寸必须等于尺寸控件的默认档（同一契约来源）。
   for (const ratio of vipRatios) {
     const tiers = imageSizeTierOptions("gpt-image-2.5-flare-vip", ratio);
-    assert.equal(tiers?.length, 3, `${ratio} 必须有快速/标准/高清三档`);
+    assert.equal(tiers?.length, 3, `${ratio} 必须有 1K/2K/4K 三档`);
     assert.ok(!tiers!.some((option) => option.value === "auto"), `${ratio} 不得再有「自动」项`);
     assert.equal(
       imageModelOptionsForAspectRatio("gpt-image-2.5-flare-vip", {}, ratio).size,
@@ -740,7 +740,7 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(shellSource, /workspaceEmpty &&/);
 });
 
-await test("最近生成成功卡显式提供查看、对比、下载与设为输入动作", () => {
+await test("最近生成成功卡只留对比动作，查看走卡片主体、下载与设为输入走查看器", () => {
   const resultsPanelSource = fs.readFileSync(
     new URL("../src/components/panels/ResultsPanel.tsx", import.meta.url),
     "utf8",
@@ -754,10 +754,11 @@ await test("最近生成成功卡显式提供查看、对比、下载与设为�
     new URL("../src/components/ImageViewer.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\}`\}/);
+  assert.match(resultsPanelSource, /aria-label=\{`查看 \$\{r\.nodeLabel\} 详情`\}/);
   assert.match(resultsPanelSource, /aria-label=\{`\$\{compareIds\.includes\(r\.id\) \? "取消" : "加入"\}对比 \$\{r\.nodeLabel\}`\}/);
-  assert.match(resultsPanelSource, /href=\{r\.image\}[\s\S]*download/);
-  assert.match(resultsPanelSource, /aria-label=\{`将 \$\{r\.nodeLabel\} 设为输入，继续处理`\}/);
+  assert.doesNotMatch(resultsPanelSource, /title="查看详情"/);
+  assert.doesNotMatch(resultsPanelSource, /title="设为输入"/);
+  assert.doesNotMatch(resultsPanelSource, /title="下载"/);
   // 「设为输入」的写回与落点引导在共享模块里，卡片只负责触发。
   assert.match(resultActionsSource, /state\.addAssetNode\(\s*\{ name: result\.nodeLabel, image: result\.image \}/);
   assert.match(resultActionsSource, /requestCanvasLanding\(\{ tabId: tab\.id, nodeId, fitView: false \}\)/);

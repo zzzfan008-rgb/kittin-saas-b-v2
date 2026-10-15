@@ -35,9 +35,9 @@ assert.match(panelSource, /videoModelOptionsWarnings\(/);
 assert.match(panelSource, /aria-label="模型参数"/);
 // §5.2 1a：text-label → text-[11px]（twMerge 挤掉 text-foreground 元凶处置）。
 assert.match(panelSource, /text-\[11px\]/);
-// 字段口径：批次（替换数量）。
-assert.match(panelSource, /label="批次"/);
-assert.doesNotMatch(panelSource, /label="数量"/);
+// 字段口径：数量（批次改名，选项 1–9）。
+assert.match(panelSource, /label="数量"/);
+assert.doesNotMatch(panelSource, /label="批次"/);
 
 // -- 工具条：无 function-picker，有 preset-picker --
 assert.doesNotMatch(toolbarSource, /function-picker/);

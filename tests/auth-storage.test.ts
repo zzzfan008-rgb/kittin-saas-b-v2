@@ -512,7 +512,7 @@ await test("删除账号时全部业务数据进入 15 天回收期并在到期�
   `, [userId, createdAt]);
   await query(`
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
-    VALUES ('retention-asset', $1, 'private', '待删除素材', 'reference', '/api/files/retention.png', $2)
+    VALUES ('retention-asset', $1, 'private', '待删除素材', 'garment', '/api/files/retention.png', $2)
   `, [userId, createdAt]);
   await query(`
     INSERT INTO generation_runs (
@@ -613,7 +613,7 @@ await test("到期清理保留仍被其他项目引用的素材文件", async ()
     INSERT INTO assets (
       id, owner_id, scope, name, category, image, created_at, deleted_at, purge_after
     ) VALUES (
-      'referenced-retention-asset', 'retention-user', 'shared', '仍被引用', 'reference',
+      'referenced-retention-asset', 'retention-user', 'shared', '仍被引用', 'garment',
       '/api/files/referenced-retention.png', $1, $1, $2
     )
   `, [createdAt, expired]);
@@ -641,7 +641,7 @@ await test("删除管理员后仍保留有效通用素材及其底层文件", as
   `, [fileId, ownerId, createdAt]);
   await query(`
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
-    VALUES ('global-retention-asset', NULL, 'global', '有效通用素材', 'reference', $1, $2)
+    VALUES ('global-retention-asset', NULL, 'global', '有效通用素材', 'garment', $1, $2)
   `, [`/api/files/${fileId}`, createdAt]);
   const uploads = path.join(temp, "uploads");
   fs.mkdirSync(uploads, { recursive: true });

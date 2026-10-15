@@ -200,13 +200,15 @@ test("VIS-06: minimap / ordinal badge / scrollbar colors trace to tokens (3 them
     // 截图：画布（徽章 + 小地图同框）
     await page.screenshot({ path: resolve(SHOT_DIR, `${theme}-canvas.png`) });
 
-    // ---------- 滚动条：模型下拉列表（压低视口保证列表溢出滚动） ----------
-    // v9 Phase 2：原「功能」行已整体删除，改用同样长列表的「模型」下拉承载滚动条断言
-    //（8 个可选模型 + 契约变体，在 500px 视口下必然溢出，与原断言意图一致）。
+    // ---------- 滚动条：参数弹窗长列表（压低视口保证溢出滚动） ----------
+    // 参数行改版：模型下拉已退役为行内选项按钮，改用同样长内容的参数弹窗承载滚动条断言
+    //（模型 8 选 + 各参数行，在 500px 视口下必然溢出，与原断言意图一致）。
     await page.setViewportSize({ width: 1280, height: 500 });
     const generatorNode = page.getByTestId(`rf__node-${GENERATOR_NODE_ID}`);
-    await generatorNode.getByRole("combobox", { name: "模型" }).click();
-    const listbox = page.locator('[role="listbox"]').last();
+    await generatorNode.getByRole("button", { name: "模型参数设置" }).click();
+    const settingsDialog = page.getByRole("dialog", { name: "模型参数设置" });
+    await expect(settingsDialog).toBeVisible();
+    const listbox = settingsDialog;
     await expect(listbox).toBeVisible();
     await page.waitForTimeout(150);
 

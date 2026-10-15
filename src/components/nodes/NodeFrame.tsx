@@ -123,7 +123,11 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
     return idx >= 0 ? idx + 1 : null;
   });
   const badgePrefix = nodeKind === "image" ? "图" : nodeKind === "video" ? "视" : nodeKind === "text" ? "文" : null;
-  const badgeText = badgeLabel ?? (frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title);
+  // 未改名显示自动编号（图1/图2），双击改名后显示用户名称（与种类默认名不同即视为已改名）。
+  const userRenamed = nodeKind != null && title !== nodeTitleForKind(nodeKind);
+  const badgeText = badgeLabel ?? (userRenamed
+    ? title
+    : (frameless && badgePrefix && kindOrdinal != null ? `${badgePrefix}${kindOrdinal}` : title));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const cancelledRef = useRef(false);

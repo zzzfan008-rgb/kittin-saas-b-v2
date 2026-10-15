@@ -90,7 +90,7 @@ export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 export const MAX_PROMPT_INPUTS = 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
-export const BATCH_SIZES = [1, 2, 4, 8] as const;
+export const BATCH_SIZES = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
 // ---------- 参考图可追溯输入 ----------
@@ -175,7 +175,7 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
-  batchSize: BatchSize; // 1 | 2 | 4 | 8
+  batchSize: BatchSize; // 1–9
   /**
    * 工作流族标识（模板实例化时落标，如 "model-tryon"）。
    * 用途：运行时提示词改写白名单门控（见 2026-10-12-prompt-rewrite/plan.md §2.3）。
@@ -365,11 +365,18 @@ export interface Asset {
   canManage?: boolean;
   name: string;
   /**
-   * 素材类型：print=印花 / fabric=面料 / reference=参考图 / model=数字模特。
+   * 素材类型（资产库二级分类；一级见 `src/lib/assetTaxonomy.ts`）：
+   * 服装设计 print=印花 / fabric=面料 / colorcard=色卡 / sketch=线稿；
+   * 模特换装 model=数字模特 / garment=服装 / accessory=配饰 / pose=动作 / background=背景；
+   * 视频生成 refvideo=参考视频 / audio=语音。
+   * 旧参考类已并入 garment（migration 26）。
    * 服务端镜像清单见 `server/routes/assets.ts` 的 `CATEGORIES` 与
    * `server/lib/database.ts` 的 CHECK 约束（R-86）。
    */
-  category: "print" | "fabric" | "reference" | "model";
+  category:
+    | "print" | "fabric" | "colorcard" | "sketch"
+    | "model" | "garment" | "accessory" | "pose" | "background"
+    | "refvideo" | "audio";
   /** 图片 URL（/api/files/xxx） */
   image: string;
   /** 列表/画布预览使用的轻量缩略图；执行节点时仍使用 image 原图。 */

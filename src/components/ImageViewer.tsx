@@ -124,7 +124,7 @@ export function ImageViewer() {
     try {
       await saveImageAsAsset({
         name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
-        category: saveToModelLibrary ? "model" : "reference",
+        category: saveToModelLibrary ? "model" : "garment",
         image: viewer.url,
         sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
       });

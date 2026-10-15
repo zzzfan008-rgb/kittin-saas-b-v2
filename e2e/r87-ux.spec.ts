@@ -9,7 +9,7 @@ import { expect, test } from "./fixtures";
  *  - ③ 图片缩放（§B/§D）：滚轮缩放改变 scale（HUD 百分比）→ 双击在「适合画布 ↔ 100%」往返 →
  *    ± 按钮步进 → 范围 clamp 在 25%–400%（`src/components/ImageViewer.tsx` MIN_SCALE/MAX_SCALE）
  *    → HUD 可点击重置为适合画布 → Esc 关闭。
- *  - ⑤ 两页合并（§E）：点结果卡「查看详情」**直接打开 ImageViewer**（不再出现「结果详情」dialog），
+ *  - ⑤ 两页合并（§E）：点结果卡主体**直接打开 ImageViewer**（不再出现「结果详情」dialog），
  *    且查看器侧边栏包含从 ResultRecordDetail 迁来的字段（节点类型 / 上游实际尺寸，以及既有模型/时间）。
  *  - ⑥ 按钮区：`mask-redraw-save` 已删除、副标题「每次提交自动保存蒙版」可见。
  *  - ⑦ 模式按钮选中态（aria-pressed + 计算样式区分）与四个工具按钮文字化。
@@ -115,10 +115,9 @@ async function openResults(page: Page): Promise<Locator> {
   return card;
 }
 
-/** 从结果卡「查看详情」进入 ImageViewer，返回 HUD 定位器。 */
+/** 从结果卡主体进入 ImageViewer，返回 HUD 定位器。 */
 async function openViewerFromCard(page: Page, card: Locator): Promise<Locator> {
-  await card.hover();
-  await card.locator('button[title="查看详情"]').click();
+  await card.getByRole("button", { name: /查看/ }).click();
   const hud = page.locator(".zoom-hud");
   await expect(hud).toBeVisible();
   return hud;
@@ -366,7 +365,7 @@ test("result card opens the viewer directly and the sidebar carries the merged r
   // ---------- ⑤ 两页合并：不再出现「结果详情」弹窗 ----------
   await expect(
     page.getByRole("dialog", { name: "结果详情" }),
-    "点「查看详情」后不得再出现旧的「结果详情」弹窗（R-87 §E 已删除 ResultDetailDialog）",
+    "点卡片主体后不得再出现旧的「结果详情」弹窗（R-87 §E 已删除 ResultDetailDialog）",
   ).toHaveCount(0);
 
   // ---------- ⑤ 侧边栏迁移字段：节点类型 / 上游实际尺寸（新增）+ 模型 / 开始时间（既有） ----------
