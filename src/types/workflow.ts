@@ -132,6 +132,16 @@ export interface TextNodeData extends BaseNodeData {
   /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。
    *  用户手写内容的所有权字段：任何运行路径都不写本字段。 */
   text: string;
+  /** 六要素结构化选择（可选）：面板写入，拼装结果落 text；下游 dag/改写/快照只读 text。
+   *  形态见 src/lib/promptElements.ts PromptElements；此处宽松类型避免循环 import。 */
+  promptElements?: {
+    subject: string;
+    environment?: unknown;
+    lighting?: unknown;
+    lens?: unknown;
+    tone?: unknown;
+    composition?: unknown;
+  };
 }
 
 export interface ImageNodeData extends BaseNodeData {
