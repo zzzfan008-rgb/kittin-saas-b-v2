@@ -139,6 +139,8 @@ const TEST_FILES = [
   "tests/provider-error-i18n.test.ts",
   "tests/recent-results.test.ts",
   "tests/reference-inputs.test.ts",
+  // P0：模特试穿参考图顺序（徽标=唯一证据，纯函数不碰库）。
+  "tests/tryon-reference-order.test.ts",
   // 本地图片引用的收集/剥除（级联删除 + 启动自愈的纯函数核心，不碰库）。
   "tests/local-image-refs.test.ts",
   "tests/video-provider.test.ts",
