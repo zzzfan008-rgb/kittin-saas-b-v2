@@ -34,6 +34,13 @@ import {
   COLOR_TOKEN_RE,
 } from "@/lib/color/colorToken";
 import { getTextPresetTemplate, listTextPresetTemplates } from "@/lib/promptPresets";
+import { REWRITE_SUPPLEMENT_ANCHOR } from "@/lib/rewriteEligibility";
+import {
+  assembleElements,
+  type ElementValue,
+  type PromptElements,
+} from "@/lib/promptElements";
+import { ElementsPanel } from "./ElementsPanel";
 
 /** 正文高度上限：超过后 textarea 内部滚动（文本随内容自然变高，与图片固定比例不同）。 */
 const TEXTAREA_MAX_HEIGHT = 320;
@@ -62,6 +69,33 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const presetOptions = useMemo(() =>
     listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
   []);
+
+  /** 协议模板判定：正文含补充位锚点即协议模板（协议区只读 + 六要素面板）。 */
+  const anchorIndex = (data.text ?? "").indexOf(REWRITE_SUPPLEMENT_ANCHOR);
+  const isProtocolTemplate = anchorIndex !== -1;
+  const protocolText = isProtocolTemplate ? (data.text ?? "").slice(0, anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+  const supplementText = isProtocolTemplate ? (data.text ?? "").slice(anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+
+  /** 六要素结构化选择（面板写入 data.promptElements；拼装结果落补充位）。 */
+  const elements: PromptElements = useMemo(() => {
+    const raw = data.promptElements as PromptElements | undefined;
+    return {
+      subject: typeof raw?.subject === "string" ? raw.subject : "",
+      environment: raw?.environment as ElementValue,
+      lighting: raw?.lighting as ElementValue,
+      lens: raw?.lens as ElementValue,
+      tone: raw?.tone as ElementValue,
+      composition: raw?.composition as ElementValue,
+    };
+  }, [data.promptElements]);
+
+  /** 写补充位：协议前缀原样保留 + 新补充（可 undo，与预设写入同款模式）。 */
+  const writeSupplement = (next: string) => {
+    if (readOnly) return;
+    const full = isProtocolTemplate ? protocolText + next : next;
+    textEdit.updateValue(full);
+    textEdit.flush();
+  };
 
   /** 从正文解析所有颜色 chip。 */
   const chips = useMemo(() => parseColorChips(data.text ?? ""), [data.text]);
@@ -347,6 +381,19 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             </span>
           ) : null}
         </div>
+        {isProtocolTemplate && (
+          <ElementsPanel
+            elements={elements}
+            readOnly={readOnly}
+            supplementText={supplementText}
+            onChange={(next) => {
+              if (readOnly) return;
+              useFlowStore.getState().updateNodeData(id, { promptElements: next });
+            }}
+            onFill={(assembled) => writeSupplement(assembled)}
+            onCleanRisks={(cleaned) => writeSupplement(cleaned)}
+          />
+        )}
         {colorToolOpen && (
           <ColorToolPanel
             onConfirm={insertColor}
