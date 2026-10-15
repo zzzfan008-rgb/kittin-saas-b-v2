@@ -22,6 +22,7 @@ import { createTextRewriteRouter } from "./routes/textRewrite";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
 import { migrateLegacyData } from "./lib/legacyMigration";
+import { repairDanglingImageReferences } from "./lib/danglingImageRefs";
 import { asyncHandler } from "./lib/asyncHandler";
 import { mountProductionFrontend } from "./lib/staticFrontend";
 import type { ErrorRequestHandler } from "express";
@@ -137,6 +138,12 @@ async function start(): Promise<void> {
   await initializeDatabase();
   await pruneExpiredSessions();
   await migrateLegacyData();
+  const repaired = await repairDanglingImageReferences();
+  if (repaired.refs > 0) {
+    console.warn(
+      `[garment-canvas] 已清理 ${repaired.refs} 处悬空图片引用（涉及 ${repaired.projects} 个项目）`,
+    );
+  }
   await reconcileOpenAiMaskTestAccountMutations();
   const initialReadiness = await readiness();
   if (!initialReadiness.ok) throw new Error(`Server is not ready: ${JSON.stringify(initialReadiness.checks)}`);
