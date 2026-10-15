@@ -28,9 +28,9 @@ assert.match(selectSource, /data-selected:text-accent-foreground/);
 //    —— 滚动职责交给 SelectList 的 overflow-y-auto。
 assert.match(selectSource, /min-w-\[max\(8rem,var\(--anchor-width\)\)\]/);
 assert.doesNotMatch(selectSource, /overflow-hidden/);
-// 5) OptionSelect 空 label 防御：回显与选项行都回退到 value，绝不渲染空白。
-// 65b 变量名变更：option → opt / o（参数全下拉后语义更精确）
-assert.match(panelSource, /opt\?\.label \|\| opt\?\.value/);
+// 5) ParamRow 空 label 防御：选项行回退到 value，绝不渲染空白；选中项 aria-pressed 标记。
 assert.match(panelSource, /o\.label \|\| o\.value \|\| "—"/);
+assert.match(panelSource, /aria-pressed=\{active\}/);
+assert.match(panelSource, /function ParamRow/);
 
 console.log("Select 可见性硬化契约测试通过");

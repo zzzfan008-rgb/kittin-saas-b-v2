@@ -449,23 +449,31 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
 
   const generator = page.getByTestId("rf__node-tryon-gen");
   await expect(generator).toBeVisible();
-  // 内联参数面板字段顺序：操作 → 模型 → 画幅 + 批次 → 模型参数（plan.md §3.3 / 面板头注释）。
+  // A 案（参数摘要行 + 弹窗）：节点内只留一行摘要，明细下拉进「模型参数设置」弹窗。
   // v9 模板 tryon-gen 显式带 operationMode=edit（templates.ts:152），面板回显「编辑」。
   await expect(generator.getByRole("combobox", { name: "功能" })).toHaveCount(0);
   // 65b: 操作由接线自动推断，无 combobox；改用语境文本展示推断结果。
   await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
   await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
-  // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
-  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
+  // 摘要行回显模型 + 参数速览（Flare VIP ｜ 3:4 · ×1）。
+  const settingsButton = generator.getByRole("button", { name: "模型参数设置" });
+  await expect(settingsButton).toContainText("GPT Image 2.5 Flare VIP");
+  await settingsButton.click();
+  const settingsDialog = page.getByRole("dialog", { name: "模型参数设置" });
+  await expect(settingsDialog).toBeVisible();
+  // 每参数独占一行、选项直接点选：断言各行选中态（aria-pressed）。
+  const pressedOption = (group: string, option: string) =>
+    settingsDialog.getByRole("group", { name: group }).getByRole("button", { name: option });
+  await expect(pressedOption("模型", "GPT Image 2.5 Flare VIP")).toHaveAttribute("aria-pressed", "true");
   // R-100 本批：model-tryon 模板画幅改为 3:4 —— server/routes/templates.ts:163
   // imageGeneratorNode("tryon-gen", …, { familyId: "model-tryon", aspectRatio: "3:4" })；
-  // 同文件 :96 的通用默认仍是 "1:1"（该模板不用它）。实测 combobox 收到 "3:4"。
-  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
-  // v9 面板把 v8 的「数量」改名为「批次」。
-  await expect(generator.getByRole("combobox", { name: "批次" })).toContainText("1");
-  const params = generator.getByRole("region", { name: "模型参数" });
+  // 同文件 :96 的通用默认仍是 "1:1"（该模板不用它）。
+  await expect(pressedOption("画幅", "3:4")).toHaveAttribute("aria-pressed", "true");
+  // 数量默认 1。
+  await expect(pressedOption("数量", "1")).toHaveAttribute("aria-pressed", "true");
+  const params = settingsDialog.getByRole("region", { name: "模型参数" });
   await expect(params).toBeVisible();
-  await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
+  await expect(pressedOption("画质", "high")).toHaveAttribute("aria-pressed", "true");
   // 65b: 参数全下拉，"添加参数" 自由输入入口已退役。
   await expect(params.getByRole("button", { name: "+ 添加参数" })).toHaveCount(0);
 
@@ -491,11 +499,11 @@ test("select value echo stays legible against its trigger surface at every deskt
   const generator = page.getByTestId("rf__node-tryon-gen");
   await expect(generator).toBeVisible();
 
-  /** 读取触发器内回显 span 的计算颜色，并对第一个不透明祖先底色算 WCAG 对比度。 */
+  /** 读取元素自身文字色，并对第一个不透明祖先底色算 WCAG 对比度。 */
   const echoLegibility = (trigger: Locator) =>
     trigger.evaluate((element) => {
-      const value = element.querySelector('[data-slot="select-value"]');
-      if (!value) return { ok: false as const, reason: "触发器内没有 select-value 回显" };
+      const value = element.querySelector('[data-slot="select-value"]') ?? element;
+      if (!value) return { ok: false as const, reason: "触发器内没有回显" };
       const parse = (color: string) => {
         const match = color.match(/rgba?\(([^)]+)\)/);
         if (!match) return null;
@@ -534,45 +542,36 @@ test("select value echo stays legible against its trigger surface at every deskt
   await expect(operationHint).toBeVisible();
   expect(((await operationHint.textContent()) ?? "").trim().length, "操作推断回显不得为空白").toBeGreaterThan(0);
 
-  // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
-  const params = generator.getByRole("region", { name: "模型参数" });
-  const qualitySelect = params.getByRole("combobox", { name: "画质" });
-  await expect(qualitySelect).toBeVisible();
-  const qualityEcho = await echoLegibility(qualitySelect);
+  // 2) 参数行选中项（aria-pressed）同样必须可读：行内选项按钮直接点选。
+  // 参数行收进「模型参数设置」弹窗，先打开再断言。
+  await generator.getByRole("button", { name: "模型参数设置" }).click();
+  const settingsDialog = page.getByRole("dialog", { name: "模型参数设置" });
+  await expect(settingsDialog).toBeVisible();
+  const params = settingsDialog.getByRole("region", { name: "模型参数" });
+  const qualityPressed = params.getByRole("group", { name: "画质" })
+    .getByRole("button", { name: "high" });
+  await expect(qualityPressed).toHaveAttribute("aria-pressed", "true");
+  const qualityEcho = await echoLegibility(qualityPressed);
   expect(qualityEcho.ok, JSON.stringify(qualityEcho)).toBe(true);
   if (qualityEcho.ok) {
-    expect(qualityEcho.ratio, `画质回显对比度 ${qualityEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+    expect(qualityEcho.ratio, `画质选中项对比度 ${qualityEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
   }
 
-  // 3) 交互路径：非门控的「批次」下拉改选后，新回显仍必须可读；同时锁弹层宽度兜底
-  //    （min-w-[max(8rem,var(--anchor-width))]：窄触发器下弹层不得塌缩到 8rem 以下）。
-  //    v9 面板把 v8 的「数量」改名为「批次」（可选项同为 1..8）。
-  //    两处必须按「打开态弹层」收敛，否则会读到假值：
-  //    a) 关掉的弹层不卸载，残留为 0×0 + data-closed（本文件既有的 1024 实测行为），
-  //       故用 [data-open] 严格选中当前打开的那个；
-  //    b) 模板落地后那次画布重渲染会收起刚打开的下拉（同上方「必要时重开下拉」的既有处理）。
-  const batchSelect = generator.getByRole("combobox", { name: "批次" });
-  const openPopup = page.locator('[data-slot="select-popup"][data-open]');
-  await expect(async () => {
-    if (await openPopup.count() === 0) {
-      await batchSelect.click();
-    }
-    await expect(openPopup).toBeVisible();
-    // 计算样式断言：min-width 兜底 = max(8rem, anchor)，不受入场缩放动画影响。
-    const popupMinWidth = await openPopup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
-    expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
-    // 渲染几何：入场动画 zoom-in-95（150ms）会把包围盒临时缩到 95%（128×0.95=121.6），
-    // 因此轮询到动画结束后的实际宽度，而不是在动画中途读一次。
-    const popupWidth = (await openPopup.boundingBox())?.width ?? 0;
-    expect(popupWidth, "弹层渲染宽度不得低于 8rem 兜底").toBeGreaterThanOrEqual(128);
-  }).toPass({ timeout: 20_000 });
-  await openPopup.getByRole("option", { name: "2", exact: true }).click();
-  await expect(batchSelect).toContainText("2");
-  const batchEcho = await echoLegibility(batchSelect);
+  // 3) 交互路径：点选「数量」行内选项后，选中态迁移且摘要行同步；选中项仍必须可读。
+  //    数量可选项为 1–9。
+  const batchGroup = settingsDialog.getByRole("group", { name: "数量" });
+  await batchGroup.getByRole("button", { name: "4", exact: true }).click();
+  const batchPressed = batchGroup.getByRole("button", { name: "4", exact: true });
+  await expect(batchPressed).toHaveAttribute("aria-pressed", "true");
+  await expect(settingsDialog.getByRole("button", { name: "1", exact: true }))
+    .toHaveAttribute("aria-pressed", "false");
+  // 摘要行同步新数量。
+  await expect(generator.getByRole("button", { name: "模型参数设置" })).toContainText("×4");
+  const batchEcho = await echoLegibility(batchPressed);
   expect(batchEcho.ok, JSON.stringify(batchEcho)).toBe(true);
   if (batchEcho.ok) {
-    expect(batchEcho.text, "改选后的回显不得为空白").toBe("2");
-    expect(batchEcho.ratio, `批次回显对比度 ${batchEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
+    expect(batchEcho.text, "改选后的选项文案不得为空白").toBe("4");
+    expect(batchEcho.ratio, `数量选中项对比度 ${batchEcho.ratio}`).toBeGreaterThanOrEqual(4.5);
   }
 });
 
@@ -791,7 +790,7 @@ test("results and project center follow desktop density for cards", async ({ pag
 
   // 断言渲染出来的栅格列数，而不是 class 名（AGENTS.md §6）。
   const resultsGrid = resultsRegion.locator("article").first().locator("xpath=..");
-  await expectGridColumns(resultsGrid, 4);
+  await expectGridColumns(resultsGrid, 5);
 
   const resultsScroller = resultsRegion.locator(".overflow-y-auto");
   const resultCards = resultsGrid.locator(":scope > *");
@@ -804,20 +803,15 @@ test("results and project center follow desktop density for cards", async ({ pag
   await expect(firstSuccessCard).toBeVisible();
   await firstSuccessCard.hover();
   const compareButton = firstSuccessCard.locator('button[title="加入对比"]');
-  // 2026-09-25 第 5 批（ab68c16）：「查看」改为「查看详情」→ 打开「结果详情」弹窗（图片查看器在弹窗里）。
-  const viewButton = firstSuccessCard.locator('button[title="查看详情"]');
-  const downloadButton = firstSuccessCard.locator('a[title="下载"]');
-  const applyButton = firstSuccessCard.locator('button[title="设为输入"]');
+  // 卡片悬浮条只剩「加入对比」：查看走卡片主体点击，下载/设为输入走 ImageViewer。
   await expect(compareButton).toBeVisible();
-  await expect(viewButton).toBeVisible();
-  await expect(downloadButton).toBeVisible();
-  await expect(applyButton).toBeVisible();
+  await expect(firstSuccessCard.locator("div.absolute.inset-x-0.bottom-0").getByRole("button")).toHaveCount(1);
 
   const resultsRect = await rect(resultsScroller);
   await expectInside(await rect(firstSuccessCard), resultsRect);
 
-  // 65d R-87 §3 Review Gap 3：点「查看详情」改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
-  await viewButton.click();
+  // 点卡片主体改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
+  await firstSuccessCard.getByRole("button", { name: /查看/ }).click();
   // ImageViewer 初始 fit 模式，HUD 按钮文字为「适合画布」或「X%」。
   const viewerHint = page.getByRole("button", { name: /适合画布|\d+%/ });
   await expect(viewerHint).toBeVisible({ timeout: 10000 });
@@ -833,12 +827,14 @@ test("results and project center follow desktop density for cards", async ({ pag
   await compareButton.click();
   await expect(firstSuccessCard.locator('button[title="取消对比"]')).toBeVisible();
 
+  // 下载与设为输入走 ImageViewer（卡片悬浮条只剩对比）：点卡片主体进查看器。
+  await firstSuccessCard.getByRole("button", { name: /查看/ }).click();
   const download = page.waitForEvent("download");
-  await downloadButton.click();
+  await page.getByRole("link", { name: "下载图片" }).click();
   await download;
 
   const nodeCountBeforeApply = await page.locator(".react-flow__node").count();
-  await applyButton.click();
+  await page.getByRole("button", { name: "设为输入" }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountBeforeApply + 1);
   await openResults();
   await expect(resultsRegion).toBeVisible();
@@ -864,7 +860,7 @@ test("results and project center follow desktop density for cards", async ({ pag
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
     }).toPass({ timeout: 20_000 });
     await openResults();
-    await expectGridColumns(resultsGrid, 4);
+    await expectGridColumns(resultsGrid, 5);
 
     await page.getByRole("button", { name: "打开项目中心" }).click();
     const center = page.getByRole("dialog", { name: "项目中心" });

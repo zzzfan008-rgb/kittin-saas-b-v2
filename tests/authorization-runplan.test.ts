@@ -275,9 +275,9 @@ for (const id of ["shared.png", "private.png", "own-private.png"]) writeTestPng(
 await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
   VALUES
-    ('shared-asset', $1, 'shared', '共享素材', 'reference', '/api/files/shared.png', $3),
-    ('other-private', $2, 'private', '他人私有素材', 'reference', '/api/files/private.png', $3),
-    ('own-private', $1, 'private', '本人私有素材', 'reference', '/api/files/own-private.png', $3)
+    ('shared-asset', $1, 'shared', '共享素材', 'garment', '/api/files/shared.png', $3),
+    ('other-private', $2, 'private', '他人私有素材', 'garment', '/api/files/private.png', $3),
+    ('own-private', $1, 'private', '本人私有素材', 'garment', '/api/files/own-private.png', $3)
 `, [users.owner.id, users.other.id, now]);
 await query(`
   INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)

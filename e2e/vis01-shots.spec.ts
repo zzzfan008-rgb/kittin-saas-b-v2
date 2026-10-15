@@ -217,9 +217,9 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
       await openResults();
       await shot(`${tag}-2-results`);
 
-      // 65d R-87 §3：结果详情弹窗已删除，点「查看详情」直接打开 ImageViewer（大图区并入查看器）。
+      // 结果详情弹窗已删除，点卡片主体直接打开 ImageViewer（大图区并入查看器）。
       const region = resultsDialog.getByRole("region", { name: "最近生成" });
-      await region.locator('button[title="查看详情"]').first().click();
+      await region.locator("article").first().getByRole("button", { name: /查看/ }).click();
       const zoomHud = page.locator(".zoom-hud");
       await expect(zoomHud).toBeVisible();
       await shot(`${tag}-3-viewer`);
@@ -249,7 +249,7 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
           detail: { target: "upload", nodeId: "n1", initialCategory: "all" },
         }));
       });
-      const picker = page.locator(".fixed.inset-0.z-50").filter({ hasText: "从素材库选择" });
+      const picker = page.locator(".fixed.inset-0.z-50").filter({ hasText: "资产库" });
       await expect(picker).toBeVisible();
       await settle(picker);
       await shot(`${tag}-6-picker`);

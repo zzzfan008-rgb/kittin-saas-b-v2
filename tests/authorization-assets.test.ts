@@ -413,7 +413,7 @@ await test("所有鉴权图片禁止缓存，撤回共享后立即恢复访问�
 
   await query(`
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
-    VALUES ('uploaded-shared-asset', $1, 'shared', '可共享图片', 'reference', $2, $3)
+    VALUES ('uploaded-shared-asset', $1, 'shared', '可共享图片', 'garment', $2, $3)
   `, [users.owner.id, uploaded.url, now]);
 
   for (const pathname of [`/files/${uploaded.id}`, `/files/${uploaded.id}/thumbnail`]) {
@@ -610,9 +610,9 @@ for (const id of ["shared.png", "private.png", "own-private.png"]) writeTestPng(
 await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
   VALUES
-    ('shared-asset', $1, 'shared', '共享素材', 'reference', '/api/files/shared.png', $3),
-    ('other-private', $2, 'private', '他人私有素材', 'reference', '/api/files/private.png', $3),
-    ('own-private', $1, 'private', '本人私有素材', 'reference', '/api/files/own-private.png', $3)
+    ('shared-asset', $1, 'shared', '共享素材', 'garment', '/api/files/shared.png', $3),
+    ('other-private', $2, 'private', '他人私有素材', 'garment', '/api/files/private.png', $3),
+    ('own-private', $1, 'private', '本人私有素材', 'garment', '/api/files/own-private.png', $3)
 `, [users.owner.id, users.other.id, now]);
 await query(`
   INSERT INTO projects (id, owner_id, name, flow_json, updated_at, created_at)
@@ -641,7 +641,7 @@ await test("素材引用接口拒绝跨用户与管理员写入他人项目", as
 await test("普通用户的回收站只显示自己删除的素材", async () => {
   await query(`
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at, deleted_at, purge_after)
-    VALUES ('other-deleted-shared', $1, 'shared', '他人已删共享素材', 'reference',
+    VALUES ('other-deleted-shared', $1, 'shared', '他人已删共享素材', 'garment',
       '/api/files/deleted-shared.png', $2, $2, $3)
   `, [users.other.id, now, new Date(Date.now() + 86_400_000).toISOString()]);
   const response = await request("/assets?deleted=true", "owner");
@@ -668,7 +668,7 @@ await test("素材名称搜索把 % 和 _ 当字面字符而非 LIKE 通配符",
   await query(`
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
     VALUES
-      ('search-percent', $1, 'private', 'A%B', 'reference', '/api/files/search-p.png', $2),
+      ('search-percent', $1, 'private', 'A%B', 'garment', '/api/files/search-p.png', $2),
       ('search-plain', $1, 'private', 'AB', 'reference', '/api/files/search-q.png', $2),
       ('search-underscore', $1, 'private', 'A_C', 'reference', '/api/files/search-u.png', $2),
       ('search-anychar', $1, 'private', 'AXC', 'reference', '/api/files/search-x.png', $2)

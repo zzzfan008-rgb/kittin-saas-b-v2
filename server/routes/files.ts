@@ -451,6 +451,50 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
   }
 }));
 
+/**
+ * 历史素材删除：仅本人上传（source_type='upload'）可删；软删（deleted_at + 15 天 purge）。
+ * 画布节点或资产仍在引用该文件时拒绝（409），避免删后图片变坏。
+ */
+filesRouter.delete("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const id = path.basename(req.params.id);
+  if (id !== req.params.id) {
+    res.status(400).json({ error: "invalid file id" });
+    return;
+  }
+  const url = `/api/files/${id}`;
+  const row = await queryOne<{ owner_id: string | null; source_type: string }>(
+    "SELECT owner_id, source_type FROM files WHERE id = $1 AND deleted_at IS NULL",
+    [id],
+  );
+  if (!row) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  if (row.owner_id !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "无权删除此文件" });
+    return;
+  }
+  if (row.source_type !== "upload") {
+    res.status(409).json({ error: "仅本地上传可在历史素材中删除" });
+    return;
+  }
+  const used = await queryOne<{ n: number }>(`
+    SELECT (
+      (SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND deleted_at IS NULL AND flow_json LIKE '%' || $2 || '%')
+      + (SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND image = $2)
+    )::int AS n
+  `, [row.owner_id, url]);
+  if (used && used.n > 0) {
+    res.status(409).json({ error: "画布或资产仍在使用该图片，不能删除" });
+    return;
+  }
+  const purgeAfter = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+  await query("UPDATE files SET deleted_at = $1, purge_after = $2 WHERE id = $3",
+    [new Date().toISOString(), purgeAfter, id]);
+  res.json({ ok: true });
+}));
+
 filesRouter.get("/:id/thumbnail", asyncHandler(async (req, res) => {
   const id = path.basename(req.params.id);
   if (id !== req.params.id || !isSupportedImageFile(id)) {
