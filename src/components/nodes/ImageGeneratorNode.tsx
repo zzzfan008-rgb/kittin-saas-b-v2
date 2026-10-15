@@ -2,7 +2,6 @@ import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
 import { isNodeRunActive, type ImageGeneratorNodeData } from "@/types/workflow";
 import { Developing, NodeFrame, STATUS_TEXT } from "./NodeFrame";
-import { NodeToolbar } from "./NodeToolbar";
 import { GeneratorParamsPanel } from "./GeneratorParamsPanel";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
 
@@ -26,24 +25,6 @@ export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageG
         status={data.status}
         error={data.error}
         selected={selected}
-        toolbar={
-          <NodeToolbar
-            kind="image-generator"
-            selected={selected}
-            actions={{
-              run: {
-                onSelect: () => void runNode(id),
-                disabled,
-                disabledReason: readOnly ? "只读项目不能运行" : undefined,
-                label: running ? STATUS_TEXT[data.status] : data.status === "success" ? "重新运行" : "运行",
-              },
-              copy: {
-                disabled: true,
-                disabledReason: DUPLICATE_UNAVAILABLE_REASON,
-              },
-            }}
-          />
-        }
       >
         <GeneratorParamsPanel nodeId={id} data={data} />
         {running && <Developing />}

@@ -75,7 +75,7 @@ export function ResultVideoNode({ id, data, selected }: NodeProps<Node<ResultVid
         }
       >
         {hasProduct ? (
-          <div className="nodrag relative overflow-hidden rounded-[10px] border border-[var(--gc-node-border)] bg-black">
+          <div className="nodrag relative overflow-hidden rounded-xl border border-[var(--gc-node-border)] bg-black">
             <video
               ref={videoRef}
               src={videos[0]}

@@ -236,7 +236,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
         {/* 槽位框（两态同一元素）：空态虚线 / 有内容态实线，均 2px accent、圆角 4px（同图片节点）。
             输入激活时加焦点光环（不改动框体本身）。 */}
         <div
-          className={`nopan relative rounded-[4px] border-2 bg-[var(--gc-node-inner)] transition-shadow ${
+          className={`nopan relative rounded-xl border-2 bg-[var(--gc-node-inner)] transition-shadow ${
             hasText ? "border-solid" : "border-dashed"
           } border-[var(--gc-accent)] ${
             inputActive ? "shadow-[0_0_0_2px_color-mix(in_srgb,var(--gc-accent)_45%,transparent)]" : ""
@@ -250,7 +250,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
               aria-readonly="true"
               aria-label="提示词正文（双击或回车进入编辑）"
               tabIndex={0}
-              className={`max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-[2px] px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
+              className={`nowheel max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-xl px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
                 hasText ? "min-h-[44px]" : "min-h-[88px]"
               }`}
               onDoubleClick={() => {
@@ -307,7 +307,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             }}
             onFocus={() => setInputActive(true)}
             onBlur={() => setInputActive(false)}
-            className={`w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
+            className={`nowheel w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
               hasText ? "min-h-[44px]" : "min-h-[88px]"
             } ${inputActive ? "nodrag cursor-text" : "hidden"}`}
           />

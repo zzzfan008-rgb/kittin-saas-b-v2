@@ -60,6 +60,44 @@ assert.doesNotMatch(
   "浮层不得自行监听打开事件（沿用 App 的单点分发）",
 );
 
+// ---------- 2b. 上传入口卡：网格首格常驻 + 多选四格式 + 类目快照 ----------
+assert.match(assetPickerSource, /本地上传/, "网格首格必须常驻「本地上传」入口卡");
+assert.match(
+  assetPickerSource,
+  /from "@\/lib\/assetSave"/,
+  "上传入口必须复用资产命名工具",
+);
+assert.match(
+  assetPickerSource,
+  /assetNameFromUpload\(file\.name/,
+  "上传命名必须走 assetNameFromUpload（文件名去目录/扩展名）",
+);
+assert.match(
+  assetPickerSource,
+  /accept="image\/png,image\/jpeg,image\/webp,image\/gif"/,
+  "文件框 accept 必须是服务端四格式显式清单",
+);
+assert.match(
+  assetPickerSource,
+  /uploadIntentRef\.current = intent/,
+  "点击来源必须快照落库意图（防途中切类串类）",
+);
+assert.match(
+  assetPickerSource,
+  /上传中 \$\{uploadProgress\}\/\$\{uploadTotal\}/,
+  "串行上传中卡片必须显示 i/n 进度",
+);
+assert.match(
+  assetPickerSource,
+  /该类目暂不支持上传/,
+  "视频生成两类必须禁用上传并给提示",
+);
+assert.doesNotMatch(
+  assetPickerSource,
+  /uploadToHistoryRef/,
+  "旧 toHistoryRef 开关必须移除（意图改为对象快照）",
+);
+
 // ---------- 3. 打开路径：App 把节点 id 的映射提示传给浮层 ----------
 assert.match(
   appSource,
