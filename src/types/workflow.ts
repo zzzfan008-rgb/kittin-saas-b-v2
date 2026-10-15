@@ -409,7 +409,10 @@ export interface Asset {
  * 服务端等价实现见 server/lib/workflowSchema.ts。
  */
 
-export type GraphNodeLike = { id: string; data: { kind: NodeKind } };
+export type GraphNodeLike = {
+  id: string;
+  data: { kind: NodeKind; label?: string; familyId?: string };
+};
 export type GraphEdgeLike = {
   target: string;
   source: string;
@@ -611,17 +614,43 @@ export function selectAllReferenceOrdinals(
   edges: readonly GraphEdgeLike[],
 ): ReadonlyMap<string, ReferenceOrdinalAssignment[]> {
   const result = new Map<string, ReferenceOrdinalAssignment[]>();
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
-  // 按目标分组编号（每个生成节点的入边序列各自从 1 起）。
-  const nextOrdinalByTarget = new Map<string, number>();
+  // 按目标分组收集（每个生成节点的入边序列各自编号）。
+  const edgesByTarget = new Map<string, GraphEdgeLike[]>();
   for (const edge of edges) {
     if (!isReferenceEdge(edge)) continue;
     if (!isImageSourceKind(kindById.get(edge.source))) continue;
-    const ordinal = nextOrdinalByTarget.get(edge.target) ?? 1;
-    nextOrdinalByTarget.set(edge.target, ordinal + 1);
-    const list = result.get(edge.source) ?? [];
-    list.push({ ordinal, targetId: edge.target });
-    result.set(edge.source, list);
+    const list = edgesByTarget.get(edge.target) ?? [];
+    list.push(edge);
+    edgesByTarget.set(edge.target, list);
+  }
+  for (const [targetId, targetEdges] of edgesByTarget) {
+    // P0（model-tryon）：徽标是图号的唯一证据——该族的上游按节点身份
+    // （id garment/model 优先，label 关键词兜底）排序，与 dag 拼装顺序一致。
+    // 用户删节点重建（身份不可识别）时保持连线顺序。
+    const familyId = nodeById.get(targetId)?.data?.familyId;
+    if (familyId === "model-tryon") {
+      const rankOf = (sourceId: string): number => {
+        if (sourceId === "garment") return 0;
+        if (sourceId === "model") return 1;
+        const label = String(nodeById.get(sourceId)?.data?.label ?? "");
+        if (label.includes("服装")) return 0;
+        if (label.includes("模特")) return 1;
+        return 2;
+      };
+      targetEdges
+        .map((edge, index) => ({ edge, index }))
+        .sort((a, b) => rankOf(a.edge.source) - rankOf(b.edge.source) || a.index - b.index)
+        .forEach(({ edge }, position) => {
+          targetEdges[position] = edge;
+        });
+    }
+    targetEdges.forEach((edge, index) => {
+      const list = result.get(edge.source) ?? [];
+      list.push({ ordinal: index + 1, targetId });
+      result.set(edge.source, list);
+    });
   }
   return result;
 }
