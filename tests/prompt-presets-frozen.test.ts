@@ -62,7 +62,7 @@ const PRESET_TEMPLATE_TEXTS_SHA256: Record<string, string> = {
   "video-animate:edit": "03eb58ffd8e4111fac6adf82cc525e5e34438e40411a997e62e5d61c2032d213",
   "prompt-polish:edit": "2294316dfc5aa23cb63ea9baa80e6d924982bc001422957765aa1f2aa2031f51",
   "prompt-generate:generate": "55996590129a4b56e2a84e470411db7319b4be570d8dfd75a6bdeb0af02e17b8",
-  "model-tryon:edit": "b593e8b92a9112dfbe1e9d8c633d23c54d67590214d07e100a631364c0ea9b8a",
+  "model-tryon:edit": "db1dd53d3093f1f4114f9e044df80907880e8235dcab4e20b8f9e815b7b158e8",  // 2026-10-16 协议瘦身：删第二段（画幅/软默认/六要素补全归改写层），身份去"姿势"
 };
 
 const EXPECTED_FAMILY_IDS = [
@@ -157,7 +157,7 @@ const REWRITE_SYSTEM_PROMPTS_SHA256: Record<string, string> = {
   "default": "c43357148a16b64ab9bbd94fd75ac0568048a008612b94375fcc296c235a5beb",
   "model-tryon": "72768654c3df481d46a18468f9f6b561c2e7363da1ff61ca5ae8707971ed01f8",
   // 补充段专用条目（2026-10-12 P1 缺陷修复：锚点切分后改写器只收补充段）
-  "model-tryon-supplement": "f4095e5491cef31b0909128609bb037f968088d1f1496addf4030b1ed9b11858",
+  "model-tryon-supplement": "0d79b8b503422ae61ffaa3faa2666c9d0a40a16cb124fb6d2cfb1d344820e06f",  // 2026-10-16 六要素补全器：无论多短都按六维补全
 };
 
 ok("键集合：REWRITE_SYSTEM_PROMPTS 与快照一致（default + model-tryon + model-tryon-supplement）", () => {
