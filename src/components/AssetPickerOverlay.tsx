@@ -17,6 +17,7 @@ import {
   type AssetLeafId,
   type AssetLevel1Id,
 } from "@/lib/assetTaxonomy";
+import { assetNameFromUpload } from "@/lib/assetSave";
 
 /** 一页 5 列 × 6 行 = 30；滚轮到底自动拉下一页。 */
 const PAGE_SIZE = 30;
@@ -59,9 +60,22 @@ export function AssetPickerOverlay({
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  // 上传入口卡：多选串行上传进度
+  const [uploading, setUploading] = useState(false);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadToHistoryRef = useRef(false);
+  /** 点击来源决定的落库意图（卡片/新增/上传按钮共用同一个 input）。 */
+  const uploadIntentRef = useRef<{ toHistoryOnly: boolean; leaf: AssetLeafId }>({
+    toHistoryOnly: false,
+    leaf: resolvedInitialLeaf,
+  });
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const openFilePicker = (intent: { toHistoryOnly: boolean; leaf: AssetLeafId }) => {
+    uploadIntentRef.current = intent;
+    fileInputRef.current?.click();
+  };
 
   // 同一个浮层实例被指向另一个节点时，预选分类跟随新请求；用户手动切换不被覆盖。
   useEffect(() => {
@@ -181,43 +195,71 @@ export function AssetPickerOverlay({
     reader.readAsDataURL(file);
   });
 
-  // 新增：本地文件 → 当前类目建资产；上传：本地文件 → 历史素材（仅 files）。
-  const handleUploadFiles = async (files: FileList | null, toHistoryOnly: boolean) => {
-    if (!files || files.length === 0) return;
+  // 新增/上传：本地多选 → 串行建资产（当前类目）或仅入历史素材（files）。
+  // intent 在点击时快照（leaf），循环内不再读实时 leaf，避免切换类目途中串类。
+  const handleUploadFiles = async (
+    files: FileList | null,
+    intent: { toHistoryOnly: boolean; leaf: AssetLeafId },
+  ) => {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
     setNotice(null);
     setError(null);
+    setUploading(true);
+    setUploadTotal(list.length);
+    setUploadProgress(0);
+    const failures: string[] = [];
+    let success = 0;
+    const { toHistoryOnly, leaf: targetLeaf } = intent;
     try {
-      for (const file of Array.from(files)) {
-        const dataUrl = await readFileAsDataUrl(file);
-        const up = await fetch("/api/files", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dataUrl }),
-        });
-        const saved = (await up.json().catch(() => ({}))) as { url?: string; error?: string };
-        if (!up.ok || !saved.url) throw new Error(saved.error || `上传失败 HTTP ${up.status}`);
-        if (!toHistoryOnly && leaf !== "history") {
-          const base = file.name.split(/[\\/]/).pop() ?? "";
-          const name = (base.replace(/\.[^.]*$/, "").replace(/\s+/g, " ").trim() || "未命名素材").slice(0, 60);
-          const created = await fetch("/api/assets", {
+      // 串行逐个上传：避免并发撑爆 50mb body；单文件失败不阻断其余。
+      for (let index = 0; index < list.length; index += 1) {
+        const file = list[index];
+        setUploadProgress(index + 1);
+        try {
+          const dataUrl = await readFileAsDataUrl(file);
+          const up = await fetch("/api/files", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, category: leaf, image: saved.url }),
+            body: JSON.stringify({ dataUrl }),
           });
-          if (!created.ok) {
-            const detail = (await created.json().catch(() => ({}))) as { error?: string };
-            throw new Error(detail.error || `建资产失败 HTTP ${created.status}`);
+          const saved = (await up.json().catch(() => ({}))) as { url?: string; error?: string };
+          if (!up.ok || !saved.url) throw new Error(saved.error || `上传失败 HTTP ${up.status}`);
+          if (!toHistoryOnly && targetLeaf !== "history") {
+            const name = assetNameFromUpload(file.name, "未命名素材");
+            const created = await fetch("/api/assets", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name, category: targetLeaf, image: saved.url }),
+            });
+            if (!created.ok) {
+              const detail = (await created.json().catch(() => ({}))) as { error?: string };
+              throw new Error(detail.error || `建资产失败 HTTP ${created.status}`);
+            }
           }
+          success += 1;
+        } catch (err) {
+          failures.push(`${file.name}：${err instanceof Error ? err.message : String(err)}`);
         }
       }
-      if (toHistoryOnly && leaf !== "history") {
-        setNotice("已上传到历史素材");
+    } finally {
+      setUploading(false);
+      setUploadTotal(0);
+      setUploadProgress(0);
+    }
+    setSelectedIds([]);
+    if (success > 0) {
+      // 新文件名通常不在当前搜索结果内，清空搜索避免"看着没变化"。
+      if (debouncedSearch) setSearch("");
+      if (toHistoryOnly && targetLeaf !== "history") {
+        setNotice(`已上传 ${success} 张到历史素材`);
       } else {
         await load(0);
+        setNotice(`已上传 ${success} 张`);
       }
-      setSelectedIds([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    }
+    if (failures.length > 0) {
+      setError(`部分上传失败：${failures.join("；")}`);
     }
   };
 
@@ -280,6 +322,9 @@ export function AssetPickerOverlay({
   const renameTarget = selectedAssets.length === 1 ? selectedAssets[0] : undefined;
   const canRename = !!renameTarget && !renameTarget.id.startsWith("upload-") && renameTarget.canManage !== false;
   const uploadable = leaf !== "refvideo" && leaf !== "audio";
+  const leafLabel = leaf === "history"
+    ? "历史素材"
+    : (ASSET_LEVEL2[level1].find((item) => item.id === leaf)?.label ?? "");
 
   return (
     <div
@@ -300,6 +345,21 @@ export function AssetPickerOverlay({
             关闭
           </button>
         </div>
+
+        {/* 常驻隐藏 input：上传入口卡 + 管理栏「新增/上传」共用同一选择器 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          multiple
+          tabIndex={-1}
+          aria-label="从本地上传图片"
+          className="pointer-events-none absolute h-0 w-0 opacity-0"
+          onChange={(e) => {
+            void handleUploadFiles(e.target.files, uploadIntentRef.current);
+            e.target.value = "";
+          }}
+        />
 
         <div className="space-y-2 border-b border-[var(--gc-border)] px-4 py-2.5">
           <div className="flex items-center gap-2">
@@ -376,24 +436,6 @@ export function AssetPickerOverlay({
           </div>
           {managing && (
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--gc-border)] pt-2">
-              {uploadable && leaf !== "history" && (
-                <button
-                  type="button"
-                  onClick={() => { uploadToHistoryRef.current = false; fileInputRef.current?.click(); }}
-                  className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
-                >
-                  新增
-                </button>
-              )}
-              {uploadable && (
-                <button
-                  type="button"
-                  onClick={() => { uploadToHistoryRef.current = true; fileInputRef.current?.click(); }}
-                  className="rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
-                >
-                  上传
-                </button>
-              )}
               <button
                 type="button"
                 onClick={startRename}
@@ -440,19 +482,6 @@ export function AssetPickerOverlay({
                 </span>
               )}
               {notice && <span className="text-label text-[var(--gc-text-muted)]">{notice}</span>}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                tabIndex={-1}
-                aria-label="上传本地图片"
-                className="pointer-events-none absolute h-0 w-0 opacity-0"
-                onChange={(e) => {
-                  void handleUploadFiles(e.target.files, uploadToHistoryRef.current);
-                  e.target.value = "";
-                }}
-              />
             </div>
           )}
         </div>
@@ -460,13 +489,13 @@ export function AssetPickerOverlay({
         <div ref={scrollerRef} onScroll={maybeLoadMore} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           {error && (
             <div className="py-6 text-center">
-              <p className="text-body text-[var(--gc-text-muted)]">素材服务暂不可用（{error}）</p>
+              <p className="text-body text-red-400">{error}</p>
               <button
                 type="button"
-                onClick={() => void load(0)}
+                onClick={() => { setError(null); void load(0); }}
                 className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:border-gold/50 hover:text-gold"
               >
-                重试
+                关闭
               </button>
             </div>
           )}
@@ -478,8 +507,24 @@ export function AssetPickerOverlay({
               {debouncedSearch && leaf !== "history" ? "没有匹配的素材" : ASSET_EMPTY_HINT[leaf]}
             </p>
           )}
-          {assets.length > 0 && (
+          {!error && !(loading && assets.length === 0) && (
             <div className="grid grid-cols-5 gap-2.5">
+              {/* 首格常驻上传入口卡：同素材卡尺寸；参考视频/语音两类禁用 */}
+              <button
+                type="button"
+                onClick={() => openFilePicker({ toHistoryOnly: leaf === "history", leaf })}
+                disabled={!uploadable || uploading}
+                title={uploadable ? `从本地上传图片到「${leafLabel}」` : "该类目暂不支持上传"}
+                aria-label={uploadable ? `从本地上传图片到「${leafLabel}」` : "该类目暂不支持上传"}
+                className="relative overflow-hidden rounded-md border border-dashed border-[var(--gc-border)] bg-[var(--gc-panel-hover)] text-left transition-colors hover:border-gold/60 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <div className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 bg-[var(--gc-control)] text-[var(--gc-text-muted)]">
+                  <span aria-hidden="true" className="text-2xl">+</span>
+                </div>
+                <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">
+                  {uploading ? `上传中 ${uploadProgress}/${uploadTotal}…` : "本地上传"}
+                </div>
+              </button>
               {assets.map((asset) => {
                 const selected = selectedIds.includes(asset.id);
                 const locked = asset.canManage === false;

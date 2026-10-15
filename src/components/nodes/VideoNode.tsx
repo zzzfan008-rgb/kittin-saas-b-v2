@@ -61,7 +61,7 @@ export function VideoNode({ id, data, selected }: NodeProps<Node<VideoNodeData>>
         }
       >
         {video ? (
-          <div className="nodrag relative overflow-hidden rounded-[10px] border border-[var(--gc-node-border)] bg-black">
+          <div className="nodrag relative overflow-hidden rounded-xl border border-[var(--gc-node-border)] bg-black">
             <video
               ref={videoRef}
               src={video}
@@ -89,7 +89,7 @@ export function VideoNode({ id, data, selected }: NodeProps<Node<VideoNodeData>>
             )}
           </div>
         ) : (
-          <div className="flex aspect-video flex-col items-center justify-center gap-1 rounded-[10px] border border-dashed border-[var(--gc-node-border)] px-3 text-center text-label leading-relaxed text-[var(--gc-node-muted)]">
+          <div className="flex aspect-video flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--gc-node-border)] px-3 text-center text-label leading-relaxed text-[var(--gc-node-muted)]">
             <span className="font-mono tracking-wider opacity-70">VIDEO · 槽位</span>
             <span>{VIDEO_UPLOAD_UNAVAILABLE_REASON}</span>
           </div>
