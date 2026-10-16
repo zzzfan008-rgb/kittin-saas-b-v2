@@ -63,6 +63,8 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
+  /** 六要素面板开关（工具条「六要素」图标切换；协议模板默认展开）。 */
+  const [elementsOpen, setElementsOpen] = useState(true);
   const [inputActive, setInputActive] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
@@ -246,6 +248,12 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
                 disabledReason: "只读项目不能修改正文",
                 label: colorToolOpen ? "收起色彩工具" : "色彩工具",
               },
+              "elements": {
+                onSelect: () => setElementsOpen((open) => !open),
+                disabled: !isProtocolTemplate,
+                disabledReason: "仅协议模板（含补充位）可用六要素",
+                label: elementsOpen ? "收起六要素" : "展开六要素",
+              },
               "preset-picker": {
                 presetOptions,
                 onPresetSelect: (value) => {
@@ -381,7 +389,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             </span>
           ) : null}
         </div>
-        {isProtocolTemplate && (
+        {isProtocolTemplate && elementsOpen && (
           <ElementsPanel
             elements={elements}
             readOnly={readOnly}
