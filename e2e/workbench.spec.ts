@@ -608,7 +608,7 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   // 未上传图片时「裁剪 / 抠图」保持可见但禁用，并给出原因（不隐藏）。
   const crop = imageNode.getByRole("button", { name: "裁剪" });
   await expect(crop).toBeDisabled();
-  await expect(crop).toHaveAttribute("title", /图片裁剪能力尚未接入/);
+  await expect(crop).toHaveAttribute("title", /请先上传图片后再裁剪/);
   await expect(imageNode.getByRole("button", { name: "抠图" })).toBeDisabled();
   await expect(imageNode.getByRole("button", { name: "复制" })).toBeEnabled();
   await expect(imageNode.getByRole("button", { name: "替换", exact: true })).toBeEnabled();
