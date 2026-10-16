@@ -7,6 +7,7 @@ import {
   CropIcon,
   DownloadIcon,
   EyeIcon,
+  ListChecksIcon,
   PaletteIcon,
   PlayIcon,
   RefreshCwIcon,
@@ -45,6 +46,7 @@ import { nodeTitleForKind, type NodeKind } from "@/types/workflow";
 
 export type NodeToolbarActionId =
   | "color-tool"
+  | "elements"
   | "crop"
   | "matting"
   | "copy"
@@ -65,6 +67,7 @@ export interface NodeToolbarActionDefinition {
 }
 
 const COLOR_TOOL: NodeToolbarActionDefinition = { id: "color-tool", label: "色彩工具", icon: PaletteIcon };
+const ELEMENTS: NodeToolbarActionDefinition = { id: "elements", label: "六要素", icon: ListChecksIcon };
 const CROP: NodeToolbarActionDefinition = { id: "crop", label: "裁剪", icon: CropIcon };
 const MATTING: NodeToolbarActionDefinition = { id: "matting", label: "抠图", icon: ScissorsIcon };
 const COPY: NodeToolbarActionDefinition = { id: "copy", label: "复制", icon: CopyIcon };
@@ -80,7 +83,7 @@ const MASK: NodeToolbarActionDefinition = { id: "mask", label: "蒙版重绘", i
 const MULTI_EDIT: NodeToolbarActionDefinition = { id: "multi-edit", label: "多轮修改", icon: SparklesIcon };
 /** v9 配置表（64 Phase 2 §6）；数组顺序即从左到右的渲染顺序。 */
 export const NODE_TOOLBAR_ACTIONS: Record<NodeKind, readonly NodeToolbarActionDefinition[]> = {
-  text: [COLOR_TOOL, PRESET_PICKER, COPY],
+  text: [COLOR_TOOL, ELEMENTS, PRESET_PICKER, COPY],
   image: [MASK, MULTI_EDIT, CROP, MATTING, COPY, REPLACE],
   video: [COPY, REPLACE],
   "image-generator": [RUN, COPY],
