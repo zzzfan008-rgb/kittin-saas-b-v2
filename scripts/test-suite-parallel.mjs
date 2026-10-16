@@ -131,6 +131,8 @@ const TEST_FILES = [
   "tests/asset-model-category.test.ts",
   "tests/canvas-dock-keyboard.test.ts",
   "tests/five-node-model-ui.test.ts",
+  // 裁剪对话框：工具条入口接线 + 回写 + 无残留错误 CSS 引用。
+  "tests/crop-dialog.test.ts",
   "tests/grid-snap-ui.test.ts",
   "tests/grid-snap.test.ts",
   "tests/node-product-policy.test.ts",

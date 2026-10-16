@@ -21,6 +21,7 @@ import { NodeFrame,
 import { NodeToolbar } from "./NodeToolbar";
 import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
 import { MattingDialog } from "@/components/panels/MattingDialog";
+import { CropImageDialog } from "@/components/panels/CropImageDialog";
 import { MaskEditor } from "./MaskEditor";
 import { MultiRoundEditPanel } from "./MultiRoundEditPanel";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
@@ -80,6 +81,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [editingMulti, setEditingMulti] = useState(false);
   const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
   const [mattingDialogOpen, setMattingDialogOpen] = useState(false);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
   const editPromptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "editPrompt" },
@@ -210,8 +212,9 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             textOnly
             actions={{
               crop: {
-                disabled: true,
-                disabledReason: "暂不可用：图片裁剪能力尚未接入",
+                onSelect: () => setCropDialogOpen(true),
+                disabled: !hasUpload || readOnly,
+                disabledReason: !hasUpload ? "请先上传图片后再裁剪" : "只读项目不能裁剪",
               },
               matting: {
                 onSelect: () => setMattingDialogOpen(true),
@@ -480,6 +483,28 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             setMattingDialogOpen(false);
           }}
           onClose={() => setMattingDialogOpen(false)}
+        />
+      )}
+      {/* 裁剪对话框 */}
+      {cropDialogOpen && hasUpload && (
+        <CropImageDialog
+          open={cropDialogOpen}
+          source={data.outputImages[0]}
+          sourceRef={data.outputImages[0]}
+          onCropComplete={(croppedUrl) => {
+            const target = selectActiveDocumentTarget(useFlowStore.getState());
+            if (!target) return;
+            updateNodeDataInTab(target, id, {
+              outputImages: [croppedUrl],
+              status: "success",
+              error: undefined,
+              mask: undefined,
+              maskSourceRef: undefined,
+              featherRadius: undefined,
+            });
+            setCropDialogOpen(false);
+          }}
+          onClose={() => setCropDialogOpen(false)}
         />
       )}
     </>
