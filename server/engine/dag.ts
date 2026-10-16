@@ -31,6 +31,7 @@ import {
   promptRunAdmissionInputFromParams,
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
+import { orderReferenceUpstream } from "../../src/lib/referenceOrder";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -286,6 +287,15 @@ export function buildExecutionPlan(
         });
         if (e.targetHandle === "prompt" && srcData.kind === "text") inputTexts.push(srcData.text);
       }
+
+      // P0（model-tryon）：参考图顺序以图片节点右上角「图N」徽标为唯一证据。
+      // 徽标顺序 = 生成节点入边序列（selectAllReferenceOrdinals），此处按该族规则重排上游，
+      // 使模型看到的「参考图N」与用户看到的「图N」徽标一一对应。
+      orderReferenceUpstream(
+        upstream,
+        (data as { familyId?: string }).familyId,
+        (sourceNodeId) => String(nodeMap.get(sourceNodeId)?.data?.label ?? ""),
+      );
 
       const inputImages = upstream.flatMap((source) => source.images);
       const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({

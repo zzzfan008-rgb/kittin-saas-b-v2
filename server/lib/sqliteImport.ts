@@ -33,7 +33,12 @@ async function importTable(source: Database.Database, client: PoolClient, name: 
       : `VALUES (${placeholders})`;
     await client.query(
       `INSERT INTO "${name}" (${columnSql}) ${valuesSql} ON CONFLICT DO NOTHING`,
-      columns.map((column) => row[column] ?? null),
+      columns.map((column) => {
+        const value = row[column] ?? null;
+        // v9+：旧 reference 类目并入 garment（新枚举不再有 reference）。
+        if (name === "assets" && column === "category" && value === "reference") return "garment";
+        return value;
+      }),
     );
   }
   return rows.length;

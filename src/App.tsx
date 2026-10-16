@@ -216,7 +216,8 @@ function Workspace() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [initialHistoryState, setInitialHistoryState] = useState<"loading" | "ready" | "error">("loading");
   const [initialHistoryAttempt, setInitialHistoryAttempt] = useState(0);
-  const historyPageSize = 20;
+  // 最近生成一页 = 5 列 × 6 行 = 30 条；面板滚动到底自动拉下一页。
+  const historyPageSize = 30;
   const historyBefore = useRef(Date.now()).current;
   const viewerOpen = useFlowStore((state) => state.viewer !== null);
   const closeViewer = useFlowStore((state) => state.closeViewer);

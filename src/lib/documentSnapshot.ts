@@ -22,6 +22,7 @@ import {
   type ImageOperationMode,
   type NodeKind,
   type PersistedWorkflow,
+  type TextNodeData,
   type ReferenceEdgeData,
   type WorkflowNodeData,
 } from "../types/workflow";
@@ -52,7 +53,7 @@ import {
  * 模式改由 operationMode 归节点 data（64 裁决 A）。
  */
 export type DocumentNodeData =
-  | { kind: "text"; label: string; text: string; nodeWidth?: number }
+  | { kind: "text"; label: string; text: string; nodeWidth?: number; promptElements?: TextNodeData["promptElements"] }
   | { kind: "image"; label: string; outputImages: string[]; nodeWidth?: number }
   | { kind: "video"; label: string; outputVideos: string[]; nodeWidth?: number }
   | {
@@ -231,8 +232,18 @@ function operationModeField(data: WorkflowNodeData): { operationMode?: ImageOper
  */
 export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData {
   switch (data.kind) {
-    case "text":
-      return { kind: "text", label: data.label, text: stringOrEmpty(data.text), ...optionalNodeWidth(data.nodeWidth) };
+    case "text": {
+      const elements = (data as TextNodeData).promptElements;
+      const validElements = (
+        typeof elements === "object" && elements !== null
+          && typeof (elements as { subject?: unknown }).subject === "string"
+      ) ? elements : undefined;
+      return {
+        kind: "text", label: data.label, text: stringOrEmpty(data.text),
+        ...(validElements !== undefined ? { promptElements: validElements } : {}),
+        ...optionalNodeWidth(data.nodeWidth),
+      };
+    }
     case "image": {
       const fr = typeof data.featherRadius === "number" && Number.isFinite(data.featherRadius)
         ? Math.max(0, Math.min(64, Math.round(data.featherRadius)))
@@ -330,7 +341,7 @@ function cloneDocumentNodeData(data: DocumentNodeData): DocumentNodeData {
  * 输入层不得带生成字段（C2），生成层不得带产物字段（C3），结果层只得带产物 + 溯源。
  */
 const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
-  text: ["kind", "label", "text", "nodeWidth"],
+  text: ["kind", "label", "text", "promptElements", "nodeWidth"],
   image: ["kind", "label", "outputImages", "mask", "maskSourceRef", "featherRadius", "editPrompt", "editInputRef", "nodeWidth"],
   video: ["kind", "label", "outputVideos", "nodeWidth"],
   "image-generator": [

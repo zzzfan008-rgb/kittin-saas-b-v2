@@ -491,11 +491,11 @@ test("select value echo stays legible against its trigger surface at every deskt
   const generator = page.getByTestId("rf__node-tryon-gen");
   await expect(generator).toBeVisible();
 
-  /** 读取触发器内回显 span 的计算颜色，并对第一个不透明祖先底色算 WCAG 对比度。 */
+  /** 读取元素自身文字色，并对第一个不透明祖先底色算 WCAG 对比度。 */
   const echoLegibility = (trigger: Locator) =>
     trigger.evaluate((element) => {
-      const value = element.querySelector('[data-slot="select-value"]');
-      if (!value) return { ok: false as const, reason: "触发器内没有 select-value 回显" };
+      const value = element.querySelector('[data-slot="select-value"]') ?? element;
+      if (!value) return { ok: false as const, reason: "触发器内没有回显" };
       const parse = (color: string) => {
         const match = color.match(/rgba?\(([^)]+)\)/);
         if (!match) return null;
@@ -606,10 +606,14 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   await expect(imageToolbar).toBeVisible();
   await expect(imageToolbar).toHaveAttribute("aria-label", "图片工具栏");
   // 未上传图片时「裁剪 / 抠图」保持可见但禁用，并给出原因（不隐藏）。
+  // #119/#120：裁剪与抠图能力均已接入，此时禁用原因是「请先上传图片」。
   const crop = imageNode.getByRole("button", { name: "裁剪" });
   await expect(crop).toBeDisabled();
   await expect(crop).toHaveAttribute("title", /请先上传图片后再裁剪/);
-  await expect(imageNode.getByRole("button", { name: "抠图" })).toBeDisabled();
+<<<<<<< HEAD
+  const matting = imageNode.getByRole("button", { name: "抠图" });
+  await expect(matting).toBeDisabled();
+  await expect(matting).toHaveAttribute("title", /请先上传图片后再抠图/);
   await expect(imageNode.getByRole("button", { name: "复制" })).toBeEnabled();
   await expect(imageNode.getByRole("button", { name: "替换", exact: true })).toBeEnabled();
 
@@ -791,7 +795,7 @@ test("results and project center follow desktop density for cards", async ({ pag
 
   // 断言渲染出来的栅格列数，而不是 class 名（AGENTS.md §6）。
   const resultsGrid = resultsRegion.locator("article").first().locator("xpath=..");
-  await expectGridColumns(resultsGrid, 4);
+  await expectGridColumns(resultsGrid, 5);
 
   const resultsScroller = resultsRegion.locator(".overflow-y-auto");
   const resultCards = resultsGrid.locator(":scope > *");
@@ -804,20 +808,15 @@ test("results and project center follow desktop density for cards", async ({ pag
   await expect(firstSuccessCard).toBeVisible();
   await firstSuccessCard.hover();
   const compareButton = firstSuccessCard.locator('button[title="加入对比"]');
-  // 2026-09-25 第 5 批（ab68c16）：「查看」改为「查看详情」→ 打开「结果详情」弹窗（图片查看器在弹窗里）。
-  const viewButton = firstSuccessCard.locator('button[title="查看详情"]');
-  const downloadButton = firstSuccessCard.locator('a[title="下载"]');
-  const applyButton = firstSuccessCard.locator('button[title="设为输入"]');
+  // 卡片悬浮条只剩「加入对比」：查看走卡片主体点击，下载/设为输入走 ImageViewer。
   await expect(compareButton).toBeVisible();
-  await expect(viewButton).toBeVisible();
-  await expect(downloadButton).toBeVisible();
-  await expect(applyButton).toBeVisible();
+  await expect(firstSuccessCard.locator("div.absolute.inset-x-0.bottom-0").getByRole("button")).toHaveCount(1);
 
   const resultsRect = await rect(resultsScroller);
   await expectInside(await rect(firstSuccessCard), resultsRect);
 
-  // 65d R-87 §3 Review Gap 3：点「查看详情」改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
-  await viewButton.click();
+  // 点卡片主体改由 ImageViewer 直接承接，不再经过 ResultDetailDialog。
+  await firstSuccessCard.getByRole("button", { name: /查看/ }).click();
   // ImageViewer 初始 fit 模式，HUD 按钮文字为「适合画布」或「X%」。
   const viewerHint = page.getByRole("button", { name: /适合画布|\d+%/ });
   await expect(viewerHint).toBeVisible({ timeout: 10000 });
@@ -833,12 +832,14 @@ test("results and project center follow desktop density for cards", async ({ pag
   await compareButton.click();
   await expect(firstSuccessCard.locator('button[title="取消对比"]')).toBeVisible();
 
+  // 下载与设为输入走 ImageViewer（卡片悬浮条只剩对比）：点卡片主体进查看器。
+  await firstSuccessCard.getByRole("button", { name: /查看/ }).click();
   const download = page.waitForEvent("download");
-  await downloadButton.click();
+  await page.getByRole("link", { name: "下载图片" }).click();
   await download;
 
   const nodeCountBeforeApply = await page.locator(".react-flow__node").count();
-  await applyButton.click();
+  await page.getByRole("button", { name: "设为输入" }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(nodeCountBeforeApply + 1);
   await openResults();
   await expect(resultsRegion).toBeVisible();
@@ -864,7 +865,7 @@ test("results and project center follow desktop density for cards", async ({ pag
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
     }).toPass({ timeout: 20_000 });
     await openResults();
-    await expectGridColumns(resultsGrid, 4);
+    await expectGridColumns(resultsGrid, 5);
 
     await page.getByRole("button", { name: "打开项目中心" }).click();
     const center = page.getByRole("dialog", { name: "项目中心" });

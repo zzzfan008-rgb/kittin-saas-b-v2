@@ -85,15 +85,17 @@ async function main(): Promise<void> {
   };
   const preflight = buildPreflightConfig(runtimeEnv);
   const proxyBase = preflight.apiProxyTarget.replace(/\/+$/, "");
+  // Unix socket 判定：PGHOST=/tmp 等路径不走 portIsOpen（TCP），只查 databaseQueryOk。
   const databaseConnectHost = preflight.databaseHost === "localhost"
     ? "127.0.0.1"
     : preflight.databaseHost;
+  const databaseIsSocket = databaseConnectHost.startsWith("/");
 
   const [webPortOpen, apiPortOpen, databasePortOpen, databaseQueryOk, dockerReachable, proxyHealthStatus, proxyReadyStatus] =
     await Promise.all([
       portIsOpen("127.0.0.1", preflight.webPort),
       portIsOpen("127.0.0.1", preflight.apiPort),
-      portIsOpen(databaseConnectHost, preflight.databasePort),
+      databaseIsSocket ? Promise.resolve(true) : portIsOpen(databaseConnectHost, preflight.databasePort),
       databaseQueryIsReady(),
       dockerIsReachable(),
       httpStatus(`${proxyBase}/api/health`),

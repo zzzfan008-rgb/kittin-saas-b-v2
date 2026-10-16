@@ -34,6 +34,13 @@ import {
   COLOR_TOKEN_RE,
 } from "@/lib/color/colorToken";
 import { getTextPresetTemplate, listTextPresetTemplates } from "@/lib/promptPresets";
+import { REWRITE_SUPPLEMENT_ANCHOR } from "@/lib/rewriteEligibility";
+import {
+  assembleElements,
+  type ElementValue,
+  type PromptElements,
+} from "@/lib/promptElements";
+import { ElementsPanel } from "./ElementsPanel";
 
 /** 正文高度上限：超过后 textarea 内部滚动（文本随内容自然变高，与图片固定比例不同）。 */
 const TEXTAREA_MAX_HEIGHT = 320;
@@ -56,12 +63,41 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
+  /** 六要素面板开关（工具条「六要素」图标切换；协议模板默认展开）。 */
+  const [elementsOpen, setElementsOpen] = useState(true);
   const [inputActive, setInputActive] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const presetOptions = useMemo(() =>
     listTextPresetTemplates().map((p) => ({ value: p.id, label: p.name })),
   []);
+
+  /** 协议模板判定：正文含补充位锚点即协议模板（协议区只读 + 六要素面板）。 */
+  const anchorIndex = (data.text ?? "").indexOf(REWRITE_SUPPLEMENT_ANCHOR);
+  const isProtocolTemplate = anchorIndex !== -1;
+  const protocolText = isProtocolTemplate ? (data.text ?? "").slice(0, anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+  const supplementText = isProtocolTemplate ? (data.text ?? "").slice(anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+
+  /** 六要素结构化选择（面板写入 data.promptElements；拼装结果落补充位）。 */
+  const elements: PromptElements = useMemo(() => {
+    const raw = data.promptElements as PromptElements | undefined;
+    return {
+      subject: typeof raw?.subject === "string" ? raw.subject : "",
+      environment: raw?.environment as ElementValue,
+      lighting: raw?.lighting as ElementValue,
+      lens: raw?.lens as ElementValue,
+      tone: raw?.tone as ElementValue,
+      composition: raw?.composition as ElementValue,
+    };
+  }, [data.promptElements]);
+
+  /** 写补充位：协议前缀原样保留 + 新补充（可 undo，与预设写入同款模式）。 */
+  const writeSupplement = (next: string) => {
+    if (readOnly) return;
+    const full = isProtocolTemplate ? protocolText + next : next;
+    textEdit.updateValue(full);
+    textEdit.flush();
+  };
 
   /** 从正文解析所有颜色 chip。 */
   const chips = useMemo(() => parseColorChips(data.text ?? ""), [data.text]);
@@ -212,6 +248,12 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
                 disabledReason: "只读项目不能修改正文",
                 label: colorToolOpen ? "收起色彩工具" : "色彩工具",
               },
+              "elements": {
+                onSelect: () => setElementsOpen((open) => !open),
+                disabled: !isProtocolTemplate,
+                disabledReason: "仅协议模板（含补充位）可用六要素",
+                label: elementsOpen ? "收起六要素" : "展开六要素",
+              },
               "preset-picker": {
                 presetOptions,
                 onPresetSelect: (value) => {
@@ -236,7 +278,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
         {/* 槽位框（两态同一元素）：空态虚线 / 有内容态实线，均 2px accent、圆角 4px（同图片节点）。
             输入激活时加焦点光环（不改动框体本身）。 */}
         <div
-          className={`nopan relative rounded-[4px] border-2 bg-[var(--gc-node-inner)] transition-shadow ${
+          className={`nopan relative rounded-xl border-2 bg-[var(--gc-node-inner)] transition-shadow ${
             hasText ? "border-solid" : "border-dashed"
           } border-[var(--gc-accent)] ${
             inputActive ? "shadow-[0_0_0_2px_color-mix(in_srgb,var(--gc-accent)_45%,transparent)]" : ""
@@ -250,7 +292,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
               aria-readonly="true"
               aria-label="提示词正文（双击或回车进入编辑）"
               tabIndex={0}
-              className={`max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-[2px] px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
+              className={`nowheel max-h-[320px] w-full cursor-grab overflow-y-auto whitespace-pre-wrap break-words rounded-xl px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] focus-visible:outline-1 focus-visible:outline-[var(--gc-accent-deep)] active:cursor-grabbing ${
                 hasText ? "min-h-[44px]" : "min-h-[88px]"
               }`}
               onDoubleClick={() => {
@@ -307,7 +349,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             }}
             onFocus={() => setInputActive(true)}
             onBlur={() => setInputActive(false)}
-            className={`w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
+            className={`nowheel w-full resize-none overflow-y-auto bg-transparent px-3 py-2.5 pr-14 text-xs leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden ${
               hasText ? "min-h-[44px]" : "min-h-[88px]"
             } ${inputActive ? "nodrag cursor-text" : "hidden"}`}
           />
@@ -347,6 +389,19 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
             </span>
           ) : null}
         </div>
+        {isProtocolTemplate && elementsOpen && (
+          <ElementsPanel
+            elements={elements}
+            readOnly={readOnly}
+            supplementText={supplementText}
+            onChange={(next) => {
+              if (readOnly) return;
+              useFlowStore.getState().updateNodeData(id, { promptElements: next });
+            }}
+            onFill={(assembled) => writeSupplement(assembled)}
+            onCleanRisks={(cleaned) => writeSupplement(cleaned)}
+          />
+        )}
         {colorToolOpen && (
           <ColorToolPanel
             onConfirm={insertColor}
