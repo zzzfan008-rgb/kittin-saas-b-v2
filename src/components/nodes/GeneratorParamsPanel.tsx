@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef } from "react";
-import { SlidersHorizontalIcon } from "lucide-react";
-import { Popover } from "@base-ui/react/popover";
 import { Handle, Position, useConnection } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -44,7 +42,17 @@ import {
   type VideoModelId,
 } from "@/types/videoModels";
 import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
-import { paramsFromContract } from "@/lib/paramsFromContract";
+import { paramsFromContract, type ParamOption } from "@/lib/paramsFromContract";
+import {
+  Select,
+  SelectItem,
+  SelectList,
+  SelectPopup,
+  SelectPortal,
+  SelectPositioner,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RunButton } from "./NodeFrame";
 
 const MEDIA_KIND: Record<GeneratorNodeKind, "image" | "video"> = {
@@ -58,66 +66,144 @@ const PARAM_LABELS: Record<string, string> = {
   seconds: "时长（秒）", resolution: "分辨率", seed: "随机种子",
 };
 function paramLabel(k: string) { return PARAM_LABELS[k] ?? k; }
-interface ParamRowOption { value: string | number | boolean; label?: string; disabled?: boolean; }
+function paramText(v: unknown) { return v === undefined || v === null ? "" : String(v); }
 
-/** 参数行：标签 + 选项直接平铺点选（Seedream 尺寸式交互），每参数独占一行。
- * 空 label 回退到 value，绝不渲染空白（select-visibility 契约）。
- * stack：长选项（模型 8 选）纵向通栏排列；短选项横向换行。 */
-function ParamRow({ label, value, options, disabled, stack, onSelect }: {
-  label: string;
+/** 参数下拉横向偏移：弹窗左缘 = 所在节点右缘外 7px。
+ * 触发器有全宽（模型/尺寸）与半格（画幅/批次）两种宽度，写死数值必在某种宽度下
+ * 落进节点内；定位时实时量触发器→节点右缘距离（屏幕像素，天然跟随缩放）。 */
+function nodeOutsideOffset(trigger: HTMLElement | null): number {
+  const triggerBox = trigger?.getBoundingClientRect();
+  const nodeBox = trigger?.closest(".react-flow__node")?.getBoundingClientRect();
+  if (!triggerBox || !nodeBox) return 17;
+  return Math.max(0, nodeBox.right - triggerBox.right) + 7;
+}
+
+interface SelectOption { value: string; label: string; disabled?: boolean; }
+
+function OptionSelect({ label, value, options, disabled, placeholder, onChange, ariaLabel, hint }: {
+  label: string; value: string; options: readonly SelectOption[]; disabled?: boolean;
+  placeholder?: string; onChange: (n: string) => void; ariaLabel?: string; hint?: string;
+}) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  return (
+    <label className="block min-w-0 space-y-1">
+      <span className="text-label text-[var(--gc-node-muted)]">{label}</span>
+      <Select value={value} disabled={disabled}
+        onValueChange={(n) => { if (typeof n === "string") onChange(n); }}>
+        <SelectTrigger ref={triggerRef} aria-label={ariaLabel ?? label} className="nodrag h-7 w-full text-[11px]">
+          <SelectValue placeholder={placeholder ?? "未选择"}>
+            {(sel) => {
+              const cur = typeof sel === "string" ? sel : "";
+              const opt = options.find((o) => o.value === cur);
+              return opt?.label || opt?.value || placeholder || "未选择";
+            }}
+          </SelectValue>
+        </SelectTrigger>
+        {/* 参数下拉统一在参数右侧弹出、与参数顶部对齐（用户裁决） */}
+        <SelectPortal><SelectPositioner
+          side="right"
+          align="start"
+          // Base UI 默认按“选中项与触发器文本对齐”摆弹窗（alignItemWithTrigger=true），
+          // 会覆盖 side/align 导致弹窗压住节点：参数下拉必须固定右侧顶部。
+          alignItemWithTrigger={false}
+          // 忽略 React Flow 视口（overflow:hidden 限幅祖先）导致的误 flip。
+          collisionBoundary={typeof document === "undefined" ? undefined : document.body}
+          sideOffset={() => nodeOutsideOffset(triggerRef.current)}
+        ><SelectPopup>
+          <SelectList>
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
+            ))}
+          </SelectList>
+        </SelectPopup></SelectPositioner></SelectPortal>
+      </Select>
+      {hint && <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">{hint}</p>}
+    </label>
+  );
+}
+
+/** 分段 pills：2–4 个短选项时比下拉更直观（quality/imageSize/outputFormat）；多选项回落下拉。 */
+function SegmentedParam({ name, value, options, disabled, onSelect }: {
+  name: string;
   value: string | number | boolean | undefined;
-  options: readonly ParamRowOption[];
+  options: readonly ParamOption[];
   disabled?: boolean;
-  stack?: boolean;
   onSelect: (v: string | number | boolean) => void;
 }) {
-  // 画幅行：选项值全是 W:H 时给数字上方配比例示意框。
-  const ratioOf = (v: string | number | boolean): [number, number] | null => {
-    const match = /^([1-9]\d*):([1-9]\d*)$/.exec(String(v));
-    if (!match) return null;
-    return [Number(match[1]), Number(match[2])];
-  };
-  const showRatios = options.length > 0 && options.every((o) => ratioOf(o.value) !== null);
   return (
-    <div className="space-y-1.5">
-      <span className="text-label text-[var(--gc-node-muted)]">{label}</span>
-      <div className={stack ? "flex flex-col gap-1" : "flex flex-nowrap gap-1"} role="group" aria-label={label}>
-        {options.map((o) => {
-          const active = o.value === value;
-          const ratio = showRatios ? ratioOf(o.value) : null;
-          const tip = typeof o.label === "string" && o.label !== String(o.value)
-            ? `${o.label} ${o.value}`
-            : String(o.label || o.value);
-          return (
-            <button
-              key={String(o.value)}
-              type="button"
-              disabled={disabled || o.disabled}
-              aria-pressed={active}
-              title={tip}
-              onClick={() => onSelect(o.value)}
-              className={`nodrag flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border px-1 py-1 text-[11px] transition-colors ${stack ? "w-full flex-row" : "flex-col"} ${
-                active
-                  ? "border-[var(--gc-accent)] bg-[var(--gc-accent)]/15 text-[var(--gc-node-text)]"
-                  : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-accent)]/50 hover:text-[var(--gc-node-text)]"
-              } disabled:cursor-not-allowed disabled:opacity-40`}
-            >
-              {ratio && (
-                <span
-                  aria-hidden="true"
-                  className="block shrink-0 rounded-[1px] border border-current opacity-70"
-                  style={{
-                    width: `${Math.max(3, Math.round((14 * ratio[0]) / Math.max(ratio[0], ratio[1])))}px`,
-                    height: `${Math.max(3, Math.round((14 * ratio[1]) / Math.max(ratio[0], ratio[1])))}px`,
-                  }}
-                />
-              )}
-              <span className="truncate">{o.label || o.value || "—"}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap gap-1" role="group" aria-label={paramLabel(name)}>
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            disabled={disabled || o.disabled}
+            aria-pressed={active}
+            title={o.label || String(o.value)}
+            onClick={() => onSelect(o.value)}
+            className={`nodrag rounded-md border px-2 py-1 text-[11px] transition-colors ${
+              active
+                ? "border-[var(--gc-accent)] bg-[var(--gc-accent)]/15 text-[var(--gc-node-text)]"
+                : "border-[var(--gc-node-border)] text-[var(--gc-node-muted)] hover:border-[var(--gc-accent)]/50 hover:text-[var(--gc-node-text)]"
+            } disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            {o.label || String(o.value)}
+          </button>
+        );
+      })}
     </div>
+  );
+}
+
+/** 选项少且短时用 pills，否则用下拉（阈值：≤4 项且标签总长 ≤12 字）。 */
+function shouldSegmentOptions(options: readonly ParamOption[]): boolean {
+  if (options.length < 2 || options.length > 4) return false;
+  return options.every((o) => !o.disabled) &&
+    options.reduce((n, o) => n + (o.label || String(o.value)).length, 0) <= 12;
+}
+
+function ParamControl({ name, value, options, disabled, onChange }: {
+  name: string; value: string | number | boolean | undefined;
+  options: readonly ParamOption[]; disabled?: boolean; onChange: (n: string | number | boolean) => void;
+}) {
+  const paramTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const segmented = shouldSegmentOptions(options);
+  if (segmented) {
+    return (
+      <div className="flex min-h-[34px] flex-col gap-1.5">
+        <span className="text-label text-[var(--gc-node-muted)]" title={name}>{paramLabel(name)}</span>
+        <SegmentedParam name={name} value={value} options={options} disabled={disabled} onSelect={onChange} />
+      </div>
+    );
+  }
+  return (
+    <label className="flex min-h-[34px] items-center gap-2">
+      <span className="w-20 shrink-0 truncate text-label text-[var(--gc-node-muted)]" title={name}>{paramLabel(name)}</span>
+      <Select value={paramText(value)} disabled={disabled || options.length === 0}
+        onValueChange={(n) => {
+          const found = typeof n === "string" ? options.find((o) => String(o.value) === n) : undefined;
+          if (found) { onChange(found.value as string | number); return; }
+          if (typeof n === "string" || typeof n === "number" || typeof n === "boolean") onChange(n);
+        }}>
+        <SelectTrigger ref={paramTriggerRef} aria-label={paramLabel(name)} className="nodrag h-7 min-w-0 flex-1 text-[11px]">
+          <SelectValue placeholder="默认">{(sel) => paramText(sel) || "默认"}</SelectValue>
+        </SelectTrigger>
+        <SelectPortal><SelectPositioner
+          side="right"
+          align="start"
+          alignItemWithTrigger={false}
+          collisionBoundary={typeof document === "undefined" ? undefined : document.body}
+          sideOffset={() => nodeOutsideOffset(paramTriggerRef.current)}
+        ><SelectPopup>
+          <SelectList>
+            {options.map((o) => (
+              <SelectItem key={String(o.value)} value={o.value} disabled={o.disabled}>{o.label || String(o.value)}</SelectItem>
+            ))}
+          </SelectList>
+        </SelectPopup></SelectPositioner></SelectPortal>
+      </Select>
+    </label>
   );
 }
 
@@ -264,7 +350,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
   const effModel = data.modelId ?? "";
 
-  const modelSel: ParamRowOption[] = mediaKind === "image"
+  const modelSel: SelectOption[] = mediaKind === "image"
     ? GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) }))
     : VIDEO_MODEL_IDS.map((id) => ({ value: id, label: videoModelLabel(id) }));
 
@@ -342,30 +428,6 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const curPromptSizeValue = typeof options.promptSizePrefix === "string" ? options.promptSizePrefix : "";
 
   const setParam = (k: string, n: string | number | boolean) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });
-  const optionsFor = (k: string): ParamRowOption[] => {
-    if (paramOpts[k] && paramOpts[k].length > 0) return paramOpts[k];
-    const spec = (recommended as Record<string, { examples?: Array<string | number | boolean> } | undefined>)[k];
-    return (spec?.examples ?? []).map((v) => ({ value: v }));
-  };
-
-  // A 案摘要行：模型 ｜ 参数速览。图片：画幅 · 尺寸 · ×批次；视频：画幅 · 分辨率 · 时长。
-  const modelLabel = modelSel.find((o) => o.value === effModel)?.label || effModel || "未选择模型";
-  const summarySpecs: string[] = [];
-  if (mediaKind === "image") {
-    if (data.aspectRatio) summarySpecs.push(data.aspectRatio);
-    const sizeEcho = curPromptSizeValue
-      || sizeTierOptions?.find((o) => o.value === curSizeValue)?.label
-      || curSizeValue
-      || (typeof options.imageSize === "string" ? options.imageSize : "");
-    if (sizeEcho) summarySpecs.push(sizeEcho);
-    const batchEcho = (data as ImageGeneratorNodeData).batchSize;
-    if (typeof batchEcho === "number") summarySpecs.push(`×${batchEcho}`);
-  } else {
-    if (data.aspectRatio) summarySpecs.push(data.aspectRatio);
-    if (typeof options.resolution === "string" && options.resolution) summarySpecs.push(options.resolution);
-    if (typeof options.seconds === "string" && options.seconds) summarySpecs.push(`${options.seconds}s`);
-  }
-  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
@@ -379,64 +441,44 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         dropState={dropStateFor(mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference")}
         onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
 
-      {/* 隔离线：输入行（提示词/参考图）与模型参数摘要行分区 */}
-      <div aria-hidden="true" className="border-t border-[var(--gc-node-border)]" />
+      <OptionSelect label="模型" value={effModel} options={modelSel}
+        disabled={disabled} onChange={patchModel} />
 
-      {/* 参数区收成一行摘要；明细在原位置向上伸出（side=top），每参数独占一行、选项直接点选 */}
-      <Popover.Root>
-        <Popover.Trigger
-          ref={settingsTriggerRef}
-          aria-label="模型参数设置"
-          className="nodrag flex h-7 w-full items-center gap-2 rounded-md border border-[var(--gc-node-border)] bg-[var(--gc-node-inner)] px-2 text-[11px] text-[var(--gc-node-text)]"
-        >
-          <span className="min-w-0 flex-1 truncate text-left">{modelLabel}{summarySpecs.length > 0 ? ` ｜ ${summarySpecs.join(" · ")}` : ""}</span>
-          <SlidersHorizontalIcon aria-hidden="true" className="size-3.5 shrink-0 text-[var(--gc-node-muted)]" />
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Positioner
-            side="top"
-            align="start"
-            sideOffset={7}
-            collisionBoundary={typeof document === "undefined" ? undefined : document.body}
-          >
-            <Popover.Popup
-              aria-label="模型参数设置"
-              className="z-[72] max-h-[50vh] w-[460px] max-w-[calc(100vw-32px)] space-y-3 overflow-y-auto rounded-md border border-[var(--gc-border)] bg-[var(--gc-panel)] p-3 shadow-lg outline-none"
-            >
-              <section aria-label="模型参数" className="space-y-3">
-              <ParamRow label="模型" value={effModel} options={modelSel} disabled={disabled} stack
-                onSelect={(v) => patchModel(String(v))} />
-              {promptSizeOptions ? (
-                <ParamRow label="尺寸" value={curPromptSizeValue} options={promptSizeOptions} disabled={disabled}
-                  onSelect={(v) => updateNodeData(nodeId, {
-                    modelOptions: { ...options, promptSizePrefix: v === "" ? undefined : v },
-                  })} />
-              ) : (
-                <ParamRow label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled}
-                  onSelect={(v) => patchAspect(String(v))} />
-              )}
-              {mediaKind === "image" && (
-                <ParamRow label="数量" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
-                  options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
-                  onSelect={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
-              )}
-              {sizeTierOptions && (
-                <ParamRow label="尺寸" value={curSizeValue} options={sizeTierOptions} disabled={disabled}
-                  onSelect={(v) => updateNodeData(nodeId, { modelOptions: { ...options, size: v } })} />
-              )}
-              {renderParamKeys.map((k) => (
-                <ParamRow key={k} label={paramLabel(k)} value={options[k]} options={optionsFor(k)} disabled={disabled}
-                  onSelect={(n) => setParam(k, n)} />
-              ))}
-              {warnings.map((w) => (
-                <p key={w} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">⚠ {w}（仍可运行）</p>
-              ))}
-              </section>
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
-      </Popover.Root>
+      <div className="grid grid-cols-2 gap-2">
+        {promptSizeOptions ? (
+          // gpt-image-2.5-all 既不接受 size 也不接受画幅参数，尺寸只能靠 prompt 前缀控制
+          // （契约 recommendedOptions.promptSizePrefix），故画幅位换成尺寸前缀下拉。
+          <OptionSelect label="尺寸" value={curPromptSizeValue} options={promptSizeOptions} disabled={disabled}
+            onChange={(v) => updateNodeData(nodeId, {
+              modelOptions: { ...options, promptSizePrefix: v === "" ? undefined : v },
+            })} />
+        ) : (
+          <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
+        )}
+        {mediaKind === "image" && (
+          <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
+            options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
+            onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+        )}
+      </div>
 
+      {sizeTierOptions && (
+        <OptionSelect label="尺寸" value={curSizeValue} options={sizeTierOptions} disabled={disabled}
+          onChange={(v) => updateNodeData(nodeId, { modelOptions: { ...options, size: v } })} />
+      )}
+
+      <section aria-label="模型参数" className="space-y-1">
+        {renderParamKeys.length === 0 && (
+          <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">当前模型没有可调参数。</p>
+        )}
+        {renderParamKeys.map((k) => (
+          <ParamControl key={k} name={k} value={options[k]} options={paramOpts[k] ?? []} disabled={disabled}
+            onChange={(n) => setParam(k, n)} />
+        ))}
+        {warnings.map((w) => (
+          <p key={w} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">⚠ {w}（仍可运行）</p>
+        ))}
+      </section>
 
       <RunButton status={data.status} onClick={() => void runNode(nodeId)}
         label={data.status === "success" ? "重新运行" : "运行"}

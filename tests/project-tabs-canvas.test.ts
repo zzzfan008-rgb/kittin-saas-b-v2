@@ -774,7 +774,8 @@ await test("最近生成成功卡只留对比动作，查看走卡片主体、�
   assert.match(resultsPanelSource, /openViewer/, "卡片直接打开 ImageViewer（65d R-87 §3）");
   assert.match(resultsPanelSource, /isNodeRunActive\(r\.status\)/);
   assert.match(resultsPanelSource, /r\.status !== "success"/);
-  assert.match(resultsPanelSource, /grid-cols-2/);
+  // 结果网格 5 列（旧 4 列已扩）；卡片悬浮层不再是双动作 2 列网格（只留对比）。
+  assert.match(resultsPanelSource, /grid-cols-5/);
   assert.match(resultsPanelSource, /text-\[var\(--gc-media-overlay-text\)\]/);
 });
 
