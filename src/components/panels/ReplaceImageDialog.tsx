@@ -108,18 +108,17 @@ export function ReplaceImageDialog({
   }, [load]);
 
   // 滚轮到底自动拉下一页（5×6 固定视口）
-  const maybeLoadMore = () => {
+  const maybeLoadMore = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller || !hasMore || loading) return;
     const remain = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
     if (remain < 320) void load(assets.length);
-  };
+  }, [hasMore, loading, load, assets.length]);
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     if (scroller.scrollHeight <= scroller.clientHeight + 48) maybeLoadMore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  });
+  }, [maybeLoadMore]);
 
   // Esc 关闭
   useEffect(() => {
