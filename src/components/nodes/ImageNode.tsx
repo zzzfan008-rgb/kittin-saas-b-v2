@@ -20,6 +20,7 @@ import { NodeFrame,
   useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
+import { MattingDialog } from "@/components/panels/MattingDialog";
 import { MaskEditor } from "./MaskEditor";
 import { MultiRoundEditPanel } from "./MultiRoundEditPanel";
 import { RefOrdinalBadge } from "./RefOrdinalBadge";
@@ -78,6 +79,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
   const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
+  const [mattingDialogOpen, setMattingDialogOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
   const editPromptEdit = useCoalescedTextEdit(
     { kind: "node-data", nodeId: id, field: "editPrompt" },
@@ -212,8 +214,9 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 disabledReason: "暂不可用：图片裁剪能力尚未接入",
               },
               matting: {
-                disabled: true,
-                disabledReason: "暂不可用：抠图能力尚未接入",
+                onSelect: () => setMattingDialogOpen(true),
+                disabled: !hasUpload || readOnly,
+                disabledReason: !hasUpload ? "请先上传图片后再抠图" : "只读项目不能抠图",
               },
               mask: {
                 onSelect: () => setEditingMask(true),
@@ -455,6 +458,28 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             return runImageEdit(id, fresh.trim(), { editInputRef });
           }}
           onClose={() => setEditingMulti(false)}
+        />
+      )}
+      {/* 抠图对话框 */}
+      {mattingDialogOpen && hasUpload && (
+        <MattingDialog
+          open={mattingDialogOpen}
+          source={data.outputImages[0]}
+          sourceRef={data.outputImages[0]}
+          onMattingComplete={(mattedUrl) => {
+            const target = selectActiveDocumentTarget(useFlowStore.getState());
+            if (!target) return;
+            updateNodeDataInTab(target, id, {
+              outputImages: [mattedUrl],
+              status: "success",
+              error: undefined,
+              mask: undefined,
+              maskSourceRef: undefined,
+              featherRadius: undefined,
+            });
+            setMattingDialogOpen(false);
+          }}
+          onClose={() => setMattingDialogOpen(false)}
         />
       )}
     </>
