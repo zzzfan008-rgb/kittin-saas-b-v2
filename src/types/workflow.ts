@@ -90,7 +90,7 @@ export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 export const MAX_PROMPT_INPUTS = 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
-export const BATCH_SIZES = [1, 2, 4, 8] as const;
+export const BATCH_SIZES = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
 // ---------- 参考图可追溯输入 ----------
@@ -132,6 +132,16 @@ export interface TextNodeData extends BaseNodeData {
   /** 提示词正文。长度上限沿用 MAX_TEXT_LENGTH = 20_000。
    *  用户手写内容的所有权字段：任何运行路径都不写本字段。 */
   text: string;
+  /** 六要素结构化选择（可选）：面板写入，拼装结果落 text；下游 dag/改写/快照只读 text。
+   *  形态见 src/lib/promptElements.ts PromptElements；此处宽松类型避免循环 import。 */
+  promptElements?: {
+    subject: string;
+    environment?: unknown;
+    lighting?: unknown;
+    lens?: unknown;
+    tone?: unknown;
+    composition?: unknown;
+  };
 }
 
 export interface ImageNodeData extends BaseNodeData {
@@ -175,7 +185,7 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
-  batchSize: BatchSize; // 1 | 2 | 4 | 8
+  batchSize: BatchSize; // 1–9
   /**
    * 工作流族标识（模板实例化时落标，如 "model-tryon"）。
    * 用途：运行时提示词改写白名单门控（见 2026-10-12-prompt-rewrite/plan.md §2.3）。
@@ -365,11 +375,18 @@ export interface Asset {
   canManage?: boolean;
   name: string;
   /**
-   * 素材类型：print=印花 / fabric=面料 / reference=参考图 / model=数字模特。
+   * 素材类型（资产库二级分类；一级见 `src/lib/assetTaxonomy.ts`）：
+   * 服装设计 print=印花 / fabric=面料 / colorcard=色卡 / sketch=线稿；
+   * 模特换装 model=数字模特 / garment=服装 / accessory=配饰 / pose=动作 / background=背景；
+   * 视频生成 refvideo=参考视频 / audio=语音。
+   * 旧参考类已并入 garment（migration 26）。
    * 服务端镜像清单见 `server/routes/assets.ts` 的 `CATEGORIES` 与
    * `server/lib/database.ts` 的 CHECK 约束（R-86）。
    */
-  category: "print" | "fabric" | "reference" | "model";
+  category:
+    | "print" | "fabric" | "colorcard" | "sketch"
+    | "model" | "garment" | "accessory" | "pose" | "background"
+    | "refvideo" | "audio";
   /** 图片 URL（/api/files/xxx） */
   image: string;
   /** 列表/画布预览使用的轻量缩略图；执行节点时仍使用 image 原图。 */
@@ -402,7 +419,10 @@ export interface Asset {
  * 服务端等价实现见 server/lib/workflowSchema.ts。
  */
 
-export type GraphNodeLike = { id: string; data: { kind: NodeKind } };
+export type GraphNodeLike = {
+  id: string;
+  data: { kind: NodeKind; label?: string; familyId?: string };
+};
 export type GraphEdgeLike = {
   target: string;
   source: string;
@@ -604,17 +624,43 @@ export function selectAllReferenceOrdinals(
   edges: readonly GraphEdgeLike[],
 ): ReadonlyMap<string, ReferenceOrdinalAssignment[]> {
   const result = new Map<string, ReferenceOrdinalAssignment[]>();
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const kindById = new Map(nodes.map((node) => [node.id, node.data.kind]));
-  // 按目标分组编号（每个生成节点的入边序列各自从 1 起）。
-  const nextOrdinalByTarget = new Map<string, number>();
+  // 按目标分组收集（每个生成节点的入边序列各自编号）。
+  const edgesByTarget = new Map<string, GraphEdgeLike[]>();
   for (const edge of edges) {
     if (!isReferenceEdge(edge)) continue;
     if (!isImageSourceKind(kindById.get(edge.source))) continue;
-    const ordinal = nextOrdinalByTarget.get(edge.target) ?? 1;
-    nextOrdinalByTarget.set(edge.target, ordinal + 1);
-    const list = result.get(edge.source) ?? [];
-    list.push({ ordinal, targetId: edge.target });
-    result.set(edge.source, list);
+    const list = edgesByTarget.get(edge.target) ?? [];
+    list.push(edge);
+    edgesByTarget.set(edge.target, list);
+  }
+  for (const [targetId, targetEdges] of edgesByTarget) {
+    // P0（model-tryon）：徽标是图号的唯一证据——该族的上游按节点身份
+    // （id garment/model 优先，label 关键词兜底）排序，与 dag 拼装顺序一致。
+    // 用户删节点重建（身份不可识别）时保持连线顺序。
+    const familyId = nodeById.get(targetId)?.data?.familyId;
+    if (familyId === "model-tryon") {
+      const rankOf = (sourceId: string): number => {
+        if (sourceId === "garment") return 0;
+        if (sourceId === "model") return 1;
+        const label = String(nodeById.get(sourceId)?.data?.label ?? "");
+        if (label.includes("服装")) return 0;
+        if (label.includes("模特")) return 1;
+        return 2;
+      };
+      targetEdges
+        .map((edge, index) => ({ edge, index }))
+        .sort((a, b) => rankOf(a.edge.source) - rankOf(b.edge.source) || a.index - b.index)
+        .forEach(({ edge }, position) => {
+          targetEdges[position] = edge;
+        });
+    }
+    targetEdges.forEach((edge, index) => {
+      const list = result.get(edge.source) ?? [];
+      list.push({ ordinal: index + 1, targetId });
+      result.set(edge.source, list);
+    });
   }
   return result;
 }

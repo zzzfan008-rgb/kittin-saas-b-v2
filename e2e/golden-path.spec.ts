@@ -392,12 +392,9 @@ test("an unverified starter no longer blocks run, and the run completes the isol
   await expect(resultCard).toBeVisible();
   await resultCard.hover();
   const actionBar = resultCard.locator("div.absolute.inset-x-0.bottom-0");
-  await expect(actionBar).toHaveClass(/grid-cols-2/);
-  // 2026-09-25 第 5 批（ab68c16）：卡片上的动作按钮「查看」改成「查看详情」（文本仍是「查看」，
-  // title 变为「查看详情」）；65d R-87 §3 起由 ImageViewer 直接承接大图查看。
-  await expect(resultCard.locator('button[title="查看详情"]')).toBeVisible();
-  await expect(resultCard.locator('button[title="加入对比"]')).toBeVisible();
-  await expect(resultCard.locator('a[title="下载"]')).toHaveAttribute("download", "");
+  // 卡片悬浮条只剩「加入对比」：查看走卡片主体点击，下载/设为输入走 ImageViewer。
+  await expect(actionBar.getByRole("button", { name: "加入对比" })).toBeVisible();
+  await expect(actionBar.getByRole("button")).toHaveCount(1);
 
   const nodesBeforeApply = await page.locator(".react-flow__node").count();
   // 媒体遮罩文字 token 的主题稳定性：必须在查看器打开前读——查看器关闭（Escape）会连同
@@ -409,7 +406,7 @@ test("an unverified starter no longer blocks run, and the run completes the isol
     }, theme);
     // 读 token 而非 computed color：computed color 受 hover:text-white 影响（鼠标移出后
     // :hover 要到下一帧才失效，存在竞态）；token 在三种主题下都应稳定为 #f4f4f4。
-    const overlayToken = await resultCard.locator('button[title="查看详情"]').evaluate(
+    const overlayToken = await resultCard.locator('button[title="加入对比"]').evaluate(
       (element) => getComputedStyle(element).getPropertyValue("--gc-media-overlay-text").trim(),
     );
     expect(overlayToken).toBe("#f4f4f4");
@@ -418,24 +415,17 @@ test("an unverified starter no longer blocks run, and the run completes the isol
     if (value) document.documentElement.setAttribute("data-theme", value);
   }, originalTheme);
 
-  // 65d R-87 §3：点「查看详情」直接打开 ImageViewer（结果详情弹窗已删除，大图区并入查看器）。
-  await resultCard.locator('button[title="查看详情"]').click();
+  // 点卡片主体直接打开 ImageViewer（结果详情弹窗已删除，大图区并入查看器）。
+  await resultCard.getByRole("button", { name: /查看/ }).click();
   const zoomHud = page.locator(".zoom-hud");
   await expect(zoomHud).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(zoomHud).toHaveCount(0);
+  // 下载走查看器。
+  await expect(page.getByRole("link", { name: "下载图片" })).toHaveAttribute("download", "");
   // 确定性地确认不存在遗留的「结果详情」弹窗，避免后续点击被遮罩拦截。
   await expect(page.getByRole("dialog", { name: "结果详情" })).toHaveCount(0);
 
-  // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点 ----------
-  // 查看器 Esc 会连同结果浮层一起收起（弹层语义），所以这里按需重开（用按钮的 ARIA 状态判断，
-  // 不用不自动等待的 isVisible()）。
-  if (await resultsFab.getAttribute("aria-expanded") !== "true") {
-    await resultsFab.click();
-  }
-  await expect(resultsDialog).toBeVisible();
-  await expect(resultCard).toBeVisible();
-  await resultCard.locator('button[title="设为输入"]').click();
+  // ---------- ⑦b 设为输入：把结果回灌成新的输入层节点（走查看器；成功后查看器自关） ----------
+  await page.getByRole("button", { name: "设为输入" }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(nodesBeforeApply + 1);
 
   // ---------- ⑧ 加节点入口：左侧工具栏的「添加」工作流菜单（节点库面板已下线） ----------

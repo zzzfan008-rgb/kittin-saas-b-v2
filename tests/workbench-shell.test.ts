@@ -170,8 +170,8 @@ const resultsPanelSource = fs.readFileSync(
 );
 assert.match(
   resultsPanelSource,
-  /grid-cols-4/,
-  "结果缩略图必须以 4 个为一行呈现（2026-10-14 批量第 2 条：信息密度 4 列）",
+  /grid-cols-5/,
+  "结果缩略图必须以 5 个为一行呈现（5×6=30 条一页，滚动加载）",
 );
 assert.match(
   appSource,
