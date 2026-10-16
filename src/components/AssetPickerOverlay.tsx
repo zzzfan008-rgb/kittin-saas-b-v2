@@ -41,12 +41,12 @@ export function AssetPickerOverlay({
     ) ?? "design",
   );
   const [leaf, setLeaf] = useState<AssetLeafId>(resolvedInitialLeaf);
-  const pickLeaf = (next: AssetLeafId) => {
+  const pickLeaf = useCallback((next: AssetLeafId) => {
     setLeaf(next);
     for (const l1 of ASSET_LEVEL1) {
       if (ASSET_LEVEL2[l1.id].some((item) => item.id === next)) { setLevel1(l1.id); break; }
     }
-  };
+  }, []);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -78,14 +78,14 @@ export function AssetPickerOverlay({
   };
 
   // 同一个浮层实例被指向另一个节点时，预选分类跟随新请求；用户手动切换不被覆盖。
+  // pickLeaf 与 setLeaf 同源（同一分类状态），放入 deps 不会引发循环。
   useEffect(() => {
     setLeaf((current) => {
       if (current === resolvedInitialLeaf) return current;
-      pickLeaf(resolvedInitialLeaf);
       return resolvedInitialLeaf;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedInitialLeaf]);
+    pickLeaf(resolvedInitialLeaf);
+  }, [resolvedInitialLeaf, pickLeaf]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -133,18 +133,17 @@ export function AssetPickerOverlay({
   }, [request, load]);
 
   // 滚轮到底自动拉下一页（5×6 固定视口）
-  const maybeLoadMore = () => {
+  const maybeLoadMore = useCallback(() => {
     const scroller = scrollerRef.current;
     if (!scroller || !hasMore || loading) return;
     const remain = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
     if (remain < 320) void load(assets.length);
-  };
+  }, [hasMore, loading, load, assets.length]);
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     if (scroller.scrollHeight <= scroller.clientHeight + 48) maybeLoadMore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  });
+  }, [maybeLoadMore]);
 
   const pick = (asset: Asset) => {
     // 有写回目标 = 选中节点后打开：素材等同一次上传（R8 上传位语义）。
