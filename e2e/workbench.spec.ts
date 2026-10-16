@@ -610,7 +610,6 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   const crop = imageNode.getByRole("button", { name: "裁剪" });
   await expect(crop).toBeDisabled();
   await expect(crop).toHaveAttribute("title", /请先上传图片后再裁剪/);
-<<<<<<< HEAD
   const matting = imageNode.getByRole("button", { name: "抠图" });
   await expect(matting).toBeDisabled();
   await expect(matting).toHaveAttribute("title", /请先上传图片后再抠图/);
