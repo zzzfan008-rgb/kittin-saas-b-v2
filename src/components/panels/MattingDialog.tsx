@@ -49,7 +49,7 @@ export function MattingDialog({
 
       // 2. 调用 removeBackground
       const blob = await removeBackground(source, {
-        model: quality === "fast" ? "small" : quality === "medium" ? "medium" : "large",
+        model: quality === "fast" ? "isnet_quint8" : quality === "medium" ? "isnet_fp16" : "isnet",
         publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal/dist/assets",
       });
 
