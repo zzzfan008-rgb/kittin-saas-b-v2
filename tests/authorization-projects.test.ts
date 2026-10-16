@@ -704,7 +704,7 @@ await test("真实账号删除先持 owner 锁时，全部并发写入等待后�
       request("/assets", sourceKey, {
         method: "POST",
         body: JSON.stringify({
-          name: "被阻止素材", category: "reference", scope: "private", image: PNG_DATA_URL,
+          name: "被阻止素材", category: "garment", scope: "private", image: PNG_DATA_URL,
         }),
       }),
       request(`/assets/${patchAssetId}`, sourceKey, {

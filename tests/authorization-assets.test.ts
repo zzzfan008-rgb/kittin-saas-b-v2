@@ -396,7 +396,7 @@ await test("所有鉴权图片禁止缓存，撤回共享后立即恢复访问�
   const hijack = await request("/assets", "other", {
     method: "POST",
     body: JSON.stringify({
-      name: "越权共享", category: "reference", scope: "shared", image: uploaded.url,
+      name: "越权共享", category: "garment", scope: "shared", image: uploaded.url,
     }),
   });
   assert.equal(hijack.status, 404);
@@ -495,7 +495,7 @@ await test("管理员创建通用素材时解除底层文件的个人归属", as
   const create = await request("/assets", "admin", {
     method: "POST",
     body: JSON.stringify({
-      name: "通用素材", category: "reference", scope: "global", image: uploaded.url,
+      name: "通用素材", category: "garment", scope: "global", image: uploaded.url,
     }),
   });
   assert.equal(create.status, 201, await create.text());
@@ -544,7 +544,7 @@ await test("已有文件创建素材持共享锁，使并发 TTL 清理等待并
       method: "POST",
       body: JSON.stringify({
         name: "并发回收素材",
-        category: "reference",
+        category: "garment",
         scope: "private",
         image: `/api/files/${fileId}`,
       }),
@@ -669,9 +669,9 @@ await test("素材名称搜索把 % 和 _ 当字面字符而非 LIKE 通配符",
     INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
     VALUES
       ('search-percent', $1, 'private', 'A%B', 'garment', '/api/files/search-p.png', $2),
-      ('search-plain', $1, 'private', 'AB', 'reference', '/api/files/search-q.png', $2),
-      ('search-underscore', $1, 'private', 'A_C', 'reference', '/api/files/search-u.png', $2),
-      ('search-anychar', $1, 'private', 'AXC', 'reference', '/api/files/search-x.png', $2)
+      ('search-plain', $1, 'private', 'AB', 'garment', '/api/files/search-q.png', $2),
+      ('search-underscore', $1, 'private', 'A_C', 'garment', '/api/files/search-u.png', $2),
+      ('search-anychar', $1, 'private', 'AXC', 'garment', '/api/files/search-x.png', $2)
   `, [users.owner.id, now]);
 
   const percent = await request("/assets?search=A%25B", "owner");

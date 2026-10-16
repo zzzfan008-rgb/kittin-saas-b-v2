@@ -352,7 +352,7 @@ assert.deepEqual(preserved, {
   owner_id: admin.id,
   scope: "private",
   name: "迁移素材",
-  category: "reference",
+  category: "garment",
   source_note: null,
 });
 console.log("  ✓ legacy 迁移不会在重复启动时夺取现有素材归属");

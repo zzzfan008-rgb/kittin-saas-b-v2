@@ -1338,10 +1338,16 @@ async function migrate(): Promise<void> {
     // 数字模特库（R-86）：assets.category 枚举扩容，新增 'model'。
     // 枚举扩容对既有数据无损，无需回填。
     if (!applied.has(22)) {
+      // 注：本分支初始 schema（迁移 1）已用 11 类枚举；此处必须与之一致，
+      // 否则会把约束窄化回旧 4 类、拒绝 'garment' 等新类目（迁移 26 会再统一）。
       await client.query(`
         ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_category_check;
         ALTER TABLE assets ADD CONSTRAINT assets_category_check
-          CHECK (category IN ('print','fabric','reference','model'));
+          CHECK (category IN (
+            'print','fabric','colorcard','sketch',
+            'model','garment','accessory','pose','background',
+            'refvideo','audio'
+          ));
       `);
       await client.query(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (22, $1, $2)",
