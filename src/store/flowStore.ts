@@ -3678,7 +3678,12 @@ if (typeof window !== "undefined") {
     const state = useFlowStore.getState();
     for (const tab of state.tabs) {
       if (tab.readOnly || !tab.dirty || !tab.hasBeenPersisted || tab.saveState !== "idle") continue;
-      if (tab.nodes.some((node) => isNodeRunActive(node.data.status))) continue;
+      // 优化1：不再阻止整个页签保存。只要当前选中节点没在运行就保存其他节点的修改
+      const selectedNodeIds = new Set(tab.selectedNodeIds ?? []);
+      const hasRunningSelectedNode = tab.nodes.some(
+        (node) => selectedNodeIds.has(node.id) && isNodeRunActive(node.data.status)
+      );
+      if (hasRunningSelectedNode) continue;
       await useFlowStore.getState().saveTabById(tab.id);
     }
   };
