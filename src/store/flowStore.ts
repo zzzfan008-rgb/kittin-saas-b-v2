@@ -3719,6 +3719,20 @@ if (typeof window !== "undefined") {
     return persistLatestStableState(false);
   };
 
+  // 优化4：页面恢复可见时立即保存（不等待debounce）
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        if (serverAutosaveHandle !== null) {
+          window.clearTimeout(serverAutosaveHandle);
+          serverAutosaveHandle = null;
+        }
+        lastServerAutosaveTime = Date.now();
+        void runServerAutosave();
+      }
+    });
+  }
+
   useFlowStore.subscribe((state, previousState) => {
     if (!persistenceSignalChanged(state, previousState)) return;
     if (activeHistoryTransaction) {
