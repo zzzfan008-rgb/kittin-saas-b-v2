@@ -140,12 +140,17 @@ export function ProjectTabs() {
             >
               <span
                 aria-hidden="true"
+                title={tab.saveState === "saving" ? "保存中..." : tab.saveState === "error" ? "保存失败，点击重试" : tab.dirty ? "未保存" : "已保存"}
                 className={`mr-2 size-2 shrink-0 rounded-full ${
                   running
                     ? "animate-pulse bg-blue-400"
-                    : tab.dirty
-                      ? "bg-[var(--gc-accent)]"
-                      : "bg-neutral-600"
+                    : tab.saveState === "saving"
+                      ? "animate-pulse bg-yellow-500"
+                      : tab.saveState === "error"
+                        ? "bg-red-500"
+                        : tab.dirty
+                          ? "bg-[var(--gc-accent)]"
+                          : "bg-neutral-600"
                 }`}
               />
 
