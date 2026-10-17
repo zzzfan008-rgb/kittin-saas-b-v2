@@ -292,6 +292,33 @@ export function ImageViewer() {
           <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-body text-red-300">{record.error}</div>
         )}
 
+        {/* 操作区 */}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
+          {record && (
+            <button
+              type="button"
+              onClick={runAgain}
+              disabled={Boolean(generationSafetyBlockReason) || unsupportedKind}
+              title={generationSafetyBlockReason ?? (unsupportedKind ? "该结果来自旧版本，不支持重新生成" : undefined)}
+              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
+            </button>
+          )}
+          {!activeTabReadOnly && (
+            <button
+              type="button"
+              onClick={handleContinueWithResult}
+              disabled={!record}
+              title={activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
+              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              设为输入
+            </button>
+          )}
+        </div>
+
       </aside>
     </div>
   );
