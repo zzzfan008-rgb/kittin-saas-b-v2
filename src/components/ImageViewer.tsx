@@ -77,6 +77,9 @@ export function ImageViewer() {
 
   if (!viewer) return null;
 
+  const providerOriginals = record?.providerImages?.length
+    ? record.providerImages
+    : record?.providerImage ? [record.providerImage] : [];
   // 视频记录（video-generator 跑出的 mp4）：主区用 video 播放，不走图片缩放链。
   const isVideoRecord = record?.kind === "video-generator" || /\.mp4($|[?#])/i.test(viewer?.url ?? "");
 
@@ -121,7 +124,7 @@ export function ImageViewer() {
     try {
       await saveImageAsAsset({
         name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
-        category: saveToModelLibrary ? "model" : "garment",
+        category: saveToModelLibrary ? "model" : "reference",
         image: viewer.url,
         sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
       });
@@ -165,9 +168,6 @@ export function ImageViewer() {
         {/* 操作栏：±按钮 + 提示 */}
         <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 py-3" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-label text-white/70">
-            <button type="button" onClick={zoom.zoomOut} disabled={zoom.scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
-            <span className="w-12 text-center text-xs">{zoom.hudLabel}</span>
-            <button type="button" onClick={zoom.zoomIn} disabled={zoom.scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
           </div>
           <span className="text-label text-white/50">
             双击{zoom.hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
@@ -237,37 +237,20 @@ export function ImageViewer() {
             <h2 className="text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
             <p className="mt-1 text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
           </div>
-          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]" aria-label="关闭">✕</button>
-        </div>
+          </div>
+        )}
 
-        {/* 从 ResultRecordDetail 迁移的字段 */}
-        <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
-          {[
-            ["状态", record ? <span className={statusColor[record.status] ?? ""}>{statusText[record.status] ?? record.status}</span> : "—"],
-            ["节点类型", record ? nodeTitleForKind(record.kind) : "—"],
-            ["模型", record?.model ?? "—"],
-            ["数量", record?.requestedCount ? `${record.successfulCount ?? 0}/${record.requestedCount}` : "—"],
-            ["上游实际尺寸", record?.providerOutputSize ?? "—"],
-            ["服务请求", record?.providerRequests ?? "—"],
-            ["开始时间", record?.startedAt ? new Date(record.startedAt).toLocaleString("zh-CN") : "—"],
-            ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
-          ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-[var(--gc-text-muted)]">{label}</dt><dd className="text-right text-[var(--gc-text)]">{value}</dd></div>)}
-        </dl>
-
-        {/* 提示词 */}
-        {(record?.prompt || viewer.prompt) && (
+        {/* Provider 原图 */}
+        {providerOriginals.length > 0 && (
           <div className="mt-4">
-            <p className="text-label text-[var(--gc-text-muted)]">提示词</p>
-            <p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-body leading-relaxed text-[var(--gc-text)]">
-              {record?.prompt ?? viewer.prompt}
-            </p>
-            <button
-              type="button"
-              onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")}
-              className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-            >
-              复制提示词
-            </button>
+            <p className="text-label text-[var(--gc-text-muted)]">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {providerOriginals.map((image, index) => (
+                <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
+                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[var(--gc-border)] object-contain" />
+                </a>
+              ))}
+            </div>
           </div>
         )}
 
@@ -289,62 +272,6 @@ export function ImageViewer() {
           <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-body text-red-300">{record.error}</div>
         )}
 
-        {/* 操作区 */}
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleCompare}
-            disabled={!record}
-            className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:opacity-50"
-          >
-            {comparing ? "取消对比" : "加入对比"}
-          </button>
-          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
-          <label className="mr-auto flex items-center gap-2 text-label text-[var(--gc-text)]">
-            <Checkbox
-              aria-label="存入数字模特库"
-              checked={saveToModelLibrary}
-              onCheckedChange={(checked) => {
-                setSaveToModelLibrary(checked === true);
-                setAssetState("idle");
-              }}
-              className="border-[var(--gc-border)] data-checked:border-gold data-checked:bg-gold/20 data-checked:text-gold"
-            />
-            <span>存入数字模特库</span>
-          </label>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void saveAsAsset()}
-            disabled={assetState === "saving" || assetState === "saved"}
-            className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:opacity-60"
-          >
-            {assetState === "saving" ? "保存中…" : assetState === "saved" ? "已保存" : assetState === "error" ? "保存失败，重试" : saveToModelLibrary ? "存入数字模特库" : "收藏为资产"}
-          </button>
-          {record && (
-            <button
-              type="button"
-              onClick={runAgain}
-              disabled={Boolean(generationSafetyBlockReason) || unsupportedKind}
-              title={generationSafetyBlockReason ?? (unsupportedKind ? "该结果来自旧版本，不支持重新生成" : undefined)}
-              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {generationSafetyBlockReason ? "生成暂不可用" : "重新生成"}
-            </button>
-          )}
-          {!activeTabReadOnly && (
-            <button
-              type="button"
-              onClick={handleContinueWithResult}
-              disabled={!record}
-              title={activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
-              className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              设为输入
-            </button>
-          )}
-        </div>
       </aside>
     </div>
   );
