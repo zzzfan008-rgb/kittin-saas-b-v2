@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DeleteIcon, FolderOpenIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
+import { DeleteIcon, EditIcon, FolderOpenIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -123,6 +123,8 @@ export function ProjectCenter({
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renamingValue, setRenamingValue] = useState("");
   const projectsLoadVersion = useRef(0);
   const openRequestVersion = useRef(0);
   const projectsHaveLoaded = useRef(false);
@@ -210,6 +212,37 @@ export function ProjectCenter({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }, []);
+
+  const startRename = useCallback((project: ProjectSummary, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setRenamingId(project.id);
+    setRenamingValue(project.name);
+  }, []);
+
+  const saveRename = useCallback(async (project: ProjectSummary) => {
+    const newName = renamingValue.trim();
+    if (!newName || newName === project.name) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setProjects((prev) => prev.map((p) => p.id === project.id ? { ...p, name: newName } : p));
+      setRenamingId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [renamingValue]);
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenamingValue("");
   }, []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
@@ -318,6 +351,7 @@ export function ProjectCenter({
 
                   {filteredProjects.slice(0, 8).map((project) => {
                     const openTab = tabs.find((tab) => tab.projectId === project.id);
+                    const isRenaming = renamingId === project.id;
                     return (
                       <CardFrame key={project.id}>
                         <div className="relative">
@@ -325,11 +359,39 @@ export function ProjectCenter({
                             type="button"
                             onClick={() => void openProject(project)}
                             className="block w-full text-left"
+                            disabled={isRenaming}
                           >
                             <ProjectCover alt={project.name} />
                             <span className="block p-3">
                               <span className="flex items-center gap-2">
-                                <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                                {isRenaming ? (
+                                  <input
+                                    type="text"
+                                    value={renamingValue}
+                                    onChange={(e) => setRenamingValue(e.target.value)}
+                                    onBlur={() => saveRename(project)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveRename(project);
+                                      if (e.key === "Escape") cancelRename();
+                                      e.stopPropagation();
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    autoFocus
+                                    className="flex-1 rounded border border-[var(--gc-accent)] bg-[var(--gc-control)] px-2 py-1 text-xs text-[var(--gc-text)] outline-none"
+                                  />
+                                ) : (
+                                  <>
+                                    <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => startRename(project, e)}
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] opacity-0 transition-opacity hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)] group-hover:opacity-100"
+                                      title="重命名"
+                                    >
+                                      改名
+                                    </button>
+                                  </>
+                                )}
                                 {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
                               </span>
                               <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
@@ -338,15 +400,17 @@ export function ProjectCenter({
                               </span>
                             </span>
                           </button>
-                          {/* 优化4：添加删除按钮 */}
-                          <button
-                            type="button"
-                            onClick={(e) => deleteProject(project, e)}
-                            className="absolute right-2 top-2 hidden rounded p-1 hover:bg-black/50 group-hover:flex text-white"
-                            title="删除项目"
-                          >
-                            <DeleteIcon className="size-3.5" />
-                          </button>
+                          {/* 优化4：删除按钮 - 改为文字+红色底色 */}
+                          {!isRenaming && (
+                            <button
+                              type="button"
+                              onClick={(e) => deleteProject(project, e)}
+                              className="absolute right-2 top-2 hidden rounded bg-red-600/90 px-2 py-1 text-xs text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-red-600 group-hover:flex"
+                              title="删除项目"
+                            >
+                              删除
+                            </button>
+                          )}
                         </div>
                       </CardFrame>
                     );

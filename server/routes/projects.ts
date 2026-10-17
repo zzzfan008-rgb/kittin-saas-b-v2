@@ -783,6 +783,33 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
   }
 }));
 
+// 重命名项目
+projectsRouter.patch("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || !name.trim()) {
+    res.status(400).json({ error: "项目名称不能为空" });
+    return;
+  }
+  const row = await queryOne<{ owner_id: string }>(
+    "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+    [req.params.id]
+  );
+  if (!row) {
+    res.status(404).json({ error: "project not found" });
+    return;
+  }
+  if (row.owner_id !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "无权修改此项目" });
+    return;
+  }
+  await query(
+    "UPDATE projects SET name = $1, updated_at = NOW() WHERE id = $2",
+    [name.trim(), req.params.id]
+  );
+  res.json({ success: true, name: name.trim() });
+}));
+
 // 优化4：删除项目
 projectsRouter.delete("/:id", asyncHandler(async (req, res) => {
   const user = requestUser(req);
