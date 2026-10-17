@@ -19,7 +19,8 @@ import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { NodeFrame,
   useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
-import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
+import { AssetPickerOverlay } from "@/components/AssetPickerOverlay";
+import type { AssetPickerRequest } from "@/lib/overlayEvents";
 import { MattingDialog } from "@/components/panels/MattingDialog";
 import { CropImageDialog } from "@/components/panels/CropImageDialog";
 import { MaskEditor } from "./MaskEditor";
@@ -80,6 +81,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
   const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
+  const [assetPickerRequest, setAssetPickerRequest] = useState<AssetPickerRequest | null>(null);
   const [mattingDialogOpen, setMattingDialogOpen] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
@@ -247,7 +249,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               },
               replace: {
                 onSelect: () => {
-                  setReplaceMenuOpen(true);
+                  setAssetPickerRequest({ nodeId: id });
                 },
                 disabled: readOnly,
                 disabledReason: "只读项目不能替换图片",
@@ -272,7 +274,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         ) : (
           <div
             onDoubleClick={() => {
-              if (!readOnly) setReplaceMenuOpen(true);
+              if (!readOnly) setAssetPickerRequest({ nodeId: id });
             }}
             onDragOver={(event) => {
               event.preventDefault();
@@ -294,7 +296,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             onKeyDown={(event) => {
               if (event.key === "Enter" && !readOnly) {
                 event.preventDefault();
-                setReplaceMenuOpen(true);
+                setAssetPickerRequest({ nodeId: id });
               }
             }}
           >
@@ -338,26 +340,16 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
 
-      {replaceMenuOpen && (
-        <ReplaceImageDialog
-          nodeId={id}
-          nodeLabel={data.label}
-          readOnly={readOnly}
-          onUpload={handleFile}
-          onPickFromLibrary={(url) => {
-            const target = selectActiveDocumentTarget(useFlowStore.getState());
-            if (!target) return;
-            updateNodeDataInTab(target, id, {
-              outputImages: [url],
-              status: "success",
-              error: undefined,
-              mask: undefined,
-              maskSourceRef: undefined,
-              featherRadius: undefined,
-            });
-            setReplaceMenuOpen(false);
+      {assetPickerRequest && (
+        <AssetPickerOverlay
+          request={assetPickerRequest}
+          onRequestChange={(req) => {
+            if (req === null) {
+              setAssetPickerRequest(null);
+            } else {
+              setAssetPickerRequest(req);
+            }
           }}
-          onClose={() => setReplaceMenuOpen(false)}
         />
       )}
 
