@@ -77,9 +77,6 @@ export function ImageViewer() {
 
   if (!viewer) return null;
 
-  const providerOriginals = record?.providerImages?.length
-    ? record.providerImages
-    : record?.providerImage ? [record.providerImage] : [];
   // 视频记录（video-generator 跑出的 mp4）：主区用 video 播放，不走图片缩放链。
   const isVideoRecord = record?.kind === "video-generator" || /\.mp4($|[?#])/i.test(viewer?.url ?? "");
 
@@ -271,20 +268,6 @@ export function ImageViewer() {
             >
               复制提示词
             </button>
-          </div>
-        )}
-
-        {/* Provider 原图 */}
-        {providerOriginals.length > 0 && (
-          <div className="mt-4">
-            <p className="text-label text-[var(--gc-text-muted)]">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {providerOriginals.map((image, index) => (
-                <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
-                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[var(--gc-border)] object-contain" />
-                </a>
-              ))}
-            </div>
           </div>
         )}
 
