@@ -168,6 +168,9 @@ export function ImageViewer() {
         {/* 操作栏：±按钮 + 提示 */}
         <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 py-3" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-label text-white/70">
+            <button type="button" onClick={zoom.zoomOut} disabled={zoom.scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
+            <span className="w-12 text-center text-xs">{zoom.hudLabel}</span>
+            <button type="button" onClick={zoom.zoomIn} disabled={zoom.scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
           </div>
           <span className="text-label text-white/50">
             双击{zoom.hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
@@ -237,20 +240,37 @@ export function ImageViewer() {
             <h2 className="text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
             <p className="mt-1 text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
           </div>
-          </div>
-        )}
+          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]" aria-label="关闭">✕</button>
+        </div>
 
-        {/* Provider 原图 */}
-        {providerOriginals.length > 0 && (
+        {/* 从 ResultRecordDetail 迁移的字段 */}
+        <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
+          {[
+            ["状态", record ? <span className={statusColor[record.status] ?? ""}>{statusText[record.status] ?? record.status}</span> : "—"],
+            ["节点类型", record ? nodeTitleForKind(record.kind) : "—"],
+            ["模型", record?.model ?? "—"],
+            ["数量", record?.requestedCount ? `${record.successfulCount ?? 0}/${record.requestedCount}` : "—"],
+            ["上游实际尺寸", record?.providerOutputSize ?? "—"],
+            ["服务请求", record?.providerRequests ?? "—"],
+            ["开始时间", record?.startedAt ? new Date(record.startedAt).toLocaleString("zh-CN") : "—"],
+            ["耗时", record?.finishedAt && record.startedAt ? `${((record.finishedAt - record.startedAt) / 1000).toFixed(1)}s` : "—"],
+          ].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4"><dt className="text-[var(--gc-text-muted)]">{label}</dt><dd className="text-right text-[var(--gc-text)]">{value}</dd></div>)}
+        </dl>
+
+        {/* 提示词 */}
+        {(record?.prompt || viewer.prompt) && (
           <div className="mt-4">
-            <p className="text-label text-[var(--gc-text-muted)]">Provider 原图（业务后处理前）· {providerOriginals.length} 张</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {providerOriginals.map((image, index) => (
-                <a key={`${image}-${index}`} href={image} target="_blank" rel="noreferrer" className="block">
-                  <img src={thumbnailImageUrl(image)} alt={`Provider 原图 ${index + 1}`} className="max-h-44 rounded-md border border-[var(--gc-border)] object-contain" />
-                </a>
-              ))}
-            </div>
+            <p className="text-label text-[var(--gc-text-muted)]">提示词</p>
+            <p className="mt-1 whitespace-pre-wrap rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] p-3 text-body leading-relaxed text-[var(--gc-text)]">
+              {record?.prompt ?? viewer.prompt}
+            </p>
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard.writeText(record?.prompt ?? viewer.prompt ?? "")}
+              className="mt-2 rounded-sm border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+            >
+              复制提示词
+            </button>
           </div>
         )}
 
