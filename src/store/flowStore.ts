@@ -3485,6 +3485,7 @@ if (typeof window !== "undefined") {
   let idleHandle: number | null = null;
   let debounceHandle: number | null = null;
   let serverAutosaveHandle: number | null = null;
+  let lastServerAutosaveTime = 0;
 
   const tabMarker = (tab: ProjectTab): string => [
     tab.projectId,
@@ -3692,10 +3693,14 @@ if (typeof window !== "undefined") {
     if (isProjectTabSessionPersistenceSuspended()) return;
     if (typeof document === "undefined" || document.visibilityState !== "visible") return;
     if (serverAutosaveHandle !== null) window.clearTimeout(serverAutosaveHandle);
+    // 优化3：自适应 debounce - 首次编辑后 1 秒保存，连续编辑保持 2.5 秒
+    const timeSinceLastSave = Date.now() - lastServerAutosaveTime;
+    const delay = timeSinceLastSave < 5000 ? SERVER_AUTOSAVE_DEBOUNCE_MS : 1000;
     serverAutosaveHandle = window.setTimeout(() => {
       serverAutosaveHandle = null;
+      lastServerAutosaveTime = Date.now();
       void runServerAutosave();
-    }, SERVER_AUTOSAVE_DEBOUNCE_MS);
+    }, delay);
   };
 
   flushDeferredTabSessionPersistence = () => {
