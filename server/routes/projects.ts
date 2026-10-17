@@ -366,8 +366,8 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
 projectsRouter.get("/", asyncHandler(async (req, res) => {
   await purgeExpiredProjects();
   const user = requestUser(req);
-  const rows = await query<Omit<ProjectRow, "flow_json">>(`
-    SELECT p.id, p.owner_id, u.display_name AS owner_name, p.name, p.updated_at
+  const rows = await query<ProjectRow>(`
+    SELECT p.id, p.owner_id, u.display_name AS owner_name, p.name, p.updated_at, p.flow_json
     FROM projects p JOIN users u ON u.id = p.owner_id
     WHERE p.deleted_at IS NULL AND p.lifecycle = 'saved'
       AND ($1 = 'admin' OR p.owner_id = $2)
@@ -379,6 +379,31 @@ projectsRouter.get("/", asyncHandler(async (req, res) => {
     const key = `${row.owner_id}:${row.name}`;
     if (!deduped.has(key)) deduped.set(key, row);
   }
+  
+  // 优化5：提取最后生成的预览图
+  const getPreviewImage = (flowJson: string): string | undefined => {
+    try {
+      const flow = JSON.parse(flowJson) as { nodes?: Array<{ data?: Record<string, unknown> }> };
+      if (!Array.isArray(flow.nodes)) return undefined;
+      for (const node of [...flow.nodes].reverse()) {
+        if (!node?.data) continue;
+        const arrays = [node.data.outputImages, node.data.images, node.data.referenceImages];
+        for (const arr of arrays) {
+          if (!Array.isArray(arr)) continue;
+          const img = [...arr].reverse().find((item): item is string => typeof item === "string" && item.length > 0);
+          if (img) return img;
+        }
+        for (const key of ["imageUrl", "fabricImageUrl", "sourceImageUrl"]) {
+          const val = node.data[key];
+          if (typeof val === "string" && val.length > 0) return val;
+        }
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  };
+  
   res.json(Array.from(deduped.values()).map((row) => ({
     id: row.id,
     name: row.name,
@@ -386,6 +411,7 @@ projectsRouter.get("/", asyncHandler(async (req, res) => {
     ownerName: row.owner_name,
     readOnly: row.owner_id !== user.id,
     updatedAt: row.updated_at,
+    previewImage: getPreviewImage(row.flow_json),
   })));
 }));
 

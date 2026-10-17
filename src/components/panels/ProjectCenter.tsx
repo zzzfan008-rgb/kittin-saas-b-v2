@@ -24,6 +24,7 @@ interface ProjectSummary {
   ownerName?: string;
   readOnly?: boolean;
   updatedAt: string;
+  previewImage?: string;
 }
 
 interface ProjectDetail extends ProjectSummary {
@@ -361,7 +362,7 @@ export function ProjectCenter({
                             className="block w-full text-left"
                             disabled={isRenaming}
                           >
-                            <ProjectCover alt={project.name} />
+                            <ProjectCover src={project.previewImage} alt={project.name} />
                             <span className="block p-3">
                               <span className="flex items-center gap-2">
                                 {isRenaming ? (
