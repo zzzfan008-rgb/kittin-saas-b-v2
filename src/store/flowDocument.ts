@@ -46,6 +46,13 @@ export function defaultProjectName(takenNames: Iterable<string> = [], now: Date 
   const base = `未命名-${y}-${m}-${d}`;
   const taken = new Set(takenNames);
   if (!taken.has(base)) return base;
+  // 优化2：使用4位随机数而非递增数字（减少碰撞概率）
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const rand = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const candidate = `${base}-${rand}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  // 降级方案：用递增数字
   let i = 2;
   while (taken.has(`${base}-${i}`)) i += 1;
   return `${base}-${i}`;

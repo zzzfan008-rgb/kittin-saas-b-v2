@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FolderOpenIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
+import { DeleteIcon, FolderOpenIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -32,7 +32,7 @@ interface ProjectDetail extends ProjectSummary {
 
 const NEW_PROJECT_COVER = "/assets/project-center/new-project-cover.jpg";
 const EMPTY_PROJECT_COVER = "/assets/project-center/empty-project-cover.jpg";
-const PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4";
+const PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 gap-4";
 const PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-[var(--gc-text)]";
 
 function flowPreviewImage(flow: { nodes: unknown[] }): string | undefined {
@@ -200,6 +200,18 @@ export function ProjectCenter({
     }
   }, [onOpenChange]);
 
+  const deleteProject = useCallback(async (project: ProjectSummary, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!confirm(`确定删除"${project.name}"吗？此操作不可撤销。`)) return;
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const filteredProjects = useMemo(
     () => projects.filter((project) => !normalizedQuery || project.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery)),
@@ -266,7 +278,7 @@ export function ProjectCenter({
               </div>
             )}
 
-            <div className="min-h-0 overflow-y-auto p-7">
+            <div className="min-h-0 overflow-y-auto p-7" style={{ maxHeight: "calc(100% - 12px)" }}>
               {projectsLoading ? (
                 <ProjectCardSkeletons />
               ) : (
@@ -304,27 +316,38 @@ export function ProjectCenter({
                     </CardFrame>
                   )}
 
-                  {filteredProjects.map((project) => {
+                  {filteredProjects.slice(0, 8).map((project) => {
                     const openTab = tabs.find((tab) => tab.projectId === project.id);
                     return (
                       <CardFrame key={project.id}>
-                        <button
-                          type="button"
-                          onClick={() => void openProject(project)}
-                          className="block w-full text-left"
-                        >
-                          <ProjectCover alt={project.name} />
-                          <span className="block p-3">
-                            <span className="flex items-center gap-2">
-                              <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
-                              {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => void openProject(project)}
+                            className="block w-full text-left"
+                          >
+                            <ProjectCover alt={project.name} />
+                            <span className="block p-3">
+                              <span className="flex items-center gap-2">
+                                <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                                {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                              </span>
+                              <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
+                                {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
+                                最后编辑 {formatUpdatedAt(project.updatedAt)}
+                              </span>
                             </span>
-                            <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
-                              {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
-                              最后编辑 {formatUpdatedAt(project.updatedAt)}
-                            </span>
-                          </span>
-                        </button>
+                          </button>
+                          {/* 优化4：添加删除按钮 */}
+                          <button
+                            type="button"
+                            onClick={(e) => deleteProject(project, e)}
+                            className="absolute right-2 top-2 hidden rounded p-1 hover:bg-black/50 group-hover:flex text-white"
+                            title="删除项目"
+                          >
+                            <DeleteIcon className="size-3.5" />
+                          </button>
+                        </div>
                       </CardFrame>
                     );
                   })}

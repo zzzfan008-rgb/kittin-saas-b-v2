@@ -373,7 +373,13 @@ projectsRouter.get("/", asyncHandler(async (req, res) => {
       AND ($1 = 'admin' OR p.owner_id = $2)
     ORDER BY p.updated_at DESC
   `, [user.role, user.id]);
-  res.json(rows.map((row) => ({
+  // 优化1：去重 - 按 (owner_id, name) 分组，只保留最新版本
+  const deduped = new Map<string, typeof rows[number]>();
+  for (const row of rows) {
+    const key = `${row.owner_id}:${row.name}`;
+    if (!deduped.has(key)) deduped.set(key, row);
+  }
+  res.json(Array.from(deduped.values()).map((row) => ({
     id: row.id,
     name: row.name,
     ownerId: row.owner_id,
@@ -775,4 +781,23 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
       error: error instanceof WorkflowValidationError ? `项目数据无法迁移：${error.message}` : "项目数据损坏",
     });
   }
+}));
+
+// 优化4：删除项目
+projectsRouter.delete("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const row = await queryOne<{ owner_id: string }>(
+    "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+    [req.params.id]
+  );
+  if (!row) {
+    res.status(404).json({ error: "project not found" });
+    return;
+  }
+  if (row.owner_id !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "无权删除此项目" });
+    return;
+  }
+  await query("UPDATE projects SET deleted_at = NOW() WHERE id = $1", [req.params.id]);
+  res.json({ success: true });
 }));
