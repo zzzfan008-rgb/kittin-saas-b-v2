@@ -385,7 +385,7 @@ export function ProjectCenter({
                                     <button
                                       type="button"
                                       onClick={(e) => startRename(project, e)}
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] opacity-0 transition-opacity hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)] group-hover:opacity-100"
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
                                       title="重命名"
                                     >
                                       改名
