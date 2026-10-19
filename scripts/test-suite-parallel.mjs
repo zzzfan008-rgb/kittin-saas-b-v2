@@ -126,6 +126,9 @@ const TEST_FILES = [
   "tests/cards-58-60-61.test.ts",
   // R-85：本地 shadcn Slider 受控回写契约护栏（纯源码断言，不碰库）。
   "tests/ui-slider-controlled-contract.test.ts",
+  // 抠图：alpha 边缘羽化纯函数 + 模型源/错误提示（纯逻辑，无 DOM/网络）。
+  "tests/matting-compositor.test.ts",
+  "tests/matting-model-source.test.ts",
 
   // P0 清单修复（审计 2026-10-02）：以下 12 个测试文件此前只在盘上、从未被执行。
   "tests/asset-model-category.test.ts",
