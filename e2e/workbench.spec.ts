@@ -606,10 +606,11 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   await expect(imageToolbar).toBeVisible();
   await expect(imageToolbar).toHaveAttribute("aria-label", "图片工具栏");
   // 未上传图片时「裁剪 / 抠图」保持可见但禁用，并给出原因（不隐藏）。
-  // #119/#120：裁剪与抠图能力均已接入，此时禁用原因是「请先上传图片」。
+  // 抠图（#119）已接入，禁用原因是「请先上传图片」；裁剪由独立 PR #120
+  // （feat/image-crop-v2，尚未合入 main）接入，在此之前禁用原因是「能力尚未接入」。
   const crop = imageNode.getByRole("button", { name: "裁剪" });
   await expect(crop).toBeDisabled();
-  await expect(crop).toHaveAttribute("title", /请先上传图片后再裁剪/);
+  await expect(crop).toHaveAttribute("title", /图片裁剪能力尚未接入/);
   const matting = imageNode.getByRole("button", { name: "抠图" });
   await expect(matting).toBeDisabled();
   await expect(matting).toHaveAttribute("title", /请先上传图片后再抠图/);
