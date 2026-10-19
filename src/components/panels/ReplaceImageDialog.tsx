@@ -3,26 +3,19 @@ import { useFlowStore } from "@/store/flowStore";
 import type { Asset } from "@/types/workflow";
 import { thumbnailImageUrl } from "@/lib/images";
 import type { AssetPickerCategory } from "@/lib/overlayEvents";
+import {
+  ASSET_EMPTY_HINT,
+  ASSET_LEVEL1,
+  ASSET_LEVEL2,
+  type AssetLeafId,
+  type AssetLevel1Id,
+} from "@/lib/assetTaxonomy";
 
-const CATEGORY_TABS = [
-  ["all", "全部"],
-  ["print", "印花"],
-  ["fabric", "面料"],
-  ["reference", "参考"],
-  ["model", "数字模特"],
-] as const;
+/** 一页 5 列 × 6 行 = 30；滚轮到底自动拉下一页。 */
+const PAGE_SIZE = 30;
 
-type CategoryFilter = (typeof CATEGORY_TABS)[number][0];
-
-const PAGE_SIZE = 20;
-
-const EMPTY_HINT: Record<CategoryFilter, string> = {
-  all: "暂无素材，可在印花提取节点中「存为素材」",
-  print: "暂无印花素材，可在印花提取节点中「存为素材」",
-  fabric: "暂无面料素材",
-  reference: "暂无参考素材，可在图片查看器中「收藏为资产」",
-  model: "暂无数字模特，可在图片查看器中「存入数字模特库」",
-};
+/** 替换弹窗只选图片：视频大类不出现（参考视频/语音不能写入图片节点）。 */
+const LEVEL1 = ASSET_LEVEL1.filter((l1) => l1.id !== "video");
 
 interface ReplaceImageDialogProps {
   nodeId: string;
@@ -42,7 +35,7 @@ interface ReplaceImageDialogProps {
  *   - 删掉图片节点内「从本地上传 / 从素材库替换」两按钮；
  *   - 点工具条「替换」→ 弹出独立窗口；
  *   - 第一张卡片 = 上传本地文件；其他 = 素材库网格；**卡片大小一致**；
- *   - 保留分类筛选、搜索、加载更多。
+ *   - 保留分类筛选、搜索、滚动自动加载。
  */
 export function ReplaceImageDialog({
   nodeId: _nodeId,
@@ -56,7 +49,8 @@ export function ReplaceImageDialog({
   void updateNodeDataInTab; // 保持 store 订阅（用户预期此弹窗与节点绑定）
   void _nodeId; // 显式标记未用（保留 API 契约稳定性）
 
-  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [level1, setLevel1] = useState<AssetLevel1Id>("design");
+  const [leaf, setLeaf] = useState<AssetLeafId>("print");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -67,6 +61,7 @@ export function ReplaceImageDialog({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -84,9 +79,12 @@ export function ReplaceImageDialog({
     setError(null);
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
-      if (category !== "all") params.set("category", category);
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      const res = await fetch(`/api/assets?${params}`);
+      const history = leaf === "history";
+      if (!history) {
+        params.set("category", leaf);
+        if (debouncedSearch) params.set("search", debouncedSearch);
+      }
+      const res = await fetch(history ? `/api/assets/history-uploads?${params}` : `/api/assets?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page = (await res.json()) as Asset[];
       if (!Array.isArray(page)) throw new Error("素材数据格式无效");
@@ -103,11 +101,24 @@ export function ReplaceImageDialog({
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
     }
-  }, [category, debouncedSearch]);
+  }, [leaf, debouncedSearch]);
 
   useEffect(() => {
     void load(0);
   }, [load]);
+
+  // 滚轮到底自动拉下一页（5×6 固定视口）
+  const maybeLoadMore = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !hasMore || loading) return;
+    const remain = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (remain < 320) void load(assets.length);
+  }, [hasMore, loading, load, assets.length]);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (scroller.scrollHeight <= scroller.clientHeight + 48) maybeLoadMore();
+  }, [maybeLoadMore]);
 
   // Esc 关闭
   useEffect(() => {
@@ -140,7 +151,7 @@ export function ReplaceImageDialog({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[80vh] w-[min(680px,90vw)] flex-col rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)]"
+        className="flex h-[min(700px,88vh)] w-[min(760px,92vw)] flex-col rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
@@ -156,68 +167,74 @@ export function ReplaceImageDialog({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-[var(--gc-border)] px-4 py-2.5">
-          <div className="flex gap-1">
-            {CATEGORY_TABS.map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setCategory(key)}
-                className={`rounded-sm border px-2 py-1 text-label transition-colors ${
-                  category === key
-                    ? "border-gold/60 text-gold"
-                    : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="space-y-2 border-b border-[var(--gc-border)] px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1" role="tablist" aria-label="资产大类">
+              {LEVEL1.map((l1) => (
+                <button
+                  key={l1.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={level1 === l1.id}
+                  onClick={() => {
+                    setLevel1(l1.id);
+                    const first = ASSET_LEVEL2[l1.id][0];
+                    // 无子类的一级（历史素材）直接落到同名叶子
+                    setLeaf(first ? first.id : "history");
+                  }}
+                  className={`rounded-sm border px-2 py-1 text-label font-medium transition-colors ${
+                    level1 === l1.id
+                      ? "border-gold/60 text-gold"
+                      : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+                  }`}
+                >
+                  {l1.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索素材名称"
+              className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
+            />
           </div>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索素材名称"
-            className="ml-auto w-44 rounded-sm border border-[var(--gc-border)] bg-[var(--gc-control)] px-2 py-1 text-label text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-gold/60 focus:outline-hidden"
-          />
+          <div className="flex items-center gap-2">
+            {ASSET_LEVEL2[level1].length > 0 ? (
+              <div className="flex gap-1" role="tablist" aria-label="资产子类">
+                {ASSET_LEVEL2[level1].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={leaf === item.id}
+                    onClick={() => setLeaf(item.id)}
+                    className={`rounded-sm border px-2 py-1 text-label transition-colors ${
+                      leaf === item.id
+                        ? "border-gold/60 text-gold"
+                        : "border-[var(--gc-border)] text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-label text-[var(--gc-text-muted)]">全部历史上传（新的在前）</span>
+            )}
+            <span className="ml-auto text-label text-[var(--gc-text-muted)]">
+              在「{leaf === "history" ? "历史素材" : (ASSET_LEVEL2[level1].find((item) => item.id === leaf)?.label ?? "")}」中搜索
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollerRef} onScroll={maybeLoadMore} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           {uploadError && (
             <p className="mb-3 rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-label text-red-400">
               上传失败：{uploadError}
             </p>
           )}
-
-          {/* 第一张卡片：本地上传（尺寸与素材卡片一致：aspect-square + object-cover） */}
-          <div className="grid grid-cols-4 gap-2.5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={readOnly || uploading}
-              title={readOnly ? "只读项目不能替换图片" : "从本地上传图片"}
-              className={`${cardBaseClass} flex flex-col items-center justify-center gap-1.5 border-dashed disabled:opacity-40`}
-            >
-              <span className="text-2xl text-[var(--gc-text-muted)]">+</span>
-              <span className="text-label text-[var(--gc-text-muted)]">
-                {uploading ? "上传中…" : "从本地上传"}
-              </span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple={false}
-              disabled={readOnly}
-              tabIndex={-1}
-              aria-label="从本地上传图片"
-              className="pointer-events-none absolute h-0 w-0 opacity-0"
-              onChange={(event) => {
-                void handleLocalFile(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-            />
-          </div>
 
           {error && (
             <div className="mt-3 py-6 text-center">
@@ -236,11 +253,38 @@ export function ReplaceImageDialog({
           )}
           {!error && !loading && assets.length === 0 && (
             <p className="mt-3 py-6 text-center text-label text-[var(--gc-text-muted)]">
-              {debouncedSearch ? "没有匹配的素材" : EMPTY_HINT[category]}
+              {debouncedSearch && leaf !== "history" ? "没有匹配的素材" : ASSET_EMPTY_HINT[leaf]}
             </p>
           )}
-          {assets.length > 0 && (
-            <div className="mt-2.5 grid grid-cols-4 gap-2.5">
+          {(assets.length > 0 || !loading) && !error && (
+            <div className="mt-2.5 grid grid-cols-5 gap-2.5">
+              {/* 第一格：本地上传（与素材卡同尺寸） */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={readOnly || uploading}
+                title={readOnly ? "只读项目不能替换图片" : "从本地上传图片"}
+                className={`${cardBaseClass} flex aspect-square w-full flex-col items-center justify-center gap-1.5 border-dashed disabled:opacity-40`}
+              >
+                <span className="text-2xl text-[var(--gc-text-muted)]">+</span>
+                <span className="text-label text-[var(--gc-text-muted)]">
+                  {uploading ? "上传中…" : "从本地上传"}
+                </span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple={false}
+                disabled={readOnly}
+                tabIndex={-1}
+                aria-label="从本地上传图片"
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
+                onChange={(event) => {
+                  void handleLocalFile(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
               {assets.map((asset) => (
                 <button
                   key={asset.id}
@@ -257,20 +301,17 @@ export function ReplaceImageDialog({
                     decoding="async"
                     className="aspect-square w-full bg-[var(--gc-control)] object-cover"
                   />
-                  <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">{asset.name}</div>
+                  <div className="truncate px-1.5 py-1 text-body text-[var(--gc-text)]">{
+                    asset.id.startsWith("upload-")
+                      ? `本地上传 ${new Date(asset.createdAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+                      : asset.name
+                  }</div>
                 </button>
               ))}
             </div>
           )}
-          {hasMore && (
-            <button
-              type="button"
-              onClick={() => void load(assets.length)}
-              disabled={loading}
-              className="mt-2.5 w-full rounded-md border border-dashed border-[var(--gc-border)] px-3 py-2 text-label text-[var(--gc-text-muted)] hover:border-gold/60 hover:text-gold disabled:opacity-50"
-            >
-              {loading ? "加载中…" : "加载更多素材"}
-            </button>
+          {loading && assets.length > 0 && (
+            <p className="py-3 text-center text-label text-[var(--gc-text-muted)]">加载中…</p>
           )}
         </div>
       </div>

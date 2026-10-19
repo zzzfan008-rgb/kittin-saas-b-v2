@@ -21,6 +21,7 @@ import {
   assertImageReferencesAccessible,
   ImageReferenceAccessError,
 } from "../lib/imageReferenceAccess";
+import { stripLocalImageRefs } from "../lib/localImageRefs";
 import {
   GPT_IMAGE_MAX_ASPECT_RATIO,
   GPT_IMAGE_MAX_PIXELS,
@@ -449,6 +450,69 @@ filesRouter.post("/masks/copy", asyncHandler(async (req, res) => {
     if (!committed) copiedFileIds.forEach(deleteStoredImage);
     throw error;
   }
+}));
+
+/**
+ * 历史素材删除：仅本人上传（source_type='upload'）可删；软删（deleted_at + 15 天 purge）。
+ * 画布节点或资产仍在引用该文件时拒绝（409），避免删后图片变坏。
+ */
+filesRouter.delete("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const id = path.basename(req.params.id);
+  if (id !== req.params.id) {
+    res.status(400).json({ error: "invalid file id" });
+    return;
+  }
+  const url = `/api/files/${id}`;
+  const row = await queryOne<{ owner_id: string | null; source_type: string }>(
+    "SELECT owner_id, source_type FROM files WHERE id = $1 AND deleted_at IS NULL",
+    [id],
+  );
+  if (!row) {
+    res.status(404).json({ error: "file not found" });
+    return;
+  }
+  if (row.owner_id !== user.id && user.role !== "admin") {
+    res.status(403).json({ error: "无权删除此文件" });
+    return;
+  }
+  if (row.source_type !== "upload") {
+    res.status(409).json({ error: "仅本地上传可在历史素材中删除" });
+    return;
+  }
+  // 级联删除：同时清理资产引用和画布引用（outputImages/mask/editInputRef 等任意层级）。
+  // 资产记录和画布引用全量清理（不按 owner 过滤：global/shared 资产可被他人画布引用），
+  // 否则保存时的存在性闸会因悬空引用让整包同步失败。
+  const now = new Date().toISOString();
+  const purgeAfter = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+  const deletedAssets = await query<{ id: string }>(
+    "UPDATE assets SET deleted_at = $1, purge_after = $2 WHERE image = $3 AND deleted_at IS NULL RETURNING id",
+    [now, purgeAfter, url],
+  );
+  const projects = await query<{ id: string; flow_json: string }>(
+    "SELECT id, flow_json FROM projects WHERE deleted_at IS NULL AND flow_json LIKE '%' || $1 || '%'",
+    [url],
+  );
+  let affectedNodes = 0;
+  for (const proj of projects) {
+    try {
+      const stripped = stripLocalImageRefs(
+        JSON.parse(proj.flow_json),
+        (ref: string) => ref === url,
+      );
+      if (stripped.removed === 0) continue;
+      affectedNodes += stripped.removed;
+      await query(
+        "UPDATE projects SET flow_json = $1, updated_at = $2 WHERE id = $3",
+        [JSON.stringify(stripped.value), now, proj.id],
+      );
+    } catch (error) {
+      console.error(`[files] 清理画布 ${proj.id} 引用失败`, error);
+    }
+  }
+  await query("UPDATE files SET deleted_at = $1, purge_after = $2 WHERE id = $3",
+    [now, purgeAfter, id]);
+  res.json({ ok: true, affectedNodes, affectedAssets: deletedAssets.length });
 }));
 
 filesRouter.get("/:id/thumbnail", asyncHandler(async (req, res) => {

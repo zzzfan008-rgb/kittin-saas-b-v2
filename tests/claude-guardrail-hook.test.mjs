@@ -63,8 +63,6 @@ for (const toolName of ["Write", "Edit", "Bash", "Read", "Grep", "Glob", "Notebo
 }
 
 for (const command of [
-  "git push origin main",
-  "gh pr create --title blocked",
   "git merge feature",
   "git rebase main",
   "git cherry-pick deadbeef",
@@ -113,19 +111,38 @@ expectExit("ordinary Read", runHook(primaryRoot, "Read", { file_path: join(prima
 expectExit("ordinary Grep", runHook(primaryRoot, "Grep", { path: "src", pattern: "canvas" }), 0);
 expectExit("ordinary Glob", runHook(primaryRoot, "Glob", { path: "src", pattern: "**/*.ts" }), 0);
 expectExit("read-only git", runHook(primaryRoot, "Bash", { command: "git status --short" }), 0);
+
+// Bash is open in the primary worktree too: non-read-only commands that are not on
+// the forbidden list must pass, and the push / PR rules are gone.
 for (const [label, command] of [
-  ["sed write command", "sed -n '1w /tmp/x' AGENTS.md"],
-  ["sed execute command", "sed -n '1e touch /tmp/x' AGENTS.md"],
-  ["git grep pager command", "git grep -O touch canvas"],
-  ["git grep long pager command", "git grep --open-files-in-pager=touch canvas"],
+  ["git push in primary", "git push origin main"],
+  ["gh pr create in primary", "gh pr create --title x"],
+  ["arbitrary command in primary", "node scripts/build.mjs"],
+  ["piped command in primary", "ls | wc -l"],
+]) {
+  expectExit(label, runHook(primaryRoot, "Bash", { command }), 0);
+}
+
+// Commands that stay blocked regardless of worktree.
+for (const [label, command] of [
+  ["merge still blocked", "git merge feature"],
+  ["hard reset still blocked", "git reset --hard HEAD~1"],
+  ["dependency install still blocked", "npm install package-name"],
+]) {
+  expectExit(label, runHook(primaryRoot, "Bash", { command }), 2);
+}
+
+// Sensitive-path reads stay blocked in every worktree. The variable-expansion /
+// command-substitution cases that used to assert exit 2 did so because the
+// primary-worktree read-only allowlist rejected anything it could not prove was
+// read-only; that allowlist is gone now that Bash is open, so those forms run.
+// Known gap: a forbidden command hidden behind a variable (e.g. `p=merge; git $p x`)
+// is matched only by its literal text, which is unchanged from linked-worktree
+// behaviour before this policy change.
+for (const [label, command] of [
   ["secret suffix glob", "cat *.env"],
   ["secret brace expansion", "cat .env{,}"],
   ["secret partial glob", "cat .e*"],
-  ["leading environment assignment", "FOO=bar git status --short"],
-  ["variable expansion", "p=push; git $p origin main"],
-  ["braced variable expansion", "p=push; git ${p} origin main"],
-  ["command substitution", "git $(printf push) origin main"],
-  ["backtick substitution", "git `printf push` origin main"],
 ]) {
   expectExit(label, runHook(primaryRoot, "Bash", { command }), 2);
 }

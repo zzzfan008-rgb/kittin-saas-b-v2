@@ -100,7 +100,11 @@ async function migrate(): Promise<void> {
       owner_id TEXT REFERENCES users(id),
       scope TEXT NOT NULL CHECK (scope IN ('global','private','shared')),
       name TEXT NOT NULL,
-      category TEXT NOT NULL CHECK (category IN ('print','fabric','reference','model')),
+      category TEXT NOT NULL CHECK (category IN (
+        'print','fabric','colorcard','sketch',
+        'model','garment','accessory','pose','background',
+        'refvideo','audio'
+      )),
       image TEXT NOT NULL,
       source_note TEXT,
       created_at TEXT NOT NULL,
@@ -1334,10 +1338,16 @@ async function migrate(): Promise<void> {
     // 数字模特库（R-86）：assets.category 枚举扩容，新增 'model'。
     // 枚举扩容对既有数据无损，无需回填。
     if (!applied.has(22)) {
+      // 注：本分支初始 schema（迁移 1）已用 11 类枚举；此处必须与之一致，
+      // 否则会把约束窄化回旧 4 类、拒绝 'garment' 等新类目（迁移 26 会再统一）。
       await client.query(`
         ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_category_check;
         ALTER TABLE assets ADD CONSTRAINT assets_category_check
-          CHECK (category IN ('print','fabric','reference','model'));
+          CHECK (category IN (
+            'print','fabric','colorcard','sketch',
+            'model','garment','accessory','pose','background',
+            'refvideo','audio'
+          ));
       `);
       await client.query(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (22, $1, $2)",
@@ -1414,6 +1424,22 @@ async function migrate(): Promise<void> {
       await client.query(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (25, $1, $2)",
         ["remove_evaluation_ledger_system", new Date().toISOString()],
+      );
+    }
+
+    if (!applied.has(26)) {
+      // 资产库二级分类：类目扩到 11 个；旧参考类并入 garment（服装）。
+      // 先删 CHECK 再 UPDATE（否则旧约束拒绝新值），最后加新 CHECK。
+      await client.query(`ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_category_check`);
+      await client.query(`UPDATE assets SET category = 'garment' WHERE category = 'reference'`);
+      await client.query(`ALTER TABLE assets ADD CONSTRAINT assets_category_check CHECK (category IN (
+        'print','fabric','colorcard','sketch',
+        'model','garment','accessory','pose','background',
+        'refvideo','audio'
+      ))`);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (26, $1, $2)",
+        ["asset_taxonomy_v2", new Date().toISOString()],
       );
     }
 

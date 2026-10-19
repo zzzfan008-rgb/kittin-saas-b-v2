@@ -62,7 +62,7 @@ export async function migrateLegacyData(): Promise<void> {
         try {
           const raw = JSON.parse(fs.readFileSync(path.join(assets, file), "utf-8")) as Record<string, unknown>;
           if (typeof raw.id !== "string" || typeof raw.name !== "string" ||
-              !["print", "fabric", "reference"].includes(String(raw.category)) ||
+              !["print", "fabric", "garment"].includes(String(raw.category)) ||
               typeof raw.image !== "string" || !isLocalImageReference(raw.image)) continue;
           const note = typeof raw.sourceNote === "string" ? raw.sourceNote : null;
           const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : now;
@@ -97,24 +97,6 @@ export async function migrateLegacyData(): Promise<void> {
     });
   }
 
-  // 权威素材 JSON 导入完成后，才为没有元数据的孤立上传补通用占位素材。
-  if (uploadFiles.length > 0) {
-    await transaction(async (client) => {
-      for (const file of uploadFiles) {
-        const id = path.basename(file);
-        const image = `/api/files/${id}`;
-        const existing = await queryOne<{ id: string }>(
-          "SELECT id FROM assets WHERE image = $1 LIMIT 1",
-          [image],
-          client,
-        );
-        if (!existing) {
-          await client.query(`
-            INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
-            VALUES ($1, NULL, 'global', $2, 'reference', $3, $4, $5)
-          `, [nanoid(10), `历史素材-${path.parse(id).name}`, image, LEGACY_PLACEHOLDER_NOTE, now]);
-        }
-      }
-    });
-  }
+  // 禁用：不再为 legacy 文件自动创建占位素材，避免污染资产库。
+  // legacy 文件不应该自动进入资产库或历史素材，只保留物理文件供特殊用途。
 }
