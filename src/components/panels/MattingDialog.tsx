@@ -1,9 +1,14 @@
 import { useCallback, useRef, useState } from "react";
-import { removeBackground } from "@imgly/background-removal";
+import { removeBackground, type Config } from "@imgly/background-removal";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { apiErrorMessage } from "@/lib/apiErrors";
+import { featherForegroundToDataUrl } from "@/lib/mattingCompositor";
+import {
+  MATTING_PUBLIC_PATH,
+  describeMattingResourceError,
+} from "@/lib/mattingModelSource";
 
 interface MattingDialogProps {
   open: boolean;
@@ -15,151 +20,123 @@ interface MattingDialogProps {
 
 type Quality = "fast" | "medium" | "large";
 
+/**
+ * 处理阶段：把库的 progress(key, current, total) 归一到 0–100。
+ * 库有两类阶段：fetch:xxx（下载资源，主要等待）与 compute:*（decode/inference/mask/encode）。
+ */
+function mapProgress(key: string, current: number, total: number): number {
+  if (key.startsWith("fetch:")) {
+    const ratio = total > 0 ? Math.min(1, current / total) : 0;
+    return Math.round(ratio * 70); // 下载占 0–70
+  }
+  const step = Math.min(4, Math.max(0, current)); // compute:decode=0/4 … encode=4/4
+  return Math.round(70 + (step / 4) * 30);
+}
+
 export function MattingDialog({
   open,
   source,
-  sourceRef,
+  sourceRef: _sourceRef,
   onMattingComplete,
   onClose,
 }: MattingDialogProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stageLabel, setStageLabel] = useState<string>("");
+  /** 已上传的抠图结果 URL；非 null 时左侧预览切到结果并出现「采用/放弃」。 */
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quality, setQuality] = useState<Quality>("medium");
   const [featherRadius, setFeatherRadius] = useState(8);
 
+  /** 调库抠图 → alpha 边缘羽化 → 上传；成功只 setResult（不再立即替换原图）。 */
   const handleMatting = useCallback(async () => {
-    if (!imgRef.current) return;
+    const img = imgRef.current;
+    if (!img || processing) return;
+    if (!img.complete || !img.naturalWidth) {
+      setError("原图未加载完成");
+      return;
+    }
 
     setProcessing(true);
     setError(null);
+    setResult(null);
     setProgress(0);
+    setStageLabel("加载抠图模型…");
 
     try {
-      // 1. 加载原图
-      const img = imgRef.current;
-      if (!img.complete || !img.naturalWidth) {
-        throw new Error("原图未加载完成");
-      }
+      const model: Config["model"] =
+        quality === "fast" ? "isnet_quint8" : quality === "medium" ? "isnet_fp16" : "isnet";
 
-      setProgress(10);
-
-      // 2. 调用 removeBackground
-      const blob = await removeBackground(source, {
-        model: quality === "fast" ? "isnet_quint8" : quality === "medium" ? "isnet_fp16" : "isnet",
-        publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal/dist/assets",
+      // 库返回的 blob 已是「原像素 + alpha=前景蒙版」成品 PNG；接真实进度回调。
+      const foreground = await removeBackground(source, {
+        model,
+        publicPath: MATTING_PUBLIC_PATH,
+        progress: (key, current, total) => {
+          setStageLabel(key.startsWith("fetch:") ? "下载模型资源…" : "AI 抠图计算…");
+          setProgress(mapProgress(key, current, total));
+        },
       });
 
-      setProgress(60);
+      setStageLabel("合成与羽化…");
+      // 顺序 await（createImageBitmap）消除旧实现 maskImg.onload/toBlob 竞态；
+      // 羽化只作用 alpha 通道边缘（RGB 主体不糊）。
+      const dataUrl = await featherForegroundToDataUrl(foreground, featherRadius);
 
-      // 3. Canvas 合成
-      const canvas = canvasRef.current;
-      if (!canvas) throw new Error("Canvas 未初始化");
-
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("无法获取 Canvas 上下文");
-
-      // 3a. 创建掩膜图片
-      const maskImg = new Image();
-      maskImg.onload = () => {
-        // 3b. 绘制原图
-        ctx.drawImage(img, 0, 0);
-
-        // 3c. 创建临时 canvas 用于 alpha 合成
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = img.naturalWidth;
-        tempCanvas.height = img.naturalHeight;
-        const tempCtx = tempCanvas.getContext("2d");
-        if (!tempCtx) throw new Error("临时 Canvas 失败");
-
-        // 3d. 绘制原图和掩膜
-        tempCtx.drawImage(img, 0, 0);
-        tempCtx.globalCompositeOperation = "destination-in";
-        tempCtx.drawImage(maskImg, 0, 0);
-
-        // 3e. 如果需要羽化，应用羽化效果
-        if (featherRadius > 0) {
-          ctx.filter = `blur(${featherRadius}px)`;
-        }
-
-        // 3f. 绘制到最终 canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(tempCanvas, 0, 0);
-        ctx.filter = "none";
-      };
-
-      maskImg.onerror = () => {
-        throw new Error("掩膜图片加载失败");
-      };
-
-      maskImg.src = URL.createObjectURL(blob);
-
-      setProgress(85);
-
-      // 4. 转换为 DataURL (PNG with Alpha)
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Canvas 转换失败"));
-              return;
-            }
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          },
-          "image/png",
-          1.0,
-        );
-      });
-
-      setProgress(90);
-
-      // 5. 上传到服务器
+      setStageLabel("上传结果…");
       const res = await fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl }),
       });
-
       const data = (await res.json().catch(() => ({}))) as {
         url?: string;
         error?: string;
       };
-
       if (!res.ok) {
-        throw new Error(
-          apiErrorMessage(res.status, data, `上传失败 HTTP ${res.status}`),
-        );
+        throw new Error(apiErrorMessage(res.status, data, `上传失败 HTTP ${res.status}`));
       }
-
       if (typeof data.url !== "string" || !data.url) {
         throw new Error("服务端返回无效的图片 URL");
       }
 
       setProgress(100);
+      // 关键修复：先预览，由用户「采用」才替换原图（旧代码直接 onComplete+onClose）。
       setResult(data.url);
-      onMattingComplete(data.url);
-      onClose();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "抠图处理失败，请重试",
-      );
+      // 资源/网络类失败给明确中文提示（#4），其余透出原始信息，绝不静默。
+      setError(describeMattingResourceError(err));
       setProgress(0);
     } finally {
       setProcessing(false);
+      setStageLabel("");
     }
-  }, [source, quality, featherRadius, onMattingComplete, onClose]);
+  }, [source, quality, featherRadius, processing]);
+
+  /** 采用当前结果：写回节点并关闭。 */
+  const handleAdopt = useCallback(() => {
+    if (!result) return;
+    onMattingComplete(result);
+    onClose();
+  }, [result, onMattingComplete, onClose]);
+
+  /** 放弃当前结果：切回原图，允许调参重跑（不替换、保留对话框）。 */
+  const handleDiscard = useCallback(() => {
+    setResult(null);
+    setProgress(0);
+    setError(null);
+  }, []);
+
+  const busy = processing;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !busy) onClose();
+      }}
+    >
       <DialogContent
         overlayClassName="bg-black/70"
         className="flex h-[min(90vh,900px)] w-[min(95vw,1200px)] max-w-none flex-col gap-4 rounded-lg"
@@ -167,25 +144,29 @@ export function MattingDialog({
         <DialogTitle>自动抠图</DialogTitle>
 
         <div className="flex min-h-0 flex-1 gap-4">
-          {/* 左侧：预览 */}
+          {/* 左侧：预览（有结果时切到抠后图，否则原图）；棋盘格透出 alpha */}
           <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto rounded-lg bg-[var(--gc-control)]">
-            <div className="relative inline-block">
+            <div
+              className="alpha-checkerboard relative inline-block"
+            >
               <img
                 ref={imgRef}
-                src={source}
-                alt="抠图原图"
+                src={result ?? source}
+                alt={result ? "抠图结果" : "抠图原图"}
+                data-testid="matting-preview"
                 style={{
                   maxWidth: "100%",
                   maxHeight: "100%",
                   objectFit: "contain",
+                  display: "block",
                 }}
               />
-              {processing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+              {busy && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
                   <div className="text-center text-white">
-                    <div className="text-sm font-medium">处理中...</div>
+                    <div className="text-sm font-medium">{stageLabel || "处理中..."}</div>
                     <div className="mt-2 text-xs opacity-75">{progress}%</div>
-                    <div className="mt-3 h-1 w-32 bg-white/20 rounded-full overflow-hidden">
+                    <div className="mt-3 h-1 w-32 overflow-hidden rounded-full bg-white/20">
                       <div
                         className="h-full bg-gold transition-all duration-300"
                         style={{ width: `${progress}%` }}
@@ -215,7 +196,7 @@ export function MattingDialog({
                       key={q}
                       type="button"
                       onClick={() => setQuality(q)}
-                      disabled={processing}
+                      disabled={busy || result !== null}
                       className={`flex-1 rounded-sm px-2 py-1 text-xs transition-colors ${
                         quality === q
                           ? "border-gold bg-gold/20 text-gold"
@@ -228,14 +209,14 @@ export function MattingDialog({
                 </div>
               </div>
 
-              {/* 羽化 */}
+              {/* 边缘羽化（只作用 alpha 边缘） */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-label text-[var(--gc-text-muted)]">
-                  <span>羽化</span>
+                  <span>边缘羽化</span>
                   <span className="tabular-nums">{featherRadius}px</span>
                 </div>
                 <Slider
-                  disabled={processing}
+                  disabled={busy || result !== null}
                   value={[featherRadius]}
                   min={0}
                   max={32}
@@ -247,37 +228,59 @@ export function MattingDialog({
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-950/20 p-2 text-xs text-red-400">
+              <div
+                className="rounded-md bg-red-950/20 p-2 text-xs text-red-400"
+                data-testid="matting-error"
+              >
                 {error}
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              <Button
-                onClick={handleMatting}
-                disabled={processing}
-                className="w-full bg-gold text-[var(--gc-accent-cta-ink)]"
-              >
-                {processing ? "处理中..." : "开始抠图"}
-              </Button>
-              <Button
-                onClick={onClose}
-                variant="outline"
-                disabled={processing}
-                className="w-full border-[var(--gc-border)] text-[var(--gc-text)]"
-              >
-                取消
-              </Button>
-            </div>
+            {result ? (
+              // 结果态：采用 / 放弃（不再静默直接替换）
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleAdopt}
+                  className="w-full bg-gold text-[var(--gc-accent-cta-ink)]"
+                  data-testid="matting-adopt"
+                >
+                  采用结果
+                </Button>
+                <Button
+                  onClick={handleDiscard}
+                  variant="outline"
+                  className="w-full border-[var(--gc-border)] text-[var(--gc-text)]"
+                  data-testid="matting-discard"
+                >
+                  放弃，重调参数
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleMatting}
+                  disabled={busy}
+                  className="w-full bg-gold text-[var(--gc-accent-cta-ink)]"
+                  data-testid="matting-run"
+                >
+                  {busy ? "处理中..." : "开始抠图"}
+                </Button>
+                <Button
+                  onClick={onClose}
+                  variant="outline"
+                  disabled={busy}
+                  className="w-full border-[var(--gc-border)] text-[var(--gc-text)]"
+                >
+                  取消
+                </Button>
+              </div>
+            )}
 
             <p className="text-xs leading-relaxed text-[var(--gc-text-muted)]">
-              选择质量等级和羽化参数，点击「开始抠图」处理图片。处理时间取决于质量等级。
+              选择质量等级和边缘羽化，点击「开始抠图」。完成后可先预览，采用才会替换原图。
             </p>
           </aside>
         </div>
-
-        {/* 隐藏 canvas 用于合成 */}
-        <canvas ref={canvasRef} className="hidden" />
       </DialogContent>
     </Dialog>
   );
