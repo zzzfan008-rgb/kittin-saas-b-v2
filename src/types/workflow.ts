@@ -90,7 +90,7 @@ export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 export const MAX_PROMPT_INPUTS = 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
-export const BATCH_SIZES = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+export const BATCH_SIZES = [1, 2, 4, 8] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
 // ---------- 参考图可追溯输入 ----------
@@ -185,7 +185,7 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
   /** R5：自由 key-value；契约提供 recommendedOptions 元数据。 */
   modelOptions?: ImageModelOptions;
   aspectRatio: string; // "1:1" | "3:4" | "4:3" | "9:16" | "16:9"
-  batchSize: BatchSize; // 1–9
+  batchSize: BatchSize; // 1 | 2 | 4 | 8
   /**
    * 工作流族标识（模板实例化时落标，如 "model-tryon"）。
    * 用途：运行时提示词改写白名单门控（见 2026-10-12-prompt-rewrite/plan.md §2.3）。

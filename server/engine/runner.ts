@@ -339,7 +339,7 @@ async function executeImageGeneratorStep(
     ...(providerMask ? { mask: providerMask } : {}),
   };
 
-  const requestedCount = Math.max(1, Math.min(9, Number(step.params.batchSize) || 1));
+  const requestedCount = Math.max(1, Math.min(8, Number(step.params.batchSize) || 1));
   const provider = resolveProvider(modelId);
   const result = await generateExactImages(
     provider,
