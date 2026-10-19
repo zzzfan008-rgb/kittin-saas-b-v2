@@ -126,6 +126,9 @@ const TEST_FILES = [
   "tests/cards-58-60-61.test.ts",
   // R-85：本地 shadcn Slider 受控回写契约护栏（纯源码断言，不碰库）。
   "tests/ui-slider-controlled-contract.test.ts",
+  // 抠图：alpha 边缘羽化纯函数 + 模型源/错误提示（纯逻辑，无 DOM/网络）。
+  "tests/matting-compositor.test.ts",
+  "tests/matting-model-source.test.ts",
 
   // P0 清单修复（审计 2026-10-02）：以下 12 个测试文件此前只在盘上、从未被执行。
   "tests/asset-model-category.test.ts",
@@ -141,6 +144,12 @@ const TEST_FILES = [
   "tests/provider-error-i18n.test.ts",
   "tests/recent-results.test.ts",
   "tests/reference-inputs.test.ts",
+  // P0：模特试穿参考图顺序（徽标=唯一证据，纯函数不碰库）。
+  "tests/tryon-reference-order.test.ts",
+  // 六要素：拼装顺序/判定/风险扫描纯函数。
+  "tests/prompt-elements.test.ts",
+  // 本地图片引用的收集/剥除（级联删除 + 启动自愈的纯函数核心，不碰库）。
+  "tests/local-image-refs.test.ts",
   "tests/video-provider.test.ts",
 
   // 64 Phase 1（backend C1-C7）：冻结提示词常量快照 + runner taskPrompt 组装回归（纯逻辑，非碰库）。

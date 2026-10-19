@@ -10,7 +10,11 @@ import { lockActiveOwner } from "../lib/ownerMutation";
 import type { Asset } from "../../src/types/workflow";
 
 export const assetsRouter = Router();
-const CATEGORIES: Array<Asset["category"] | "model"> = ["print", "fabric", "reference", "model"];
+const CATEGORIES: Array<Asset["category"]> = [
+  "print", "fabric", "colorcard", "sketch",
+  "model", "garment", "accessory", "pose", "background",
+  "refvideo", "audio",
+];
 const TRASH_DAYS = 15;
 
 interface AssetRow {
@@ -73,6 +77,34 @@ assetsRouter.get("/", asyncHandler(async (req, res) => {
   res.json(rows.map((row) => ({
     ...mapAsset(row, user.id),
     canManage: row.scope === "global" ? user.role === "admin" : row.owner_id === user.id,
+  })));
+}));
+
+/**
+ * 历史素材：仅用户本地上传的图片（files.source_type='upload'），倒序。
+ * 蒙版（mask/mask-draft）与多轮合成（edit-draft）及生成产物一律排除。
+ */
+assetsRouter.get("/history-uploads", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const rows = await query<{
+    id: string; created_at: string;
+  }>(`
+    SELECT id, created_at
+    FROM files
+    WHERE owner_id = $1 AND source_type = 'upload' AND deleted_at IS NULL
+      AND (mime_type IS NULL OR mime_type LIKE 'image/%')
+    ORDER BY created_at DESC
+    LIMIT $2 OFFSET $3
+  `, [user.id, limit, offset]);
+  res.json(rows.map((row) => ({
+    id: `upload-${row.id}`,
+    name: row.created_at,
+    category: "history",
+    image: `/api/files/${row.id}`,
+    thumbnail: `/api/files/${row.id}`,
+    createdAt: row.created_at,
   })));
 }));
 

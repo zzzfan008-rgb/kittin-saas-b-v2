@@ -46,6 +46,7 @@ assert.deepEqual(versions, [
   { version: 23, name: "envelope_inputs_snapshot_columns" },
   { version: 24, name: "flow_json_sha256_campaign_tracking" },
   { version: 25, name: "remove_evaluation_ledger_system" },
+  { version: 26, name: "asset_taxonomy_v2" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -56,9 +57,9 @@ const assetCategoryConstraint = await queryOne<{ definition: string }>(`
 `);
 assert.match(assetCategoryConstraint?.definition ?? "", /'print'/);
 assert.match(assetCategoryConstraint?.definition ?? "", /'fabric'/);
-assert.match(assetCategoryConstraint?.definition ?? "", /'reference'/);
+assert.match(assetCategoryConstraint?.definition ?? "", /'garment'/);
 assert.match(assetCategoryConstraint?.definition ?? "", /'model'/);
-console.log("  ✓ 素材 category 枚举已扩容为 print/fabric/reference/model");
+console.log("  ✓ 素材 category 枚举已扩容为 11 类（reference 并入 garment）");
 
 const tutorialReceiptColumns = await query<{ column_name: string }>(`
   SELECT column_name FROM information_schema.columns
@@ -293,7 +294,7 @@ fs.mkdirSync(path.join(temp, "uploads"), { recursive: true });
 fs.writeFileSync(path.join(temp, "uploads", "legacy-rich.png"), "legacy-image");
 await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
-  VALUES ('migration-asset', $1, 'private', '迁移素材', 'reference', '/api/files/migration.png', $2)
+  VALUES ('migration-asset', $1, 'private', '迁移素材', 'garment', '/api/files/migration.png', $2)
 `, [admin.id, now]);
 
 fs.mkdirSync(path.join(temp, "assets"), { recursive: true });
@@ -326,7 +327,7 @@ fs.writeFileSync(path.join(temp, "assets", "legacy-placeholder.json"), JSON.stri
 }));
 await query(`
   INSERT INTO assets (id, owner_id, scope, name, category, image, source_note, created_at)
-  VALUES ('legacy-placeholder-row', NULL, 'global', '历史素材-legacy-placeholder', 'reference',
+  VALUES ('legacy-placeholder-row', NULL, 'global', '历史素材-legacy-placeholder', 'garment',
     '/api/files/legacy-placeholder.png', '从升级前服务器文件迁移', $1)
 `, [now]);
 await migrateLegacyData();
@@ -351,7 +352,7 @@ assert.deepEqual(preserved, {
   owner_id: admin.id,
   scope: "private",
   name: "迁移素材",
-  category: "reference",
+  category: "garment",
   source_note: null,
 });
 console.log("  ✓ legacy 迁移不会在重复启动时夺取现有素材归属");

@@ -57,6 +57,12 @@ test("文本节点：工具条动作齐全（含预设下拉），正文可编�
   const html = render(node);
   const labels = ["色彩工具", "提示词预设", "复制"];
   for (const label of labels) assert.match(html, new RegExp(`aria-label="${label}"`), `缺少工具条动作 ${label}`);
+  // 六要素图标（aria-label 为"展开六要素"/"收起六要素"）：色彩工具之后、提示词预设之前。
+  assert.match(html, /aria-label="(展开|收起)六要素"/);
+  assert.ok(
+    html.indexOf("色彩工具") < html.indexOf("六要素") && html.indexOf("六要素") < html.indexOf("提示词预设"),
+    "六要素图标必须在提示词预设前面",
+  );
   assert.match(html, /role="toolbar"/);
   assert.match(html, /一件棉质白衬衫/);
   assert.doesNotMatch(html, /功能设置/);

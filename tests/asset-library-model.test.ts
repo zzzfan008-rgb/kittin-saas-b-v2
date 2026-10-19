@@ -23,15 +23,17 @@ const railConfigSource = read("src/components/workbench/railConfig.tsx");
 const workflowTypesSource = read("src/types/workflow.ts");
 const appSource = read("src/App.tsx");
 
-// ---------- 1. 素材分类联合扩 model（单一事实源在 src/types/workflow.ts） ----------
+// ---------- 1. 素材分类 11 值（单一事实源在 src/types/workflow.ts） ----------
 assert.match(
   workflowTypesSource,
-  /category: "print" \| "fabric" \| "reference" \| "model"/,
-  "Asset.category 必须扩到四个值（model = 数字模特）",
+  /category:\s+\| "print" \| "fabric" \| "colorcard" \| "sketch"\s+\| "model" \| "garment" \| "accessory" \| "pose" \| "background"\s+\| "refvideo" \| "audio";/,
+  "Asset.category 必须是 11 类：服装设计 4 + 模特换装 5 + 视频生成 2（旧参考类已并入 garment）",
 );
 
 // ---------- 2. 选择器：tab、预选分类、v8 写回路径 ----------
-assert.match(assetPickerSource, /\["model", "数字模特"\]/, "分类 tab 必须出现「数字模特」");
+assert.match(assetPickerSource, /ASSET_LEVEL1/, "一级分类必须走共享 assetTaxonomy");
+assert.match(assetPickerSource, /ASSET_LEVEL2\[level1\]/, "二级分类必须跟随一级切换");
+assert.doesNotMatch(assetPickerSource, /"全部"/, "一级选项取消「全部」");
 assert.match(
   assetPickerSource,
   /initialCategory\?: AssetPickerCategory/,
@@ -39,8 +41,8 @@ assert.match(
 );
 assert.match(
   assetPickerSource,
-  /request\.initialCategory \?\? initialCategory \?\? "all"/,
-  "打开时必须按初始分类过滤，而不是固定「全部」",
+  /normalizeLeaf\(request\.initialCategory \?\? initialCategory\)/,
+  "打开时必须按初始分类归一化到叶子，而不是固定某类",
 );
 assert.match(
   assetPickerSource,
@@ -56,6 +58,44 @@ assert.doesNotMatch(
   assetPickerSource,
   /addEventListener\(OPEN_ASSET_PICKER_EVENT/,
   "浮层不得自行监听打开事件（沿用 App 的单点分发）",
+);
+
+// ---------- 2b. 上传入口卡：网格首格常驻 + 多选四格式 + 类目快照 ----------
+assert.match(assetPickerSource, /本地上传/, "网格首格必须常驻「本地上传」入口卡");
+assert.match(
+  assetPickerSource,
+  /from "@\/lib\/assetSave"/,
+  "上传入口必须复用资产命名工具",
+);
+assert.match(
+  assetPickerSource,
+  /assetNameFromUpload\(file\.name/,
+  "上传命名必须走 assetNameFromUpload（文件名去目录/扩展名）",
+);
+assert.match(
+  assetPickerSource,
+  /accept="image\/png,image\/jpeg,image\/webp,image\/gif"/,
+  "文件框 accept 必须是服务端四格式显式清单",
+);
+assert.match(
+  assetPickerSource,
+  /uploadIntentRef\.current = intent/,
+  "点击来源必须快照落库意图（防途中切类串类）",
+);
+assert.match(
+  assetPickerSource,
+  /上传中 \$\{uploadProgress\}\/\$\{uploadTotal\}/,
+  "串行上传中卡片必须显示 i/n 进度",
+);
+assert.match(
+  assetPickerSource,
+  /该类目暂不支持上传/,
+  "视频生成两类必须禁用上传并给提示",
+);
+assert.doesNotMatch(
+  assetPickerSource,
+  /uploadToHistoryRef/,
+  "旧 toHistoryRef 开关必须移除（意图改为对象快照）",
 );
 
 // ---------- 3. 打开路径：App 把节点 id 的映射提示传给浮层 ----------
@@ -108,8 +148,8 @@ assert.equal(assetPickerCategoryForNode(""), undefined);
 assert.match(imageViewerSource, /存入数字模特库/, "保存区必须有「存入数字模特库」选项");
 assert.match(
   imageViewerSource,
-  /category: saveToModelLibrary \? "model" : "reference"/,
-  "勾选后必须写入 category: model，未勾选仍为参考素材",
+  /category: saveToModelLibrary \? "model" : "garment"/,
+  "勾选后必须写入 category: model，未勾选写入服装（garment）",
 );
 assert.match(imageViewerSource, /from "@\/components\/ui\/checkbox"/, "勾选控件必须复用本地 shadcn Checkbox");
 assert.deepEqual(
@@ -153,7 +193,7 @@ const replaceDialogSource = read("src/components/panels/ReplaceImageDialog.tsx")
 assert.match(replaceDialogSource, /从本地上传/, "统一弹窗必须有「从本地上传」入口");
 assert.match(replaceDialogSource, /type="file"/, "统一弹窗必须内嵌 file input");
 assert.match(replaceDialogSource, /aspect-square w-full bg-\[var\(--gc-control\)\] object-cover/, "素材卡片尺寸必须固定为 aspect-square + object-cover");
-assert.match(replaceDialogSource, /grid-cols-4 gap-2\.5/, "统一弹窗网格必须 4 列");
+assert.match(replaceDialogSource, /grid-cols-5 gap-2\.5/, "统一弹窗网格必须 5 列（固定尺寸容器，5×6 一页 30 项）");
 
 // 命名与分类：文件名优先（数字模特库靠名称辨识），空名称绝不提交。
 assert.equal(assetNameFromUpload("模特-1.png"), "模特-1");

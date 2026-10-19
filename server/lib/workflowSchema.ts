@@ -251,7 +251,13 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
     case "text": {
       assertNoGenerationFields(raw, path);
       const text = stringValue(raw.text, `${path}.text`);
-      return { kind, label, status, text, ...withError({}) } as WorkflowNodeData;
+      // 六要素结构化选择：用户所有权字段（与 text 同级），透传不校验细结构；
+      // 拼装/判定由前端 promptElements.ts 收敛，运行路径只读 text。
+      const promptElements = (
+        typeof raw.promptElements === "object" && raw.promptElements !== null
+          && typeof (raw.promptElements as { subject?: unknown }).subject === "string"
+      ) ? raw.promptElements : undefined;
+      return { kind, label, status, text, ...(promptElements !== undefined ? { promptElements } : {}), ...withError({}) } as WorkflowNodeData;
     }
     case "image": {
       assertNoGenerationFields(raw, path);

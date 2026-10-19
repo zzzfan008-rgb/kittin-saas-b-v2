@@ -48,6 +48,7 @@ const ALLOWED_FILES = new Map([
   ["scripts/apiyi-docs.mjs", "API易模型文档契约哈希校验（活概念）"],
   ["server/lib/promptPresetsFrozen.ts", "冻结常量的文本溯源注释（说明抽取来源，非活引用）"],
   ["src/store/flowStore.ts", "会话恢复防御性 delete 清单（SESSION_GENERATION_FIELDS 清理旧会话脏数据的死字段；delete 语义不写入）"],
+  ["src/store/flowTabSession.ts", "会话持久化防御性 delete 清单（SESSION_GENERATION_FIELDS 清理旧 localStorage 脏数据；与 flowStore 同语义，delete 不写入）"],
   // 3) 迁移/剥离证明测试（合法脏输入）
   ["tests/workflow-schema.test.ts", "C2 迁移三态测试：v7/v8 脏输入投喂 + 剥离断言"],
   ["tests/document-snapshot.test.ts", "文档投影剥离证明：脏输入投喂 + 死字段不得落盘断言"],

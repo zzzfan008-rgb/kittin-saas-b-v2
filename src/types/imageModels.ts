@@ -179,7 +179,7 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
 };
 
 /**
- * VIP 系模型按画幅的三档像素尺寸（快速 / 标准 / 高清）。
+ * VIP 系模型按画幅的三档像素尺寸（1K / 2K / 4K 标签；提交值仍是像素尺寸，上游只认 WxH）。
  *
  * 取值来源：docs/ai/apiyi/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
  * docs/ai/apiyi/consultations/vip-size-tiers.json 的咨询凭证）；标准档与
@@ -188,16 +188,16 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
  * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。
  */
 export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: string; size: string }[]>> = {
-  "1:1": [{ tier: "快速", size: "1280x1280" }, { tier: "标准", size: "2048x2048" }, { tier: "高清", size: "2880x2880" }],
-  "2:3": [{ tier: "快速", size: "848x1280" }, { tier: "标准", size: "1360x2048" }, { tier: "高清", size: "2336x3520" }],
-  "3:2": [{ tier: "快速", size: "1280x848" }, { tier: "标准", size: "2048x1360" }, { tier: "高清", size: "3520x2336" }],
-  "3:4": [{ tier: "快速", size: "960x1280" }, { tier: "标准", size: "1536x2048" }, { tier: "高清", size: "2480x3312" }],
-  "4:3": [{ tier: "快速", size: "1280x960" }, { tier: "标准", size: "2048x1536" }, { tier: "高清", size: "3312x2480" }],
-  "4:5": [{ tier: "快速", size: "1024x1280" }, { tier: "标准", size: "1632x2048" }, { tier: "高清", size: "2560x3216" }],
-  "5:4": [{ tier: "快速", size: "1280x1024" }, { tier: "标准", size: "2048x1632" }, { tier: "高清", size: "3216x2560" }],
-  "9:16": [{ tier: "快速", size: "720x1280" }, { tier: "标准", size: "1152x2048" }, { tier: "高清", size: "2160x3840" }],
-  "16:9": [{ tier: "快速", size: "1280x720" }, { tier: "标准", size: "2048x1152" }, { tier: "高清", size: "3840x2160" }],
-  "21:9": [{ tier: "快速", size: "1280x544" }, { tier: "标准", size: "2048x864" }, { tier: "高清", size: "3840x1632" }],
+  "1:1": [{ tier: "1K", size: "1280x1280" }, { tier: "2K", size: "2048x2048" }, { tier: "4K", size: "2880x2880" }],
+  "2:3": [{ tier: "1K", size: "848x1280" }, { tier: "2K", size: "1360x2048" }, { tier: "4K", size: "2336x3520" }],
+  "3:2": [{ tier: "1K", size: "1280x848" }, { tier: "2K", size: "2048x1360" }, { tier: "4K", size: "3520x2336" }],
+  "3:4": [{ tier: "1K", size: "960x1280" }, { tier: "2K", size: "1536x2048" }, { tier: "4K", size: "2480x3312" }],
+  "4:3": [{ tier: "1K", size: "1280x960" }, { tier: "2K", size: "2048x1536" }, { tier: "4K", size: "3312x2480" }],
+  "4:5": [{ tier: "1K", size: "1024x1280" }, { tier: "2K", size: "1632x2048" }, { tier: "4K", size: "2560x3216" }],
+  "5:4": [{ tier: "1K", size: "1280x1024" }, { tier: "2K", size: "2048x1632" }, { tier: "4K", size: "3216x2560" }],
+  "9:16": [{ tier: "1K", size: "720x1280" }, { tier: "2K", size: "1152x2048" }, { tier: "4K", size: "2160x3840" }],
+  "16:9": [{ tier: "1K", size: "1280x720" }, { tier: "2K", size: "2048x1152" }, { tier: "4K", size: "3840x2160" }],
+  "21:9": [{ tier: "1K", size: "1280x544" }, { tier: "2K", size: "2048x864" }, { tier: "4K", size: "3840x1632" }],
 };
 
 /**
@@ -233,7 +233,7 @@ export function imageSizeTierOptions(
 ): { value: string; label: string }[] | undefined {
   const tiers = vipSizeTiersForRatio(modelId, aspectRatio);
   if (!tiers) return undefined;
-  return tiers.map((t) => ({ value: t.size, label: `${t.tier} · ${t.size.replace("x", "×")}` }));
+  return tiers.map((t) => ({ value: t.size, label: t.tier }));
 }
 
 /**

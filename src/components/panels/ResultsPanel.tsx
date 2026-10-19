@@ -9,7 +9,6 @@ import { thumbnailImageUrl } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { isNodeRunActive } from "@/types/workflow";
 import { STATUS_TEXT } from "@/components/nodes/NodeFrame";
-import { continueWithResult } from "@/lib/resultActions";
 
 interface ResultsPanelProps {
   hasMore?: boolean;
@@ -17,11 +16,11 @@ interface ResultsPanelProps {
   onLoadMore?: () => void;
   /** 点单个结果时打开 ImageViewer（65d R-87 §3：ResultDetailDialog 已删除）。 */
   className?: string;
-  /** 固定可见行数（4 列网格 × 6 行）；列表高度 = 行数 × 行高，超出部分滚轮滚动自动加载更多。 */
+  /** 固定可见行数（5 列网格 × 6 行 = 30 条一页）；列表高度 = 行数 × 行高，超出部分滚轮滚动自动加载更多。 */
   rowsVisible?: number;
 }
 
-/** 「历史创作记录」浮层里的跨项目结果列表（4 列缩略图，滚轮到底自动加载）。 */
+/** 「历史创作记录」浮层里的跨项目结果列表（5 列缩略图；首屏一页 30 条，滚轮到底自动加载下一页）。 */
 export function ResultsPanel({
   hasMore = false,
   loadingMore = false,
@@ -35,9 +34,6 @@ export function ResultsPanel({
   const setSelectedResultId = useFlowStore((s) => s.setSelectedResultId);
   const compareIds = useFlowStore(selectActiveCompareIds);
   const toggleCompareId = useFlowStore((s) => s.toggleCompareId);
-  const activeTabReadOnly = useFlowStore(
-    (s) => s.tabs.find((tab) => tab.id === s.activeTabId)?.readOnly ?? false,
-  );
   const resultCardClass = "aspect-square min-w-0 w-full";
   const resultActionClass =
     "rounded-sm px-1 py-1 text-label font-medium leading-none text-[var(--gc-media-overlay-text)] hover:bg-white/15 hover:text-white focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-45";
@@ -76,9 +72,12 @@ export function ResultsPanel({
     scroller.style.maxHeight = `${rowsVisible * rowH + (rowsVisible - 1) * gap + 24}px`;
   }, [rowsVisible, recentResults.length]);
 
-  // 内容不足一屏时也补一页，避免首屏不满 4×6 却要手动点。
+  // 内容不足一屏（滚不动）时才补一页，避免首屏不满 5×6 却要手动点；
+  // 之前无条件补页会导致打开即拉穿所有页（36 条一次全出），必须按需加载。
   useLayoutEffect(() => {
-    maybeLoadMore();
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (scroller.scrollHeight <= scroller.clientHeight + 48) maybeLoadMore();
   });
 
   return (
@@ -116,7 +115,7 @@ export function ResultsPanel({
               运行 AI 节点后，生成结果与运行记录会汇总在这里
             </p>
           ) : (
-            <div ref={gridRef} className="grid grid-cols-4 gap-2">
+            <div ref={gridRef} className="grid grid-cols-5 gap-2">
               {recentResults.map((r) =>
                 isNodeRunActive(r.status) ? (
                   <button
@@ -206,54 +205,19 @@ export function ResultsPanel({
                         {compareIds.indexOf(r.id) + 1}
                       </span>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-1 bg-black/75 p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDetail(r);
-                        }}
-                        className={resultActionClass}
-                        aria-label={`查看 ${r.nodeLabel}`}
-                        title="查看详情"
-                      >
-                        查看
-                      </button>
+                    <div className="absolute inset-x-0 bottom-0 bg-black/75 p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleCompareId(r.id);
                         }}
-                        className={resultActionClass}
+                        className={`${resultActionClass} w-full`}
                         aria-label={`${compareIds.includes(r.id) ? "取消" : "加入"}对比 ${r.nodeLabel}`}
                         aria-pressed={compareIds.includes(r.id)}
                         title={compareIds.includes(r.id) ? "取消对比" : "加入对比"}
                       >
-                        {compareIds.includes(r.id) ? "取消" : "对比"}
-                      </button>
-                      <a
-                        href={r.image}
-                        download
-                        onClick={(e) => e.stopPropagation()}
-                        className={resultActionClass}
-                        aria-label={`下载 ${r.nodeLabel}`}
-                        title="下载"
-                      >
-                        下载
-                      </a>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          continueWithResult(r);
-                        }}
-                        disabled={activeTabReadOnly}
-                        className={resultActionClass}
-                        aria-label={`将 ${r.nodeLabel} 设为输入，继续处理`}
-                        title={activeTabReadOnly ? "当前项目只读" : "设为输入"}
-                      >
-                        输入
+                        {compareIds.includes(r.id) ? "取消对比" : "加入对比"}
                       </button>
                     </div>
                   </article>
