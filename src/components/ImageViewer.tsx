@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { selectActiveCompareIds, useFlowStore } from "@/store/flowStore";
 import { thumbnailImageUrl } from "@/lib/images";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { normalizeReferenceImageEvidence } from "@/lib/referenceEvidence";
-import { saveImageAsAsset } from "@/lib/assetSave";
 import { continueWithResult, toggleResultCompare } from "@/lib/resultActions";
 import { nodeSpecForKind, nodeTitleForKind } from "@/types/workflow";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useImageZoom, MIN_SCALE, MAX_SCALE } from "@/hooks/useImageZoom";
 
 export function ReferenceEvidenceList({
@@ -109,30 +107,9 @@ export function ImageViewer() {
     return () => document.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [viewer, closeViewer]);
 
-  // 保存资产
-  const [assetState, setAssetState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
-
   useEffect(() => {
     zoom.resetScale(1);
-    setAssetState("idle");
-    setSaveToModelLibrary(false);
   }, [viewer?.url]);
-
-  const saveAsAsset = async () => {
-    setAssetState("saving");
-    try {
-      await saveImageAsAsset({
-        name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
-        category: saveToModelLibrary ? "model" : "reference",
-        image: viewer.url,
-        sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
-      });
-      setAssetState("saved");
-    } catch {
-      setAssetState("error");
-    }
-  };
 
   // 重新生成
   const runAgain = () => {
