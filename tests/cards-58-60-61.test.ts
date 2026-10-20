@@ -118,6 +118,33 @@ console.log("  ✓ handleClick 处理无菜单入口（AI 画板）并调用 onO
 console.log("  ✓ handleMenuLeave 有 sticky guard");
 console.log("  ✓ railConfig 包含 id='canvas'");
 
+// 7. #71 tech-debt：Escape/外部关闭后的 sticky 复位 + 定时器句柄治理
+// 7a. open 翻 false 时必须复位 sticky/menuHover（Esc 只改父级 openMenuId，
+//     不复位内部 sticky 会让之后的 hover 菜单无法自动关闭——e2e 另有行为回归）。
+assert.match(
+  shellSource,
+  /useEffect\(\(\)\s*=>\s*\{[\s\S]*?if\s*\(\s*!\s*open\s*\)\s*\{[\s\S]*?setSticky\(false\)[\s\S]*?setMenuHover\(false\)/,
+  "open 翻 false 时 effect 必须复位 sticky 与 menuHover（#71 sticky Escape leak）",
+);
+// 7b. hover 抑制定时器必须存句柄，且组件卸载时清掉全部定时器。
+assert.match(
+  shellSource,
+  /suppressTimer\s*=\s*useRef/,
+  "hover 抑制 setTimeout 必须存入 suppressTimer ref（#71）",
+);
+assert.match(
+  shellSource,
+  /clearTimeout\(suppressTimer\.current\)/,
+  "suppressTimer 必须被 clearTimeout（卸载清理，#71）",
+);
+// 7c. 不再允许裸 setTimeout 写 suppressHoverRef（两处历史点都须走统一函数）。
+const suppressionWrites = shellSource.match(/suppressHoverRef\.current\s*=\s*true/g) ?? [];
+assert.ok(
+  suppressionWrites.length === 1,
+  `suppressHoverRef 置位只应出现在统一的 armHoverSuppression 内，实际 ${suppressionWrites.length} 处`,
+);
+console.log("  ✓ #71 open→false 复位 sticky/menuHover；suppressTimer 存句柄并在卸载清理");
+
 // ──────────────────────────────────────────────────────────────────────────────
 // 卡 #60：Excalidraw AI 画板
 // ──────────────────────────────────────────────────────────────────────────────

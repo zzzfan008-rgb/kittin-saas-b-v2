@@ -715,6 +715,31 @@ test("workflow menu reports a readable error and leaves the canvas untouched whe
   await expect(tabNav.getByRole("tab")).toHaveCount(tabsBefore);
 });
 
+test("rail sticky menu closed by Escape does not block a later hover menu from auto-closing (#71)", async ({ page }) => {
+  const rail = page.getByRole("navigation", { name: "工作台左侧工具" });
+  const entry = rail.getByRole("button", { name: "AI 换装工作流" });
+  const menu = page.getByRole("menu", { name: "AI 换装工作流" });
+
+  // ① 点击打开 = sticky：粘住，鼠标移走也不自动关。
+  await entry.click();
+  await expect(menu).toBeVisible();
+
+  // ② Escape 只改父级 openMenuId；修复前 RailTool 内部 sticky 残留为 true。
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+
+  // ③ 再以 hover 打开（非 sticky）。鼠标移出按钮与菜单后，菜单必须在 closeTimer
+  //    （200ms）后自动关闭——修复前残留 sticky 会阻止 handleLeave 排关闭定时器。
+  await page.mouse.move(0, 0);
+  await entry.hover();
+  await expect(menu).toBeVisible();
+
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("Desktop viewport is required");
+  await page.mouse.move(Math.round(viewport.width / 2), Math.round(viewport.height / 2));
+  await expect(menu).toBeHidden({ timeout: 3_000 });
+});
+
 test("project center keeps 最近项目 usable when the project list fails", async ({ page }) => {
   // 模板入口迁走后，项目中心的唯一数据源是 GET /api/projects；它挂掉时「最近项目」仍要可用。
   await page.route("**/api/projects", async (route) => {
