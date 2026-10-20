@@ -743,8 +743,10 @@ test("project center covers, rename, and delete wire to the management endpoints
   // 项目中心三项管理交互的真实请求链路（对应 server fa14ba8）：
   // previewImage 封面、PATCH 改名（改名后重拉、浮顶）、DELETE 软删（本地移除）。
   type Summary = { id: string; name: string; updatedAt: string; previewImage?: string };
+  // 封面用可真实加载的 data URI：/api/files/* 会被转成 /thumbnail 而测试库无此文件，
+  // 触发 ProjectCover onError 回退占位图，无法断言 previewImage 透传。
   let projects: Summary[] = [
-    { id: "pc-manage-1", name: "可改名项目", updatedAt: "2026-10-01T00:00:00.000Z", previewImage: "/api/files/pc-cover-1" },
+    { id: "pc-manage-1", name: "可改名项目", updatedAt: "2026-10-01T00:00:00.000Z", previewImage: RESULTS_DENSITY_IMAGE },
     { id: "pc-manage-2", name: "待删除项目", updatedAt: "2026-10-02T00:00:00.000Z" },
   ];
   const patchRequests: Array<{ url: string; body: unknown }> = [];
@@ -788,33 +790,44 @@ test("project center covers, rename, and delete wire to the management endpoints
   const firstCard = center.locator(".group").filter({ hasText: "可改名项目" });
   await expect(firstCard.getByRole("img", { name: "可改名项目" })).toHaveAttribute(
     "src",
-    /\/api\/files\/pc-cover-1\/thumbnail/,
+    RESULTS_DENSITY_IMAGE,
   );
 
   // ② 改名按钮长亮：点「改名」就地出现输入框，Enter 发 PATCH 并重拉列表。
-  await expect(firstCard.getByRole("button", { name: "改名" })).toBeVisible();
-  await firstCard.getByRole("button", { name: "改名" }).click();
+  // 用 title 精确定位：外层整卡 <button> 的 accessible name 也拼入了「改名」文本。
+  const renameTrigger = firstCard.locator('button[title="重命名项目"]');
+  await expect(renameTrigger).toBeVisible();
+  await renameTrigger.click();
   const nameInput = firstCard.getByLabel("项目新名称");
   await expect(nameInput).toBeVisible();
   await expect(nameInput).toHaveValue("可改名项目");
   await nameInput.fill("  改后的项目名  ");
   await nameInput.press("Enter");
-  const renamedCard = center.locator("article").filter({ hasText: "改后的项目名" });
+  const renamedCard = center.locator(".group").filter({ hasText: "改后的项目名" });
   await expect(renamedCard).toContainText("改后的项目名");
   expect(patchRequests).toHaveLength(1);
   expect(patchRequests[0]!.url).toBe("/api/projects/pc-manage-1");
   expect(patchRequests[0]!.body).toEqual({ name: "改后的项目名" });
 
   // ③ 删除：hover 卡片出现「删除」，确认后发 DELETE，卡片从列表消失。
-  page.once("dialog", (dialog) => {
-    expect(dialog.message()).toContain("待删除项目");
-    void dialog.accept();
-  });
+  // waitForEvent 先挂起等待器再点击（比 page.once 时序更确定）。
   const secondCard = center.locator(".group").filter({ hasText: "待删除项目" });
   await secondCard.hover();
-  await secondCard.getByRole("button", { name: "删除项目" }).click();
+  // 用 title 精确定位：getByRole 的 name 是子串匹配，封面按钮名「待删除项目」
+  // 也含「删除项目」会被误匹配。
+  const deleteButton = secondCard.locator('button[title="删除项目"]');
+  await expect(deleteButton).toBeVisible();
+  // 必须在点击前注册 dialog handler：原生 confirm 是模态的，触发后立即阻塞页面，
+  // waitForEvent 只等事件不处理它，会让 click action 卡死。
+  let confirmMessage = "";
+  page.once("dialog", (dialog) => {
+    confirmMessage = dialog.message();
+    void dialog.accept();
+  });
+  await deleteButton.click();
+  await expect.poll(() => confirmMessage).toContain("待删除项目");
+  await expect.poll(() => deleteCount).toBe(1);
   await expect(center.getByText("待删除项目", { exact: true })).toHaveCount(0);
-  expect(deleteCount).toBe(1);
 });
 
 test("results and project center follow desktop density for cards", async ({ page }) => {

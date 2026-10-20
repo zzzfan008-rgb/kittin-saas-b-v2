@@ -377,6 +377,8 @@ export function ProjectCenter({
                     return (
                       <CardFrame key={project.id}>
                         <div className="relative">
+                          {/* 打开项目只由封面按钮承担；卡片级控件（改名/删除）是其兄弟元素，
+                              避免 <button> 内嵌套 <button>/<input> 的非法 HTML 与 a11y 子树排除。 */}
                           <button
                             type="button"
                             onClick={() => void openProject(project)}
@@ -384,63 +386,63 @@ export function ProjectCenter({
                             disabled={isRenaming}
                           >
                             <ProjectCover src={project.previewImage} alt={project.name} />
-                            <span className="block p-3">
-                              <span className="flex items-center gap-2">
-                                {isRenaming ? (
-                                  <input
-                                    type="text"
-                                    value={renamingValue}
-                                    onChange={(event) => setRenamingValue(event.target.value)}
-                                    onBlur={() => void saveRename(project)}
-                                    onKeyDown={(event) => {
-                                      event.stopPropagation();
-                                      if (event.key === "Enter") void saveRename(project);
-                                      if (event.key === "Escape") cancelRename();
-                                    }}
-                                    onClick={(event) => event.stopPropagation()}
-                                    autoFocus
-                                    maxLength={200}
-                                    aria-label="项目新名称"
-                                    className="min-w-0 flex-1 rounded border border-[var(--gc-accent)] bg-[var(--gc-control)] px-2 py-1 text-xs text-[var(--gc-text)] outline-none"
-                                  />
-                                ) : (
-                                  <>
-                                    <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
-                                    {/* 改名按钮长亮（不随 hover 出现），点击就地内联重命名。 */}
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        startRename(project);
-                                      }}
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
-                                      title="重命名项目"
-                                    >
-                                      改名
-                                    </button>
-                                  </>
-                                )}
-                                {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
-                              </span>
-                              <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
-                                {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
-                                最后编辑 {formatUpdatedAt(project.updatedAt)}
-                              </span>
-                            </span>
                           </button>
-                          {/* 删除：仅 hover 卡片时出现，二次确认后软删并关闭已打开页签。 */}
-                          {!isRenaming && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
+                          <span className="block px-3 pb-3 pt-2">
+                            <span className="flex items-center gap-2">
+                              <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                              {/* 改名按钮长亮（不随 hover 出现）。 */}
+                              {!isRenaming && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    startRename(project);
+                                  }}
+                                  className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
+                                  title="重命名项目"
+                                >
+                                  改名
+                                </button>
+                              )}
+                              {/* 删除放信息区（与改名同行），避免覆盖封面造成命中歧义；
+                                  hover 卡片时显现，二次确认由 removeProject 负责。 */}
+                              {!isRenaming && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void removeProject(project);
+                                  }}
+                                  className="shrink-0 rounded px-1.5 py-0.5 text-label text-red-500 opacity-0 transition-opacity hover:bg-red-500/10 focus-visible:opacity-100 group-hover:opacity-100"
+                                  title="删除项目"
+                                >
+                                  删除
+                                </button>
+                              )}
+                              {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                            </span>
+                            <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
+                              {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
+                              最后编辑 {formatUpdatedAt(project.updatedAt)}
+                            </span>
+                          </span>
+                          {/* 改名中：输入框覆盖信息区（Enter 提交 / Esc 取消 / blur 提交）。 */}
+                          {isRenaming && (
+                            <input
+                              type="text"
+                              value={renamingValue}
+                              onChange={(event) => setRenamingValue(event.target.value)}
+                              onBlur={() => void saveRename(project)}
+                              onKeyDown={(event) => {
                                 event.stopPropagation();
-                                void removeProject(project);
+                                if (event.key === "Enter") void saveRename(project);
+                                if (event.key === "Escape") cancelRename();
                               }}
-                              className="absolute right-2 top-2 hidden rounded bg-red-600/90 px-2 py-1 text-label text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-red-600 group-hover:flex"
-                              title="删除项目"
-                            >
-                              删除
-                            </button>
+                              autoFocus
+                              maxLength={200}
+                              aria-label="项目新名称"
+                              className="absolute inset-x-3 bottom-3 rounded border border-[var(--gc-accent)] bg-[var(--gc-control)] px-2 py-1 text-xs text-[var(--gc-text)] outline-none"
+                            />
                           )}
                         </div>
                       </CardFrame>
