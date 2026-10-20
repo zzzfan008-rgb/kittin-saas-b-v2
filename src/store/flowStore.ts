@@ -3678,8 +3678,9 @@ if (typeof window !== "undefined") {
     if (typeof document === "undefined" || document.visibilityState !== "visible") return;
     const state = useFlowStore.getState();
     for (const tab of state.tabs) {
-      // 优化2：允许新建页签在编辑后自动保存（去掉 hasBeenPersisted 门槛）
-      if (tab.readOnly || !tab.dirty || tab.saveState !== "idle") continue;
+      // 只存已保存过的页签：新建页签的首存走 initial-draft bootstrap（方案 C，
+      // 首次实质修改才持久化），自动保存只负责已落库页签的写回。
+      if (tab.readOnly || !tab.dirty || !tab.hasBeenPersisted || tab.saveState !== "idle") continue;
       // 优化1：不再阻止整个页签保存。只要当前选中节点没在运行就保存其他节点的修改
       const selectedNodeIds = new Set(tab.selectedNodeIds ?? []);
       const hasRunningSelectedNode = tab.nodes.some(
