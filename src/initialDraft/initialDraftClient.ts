@@ -142,6 +142,11 @@ export interface ServerProjectSummary {
   ownerName?: string;
   readOnly?: boolean;
   updatedAt: string;
+  /**
+   * 最后一次成功生成步的最后一张图（GET /api/projects 服务端子查询给出）。
+   * 无生成记录时字段整体缺省（服务端不落 null）。
+   */
+  previewImage?: string;
 }
 
 export interface ServerProjectDetail extends ServerProjectSummary {
@@ -156,7 +161,9 @@ function parseProjectSummary(value: unknown): ServerProjectSummary {
     typeof project.name !== "string" || !project.name ||
     typeof project.updatedAt !== "string" || !Number.isFinite(Date.parse(project.updatedAt)) ||
     (project.ownerName !== undefined && typeof project.ownerName !== "string") ||
-    (project.readOnly !== undefined && typeof project.readOnly !== "boolean")
+    (project.readOnly !== undefined && typeof project.readOnly !== "boolean") ||
+    (project.previewImage !== undefined &&
+      (typeof project.previewImage !== "string" || !project.previewImage))
   ) throw new Error("项目列表响应格式无效");
   return project as ServerProjectSummary;
 }

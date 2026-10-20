@@ -220,6 +220,12 @@ globalThis.fetch = async (input) => {
       id: "saved-project",
       name: "最近正式项目",
       updatedAt: "2026-08-27T00:00:00.000Z",
+      previewImage: "/api/files/cover.png",
+    }, {
+      // 无生成记录：previewImage 整体缺省也合法
+      id: "saved-project-2",
+      name: "无图项目",
+      updatedAt: "2026-08-26T00:00:00.000Z",
     }]);
   }
   return Response.json({
@@ -232,12 +238,32 @@ globalThis.fetch = async (input) => {
 try {
   const savedProjects = await fetchSavedProjects();
   assert.equal(savedProjects[0]?.id, "saved-project");
+  assert.equal(savedProjects[0]?.previewImage, "/api/files/cover.png", "previewImage 应透传");
+  assert.equal(savedProjects[1]?.previewImage, undefined, "无封面字段时缺省");
   const savedProject = await fetchSavedProject("saved-project");
   assert.equal(savedProject.flow.schemaVersion, projectFlow.schemaVersion);
 } finally {
   globalThis.fetch = originalFetch;
 }
-console.log("  ✓ 登录恢复可读取最近正式项目及完整画布");
+console.log("  ✓ 登录恢复可读取最近正式项目及完整画布（含 previewImage 透传/缺省）");
+
+// previewImage 若出现必须是非空字符串（服务端契约：给字符串或整体省略）
+globalThis.fetch = async () => Response.json([{
+  id: "bad-project",
+  name: "坏封面",
+  updatedAt: "2026-08-27T00:00:00.000Z",
+  previewImage: "",
+}]);
+try {
+  await assert.rejects(
+    () => fetchSavedProjects(),
+    /项目列表响应格式无效/,
+    "空串 previewImage 必须判为非法响应",
+  );
+  console.log("  ✓ previewImage 空串/非字符串形状被拒绝");
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 const maskLocal = tab({
   projectId: "mask-source-project",
