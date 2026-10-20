@@ -146,12 +146,42 @@ function RailTool({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 点击关闭后 250ms 内抑制 hover 打开（#58 fix — 防止点击关闭后被 hover 重开）。 */
   const suppressHoverRef = useRef(false);
+  /** 抑制期定时器句柄：卸载时必须清除，否则回调会写已卸载组件的 ref（#71）。 */
+  const suppressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasMenu = !!entry.items?.length;
 
   const clearTimers = () => {
     if (openTimer.current) clearTimeout(openTimer.current);
     if (closeTimer.current) clearTimeout(closeTimer.current);
   };
+
+  /** 进入 250ms hover 抑制期；重复触发先撤旧定时器，避免回调堆积。 */
+  const armHoverSuppression = () => {
+    suppressHoverRef.current = true;
+    if (suppressTimer.current) clearTimeout(suppressTimer.current);
+    suppressTimer.current = setTimeout(() => {
+      suppressTimer.current = null;
+      suppressHoverRef.current = false;
+    }, 250);
+  };
+
+  // 卸载清光全部定时器（open/close/suppress），杜绝写已卸载组件（#71）。
+  useEffect(() => () => {
+    if (openTimer.current) clearTimeout(openTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (suppressTimer.current) clearTimeout(suppressTimer.current);
+  }, []);
+
+  // open 翻为 false（Esc / 手风琴互切 / 外部关闭）时复位内部 sticky/hover 态与定时器：
+  // sticky 由点击打开置位，过去只在同一实例的点击关闭路径复位，Escape 只改父级
+  // openMenuId，残留的 sticky=true 会让该工具之后的 hover 菜单无法自动关闭（#71）。
+  useEffect(() => {
+    if (!open) {
+      setSticky(false);
+      setMenuHover(false);
+      clearTimers();
+    }
+  }, [open]);
 
   const handleEnter = () => {
     if (!hasMenu) return;
@@ -196,10 +226,7 @@ function RailTool({
       // 关闭：先取消 focus/hover 排下的 pending 定时器（#58 fix — root cause）
       clearTimers();
       // 设抑制标志防 hover 重开
-      suppressHoverRef.current = true;
-      setTimeout(() => {
-        suppressHoverRef.current = false;
-      }, 250);
+      armHoverSuppression();
       setSticky(false);
       onRequestClose(entry.id);
     } else {
@@ -277,10 +304,7 @@ function RailTool({
               setSticky(false);
               // 同型防御：取消已排程的打开定时器（focus/hover 可能先于点击）
               clearTimers();
-              suppressHoverRef.current = true;
-              setTimeout(() => {
-                suppressHoverRef.current = false;
-              }, 250);
+              armHoverSuppression();
               onRequestClose(entry.id);
               onSelectItem(entry, item);
             }}
