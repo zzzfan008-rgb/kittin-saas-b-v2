@@ -122,6 +122,7 @@ const TEST_FILES = [
   "tests/project-tabs-save-drag.test.ts",
   "tests/project-tabs-run.test.ts",
   "tests/project-tabs-canvas.test.ts",
+  "tests/projects-api.test.ts",
   "tests/result-export.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",

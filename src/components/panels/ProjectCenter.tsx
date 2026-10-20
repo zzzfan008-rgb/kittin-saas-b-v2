@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { thumbnailImageUrl } from "@/lib/images";
+import { deleteProjectRequest, renameProjectRequest } from "@/lib/projectsApi";
 import {
   projectTabLifecycle,
   useFlowStore,
@@ -24,6 +25,8 @@ interface ProjectSummary {
   ownerName?: string;
   readOnly?: boolean;
   updatedAt: string;
+  /** 最后生成图（服务端子查询从 flow_json 提取，见 GET /api/projects）。 */
+  previewImage?: string;
 }
 
 interface ProjectDetail extends ProjectSummary {
@@ -131,6 +134,9 @@ export function ProjectCenter({
   const activeTabId = useFlowStore((state) => state.activeTabId);
   const createBlankTab = useFlowStore((state) => state.createBlankTab);
   const initialDraft = tabs.find((tab) => projectTabLifecycle(tab) === "initial_draft");
+  // 卡片内联重命名状态（一次只改一张卡）。
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renamingValue, setRenamingValue] = useState("");
 
   const loadProjects = useCallback(async () => {
     const version = ++projectsLoadVersion.current;
@@ -162,6 +168,8 @@ export function ProjectCenter({
       projectsLoadVersion.current += 1;
       openRequestVersion.current += 1;
       setQuery("");
+      setRenamingId(null);
+      setRenamingValue("");
       return;
     }
     void load();
@@ -199,6 +207,49 @@ export function ProjectCenter({
       setError(openError instanceof Error ? openError.message : String(openError));
     }
   }, [onOpenChange]);
+
+  const startRename = useCallback((project: ProjectSummary) => {
+    setRenamingId(project.id);
+    setRenamingValue(project.name);
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenamingValue("");
+  }, []);
+
+  const saveRename = useCallback(async (project: ProjectSummary) => {
+    const newName = renamingValue.trim();
+    // 空白或未改名：静默收起，不发请求。
+    if (!newName || newName === project.name) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      setError(null);
+      await renameProjectRequest(project.id, newName);
+      setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, name: newName } : p)));
+      setRenamingId(null);
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : String(renameError));
+    }
+  }, [renamingValue]);
+
+  const removeProject = useCallback(async (project: ProjectSummary) => {
+    // 原生二次确认（删除不可撤销）；不引入新弹层原语，与项目中心现有交互保持轻量。
+    const confirmed = window.confirm(`确定删除项目「${project.name}」吗？此操作不可撤销。`);
+    if (!confirmed) return;
+    try {
+      setError(null);
+      await deleteProjectRequest(project.id);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+      // 联动：该项目若正开着页签则一并关闭（运行中页签由 closeTab 既有封锁规则保护）。
+      const openTab = useFlowStore.getState().tabs.find((tab) => tab.projectId === project.id);
+      if (openTab) useFlowStore.getState().closeTab(openTab.id);
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : String(removeError));
+    }
+  }, []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const filteredProjects = useMemo(
@@ -306,25 +357,75 @@ export function ProjectCenter({
 
                   {filteredProjects.map((project) => {
                     const openTab = tabs.find((tab) => tab.projectId === project.id);
+                    const isRenaming = renamingId === project.id;
                     return (
                       <CardFrame key={project.id}>
-                        <button
-                          type="button"
-                          onClick={() => void openProject(project)}
-                          className="block w-full text-left"
-                        >
-                          <ProjectCover alt={project.name} />
-                          <span className="block p-3">
-                            <span className="flex items-center gap-2">
-                              <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
-                              {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => void openProject(project)}
+                            className="block w-full text-left"
+                            disabled={isRenaming}
+                          >
+                            <ProjectCover src={project.previewImage} alt={project.name} />
+                            <span className="block p-3">
+                              <span className="flex items-center gap-2">
+                                {isRenaming ? (
+                                  <input
+                                    type="text"
+                                    value={renamingValue}
+                                    onChange={(event) => setRenamingValue(event.target.value)}
+                                    onBlur={() => void saveRename(project)}
+                                    onKeyDown={(event) => {
+                                      event.stopPropagation();
+                                      if (event.key === "Enter") void saveRename(project);
+                                      if (event.key === "Escape") cancelRename();
+                                    }}
+                                    onClick={(event) => event.stopPropagation()}
+                                    autoFocus
+                                    aria-label="项目新名称"
+                                    className="min-w-0 flex-1 rounded border border-[var(--gc-accent)] bg-[var(--gc-control)] px-2 py-1 text-xs text-[var(--gc-text)] outline-none"
+                                  />
+                                ) : (
+                                  <>
+                                    <span className={PROJECT_CENTER_TITLE_CLASS}>{project.name}</span>
+                                    {/* 改名按钮长亮（不随 hover 出现），点击就地内联重命名。 */}
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        startRename(project);
+                                      }}
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-label text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
+                                      title="重命名项目"
+                                    >
+                                      改名
+                                    </button>
+                                  </>
+                                )}
+                                {openTab && <span className="shrink-0 text-label text-[var(--gc-accent)]">{openTab.id === activeTabId ? "当前" : "已打开"}</span>}
+                              </span>
+                              <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
+                                {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
+                                最后编辑 {formatUpdatedAt(project.updatedAt)}
+                              </span>
                             </span>
-                            <span className="mt-1 block truncate text-label text-[var(--gc-text-muted)]">
-                              {project.readOnly && project.ownerName ? `${project.ownerName} · 只读 · ` : ""}
-                              最后编辑 {formatUpdatedAt(project.updatedAt)}
-                            </span>
-                          </span>
-                        </button>
+                          </button>
+                          {/* 删除：仅 hover 卡片时出现，二次确认后软删并关闭已打开页签。 */}
+                          {!isRenaming && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void removeProject(project);
+                              }}
+                              className="absolute right-2 top-2 hidden rounded bg-red-600/90 px-2 py-1 text-label text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-red-600 group-hover:flex"
+                              title="删除项目"
+                            >
+                              删除
+                            </button>
+                          )}
+                        </div>
                       </CardFrame>
                     );
                   })}
