@@ -3485,6 +3485,7 @@ if (typeof window !== "undefined") {
   let idleHandle: number | null = null;
   let debounceHandle: number | null = null;
   let serverAutosaveHandle: number | null = null;
+  let lastServerAutosaveTime = 0;
 
   const tabMarker = (tab: ProjectTab): string => [
     tab.projectId,
@@ -3677,8 +3678,15 @@ if (typeof window !== "undefined") {
     if (typeof document === "undefined" || document.visibilityState !== "visible") return;
     const state = useFlowStore.getState();
     for (const tab of state.tabs) {
+      // 只存已保存过的页签：新建页签的首存走 initial-draft bootstrap（方案 C，
+      // 首次实质修改才持久化），自动保存只负责已落库页签的写回。
       if (tab.readOnly || !tab.dirty || !tab.hasBeenPersisted || tab.saveState !== "idle") continue;
-      if (tab.nodes.some((node) => isNodeRunActive(node.data.status))) continue;
+      // 优化1：不再阻止整个页签保存。只要当前选中节点没在运行就保存其他节点的修改
+      const selectedNodeIds = new Set(tab.selectedNodeIds ?? []);
+      const hasRunningSelectedNode = tab.nodes.some(
+        (node) => selectedNodeIds.has(node.id) && isNodeRunActive(node.data.status)
+      );
+      if (hasRunningSelectedNode) continue;
       await useFlowStore.getState().saveTabById(tab.id);
     }
   };
@@ -3686,10 +3694,14 @@ if (typeof window !== "undefined") {
     if (isProjectTabSessionPersistenceSuspended()) return;
     if (typeof document === "undefined" || document.visibilityState !== "visible") return;
     if (serverAutosaveHandle !== null) window.clearTimeout(serverAutosaveHandle);
+    // 优化3：自适应 debounce - 首次编辑后 1 秒保存，连续编辑保持 2.5 秒
+    const timeSinceLastSave = Date.now() - lastServerAutosaveTime;
+    const delay = timeSinceLastSave < 5000 ? SERVER_AUTOSAVE_DEBOUNCE_MS : 1000;
     serverAutosaveHandle = window.setTimeout(() => {
       serverAutosaveHandle = null;
+      lastServerAutosaveTime = Date.now();
       void runServerAutosave();
-    }, SERVER_AUTOSAVE_DEBOUNCE_MS);
+    }, delay);
   };
 
   flushDeferredTabSessionPersistence = () => {
@@ -3707,6 +3719,20 @@ if (typeof window !== "undefined") {
     if (!tabSessionPersistencePending && !tabSessionPersistenceDeferred) return true;
     return persistLatestStableState(false);
   };
+
+  // 优化4：页面恢复可见时立即保存（不等待debounce）
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        if (serverAutosaveHandle !== null) {
+          window.clearTimeout(serverAutosaveHandle);
+          serverAutosaveHandle = null;
+        }
+        lastServerAutosaveTime = Date.now();
+        void runServerAutosave();
+      }
+    });
+  }
 
   useFlowStore.subscribe((state, previousState) => {
     if (!persistenceSignalChanged(state, previousState)) return;
