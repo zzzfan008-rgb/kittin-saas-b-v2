@@ -39,6 +39,8 @@ interface ProjectMaskFileRef {
 
 const RETIRED_MASK_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 const INITIAL_DRAFT_TRASH_RETENTION_MS = 15 * 24 * 60 * 60 * 1_000;
+/** 正式保存项目的回收站保留期（软删后可恢复窗口；超期由 purgeExpiredProjects 物理清除）。 */
+const SAVED_PROJECT_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_DRAFT_REVISION = 2_147_483_646;
 
@@ -366,9 +368,29 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
 projectsRouter.get("/", asyncHandler(async (req, res) => {
   await purgeExpiredProjects();
   const user = requestUser(req);
-  const rows = await query<Omit<ProjectRow, "flow_json">>(`
-    SELECT p.id, p.owner_id, u.display_name AS owner_name, p.name, p.updated_at
+  // 封面优化：不再拉全量 flow_json，由 LATERAL 子查询直接取「该项目最后一次成功生成步的
+  // 最后一张图」作为 previewImage（无生成记录 → NULL，前端槽位 previewImage?: string）。
+  // 排序口径与最近结果页一致：run.started_at 降序，同 run 内 step_index 降序。
+  const rows = await query<{
+    id: string;
+    owner_id: string;
+    owner_name: string;
+    name: string;
+    updated_at: string;
+    preview_image: string | null;
+  }>(`
+    SELECT p.id, p.owner_id, u.display_name AS owner_name, p.name, p.updated_at,
+      preview.preview_image
     FROM projects p JOIN users u ON u.id = p.owner_id
+    LEFT JOIN LATERAL (
+      SELECT (s.output_images_json::jsonb -> -1) ->> 0 AS preview_image
+      FROM generation_runs r
+      JOIN generation_run_steps s ON s.run_id = r.id
+      WHERE r.project_id = p.id AND r.deleted_at IS NULL
+        AND s.output_images_json <> '[]'
+      ORDER BY r.started_at DESC, s.step_index DESC
+      LIMIT 1
+    ) preview ON true
     WHERE p.deleted_at IS NULL AND p.lifecycle = 'saved'
       AND ($1 = 'admin' OR p.owner_id = $2)
     ORDER BY p.updated_at DESC
@@ -380,6 +402,7 @@ projectsRouter.get("/", asyncHandler(async (req, res) => {
     ownerName: row.owner_name,
     readOnly: row.owner_id !== user.id,
     updatedAt: row.updated_at,
+    previewImage: row.preview_image ?? undefined,
   })));
 }));
 
@@ -775,4 +798,97 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
       error: error instanceof WorkflowValidationError ? `项目数据无法迁移：${error.message}` : "项目数据损坏",
     });
   }
+}));
+
+// 软删正式保存项目（项目中心「删除」）。已打开 tab 的联动关闭由前端处理。
+// 语义与初始草稿放弃一致：deleted_at + purge_after，30 天保留期内可恢复（restore 端点后续需求），
+// 超期由 purgeExpiredProjects 物理清除（含关联 files/generation_runs 的级联清理已有逻辑）。
+projectsRouter.delete("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  if (!PROJECT_ID_PATTERN.test(req.params.id)) {
+    res.status(400).json({ error: "invalid project id" });
+    return;
+  }
+  const outcome = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+    // 注意 owner 限定：管理员对他人项目只读（与 PUT/GET 的 403 语义一致），不提供管理删。
+    const existing = await queryOne<{ lifecycle: "initial_draft" | "saved" }>(`
+      SELECT lifecycle FROM projects
+      WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+      FOR UPDATE
+    `, [req.params.id, user.id], client);
+    if (!existing) return { status: "not_found" as const };
+    // 初始草稿走专属端点（带 revision 冲突检查）；此处只接受正式保存项目。
+    if (existing.lifecycle !== "saved") return { status: "draft_not_supported" as const };
+
+    const deletedAt = new Date();
+    const purgeAfter = new Date(deletedAt.getTime() + SAVED_PROJECT_TRASH_RETENTION_MS);
+    const deletedAtIso = deletedAt.toISOString();
+    const purgeAfterIso = purgeAfter.toISOString();
+    await client.query(`
+      UPDATE projects
+      SET deleted_at = $1, purge_after = $2, updated_at = $1
+      WHERE id = $3 AND owner_id = $4 AND lifecycle = 'saved' AND deleted_at IS NULL
+    `, [deletedAtIso, purgeAfterIso, req.params.id, user.id]);
+    // 关联蒙版文件一并进回收队列（与初始草稿放弃同款口径）。
+    await client.query(`
+      UPDATE files
+      SET deleted_at = $1, purge_after = $2
+      WHERE owner_id = $3 AND project_id = $4
+        AND source_type = 'mask' AND deleted_at IS NULL AND purge_after IS NULL
+    `, [deletedAtIso, purgeAfterIso, user.id, req.params.id]);
+    return { status: "deleted" as const, purgeAfter: purgeAfterIso };
+  });
+
+  if (outcome.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能删除项目" });
+    return;
+  }
+  if (outcome.status === "not_found") {
+    res.status(404).json({ error: "project not found" });
+    return;
+  }
+  if (outcome.status === "draft_not_supported") {
+    res.status(409).json({ error: "初始草稿请使用草稿删除入口" });
+    return;
+  }
+  res.json({ ok: true, purgeAfter: outcome.purgeAfter });
+}));
+
+// 项目改名（项目中心「重命名」）。只动 name，不碰 flow_json / revision；
+// updated_at 同步刷新（列表按 updated_at 排序，改名后浮到顶部符合预期）。
+projectsRouter.patch("/:id", asyncHandler(async (req, res) => {
+  const user = requestUser(req);
+  if (!PROJECT_ID_PATTERN.test(req.params.id)) {
+    res.status(400).json({ error: "invalid project id" });
+    return;
+  }
+  const { name } = req.body as { name?: unknown };
+  if (typeof name !== "string" || !name.trim() || name.length > 200) {
+    res.status(400).json({ error: "name must be a non-empty string up to 200 characters" });
+    return;
+  }
+  const outcome = await transaction(async (client) => {
+    if (!await lockActiveOwner(client, user.id)) return { status: "owner_unavailable" as const };
+    // 管理员对他人项目只读（与 PUT/DELETE 同口径），rename 也只允许本人。
+    const updated = await queryOne<{ id: string; name: string; updated_at: string }>(`
+      UPDATE projects
+      SET name = $1, updated_at = $2
+      WHERE id = $3 AND owner_id = $4 AND lifecycle = 'saved' AND deleted_at IS NULL
+      RETURNING id, name, updated_at
+    `, [name.trim(), new Date().toISOString(), req.params.id, user.id], client);
+    return updated
+      ? { status: "renamed" as const, row: updated }
+      : { status: "not_found" as const };
+  });
+
+  if (outcome.status === "owner_unavailable") {
+    res.status(409).json({ error: "账号已停用或删除，不能重命名项目" });
+    return;
+  }
+  if (outcome.status === "not_found") {
+    res.status(404).json({ error: "project not found" });
+    return;
+  }
+  res.json({ ok: true, id: outcome.row.id, name: outcome.row.name, updatedAt: outcome.row.updated_at });
 }));
