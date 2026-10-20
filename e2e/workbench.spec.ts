@@ -610,10 +610,9 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   // （feat/image-crop-v2，尚未合入 main）接入，在此之前禁用原因是「能力尚未接入」。
   const crop = imageNode.getByRole("button", { name: "裁剪" });
   await expect(crop).toBeDisabled();
-  await expect(crop).toHaveAttribute("title", /图片裁剪能力尚未接入/);
-  const matting = imageNode.getByRole("button", { name: "抠图" });
-  await expect(matting).toBeDisabled();
-  await expect(matting).toHaveAttribute("title", /请先上传图片后再抠图/);
+  await expect(crop).toHaveAttribute("title", /请先上传图片后再裁剪/);
+  await expect(imageNode.getByRole("button", { name: "抠图" })).toBeDisabled();
+  await expect(imageNode.getByRole("button", { name: "抠图" })).toHaveAttribute("title", /请先上传图片后再抠图/);
   await expect(imageNode.getByRole("button", { name: "复制" })).toBeEnabled();
   await expect(imageNode.getByRole("button", { name: "替换", exact: true })).toBeEnabled();
 

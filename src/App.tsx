@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { nanoid } from "nanoid";
+import "@/styles/react-image-crop.css";
 import {
   addExistingNodes,
   flushActiveTextEdit,
