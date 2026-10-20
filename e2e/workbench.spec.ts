@@ -739,6 +739,84 @@ test("project center keeps 最近项目 usable when the project list fails", asy
   await expect(page.locator(".react-flow__node")).toHaveCount(0);
 });
 
+test("project center covers, rename, and delete wire to the management endpoints", async ({ page }) => {
+  // 项目中心三项管理交互的真实请求链路（对应 server fa14ba8）：
+  // previewImage 封面、PATCH 改名（改名后重拉、浮顶）、DELETE 软删（本地移除）。
+  type Summary = { id: string; name: string; updatedAt: string; previewImage?: string };
+  let projects: Summary[] = [
+    { id: "pc-manage-1", name: "可改名项目", updatedAt: "2026-10-01T00:00:00.000Z", previewImage: "/api/files/pc-cover-1" },
+    { id: "pc-manage-2", name: "待删除项目", updatedAt: "2026-10-02T00:00:00.000Z" },
+  ];
+  const patchRequests: Array<{ url: string; body: unknown }> = [];
+  let deleteCount = 0;
+
+  await page.route("**/api/projects", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ json: projects });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route("**/api/projects/*", async (route) => {
+    const method = route.request().method();
+    const url = new URL(route.request().url());
+    const id = url.pathname.split("/").pop()!;
+    if (method === "PATCH") {
+      const body = route.request().postDataJSON() as { name?: string };
+      patchRequests.push({ url: url.pathname, body });
+      const name = String(body.name ?? "").trim();
+      projects = projects.map((p) =>
+        p.id === id ? { ...p, name, updatedAt: "2026-10-20T08:00:00.000Z" } : p,
+      );
+      await route.fulfill({ json: { ok: true, id, name, updatedAt: "2026-10-20T08:00:00.000Z" } });
+      return;
+    }
+    if (method === "DELETE") {
+      deleteCount += 1;
+      projects = projects.filter((p) => p.id !== id);
+      await route.fulfill({ json: { ok: true, purgeAfter: "2026-11-19T08:00:00.000Z" } });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "打开项目中心" }).click();
+  const center = page.getByRole("dialog", { name: "项目中心" });
+  await expect(center).toBeVisible();
+
+  // ① 封面：有 previewImage 的卡片用缩略图；无封面走默认占位（不 404 阻断渲染）。
+  const firstCard = center.locator(".group").filter({ hasText: "可改名项目" });
+  await expect(firstCard.getByRole("img", { name: "可改名项目" })).toHaveAttribute(
+    "src",
+    /\/api\/files\/pc-cover-1\/thumbnail/,
+  );
+
+  // ② 改名按钮长亮：点「改名」就地出现输入框，Enter 发 PATCH 并重拉列表。
+  await expect(firstCard.getByRole("button", { name: "改名" })).toBeVisible();
+  await firstCard.getByRole("button", { name: "改名" }).click();
+  const nameInput = firstCard.getByLabel("项目新名称");
+  await expect(nameInput).toBeVisible();
+  await expect(nameInput).toHaveValue("可改名项目");
+  await nameInput.fill("  改后的项目名  ");
+  await nameInput.press("Enter");
+  const renamedCard = center.locator("article").filter({ hasText: "改后的项目名" });
+  await expect(renamedCard).toContainText("改后的项目名");
+  expect(patchRequests).toHaveLength(1);
+  expect(patchRequests[0]!.url).toBe("/api/projects/pc-manage-1");
+  expect(patchRequests[0]!.body).toEqual({ name: "改后的项目名" });
+
+  // ③ 删除：hover 卡片出现「删除」，确认后发 DELETE，卡片从列表消失。
+  page.once("dialog", (dialog) => {
+    expect(dialog.message()).toContain("待删除项目");
+    void dialog.accept();
+  });
+  const secondCard = center.locator(".group").filter({ hasText: "待删除项目" });
+  await secondCard.hover();
+  await secondCard.getByRole("button", { name: "删除项目" }).click();
+  await expect(center.getByText("待删除项目", { exact: true })).toHaveCount(0);
+  expect(deleteCount).toBe(1);
+});
+
 test("results and project center follow desktop density for cards", async ({ page }) => {
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("Desktop viewport is required");

@@ -16,9 +16,13 @@ const record = (calls: Call[], status: number, payload: unknown = {}) =>
     return Response.json(payload, { status });
   }) as typeof fetch;
 
-// ---------- 1. 重命名：PATCH + JSON {name} + 路径编码 ----------
+// ---------- 1. 重命名：PATCH + JSON {name} + 路径编码，返回服务端结果 ----------
 const renameCalls: Call[] = [];
-await renameProjectRequest("p/1 x", "新名称", record(renameCalls, 200));
+const renameResult = await renameProjectRequest(
+  "p/1 x",
+  "新名称",
+  record(renameCalls, 200, { ok: true, id: "p/1 x", name: "新名称", updatedAt: "2026-10-20T08:00:00.000Z" }),
+);
 assert.equal(renameCalls.length, 1);
 assert.equal(renameCalls[0]!.init?.method, "PATCH");
 assert.equal(renameCalls[0]!.url, "/api/projects/p%2F1%20x");
@@ -27,7 +31,9 @@ assert.equal(
   "application/json",
 );
 assert.deepEqual(renameCalls[0]!.body, { name: "新名称" });
-console.log("  ✓ 重命名发 PATCH /api/projects/:id + JSON {name}，id 经 encodeURIComponent");
+assert.equal(renameResult.name, "新名称");
+assert.equal(renameResult.updatedAt, "2026-10-20T08:00:00.000Z");
+console.log("  ✓ 重命名发 PATCH /api/projects/:id + JSON {name}，id 经 encodeURIComponent，返回服务端结果");
 
 // ---------- 2. 删除：DELETE、无 body ----------
 const deleteCalls: Call[] = [];

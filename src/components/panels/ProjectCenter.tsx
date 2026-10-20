@@ -13,10 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { thumbnailImageUrl } from "@/lib/images";
 import { deleteProjectRequest, renameProjectRequest } from "@/lib/projectsApi";
 import {
+  projectTabCloseBlockReason,
   projectTabLifecycle,
   useFlowStore,
   type ProjectTab,
 } from "@/store/flowStore";
+import { getGenerationSafetyBlockReason } from "@/store/generationSafety";
 import type { PersistedWorkflow } from "@/types/workflow";
 
 interface ProjectSummary {
@@ -225,17 +227,32 @@ export function ProjectCenter({
       setRenamingId(null);
       return;
     }
+    if (newName.length > 200) {
+      setError("项目名称最多 200 字");
+      return;
+    }
     try {
       setError(null);
+      // 服务端返回 trim 后的 name 与刷新的 updatedAt；重拉以拿到新顺序（改名浮顶）。
       await renameProjectRequest(project.id, newName);
-      setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, name: newName } : p)));
       setRenamingId(null);
+      await loadProjects();
     } catch (renameError) {
       setError(renameError instanceof Error ? renameError.message : String(renameError));
     }
-  }, [renamingValue]);
+  }, [renamingValue, loadProjects]);
 
   const removeProject = useCallback(async (project: ProjectSummary) => {
+    // 该项目若正开着页签，先复用页签关闭的硬保护（运行中付费任务/历史对账未完成）：
+    // 阻止删除，避免服务端已软删而页签保留、后续保存落到已删项目。
+    const openTab = useFlowStore.getState().tabs.find((tab) => tab.projectId === project.id);
+    if (openTab) {
+      const blockReason = projectTabCloseBlockReason(openTab, getGenerationSafetyBlockReason());
+      if (blockReason) {
+        setError(blockReason);
+        return;
+      }
+    }
     // 原生二次确认（删除不可撤销）；不引入新弹层原语，与项目中心现有交互保持轻量。
     const confirmed = window.confirm(`确定删除项目「${project.name}」吗？此操作不可撤销。`);
     if (!confirmed) return;
@@ -243,8 +260,7 @@ export function ProjectCenter({
       setError(null);
       await deleteProjectRequest(project.id);
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
-      // 联动：该项目若正开着页签则一并关闭（运行中页签由 closeTab 既有封锁规则保护）。
-      const openTab = useFlowStore.getState().tabs.find((tab) => tab.projectId === project.id);
+      // 联动：关闭该项目已打开的页签（上面已确认其不在关闭封锁态）。
       if (openTab) useFlowStore.getState().closeTab(openTab.id);
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : String(removeError));
@@ -383,6 +399,7 @@ export function ProjectCenter({
                                     }}
                                     onClick={(event) => event.stopPropagation()}
                                     autoFocus
+                                    maxLength={200}
                                     aria-label="项目新名称"
                                     className="min-w-0 flex-1 rounded border border-[var(--gc-accent)] bg-[var(--gc-control)] px-2 py-1 text-xs text-[var(--gc-text)] outline-none"
                                   />

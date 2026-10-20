@@ -21,12 +21,19 @@ async function readErrorBody(response: Response): Promise<unknown> {
   }
 }
 
+/** 改名成功响应：name 已由服务端 trim，updatedAt 已刷新（列表按它排序）。 */
+export interface RenameProjectResult {
+  id: string;
+  name: string;
+  updatedAt: string;
+}
+
 /** 重命名已保存项目；非 2xx 抛出带服务端文案的错误。fetcher 可注入以便单测。 */
 export async function renameProjectRequest(
   projectId: string,
   name: string,
   fetcher: typeof fetch = fetch,
-): Promise<void> {
+): Promise<RenameProjectResult> {
   const response = await fetcher(`/api/projects/${encodeURIComponent(projectId)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -37,6 +44,7 @@ export async function renameProjectRequest(
       apiErrorMessage(response.status, await readErrorBody(response), `重命名失败 HTTP ${response.status}`),
     );
   }
+  return (await response.json()) as RenameProjectResult;
 }
 
 /** 软删除已保存项目；非 2xx 抛出带服务端文案的错误。fetcher 可注入以便单测。 */
