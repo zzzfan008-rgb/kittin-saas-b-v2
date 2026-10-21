@@ -53,6 +53,19 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      // 工作树/产物目录不进文件监视：每个任务一个 git worktree 时，chokidar 会顺带
+      // 监视 .worktrees/*/tsconfig.json 等文件，一有改动 Vite 就清缓存强制全量重载，
+      // 依赖图重建期间 @base-ui 等预打包 chunk 会持有失效的 React 引用
+      // → "Cannot read properties of null (reading 'useRef')"（页面出现异常 GC-*）。
+      watch: {
+        ignored: [
+          "**/.worktrees/**",
+          "**/.claude/worktrees/**",
+          "**/playwright-report/**",
+          "**/test-results/**",
+          "**/.hermes/**",
+        ],
+      },
       proxy: {
         "/api": {
           target: resolveApiProxyTarget(env),
