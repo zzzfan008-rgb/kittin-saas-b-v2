@@ -644,7 +644,8 @@ test("workflow menu templates merge into the active canvas without opening a tab
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const center = page.getByRole("dialog", { name: "项目中心" });
   await expect(center).toBeVisible();
-  await expect(center.getByText("最近项目", { exact: true })).toBeVisible();
+  // 2026-10-22 批注 1：「最近项目」静态标题已改为排序下拉（方案 A），断言改为控件锚点。
+  await expect(center.getByRole("combobox", { name: "项目排序" })).toBeVisible();
   await expect(center.getByRole("tab")).toHaveCount(0);
   await expect(center.getByRole("button", { name: /保存当前画布为模板|管理模板/ })).toHaveCount(0);
   await center.getByRole("button", { name: "关闭项目中心" }).click();
@@ -753,7 +754,8 @@ test("project center keeps 最近项目 usable when the project list fails", asy
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const center = page.getByRole("dialog", { name: "项目中心" });
   await expect(center).toBeVisible();
-  await expect(center.getByText("最近项目", { exact: true })).toBeVisible();
+  // 2026-10-22 批注 1：标题换成排序下拉后，控件仍在 = 列表区骨架可用。
+  await expect(center.getByRole("combobox", { name: "项目排序" })).toBeVisible();
   await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
   await expect(center.getByRole("alert")).toContainText("加载失败");
   await expect(center.getByLabel("正在加载模板")).toHaveCount(0);
@@ -985,12 +987,39 @@ test("results and project center follow desktop density for cards", async ({ pag
     await page.getByRole("button", { name: "打开项目中心" }).click();
     const center = page.getByRole("dialog", { name: "项目中心" });
     await expect(center).toBeVisible();
-    // 2026-09-25 决策：项目中心只留「最近项目」（模板入口已迁到左侧工作流二级菜单）。
-    await expect(center.getByText("最近项目", { exact: true })).toBeVisible();
+    // 2026-09-25 决策：项目中心只留最近项目（模板入口已迁到左侧工作流二级菜单）。
+    // 2026-10-22 批注 1：静态标题改为排序下拉，断言改用控件锚点。
+    await expect(center.getByRole("combobox", { name: "项目排序" })).toBeVisible();
     await expect(center.getByRole("tab")).toHaveCount(0);
     // 「新建项目」卡是唯一稳定锚点（初始草稿卡按会话存在与否出现），用它反查所在栅格。
     const recentGrid = center.getByRole("button", { name: "新建项目" }).locator("xpath=../..");
     await expectGridColumns(recentGrid, expectedProjectColumns);
+    // 2026-10-22 回归：项目多于可视高度时列表区必须真的能滚（滚轮 + 滚动条）。
+    // 此前外层缺 flex 导致 flex-1/overflow-y-auto 失效，内容被 DialogContent 的
+    // overflow-hidden 裁掉，用户选不到最下面的项目。
+    const scrollDiagnostics = await recentGrid.evaluate((grid) => {
+      const scroller = grid.parentElement as HTMLElement | null;
+      if (!scroller) return { ok: false, reason: "no scroll container" };
+      return {
+        ok: scroller.scrollHeight > scroller.clientHeight,
+        reason: "",
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        overflowY: getComputedStyle(scroller).overflowY,
+      };
+    });
+    expect(scrollDiagnostics.overflowY, JSON.stringify(scrollDiagnostics)).toMatch(/auto|scroll/);
+    // 夹具不足一屏时不强行断言可滚，只锁 overflow 语义（避免依赖夹具数量）。
+    if (scrollDiagnostics.ok) {
+      await recentGrid.evaluate((grid) => {
+        const scroller = grid.parentElement as HTMLElement;
+        scroller.scrollTop = scroller.scrollHeight;
+      });
+      await expect.poll(async () => recentGrid.evaluate((grid) => {
+        const scroller = grid.parentElement as HTMLElement;
+        return scroller.scrollTop;
+      })).toBeGreaterThan(0);
+    }
     if (theme.id === "white") {
       await expectTwoLineTitle(center.getByText(PROJECT_CENTER_PROJECT_FIXTURES[0].name, { exact: true }));
       const projectCardHeights = await center.getByRole("button", { name: /^超长项目名称/ }).evaluateAll(
@@ -1356,7 +1385,8 @@ test("floating rail, zoom controls, and the results layer preserve canvas identi
   await projectCenterToggle.click();
   const projectCenter = page.getByRole("dialog", { name: "项目中心" });
   await expect(projectCenter).toBeVisible();
-  await expect(projectCenter.getByText("最近项目", { exact: true })).toBeVisible();
+  // 2026-10-22 批注 1：标题改为排序下拉，控件存在即证明筛选条已渲染。
+  await expect(projectCenter.getByRole("combobox", { name: "项目排序" })).toBeVisible();
   await expect(projectCenter.getByRole("button", { name: "新建项目" })).toBeVisible();
   const projectCenterRect = await rect(projectCenter);
   expect(projectCenterRect.left).toBeGreaterThanOrEqual(39);

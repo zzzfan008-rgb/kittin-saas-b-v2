@@ -721,17 +721,24 @@ await test("桌面工作台使用稳定 Dock，主题通过三列网格严格居
   assert.match(projectTabsSource, /if \(!saved\) \{[\s\S]*setRenameError/);
   assert.match(projectTabsSource, /onBlur=\{\(event\) => \{[\s\S]*setEditingTabId\(null\)/);
   assert.match(projectTabsSource, /role="alert"/);
-  // 2026-09-25 决策 3：项目中心只保留「最近项目」——「内置模板」迁到左侧工作流二级菜单,
+  // 2026-09-25 决策 3：项目中心只保留最近项目一处列表——「内置模板」迁到左侧工作流二级菜单,
   // 「我的模板」与「保存当前画布为模板」整体取消（模板/项目都自带自动保存）。
-  assert.match(projectCenterSource, /最近项目/);
+  // 2026-10-22 批注 1+2：静态标题「最近项目」改为排序下拉，搜索框从 header 移入该行并列；
+  // 断言改为锁控件锚点（搜索框占位文案仍是「搜索最近项目」）。
+  assert.match(projectCenterSource, /aria-label="项目排序"/);
+  assert.match(projectCenterSource, /搜索最近项目/);
   assert.doesNotMatch(projectCenterSource, /内置模板|我的模板|保存当前画布为模板/);
   assert.doesNotMatch(projectCenterSource, /<Tabs|TabsTrigger|TabsContent|inferTemplateLaunchMode|launchTemplateInNewTab/);
   assert.doesNotMatch(projectCenterSource, /DELETE|AlertDialog|DropdownMenu|SAVE_TEMPLATE_COVER|BUILTIN_TEMPLATE_COVERS|templateProductPolicy/);
   assert.doesNotMatch(projectCenterSource, /projectDetails/);
   assert.match(projectCenterSource, /const requestVersion = \+\+openRequestVersion\.current/);
   assert.match(projectCenterSource, /if \(requestVersion !== openRequestVersion\.current\) return/);
-  assert.match(projectCenterSource, /NEW_PROJECT_COVER/);
+  // 2026-10-22 批注 3：新建项目卡封面改为纯色底 + 居中放大加号，不再使用工作台照片。
+  assert.doesNotMatch(projectCenterSource, /NEW_PROJECT_COVER/);
   assert.match(projectCenterSource, /EMPTY_PROJECT_COVER/);
+  // 滚动回归：外层容器必须同时具备 flex 与 flex-col，否则 flex-1/overflow-y-auto 失效。
+  assert.match(projectCenterSource, /className="flex min-h-0 flex-1 flex-col gap-0"/);
+  assert.match(projectCenterSource, /className="min-h-0 flex-1 overflow-y-auto p-7"/);
   assert.match(projectCenterSource, /PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4"/);
   assert.match(projectCenterSource, /PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-\[var\(--gc-text\)\]"/);
   // 内置模板的落点在左侧工作流二级菜单：菜单项 → 映射表 → 合并进当前活动画布（不新建页签）。
