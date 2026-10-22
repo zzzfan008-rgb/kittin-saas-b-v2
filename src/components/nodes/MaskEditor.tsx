@@ -471,7 +471,11 @@ export function MaskEditor({
         aria-label="蒙版重绘"
       >
       {/* 左 stage：原图 + 涂抹层 + 运行期显影中 */}
-      <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-4">
+      {/* 左 stage：原图 + 涂抹层 + 运行期显影中。
+          用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致
+          （CropImageDialog 的左栏是 bg-[var(--gc-control)] + rounded-lg 的底板），
+          让图片在深色背景上有明确边界，而不是悬空。 */}
+      <main className="relative m-4 flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-4">
         <div className="relative inline-flex max-h-full max-w-full shadow-2xl shadow-black">
           <img
             ref={imageRef}

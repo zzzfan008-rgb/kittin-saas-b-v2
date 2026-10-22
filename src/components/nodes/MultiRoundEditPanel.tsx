@@ -250,8 +250,10 @@ export function MultiRoundEditPanel({
       aria-label="多轮修改"
       data-testid="multi-round-edit-panel"
     >
-      {/* 左 stage：底图 + 标记层 + 运行期显影中 */}
-      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
+      {/* 左 stage：底图 + 标记层 + 运行期显影中。
+          用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致
+          （CropImageDialog 左栏 = bg-[var(--gc-control)] + rounded-lg 底板）。 */}
+      <div className="relative m-6 flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-6">
         {baseSource ? (
           // 对齐 MaskEditor 已验证布局：容器 inline-flex，img 用 viewport 绝对约束
           //（max-w-full 在收缩型 flex item 内百分比自引用会解析为 0 → 面板图塌缩）。
