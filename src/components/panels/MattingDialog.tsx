@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { removeBackground, type Config } from "@imgly/background-removal";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
@@ -138,14 +139,19 @@ export function MattingDialog({
       }}
     >
       <DialogContent
+        showCloseButton={false}
         overlayClassName="bg-black/70"
-        className="flex h-[min(90vh,900px)] w-[min(95vw,1200px)] max-w-none flex-col gap-4 rounded-lg"
+        // 2026-10-22 用户批注 2：整体 UI 对齐蒙版重绘页——全屏分栏（左 stage + 右栏）。
+        // R-83：sm:max-w-none 必须显式补，否则 base sm:max-w-sm(384px) 穿透压窄预览。
+        className="top-0 left-0 flex h-dvh w-screen max-w-none sm:max-w-none translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
+        data-panel="matting"
+        aria-label="自动抠图"
       >
-        <DialogTitle>自动抠图</DialogTitle>
+        <DialogTitle className="sr-only">自动抠图</DialogTitle>
 
-        <div className="flex min-h-0 flex-1 gap-4">
+        <div className="flex min-h-0 flex-1 gap-0">
           {/* 左侧：预览（有结果时切到抠后图，否则原图）；棋盘格透出 alpha */}
-          <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto rounded-lg bg-[var(--gc-control)]">
+          <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
             <div
               className="alpha-checkerboard relative inline-block"
             >
@@ -155,8 +161,9 @@ export function MattingDialog({
                 alt={result ? "抠图结果" : "抠图原图"}
                 data-testid="matting-preview"
                 style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
+                  // R-83 同款：百分比在收缩型 flex item 内自引用解析为 0，用 viewport 约束。
+                  maxWidth: "calc(100vw - 360px)",
+                  maxHeight: "calc(100vh - 64px)",
                   objectFit: "contain",
                   display: "block",
                 }}
@@ -176,10 +183,24 @@ export function MattingDialog({
                 </div>
               )}
             </div>
-          </div>
+          </main>
 
-          {/* 右侧：控制面板 */}
-          <aside className="flex w-56 shrink-0 flex-col gap-4 rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)] p-4">
+          {/* 右栏：对齐蒙版重绘页——全高、左边框、clamp 宽度、纵向滚动。 */}
+          <aside className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col gap-4 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)] p-4">
+            <div className="flex items-center justify-between border-b border-[var(--gc-border)] pb-3">
+              <h2 className="text-sm font-medium text-[var(--gc-text)]">自动抠图</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="关闭"
+                title={busy ? "处理中不能关闭" : "关闭（ESC）"}
+                onClick={onClose}
+                disabled={busy}
+              >
+                <XIcon aria-hidden="true" className="size-4" />
+              </Button>
+            </div>
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-[var(--gc-text)]">
                 处理选项

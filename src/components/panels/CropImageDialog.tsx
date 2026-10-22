@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { Crop, PixelCrop, ReactCrop } from "react-image-crop";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { apiErrorMessage } from "@/lib/apiErrors";
@@ -118,29 +119,30 @@ export function CropImageDialog({
 
   const handleImageLoad = () => {
     if (!imgRef.current) return;
-    const { naturalWidth, naturalHeight } = imgRef.current;
-    // 默认裁剪区域：中央 80%
-    const margin = Math.min(naturalWidth, naturalHeight) * 0.1;
-    setCrop({
-      unit: "px",
-      x: margin,
-      y: margin,
-      width: naturalWidth - margin * 2,
-      height: naturalHeight - margin * 2,
-    });
+    // 2026-10-22 用户批注 3：打开时不预置裁剪框。自带一圈默认选区会被误读成
+    // 「已选好可确认」，用户直接点确认就裁成非预期的中央 80%。
+    // 保持 crop 初始 0×0，由用户自己拖出选区；未框选时确认按钮 disabled。
+    setCrop({ unit: "px", x: 0, y: 0, width: 0, height: 0 });
+    setCompletedCrop(null);
   };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent
+        showCloseButton={false}
         overlayClassName="bg-black/70"
-        className="flex h-[min(90vh,900px)] w-[min(95vw,1200px)] max-w-none flex-col gap-4 rounded-lg"
+        // 2026-10-22 用户批注 2：整体 UI 对齐蒙版重绘页——全屏分栏（左 stage + 右栏），
+        // 不再是居中卡片。R-83：sm:max-w-none 必须显式补，否则 base sm:max-w-sm(384px) 穿透。
+        className="top-0 left-0 flex h-dvh w-screen max-w-none sm:max-w-none translate-x-0 translate-y-0 gap-0 rounded-none bg-transparent p-0 ring-0"
+        data-panel="crop"
+        aria-label="裁剪图片"
       >
-        <DialogTitle>裁剪图片</DialogTitle>
+        <DialogTitle className="sr-only">裁剪图片</DialogTitle>
 
-        <div className="flex min-h-0 flex-1 gap-4">
-          {/* 左侧：裁剪画布 */}
-          <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[var(--gc-control)] rounded-lg">
+        <div className="flex min-h-0 flex-1 gap-0">
+          {/* 左侧：裁剪画布。用 viewport 绝对约束替代百分比自引用（R-83 第二条：
+              max-w-full 在收缩型 flex item 内会解析为 0，图直接塌缩）。 */}
+          <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
             {source && (
               <ReactCrop
                 crop={crop}
@@ -148,7 +150,7 @@ export function CropImageDialog({
                 onComplete={(c: PixelCrop) => setCompletedCrop(c)}
                 circularCrop={false}
                 locked={false}
-                className="max-w-full max-h-full"
+                className="max-w-[calc(100vw-360px)] max-h-[calc(100vh-64px)]"
               >
                 <img
                   ref={imgRef}
@@ -156,17 +158,31 @@ export function CropImageDialog({
                   alt="裁剪预览"
                   onLoad={handleImageLoad}
                   style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
+                    maxWidth: "calc(100vw - 360px)",
+                    maxHeight: "calc(100vh - 64px)",
                     objectFit: "contain",
                   }}
                 />
               </ReactCrop>
             )}
-          </div>
+          </main>
 
-          {/* 右侧：信息和操作 */}
-          <aside className="flex w-56 shrink-0 flex-col gap-4 rounded-lg border border-[var(--gc-border)] bg-[var(--gc-panel)] p-4">
+          {/* 右栏：对齐蒙版重绘页——全高、左边框、clamp 宽度、纵向滚动。 */}
+          <aside className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col gap-4 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)] p-4">
+            <div className="flex items-center justify-between border-b border-[var(--gc-border)] pb-3">
+              <h2 className="text-sm font-medium text-[var(--gc-text)]">裁剪图片</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="关闭"
+                title="关闭（ESC）"
+                onClick={onClose}
+                disabled={processing}
+              >
+                <XIcon aria-hidden="true" className="size-4" />
+              </Button>
+            </div>
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-[var(--gc-text)]">
                 裁剪信息
