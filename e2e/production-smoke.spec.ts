@@ -48,8 +48,9 @@ test("production bundle serves hashed assets and the authenticated desktop shell
   await page.getByRole("button", { name: "打开项目中心" }).click();
   const center = page.getByRole("dialog", { name: "项目中心" });
   await expect(center).toBeVisible();
-  // 2026-09-25 决策：项目中心只留「最近项目」，模板入口迁到左侧工作流二级菜单。
-  await expect(center.getByText("最近项目", { exact: true })).toBeVisible();
+  // 2026-10-22：静态「最近项目」标题换成排序下拉框（项目中心改版），
+  // 用控件锚点替代已删除的文案锚点。
+  await expect(center.getByRole("combobox", { name: "项目排序" })).toBeVisible();
   await expect(center.getByRole("button", { name: "新建项目" })).toBeVisible();
   await center.getByRole("button", { name: "关闭项目中心" }).click();
   // 生产包里二级菜单（及其 lazy chunk）必须能展开。
