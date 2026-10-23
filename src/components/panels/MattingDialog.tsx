@@ -150,8 +150,11 @@ export function MattingDialog({
         <DialogTitle className="sr-only">自动抠图</DialogTitle>
 
         <div className="flex min-h-0 flex-1 gap-0">
-          {/* 左侧：预览（有结果时切到抠后图，否则原图）；棋盘格透出 alpha */}
-          <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
+          {/* 左侧：预览（有结果时切到抠后图，否则原图）；棋盘格透出 alpha。
+              用户批注（2026-10-22）：图片底下要有可见底板框，与蒙版重绘页一致。
+              只能靠 padding + bg 实现，不能加 margin —— e2e/mask-slider-drag.spec.ts:333
+              断言「左图区 + 右栏正好铺满视口」，<main> 上的 margin 会让该回归红掉。 */}
+          <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-6">
             <div
               className="alpha-checkerboard relative inline-block"
             >
