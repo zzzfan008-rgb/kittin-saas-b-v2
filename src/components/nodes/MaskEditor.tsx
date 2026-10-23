@@ -470,12 +470,11 @@ export function MaskEditor({
         data-panel="mask-redraw"
         aria-label="蒙版重绘"
       >
-      {/* 左 stage：原图 + 涂抹层 + 运行期显影中 */}
       {/* 左 stage：原图 + 涂抹层 + 运行期显影中。
-          用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致
-          （CropImageDialog 的左栏是 bg-[var(--gc-control)] + rounded-lg 的底板），
-          让图片在深色背景上有明确边界，而不是悬空。 */}
-      <main className="relative m-4 flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-4">
+          用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致。
+          注意：底板只能靠 padding + bg 实现，不能加 margin —— e2e/mask-slider-drag.spec.ts:333
+          断言「左图区 + 右栏正好铺满视口」，<main> 上的 margin 会让该回归红掉。 */}
+      <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-4">
         <div className="relative inline-flex max-h-full max-w-full shadow-2xl shadow-black">
           <img
             ref={imageRef}
