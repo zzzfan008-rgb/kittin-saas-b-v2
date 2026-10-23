@@ -19,6 +19,7 @@ import { tutorialsRouter } from "./routes/tutorials";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
 import { createTextRewriteRouter } from "./routes/textRewrite";
+import { mattingRouter } from "./routes/matting";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
 import { migrateLegacyData } from "./lib/legacyMigration";
@@ -114,6 +115,8 @@ app.use("/api/usage", usageRouter);
 app.use("/api/tutorials", tutorialsRouter);
 app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
 app.use("/api/text", textRewriteRateLimit, createTextRewriteRouter());
+// 抠图：转发到本地 Python rembg 服务（rembg-service/，不走 AI 限流——不消耗外部配额）。
+app.use("/api/matting", mattingRouter);
 app.use("/api", (_req, res) => res.status(404).json({ error: "API not found" }));
 
 // 生产模式：完整模式必须有前端构建；API_ONLY=true 可显式跳过前端托管。

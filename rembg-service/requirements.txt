@@ -1,0 +1,11 @@
+# 抠图服务的 Python 依赖（版本已在本机 Python 3.14.7 实测通过）
+#
+# 注意：onnxruntime 没有 Python 3.9 的 wheel，会被 pip 静默跳过，
+# 导致 `import rembg` 直接失败。必须用 3.12+ 解释器建 venv：
+#   /opt/homebrew/bin/python3.14 -m venv venv
+rembg==2.0.86
+onnxruntime==1.31.0
+pillow==13.0.0
+numpy==2.5.4
+fastapi==0.133.1
+uvicorn==0.41.0

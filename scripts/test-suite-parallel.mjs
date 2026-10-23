@@ -130,7 +130,9 @@ const TEST_FILES = [
   "tests/ui-slider-controlled-contract.test.ts",
   // 抠图：alpha 边缘羽化纯函数 + 模型源/错误提示（纯逻辑，无 DOM/网络）。
   "tests/matting-compositor.test.ts",
-  "tests/matting-model-source.test.ts",
+  // 2026-10-23 抠图改服务端（rembg-service）：mattingModelSource 已删除，
+  // 其测试随之退役；新契约由 tests/matting-service.test.ts 覆盖。
+  "tests/matting-service.test.ts",
 
   // P0 清单修复（审计 2026-10-02）：以下 12 个测试文件此前只在盘上、从未被执行。
   "tests/asset-model-category.test.ts",
