@@ -92,16 +92,101 @@ curl -L -o models/models/isnet-general-use/isnet-general-use.onnx \
 
 ## 启动
 
+推荐用 `start.sh`（带 fail-fast 检查）：
+
 ```bash
-cd rembg-service
-U2NET_HOME=./models ./venv/bin/uvicorn app:app --host 127.0.0.1 --port 8001
+# 前台
+./start.sh
+
+# 后台（写 .matting.pid）
+./start.sh --daemon
 ```
 
-启动后立即在后台线程加载模型（约 2-5 秒）。加载期间 `/health` 返回 `loading`。
+脚本做三件事：检查 venv 与模型文件存在、清空 `PYTHONPATH`、启动 uvicorn。
+
+手动启动等价于：
+
+```bash
+cd rembg-service
+env -u PYTHONPATH -u VIRTUAL_ENV \
+  U2NET_HOME=./models \
+  ./venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8001
+```
+
+> **必须清空 `PYTHONPATH`。** Hermes / IDE 等工具会注入自己的 site-packages，
+> 不清会让 `import uvicorn` 从别的 venv 解析，表现为「装了却找不到」。
+
+启动后立即在后台线程加载模型（约 1-5 秒）。加载期间 `/health` 返回 `loading`。
 
 ```bash
 curl -s localhost:8001/health
 # {"status":"ready","model":"isnet-general-use","model_dir":"./models"}
+```
+
+## Node 侧接入
+
+`server/routes/matting.ts` 通过环境变量指向服务：
+
+```bash
+MATTING_SERVICE_URL=http://127.0.0.1:8001   # 默认值就是这个
+```
+
+前端调 `POST /api/matting`，不直接连 Python 服务（只有回环地址可达）。
+
+## 部署（常驻形态）
+
+决策 **A+C**：部署时预置模型 + 启动即预加载。
+
+### macOS（launchd）
+
+`~/Library/LaunchAgents/com.garmentcanvas.matting.plist`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.garmentcanvas.matting</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/kittin-saas-b-v2/rembg-service/start.sh</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/matting.log</string>
+  <key>StandardErrorPath</key><string>/tmp/matting.log</string>
+</dict>
+</plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.garmentcanvas.matting.plist
+```
+
+### Linux（systemd）
+
+```ini
+# /etc/systemd/system/garment-canvas-matting.service
+[Unit]
+Description=Garment Canvas Matting Service
+After=network.target
+
+[Service]
+Type=simple
+User=garment
+WorkingDirectory=/opt/kittin-saas-b-v2/rembg-service
+ExecStart=/opt/kittin-saas-b-v2/rembg-service/start.sh
+Restart=always
+RestartSec=5
+Environment=MATTING_PORT=8001
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl enable --now garment-canvas-matting
 ```
 
 ## 接口
