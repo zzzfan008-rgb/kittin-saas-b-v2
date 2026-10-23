@@ -1,0 +1,8 @@
+# 抠图服务的 Python 虚拟环境与模型文件
+#
+# 模型约 170MB（isnet-general-use），部署时预置，绝不进 git。
+# 预置方式见 README「模型文件」。
+venv/
+models/
+__pycache__/
+*.pyc

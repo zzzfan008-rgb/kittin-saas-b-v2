@@ -141,3 +141,26 @@ function clampIndex(i: number, size: number): number {
   if (i >= size) return size - 1;
   return i;
 }
+
+/**
+ * 把服务端存好的抠图结果（`/api/files/:id` URL）取回本地做 alpha 羽化，返回 dataUrl。
+ *
+ * 为什么羽化留在前端而不是服务端：
+ * 服务端只负责 rembg 的精确抠像（它的 alpha 已经是最准的）；羽化是**用户可调**的
+ * 呈现参数（滑杆 0-40），放在前端才能实时预览，不必每调一次都跑一遍推理。
+ *
+ * 这个封装存在的意义：`featherForegroundToDataUrl` 只吃 Blob，
+ * 而服务端返回的是 URL，中间需要一次 fetch。
+ */
+export async function featherStoredImageUrl(
+  url: string,
+  featherRadius: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const response = await fetchImpl(url);
+  if (!response.ok) {
+    throw new Error(`无法读取抠图结果（HTTP ${response.status}）`);
+  }
+  const blob = await response.blob();
+  return featherForegroundToDataUrl(blob, featherRadius);
+}
