@@ -152,6 +152,13 @@ export function AssetPickerOverlay({
         outputImages: [asset.image],
         status: "success",
         error: undefined,
+        // 换底图必须同时清蒙版三字段：mask 存的是服务端 mask-draft 文件 URL，
+        // maskSourceRef 绑定的是旧底图。留着会让 dag.ts:145 的
+        // `mask does not match its current source image` 在下次运行时炸掉。
+        // 与 ImageNode 的上传/裁剪/抠图/多轮修改路径保持同一清理语义（不删文件本体）。
+        mask: undefined,
+        maskSourceRef: undefined,
+        featherRadius: undefined,
       });
       onRequestChange(null);
       return;
