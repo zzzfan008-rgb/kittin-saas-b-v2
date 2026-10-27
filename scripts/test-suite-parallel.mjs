@@ -165,6 +165,8 @@ const TEST_FILES = [
   "tests/text-rewrite-route.test.ts",
   // 2026-10-22 模板语义漂移修复：15 个内置模板提示词两两不同（fail-closed 闸门）。
   "tests/builtin-prompt-distinct.test.ts",
+  // 2026-10-22 换底图清蒙版：资产库写回补齐 mask 三字段清理（与上传/裁剪同语义）。
+  "tests/mask-reset-on-replace.test.ts",
 ];
 
 /**
