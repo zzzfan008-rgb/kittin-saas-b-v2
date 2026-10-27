@@ -250,8 +250,12 @@ export function MultiRoundEditPanel({
       aria-label="多轮修改"
       data-testid="multi-round-edit-panel"
     >
-      {/* 左 stage：底图 + 标记层 + 运行期显影中 */}
-      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden p-6">
+      {/* 左 stage：底图 + 标记层 + 运行期显影中。
+          用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致。
+          注意：底板只能靠 padding + bg 实现，不能加 margin —— 蒙版页有
+          e2e/mask-slider-drag.spec.ts:333 的「左图区 + 右栏正好铺满视口」
+          几何断言，多轮修改页与它同构，保持一致的布局契约。 */}
+      <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-6">
         {baseSource ? (
           // 对齐 MaskEditor 已验证布局：容器 inline-flex，img 用 viewport 绝对约束
           //（max-w-full 在收缩型 flex item 内百分比自引用会解析为 0 → 面板图塌缩）。
