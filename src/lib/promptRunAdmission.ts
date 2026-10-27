@@ -130,7 +130,6 @@ export interface PromptRunAdmissionDecision {
   code:
     | "verified"
     | "node-product-policy-blocked"
-    | "retired-model"
     | "unsupported-model"
     | "model-node-incompatible"
     | "operation-mode-incompatible"
@@ -158,19 +157,9 @@ export function evaluatePromptRunCompatibility(
       reason: productPolicy.reason ?? "该节点不在首版付费运行范围内。",
     };
   }
-  if (
-    input.modelSelectionNeedsConfirmation === true
-    || (typeof input.retiredModelId === "string" && input.retiredModelId.trim())
-  ) {
-    const retiredModelId = typeof input.retiredModelId === "string"
-      ? input.retiredModelId
-      : "历史模型";
-    return {
-      allowed: false,
-      code: "retired-model",
-      reason: `模型 ${retiredModelId} 已退出当前产品范围；系统不会静默换模，请手动选择新模型并重新确认提示词与参数。`,
-    };
-  }
+  // 2026-10-27 用户拍板：模型新老交替对用户不可见。retired / 待确认等历史字段
+  // 一律不再作为拦截理由（前端读取时已静默回落默认模型，见 flowTabSession）。
+  // 真正的未知模型（从未存在于任何清单）仍由下方 isImageModelId 拦截。
   if (!isImageModelId(input.modelId)) {
     return {
       allowed: false,
