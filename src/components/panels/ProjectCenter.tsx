@@ -10,6 +10,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectItem,
+  SelectList,
+  SelectPopup,
+  SelectPortal,
+  SelectPositioner,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { thumbnailImageUrl } from "@/lib/images";
 import { deleteProjectRequest, renameProjectRequest } from "@/lib/projectsApi";
 import {
@@ -35,7 +45,6 @@ interface ProjectDetail extends ProjectSummary {
   flow: PersistedWorkflow;
 }
 
-const NEW_PROJECT_COVER = "/assets/project-center/new-project-cover.jpg";
 const EMPTY_PROJECT_COVER = "/assets/project-center/empty-project-cover.jpg";
 const PROJECT_CENTER_CARD_GRID_CLASS = "grid grid-cols-3 xl:grid-cols-4 gap-4";
 const PROJECT_CENTER_TITLE_CLASS = "min-w-0 flex-1 line-clamp-2 min-h-8 text-xs font-semibold text-[var(--gc-text)]";
@@ -124,6 +133,10 @@ export function ProjectCenter({
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
+  /** 排序口径（用户 2026-10-22 批注 1：原静态「最近项目」标题改为下拉框）。
+      "updated" = 最近编辑（服务端 ORDER BY updated_at DESC 的原生顺序，零额外开销）。
+      不提供「创建时间」：GET /api/projects 不返回 createdAt，加它就超范围了。 */
+  const [sortMode, setSortMode] = useState<"updated" | "name">("updated");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -268,10 +281,12 @@ export function ProjectCenter({
   }, []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const filteredProjects = useMemo(
-    () => projects.filter((project) => !normalizedQuery || project.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery)),
-    [normalizedQuery, projects],
-  );
+  const filteredProjects = useMemo(() => {
+    const matched = projects.filter((project) => !normalizedQuery || project.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery));
+    if (sortMode === "updated") return matched;
+    // 名称排序：中文按 zh-CN 排序规则（拼音序），不区分大小写。
+    return [...matched].sort((a, b) => a.name.localeCompare(b.name, "zh-CN", { sensitivity: "base" }));
+  }, [normalizedQuery, projects, sortMode]);
   const createProject = () => {
     createBlankTab();
     onOpenChange(false);
@@ -299,20 +314,10 @@ export function ProjectCenter({
                 新建或继续最近项目
               </DialogDescription>
             </div>
-            <label className="relative ml-auto block w-80">
-              <SearchIcon aria-hidden="true" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--gc-text-muted)]" />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-9 w-full rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] pl-9 pr-3 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
-              />
-            </label>
             <DialogClose
               type="button"
               aria-label="关闭项目中心"
-              className="flex size-8 items-center justify-center rounded-lg text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
+              className="ml-auto flex size-8 items-center justify-center rounded-lg text-[var(--gc-text-muted)] hover:bg-[var(--gc-panel-hover)] hover:text-[var(--gc-text)]"
             >
               <XIcon aria-hidden="true" className="size-4" />
             </DialogClose>
@@ -320,30 +325,70 @@ export function ProjectCenter({
 
           {/* 用户 2026-09-25 决策 3：项目中心只留「最近项目」；模板入口迁到左侧工作流二级菜单，
               自建模板能力整体取消（绘制内容与打开过的项目都已自动保存）。 */}
-          <div className="min-h-0 flex-1 flex-col gap-0">
-            <div className="flex h-12 w-full shrink-0 items-center gap-2.5 border-b border-[var(--gc-border)] px-7">
-              <FolderOpenIcon aria-hidden="true" className="size-3.5 text-[var(--gc-text-muted)]" />
-              <span className="text-xs text-[var(--gc-accent)]">最近项目</span>
-            </div>
+          {/* 用户 2026-10-22 批注 1+2：原静态「最近项目」标题行改为筛选条——
+              左侧排序下拉（原来只是一行字），右侧搜索框从 header 下移到此行并列。
+              用户 2026-09-25 决策 3 保持不变：模板入口仍在左侧工作流二级菜单。 */}
+          <div className="flex h-12 w-full shrink-0 items-center gap-2.5 border-b border-[var(--gc-border)] px-7">
+            <Select
+              value={sortMode}
+              onValueChange={(value) => {
+                if (value === "updated" || value === "name") setSortMode(value);
+              }}
+            >
+              <SelectTrigger aria-label="项目排序" className="h-6 w-auto gap-1.5 border-0 bg-transparent px-1.5 text-xs text-[var(--gc-accent)] hover:bg-[var(--gc-panel-hover)]">
+                <FolderOpenIcon aria-hidden="true" className="size-3.5" />
+                <SelectValue>
+                  {(selected) => (selected === "name" ? "名称 A→Z" : "最近编辑")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPortal>
+                <SelectPositioner side="bottom" align="start" alignItemWithTrigger={false}>
+                  <SelectPopup>
+                    <SelectList>
+                      <SelectItem value="updated">最近编辑</SelectItem>
+                      <SelectItem value="name">名称 A→Z</SelectItem>
+                    </SelectList>
+                  </SelectPopup>
+                </SelectPositioner>
+              </SelectPortal>
+            </Select>
 
+            <label className="relative ml-auto block w-80">
+              <SearchIcon aria-hidden="true" className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--gc-text-muted)]" />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-8 w-full rounded-lg border border-[var(--gc-border)] bg-[var(--gc-control)] pl-9 pr-3 text-xs text-[var(--gc-text)] placeholder:text-[var(--gc-text-muted)] focus:border-[var(--gc-accent)] focus:outline-hidden"
+              />
+            </label>
+          </div>
+
+          {/* 外层必须同时有 flex + flex-col：只有 flex-col 时它退化成块级盒子，
+              子层的 flex-1/min-h-0/overflow-y-auto 全部失效 → 内容超出被
+              DialogContent 的 overflow-hidden 直接裁掉，滚轮与滚动条都不出现
+              （2026-10-22 用户实测：无法滚动到最下面的项目）。 */}
+          <div className="flex min-h-0 flex-1 flex-col gap-0">
             {visibleError && (
-              <div role="alert" className="mx-7 mt-5 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-body text-red-300">
+              <div role="alert" className="mx-7 mt-5 flex shrink-0 items-center justify-between rounded-lg border border-red-500/30 bg-red-950/20 px-4 py-3 text-body text-red-300">
                 <span>加载失败：{visibleError}</span>
                 <Button type="button" variant="outline" size="xs" onClick={() => void load()}>重试</Button>
               </div>
             )}
 
-            <div className="min-h-0 overflow-y-auto p-7">
+            <div className="min-h-0 flex-1 overflow-y-auto p-7">
               {projectsLoading ? (
                 <ProjectCardSkeletons />
               ) : (
                 <div className={PROJECT_CENTER_CARD_GRID_CLASS}>
                   <CardFrame>
                     <button type="button" onClick={createProject} className="block w-full text-left">
-                      <div className="relative overflow-hidden">
-                        <ProjectCover src={NEW_PROJECT_COVER} fallback={NEW_PROJECT_COVER} alt="新建项目" />
-                        <span className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-sm">
-                          <PlusIcon aria-hidden="true" className="size-4" />
+                      <div className="relative flex aspect-[16/10] w-full items-center justify-center bg-[var(--gc-panel-hover)]">
+                        {/* 空封面：不放照片，居中放大加号作为唯一的「新建」视觉锚点
+                            （用户 2026-10-22 批注 3：改为空白，加号放大 2 倍并上下左右居中）。 */}
+                        <span className="flex size-16 items-center justify-center rounded-full border border-[var(--gc-border)] bg-[var(--gc-panel)] text-[var(--gc-text)] transition-colors group-hover:border-[var(--gc-accent)] group-hover:text-[var(--gc-accent)]">
+                          <PlusIcon aria-hidden="true" className="size-8" />
                         </span>
                       </div>
                       <span className="block p-3">
