@@ -62,7 +62,7 @@ assert.equal(FROZEN_PROMPT_ENTRY_COUNT, serverKeys.length, "冻结条目数与 s
 for (const [key, entry] of Object.entries(PRESET_TEMPLATE_TEXTS)) {
   const clientBinding = frozenPromptBindingForVariantId(`test.${key}.v1`);
   // 用 familyId:mode 直接构造 variantId（模拟迁移输入），断言解析成功
-  const variantId = `${entry.familyId}.gpt-image-2.5-flare-vip.${entry.mode}.v1`;
+  const variantId = `${entry.familyId}.gpt-image-2.5-flare.${entry.mode}.v1`;
   const binding = frozenPromptBindingForVariantId(variantId);
   assert.ok(binding, `客户端冻结绑定未命中 server 键 ${key}（variantId=${variantId}）`);
   assert.equal(binding.familyId, entry.familyId, `${key}: familyId 不一致`);
@@ -84,14 +84,14 @@ console.log(`  ${FROZEN_PROMPT_FAMILY_IDS.length} 族全量覆盖 ✓`);
 // ===== variantId 解析三态 =====
 console.log("\n--- variantId 解析三态 ---");
 // 已知 family（fashion-lookbook, generate）→ 命中
-const known = frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1");
+const known = frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare.generate.v1");
 assert.ok(known, "已知 fashion-lookbook.generate 未命中");
 assert.equal(known.familyId, "fashion-lookbook");
 assert.equal(known.mode, "generate");
 console.log(`  ✓ fashion-lookbook.generate → familyId="${known.familyId}" mode="${known.mode}"`);
 
 // 未知 family → undefined
-const unknownFamily = frozenPromptBindingForVariantId("nonexistent.gpt-image-2.5-flare-vip.generate.v1");
+const unknownFamily = frozenPromptBindingForVariantId("nonexistent.gpt-image-2.5-flare.generate.v1");
 assert.equal(unknownFamily, undefined, "未知 family 应返回 undefined");
 console.log(`  ✓ 未知 family → undefined`);
 
@@ -101,7 +101,7 @@ assert.equal(badFormat, undefined, "格式错误应返回 undefined");
 console.log(`  ✓ 格式错误 → undefined`);
 
 // mask-local-edit:mask-edit → 命中
-const maskBinding = frozenPromptBindingForVariantId("mask-local-edit.gpt-image-2.5-flare-vip.mask-edit.v1");
+const maskBinding = frozenPromptBindingForVariantId("mask-local-edit.gpt-image-2.5-flare.mask-edit.v1");
 assert.ok(maskBinding, "mask-local-edit 未命中");
 assert.equal(maskBinding.mode, "mask-edit");
 console.log(`  ✓ mask-local-edit → mode=mask-edit, text 非空 (${maskBinding.text.length} chars)`);
@@ -112,27 +112,27 @@ assert.ok(videoBinding, "video-animate 未命中");
 console.log(`  ✓ video-animate → mode=edit, text 非空 (${videoBinding.text.length} chars)`);
 
 // prompt-generate:generate → 命中
-const genBinding = frozenPromptBindingForVariantId("prompt-generate.gpt-image-2.5-flare-vip.generate.v1");
+const genBinding = frozenPromptBindingForVariantId("prompt-generate.gpt-image-2.5-flare.generate.v1");
 assert.ok(genBinding, "prompt-generate 未命中");
 console.log(`  ✓ prompt-generate → mode=generate, text 非空 (${genBinding.text.length} chars)`);
 
 // ===== 客户端 server 函数结果一致（同一 variantId 输入） =====
 console.log("\n--- 客户端 vs server frozenPromptBindingForVariantId 逐项比较 ---");
 const TEST_VARIANT_IDS = [
-  "fashion-lookbook.gpt-image-2.5-flare-vip.generate.v1",
-  "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-  "commerce-hero.gpt-image-2.5-flare-vip.generate.v1",
+  "fashion-lookbook.gpt-image-2.5-flare.generate.v1",
+  "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
+  "commerce-hero.gpt-image-2.5-flare.generate.v1",
   "commerce-hero.grok-imagine-image.edit.v1",
-  "design-sheet.gpt-image-2.5-flare-vip.generate.v1",
-  "upscale.gpt-image-2.5-flare-vip.edit.v1",
-  "print-extract.gpt-image-2.5-flare-vip.edit.v1",
-  "print-mutate.gpt-image-2.5-flare-vip.edit.v1",
-  "fabric-recolor.gpt-image-2.5-flare-vip.edit.v1",
-  "mask-local-edit.gpt-image-2.5-flare-vip.mask-edit.v1",
+  "design-sheet.gpt-image-2.5-flare.generate.v1",
+  "upscale.gpt-image-2.5-flare.edit.v1",
+  "print-extract.gpt-image-2.5-flare.edit.v1",
+  "print-mutate.gpt-image-2.5-flare.edit.v1",
+  "fabric-recolor.gpt-image-2.5-flare.edit.v1",
+  "mask-local-edit.gpt-image-2.5-flare.mask-edit.v1",
   "video-animate.doubao-seedance-2-5-260628.edit.v1",
-  "prompt-polish.gpt-image-2.5-flare-vip.edit.v1",
-  "prompt-generate.gpt-image-2.5-flare-vip.generate.v1",
-  "model-tryon.gpt-image-2.5-flare-vip.edit.v1",
+  "prompt-polish.gpt-image-2.5-flare.edit.v1",
+  "prompt-generate.gpt-image-2.5-flare.generate.v1",
+  "model-tryon.gpt-image-2.5-flare.edit.v1",
 ];
 for (const variantId of TEST_VARIANT_IDS) {
   const clientResult = frozenPromptBindingForVariantId(variantId);

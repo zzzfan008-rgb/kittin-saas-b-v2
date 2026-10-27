@@ -30,7 +30,7 @@ function ok(name: string, fn: () => void): void {
   }
 }
 
-const IMAGE_MODEL = "gpt-image-2.5-flare-vip";
+const IMAGE_MODEL = "gpt-image-2.5-flare";
 const VIDEO_MODEL = "doubao-seedance-2-5-260628";
 
 function textNode(id: string, text = "设计一套现代都市女装"): Record<string, unknown> {
@@ -394,7 +394,7 @@ function main() {
 
   ok("v9：generator 携带旧 promptVariantId 被白名单剥离（不报错、输出干净）", () => {
     const result = validateAndMigrateFlow(flow(
-      [textNode("t1"), imageGeneratorNode("g1", { promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1" })],
+      [textNode("t1"), imageGeneratorNode("g1", { promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1" })],
       [promptEdge("e1", "t1", "g1")],
     ));
     const g = result.nodes.find((n) => n.id === "g1")!;
@@ -564,7 +564,7 @@ function main() {
   });
 
   // ---------- v8→v9 迁移（64 Phase 1 C2）三态 + flow_json 夹具 ----------
-  const V8_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1";
+  const V8_VARIANT_ID = "fashion-lookbook.gpt-image-2.5-flare.edit.v1";
 
   ok("C2 迁移态一：v8 generator 空 text 上游 → 填入预设模板文本", () => {
     const v8 = flow(
@@ -728,7 +728,7 @@ function main() {
         { id: "tryon-requirement", type: "text", position: { x: 0, y: -170 }, data: { kind: "text", label: "试穿要求", status: "idle", text: "" } },
         imageNode("garment"),
         imageNode("model"),
-        { id: "tryon-gen", type: "image-generator", position: { x: 380, y: 20 }, data: { kind: "image-generator", label: "试穿生成", status: "idle", promptVariantId: V8_VARIANT_ID, promptFamilyId: "fashion-lookbook", parameterProfileId: "gpt-image-2.5-flare-vip:fashion-lookbook:edit:v1", contractHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evaluationVersion: "garment-eval-v3-pending", postprocessVersion: "p1", modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
+        { id: "tryon-gen", type: "image-generator", position: { x: 380, y: 20 }, data: { kind: "image-generator", label: "试穿生成", status: "idle", promptVariantId: V8_VARIANT_ID, promptFamilyId: "fashion-lookbook", parameterProfileId: "gpt-image-2.5-flare:fashion-lookbook:edit:v1", contractHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evaluationVersion: "garment-eval-v3-pending", postprocessVersion: "p1", modelId: IMAGE_MODEL, aspectRatio: "3:4", batchSize: 1 } },
       ],
       [
         promptEdge("e-tryon-prompt", "tryon-requirement", "tryon-gen"),

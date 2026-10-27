@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
-  "capturedOn": "2026-09-02",
-  "capturedAt": "2026-09-02T05:02:00Z",
+  "capturedOn": "2026-10-27",
+  "capturedAt": "2026-10-27T12:00:00Z",
   "sourceFormat": "official-markdown",
   "sourceHashScope": "Exact response body returned by markdownUrl",
   "documentationIndex": "https://docs.apiyi.com/llms.txt",
@@ -46,38 +46,37 @@
   "modelCatalog": {
     "sourceLayer": "gatewayContract",
     "expectedGatewayModelIds": [
-      "gpt-image-2.5-sunburst",
-      "gpt-image-2.5-all",
-      "gpt-image-2.5-sunburst-vip",
-      "gpt-image-2.5-flare-vip",
-      "gemini-3-pro-image-preview",
-      "gemini-3.1-flash-lite-image",
+      "gemini-nano-banana-2.1",
       "gemini-3.1-flash-image",
-      "flux-2-pro",
-      "seedream-5-0-260128"
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-flare",
+      "flux-3-image",
+      "doubao-seedream-5-0-pro-260628",
+      "doubao-seedream-5-0-lite-260128",
+      "qwen-image-3.0-pro",
+      "qwen-image-3.0"
     ],
     "aliasesAreNotAutomaticFallbacks": true,
     "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
     "reviewedExportSha256": null,
     "reviewedRawExportSha256": null,
     "reviewedExportCapturedAt": null,
-    "policy": "模型列表校验需显式传入从 API易导出的 JSON；不从文档别名推断当前可用性。"
+    "policy": "模型列表校验需显式传入从兔子API导出的 JSON；不从文档别名推断当前可用性。"
   },
   "sources": [
     {
-      "sourceId": "apiyi-gpt-image-2-overview",
+      "sourceId": "tuzi-gpt-image-generate",
       "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/overview.md",
-      "localDocument": "models/gpt-image-2.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "12051716fe8d05c0d689165bc60398accce6893bd43e45d60bea46b5b60bf0b3",
+      "url": "https://tuzi-api.apifox.cn/343646952e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646952e0.md",
+      "localDocument": "models/tuzi-gpt-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "026c6875be712f124007d2f3bfee8da5662c74b8c11ecda2de276dd4785d15c0",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst"
       ],
       "semanticClaims": [
         "gateway-model-id",
@@ -86,602 +85,106 @@
       ]
     },
     {
-      "sourceId": "apiyi-gpt-image-2-edit",
+      "sourceId": "tuzi-gpt-image-edit",
       "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/image-edit.md",
-      "localDocument": "models/gpt-image-2.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "f8fb91508784b27cadd4c253303463e1f7bfbb1fc2899476379b6de92a773ccc",
+      "url": "https://tuzi-api.apifox.cn/343646953e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646953e0.md",
+      "localDocument": "models/tuzi-gpt-image-edit.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "0865b76bad042231e05e8d6e38572ad8be70b11994287664cc5a7e1e778ac188",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "edit-endpoint",
-        "reference-fields",
-        "forbidden-input-fidelity"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-mask",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2/mask-editing.md",
-      "localDocument": "models/gpt-image-2.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "6dc2284c797340db0c9b4eb171f606d405f54313a49be8f65fe2281cbe316a5b",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "alpha-mask-semantics",
-        "mask-dimension-match",
-        "mask-size-limit"
-      ]
-    },
-    {
-      "sourceId": "apiyi-transparent-background",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/faq/image-transparent-background",
-      "markdownUrl": "https://docs.apiyi.com/faq/image-transparent-background.md",
-      "localDocument": "models/gpt-image-2.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "fd17167d70c2a201a4c8df2cb83501d86a5075d332c1b56deac7c54b1bcdcd89",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "transparent-output-format",
-        "alpha-validation"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-vip-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/overview.md",
-      "localDocument": "models/gpt-image-2-vip.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "fa55bbeb13928bdbb7fd51cf243c0f038147bcccf7b5780aa7ffb7698266cbda",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "apiyi-exclusive-route",
-        "thirty-size-values",
-        "single-output"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-vip-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/text-to-image.md",
-      "localDocument": "models/gpt-image-2-vip.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "c5dabb97698987e05b366671fc1001d1acfcb92efeab55536e9d36a4bc4d63ba",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "generation-endpoint",
-        "size-enum",
-        "forbidden-quality-n-aspect-ratio"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-vip-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-vip/image-edit.md",
-      "localDocument": "models/gpt-image-2-vip.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "254baf1be3368cc6977ae27f90bef8cfc2e4f65f72f0315670d5c5f1ab618d43",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
-        "gpt-image-2.5-sunburst",
-        "gpt-image-2.5-flare"
-      ],
-      "semanticClaims": [
-        "multipart-edit",
-        "ordered-references",
-        "eight-reference-limit"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gemini-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/overview.md",
-      "localDocument": "models/gemini-3.1-flash-image.md",
-      "capturedAt": "2026-09-02T05:01:06Z",
-      "sha256": "eab4963c32d8a88544e54893d377b7a4a52a11134edc09cfcad1bbd922728eca",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:06 GMT",
-      "modelAliases": [
-        "gemini-3.1-flash-image",
-        "gemini-3.1-flash-image-preview",
-        "nano-banana-2-image"
-      ],
-      "semanticClaims": [
-        "gateway-model-aliases",
-        "fourteen-aspect-ratios",
-        "image-size-enum"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gemini-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/text-to-image.md",
-      "localDocument": "models/gemini-3.1-flash-image.md",
-      "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "f0adb664021cff44b88d3050ddec4ec07299e5b177580cfb978482edcf3b180f",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
-      "modelAliases": [
-        "gemini-3.1-flash-image",
-        "gemini-3.1-flash-image-preview"
-      ],
-      "semanticClaims": [
-        "generate-content-endpoint",
-        "image-config",
-        "http-200-without-image"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gemini-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-2-image/image-edit.md",
-      "localDocument": "models/gemini-3.1-flash-image.md",
-      "capturedAt": "2026-09-02T05:01:08Z",
-      "sha256": "aa36bffdc43b4c62da9967753279306d2355ade8aa7e0ac9a032d27583907b16",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:08 GMT",
-      "modelAliases": [
-        "gemini-3.1-flash-image",
-        "gemini-3.1-flash-image-preview"
-      ],
-      "semanticClaims": [
-        "inline-data-references",
-        "ordered-role-description",
-        "multi-image-edit"
-      ]
-    },
-    {
-      "sourceId": "apiyi-flux-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/flux/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/overview.md",
-      "localDocument": "models/flux-2-pro.md",
-      "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "23df4f5be137712d9b830a459b259e3147a53dc44a7634634e39bc2cf0eafbd4",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
-      "modelAliases": [
-        "flux-2-pro",
-        "FLUX.2 Pro"
-      ],
-      "semanticClaims": [
-        "gateway-model-id",
-        "four-megapixel-boundary",
-        "temporary-url"
-      ]
-    },
-    {
-      "sourceId": "apiyi-flux-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/flux/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/text-to-image.md",
-      "localDocument": "models/flux-2-pro.md",
-      "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "a18d483179d7412528f52abbd6f61cf8c5e6d489f7f92611c662f377b2dab3fc",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
-      "modelAliases": [
-        "flux-2-pro"
-      ],
-      "semanticClaims": [
-        "generation-endpoint",
-        "dimension-multiple",
-        "output-format"
-      ]
-    },
-    {
-      "sourceId": "apiyi-flux-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/flux/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/flux/image-edit.md",
-      "localDocument": "models/flux-2-pro.md",
-      "capturedAt": "2026-09-02T05:01:07Z",
-      "sha256": "3183f5e421e9b5a272d9d4acef12e0aaecffcd99c1a6e8359575606d4e2eae95",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:07 GMT",
-      "modelAliases": [
-        "flux-2-pro"
-      ],
-      "semanticClaims": [
-        "ordered-input-image-fields",
-        "eight-reference-limit",
-        "first-reference-aspect"
-      ]
-    },
-    {
-      "sourceId": "apiyi-seedream-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/seedream-image/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/overview.md",
-      "localDocument": "models/seedream-5-0-260128.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "aa4d154188ddfa2f3cd89a42b22c633ec0dcf93b382d9ec0bd1a13b4074e13b7",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "seedream-5-0-260128",
-        "Seedream 5.0"
-      ],
-      "semanticClaims": [
-        "gateway-model-id",
-        "2k-3k-size-policy",
-        "actual-output-size"
-      ]
-    },
-    {
-      "sourceId": "apiyi-seedream-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/seedream-image/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/text-to-image.md",
-      "localDocument": "models/seedream-5-0-260128.md",
-      "capturedAt": "2026-09-02T05:01:08Z",
-      "sha256": "b39d9a4300e25eee1a9ab51228677a5b3482a623e39aa6a34a8a846c37d245f9",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:08 GMT",
-      "modelAliases": [
-        "seedream-5-0-260128"
-      ],
-      "semanticClaims": [
-        "generation-endpoint",
-        "watermark-disabled",
-        "sequential-output-disabled"
-      ]
-    },
-    {
-      "sourceId": "apiyi-seedream-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/seedream-image/image-edit.md",
-      "localDocument": "models/seedream-5-0-260128.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "211721f7eb7c44fefa0e93a717570862b906cad361435246cd6593fd37bfb3f8",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "seedream-5-0-260128"
-      ],
-      "semanticClaims": [
-        "ordered-image-array",
-        "gateway-reference-limit",
-        "no-native-aspect-ratio"
-      ]
-    },
-    {
-      "sourceId": "apiyi-image-best-practices",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/image-api-best-practices",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-api-best-practices.md",
-      "localDocument": "input-image-normalization.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "843b51404f748b036d166b55dcfddbf6dbc4ef826e4e77d81677e9cbbb6a1154",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "*"
-      ],
-      "semanticClaims": [
-        "input-normalization",
-        "temporary-url-persistence",
-        "error-handling"
-      ]
-    },
-    {
-      "sourceId": "apiyi-image-async-queue",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/image-async-queue",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/image-async-queue.md",
-      "localDocument": "async-runtime.md",
-      "capturedAt": "2026-09-02T05:01:10Z",
-      "sha256": "10c784ebbcea6579ea896da1e1ec4b13fb7d71fc0bb1101867e0b84f51045207",
-      "etag": null,
-      "lastModified": "Wed, 02 Sep 2026 05:01:10 GMT",
-      "modelAliases": [
-        "*"
-      ],
-      "semanticClaims": [
-        "synchronous-provider-call",
-        "business-queue-ownership",
-        "ambiguous-outcome"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-all-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/overview.md",
-      "localDocument": "models/gpt-image-2.5-all.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "04f5c3377f8884525668879958d3322bbc9ee009777556451c52601f41bbe3cf",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2-all",
-        "gpt-image-2.5-all"
-      ],
-      "semanticClaims": [
-        "gateway-model-id",
-        "no-size-quality-n-aspect-ratio",
-        "single-output"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-all-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/text-to-image.md",
-      "localDocument": "models/gpt-image-2.5-all.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "9b2734ec47b1db645e8eab2059279ac9db1798bcded5e4796f38843c2080a431",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2-all",
-        "gpt-image-2.5-all"
-      ],
-      "semanticClaims": [
-        "generation-endpoint",
-        "forbidden-size-quality-n-aspect-ratio",
-        "response-format"
-      ]
-    },
-    {
-      "sourceId": "apiyi-gpt-image-2-all-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/gpt-image-2-all/image-edit.md",
-      "localDocument": "models/gpt-image-2.5-all.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "d9f01d72f6cfef80b985dc7e9f3b8736c27bf8d2a9a31ba89e8904c3a40ae413",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2-all",
-        "gpt-image-2.5-all"
-      ],
-      "semanticClaims": [
-        "multipart-edit",
-        "repeated-image-field",
-        "no-size"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-pro-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/overview.md",
-      "localDocument": "models/nano-banana-pro-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "607fb7d006a6dc67a8e0063d2ffe2cc76a318a9b008975351327afc868023794",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3-pro-image-preview",
-        "gemini-3-pro-image",
-        "nano-banana-pro-image"
-      ],
-      "semanticClaims": [
-        "gateway-model-id",
-        "ten-aspect-ratios",
-        "1k-2k-4k-image-size"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-pro-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-image/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/text-to-image.md",
-      "localDocument": "models/nano-banana-pro-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "c0919d673c0d4202452adb4182b9f3a91263a5bcea0788be290431bb37e933ad",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3-pro-image-preview",
-        "gemini-3-pro-image"
-      ],
-      "semanticClaims": [
-        "generate-content-endpoint",
-        "image-config"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-pro-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-image/image-edit.md",
-      "localDocument": "models/nano-banana-pro-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "32d1e53f1125a200e8c53e790f2fdd8aa00dfe8511a566e49a7da568ef18abc7",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3-pro-image-preview",
-        "gemini-3-pro-image"
-      ],
-      "semanticClaims": [
-        "inline-data-references",
-        "multi-image-edit"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-lite-overview",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/overview",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/overview.md",
-      "localDocument": "models/nano-banana-lite-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "5803e83c38c5350e3c87e035b509bb9085ef06d7e16be704d441f9f3d761ecee",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3.1-flash-lite-image",
-        "nano-banana-lite-image"
-      ],
-      "semanticClaims": [
-        "gateway-model-id",
-        "fourteen-aspect-ratios",
-        "1k-only-image-size"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-lite-generate",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/text-to-image",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/text-to-image.md",
-      "localDocument": "models/nano-banana-lite-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "2308201f6206c451d92cdb9fdc44df5c0c19e49a42ded83e87deee13d6700a4d",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3.1-flash-lite-image"
-      ],
-      "semanticClaims": [
-        "generate-content-endpoint",
-        "image-config",
-        "1k-only"
-      ]
-    },
-    {
-      "sourceId": "apiyi-nano-banana-lite-edit",
-      "sourceLayer": "gatewayContract",
-      "url": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/image-edit",
-      "markdownUrl": "https://docs.apiyi.com/api-capabilities/nano-banana-lite-image/image-edit.md",
-      "localDocument": "models/nano-banana-lite-image.md",
-      "capturedAt": "2026-09-18T04:00:00Z",
-      "sha256": "87d68321f7d10b499297524f705b8ce7bbba6000ef109fcff78b530228175286",
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gemini-3.1-flash-lite-image"
-      ],
-      "semanticClaims": [
-        "inline-data-references",
-        "multi-image-edit"
-      ]
-    }
-  ],
-  "vendorSources": [
-    {
-      "sourceId": "openai-image-generation",
-      "sourceLayer": "vendorCapability",
-      "url": "https://developers.openai.com/api/docs/guides/image-generation",
-      "capturedAt": "2026-09-02T00:00:00Z",
-      "sha256": null,
-      "etag": null,
-      "lastModified": null,
-      "modelAliases": [
-        "gpt-image-2",
+        "gpt-image-2.5-flare",
         "gpt-image-2.5-sunburst"
       ],
       "semanticClaims": [
-        "image-generation",
-        "image-edit",
-        "mask-edit",
-        "prompt-guidance"
-      ],
-      "fingerprintPolicy": "manual-official-doc-review"
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
     },
     {
-      "sourceId": "google-gemini-image-generation",
-      "sourceLayer": "vendorCapability",
-      "url": "https://ai.google.dev/gemini-api/docs/image-generation",
-      "capturedAt": "2026-09-02T00:00:00Z",
-      "sha256": null,
+      "sourceId": "tuzi-gemini-image-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/360926406e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/360926406e0.md",
+      "localDocument": "models/tuzi-gemini-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "34f591b3074d8560399187ab305c6207c675c5977e17fd63e4b0736377806966",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
-        "gemini-3.1-flash-image",
-        "gemini-3-pro-image-preview",
-        "gemini-3.1-flash-lite-image"
+        "gemini-nano-banana-2.1",
+        "gemini-3.1-flash-image"
       ],
       "semanticClaims": [
-        "multi-image-generation",
-        "reference-capability",
-        "prompt-guidance"
-      ],
-      "fingerprintPolicy": "manual-official-doc-review"
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
     },
     {
-      "sourceId": "bfl-flux2-prompting",
-      "sourceLayer": "vendorCapability",
-      "url": "https://docs.bfl.ai/guides/prompting_guide_flux2",
-      "capturedAt": "2026-09-02T00:00:00Z",
-      "sha256": null,
+      "sourceId": "tuzi-flux-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/343646931e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646931e0.md",
+      "localDocument": "models/tuzi-flux-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "375e18eb2c1c378bf631e2cd6edbf25c94b744d3b8200f08c74f7224d8692c9a",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
-        "flux-2-pro",
-        "FLUX.2 Pro"
+        "flux-3-image"
       ],
       "semanticClaims": [
-        "structured-prompting",
-        "positive-description",
-        "reference-guidance"
-      ],
-      "fingerprintPolicy": "manual-official-doc-review"
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
     },
     {
-      "sourceId": "byteplus-seedream-image",
-      "sourceLayer": "vendorCapability",
-      "url": "https://docs.byteplus.com/api/docs/ModelArk/1824121",
-      "capturedAt": "2026-09-02T00:00:00Z",
-      "sha256": null,
+      "sourceId": "tuzi-seedream-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/349741169e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/349741169e0.md",
+      "localDocument": "models/tuzi-seedream-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "b5200f838d2074792828663df35d60f1ac1e90eccdf27d3858a4921cc24a7019",
       "etag": null,
       "lastModified": null,
       "modelAliases": [
-        "seedream-5-0-260128",
-        "Seedream 5.0"
+        "doubao-seedream-5-0-pro-260628",
+        "doubao-seedream-5-0-lite-260128"
       ],
       "semanticClaims": [
-        "image-generation",
-        "multi-reference",
-        "resolution"
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-qwen-image-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/498659603e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/498659603e0.md",
+      "localDocument": "models/tuzi-qwen-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "e1838c2a222eda59993551dfeb1168042598b9c0d7b4c81c4043de6854719fe1",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "qwen-image-3.0-pro",
+        "qwen-image-3.0"
       ],
-      "fingerprintPolicy": "manual-official-doc-review"
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
     }
   ],
+  "vendorSources": [],
   "pricingSnapshot": {
     "sha256": "e586fe0f23fc13ab264d202205992891f4ef819457f295ad124c31406c7ef2f8",
     "capturedAt": "2026-08-26T00:00:00Z",

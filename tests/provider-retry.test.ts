@@ -113,7 +113,7 @@ try {
 const deterministic503 = providerErrorFromResponse(
   503,
   JSON.stringify({ error: { message: "width=513 is unsupported; width must be a multiple of 16" } }),
-  "flux-2-pro",
+  "flux-3-image",
 );
 assert.equal(deterministic503.category, "invalid_request");
 

@@ -35,7 +35,7 @@ import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 // v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数
 // （值与原参数档案 materialize 等价：commerce-hero edit → aspectRatio "1:1"、batchSize 1；
 // flare-vip modelOptions { size: "2048x2048" }；gemini modelOptions { aspectRatio: "1:1", imageSize: "2K" }）。
-const AI_TEST_MODEL_ID = "gpt-image-2.5-flare-vip";
+const AI_TEST_MODEL_ID = "gpt-image-2.5-flare";
 const AI_TEST_ASPECT_RATIO = "1:1";
 const AI_TEST_BATCH_SIZE = 1;
 const AI_TEST_MODEL_OPTIONS = { size: "2048x2048" };
@@ -357,46 +357,46 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
 
 await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 尺寸档表无「自动」/ -all 尺寸前缀）", () => {
   // ① VIP×2 画幅补齐为契约 10 比例：此前面板硬编码 5 比例，10 比例 × 3 档里 15 档永远不可达。
-  const vipRatios = imageAspectRatioOptions("gpt-image-2.5-flare-vip");
+  const vipRatios = imageAspectRatioOptions("gpt-image-2.5-flare");
   assert.equal(vipRatios.length, 10, "VIP 画幅必须与契约 aspectRatios 的 10 比例一致");
   assert.deepEqual(
     vipRatios,
-    getImageModelContract("gpt-image-2.5-flare-vip").aspectRatios,
+    getImageModelContract("gpt-image-2.5-flare").aspectRatios,
     "VIP 画幅下拉必须直接取自契约，不得再硬编码子集",
   );
-  assert.equal(imageAspectRatioOptions("gpt-image-2.5-sunburst-vip").length, 10, "两个 VIP 模型画幅必须一致");
+  assert.equal(imageAspectRatioOptions("gpt-image-2.5-sunburst").length, 10, "两个 VIP 模型画幅必须一致");
 
-  // ② 尺寸档表不再有「自动」项；且画幅联动填充的默认尺寸必须等于尺寸控件的默认档（同一契约来源）。
-  for (const ratio of vipRatios) {
-    const tiers = imageSizeTierOptions("gpt-image-2.5-flare-vip", ratio);
-    assert.equal(tiers?.length, 3, `${ratio} 必须有 1K/2K/4K 三档`);
-    assert.ok(!tiers!.some((option) => option.value === "auto"), `${ratio} 不得再有「自动」项`);
-    assert.equal(
-      imageModelOptionsForAspectRatio("gpt-image-2.5-flare-vip", {}, ratio).size,
-      tiers![VIP_SIZE_DEFAULT_TIER_INDEX].value,
-      `${ratio} 画幅联动填充的默认尺寸必须等于尺寸控件的默认档`,
-    );
-  }
-  assert.equal(imageSizeTierOptions("gemini-3.1-flash-image", "1:1"), undefined, "非 VIP 模型不得出现专属尺寸控件");
+  // ② 兔子API 迁移后不再有 VIP 专属尺寸档表：gpt-image-2.5-flare 用契约声明的 size/quality。
+  assert.equal(
+    imageSizeTierOptions("gpt-image-2.5-flare", "3:4"),
+    undefined,
+    "迁移后不存在 VIP 1K/2K/4K 档表，尺寸由契约 size 取值驱动",
+  );
+  const flareRecommended = getImageModelContract("gpt-image-2.5-flare").recommendedOptions!;
+  assert.deepEqual(
+    flareRecommended.size!.examples,
+    ["1024x1024", "1536x1024", "1024x1536", "2048x2048", "2048x1152", "3840x2160", "2160x3840", "auto"],
+    "flare 的 size 取值必须与兔子API 文档的常用尺寸一致",
+  );
+  assert.equal(flareRecommended.size!.default, "1536x2048", "flare 默认尺寸为 3:4 竖版");
+  assert.deepEqual(
+    flareRecommended.quality!.examples,
+    ["auto", "low", "medium", "high"],
+    "flare 的 quality 取值必须与文档一致",
+  );
 
-  // ③ gpt-image-2.5-all：不接受 size，尺寸唯一手段是 prompt 前缀，标签需带实测分辨率。
-  const prefixOptions = imagePromptSizePrefixOptions("gpt-image-2.5-all");
-  assert.equal(prefixOptions?.length, 9, "-all 尺寸前缀 = 「不指定」+ 文档 8 档");
-  assert.equal(prefixOptions![0].value, "", "首项必须是不指定（模型自适应）");
-  assert.ok(
-    prefixOptions!.slice(1).every((option) => /\d+×\d+/.test(option.label)),
-    "-all 前缀标签必须带实测分辨率",
+  // ③ 迁移后没有任何模型使用 prompt 尺寸前缀（该机制属于已退役的 gpt-image-2.5-all）。
+  assert.equal(
+    imagePromptSizePrefixOptions("gpt-image-2.5-flare"),
+    undefined,
+    "兔子API 的 flare 直接接受 size，不再需要提示词尺寸前缀",
   );
+
+  // ④ 画幅联动不得丢掉用户已选的 size/quality。
   assert.deepEqual(
-    prefixOptions!.slice(1).map((option) => option.value),
-    getImageModelContract("gpt-image-2.5-all").recommendedOptions!.promptSizePrefix!.examples,
-    "-all 前缀取值必须直接取自契约",
-  );
-  assert.equal(imagePromptSizePrefixOptions("gpt-image-2.5-flare-vip"), undefined, "尺寸前缀控件只属于 -all");
-  assert.deepEqual(
-    imageModelOptionsForAspectRatio("gpt-image-2.5-all", { promptSizePrefix: "横版 16:9" }, "3:4"),
-    { promptSizePrefix: "横版 16:9" },
-    "-all 的参数联动不得丢掉尺寸前缀",
+    imageModelOptionsForAspectRatio("gpt-image-2.5-flare", { size: "1024x1024", quality: "high" }, "3:4"),
+    { size: "1024x1024", quality: "high" },
+    "画幅联动必须保留用户已选的模型参数",
   );
 });
 

@@ -16,9 +16,11 @@ import {
 } from "../../src/types/videoModels";
 import { config } from "../config";
 import { downloadVideoToBuffer, saveVideoBuffer } from "../lib/fileStore";
+import { FormData as UndiciFormData } from "undici";
 import {
   fetchWithRetry,
   inspectProviderTransportFailure,
+  parseDataUrl,
   ProviderError,
 } from "./base";
 import { getApiyiDispatcher, readApiyiJsonResponse } from "./apiyiTransport";
@@ -91,14 +93,42 @@ async function readVideoJson(response: Response, modelId: VideoModelId): Promise
   return payload;
 }
 
+/** veo 走 multipart/form-data；seedance / H3 走 JSON。字段按兔子API 文档逐模型声明。 */
+function buildVeoForm(modelId: VideoModelId, req: VideoGenRequest) {
+  const options = req.modelOptions ?? {};
+  const form = new UndiciFormData();
+  form.append("model", modelId);
+  form.append("prompt", req.prompt);
+  // veo 系列固定 8s（文档：veo系列固定为 8s）。
+  form.append("seconds", typeof options.seconds === "string" ? options.seconds : "8");
+  if (typeof options.resolution === "string") form.append("resolution", options.resolution);
+  if (typeof options.mode === "string") form.append("mode", options.mode);
+  form.append("watermark", "false");
+  if (req.firstFrame?.dataUrl) {
+    const parsed = parseDataUrl(req.firstFrame.dataUrl);
+    const ext = parsed.mime === "image/jpeg" ? "jpg" : parsed.mime.split("/")[1];
+    form.append(
+      "input_reference",
+      new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }),
+      `reference.${ext}`,
+    );
+  }
+  return form;
+}
+
 async function submitWithApiyi(modelId: VideoModelId, req: VideoGenRequest): Promise<{ taskId: string }> {
   const contract = getVideoModelContract(modelId);
+  const isMultipart = contract.endpoint.contentType === "multipart/form-data";
+  const form = isMultipart ? buildVeoForm(modelId, req) : undefined;
   const response = await fetchWithRetry(
     `${config.apiyiBaseUrl()}${contract.endpoint.submitPath}`,
     () => ({
       method: "POST",
-      headers: submitHeaders(),
-      body: JSON.stringify(buildSubmitBody(modelId, req)),
+      headers: isMultipart
+        // multipart 由 undici 自动带 boundary，不能手写 Content-Type。
+        ? { "Accept-Encoding": "identity", Authorization: `Bearer ${config.apiyiVideoApiKey()}` }
+        : submitHeaders(),
+      body: form ? (form as unknown as RequestInit["body"]) : JSON.stringify(buildSubmitBody(modelId, req)),
     }),
     {
       providerId: modelId,
@@ -108,7 +138,8 @@ async function submitWithApiyi(modelId: VideoModelId, req: VideoGenRequest): Pro
     },
   );
   const payload = await readVideoJson(response, modelId);
-  const taskId = payload.id;
+  const idField = contract.responseShape?.submitIdField ?? "id";
+  const taskId = payload[idField];
   if (typeof taskId !== "string" || !taskId.trim()) {
     throw new ProviderError("AI 服务未返回视频任务 ID", 502, modelId, "invalid_response");
   }
@@ -121,12 +152,24 @@ function pollStatus(status: unknown): VideoPollResult | undefined {
   return undefined;
 }
 
+/** 按契约点路径取值（`content.url` 这类嵌套字段）。 */
+function getByPath(obj: unknown, path: string): unknown {
+  let cur: unknown = obj;
+  for (const key of path.split(".")) {
+    const rec = record(cur);
+    if (!rec) return undefined;
+    cur = rec[key];
+  }
+  return cur;
+}
+
 async function pollWithApiyi(
   modelId: VideoModelId,
   taskId: string,
   downloadVideo: (url: string) => Promise<Buffer> = downloadVideoToBuffer,
 ): Promise<VideoPollResult> {
   const contract = getVideoModelContract(modelId);
+  const shape = contract.responseShape;
   const pollPath = contract.endpoint.pollPathTemplate.replace("{id}", encodeURIComponent(taskId));
   const response = await fetchWithRetry(
     `${config.apiyiBaseUrl()}${pollPath}`,
@@ -138,24 +181,49 @@ async function pollWithApiyi(
       dispatcherFactory: getApiyiDispatcher,
     },
   );
-  const payload = await readVideoJson(response, modelId);
-  const status = payload.status;
+  // H3 的查询可能把任务包在 task 对象里，按契约解包。
+  const raw = await readVideoJson(response, modelId);
+  const payload = shape?.taskWrapper ? (record(raw[shape.taskWrapper]) ?? raw) : raw;
+
+  const statusKey = shape?.statusField ?? "status";
+  const status = payload[statusKey];
   const pending = pollStatus(status);
   if (pending) return pending;
-  if (status === "succeeded") {
-    const content = record(payload.content);
-    const videoUrl = content?.video_url;
-    if (typeof videoUrl !== "string" || !videoUrl.trim()) {
-      throw new ProviderError("AI 服务返回了无效视频地址", 502, modelId, "invalid_response");
+
+  // 成功态按契约（seedance/veo 为 completed，H3 为 succeeded）；
+  // 同时接受另一写法，防网关版本间状态词漂移导致"永远轮询不完成"。
+  const successStatus = shape?.successStatus ?? "succeeded";
+  const successAliases = new Set([successStatus, "completed", "succeeded"]);
+  if (typeof status === "string" && successAliases.has(status)) {
+    // 三种信封：seedance/veo 用顶层 video_url，H3 用 content.url。
+    const urlFields = shape?.videoUrlFields ?? ["video_url"];
+    let videoUrl: string | undefined;
+    for (const field of urlFields) {
+      const value = getByPath(payload, field);
+      if (typeof value === "string" && value.trim()) { videoUrl = value.trim(); break; }
+    }
+    if (!videoUrl) {
+      throw new ProviderError("AI 服务返回了无效视频地址", 502, modelId, "invalid_response",
+        `status=${String(status)} fields=${urlFields.join(",")}`);
     }
     const buffer = await downloadVideo(videoUrl);
-    // Seedance 默认输出 mp4（本 Provider 不显式请求 mov）。
     const saved = saveVideoBuffer(buffer, "video/mp4");
-    const durationSec = typeof payload.duration === "number" ? payload.duration : undefined;
+    // 兔子API 各模型时长字段不同：seedance/veo 用字符串 seconds，H3 用数值 duration。
+    const rawSeconds = payload.seconds ?? payload.duration;
+    const parsedSeconds = typeof rawSeconds === "number"
+      ? rawSeconds
+      : typeof rawSeconds === "string" && rawSeconds.trim() !== "" && Number.isFinite(Number(rawSeconds))
+        ? Number(rawSeconds)
+        : undefined;
+    const durationSec = parsedSeconds && parsedSeconds > 0 ? parsedSeconds : undefined;
     return { status: "completed", videoFileRef: saved.url, ...(durationSec ? { durationSec } : {}) };
   }
-  if (status === "failed" || status === "expired") {
-    const detail = record(payload.error);
+
+  const failedStatuses = shape?.failedStatuses ?? ["failed", "expired"];
+  if (failedStatuses.includes(String(status))) {
+    // H3 错误在 error.{code,message}；seedance/veo 亦为 error.message。
+    const errorField = shape?.errorField ?? "error";
+    const detail = record(getByPath(payload, errorField));
     const message = typeof detail?.message === "string"
       ? detail.message
       : status === "expired" ? "视频任务已过期" : "视频生成失败";
@@ -177,7 +245,8 @@ export function createApiyiVideoProvider(
 }
 
 export const apiyiVideoProviders = Object.fromEntries(
-  (["doubao-seedance-2-5-260628"] as const).map((modelId) => [modelId, createApiyiVideoProvider(modelId)]),
+  (["doubao-seedance-2-5-260628", "MiniMax-H3", "veo3.1"] as const)
+    .map((modelId) => [modelId, createApiyiVideoProvider(modelId)]),
 ) as Record<VideoModelId, VideoProvider>;
 
 export function getVideoProvider(modelId: string): VideoProvider {

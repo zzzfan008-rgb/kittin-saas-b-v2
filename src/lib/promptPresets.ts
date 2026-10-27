@@ -24,7 +24,7 @@ export interface TextPresetTemplate {
   text: string;
 }
 
-// ---------- 模板正文（逐字迁移自 garmentPromptPresets MODEL_PROMPTS[gpt-image-2.5-flare-vip]/familyPrompts）----------
+// ---------- 模板正文（逐字迁移自 garmentPromptPresets MODEL_PROMPTS[gpt-image-2.5-flare]/familyPrompts）----------
 // 文本与 server/lib/promptPresetsFrozen.ts PRESET_TEMPLATE_TEXTS 同源同值，一致性测试锁定。
 
 // --- 三任务族（取默认生图模型 generate 文本，文生图起手模板）---

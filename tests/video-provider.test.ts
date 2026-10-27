@@ -75,18 +75,24 @@ async function main(): Promise<void> {
   console.log("P2-e 视频 Provider / 落地 / runner 测试");
 
   // ---------- 契约类型层 ----------
-  await test("视频模型清单收敛为单个 doubao-seedance-2-5-260628 且契约一致", () => {
-    assert.deepEqual(VIDEO_MODEL_IDS, ["doubao-seedance-2-5-260628"]);
+  await test("视频模型清单为兔子API 三个模型（seedance / MiniMax-H3 / veo3.1）且契约一致", () => {
+    assert.deepEqual([...VIDEO_MODEL_IDS], ["doubao-seedance-2-5-260628", "MiniMax-H3", "veo3.1"]);
     assert.equal(getVideoModelContract("doubao-seedance-2-5-260628").id, "doubao-seedance-2-5-260628");
     assert.match(getVideoModelContract("doubao-seedance-2-5-260628").contractHash, /^sha256:[a-f0-9]{64}$/);
   });
 
-  await test("视频运行时契约声明异步任务端点与 succeeded 成功状态", () => {
+  await test("视频运行时契约声明异步任务端点与 completed 成功状态", () => {
     const runtime = getVideoRuntimeContract();
     assert.equal(runtime.upstreamMode, "async-task");
-    assert.equal(runtime.submitEndpoint, "/seedance/api/v3/contents/generations/tasks");
+    // 兔子API 三家视频模型共用 /v1/videos 提交与 /v1/videos/{id} 轮询。
+    assert.equal(runtime.submitEndpoint, "/v1/videos");
     assert.ok(runtime.pollEndpointTemplate.includes("{id}"));
-    assert.equal(runtime.successStatus, "succeeded");
+    // seedance / veo 的成功态是 completed；H3 是 succeeded，由各模型契约覆写。
+    assert.equal(runtime.successStatus, "completed");
+    // 逐模型的成功态差异记在各模型契约的 responseShape 上（H3 为 succeeded）。
+    assert.equal(getVideoModelContract("MiniMax-H3").responseShape?.successStatus, "succeeded");
+    assert.deepEqual(getVideoModelContract("MiniMax-H3").responseShape?.videoUrlFields, ["content.url"]);
+    assert.equal(getVideoModelContract("doubao-seedance-2-5-260628").responseShape?.successStatus, "completed");
   });
 
   await test("视频参数仅产生 warning（R5），未知 key 与越界值分别提示", () => {
@@ -129,7 +135,8 @@ async function main(): Promise<void> {
         const { taskId } = await provider.submit({ prompt: "一段测试视频" });
         assert.equal(taskId, "cgt-test-task-1");
         assert.equal(captures.length, 1);
-        assert.equal(captures[0].url, "https://gateway.example/seedance/api/v3/contents/generations/tasks");
+        // 兔子API 统一视频端点（三家模型共用 /v1/videos）。
+        assert.equal(captures[0].url, "https://gateway.example/v1/videos");
         assert.equal(captures[0].body.model, "doubao-seedance-2-5-260628");
         assert.equal(captures[0].body.duration, 5);
         assert.equal(captures[0].body.generate_audio, false);
@@ -159,11 +166,15 @@ async function main(): Promise<void> {
     await test("poll 成功时拉回 MP4 落地并返回 /api/files 引用", async () => {
       const restoreFetch = installFetchMock((input) => {
         assert.ok(String(input).includes("cgt-test-task-1"));
+        // 兔子API Seedance 轮询信封：成功态 completed，视频地址在顶层 video_url。
         return Response.json({
           id: "cgt-test-task-1",
-          status: "succeeded",
-          content: { video_url: "https://cdn.example/out.mp4" },
-          duration: 5,
+          object: "video",
+          status: "completed",
+          progress: 100,
+          video_url: "https://cdn.example/out.mp4",
+          created_at: 1768976510,
+          seconds: "5",
         });
       });
       try {

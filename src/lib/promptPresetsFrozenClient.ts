@@ -182,7 +182,7 @@ const FROZEN_PROMPT_BINDING_MAP: Readonly<Record<string, FrozenPromptBinding>> =
 /**
  * variantId 格式：`${familyId}.${modelId}.${mode}.v1`
  * familyId: 小写字母+连字符
- * modelId: 小写字母/数字/点/连字符（默认模型 gpt-image-2.5-flare-vip 含点）
+ * modelId: 小写字母/数字/点/连字符（默认模型 gpt-image-2.5-flare 含点）
  * mode: generate | edit | mask-edit
  * 版本后缀：v1
  */

@@ -203,14 +203,14 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-flare-vip 文生图与多参考图编辑使用文档字段", async () => {
+    await test("gpt-image-2.5-flare 文生图与多参考图编辑使用文档字段", async () => {
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init });
         return Response.json(pngPayload(white));
       });
       try {
-        const generated = await apiyiProviders["gpt-image-2.5-flare-vip"].generate({
+        const generated = await apiyiProviders["gpt-image-2.5-flare"].generate({
           prompt: "礼服",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
         assert.equal(captures[0].url, "https://gateway.example/v1/images/generations");
         assert.equal(new Headers(captures[0].init?.headers).get("authorization"), "Bearer apiyi-test-key");
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "gpt-image-2.5-flare-vip",
+          model: "gpt-image-2.5-flare",
           prompt: "礼服",
           size: "1280x1280",
           quality: "high",
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
         const generateDispatcher = (captures[0].init as RequestInit & { dispatcher?: unknown })?.dispatcher;
         assert.ok(generateDispatcher, "API易请求必须显式携带专属 Undici dispatcher");
 
-        await apiyiProviders["gpt-image-2.5-flare-vip"].edit({
+        await apiyiProviders["gpt-image-2.5-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white, blue],
@@ -235,7 +235,7 @@ async function main(): Promise<void> {
         });
         const form = captures[1].init?.body as FormData;
         assert.equal(captures[1].url, "https://gateway.example/v1/images/edits");
-        assert.equal(form.get("model"), "gpt-image-2.5-flare-vip");
+        assert.equal(form.get("model"), "gpt-image-2.5-flare");
         assert.equal(form.get("size"), "2048x2048");
         assert.equal(form.get("response_format"), null);
         assert.equal(form.getAll("image").length, 2);
@@ -253,78 +253,64 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-flare-vip 缺 size 的 multipart 编辑不发送 size=undefined", async () => {
-      // R-101 回归：面板删除「自动」项后 size 由 UI 统一填默认档，但历史卡片仍可能缺 size。
-      // String(undefined) 会写出字面量 "undefined"，上游按「参数不支持」回 4xx —— 必须不发。
+    await test("gpt-image-2.5-flare 空参数用契约默认值填充且绝不写出 size=undefined", async () => {
+      // 兔子API 契约声明 flare 的默认 size=1536x2048、quality=high：空参数必须填契约默认；
+      // 核心保证不变：任何字段都不得被序列化成字面量 "undefined" 触发上游 4xx。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init });
         return Response.json(pngPayload(white));
       });
       try {
-        await apiyiProviders["gpt-image-2.5-flare-vip"].edit({
+        await apiyiProviders["gpt-image-2.5-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white],
           modelOptions: {},
         });
         const form = captures[0].init?.body as FormData;
-        assert.equal(form.get("size"), null, "缺 size 时不得写出字面量 \"undefined\"");
+        assert.equal(form.get("size"), "1536x2048", "缺 size 时填契约默认值，而不是写出字面量 undefined");
         assert.equal(form.get("quality"), "high");
-        assert.equal(form.get("model"), "gpt-image-2.5-flare-vip");
+        assert.equal(form.get("model"), "gpt-image-2.5-flare");
+        for (const [, value] of form.entries()) {
+          assert.notEqual(String(value), "undefined", "任何表单字段都不得是字面量 undefined");
+        }
       } finally {
         restoreFetch();
       }
     });
 
-    await test("gpt-image-2.5-all 的尺寸前缀拼在 prompt 最前且不重复拼接", async () => {
+    await test("gpt-image-2.5-flare 直接用 size 控制尺寸，不再拼接提示词前缀", async () => {
+      // 兔子API 迁移后，gpt-image-2.5-flare 直接接受像素 size（旧 gpt-image-2.5-all 的
+      // promptSizePrefix 机制已随该模型退役删除）：prompt 必须原样发送，不被改写。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init });
         return Response.json(pngPayload(white));
       });
       try {
-        await apiyiProviders["gpt-image-2.5-all"].generate({
+        await apiyiProviders["gpt-image-2.5-flare"].generate({
           prompt: "一只猫",
           operationMode: "generate",
-          modelOptions: { promptSizePrefix: "横版 16:9" },
+          modelOptions: { size: "3840x2160" },
         });
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "gpt-image-2.5-all",
-          prompt: "横版 16:9，一只猫",
-        });
-
-        await apiyiProviders["gpt-image-2.5-all"].generate({
+          model: "gpt-image-2.5-flare",
           prompt: "一只猫",
-          operationMode: "generate",
-          modelOptions: {},
-        });
-        assert.deepEqual(jsonBody(captures[1].init), {
-          model: "gpt-image-2.5-all",
-          prompt: "一只猫",
-        });
+          size: "3840x2160",
+          quality: "high",
+        }, "文生图必须直接传像素 size，prompt 不得拼接任何尺寸前缀");
 
-        await apiyiProviders["gpt-image-2.5-all"].generate({
-          prompt: "横版 16:9，一只猫",
-          operationMode: "generate",
-          modelOptions: { promptSizePrefix: "横版 16:9" },
-        });
-        assert.equal(
-          jsonBody(captures[2].init).prompt,
-          "横版 16:9，一只猫",
-          "提示词里已写过前缀时不得重复拼接",
-        );
-
-        await apiyiProviders["gpt-image-2.5-all"].edit({
+        await apiyiProviders["gpt-image-2.5-flare"].edit({
           prompt: "加一顶帽子",
           operationMode: "edit",
           referenceImages: [white],
-          modelOptions: { promptSizePrefix: "竖屏 9:16" },
+          modelOptions: { size: "1024x1536" },
         });
-        const form = captures[3].init?.body as FormData;
-        assert.equal(captures[3].url, "https://gateway.example/v1/images/edits");
-        assert.equal(form.get("prompt"), "竖屏 9:16，加一顶帽子");
-        assert.equal(form.get("size"), null, "gpt-image-2.5-all 不接受 size");
+        const form = captures[1].init?.body as FormData;
+        assert.equal(captures[1].url, "https://gateway.example/v1/images/edits");
+        assert.equal(form.get("prompt"), "加一顶帽子", "编辑 prompt 必须原样发送");
+        assert.equal(form.get("size"), "1024x1536", "编辑直接传像素 size");
       } finally {
         restoreFetch();
       }
@@ -404,16 +390,14 @@ async function main(): Promise<void> {
         assert.equal(capturedForms[0].get("model"), "gpt-image-2.5-sunburst");
         assert.equal(capturedForms[0].get("n"), null);
         assert.equal(capturedForms[0].get("size"), "1152x576");
-        assert.equal(capturedForms[0].get("output_format"), "png");
-        assert.equal(
-          capturedForms[0].get("background"),
-          "opaque",
-          "统一局部修改必须请求完整不透明画面",
-        );
-        assert.equal(capturedForms[0].get("response_format"), null);
+        // 兔子API /v1/images/edits 没有 background / output_format / input_fidelity 字段。
+        assert.equal(capturedForms[0].get("background"), null);
+        assert.equal(capturedForms[0].get("output_format"), null);
         assert.equal(capturedForms[0].get("input_fidelity"), null);
-        assert.ok(capturedForms[0].get("image[]") instanceof Blob);
-        assert.equal(capturedForms[0].get("image"), null);
+        assert.equal(capturedForms[0].get("response_format"), null);
+        // 兔子文档图片字段统一为 image（可重复多文件），不是 image[]。
+        assert.ok(capturedForms[0].get("image") instanceof Blob);
+        assert.equal(capturedForms[0].get("image[]"), null);
         assert.ok(capturedForms[0].get("mask") instanceof Blob);
       } finally {
         restoreFetch();
@@ -465,13 +449,16 @@ async function main(): Promise<void> {
         const editBody = jsonBody(captures[1].init) as { contents: Array<{ parts: Array<Record<string, unknown>> }> };
         const parts = editBody.contents[0].parts;
         assert.deepEqual(parts[0], { text: "改图" });
-        assert.equal((parts[1].inlineData as { mimeType: string }).mimeType, "image/png");
+        // 兔子API 的 Gemini 端点用 snake_case（inline_data/mime_type）；WebP 必须转成 PNG 上传。
+        assert.equal((parts[1].inline_data as { mime_type: string }).mime_type, "image/png");
       } finally {
         restoreFetch();
       }
     });
 
-    await test("FLUX.2 Pro 使用 generations 端点、显式尺寸和有序参考图字段", async () => {
+    await test("FLUX 3 Image generations 用 aspect_ratio、编辑走 multipart /v1/images/edits", async () => {
+      // 兔子API flux-3-image：/v1/images/generations 明确「不支持传图」、用 aspect_ratio
+      // （没有 width/height）；参考图编辑走 multipart /v1/images/edits（字段 image，可重复）。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const resultUrl = "https://cdn.example/flux.png?token=temporary";
       const restoreFetch = installFetchMock((input, init) => {
@@ -479,46 +466,26 @@ async function main(): Promise<void> {
         return Response.json({ data: [{ url: resultUrl }] });
       });
       try {
-        const modelOptions = { width: 1024, height: 768, outputFormat: "png" as const };
-        const generated = await apiyiProviders["flux-2-pro"].generate({
-          prompt: "生成", operationMode: "generate", modelOptions,
+        const generated = await apiyiProviders["flux-3-image"].generate({
+          prompt: "生成", operationMode: "generate",
+          modelOptions: { aspect_ratio: "3:4", output_format: "png" },
         });
         assert.deepEqual(generated.images, [resultUrl]);
+        assert.equal(captures[0].url, "https://gateway.example/v1/images/generations");
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "flux-2-pro", prompt: "生成", width: 1024, height: 768, output_format: "png",
-        });
-        await apiyiProviders["flux-2-pro"].edit({
-          prompt: "融合", operationMode: "edit", referenceImages: [white, blue], modelOptions,
-        });
-        const editedBody = jsonBody(captures[1].init);
-        const firstInput = String(editedBody.input_image);
-        const secondInput = String(editedBody.input_image_2);
-        delete editedBody.input_image;
-        delete editedBody.input_image_2;
-        assert.deepEqual(editedBody, {
-          model: "flux-2-pro", prompt: "融合", width: 1024, height: 768, output_format: "png",
-        });
-        for (const input of [firstInput, secondInput]) {
-          assert.match(input, /^data:image\/(?:jpeg|png);base64,/);
-          const metadata = await sharp(Buffer.from(input.split(",")[1], "base64")).metadata();
-          assert.ok(metadata.width && metadata.height);
-          assert.equal(metadata.width % 16, 0);
-          assert.equal(metadata.height % 16, 0);
-          assert.ok(metadata.width >= 64 && metadata.height >= 64);
-          assert.ok(metadata.width * metadata.height <= 4_194_304);
-        }
+          model: "flux-3-image", prompt: "生成", aspect_ratio: "3:4", output_format: "png",
+        }, "flux generations 只发 aspect_ratio，不发 width/height/size");
 
-        const largeReference = await imageDataUrl(3000, 2000, { r: 120, g: 80, b: 40 }, "jpeg");
-        await apiyiProviders["flux-2-pro"].edit({
-          prompt: "缩放输入", operationMode: "edit", referenceImages: [largeReference], modelOptions,
+        await apiyiProviders["flux-3-image"].edit({
+          prompt: "融合", operationMode: "edit", referenceImages: [white, blue],
+          modelOptions: { aspect_ratio: "3:4" },
         });
-        const adapted = String(jsonBody(captures[2].init).input_image);
-        const adaptedMetadata = await sharp(Buffer.from(adapted.split(",")[1], "base64")).metadata();
-        assert.ok(adaptedMetadata.width && adaptedMetadata.height);
-        assert.equal(adaptedMetadata.width % 16, 0);
-        assert.equal(adaptedMetadata.height % 16, 0);
-        assert.ok(adaptedMetadata.width * adaptedMetadata.height <= 4_194_304);
-        assert.ok(captures.every((capture) => capture.url === "https://gateway.example/v1/images/generations"));
+        assert.equal(captures[1].url, "https://gateway.example/v1/images/edits", "flux 编辑必须走 multipart edits");
+        const form = captures[1].init?.body as FormData;
+        assert.equal(form.get("model"), "flux-3-image");
+        assert.equal(form.get("prompt"), "融合");
+        assert.equal(form.getAll("image").length, 2, "多参考图用重复的 image 字段上传");
+        assert.equal(form.getAll("image[]").length, 0);
       } finally {
         restoreFetch();
       }
@@ -536,21 +503,21 @@ async function main(): Promise<void> {
         });
       });
       try {
-        const generated = await apiyiProviders["seedream-5-0-260128"].generate({
+        const generated = await apiyiProviders["doubao-seedream-5-0-pro-260628"].generate({
           prompt: "生成", operationMode: "generate", batchSize: 8, modelOptions: { size: "2K" },
         });
-        const edited = await apiyiProviders["seedream-5-0-260128"].edit({
+        const edited = await apiyiProviders["doubao-seedream-5-0-pro-260628"].edit({
           prompt: "融合", operationMode: "edit",
           referenceImages: [white, blue], modelOptions: { size: "3K" },
         });
         assert.deepEqual(generated.providerOutputSizes, ["2048x2048"]);
         assert.deepEqual(edited.providerOutputSizes, ["3072x3072"]);
         assert.deepEqual(bodies[0], {
-          model: "seedream-5-0-260128", prompt: "生成", size: "2K", response_format: "b64_json",
+          model: "doubao-seedream-5-0-pro-260628", prompt: "生成", size: "2K", response_format: "b64_json",
           watermark: false, sequential_image_generation: "disabled",
         });
         assert.deepEqual(bodies[1], {
-          model: "seedream-5-0-260128", prompt: "融合", image: [white, blue], size: "3K",
+          model: "doubao-seedream-5-0-pro-260628", prompt: "融合", image: [white, blue], size: "3K",
           response_format: "b64_json", watermark: false, sequential_image_generation: "disabled",
         });
         assert.equal("n" in bodies[0], false);
@@ -560,17 +527,17 @@ async function main(): Promise<void> {
     });
 
     await test("模型原生参数校验降级为 warning：仅形状校验，取值不再阻断付费调用", async () => {
-      assert.equal(imageModelOptionsError("flux-2-pro", null), "must be an object");
-      assert.equal(imageModelOptionsError("flux-2-pro", [1, 2, 3]), "must be an object");
-      assert.equal(imageModelOptionsError("flux-2-pro", { width: 513, height: 512, outputFormat: "png" }), undefined);
-      assert.equal(imageModelOptionsError("seedream-5-0-260128", { size: "4K" }), undefined);
+      assert.equal(imageModelOptionsError("flux-3-image", null), "must be an object");
+      assert.equal(imageModelOptionsError("flux-3-image", [1, 2, 3]), "must be an object");
+      assert.equal(imageModelOptionsError("flux-3-image", { width: 513, height: 512, outputFormat: "png" }), undefined);
+      assert.equal(imageModelOptionsError("doubao-seedream-5-0-pro-260628", { size: "4K" }), undefined);
       let calls = 0;
       const restoreFetch = installFetchMock(() => {
         calls += 1;
         return Response.json({ data: [{ url: "https://cdn.example/generated.png" }] });
       });
       try {
-        await apiyiProviders["flux-2-pro"].generate({
+        await apiyiProviders["flux-3-image"].generate({
           prompt: "非法尺寸",
           operationMode: "generate",
           modelOptions: { width: 513, height: 512, outputFormat: "png" },
@@ -589,7 +556,7 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
+          () => apiyiProviders["gpt-image-2.5-flare"].generate({
             prompt: "截断", operationMode: "generate", modelOptions: { size: "1280x1280" },
           }),
           (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
@@ -621,7 +588,7 @@ async function main(): Promise<void> {
         });
         return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
       });
-      const request = () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
+      const request = () => apiyiProviders["gpt-image-2.5-flare"].generate({
         prompt: "尾部恢复", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -653,7 +620,7 @@ async function main(): Promise<void> {
         calls += 1;
         return Response.json(payload);
       });
-      const vipRequest = () => apiyiProviders["gpt-image-2.5-flare-vip"].generate({
+      const vipRequest = () => apiyiProviders["gpt-image-2.5-flare"].generate({
         prompt: "响应校验", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -674,7 +641,7 @@ async function main(): Promise<void> {
           { payload: { data: [{ url: "/relative-result.png?token=secret" }] }, invoke: vipRequest },
           {
             payload: pngPayload(white),
-            invoke: () => apiyiProviders["seedream-5-0-260128"].generate({
+            invoke: () => apiyiProviders["doubao-seedream-5-0-pro-260628"].generate({
               prompt: "响应校验", operationMode: "generate", modelOptions: { size: "2K" },
             }),
           },

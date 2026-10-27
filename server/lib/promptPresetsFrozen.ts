@@ -84,7 +84,7 @@ export interface FrozenPresetText {
 /**
  * 预设模板文本表。键 = `${familyId}:${mode}`。
  * 三任务族（fashion-lookbook / commerce-hero / design-sheet）在源目录里按模型×模式
- * 各有一份（MODEL_PROMPTS）；冻结表取默认生图模型（gpt-image-2.5-flare-vip）一份——
+ * 各有一份（MODEL_PROMPTS）；冻结表取默认生图模型（gpt-image-2.5-flare）一份——
  * 内置模板既往绑定的正是该模型，文本与历史运行逐字一致。
  * 其余族为模型无关单文本（源 familyPrompts）。
  */
@@ -263,7 +263,7 @@ export interface FrozenPromptBinding {
 
 /**
  * 按 variantId 解析冻结预设绑定（v8→v9 迁移消费）。
- * variantId 形如 `${familyId}.${modelId}.${mode}.v1`（modelId 可含点，如 gpt-image-2.5-flare-vip），
+ * variantId 形如 `${familyId}.${modelId}.${mode}.v1`（modelId 可含点，如 gpt-image-2.5-flare），
  * 故不能按点号拆分；familyId 只含小写字母与连字符，mode 取值域封闭。
  * 未知 familyId / mode / 版本后缀 → undefined（调用方丢弃绑定，fail-closed 不猜）。
  */

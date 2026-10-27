@@ -1,29 +1,32 @@
 {
   "schemaVersion": 1,
   "contractLayer": "productPolicy",
-  "contractId": "apiyi-video-contracts-v1",
-  "reviewedOn": "2026-09-19",
+  "contractId": "tuzi-video-contracts-v1",
+  "reviewedOn": "2026-10-27",
   "generatedFrom": {
-    "knowledgeFile": "video-model-contracts.json",
+    "knowledgeFile": "tuzi-protocol-audit-2026-10-27",
     "productMustRemainGatewaySubset": true
   },
-  "baseUrl": "https://api.apiyi.com",
+  "baseUrl": "https://api.tu-zi.com",
   "runtime": {
     "upstreamMode": "async-task",
-    "submitEndpoint": "/seedance/api/v3/contents/generations/tasks",
-    "pollEndpointTemplate": "/seedance/api/v3/contents/generations/tasks/{id}",
-    "successStatus": "succeeded",
+    "submitEndpoint": "/v1/videos",
+    "pollEndpointTemplate": "/v1/videos/{id}",
+    "successStatus": "completed",
     "pendingStatuses": [
       "queued",
-      "running"
+      "running",
+      "pending"
     ],
     "terminalStatuses": [
+      "completed",
       "succeeded",
       "failed",
+      "cancelled",
       "expired"
     ],
-    "pollInitialDelayMs": 20000,
-    "pollIntervalMs": 20000,
+    "pollInitialDelayMs": 15000,
+    "pollIntervalMs": 10000,
     "pollTimeoutMs": 900000,
     "videoUrlExpirySeconds": 86400,
     "downloadTimeoutMs": 300000
@@ -31,16 +34,35 @@
   "models": [
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:b8c28766fa3af4c6823b2a61f79ab237850a8dcf523f5c0d53d79e167f99cde7",
+      "contractHash": "sha256:d833fba61eebfc7507c7fcce0edcbe1c0bb7eb47f410c1b7836b79c7579caf0f",
       "id": "doubao-seedance-2-5-260628",
       "label": "Seedance 2.5（字节）",
       "channel": "official",
       "vendor": "bytedance",
       "timeoutMs": 60000,
       "endpoint": {
-        "submitPath": "/seedance/api/v3/contents/generations/tasks",
-        "pollPathTemplate": "/seedance/api/v3/contents/generations/tasks/{id}",
+        "submitPath": "/v1/videos",
+        "pollPathTemplate": "/v1/videos/{id}",
         "contentType": "application/json"
+      },
+      "responseShape": {
+        "submitIdField": "id",
+        "statusField": "status",
+        "successStatus": "completed",
+        "pendingStatuses": [
+          "queued",
+          "running",
+          "pending"
+        ],
+        "failedStatuses": [
+          "failed",
+          "expired",
+          "cancelled"
+        ],
+        "videoUrlFields": [
+          "video_url"
+        ],
+        "errorField": null
       },
       "recommendedOptions": {
         "resolution": {
@@ -51,7 +73,7 @@
             "1080p"
           ]
         },
-        "aspectRatio": {
+        "ratio": {
           "default": "adaptive",
           "examples": [
             "16:9",
@@ -63,14 +85,13 @@
             "adaptive"
           ]
         },
-        "seconds": {
-          "default": "5",
+        "duration": {
+          "default": 5,
           "examples": [
-            "4",
-            "5",
-            "10",
-            "30",
-            "-1"
+            4,
+            5,
+            10,
+            30
           ]
         },
         "seed": {
@@ -79,16 +100,125 @@
           ]
         }
       },
-      "knowledgeSources": [
-        {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/overview.md",
-          "sha256": "693a068a2a1ba83fdce83f745ea49ad36b1f0f7c3e8fca89b2cef57fd78f606f"
+      "knowledgeSources": []
+    },
+    {
+      "contractHashScope": "sha256-canonical-video-model-envelope-v1",
+      "contractHash": "sha256:1d1ffe118e7a4aa195faaf0a5b90cf137e7b4f5b32d63e4b35d2c4b3b29b06b1",
+      "id": "MiniMax-H3",
+      "label": "MiniMax H3",
+      "channel": "official",
+      "vendor": "minimax",
+      "timeoutMs": 60000,
+      "endpoint": {
+        "submitPath": "/v1/videos",
+        "pollPathTemplate": "/v1/videos/{id}",
+        "contentType": "application/json"
+      },
+      "responseShape": {
+        "submitIdField": "id",
+        "statusField": "status",
+        "successStatus": "succeeded",
+        "pendingStatuses": [
+          "queued",
+          "running"
+        ],
+        "failedStatuses": [
+          "failed",
+          "cancelled"
+        ],
+        "videoUrlFields": [
+          "content.url"
+        ],
+        "errorField": "error",
+        "taskWrapper": "task"
+      },
+      "recommendedOptions": {
+        "resolution": {
+          "default": "768P",
+          "examples": [
+            "768P",
+            "1080P"
+          ]
         },
-        {
-          "pageLocalPath": "snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/pages/api-capabilities/seedance2/video-generation.md",
-          "sha256": "971f78c3d6af915f86065d4ec63628f499672742d41b665128c880ff21455c3a"
+        "ratio": {
+          "default": "adaptive",
+          "examples": [
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16",
+            "adaptive"
+          ]
+        },
+        "duration": {
+          "default": 5,
+          "examples": [
+            5,
+            10
+          ]
         }
-      ]
+      },
+      "knowledgeSources": []
+    },
+    {
+      "contractHashScope": "sha256-canonical-video-model-envelope-v1",
+      "contractHash": "sha256:0ff3d2056c524edc20c0c7c04a86c7823b097a07bb924bdc7d8dcd1eeb49a9d4",
+      "id": "veo3.1",
+      "label": "Veo 3.1（Google）",
+      "channel": "official",
+      "vendor": "google",
+      "timeoutMs": 60000,
+      "endpoint": {
+        "submitPath": "/v1/videos",
+        "pollPathTemplate": "/v1/videos/{id}",
+        "contentType": "multipart/form-data"
+      },
+      "responseShape": {
+        "submitIdField": "id",
+        "statusField": "status",
+        "successStatus": "completed",
+        "pendingStatuses": [
+          "queued",
+          "running",
+          "pending"
+        ],
+        "failedStatuses": [
+          "failed",
+          "cancelled",
+          "expired"
+        ],
+        "videoUrlFields": [
+          "video_url"
+        ],
+        "errorField": null
+      },
+      "recommendedOptions": {
+        "resolution": {
+          "default": "720p",
+          "examples": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seconds": {
+          "default": "8",
+          "examples": [
+            "8"
+          ]
+        },
+        "mode": {
+          "default": "frame",
+          "examples": [
+            "text",
+            "ref",
+            "frame",
+            "edit"
+          ]
+        }
+      },
+      "knowledgeSources": []
     }
   ]
 }

@@ -55,7 +55,7 @@ const flow = {
       id: "g1", type: "image-generator", position: { x: 1, y: 0 },
       data: {
         kind: "image-generator", label: "生图", status: "idle",
-        modelId: "gpt-image-2.5-flare-vip", aspectRatio: "1:1", batchSize: 1, operationMode: "edit",
+        modelId: "gpt-image-2.5-flare", aspectRatio: "1:1", batchSize: 1, operationMode: "edit",
       },
     },
   ],

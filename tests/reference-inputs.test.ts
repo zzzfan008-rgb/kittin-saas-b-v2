@@ -102,7 +102,7 @@ assert.match(
 {
   const promptA = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}, {}],
@@ -111,14 +111,14 @@ assert.match(
   assert.equal(
     promptA,
     "换装\n参考图:参考图1、参考图2、参考图3",
-    "gpt-image-2.5-flare-vip edit 3 张参考图渲染结果",
+    "gpt-image-2.5-flare edit 3 张参考图渲染结果",
   );
 }
 
 {
   const promptB = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}],
@@ -127,7 +127,7 @@ assert.match(
   assert.equal(
     promptB,
     "换装\n参考图:参考图1、参考图2",
-    "gpt-image-2.5-flare-vip edit 2 张参考图渲染结果",
+    "gpt-image-2.5-flare edit 2 张参考图渲染结果",
   );
 }
 
@@ -135,7 +135,7 @@ assert.match(
 {
   const rendered = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     operationMode: "edit",
     taskPrompt: "换装",
     references: [{}, {}, {}],
@@ -143,7 +143,7 @@ assert.match(
   assert.equal(
     rendered,
     "换装\n参考图:参考图1、参考图2、参考图3",
-    "改后 gpt-image-2.5-flare-vip edit 3 张参考图提示词实例",
+    "改后 gpt-image-2.5-flare edit 3 张参考图提示词实例",
   );
   assert.ok(!rendered.includes("职责"), "改后提示词不得包含职责");
   assert.ok(!rendered.includes("禁止影响"), "改后提示词不得包含禁止影响");
@@ -184,15 +184,16 @@ assert.deepEqual(
     [modelId, Object.keys(intros)]
   ))),
   {
+    // 兔子API 9 个图像模型：sunburst 仅 mask-edit，其余 generate+edit。
     "gpt-image-2.5-sunburst": ["mask-edit"],
-    "gpt-image-2.5-all": ["generate", "edit"],
-    "gpt-image-2.5-sunburst-vip": ["generate", "edit"],
-    "gpt-image-2.5-flare-vip": ["generate", "edit"],
-    "gemini-3-pro-image-preview": ["generate", "edit"],
-    "gemini-3.1-flash-lite-image": ["generate", "edit"],
+    "gpt-image-2.5-flare": ["generate", "edit"],
+    "gemini-nano-banana-2.1": ["generate", "edit"],
     "gemini-3.1-flash-image": ["generate", "edit"],
-    "flux-2-pro": ["generate", "edit"],
-    "seedream-5-0-260128": ["generate", "edit"],
+    "flux-3-image": ["generate", "edit"],
+    "doubao-seedream-5-0-pro-260628": ["generate", "edit"],
+    "doubao-seedream-5-0-lite-260128": ["generate", "edit"],
+    "qwen-image-3.0-pro": ["generate", "edit"],
+    "qwen-image-3.0": ["generate", "edit"],
   },
   "发布 hash material 必须覆盖全部模型的显式合法模式 intro",
 );
@@ -200,14 +201,20 @@ assert.deepEqual(
 // ---- 空提示词必须抛错 ----
 for (const [modelId, operationMode] of [
   ["gpt-image-2.5-sunburst", "mask-edit"],
-  ["gpt-image-2.5-flare-vip", "generate"],
-  ["gpt-image-2.5-flare-vip", "edit"],
+  ["gpt-image-2.5-flare", "generate"],
+  ["gpt-image-2.5-flare", "edit"],
   ["gemini-3.1-flash-image", "generate"],
   ["gemini-3.1-flash-image", "edit"],
-  ["flux-2-pro", "generate"],
-  ["flux-2-pro", "edit"],
-  ["seedream-5-0-260128", "generate"],
-  ["seedream-5-0-260128", "edit"],
+  ["flux-3-image", "generate"],
+  ["flux-3-image", "edit"],
+  ["doubao-seedream-5-0-pro-260628", "generate"],
+  ["doubao-seedream-5-0-pro-260628", "edit"],
+  ["doubao-seedream-5-0-lite-260128", "generate"],
+  ["doubao-seedream-5-0-lite-260128", "edit"],
+  ["qwen-image-3.0-pro", "generate"],
+  ["qwen-image-3.0-pro", "edit"],
+  ["qwen-image-3.0", "generate"],
+  ["qwen-image-3.0", "edit"],
 ] as const satisfies readonly [ImageModelId, ImageOperationMode][]) {
   // v7：needsMask 声明驱动蒙版错误文案；kind 统一为三值。
   const needsMask = operationMode === "mask-edit";

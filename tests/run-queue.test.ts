@@ -36,7 +36,7 @@ const { renderProviderPrompt } = await import("../src/lib/providerPromptRenderer
 await database.initializeDatabase();
 
 // v9（64 Phase 3）：原 variant fixture 的模型直给（fashion-lookbook / commerce-hero 同模型）。
-const QUEUE_MODEL_ID: ImageModelId = "gpt-image-2.5-flare-vip";
+const QUEUE_MODEL_ID: ImageModelId = "gpt-image-2.5-flare";
 const MASK_MODEL_ID: ImageModelId = "gpt-image-2.5-sunburst";
 
 const owner = await database.queryOne<{ id: string }>("SELECT id FROM users WHERE account_id = 'queue-admin'");
@@ -207,7 +207,7 @@ function resolver(
     return behavior(request, calls);
   };
   const provider: AIProvider = {
-    id: "gpt-image-2.5-flare-vip",
+    id: "gpt-image-2.5-flare",
     async generate(request) { return invoke(request); },
     async edit(request) { return invoke(request); },
   };
@@ -237,7 +237,7 @@ console.log("PostgreSQL 持久生成队列测试");
 
 await test("入队立即返回且数据库重连后 queued 任务仍可执行并重放事件", async () => {
   const fake = resolver(() => ({
-    images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip", providerOutputSizes: ["2048x2048"],
+    images: [PNG_DATA_URL], model: "gpt-image-2.5-flare", providerOutputSizes: ["2048x2048"],
   }));
   const runId = await enqueueSingle("restart");
   assert.equal(fake.calls(), 0, "入队阶段不得调用上游");
@@ -289,7 +289,7 @@ await test("RUN-02：batchSize=4 的 executeStep 进度 done 单调不减", asyn
   let calls = 0;
   const fake = resolver(() => {
     calls += 1;
-    return { images: [`generated-${calls}`], model: "gpt-image-2.5-flare-vip" };
+    return { images: [`generated-${calls}`], model: "gpt-image-2.5-flare" };
   });
   const progressEvents: NodeStatusRunEvent[] = [];
   const batchStep: NodeExecution = {
@@ -314,7 +314,7 @@ await test("RUN-02：Worker 持久化 progress 事件；无 progress 的旧事�
   sequence += 1;
   const nodeId = `progress-w-${sequence}`;
   const run = await queue.enqueueGenerationRun({ steps: [step(nodeId)] }, owner.id, context(nodeId));
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
   const now = tick();
   assert.equal(await queue.processNextGenerationJob("worker-progress", {
     resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
@@ -776,7 +776,7 @@ await test("179 条活动任务下两个不同请求并发入队时只接受一�
 });
 
 await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上游", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
   const runId = await enqueueSingle("soft-deleted");
   try {
     await database.query(`
@@ -794,7 +794,7 @@ await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上
 });
 
 await test("retry_wait 在 available_at 前不可领取，到期后才对 Worker 可见", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
   const runId = await enqueueSingle("available-at");
   const availableAt = tick(10_000);
   await database.query(
@@ -863,7 +863,7 @@ await test("确认临时的 503 连续两次失败后第三次成功且请求数
     if (call <= 2) {
       throw new ProviderError("AI 服务暂时不可用，请稍后重试", 503, "stub", "gateway_unavailable");
     }
-    return { images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" };
+    return { images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" };
   });
   const runId = await enqueueSingle("temporary-503");
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -989,7 +989,7 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
   };
   const fake = resolver((request) => ({
     images: Array.from({ length: Number(request.batchSize) || 1 }, () => PNG_DATA_URL),
-    model: "gpt-image-2.5-flare-vip",
+    model: "gpt-image-2.5-flare",
   }));
   const run = await queue.enqueueGenerationRun(plan, owner.id, {
     userId: owner.id,
@@ -1146,7 +1146,7 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   await database.query("UPDATE generation_runs SET status = 'running' WHERE id = $1", [safeRunId]);
   assert.equal(await queue.recoverExpiredGenerationJobs(expiredAt), 1);
   assert.equal((await runRow(safeRunId))?.status, "queued");
-  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare-vip" }));
+  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
   const safeNow = tick();
   assert.equal(await queue.processNextGenerationJob("worker-recovered", {
     resolveProvider: safeFake.resolveProvider, now: () => safeNow, random: () => 0,

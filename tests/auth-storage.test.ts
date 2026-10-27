@@ -30,7 +30,7 @@ function boundStorageGenerateParams(intent: string): Record<string, unknown> {
     // evaluationVersion/postprocessVersion）已随 variant 概念删除。
     inputTexts: [intent],
     operationMode: "generate",
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     modelOptions: {},
     aspectRatio: "1:1",
     batchSize: 1,
@@ -685,9 +685,9 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   const processNow = Date.now() + 10_000;
   const successProvider = {
-    id: "gpt-image-2.5-flare-vip",
-    async generate() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare-vip" }; },
-    async edit() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare-vip" }; },
+    id: "gpt-image-2.5-flare",
+    async generate() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare" }; },
+    async edit() { return { images: [pngDataUrl], model: "gpt-image-2.5-flare" }; },
   };
   const successNodeId = "usage-success-node";
   const successRun = await enqueueGenerationRun(
@@ -716,7 +716,7 @@ await test("成功图片写消耗流水，失败任务不写消耗", async () =>
   }), true);
 
   const failureProvider = {
-    id: "gpt-image-2.5-flare-vip",
+    id: "gpt-image-2.5-flare",
     async generate() { throw new Error("timeout"); },
     async edit() { throw new Error("timeout"); },
   };

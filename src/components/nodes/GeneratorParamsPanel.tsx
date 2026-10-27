@@ -362,7 +362,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? imageModelOptionsWarnings(effModel, options)
     : mediaKind === "video" ? videoModelOptionsWarnings(effModel as VideoModelId, options) : [];
   const declaredKeys = Object.keys(recommended);
-  /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.5-all）都有专属控件，不在此重复。 */
+  /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.5-flare）都有专属控件，不在此重复。 */
   const renderParamKeys = declaredKeys.filter((k) => k !== "aspectRatio" && k !== "promptSizePrefix");
 
   const aspectRatioOptions = mediaKind === "image" && isImageModelId(effModel)
@@ -421,7 +421,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     updateNodeData(nodeId, { modelOptions: { ...options, size: vipSizeWriteBack } });
   }, [disabled, nodeId, options, updateNodeData, vipSizeWriteBack]);
 
-  /** 「尺寸」参数（仅 gpt-image-2.5-all：唯一可控尺寸的手段是拼在 prompt 最前的尺寸前缀）。 */
+  /** 「尺寸」参数（仅 gpt-image-2.5-flare：唯一可控尺寸的手段是拼在 prompt 最前的尺寸前缀）。 */
   const promptSizeOptions = mediaKind === "image" && isImageModelId(effModel)
     ? imagePromptSizePrefixOptions(effModel)
     : undefined;
@@ -446,7 +446,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
       <div className="grid grid-cols-2 gap-2">
         {promptSizeOptions ? (
-          // gpt-image-2.5-all 既不接受 size 也不接受画幅参数，尺寸只能靠 prompt 前缀控制
+          // gpt-image-2.5-flare 既不接受 size 也不接受画幅参数，尺寸只能靠 prompt 前缀控制
           // （契约 recommendedOptions.promptSizePrefix），故画幅位换成尺寸前缀下拉。
           <OptionSelect label="尺寸" value={curPromptSizeValue} options={promptSizeOptions} disabled={disabled}
             onChange={(v) => updateNodeData(nodeId, {

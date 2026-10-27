@@ -16,11 +16,13 @@ import contracts from "../../docs/ai/apiyi/video-model-contracts.json";
 
 export const VIDEO_MODEL_IDS = [
   "doubao-seedance-2-5-260628",
+  "MiniMax-H3",
+  "veo3.1",
 ] as const;
 
 export type VideoModelId = (typeof VIDEO_MODEL_IDS)[number];
 
-/** 主力（且唯一）模型。 */
+/** 主力默认模型。 */
 export const DEFAULT_VIDEO_MODEL_ID: VideoModelId = "doubao-seedance-2-5-260628";
 
 export function isVideoModelId(value: unknown): value is VideoModelId {
@@ -75,6 +77,22 @@ export interface VideoModelContract {
     submitPath: string;
     pollPathTemplate: string;
     contentType: string;
+  };
+  /**
+   * 各供应商的查询响应信封不同（兔子API 实测）：
+   * - seedance / veo：顶层 `video_url`
+   * - MiniMax-H3：`content.url`，错误在 `error.{code,message}`
+   * 不声明就无法用同一段轮询代码解析三种返回。
+   */
+  responseShape?: {
+    submitIdField: string;
+    statusField: string;
+    successStatus: string;
+    pendingStatuses: readonly string[];
+    failedStatuses: readonly string[];
+    videoUrlFields: readonly string[];
+    errorField?: string | null;
+    taskWrapper?: string;
   };
   recommendedOptions?: Record<string, RecommendedOptionSpec>;
   /** 证据页（untrusted_document_content；快照内相对路径 + SHA-256）。 */

@@ -161,7 +161,7 @@ function editFlow(imageUrl: string) {
           label: "改款",
           status: "idle",
           operationMode: "edit",
-          modelId: "gpt-image-2.5-flare-vip",
+          modelId: "gpt-image-2.5-flare",
           modelOptions: EDIT_MODEL_OPTIONS,
           aspectRatio: EDIT_ASPECT_RATIO,
           batchSize: 1,
@@ -339,7 +339,7 @@ async function waitForDatabaseCondition(
 function directGenerateBody(referenceImage: string, projectId?: string, clientRequestId = "direct-request") {
   return {
     clientRequestId,
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     kind: "image-generator",
     projectId,
     projectName: "客户端伪造名称",

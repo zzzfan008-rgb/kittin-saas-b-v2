@@ -153,15 +153,16 @@ export function validateDocuments({
   const expectedIds = ensureArray(sources.modelCatalog?.expectedGatewayModelIds);
   const contractIds = ensureArray(contracts.models).map((model) => model.id);
   const knowledgeIds = ensureArray(knowledge.models).map((model) => model.id);
-  if (expectedIds.length !== 9) errors.push(`expected exactly nine gateway model IDs, received ${expectedIds.length}`);
+  // 供应商迁移（兔子API）后模型清单不再是固定的九个；只要求基线非空且与契约/知识库同集合。
+  if (expectedIds.length === 0) errors.push("expected gateway model IDs must not be empty");
   if (expectedIds.some((id) => typeof id !== "string" || !id.trim())) {
     errors.push("expected gateway model IDs must be non-empty strings");
   }
   if (new Set(expectedIds).size !== expectedIds.length) {
     errors.push("expected gateway model IDs must not contain duplicates");
   }
-  if (!sameSet(expectedIds, contractIds)) errors.push("runtime contract model IDs do not match the reviewed nine-model catalog");
-  if (!sameSet(expectedIds, knowledgeIds)) errors.push("knowledge model IDs do not match the reviewed nine-model catalog");
+  if (!sameSet(expectedIds, contractIds)) errors.push("runtime contract model IDs do not match the reviewed model catalog");
+  if (!sameSet(expectedIds, knowledgeIds)) errors.push("knowledge model IDs do not match the reviewed model catalog");
 
   const sourceIds = new Set();
   for (const source of ensureArray(sources.sources)) {
