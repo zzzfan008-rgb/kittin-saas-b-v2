@@ -1,7 +1,7 @@
 import type { Asset } from "@/types/workflow";
 
 /**
- * 资产库两级分类（单一事实源；AssetPickerOverlay / ReplaceImageDialog 共用）。
+ * 资产库两级分类（单一事实源；AssetPickerOverlay 消费）。
  *
  * 一级：服装设计 / 模特换装 / 视频生成 / 历史素材（无「全部」）。
  * 二级即素材真实 category；历史素材是 files 表的本地上传（source_type='upload'），

@@ -19,7 +19,7 @@ import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
 import { NodeFrame,
   useNodeResizeWidth,} from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
-import { ReplaceImageDialog } from "@/components/panels/ReplaceImageDialog";
+import { OPEN_ASSET_PICKER_EVENT, type AssetPickerRequest } from "@/lib/overlayEvents";
 import { MattingDialog } from "@/components/panels/MattingDialog";
 import { CropImageDialog } from "@/components/panels/CropImageDialog";
 import { MaskEditor } from "./MaskEditor";
@@ -79,7 +79,19 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
   const [dragOver, setDragOver] = useState(false);
   const [editingMask, setEditingMask] = useState(false);
   const [editingMulti, setEditingMulti] = useState(false);
-  const [replaceMenuOpen, setReplaceMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * 用户批注（2026-10-22）：替换按钮不再弹自家「替换图片」窗口，直接打开资产库；
+   * 未选中节点时打开 = 浏览模式，选中素材后新建图片节点承载（AssetPickerOverlay 既有语义）。
+   */
+  const openAssetLibrary = useCallback(() => {
+    if (readOnly) return;
+    const state = useFlowStore.getState();
+    const target = selectActiveDocumentTarget(state);
+    const request: AssetPickerRequest = target ? { target, nodeId: id } : {};
+    window.dispatchEvent(new CustomEvent(OPEN_ASSET_PICKER_EVENT, { detail: request }));
+  }, [id, readOnly]);
   const [mattingDialogOpen, setMattingDialogOpen] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   // 65d：图片节点本地编辑 —— editPrompt 走与 label/prompt 同一 coalesced 历史通道（IME/撤销安全）。
@@ -246,9 +258,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 disabledReason: "只读项目不能新增节点",
               },
               replace: {
-                onSelect: () => {
-                  setReplaceMenuOpen(true);
-                },
+                // 2026-10-22 批注：直接打开资产库（原替换弹窗已删除）。
+                onSelect: () => openAssetLibrary(),
                 disabled: readOnly,
                 disabledReason: "只读项目不能替换图片",
               },
@@ -272,7 +283,8 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         ) : (
           <div
             onDoubleClick={() => {
-              if (!readOnly) setReplaceMenuOpen(true);
+              // 2026-10-22 批注：双击空白槽位直接弹本地上传，不再绕一层选择窗口。
+              if (!readOnly) fileInputRef.current?.click();
             }}
             onDragOver={(event) => {
               event.preventDefault();
@@ -284,7 +296,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
               setDragOver(false);
               void handleFile(event.dataTransfer.files?.[0]);
             }}
-            title="双击上传或从资产库选择"
+            title="双击上传本地图片；用工具条「替换」从资产库选择"
             className={`nopan relative flex aspect-[4/3] w-full cursor-grab flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-dashed bg-[var(--gc-node-inner)] text-center transition-colors focus-within:ring-2 focus-within:ring-(--gc-accent-deep) ${
               dragOver
                 ? "border-solid border-[var(--gc-accent)] text-[var(--gc-accent)]"
@@ -294,7 +306,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
             onKeyDown={(event) => {
               if (event.key === "Enter" && !readOnly) {
                 event.preventDefault();
-                setReplaceMenuOpen(true);
+                fileInputRef.current?.click();
               }
             }}
           >
@@ -303,6 +315,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
                 隐藏原生 file input —— 提供 a11y 直传路径与 Playwright setInputFiles 锚点。
                 它不是「可见上传入口」（可见入口仍是弹窗），故不违背 R-101「节点内不得内联可见上传控件」。 */}
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               multiple={false}
@@ -337,29 +350,6 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
         ) : null}
       </NodeFrame>
       <Handle type="source" position={Position.Right} title="输出图片" />
-
-      {replaceMenuOpen && (
-        <ReplaceImageDialog
-          nodeId={id}
-          nodeLabel={data.label}
-          readOnly={readOnly}
-          onUpload={handleFile}
-          onPickFromLibrary={(url) => {
-            const target = selectActiveDocumentTarget(useFlowStore.getState());
-            if (!target) return;
-            updateNodeDataInTab(target, id, {
-              outputImages: [url],
-              status: "success",
-              error: undefined,
-              mask: undefined,
-              maskSourceRef: undefined,
-              featherRadius: undefined,
-            });
-            setReplaceMenuOpen(false);
-          }}
-          onClose={() => setReplaceMenuOpen(false)}
-        />
-      )}
 
       {/* 蒙版编辑器（65b：蒙版入口从生成节点面板迁入图片节点） */}
       {/* 蒙版重绘页（65d v2）：右栏约 1/4 宽整合控件；主按钮=保存+重绘且不关闭面板，
