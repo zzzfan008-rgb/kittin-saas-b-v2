@@ -1,15 +1,10 @@
 import { useCallback, useRef, useState } from "react";
-import { removeBackground, type Config } from "@imgly/background-removal";
 import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { apiErrorMessage } from "@/lib/apiErrors";
 import { featherForegroundToDataUrl } from "@/lib/mattingCompositor";
-import {
-  MATTING_PUBLIC_PATH,
-  describeMattingResourceError,
-} from "@/lib/mattingModelSource";
 
 interface MattingDialogProps {
   open: boolean;
@@ -22,16 +17,72 @@ interface MattingDialogProps {
 type Quality = "fast" | "medium" | "large";
 
 /**
- * 处理阶段：把库的 progress(key, current, total) 归一到 0–100。
- * 库有两类阶段：fetch:xxx（下载资源，主要等待）与 compute:*（decode/inference/mask/encode）。
+ * 画质档 → 服务端模型。
+ *
+ * 2026-10-23 改造：抠图从浏览器本地（@imgly/background-removal，每次要下载
+ * 170MB 模型）改为服务端 rembg（rembg-service/，模型常驻内存、启动即预加载）。
+ * 用户端零下载；边缘更锐利（isnet 过渡带 0.307% vs u2net 1.210%）。
+ *
+ * 服务端只预置了 isnet-general-use。其余模型需运维先放文件，
+ * 否则 /remove 返回 503（刻意不触发 170MB 下载把请求挂死）。
  */
-function mapProgress(key: string, current: number, total: number): number {
-  if (key.startsWith("fetch:")) {
-    const ratio = total > 0 ? Math.min(1, current / total) : 0;
-    return Math.round(ratio * 70); // 下载占 0–70
+const MODEL_BY_QUALITY: Record<Quality, string> = {
+  fast: "isnet-general-use",
+  medium: "isnet-general-use",
+  large: "isnet-general-use",
+};
+
+/**
+ * 抠图请求的进度节点（0–100）。
+ *
+ * 旧实现按 @imgly 的 fetch:xxx / compute:* 两类阶段算（下载占 0-70）。
+ * 现在模型常驻服务端、没有下载阶段，改成「上传 → 推理 → 羽化」三段。
+ */
+function progressFor(stage: "upload" | "infer" | "feather"): number {
+  return stage === "upload" ? 15 : stage === "infer" ? 65 : 85;
+}
+
+/**
+ * 把图片引用（本地 blob URL / data URL / `/api/files/...`）转成 dataUrl。
+ *
+ * 为什么要这一层：抠图入口的 `source` 可能是三种形态之一 ——
+ *   1. `blob:` 本地刚上传还没落库
+ *   2. `data:image/...` 直接内联
+ *   3. `/api/files/xxx.png` 已落库
+ * 服务端 route 统一收 base64 dataUrl，所以这里归一化。
+ */
+async function imageRefToDataUrl(source: string): Promise<string> {
+  if (source.startsWith("data:image/")) return source;
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw new Error(`无法读取原图（HTTP ${response.status}）`);
   }
-  const step = Math.min(4, Math.max(0, current)); // compute:decode=0/4 … encode=4/4
-  return Math.round(70 + (step / 4) * 30);
+  const blob = await response.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("无法读取原图数据"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * 失败提示翻译。
+ *
+ * 服务端（server/routes/matting.ts 的 describeMattingError）已经把 Python 侧
+ * 的错误翻成中文并写进 `error` 字段，这里再兜一层网络层失败。
+ */
+function describeMattingError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (!raw) return "抠图失败，请稍后重试";
+  if (/Failed to fetch|NetworkError|network|load failed/i.test(raw)) {
+    return "无法连接抠图服务，请检查网络后重试";
+  }
+  if (/AbortError|timeout/i.test(raw)) {
+    return "抠图超时，请换一张更小的图片或稍后重试";
+  }
+  // 服务端已翻好的中文，原样透出
+  return raw;
 }
 
 export function MattingDialog({
@@ -64,50 +115,51 @@ export function MattingDialog({
     setError(null);
     setResult(null);
     setProgress(0);
-    setStageLabel("加载抠图模型…");
+    setStageLabel("准备抠图…");
 
     try {
-      const model: Config["model"] =
-        quality === "fast" ? "isnet_quint8" : quality === "medium" ? "isnet_fp16" : "isnet";
+      // 原图 → dataUrl（服务端 route 收 base64，与 /api/files 一致）
+      setStageLabel("上传原图…");
+      setProgress(progressFor("upload"));
+      const sourceDataUrl = await imageRefToDataUrl(source);
 
-      // 库返回的 blob 已是「原像素 + alpha=前景蒙版」成品 PNG；接真实进度回调。
-      const foreground = await removeBackground(source, {
-        model,
-        publicPath: MATTING_PUBLIC_PATH,
-        progress: (key, current, total) => {
-          setStageLabel(key.startsWith("fetch:") ? "下载模型资源…" : "AI 抠图计算…");
-          setProgress(mapProgress(key, current, total));
-        },
-      });
-
-      setStageLabel("合成与羽化…");
-      // 顺序 await（createImageBitmap）消除旧实现 maskImg.onload/toBlob 竞态；
-      // 羽化只作用 alpha 通道边缘（RGB 主体不糊）。
-      const dataUrl = await featherForegroundToDataUrl(foreground, featherRadius);
-
-      setStageLabel("上传结果…");
-      const res = await fetch("/api/files", {
+      // 服务端抠图：rembg（isnet-general-use）返回透明底 PNG
+      setStageLabel("AI 抠图计算…");
+      setProgress(progressFor("infer"));
+      const res = await fetch("/api/matting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl: sourceDataUrl, model: MODEL_BY_QUALITY[quality] }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         url?: string;
         error?: string;
       };
       if (!res.ok) {
-        throw new Error(apiErrorMessage(res.status, data, `上传失败 HTTP ${res.status}`));
+        // 服务端已把 Python 侧错误翻成中文（describeMattingError），直接透出
+        throw new Error(
+          typeof data.error === "string" && data.error
+            ? data.error
+            : apiErrorMessage(res.status, data, `抠图失败 HTTP ${res.status}`),
+        );
       }
       if (typeof data.url !== "string" || !data.url) {
         throw new Error("服务端返回无效的图片 URL");
       }
 
+      // 羽化在本地做：只作用 alpha 边缘，RGB 主体不糊。
+      // 服务端返回的是已落库的 URL，先取回字节再做 alpha 羽化。
+      setStageLabel("合成与羽化…");
+      setProgress(progressFor("feather"));
+      const { featherStoredImageUrl } = await import("@/lib/mattingCompositor");
+      const finalUrl = await featherStoredImageUrl(data.url, featherRadius);
+
       setProgress(100);
-      // 关键修复：先预览，由用户「采用」才替换原图（旧代码直接 onComplete+onClose）。
-      setResult(data.url);
+      // 先预览，由用户「采用」才替换原图（旧代码直接 onComplete+onClose）。
+      setResult(finalUrl);
     } catch (err) {
-      // 资源/网络类失败给明确中文提示（#4），其余透出原始信息，绝不静默。
-      setError(describeMattingResourceError(err));
+      // 失败给明确中文提示，绝不静默。
+      setError(describeMattingError(err));
       setProgress(0);
     } finally {
       setProcessing(false);
