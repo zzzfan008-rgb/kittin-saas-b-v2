@@ -46,6 +46,9 @@ import {
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
+  modelSupportsQuality,
+  resolutionOptionsInBounds,
+  type ImageModelId,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { DEFAULT_VIDEO_MODEL_ID, isVideoModelId, type VideoModelOptions } from "../../src/types/videoModels";
@@ -226,6 +229,18 @@ export async function resolveReferenceInputs(
   });
 }
 
+/**
+ * 官方不支持 `quality` 的模型（gemini / flux / seedream / qwen）不得携带该字段：
+ * 旧草稿里残留的 quality 会原样进请求体，被上游判成不支持的参数。
+ */
+function withoutUnsupportedQuality(modelId: ImageModelId, options: ImageModelOptions): ImageModelOptions {
+  if (modelSupportsQuality(modelId)) return options;
+  if (!("quality" in options)) return options;
+  const rest = { ...options };
+  delete rest.quality;
+  return rest;
+}
+
 async function executeImageGeneratorStep(
   step: NodeExecution,
   inputImages: string[],
@@ -340,7 +355,15 @@ async function executeImageGeneratorStep(
     // 收不到 size、评估证据侧也会判定 native 参数漂移。
     modelOptions: preparedMask
       ? { ...(step.params.modelOptions ?? {}), size: preparedMask.size }
-      : step.params.modelOptions as ImageModelOptions | undefined,
+      // 旧草稿可能带着当前模型已不支持的尺寸（如 seedream 的 4K），运行前按官方区间收敛。
+      : withoutUnsupportedQuality(
+          modelId,
+          resolutionOptionsInBounds(
+            modelId,
+            step.params.modelOptions as ImageModelOptions | undefined,
+            typeof step.params.aspectRatio === "string" ? step.params.aspectRatio : "1:1",
+          ),
+        ),
     ...(providerMask ? { mask: providerMask } : {}),
   };
 

@@ -242,7 +242,11 @@ export function imageModelShortName(id: ImageModelId): string {
 
 // ---------- 分辨率档位（用户 2026-10-28 批注：面板只保留 画幅 / 分辨率 / 画质）----------
 
-export const RESOLUTION_TIERS = ["1K", "2K", "4K"] as const;
+/**
+ * 分辨率档位标签（用户 2026-10-28：每个模型只显示**它自己官方支持**的档位）。
+ * 1.5K 只出现在 flux（官方 resolution 值 1.5k），其余模型不显示。
+ */
+export const RESOLUTION_TIERS = ["1K", "1.5K", "2K", "4K"] as const;
 export type ResolutionTier = (typeof RESOLUTION_TIERS)[number];
 /** 所有工作流默认 2K（用户拍板）。 */
 export const DEFAULT_RESOLUTION_TIER: ResolutionTier = "2K";
@@ -256,7 +260,7 @@ export const DEFAULT_ASPECT_RATIO = "1:1";
 export const DEFAULT_QUALITY = "low";
 
 /** 档位 → 长边像素（大图统一 16 的倍数约束）。 */
-const TIER_LONG_EDGE: Record<ResolutionTier, number> = { "1K": 1024, "2K": 2048, "4K": 3840 };
+const TIER_LONG_EDGE: Record<ResolutionTier, number> = { "1K": 1024, "1.5K": 1536, "2K": 2048, "4K": 3840 };
 
 /**
  * 各模型的分辨率承载参数（实测 2026-10-28，真实付费调用确认）：
@@ -293,57 +297,6 @@ export function resolutionDimensions(tier: ResolutionTier, aspectRatio: string):
     : { width: shortEdge, height: long };
 }
 
-/**
- * 档位 + 画幅 → 该模型实际的 modelOptions 补丁。
- * 这个函数是「画幅/分辨率」两个控件唯一的写入口，任何模型都从这里取值，
- * 避免面板里按模型写 if/else。
- */
-export function resolutionModelOptions(
-  modelId: ImageModelId,
-  tier: ResolutionTier,
-  aspectRatio: string,
-): ImageModelOptions {
-  const key = imageResolutionParamKey(modelId);
-  if (key === "imageSize") {
-    // gemini：画幅走 imageConfig.aspectRatio，分辨率走 imageSize。
-    return { aspectRatio, imageSize: tier };
-  }
-  if (key === "resolution") {
-    // flux：resolution 只有 768sq/1k/1.5k/2k/4k，映射到我们的三档。
-    const mapped = tier === "1K" ? "1k" : tier === "2K" ? "2k" : "4k";
-    return { aspect_ratio: aspectRatio, resolution: mapped };
-  }
-  const { width, height } = resolutionDimensions(tier, aspectRatio);
-  // qwen 只认 `宽*高`；其余模型用 `宽x高`。
-  const isQwen = modelId === "qwen-image-3.0" || modelId === "qwen-image-3.0-pro";
-  return { size: isQwen ? `${width}*${height}` : `${width}x${height}` };
-}
-
-/** 从 modelOptions 反解当前档位（面板回显用）；无法判定时返回默认档。 */
-export function resolutionTierOf(modelId: ImageModelId, options: ImageModelOptions | undefined): ResolutionTier {
-  const raw = options ?? {};
-  const key = imageResolutionParamKey(modelId);
-  const value = raw[key];
-  if (typeof value !== "string") return DEFAULT_RESOLUTION_TIER;
-  if (key === "imageSize") {
-    return (RESOLUTION_TIERS as readonly string[]).includes(value) ? value as ResolutionTier : DEFAULT_RESOLUTION_TIER;
-  }
-  if (key === "resolution") {
-    const lower = value.toLowerCase();
-    if (lower === "1k" || lower === "768sq") return "1K";
-    if (lower === "2k" || lower === "1.5k") return "2K";
-    if (lower === "4k") return "4K";
-    return DEFAULT_RESOLUTION_TIER;
-  }
-  // size 形态：取长边判定档位
-  const nums = value.split(/[x*]/).map((part) => Number(part.trim()));
-  const longEdge = Math.max(...nums.filter((n) => Number.isFinite(n)));
-  if (!Number.isFinite(longEdge)) return DEFAULT_RESOLUTION_TIER;
-  if (longEdge >= 3000) return "4K";
-  if (longEdge >= 1600) return "2K";
-  return "1K";
-}
-
 const VIP_SIZE_BY_RATIO: Record<string, string> = {
   "1:1": "2048x2048",
   "2:3": "1360x2048",
@@ -378,6 +331,252 @@ export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: s
   "16:9": [{ tier: "1K", size: "1280x720" }, { tier: "2K", size: "2048x1152" }, { tier: "4K", size: "3840x2160" }],
   "21:9": [{ tier: "1K", size: "1280x544" }, { tier: "2K", size: "2048x864" }, { tier: "4K", size: "3840x1632" }],
 };
+
+// ---------- 每个模型自己的分辨率能力表（用户 2026-10-28：不许所有模型公用一套） ----------
+
+/**
+ * 取值来源（2026-10-28 逐家核实，含真实付费调用）：
+ *
+ * | 模型 | 承载参数 | 官方取值 | 依据 |
+ * |---|---|---|---|
+ * | gemini 系 | imageConfig.imageSize | 1K / 2K / 4K 关键字 | 契约 imageSizes + 谷歌官方 |
+ * | gpt-image-2.5 系 | size | 30 档像素表（3 档 × 10 画幅） | docs/ai/apiyi/models/gpt-image-2-vip.md |
+ * | flux-3-image | resolution | 768sq / 1k / 1.5k / 2k / 4k | tuzi-flux-generate.md（实测 1k+16:9 → 2736x1536） |
+ * | seedream 5.0 pro/lite | size | 像素面积 [921600, 4624220] | 实测 512x512 与 3072x3072 均 400 |
+ * | qwen-image-3.0(-pro) | size（`宽*高`） | 像素面积 [262144, 4194304] | 实测 4096*4096 500，512*512 与 2048*1152 通过 |
+ *
+ * 注意 seedream / qwen **没有 4K 档**（面积上限卡死），所以面板只给它们 1K / 2K。
+ */
+interface ModelResolutionProfile {
+  /** 该模型面板上出现的档位（顺序即展示顺序）。 */
+  tiers: readonly ResolutionTier[];
+  /** 官方关键字（keyword 参数模型）。 */
+  keyword?: Partial<Record<ResolutionTier, string>>;
+  /** 官方离散像素表（画幅 → 各档 size）。 */
+  sizeTable?: Readonly<Record<string, readonly { tier: string; size: string }[]>>;
+  /** 连续尺寸模型的每档长边像素。 */
+  longEdge?: Partial<Record<ResolutionTier, number>>;
+  /** 连续尺寸模型的像素面积上下限；超界时等比缩放。 */
+  area?: { min: number; max: number };
+  /** qwen 只认 `宽*高`，其余用 `宽x高`。 */
+  sizeSeparator?: "*" | "x";
+}
+
+const GEMINI_PROFILE: ModelResolutionProfile = {
+  tiers: ["1K", "2K", "4K"],
+  keyword: { "1K": "1K", "2K": "2K", "4K": "4K" },
+};
+const GPT_IMAGE_PROFILE: ModelResolutionProfile = {
+  tiers: ["1K", "2K", "4K"],
+  sizeTable: VIP_SIZE_TIERS_BY_RATIO,
+};
+const FLUX_PROFILE: ModelResolutionProfile = {
+  tiers: ["1K", "1.5K", "2K", "4K"],
+  keyword: { "1K": "1k", "1.5K": "1.5k", "2K": "2k", "4K": "4k" },
+};
+const SEEDREAM_PROFILE: ModelResolutionProfile = {
+  tiers: ["1K", "2K"],
+  longEdge: { "1K": 1024, "2K": 2048 },
+  area: { min: 921_600, max: 4_624_220 },
+};
+const QWEN_PROFILE: ModelResolutionProfile = {
+  tiers: ["1K", "2K"],
+  longEdge: { "1K": 1024, "2K": 2048 },
+  area: { min: 262_144, max: 4_194_304 },
+  sizeSeparator: "*",
+};
+
+const MODEL_RESOLUTION_PROFILES: Readonly<Record<ImageModelId, ModelResolutionProfile>> = {
+  "gemini-nano-banana-2.1": GEMINI_PROFILE,
+  "gemini-3.1-flash-image": GEMINI_PROFILE,
+  "gpt-image-2.5-sunburst": GPT_IMAGE_PROFILE,
+  "gpt-image-2.5-flare": GPT_IMAGE_PROFILE,
+  "flux-3-image": FLUX_PROFILE,
+  "doubao-seedream-5-0-pro-260628": SEEDREAM_PROFILE,
+  "doubao-seedream-5-0-lite-260128": SEEDREAM_PROFILE,
+  "qwen-image-3.0-pro": QWEN_PROFILE,
+  "qwen-image-3.0": QWEN_PROFILE,
+};
+
+/**
+ * 该模型是否官方支持 `quality` 参数（用户 2026-10-28：只保留官方支持的参数）。
+ * 只有 gpt-image 2.5 两兄弟在契约里声明了 qualityValues；gemini / flux /
+ * seedream / qwen 都没有这个参数——发过去只会被上游判为不支持的字段。
+ */
+export function modelSupportsQuality(modelId: ImageModelId): boolean {
+  return getImageModelContract(modelId).qualityValues !== undefined;
+}
+
+/** 该模型官方支持的分辨率档位（面板用；不同模型不同，不再全站一套）。 */
+export function modelResolutionTiers(modelId: ImageModelId): readonly ResolutionTier[] {
+  return MODEL_RESOLUTION_PROFILES[modelId]?.tiers ?? RESOLUTION_TIERS;
+}
+
+/** 该模型的默认档位：优先 2K，模型不支持时取它支持的最高档。 */
+export function defaultResolutionTierFor(modelId: ImageModelId): ResolutionTier {
+  const tiers = modelResolutionTiers(modelId);
+  if (tiers.includes(DEFAULT_RESOLUTION_TIER)) return DEFAULT_RESOLUTION_TIER;
+  return tiers[tiers.length - 1] ?? DEFAULT_RESOLUTION_TIER;
+}
+
+/**
+ * 面积受限模型（seedream / qwen）的尺寸推导。
+ *
+ * 语义：档位 = **长边**（1K≈1024、2K≈2048），短边按画幅算——这样"2K 16:9"就是
+ * 2048x1152，符合用户对档位的直觉；只有当结果超出官方面积区间时才**整体等比**缩放
+ * （缩放必须同时作用于宽高，否则画幅会被拉歪——曾把 3:4 算成 912x1024）。
+ */
+function sizeForAreaTier(
+  longEdge: number,
+  aspectRatio: string,
+  area: { min: number; max: number },
+): { width: number; height: number } {
+  const round16 = (value: number) => Math.max(16, Math.round(value / 16) * 16);
+  const ratio = parseRatio(aspectRatio) ?? { w: 1, h: 1 };
+  const landscape = ratio.w >= ratio.h;
+  const major = Math.max(ratio.w, ratio.h);
+  const minor = Math.min(ratio.w, ratio.h);
+  let width = landscape ? longEdge : round16((longEdge * minor) / major);
+  let height = landscape ? round16((longEdge * minor) / major) : longEdge;
+  // 一次算准缩放系数再取整：逐步 ×1.01 会被 16 取整吃掉（576→576 死循环），
+  // 曾导致 9:16 的 1K 掉到下限以下。
+  const pixels = width * height;
+  if (pixels < area.min) {
+    const factor = Math.sqrt(area.min / pixels);
+    width = Math.ceil((width * factor) / 16) * 16;
+    height = Math.ceil((height * factor) / 16) * 16;
+  } else if (pixels > area.max) {
+    const factor = Math.sqrt(area.max / pixels);
+    width = Math.floor((width * factor) / 16) * 16;
+    height = Math.floor((height * factor) / 16) * 16;
+  }
+  // 兜底：极端取整后仍越界时按同方向微调，绝不发非法值。
+  for (let guard = 0; guard < 64 && width * height > area.max; guard += 1) {
+    width = Math.max(16, width - 16);
+    height = Math.max(16, height - 16);
+  }
+  for (let guard = 0; guard < 64 && width * height < area.min; guard += 1) {
+    width += 16;
+    height += 16;
+  }
+  return { width, height };
+}
+
+/**
+ * 档位 + 画幅 → 该模型实际的 modelOptions 补丁。
+ * 「画幅」和「分辨率」两个控件都只从这里取值——每家模型走自己的官方形态，
+ * 面板里不再有按模型分叉的 if/else。
+ */
+export function resolutionModelOptions(
+  modelId: ImageModelId,
+  tier: ResolutionTier,
+  aspectRatio: string,
+): ImageModelOptions {
+  const profile = MODEL_RESOLUTION_PROFILES[modelId];
+  const key = imageResolutionParamKey(modelId);
+  if (key === "imageSize") {
+    return { aspectRatio, imageSize: profile?.keyword?.[tier] ?? tier };
+  }
+  if (key === "resolution") {
+    return { aspect_ratio: aspectRatio, resolution: profile?.keyword?.[tier] ?? tier.toLowerCase() };
+  }
+  const fromTable = profile?.sizeTable?.[aspectRatio]?.find((entry) => entry.tier === tier)?.size;
+  if (fromTable) return { size: fromTable };
+  const longEdge = profile?.longEdge?.[tier] ?? TIER_LONG_EDGE[tier];
+  const area = profile?.area;
+  let final: { width: number; height: number };
+  if (area) {
+    final = sizeForAreaTier(longEdge, aspectRatio, area);
+  } else {
+    const ratio = parseRatio(aspectRatio) ?? { w: 1, h: 1 };
+    const major = Math.max(ratio.w, ratio.h);
+    const minor = Math.min(ratio.w, ratio.h);
+    const shortEdge = Math.max(16, Math.round((longEdge * minor) / major / 16) * 16);
+    final = ratio.w >= ratio.h
+      ? { width: longEdge, height: shortEdge }
+      : { width: shortEdge, height: longEdge };
+  }
+  const separator = profile?.sizeSeparator ?? "x";
+  return { size: `${final.width}${separator}${final.height}` };
+}
+
+/**
+ * 运行时兜底：旧草稿可能带着模型已不支持的尺寸（例如此前给 seedream 存了 4K 的
+ * 3840x3840）。超出官方区间就按「反解档位 × 画幅」重算，绝不把非法值发上去。
+ * 合法自定义尺寸（在区间内、不属于我们档表）原样保留。
+ */
+export function resolutionOptionsInBounds(
+  modelId: ImageModelId,
+  options: ImageModelOptions | undefined,
+  aspectRatio: string,
+): ImageModelOptions {
+  const profile = MODEL_RESOLUTION_PROFILES[modelId];
+  const current = { ...(options ?? {}) };
+  if (!profile || imageResolutionParamKey(modelId) !== "size") return current;
+  const value = current.size;
+  if (typeof value !== "string") return current;
+  const nums = value.split(/[x*]/).map((part) => Number(part.trim())).filter((n) => Number.isFinite(n));
+  if (nums.length < 2) {
+    const tier = resolutionTierOf(modelId, current);
+    return { ...current, ...resolutionModelOptions(modelId, tier, aspectRatio) };
+  }
+  const [width, height] = nums;
+  const pixels = width * height;
+  const aspect = Math.max(width, height) / Math.min(width, height);
+  const inTable = profile.sizeTable?.[aspectRatio]?.some((entry) => entry.size === value) ?? false;
+  const gptBounds = profile.sizeTable !== undefined;
+  const ok = gptBounds
+    // gpt-image：契约 dimensions（16 倍数、边长 ≤3840、总像素 ≤8294400、比 ≤3）
+    ? width % 16 === 0 && height % 16 === 0
+      && Math.max(width, height) <= 3840 && pixels <= 8_294_400 && aspect <= 3
+    : profile.area !== undefined
+      ? pixels >= profile.area.min && pixels <= profile.area.max
+      : true;
+  if (inTable || ok) return current;
+  const tier = resolutionTierOf(modelId, current);
+  return { ...current, ...resolutionModelOptions(modelId, tier, aspectRatio) };
+}
+
+/** 从 modelOptions 反解当前档位（面板回显用）；无法判定时返回该模型的默认档。 */
+export function resolutionTierOf(modelId: ImageModelId, options: ImageModelOptions | undefined): ResolutionTier {
+  const profile = MODEL_RESOLUTION_PROFILES[modelId];
+  const fallback = defaultResolutionTierFor(modelId);
+  const raw = options ?? {};
+  const key = imageResolutionParamKey(modelId);
+  const value = raw[key];
+  if (typeof value !== "string") return fallback;
+  const tiers = modelResolutionTiers(modelId);
+  if (key === "imageSize") {
+    const hit = tiers.find((tier) => (profile?.keyword?.[tier] ?? tier) === value);
+    return hit ?? fallback;
+  }
+  if (key === "resolution") {
+    const lower = value.toLowerCase();
+    const hit = tiers.find((tier) => (profile?.keyword?.[tier] ?? tier.toLowerCase()).toLowerCase() === lower);
+    return hit ?? fallback;
+  }
+  // size 形态：先按官方表精确匹配，再按长边归入最近的档
+  for (const [ratio, entries] of Object.entries(profile?.sizeTable ?? {})) {
+    void ratio;
+    const hit = entries.find((entry) => entry.size === value);
+    if (hit) {
+      const tier = tiers.find((candidate) => candidate === hit.tier);
+      if (tier) return tier;
+    }
+  }
+  const nums = value.split(/[x*]/).map((part) => Number(part.trim())).filter((n) => Number.isFinite(n));
+  if (nums.length < 2) return fallback;
+  const pixels = nums[0] * nums[1];
+  const longEdge = Math.max(...nums);
+  let best: ResolutionTier = fallback;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (const tier of tiers) {
+    const target = profile?.longEdge?.[tier] ?? TIER_LONG_EDGE[tier];
+    const gap = Math.abs(target - longEdge);
+    if (gap < bestGap) { best = tier; bestGap = gap; }
+  }
+  return best;
+}
 
 /**
  * 历史遗留的 VIP 三档尺寸表（1K/2K/4K）。

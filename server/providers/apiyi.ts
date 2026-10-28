@@ -11,6 +11,7 @@ import {
   defaultImageModelOptions,
   getImageModelContract,
   modelMaxReferenceImages,
+  modelSupportsQuality,
   type ImageModelId,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
@@ -49,10 +50,14 @@ function requestOptions(modelId: ImageModelId, req: ImageGenRequest): ImageModel
   // 不再因 modelOptions 拒绝请求。警告接线（响应 meta 透出）归 P2-b。
   // 契约默认（如 GPT Image 2.5 的 quality=high）必须在显式只传部分参数时也生效：
   // 用户显式值覆盖契约默认，而不是「显式传了对象就丢掉所有默认」。
-  return {
+  const merged = {
     ...defaultImageModelOptions(modelId, req.aspectRatio),
     ...(req.modelOptions ?? {}),
   } as ImageModelOptions;
+  // 官方没有 quality 参数的模型（gemini / flux / seedream / qwen）不得携带该字段：
+  // 旧草稿里的 quality 会在请求体里出现，被上游当成不支持的参数。
+  if (!modelSupportsQuality(modelId)) delete merged.quality;
+  return merged;
 }
 
 function referenceData(req: ImageGenRequest, modelId: ImageModelId): string[] {

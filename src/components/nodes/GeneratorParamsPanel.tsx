@@ -26,6 +26,9 @@ import {
   IMAGE_MODEL_IDS,
   IMAGE_MODEL_VENDOR_GROUPS,
   RESOLUTION_TIERS,
+  modelResolutionTiers,
+  modelSupportsQuality,
+  defaultResolutionTierFor,
   imageModelReferenceWarning,
   VIP_SIZE_DEFAULT_TIER_INDEX,
   defaultImageModelOptions,
@@ -449,7 +452,25 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
 
   const patchModel = (mid: string) => {
     if (mediaKind === "image") {
-      updateNodeData(nodeId, { modelId: mid, modelOptions: defaultImageModelOptions(mid as any, data.aspectRatio), error: undefined });
+      // 切模型必须按新模型的能力收敛参数（用户 2026-10-28「不要所有模型公用一套」）：
+      // 新模型不支持的档位（如 seedream 的 4K）回落到它自己的默认档；
+      // 新模型不支持的画幅回落到 1:1，然后按「档位 × 画幅」重算尺寸。
+      const modelTiers = modelResolutionTiers(mid as ImageModelId);
+      const prevTier = resolutionTierOf(mid as ImageModelId, options);
+      const nextTier = modelTiers.includes(prevTier) ? prevTier : defaultResolutionTierFor(mid as ImageModelId);
+      const allowedRatios = imageAspectRatioOptions(mid as ImageModelId);
+      const prevRatio = data.aspectRatio ?? DEFAULT_ASPECT_RATIO;
+      const nextRatio = allowedRatios.includes(prevRatio) ? prevRatio : DEFAULT_ASPECT_RATIO;
+      updateNodeData(nodeId, {
+        modelId: mid,
+        aspectRatio: nextRatio,
+        modelOptions: {
+          ...defaultImageModelOptions(mid as any, nextRatio),
+          ...resolutionModelOptions(mid as ImageModelId, nextTier, nextRatio),
+          ...(typeof options.quality === "string" ? { quality: options.quality } : {}),
+        },
+        error: undefined,
+      });
     } else {
       updateNodeData(nodeId, { modelId: mid, modelOptions: defaultVideoModelOptions(mid as VideoModelId), error: undefined });
     }
@@ -551,7 +572,11 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               </Select>
             </label>
             <OptionSelect label="分辨率" value={currentTier} disabled={disabled}
-              options={RESOLUTION_TIERS.map((t) => ({ value: t, label: t }))}
+              // 每个模型只列它自己官方支持的档位（用户 2026-10-28）：
+              // gemini/gpt-image = 1K/2K/4K；flux = 1K/1.5K/2K/4K；seedream/qwen = 1K/2K（面积上限卡死 4K）。
+              options={(mediaKind === "image" && isImageModelId(effModel)
+                ? modelResolutionTiers(effModel)
+                : RESOLUTION_TIERS).map((t) => ({ value: t, label: t }))}
               onChange={(t) => updateNodeData(nodeId, {
                 modelOptions: {
                   ...(data.modelOptions ?? {}),
@@ -560,11 +585,15 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               })} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <OptionSelect label="画质" value={currentQuality} disabled={disabled}
-              options={QUALITY_OPTIONS.map((q) => ({ value: q, label: q }))}
-              onChange={(q) => updateNodeData(nodeId, {
-                modelOptions: { ...(data.modelOptions ?? {}), quality: q },
-              })} />
+            {/* 画质只有官方声明 qualityValues 的模型才有（gpt-image 2.5 两兄弟）；
+                gemini / flux / seedream / qwen 没有这个参数，给了就是无效控件。 */}
+            {mediaKind === "image" && isImageModelId(effModel) && !modelSupportsQuality(effModel) ? null : (
+              <OptionSelect label="画质" value={currentQuality} disabled={disabled}
+                options={QUALITY_OPTIONS.map((q) => ({ value: q, label: q }))}
+                onChange={(q) => updateNodeData(nodeId, {
+                  modelOptions: { ...(data.modelOptions ?? {}), quality: q },
+                })} />
+            )}
             {/* 用户 2026-10-28：数量（原「批次」）回归面板，1–8 全整数可选。 */}
             <OptionSelect label="数量" value={String((data as ImageGeneratorNodeData).batchSize ?? 1)}
               options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}

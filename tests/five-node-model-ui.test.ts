@@ -223,6 +223,32 @@ test("文本节点：只读项目中「帮我补全」按钮禁用（源码接�
   );
 });
 
+test("生图节点：官方支持 quality 的模型（gpt-image 2.5）才显示画质控件", () => {
+  const node = {
+    id: "image-generator-quality",
+    type: "image-generator",
+    position: { x: 0, y: 0 },
+    data: {
+      kind: "image-generator",
+      label: "生图",
+      status: "idle",
+      modelId: "gpt-image-2.5-flare",
+      modelOptions: { size: "2048x2048", quality: "low" },
+      aspectRatio: "1:1",
+      batchSize: 1,
+    },
+  } as unknown as FlowNode;
+  useFlowStore.getState().openFlowTab({
+    projectId: "v8-generator-quality-project",
+    projectName: "画质控件",
+    nodes: [node],
+    edges: [],
+  });
+  const html = render(node);
+  assert.match(html, /aria-label="画质"/, "gpt-image 必须显示画质控件");
+  assert.match(html, /aria-label="分辨率"/);
+});
+
 test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运行闸门按兼容判定", () => {
   const node = {
     id: "image-generator-1",
@@ -252,7 +278,9 @@ test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运�
   // 用户 2026-10-28：图片生成节点只保留 画幅 / 分辨率 / 画质 三个控件，
   // 不再有「批次」与契约驱动的「模型参数」区。
   assert.match(html, /aria-label="分辨率"/);
-  assert.match(html, /aria-label="画质"/);
+  // 2026-10-28 二次收敛：画质只给官方支持 quality 的模型（gpt-image 2.5）。
+  // 本夹具是 gemini，官方没有该参数 → 控件必须不出现。
+  assert.doesNotMatch(html, /aria-label="画质"/, "gemini 没有 quality 参数，不得渲染画质控件");
   assert.doesNotMatch(html, /aria-label="批次"/);
   assert.doesNotMatch(html, /aria-label="模型参数"/);
   // 端口行 + 来源胶囊取代底部统计行：两行端口（提示词/参考图）未接线时值列均为「未连接」

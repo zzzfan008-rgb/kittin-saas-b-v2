@@ -75,11 +75,11 @@ await ok("gpt-image：切画幅真的改 size（原来完全无效）", () => {
   assert.equal(square.size, "2048x2048", "切回 1:1 必须是 2048x2048");
 });
 
-await ok("gpt-image：档位跟着画幅走，不被画幅切回默认档", () => {
+await ok("gpt-image：档位跟着画幅走，且取官方表里的值", () => {
   const oneK = { ...resolutionModelOptions("gpt-image-2.5-flare", "1K", "1:1") };
-  assert.equal(oneK.size, "1024x1024");
+  assert.equal(oneK.size, "1280x1280", "官方 1K 1:1 = 1280x1280");
   const wide = imageModelOptionsForAspectRatio("gpt-image-2.5-flare", oneK, "16:9");
-  assert.equal(wide.size, "1024x576", "1K 档切 16:9 仍是 1K 长边");
+  assert.equal(wide.size, "1280x720", "官方 1K 16:9 = 1280x720");
 });
 
 await ok("qwen：画幅换算是 宽*高 格式（上游只认星号）", () => {

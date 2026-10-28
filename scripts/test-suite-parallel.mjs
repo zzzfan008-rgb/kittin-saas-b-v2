@@ -142,6 +142,8 @@ const TEST_FILES = [
   "tests/reference-roles.test.ts",
   // 2026-10-28：参考图 alpha 压平 + 画幅参数真实生效（gpt-image 原失效）。
   "tests/reference-flatten-and-ratio.test.ts",
+  // 2026-10-28：逐模型分辨率契约（每家官方档位/尺寸，禁止全站共用一套）。
+  "tests/model-resolution-matrix.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
   // 2026-10-27 数据隔离契约：默认只看自己，跨用户需显式 all=true（纯源码断言）。
