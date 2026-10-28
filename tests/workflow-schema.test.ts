@@ -581,7 +581,8 @@ function main() {
     const g = result.nodes.find((n) => n.id === "g1")!;
     const text = (t.data as { text: string }).text;
     // 填入 = 冻结表 fashion-lookbook:edit 文本（逐字，快照测试锁定）
-    assert.ok(text.startsWith("GPT Image 2 VIP 多图写实穿搭编辑。"), `填入文本异常: ${text.slice(0, 40)}`);
+    // 2026-10-28 提示词体检：删模型名与 VIP 残留，前缀改为模板自身语义。
+    assert.ok(text.startsWith("写实穿搭编辑。严格按参考图序号使用输入图片"), `填入文本异常: ${text.slice(0, 40)}`);
     assert.equal((g.data as { operationMode?: string }).operationMode, "edit"); // mode 物化
     assert.ok(!("promptVariantId" in (g.data as Record<string, unknown>))); // 绑定剥离
   });
@@ -674,7 +675,7 @@ function main() {
     const t = result.nodes.find((n) => n.id === "t1")!;
     const text = (t.data as { text?: string }).text ?? "";
     assert.ok(text.trim().length > 0, "空 text 上游必须填入预设模板文本");
-    assert.match(text, /GPT Image 2 VIP/, "填入的是 fashion-lookbook:edit 预设模板正文");
+    assert.match(text, /写实穿搭编辑/, "填入的是 fashion-lookbook:edit 预设模板正文");
     // 迁移绝不改写节点自身 modelId（64 裁决：绑定来自变体，模型归节点）。
     assert.equal(data.modelId, NON_DEFAULT_MODEL, "迁移不得改写非默认模型的 modelId");
     // 六绑定字段全部剥离。
@@ -749,7 +750,7 @@ function main() {
     assert.equal(data.operationMode, "edit");
     assert.equal(data.modelId, IMAGE_MODEL);
     const t = result.nodes.find((n) => n.id === "tryon-requirement")!;
-    assert.ok((t.data as { text: string }).text.startsWith("GPT Image 2 VIP 多图写实穿搭编辑。"));
+    assert.ok((t.data as { text: string }).text.startsWith("写实穿搭编辑。严格按参考图序号使用输入图片"));
   });
 
   console.log(`\n通过 ${passed} 项`);

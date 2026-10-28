@@ -207,20 +207,22 @@ for (const fileName of builtinFiles) {
       );
       console.log(`  ✓ ${fileName} → ${matchedKeys[0]}（mode=${operationMode}）`);
     } else {
-      // video 模板：文本必须逐字命中 video-animate:edit（Seedance 协议文本）。
-      const videoEntry = PRESET_TEMPLATE_TEXTS["video-animate:edit"];
-      assert.ok(videoEntry, "冻结表缺少 video-animate:edit 条目");
-      assert.equal(
-        nodeText,
-        videoEntry.text,
-        `${fileName}: video 模板 text 与 video-animate:edit 冻结文本漂移`,
+      // video 模板：2026-10-28 起走秀/小红书各自独立族，文本必须逐字命中对应冻结条目。
+      // 旧口径是两个视频模板共用 video-animate:edit，导致正文一字不差、任务语义无法区分。
+      const videoFamilies = ["video-runway", "video-xhs", "video-animate"];
+      const matchedVideoKey = videoFamilies
+        .map((family) => `${family}:edit`)
+        .find((key) => PRESET_TEMPLATE_TEXTS[key]?.text === nodeText);
+      assert.ok(
+        matchedVideoKey,
+        `${fileName}: video 模板 text 未命中任何视频冻结条目（${videoFamilies.join("/")}）`,
       );
       assert.equal(
         videoGenerators[0]?.data?.operationMode,
         "generate",
         `${fileName}: video 生成节点 operationMode 必须是 generate（视频生成轴）`,
       );
-      console.log(`  ✓ ${fileName} → video-animate:edit（video 生成轴 operationMode=generate）`);
+      console.log(`  ✓ ${fileName} → ${matchedVideoKey}（video 生成轴 operationMode=generate）`);
     }
   }
 }

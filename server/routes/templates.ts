@@ -28,8 +28,12 @@ import {
   type WorkflowTemplate,
 } from "../../src/types/workflow";
 import {
+  DEFAULT_ASPECT_RATIO,
   DEFAULT_GENERATION_MODEL_ID,
+  DEFAULT_QUALITY,
+  DEFAULT_RESOLUTION_TIER,
   defaultImageModelOptions,
+  resolutionModelOptions,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import {
@@ -92,10 +96,16 @@ function imageGeneratorNode(
   options: ImageGeneratorOptions = {},
 ): PersistedWorkflowNode {
   // v9（64 Phase 1 C7）：variant 绑定删除；显式 modelId + operationMode + 契约默认参数
-  //（batchSize 1，拍板③）；modelOptions 走契约推荐默认（裁决 C）；aspectRatio 走模板定义。
-  const aspectRatio = options.aspectRatio ?? "1:1";
+  //（batchSize 1，拍板③；2026-10-28 起数量改由生成面板「数量」控件输入，模板全部留 1）；aspectRatio 走模板定义。
+  // 用户 2026-10-28：所有工作流默认 1:1 画幅 + 2K 分辨率 + GPT2.5快速（gpt-image-2.5-flare）；
+  // modelOptions 由「画幅 × 档位」统一推导，不再直接取契约推荐值（避免各模型参数名不一致）。
+  const aspectRatio = options.aspectRatio ?? DEFAULT_ASPECT_RATIO;
   const batchSize = options.batchSize ?? 1;
-  const modelOptions: ImageModelOptions = { ...defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio) };
+  const modelOptions: ImageModelOptions = {
+    ...defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, aspectRatio),
+    ...resolutionModelOptions(DEFAULT_GENERATION_MODEL_ID, DEFAULT_RESOLUTION_TIER, aspectRatio),
+    quality: DEFAULT_QUALITY,
+  };
   return {
     id,
     type: "image-generator",
@@ -160,7 +170,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
           textNode("tryon-requirement", 0, -170, "试穿要求", requirePresetText("model-tryon", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("model", 0, 210, "数字模特"),
-          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit", { familyId: "model-tryon", aspectRatio: "3:4" }),
+          imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit", { familyId: "model-tryon" }),
         ],
         edges: [
           edge("e-tryon-prompt", "tryon-requirement", "tryon-gen", "prompt"),
@@ -221,7 +231,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
         nodes: [
           textNode("lookbook-requirement", 0, -170, "风格/场景清单", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
-          imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", "edit", { batchSize: 2 }),
+          imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", "edit"),
         ],
         edges: [
           edge("e-lookbook-prompt", "lookbook-requirement", "lookbook-gen", "prompt"),
@@ -282,7 +292,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
         nodes: [
           textNode("mutate-requirement", 0, -170, "裂变方向/数量", requirePresetText("print-mutate", "edit")),
           imageNode("print", 0, 20, "印花图"),
-          imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", "edit", { batchSize: 2 }),
+          imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", "edit"),
         ],
         edges: [
           edge("e-mutate-prompt", "mutate-requirement", "mutate-gen", "prompt"),
@@ -421,7 +431,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", requirePresetText("video-animate", "edit")),
+          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", requirePresetText("video-runway", "edit")),
           imageNode("source", 0, 20, "服装或模特图"),
           videoGeneratorNode("runway-gen", 380, -75, "走秀视频"),
         ],
@@ -441,7 +451,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("xhs-requirement", 0, -170, "小红书脚本", requirePresetText("video-animate", "edit")),
+          textNode("xhs-requirement", 0, -170, "小红书脚本", requirePresetText("video-xhs", "edit")),
           imageNode("main-image", 0, 20, "主图"),
           videoGeneratorNode("xhs-gen", 380, -75, "小红书视频"),
         ],

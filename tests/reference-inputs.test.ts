@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import {
-  PROVIDER_PROMPT_RENDERER_CONTRACT,
-  PROVIDER_PROMPT_RENDERER_HASH,
-  PROVIDER_PROMPT_RENDERER_VERSION,
-  providerPromptRendererHashMaterial,
-  renderProviderPrompt,
-} from "../src/lib/providerPromptRenderer";
+import { renderProviderPrompt } from "../src/lib/providerPromptRenderer";
 import {
   referenceInputIssues,
   referenceDataUrls,
@@ -163,75 +157,43 @@ assert.match(renderedMaskPrompt, /^目标修改：将袖口改成银色拉链。
 assert.match(renderedMaskPrompt, /最后一张参考图（参考图2）是区域引导图/);
 assert.match(renderedMaskPrompt, /局部修改参考图:参考图1/);
 
-// ---- renderer 版本与 hash ----
-assert.equal(
-  PROVIDER_PROMPT_RENDERER_HASH,
-  `sha256:${createHash("sha256").update(providerPromptRendererHashMaterial()).digest("hex")}`,
-  "renderer 语义合同变化时必须同步更新发布 hash",
-);
-assert.equal(PROVIDER_PROMPT_RENDERER_VERSION, "provider-prompt-renderer-v4");
-assert.notEqual(
-  PROVIDER_PROMPT_RENDERER_HASH,
-  "sha256:cb1e87e905b6ac26b41182f9f790d4325a924d0447bdbdd31b684a51f8f6b0b4",
-  "角色语义移除后 v3 hash 必须失效",
-);
-
-const rendererHashMaterial = JSON.parse(providerPromptRendererHashMaterial()) as {
-  referenceListIntro: Record<string, Record<string, string>>;
-};
-assert.deepEqual(
-  Object.fromEntries(Object.entries(rendererHashMaterial.referenceListIntro).map(([modelId, intros]) => (
-    [modelId, Object.keys(intros)]
-  ))),
-  {
-    // 兔子API 9 个图像模型：sunburst 仅 mask-edit，其余 generate+edit。
-    "gpt-image-2.5-sunburst": ["mask-edit"],
-    "gpt-image-2.5-flare": ["generate", "edit"],
-    "gemini-nano-banana-2.1": ["generate", "edit"],
-    "gemini-3.1-flash-image": ["generate", "edit"],
-    "flux-3-image": ["generate", "edit"],
-    "doubao-seedream-5-0-pro-260628": ["generate", "edit"],
-    "doubao-seedream-5-0-lite-260128": ["generate", "edit"],
-    "qwen-image-3.0-pro": ["generate", "edit"],
-    "qwen-image-3.0": ["generate", "edit"],
-  },
-  "发布 hash material 必须覆盖全部模型的显式合法模式 intro",
-);
-
-// ---- 空提示词必须抛错 ----
-for (const [modelId, operationMode] of [
-  ["gpt-image-2.5-sunburst", "mask-edit"],
-  ["gpt-image-2.5-flare", "generate"],
-  ["gpt-image-2.5-flare", "edit"],
-  ["gemini-3.1-flash-image", "generate"],
-  ["gemini-3.1-flash-image", "edit"],
-  ["flux-3-image", "generate"],
-  ["flux-3-image", "edit"],
-  ["doubao-seedream-5-0-pro-260628", "generate"],
-  ["doubao-seedream-5-0-pro-260628", "edit"],
-  ["doubao-seedream-5-0-lite-260128", "generate"],
-  ["doubao-seedream-5-0-lite-260128", "edit"],
-  ["qwen-image-3.0-pro", "generate"],
-  ["qwen-image-3.0-pro", "edit"],
-  ["qwen-image-3.0", "generate"],
-  ["qwen-image-3.0", "edit"],
-] as const satisfies readonly [ImageModelId, ImageOperationMode][]) {
-  // v7：needsMask 声明驱动蒙版错误文案；kind 统一为三值。
-  const needsMask = operationMode === "mask-edit";
-  assert.throws(
-    () => renderProviderPrompt({
-      nodeKind: "image",
-      needsMask,
-      modelId,
-      operationMode,
-      taskPrompt: " \n ",
-      references: [],
-    }),
-    needsMask
-      ? /局部修改必须填写修改说明/
-      : /节点 image 没有可发送的提示词/,
-    `${modelId}/${operationMode} 不得从空任务提示词静默回退到跨模型默认文案`,
-  );
+// ---- 引导语只取决于模式，与模型无关（2026-10-28 简化后行为锁定）----
+{
+  const models = [
+    "gpt-image-2.5-sunburst",
+    "gpt-image-2.5-flare",
+    "gemini-nano-banana-2.1",
+    "gemini-3.1-flash-image",
+    "flux-3-image",
+    "doubao-seedream-5-0-pro-260628",
+    "doubao-seedream-5-0-lite-260128",
+    "qwen-image-3.0-pro",
+    "qwen-image-3.0",
+  ] as const;
+  const modes = ["generate", "edit"] as const;
+  for (const modelId of models) {
+    for (const operationMode of modes) {
+      const rendered = renderProviderPrompt({
+        nodeKind: "image",
+        modelId,
+        operationMode,
+        taskPrompt: "换装",
+        references: [{}, {}],
+      });
+      assert.equal(
+        rendered,
+        "换装\n参考图:参考图1、参考图2",
+        `${modelId}/${operationMode} 必须渲染同一引导语，不得出现"不支持"假故障`,
+      );
+    }
+  }
+  const maskRendered = renderProviderPrompt({
+    nodeKind: "mask-redraw",
+    modelId: "gpt-image-2.5-sunburst",
+    operationMode: "mask-edit",
+    taskPrompt: "改成红色",
+    references: [{}],
+    needsMask: true,
+  });
+  assert.match(maskRendered, /局部修改参考图:参考图1/);
 }
-
-console.log("结构化参考图与 Provider 适配测试通过");

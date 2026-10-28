@@ -153,7 +153,8 @@ async function main() {
     const req = calls[0].request;
     assert.equal(req.operationMode, "mask-edit");
     // 系统文本（冻结表 image.mask-edit）作为 TARGET 进入蒙版模板，用户文本随 TARGET 一体送达
-    assert.ok(req.prompt.includes("GPT Image 2 服装局部修改。"), `缺系统文本: ${req.prompt.slice(0, 60)}`);
+    // 2026-10-28 提示词体检：蒙版协议文本去掉了「GPT Image 2」模型名残留。
+    assert.ok(req.prompt.includes("服装局部修改。"), `缺系统文本: ${req.prompt.slice(0, 60)}`);
     assert.ok(req.prompt.includes("把领子改成圆领"), `缺用户文本: ${req.prompt.slice(0, 60)}`);
   });
 

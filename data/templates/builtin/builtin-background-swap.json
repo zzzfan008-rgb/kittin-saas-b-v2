@@ -50,8 +50,8 @@
           "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare",
           "modelOptions": {
-            "size": "1536x2048",
-            "quality": "high"
+            "size": "2048x2048",
+            "quality": "low"
           },
           "aspectRatio": "1:1",
           "batchSize": 1
