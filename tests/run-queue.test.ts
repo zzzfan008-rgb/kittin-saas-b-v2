@@ -1371,17 +1371,32 @@ await test("500 个 job 的领取计划无 Sort 且 claimNextJob P95 小于 50ms
       nodeType: node["Node Type"], sortMethod: node["Sort Method"] ?? null,
     })), []);
 
-    const durations: number[] = [];
-    for (let index = 0; index < 20; index += 1) {
-      const started = process.hrtime.bigint();
-      const claimed = await queue.claimNextJob("perf-worker-" + index, benchmarkNow, 60_000);
-      durations.push(Number(process.hrtime.bigint() - started) / 1_000_000);
-      assert.ok(claimed && runIds.includes(claimed.runId));
+    // 测量取三轮 P95 的中位数（用户 2026-10-28 拍板 A）：
+    // 单轮 P95 会被共享 runner 的瞬时抢占打成噪声（CI 上出现 91.63ms，
+    // 同一份代码本机 1.32ms），而真实退化（缺索引 → 全表扫描）三轮都会慢，
+    // 所以取中位数既保留防退化意图，又不靠"重试掩盖"。
+    const roundP95: number[] = [];
+    for (let round = 0; round < 3; round += 1) {
+      const durations: number[] = [];
+      for (let index = 0; index < 20; index += 1) {
+        const started = process.hrtime.bigint();
+        const claimed = await queue.claimNextJob("perf-worker-" + round + "-" + index, benchmarkNow, 60_000);
+        durations.push(Number(process.hrtime.bigint() - started) / 1_000_000);
+        assert.ok(claimed && runIds.includes(claimed.runId));
+      }
+      durations.sort((left, right) => left - right);
+      roundP95.push(durations[Math.ceil(durations.length * 0.95) - 1]);
     }
-    durations.sort((left, right) => left - right);
-    const p95 = durations[Math.ceil(durations.length * 0.95) - 1];
-    assert.ok(p95 < 50, "claimNextJob P95 " + p95.toFixed(2) + "ms exceeds 50ms");
-    console.log("    claimNextJob P95 " + p95.toFixed(2) + "ms");
+    const p95 = [...roundP95].sort((left, right) => left - right)[1];
+    assert.ok(
+      p95 < 50,
+      "claimNextJob P95 中位数 " + p95.toFixed(2) + "ms exceeds 50ms（三轮："
+        + roundP95.map((value) => value.toFixed(2)).join(" / ") + "）",
+    );
+    console.log(
+      "    claimNextJob P95 三轮 " + roundP95.map((value) => value.toFixed(2)).join(" / ")
+        + "ms → 中位数 " + p95.toFixed(2) + "ms",
+    );
   } finally {
     await database.query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [runIds]);
   }

@@ -9,7 +9,33 @@
 // 客户端冻结表已是同款镜像模式）。漂移由单测 + 契约评审兜。
 
 /** 补充位锚点行（与 server REWRITE_SUPPLEMENT_ANCHOR 逐字一致）。 */
-export const REWRITE_SUPPLEMENT_ANCHOR = "用户补充要求（如为空则忽略本行）：";
+/**
+ * 补充位锚点行（新版「补充要求：」+ 旧草稿里的长版，两者都要认）。
+ * 只认整行等于锚点的行——协议正文里出现的「补充要求」字样不会误判。
+ */
+export const REWRITE_SUPPLEMENT_ANCHORS: readonly string[] = [
+  "补充要求：",
+  "用户补充要求（如为空则忽略本行）：",
+];
+
+/** 兼容旧名（逐字一致的单值出口已废弃，仍保留指向新版短锚点）。 */
+export const REWRITE_SUPPLEMENT_ANCHOR = REWRITE_SUPPLEMENT_ANCHORS[0];
+
+/**
+ * 定位补充位锚点：返回原文中最后一次出现的锚点区间 [start, end)。
+ * 允许锚点后同行接写补充内容（「补充要求：红色长裙」），故用子串而不是整行匹配；
+ * 多个锚点取最靠后的那个，避免协议里引用锚点字样时切错位置。
+ */
+export function findSupplementAnchor(text: string): { start: number; end: number } | null {
+  let found: { start: number; end: number } | null = null;
+  for (const anchor of REWRITE_SUPPLEMENT_ANCHORS) {
+    const index = text.lastIndexOf(anchor);
+    if (index >= 0 && (!found || index > found.start)) {
+      found = { start: index, end: index + anchor.length };
+    }
+  }
+  return found;
+}
 
 export interface RewriteEligibility {
   /** 是否可发补全请求。 */
@@ -30,9 +56,9 @@ export interface RewriteEligibility {
 export function rewriteEligibility(rawText: string): RewriteEligibility {
   const text = typeof rawText === "string" ? rawText : "";
   if (text.trim() === "") return { eligible: false, reason: "empty_text" };
-  const anchorIndex = text.indexOf(REWRITE_SUPPLEMENT_ANCHOR);
-  if (anchorIndex === -1) return { eligible: true, reason: null };
-  const supplement = text.slice(anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length);
+  const anchor = findSupplementAnchor(text);
+  if (!anchor) return { eligible: true, reason: null };
+  const supplement = text.slice(anchor.end);
   if (supplement.trim() === "") return { eligible: false, reason: "empty_supplement" };
   return { eligible: true, reason: null };
 }

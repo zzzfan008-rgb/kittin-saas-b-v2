@@ -13,6 +13,7 @@ import {
 import { isLocalImageReference, validateImageDataUrl } from "./imageValidation";
 import {
   DEFAULT_GENERATION_MODEL_ID,
+  IMAGE_ASPECT_RATIO_UNION,
   MASK_REDRAW_MODEL_ID,
   getImageModelContract,
   isImageModelId,
@@ -29,7 +30,12 @@ const STATUSES = [
   "idle", "queued", "running", "retry_wait", "cancel_requested",
   "success", "error", "outcome_unknown", "cancelled",
 ] as const;
-const ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
+/**
+ * 画幅取值域（用户 2026-10-28）：改为「全模型契约并集」的单一事实源。
+ * 原来这里硬编码 5 种，而面板按契约最多给 10 种 → 选 4:5/5:4/2:3/3:2/21:9
+ * 保存时报 `must be one of: 1:1, 3:4, 4:3, 9:16, 16:9`（云端草稿同步失败）。
+ */
+const ASPECT_RATIOS = IMAGE_ASPECT_RATIO_UNION;
 /** v8 视频生成节点只实现首帧任务（T4），画幅必须 "adaptive"（data-model.md C6）。 */
 const VIDEO_ASPECT_RATIO = "adaptive" as const;
 export const MAX_WORKFLOW_NODES = 500;

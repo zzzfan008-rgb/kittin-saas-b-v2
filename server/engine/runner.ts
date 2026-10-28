@@ -40,11 +40,15 @@ import {
 } from "../lib/imageValidation";
 import { REMOTE_IMAGE_REFERENCE_MESSAGE } from "../lib/imageReferenceAccess";
 import { normalizeUploadImageDataUrl } from "../lib/uploadImageNormalization";
+import { flattenReferenceAlpha } from "../lib/referenceFlatten";
 import { query } from "../lib/database";
 import {
   isImageModelId,
   isModelAllowedForNode,
   modelMaxReferenceImages,
+  modelSupportsQuality,
+  resolutionOptionsInBounds,
+  type ImageModelId,
   type ImageModelOptions,
 } from "../../src/types/imageModels";
 import { DEFAULT_VIDEO_MODEL_ID, isVideoModelId, type VideoModelOptions } from "../../src/types/videoModels";
@@ -220,8 +224,21 @@ export async function resolveReferenceInputs(
       order: source.order,
       assetSha256: assetSha256(dataUrl),
       ...(source.sourceNodeId ? { sourceNodeId: source.sourceNodeId } : {}),
+      ...(source.role ? { role: source.role } : {}),
     };
   });
+}
+
+/**
+ * 官方不支持 `quality` 的模型（gemini / flux / seedream / qwen）不得携带该字段：
+ * 旧草稿里残留的 quality 会原样进请求体，被上游判成不支持的参数。
+ */
+function withoutUnsupportedQuality(modelId: ImageModelId, options: ImageModelOptions): ImageModelOptions {
+  if (modelSupportsQuality(modelId)) return options;
+  if (!("quality" in options)) return options;
+  const rest = { ...options };
+  delete rest.quality;
+  return rest;
 }
 
 async function executeImageGeneratorStep(
@@ -275,7 +292,10 @@ async function executeImageGeneratorStep(
     : fallbackReferenceSources(step, inputImages);
   assertReferenceSourcesMatchImages(inputReferenceSources, inputImages, step.nodeId);
   const references = await resolveReferenceInputs(inputReferenceSources);
-  const promptReferences: ProviderPromptReference[] = references.map(() => ({}));
+  // 角色随参考图一起进渲染：gemini 走逐图标签内联，其余模型由渲染层生成映射行。
+  const promptReferences: ProviderPromptReference[] = references.map((reference) => (
+    reference.role ? { role: reference.role } : {}
+  ));
   const referenceImages = references.map((reference) => reference.dataUrl);
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
   const maxUserReferences = needsMask
@@ -335,7 +355,15 @@ async function executeImageGeneratorStep(
     // 收不到 size、评估证据侧也会判定 native 参数漂移。
     modelOptions: preparedMask
       ? { ...(step.params.modelOptions ?? {}), size: preparedMask.size }
-      : step.params.modelOptions as ImageModelOptions | undefined,
+      // 旧草稿可能带着当前模型已不支持的尺寸（如 seedream 的 4K），运行前按官方区间收敛。
+      : withoutUnsupportedQuality(
+          modelId,
+          resolutionOptionsInBounds(
+            modelId,
+            step.params.modelOptions as ImageModelOptions | undefined,
+            typeof step.params.aspectRatio === "string" ? step.params.aspectRatio : "1:1",
+          ),
+        ),
     ...(providerMask ? { mask: providerMask } : {}),
   };
 
@@ -492,13 +520,17 @@ export async function resolveImageRefs(refs: string[]): Promise<string[]> {
 
   return Promise.all(refs.map(async (ref) => {
     const resolved = await normalizeImageRef(ref);
-    if (!isLocalImageReference(ref)) return resolved;
+    if (!isLocalImageReference(ref)) return await flattenReferenceAlpha(resolved);
 
     const id = ref.slice("/api/files/".length);
     const metadata = metadataById.get(id);
-    if (metadata?.normalized || metadata?.source_type === "generation") return resolved;
-
-    const normalized = await normalizeUploadImageDataUrl(resolved);
-    return toDataUrl(normalized.buffer.toString("base64"), normalized.mimeType);
+    // 2026-10-28：生成结果不再豁免——4.5MB 的原生 PNG 直接当参考图会撑大请求体，
+    // 上游偶发 400「参考图无法解码」。统一走标准化（体积/格式收敛）。
+    if (!metadata?.normalized) {
+      const normalized = await normalizeUploadImageDataUrl(resolved);
+      return await flattenReferenceAlpha(toDataUrl(normalized.buffer.toString("base64"), normalized.mimeType));
+    }
+    // 已标准化的上传仍可能带透明通道（抠图素材），参考图副本要压平。
+    return await flattenReferenceAlpha(resolved);
   }));
 }

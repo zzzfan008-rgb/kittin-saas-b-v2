@@ -220,7 +220,7 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
       : rewriteGate.reason === "empty_text"
         ? "先写点要求再补全"
         : rewriteGate.reason === "empty_supplement"
-          ? "请先在「用户补充要求：」后填写补充内容再补全"
+          ? "请先在「补充要求：」后填写补充内容再补全"
           : "AI 补全提示词";
 
   return (

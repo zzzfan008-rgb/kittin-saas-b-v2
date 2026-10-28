@@ -392,11 +392,15 @@ await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 
     "兔子API 的 flare 直接接受 size，不再需要提示词尺寸前缀",
   );
 
-  // ④ 画幅联动不得丢掉用户已选的 size/quality。
+  // ④ 画幅联动必须真的改尺寸，同时保留档位与其它参数。
+  // 2026-10-28 行为变更（用户拍板）：原断言「不得覆盖已选 size」把画幅控件锁死了——
+  // 契约默认值本身就会注入 size，导致面板切画幅对 gpt-image 完全无效（实测选 16:9 仍发
+  // 1536x2048）。现改为「保留当前分辨率档位、按新画幅重算 size」；quality 等其它参数不变。
+  // 官方 1K×3:4 是 960x1280（不是按长边公式推的 768x1024）——gpt-image 走 30 档官方表。
   assert.deepEqual(
-    imageModelOptionsForAspectRatio("gpt-image-2.5-flare", { size: "1024x1024", quality: "high" }, "3:4"),
-    { size: "1024x1024", quality: "high" },
-    "画幅联动必须保留用户已选的模型参数",
+    imageModelOptionsForAspectRatio("gpt-image-2.5-flare", { size: "1280x1280", quality: "high" }, "3:4"),
+    { size: "960x1280", quality: "high" },
+    "画幅联动必须生效（同档官方尺寸），且不丢其它已选参数",
   );
 });
 

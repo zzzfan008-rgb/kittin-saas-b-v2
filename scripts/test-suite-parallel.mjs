@@ -136,6 +136,14 @@ const TEST_FILES = [
   "tests/model-reference-warning.test.ts",
   // 2026-10-28 P2：SSRF × 代理 fake-IP 的上游产物域名白名单。
   "tests/ssrf-upstream-allowlist.test.ts",
+  // 2026-10-28 用户拍板：产线提示词不得残留协议脚手架（如为空则忽略本行 / 参考图清单 / 正文）。
+  "tests/prompt-hygiene.test.ts",
+  // 2026-10-28 角色下发：dag 推导角色 → reference.role → gemini 内联标签/其余映射行。
+  "tests/reference-roles.test.ts",
+  // 2026-10-28：参考图 alpha 压平 + 画幅参数真实生效（gpt-image 原失效）。
+  "tests/reference-flatten-and-ratio.test.ts",
+  // 2026-10-28：逐模型分辨率契约（每家官方档位/尺寸，禁止全站共用一套）。
+  "tests/model-resolution-matrix.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
   // 2026-10-27 数据隔离契约：默认只看自己，跨用户需显式 all=true（纯源码断言）。

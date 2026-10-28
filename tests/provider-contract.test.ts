@@ -444,6 +444,27 @@ async function main(): Promise<void> {
         // 兔子API 的 Gemini 端点用 snake_case（inline_data/mime_type）；WebP 必须转成 PNG 上传。
         assert.equal((parts[1].inline_data as { mime_type: string }).mime_type, "image/png");
         assert.deepEqual(parts[2], { text: "改图" }, "提示词必须排在全部图片之后");
+
+        // 2026-10-28 角色下发：有 role 时标签内联角色（图号 + 是什么绑在同一点）。
+        await apiyiProviders["gemini-3.1-flash-image"].edit({
+          prompt: "换装",
+          operationMode: "edit",
+          references: [
+            { dataUrl: await imageDataUrl(4, 4, { r: 200, g: 30, b: 30 }, "png"), order: 0, assetSha256: "0".repeat(64), role: "服装" },
+            { dataUrl: await imageDataUrl(4, 4, { r: 30, g: 30, b: 200 }, "png"), order: 1, assetSha256: "1".repeat(64), role: "模特" },
+          ],
+          // 旧数组通道必须与结构化通道逐项一致（referenceInputs 契约）
+          referenceImages: [
+            await imageDataUrl(4, 4, { r: 200, g: 30, b: 30 }, "png"),
+            await imageDataUrl(4, 4, { r: 30, g: 30, b: 200 }, "png"),
+          ],
+          modelOptions: options,
+        });
+        const roleBody = jsonBody(captures[2].init) as { contents: Array<{ parts: Array<Record<string, unknown>> }> };
+        const roleParts = roleBody.contents[0].parts;
+        assert.deepEqual(roleParts[0], { text: "参考图1（服装）：" });
+        assert.deepEqual(roleParts[2], { text: "参考图2（模特）：" });
+        assert.deepEqual(roleParts[4], { text: "换装" });
       } finally {
         restoreFetch();
       }

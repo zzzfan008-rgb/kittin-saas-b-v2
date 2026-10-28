@@ -31,7 +31,7 @@ import {
   promptRunAdmissionInputFromParams,
   type PromptRunAdmissionDecision,
 } from "../../src/lib/promptRunAdmission";
-import { orderReferenceUpstream } from "../../src/lib/referenceOrder";
+import { orderReferenceUpstream, tryonRoleOf } from "../../src/lib/referenceOrder";
 
 /** React Flow 节点/边的最小结构（前端传入） */
 export interface FlowNode {
@@ -298,10 +298,17 @@ export function buildExecutionPlan(
       );
 
       const inputImages = upstream.flatMap((source) => source.images);
-      const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => ({
-        imageRef,
-        sourceNodeId: source.nodeId,
-      }))).map((reference, order) => ({ ...reference, order }));
+      const familyId = (data as { familyId?: string }).familyId;
+      const labelOf = (sourceNodeId: string) => String(nodeMap.get(sourceNodeId)?.data?.label ?? "");
+      const inputReferences = upstream.flatMap((source) => source.images.map((imageRef) => {
+        // 角色只在族有明确角色定义时下发（当前仅 model-tryon）；其余族不猜语义。
+        const role = familyId === "model-tryon" ? tryonRoleOf(source.nodeId, labelOf(source.nodeId)) : undefined;
+        return {
+          imageRef,
+          sourceNodeId: source.nodeId,
+          ...(role ? { role } : {}),
+        };
+      })).map((reference, order) => ({ ...reference, order }));
       if (inputReferences.length !== inputImages.length) {
         throw new DagError(`Node ${id} reference role expansion does not match its input images`);
       }

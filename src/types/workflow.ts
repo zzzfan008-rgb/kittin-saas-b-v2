@@ -107,6 +107,12 @@ export interface ReferenceImageInput {
   order: number;
   assetSha256: string;
   sourceNodeId?: string;
+  /**
+   * 参考图角色（用户 2026-10-28 拍板）：由 dag 按族规则推导，随请求一起下发。
+   * gemini 走逐图标签（`参考图1（服装）：`），其余模型走提示词映射行——
+   * 两者都让"编号"和"是什么"绑在同一点上，而不是只靠数组顺序。
+   */
+  role?: string;
 }
 
 /** 持久化历史证据不包含 base64 正文，避免数据库与 API 载荷膨胀。 */
@@ -117,6 +123,8 @@ export interface ReferenceImageSource {
   imageRef: string;
   order: number;
   sourceNodeId?: string;
+  /** 角色随计划一起落盘，运行时原样透传给 Provider（见 ReferenceImageInput.role）。 */
+  role?: string;
 }
 
 // ---------- 节点数据（存 React Flow node.data）----------
