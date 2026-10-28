@@ -18,6 +18,14 @@ export interface ReferenceUpstreamEntry {
 const GARMENT_IDS = new Set(["garment"]);
 const MODEL_IDS = new Set(["model"]);
 
+/** 该上游在 model-tryon 族中的角色名（供 Provider 逐图标签/提示词映射使用）。 */
+export function tryonRoleOf(nodeId: string, label: string): "服装" | "模特" | undefined {
+  const rank = tryonUpstreamRank(nodeId, label);
+  if (rank === 0) return "服装";
+  if (rank === 1) return "模特";
+  return undefined;
+}
+
 /** 返回该上游在 model-tryon 族中的期望序号位：0=图1服装，1=图2模特，2=未知。 */
 export function tryonUpstreamRank(nodeId: string, label: string): 0 | 1 | 2 {
   if (GARMENT_IDS.has(nodeId) || label.includes("服装")) return 0;

@@ -19,6 +19,7 @@ import { validateMaskForSource } from "../lib/maskProcessing";
 import { detectImageMime, MAX_IMAGE_BYTES, validateImageDataUrl } from "../lib/imageValidation";
 import { withImageProcessingSlot } from "../lib/imageProcessingLimit";
 import {
+  orderedReferenceInputs,
   referenceDataUrls,
   referenceInputsError,
 } from "../../src/lib/referenceInputs";
@@ -369,13 +370,22 @@ async function parseGeminiImages(payload: unknown, modelId: ImageModelId): Promi
  * 现按谷歌官方图文编辑的形态改：**图片在前、提示词在后**，且每张图前插一条
  * 「参考图N：」文字，把编号和图片就地绑死；提示词里的图号与它一一对应。
  */
+/** 与 referenceDataUrls 同序的角色列表（旧数组通道没有角色 → 全 undefined）。 */
+function referenceRoles(req: ImageGenRequest): Array<string | undefined> {
+  const structured = orderedReferenceInputs(req);
+  return structured.length > 0 ? structured.map((reference) => reference.role) : [];
+}
+
 function geminiParts(
   prompt: string,
   images: ReadonlyArray<{ inline_data: { mime_type: string; data: string } }>,
+  roles: ReadonlyArray<string | undefined> = [],
 ): Array<Record<string, unknown>> {
   const parts: Array<Record<string, unknown>> = [];
   images.forEach((image, index) => {
-    parts.push({ text: `参考图${index + 1}：` });
+    // 角色（服装/模特…）与编号贴在同一处：模型不必只靠数组顺序推算"哪张是什么"。
+    const role = roles[index];
+    parts.push({ text: role ? `参考图${index + 1}（${role}）：` : `参考图${index + 1}：` });
     parts.push(image);
   });
   parts.push({ text: prompt });
@@ -568,7 +578,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
 
   if (isGeminiFamily(modelId)) {
     const imageParts = await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)));
-    const parts = geminiParts(req.prompt, imageParts);
+    const parts = geminiParts(req.prompt, imageParts, referenceRoles(req));
     const response = await fetchApiyi(modelId, contract.edit.path, () => ({
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },

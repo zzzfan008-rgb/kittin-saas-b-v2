@@ -29,8 +29,16 @@ const MASK_PROMPT_TEMPLATE = "目标修改：{{TARGET}}。{{MASK_REFERENCE_ROLES
 
 
 export interface ProviderPromptReference {
-  /** 占位：参考图顺序已由数组位置决定，不再需要角色字段。 */
-  readonly _?: never;
+  /**
+   * 参考图角色（如「服装」「模特」），由 dag 按族规则推导。
+   * provider 能力不同：能逐图贴标签的（gemini）内联，只能传数组的由本层生成映射行。
+   */
+  readonly role?: string;
+}
+
+/** 能在参考图本体旁贴标签的模型：这些模型不需要额外的提示词映射行。 */
+function inlinesReferenceLabels(modelId: ImageModelId): boolean {
+  return modelId.startsWith("gemini-");
 }
 
 export interface ProviderPromptRenderInput {
@@ -116,6 +124,21 @@ function maskReferenceRolePrompt(userReferenceCount: number): string {
  * It owns the ordered reference list and the mask wrapper; callers supply
  * only the reviewed task prompt / user intent.
  */
+/**
+ * 参考图映射行：编号 + 角色，让模型不必只靠数组顺序猜"哪张是什么"。
+ * 只在角色已知、且该模型不能逐图贴标签时才加（gemini 内联标签，不重复）。
+ */
+function referenceRoleLine(
+  references: readonly ProviderPromptReference[],
+  modelId: ImageModelId,
+): string | null {
+  if (inlinesReferenceLabels(modelId)) return null;
+  const entries = references
+    .map((reference, index) => (reference.role ? `图${index + 1}=${reference.role}` : null))
+    .filter((entry): entry is string => entry !== null);
+  return entries.length > 0 ? `参考图对应：${entries.join("，")}` : null;
+}
+
 export function renderProviderPrompt(input: ProviderPromptRenderInput): string {
   const rawTaskPrompt = sanitizeProviderTaskPrompt(input.taskPrompt);
   if (!rawTaskPrompt) {
@@ -128,5 +151,6 @@ export function renderProviderPrompt(input: ProviderPromptRenderInput): string {
       MASK_REFERENCE_ROLES: maskReferenceRolePrompt(input.references.length),
     });
   }
-  return rawTaskPrompt;
+  const roleLine = referenceRoleLine(input.references, input.modelId);
+  return roleLine ? `${rawTaskPrompt}\n${roleLine}` : rawTaskPrompt;
 }

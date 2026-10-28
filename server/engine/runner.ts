@@ -40,6 +40,7 @@ import {
 } from "../lib/imageValidation";
 import { REMOTE_IMAGE_REFERENCE_MESSAGE } from "../lib/imageReferenceAccess";
 import { normalizeUploadImageDataUrl } from "../lib/uploadImageNormalization";
+import { flattenReferenceAlpha } from "../lib/referenceFlatten";
 import { query } from "../lib/database";
 import {
   isImageModelId,
@@ -220,6 +221,7 @@ export async function resolveReferenceInputs(
       order: source.order,
       assetSha256: assetSha256(dataUrl),
       ...(source.sourceNodeId ? { sourceNodeId: source.sourceNodeId } : {}),
+      ...(source.role ? { role: source.role } : {}),
     };
   });
 }
@@ -275,7 +277,10 @@ async function executeImageGeneratorStep(
     : fallbackReferenceSources(step, inputImages);
   assertReferenceSourcesMatchImages(inputReferenceSources, inputImages, step.nodeId);
   const references = await resolveReferenceInputs(inputReferenceSources);
-  const promptReferences: ProviderPromptReference[] = references.map(() => ({}));
+  // 角色随参考图一起进渲染：gemini 走逐图标签内联，其余模型由渲染层生成映射行。
+  const promptReferences: ProviderPromptReference[] = references.map((reference) => (
+    reference.role ? { role: reference.role } : {}
+  ));
   const referenceImages = references.map((reference) => reference.dataUrl);
   const maxReferences = Math.min(MAX_REFERENCE_IMAGES, modelMaxReferenceImages(modelId));
   const maxUserReferences = needsMask
@@ -492,13 +497,17 @@ export async function resolveImageRefs(refs: string[]): Promise<string[]> {
 
   return Promise.all(refs.map(async (ref) => {
     const resolved = await normalizeImageRef(ref);
-    if (!isLocalImageReference(ref)) return resolved;
+    if (!isLocalImageReference(ref)) return await flattenReferenceAlpha(resolved);
 
     const id = ref.slice("/api/files/".length);
     const metadata = metadataById.get(id);
-    if (metadata?.normalized || metadata?.source_type === "generation") return resolved;
-
-    const normalized = await normalizeUploadImageDataUrl(resolved);
-    return toDataUrl(normalized.buffer.toString("base64"), normalized.mimeType);
+    // 2026-10-28：生成结果不再豁免——4.5MB 的原生 PNG 直接当参考图会撑大请求体，
+    // 上游偶发 400「参考图无法解码」。统一走标准化（体积/格式收敛）。
+    if (!metadata?.normalized) {
+      const normalized = await normalizeUploadImageDataUrl(resolved);
+      return await flattenReferenceAlpha(toDataUrl(normalized.buffer.toString("base64"), normalized.mimeType));
+    }
+    // 已标准化的上传仍可能带透明通道（抠图素材），参考图副本要压平。
+    return await flattenReferenceAlpha(resolved);
   }));
 }

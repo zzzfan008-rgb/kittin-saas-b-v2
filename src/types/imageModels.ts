@@ -520,10 +520,14 @@ export function imageModelOptionsForAspectRatio(
   const normalized = { ...normalizeImageModelOptions(modelId, current) };
   switch (modelId) {
     // 兔子API GPT Image 2.5：size 直接吃像素串（宽高 16 的倍数、长边≤3840、比≤3:1）。
-    // 画幅联动只在用户尚未选 size 时按画幅填默认值，绝不覆盖用户已选尺寸。
+    //
+    // 2026-10-28 修缺陷：原实现 `size: normalized.size ?? VIP_SIZE_BY_RATIO[aspectRatio]`
+    // 只在「还没有 size」时才按画幅填——而契约默认值本身就会注入一个 size（1536x2048），
+    // 于是面板切画幅对 gpt-image 两兄弟**完全无效**（实测：选 16:9 仍提交 1536x2048）。
+    // 现在改为「保留当前分辨率档位，按新画幅重算 size」，两个控件都真实生效。
     case "gpt-image-2.5-sunburst":
     case "gpt-image-2.5-flare":
-      return { ...normalized, size: normalized.size ?? VIP_SIZE_BY_RATIO[aspectRatio] };
+      return { ...normalized, size: resolutionModelOptions(modelId, resolutionTierOf(modelId, normalized), aspectRatio).size };
     case "gemini-nano-banana-2.1":
     case "gemini-3.1-flash-image": {
       const allowed = getImageModelContract(modelId).aspectRatios ?? [];
@@ -534,11 +538,12 @@ export function imageModelOptionsForAspectRatio(
       const allowed = getImageModelContract(modelId).aspectRatios ?? [];
       return allowed.includes(aspectRatio) ? { ...normalized, aspect_ratio: aspectRatio } : normalized;
     }
+    // 同上：按「当前档位 × 新画幅」重算，而不是固定 2K 长边。
     case "doubao-seedream-5-0-pro-260628":
     case "doubao-seedream-5-0-lite-260128":
     case "qwen-image-3.0-pro":
     case "qwen-image-3.0":
-      return { ...normalized, size: VIP_SIZE_BY_RATIO[aspectRatio] ?? normalized.size };
+      return { ...normalized, ...resolutionModelOptions(modelId, resolutionTierOf(modelId, normalized), aspectRatio) };
   }
 }
 
