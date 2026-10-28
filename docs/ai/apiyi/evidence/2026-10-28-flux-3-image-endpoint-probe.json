@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "tuzi-flux-3-image-endpoint-probe-20261028T204500Z",
+  "kind": "model-endpoint-probe",
+  "capturedAt": "2026-10-28T20:45:00Z",
+  "gateway": {
+    "baseHost": "api.tu-zi.com"
+  },
+  "model": {
+    "gatewayModelId": "flux-3-image",
+    "vendor": "Black Forest Labs"
+  },
+  "request": {
+    "authentication": "configured-project-token",
+    "paidProviderCalls": 1,
+    "freeRejections": 1,
+    "retryCount": 0
+  },
+  "probes": [
+    {
+      "id": "native-endpoint-rejects-aspect-ratio",
+      "method": "POST",
+      "path": "/flux/v1/flux-3-image",
+      "body": {
+        "prompt": "a white ceramic cup",
+        "aspect_ratio": "1:1"
+      },
+      "httpStatus": 400,
+      "errorMessage": "aspect_ratio is not supported by this FLUX endpoint",
+      "conclusion": "原生 FLUX 端点只接受 prompt/width/height；aspect_ratio、images、input_image 等参考图字段一律 400。"
+    },
+    {
+      "id": "generations-accepts-input-image",
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "body": {
+        "model": "flux-3-image",
+        "prompt": "put the red square object on a wooden table",
+        "input_image": "<data:image/png;base64,…>",
+        "aspect_ratio": "1:1",
+        "output_format": "jpeg"
+      },
+      "httpStatus": 200,
+      "returnedImage": true,
+      "latencySeconds": 36,
+      "conclusion": "参考图只能走 OpenAI 兼容 generations 的 input_image / input_image_2 …；该通道同时接受 aspect_ratio 与 output_format。"
+    }
+  ],
+  "knownLimitations": [
+    "multipart /v1/images/edits 传多张同名 image 时参考图被整体丢弃且仍返回 succeeded（静默错误，2026-10-28 复现）。",
+    "多图索引稳定性有限：参考图 >1 时产品侧给出非阻断告警。"
+  ],
+  "rawExportRetainedInRepository": false,
+  "rawExportPolicy": "只保留可复核的状态码、错误文案与请求字段名；不保存参考图字节与最终产物 URL。"
+}

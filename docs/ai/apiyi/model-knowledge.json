@@ -362,8 +362,10 @@
         "maxTotalReferences": 8
       },
       "observedEvidence": {
-        "status": "unverified",
-        "acceptedEvidenceIds": [],
+        "status": "verified",
+        "acceptedEvidenceIds": [
+          "tuzi-flux-3-image-endpoint-probe-20261028T204500Z"
+        ],
         "catalogEvidenceIds": [
           "apiyi-model-catalog-20260902T150417Z",
           "apiyi-model-catalog-20260903T031129Z",
@@ -373,7 +375,7 @@
         "legacySignals": [
           "historical-browser-failure"
         ],
-        "blockingReason": "2026-10-28 实测：edit 已改 input_image/input_image_2（JSON generations），待归档为正式 evidence 后转 verified。"
+        "blockingReason": ""
       }
     },
     {

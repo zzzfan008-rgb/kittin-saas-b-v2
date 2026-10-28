@@ -19,6 +19,13 @@
 原生通道的模型枚举（该文档页）只有 `bfl-flux-2-pro/max/flex`、`flux-kontext-pro/max`，
 **不含 flux-3-image** —— 这也是 flux-3 走原生只能文生图的原因。
 
+## 证据归档
+
+上面的实测已归档为正式证据：`docs/ai/apiyi/evidence/2026-10-28-flux-3-image-endpoint-probe.json`
+（`kind: model-endpoint-probe`，含原生端点拒绝 `aspect_ratio` 的 400 原文与
+`/v1/images/generations` + `input_image` 的 200 结果）。据此两个契约文件的
+`evidenceStatus` 由 `unverified` 升为 `verified`。
+
 ## 实测证据（2026-10-28，每次都是真实付费调用）
 
 判据：给两张 256px 纯色 JPEG（红=图1、绿=图2），让模型「只输出某一号图的颜色」，读回图求通道均值。

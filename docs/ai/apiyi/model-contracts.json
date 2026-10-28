@@ -616,7 +616,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:9727df68645e96bae55833f56cb1f9cca58a70b1d746dfcbbf1c5f4e8fb56bd2",
+      "contractHash": "sha256:2cb186ef126a1de6f428a3b00da75dc7ccf94d2ac216ad89a1991b77aa880ba0",
       "id": "flux-3-image",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -637,7 +637,7 @@
       "gatewayModelId": "flux-3-image",
       "upstreamModelId": "flux-3-image",
       "vendorModelId": "flux-3-image",
-      "evidenceStatus": "unverified",
+      "evidenceStatus": "verified",
       "label": "FLUX 3 Image",
       "channel": "official",
       "vendor": "bfl",
