@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
-import { isNodeRunActive, type VideoGeneratorNodeData } from "@/types/workflow";
-import { Developing, NodeFrame, STATUS_TEXT } from "./NodeFrame";
+import { EDGE_HANDLE_RESULT, isNodeRunActive, type VideoGeneratorNodeData } from "@/types/workflow";
+import { NodeFrame, STATUS_TEXT } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { GeneratorParamsPanel } from "./GeneratorParamsPanel";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
@@ -49,9 +49,9 @@ export function VideoGeneratorNode({ id, data, selected }: NodeProps<Node<VideoG
         }
       >
         <GeneratorParamsPanel nodeId={id} data={data} />
-        {running && <Developing />}
       </NodeFrame>
-      <Handle type="source" position={Position.Right} title="输出视频" />
+      {/* 输出柄：只承载「生成节点 → 结果节点」的溯源边，不可手动拖拽。 */}
+      <Handle id={EDGE_HANDLE_RESULT} type="source" position={Position.Right} title="输出视频（连到结果节点）" isConnectable={false} />
     </>
   );
 }

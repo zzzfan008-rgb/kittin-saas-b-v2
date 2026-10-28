@@ -356,6 +356,7 @@ export function ImageNode({ id, data, selected }: NodeProps<Node<ImageNodeData>>
           运行期左栏显影中，image-node-updated 覆盖左图后用户手动关闭。 */}
       {editingMask && hasUpload && (
         <MaskEditor
+          nodeId={id}
           source={data.outputImages[0]}
           initialMask={
             typeof data.maskSourceRef === "string" && data.maskSourceRef === data.outputImages[0]

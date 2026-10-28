@@ -7,6 +7,7 @@ import {
   EDGE_HANDLE_FIRST_FRAME,
   EDGE_HANDLE_PROMPT,
   EDGE_HANDLE_REFERENCE,
+  EDGE_HANDLE_RESULT,
   WORKFLOW_SCHEMA_VERSION,
   danglingResultNodeIds,
   forbiddenReferenceEdgeIndexes,
@@ -422,11 +423,22 @@ export function createDocumentSnapshot(source: {
   nodes: readonly NodeLike[];
   edges: readonly EdgeLike[];
 }): DocumentSnapshot {
+  // 生成中的占位结果节点（runId 为空）不落库：服务端 schema 要求 result 节点 runId 非空，
+  // 且它只是客户端瞬态 UI（用户 2026-10-28）。连同指向它的边一起过滤。
+  const persistedNodes = source.nodes.filter((node) => {
+    const data = node.data as { kind?: string; runId?: string } | undefined;
+    const kind = data?.kind;
+    if (kind !== "result-image" && kind !== "result-video") return true;
+    return typeof data?.runId === "string" && data.runId !== "";
+  });
+  const keptIds = new Set(persistedNodes.map((node) => node.id));
   return {
     version: WORKFLOW_SCHEMA_VERSION,
     projectName: source.projectName,
-    nodes: source.nodes.map(createDocumentNode),
-    edges: source.edges.map(createDocumentEdge),
+    nodes: persistedNodes.map(createDocumentNode),
+    edges: source.edges
+      .filter((edge) => keptIds.has(edge.source) && keptIds.has(edge.target))
+      .map(createDocumentEdge),
   };
 }
 
@@ -473,12 +485,31 @@ export function documentSnapshotToPersistedWorkflow(snapshot: DocumentSnapshot):
 // v8 连线规则（plan.md §2.1/§2.2 + runtime.md §2.1）
 // ---------------------------------------------------------------------------
 
-type EdgeHandle = typeof EDGE_HANDLE_PROMPT | typeof EDGE_HANDLE_REFERENCE | typeof EDGE_HANDLE_FIRST_FRAME;
+type EdgeHandle =
+  | typeof EDGE_HANDLE_PROMPT
+  | typeof EDGE_HANDLE_REFERENCE
+  | typeof EDGE_HANDLE_FIRST_FRAME
+  | typeof EDGE_HANDLE_RESULT;
+
+/**
+ * 源节点输出柄的 handle id。
+ *
+ * React Flow 按 id 精确匹配：边不写 sourceHandle 时只会找 id 为 null 的柄。
+ * text 节点的输出柄 id 固定为 "prompt"、生成节点的输出柄 id 为 "result"，
+ * 因此这两类源必须把 id 物化到边上，否则整条边被静默丢弃（2026-10-28 修复）。
+ * image / result-image 的输出柄无 id（null），保持不写。
+ */
+export function resolveSourceHandleId(sourceKind: NodeKind | undefined): string | null {
+  if (sourceKind === "text") return EDGE_HANDLE_PROMPT;
+  if (isGeneratorNodeKind(sourceKind)) return EDGE_HANDLE_RESULT;
+  return null;
+}
 
 const KNOWN_EDGE_HANDLES: readonly string[] = [
   EDGE_HANDLE_PROMPT,
   EDGE_HANDLE_REFERENCE,
   EDGE_HANDLE_FIRST_FRAME,
+  EDGE_HANDLE_RESULT,
 ];
 
 /**
@@ -497,6 +528,12 @@ export function resolveTargetHandle(
   if (rawHandle !== null && rawHandle !== undefined && rawHandle !== "") {
     if (!KNOWN_EDGE_HANDLES.includes(rawHandle)) return undefined;
     if (rawHandle === EDGE_HANDLE_PROMPT) return sourceKind === "text" ? EDGE_HANDLE_PROMPT : undefined;
+    // 溯源边：生成节点 → 结果节点（用户 2026-10-28）。
+    if (rawHandle === EDGE_HANDLE_RESULT) {
+      return isGeneratorNodeKind(sourceKind) && isResultNodeKind(targetKind)
+        ? EDGE_HANDLE_RESULT
+        : undefined;
+    }
     return isImageSourceKind(sourceKind) ? rawHandle as EdgeHandle : undefined;
   }
   if (sourceKind === "text") return EDGE_HANDLE_PROMPT;
@@ -550,6 +587,12 @@ export function isV8ConnectionValid(document: DocumentGraphLike, connection: Con
   const targetKind = target.data.kind;
   const targetSpec = nodeSpecForKind(targetKind);
   if (!targetSpec) return false;
+  // 溯源边（用户 2026-10-28）：生成节点右侧输出柄 → 结果节点左侧入柄。
+  // 两端 handle 都是 isConnectable=false，用户拖不出这条线，只有运行时创建。
+  if (connection.targetHandle === EDGE_HANDLE_RESULT) {
+    if (!isGeneratorNodeKind(sourceKind) || !isResultNodeKind(targetKind)) return false;
+    return true;
+  }
   // 生成节点不是数据源：产物经结果节点复用（plan.md §2.2）。
   if (isGeneratorNodeKind(sourceKind)) return false;
   const handle = resolveTargetHandle(sourceKind, targetKind, connection.targetHandle ?? null);
@@ -909,7 +952,15 @@ export function readDocumentSnapshotFromFlow(value: unknown): DocumentReadResult
  */
 export function readFlowDocumentForOpen(value: unknown): DocumentOpenResult {
   const { snapshot, migrated } = readDocumentSnapshotFromFlow(value);
-  return { flow: documentSnapshotToPersistedWorkflow(snapshot), migrated };
+  const flow = documentSnapshotToPersistedWorkflow(snapshot);
+  // 源句柄物化（2026-10-28）：text 节点的输出柄 id 是 "prompt"、生成节点是 "result"，
+  // React Flow 按 id 精确匹配，边不写 sourceHandle 会被静默丢弃（整条连线不显示）。
+  const kindById = new Map(flow.nodes.map((node) => [node.id, node.data.kind]));
+  (flow.edges as PersistedWorkflow["edges"]) = flow.edges.map((edge) => {
+    const sourceHandle = resolveSourceHandleId(kindById.get(edge.source));
+    return sourceHandle ? { ...edge, sourceHandle } : edge;
+  });
+  return { flow, migrated };
 }
 
 /**
@@ -947,11 +998,42 @@ export function normalizeFlowForDocumentRead(source: {
     if (handle && edgeIsValidInDocument(graph, candidate)) {
       // v8 要求显式 targetHandle（data-model §2）：把缺省/别名 handle 物化为契约值，
       // 否则 types/workflow 的 isPromptEdge（严格比较 "prompt"）会把 prompt 边算成参考边。
-      edges.push({ ...edge, targetHandle: handle });
+      const sourceHandle = resolveSourceHandleId(sourceKind);
+      edges.push({
+        ...edge,
+        targetHandle: handle,
+        ...(sourceHandle ? { sourceHandle } : {}),
+      });
       graph.edges = [...graph.edges, candidate];
     } else {
       droppedEdgeIds.push(edge.id);
     }
+  }
+  // 溯源边回填（用户 2026-10-28）：结果节点必须能看到来自生成节点的连线。
+  // 老文档里结果节点只有 sourceGeneratorId、没有边，这里按来源补齐；来源节点已被删
+  // （dangling-result-source）时不补——那类结果仍作为孤儿产物展示。
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const hasResultEdge = new Set(
+    edges
+      .filter((edge) => edge.targetHandle === EDGE_HANDLE_RESULT)
+      .map((edge) => edge.target),
+  );
+  for (const node of nodes) {
+    const data = node.data as { kind?: string; sourceGeneratorId?: string };
+    if (!isResultNodeKind(data.kind as NodeKind | undefined)) continue;
+    const sourceId = data.sourceGeneratorId;
+    if (!sourceId || !nodeIds.has(sourceId)) continue;
+    if (hasResultEdge.has(node.id)) continue;
+    const id = `e-result-${node.id}`;
+    edges.push({
+      id,
+      source: sourceId,
+      sourceHandle: EDGE_HANDLE_RESULT,
+      target: node.id,
+      targetHandle: EDGE_HANDLE_RESULT,
+      data: {},
+    } as EdgeLike);
+    hasResultEdge.add(node.id);
   }
   return { nodes, edges, migratedNodeIds, droppedEdgeIds };
 }

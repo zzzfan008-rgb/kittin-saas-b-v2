@@ -7,7 +7,11 @@ import { saveImageAsAsset } from "@/lib/assetSave";
 import { continueWithResult, toggleResultCompare } from "@/lib/resultActions";
 import { nodeSpecForKind, nodeTitleForKind } from "@/types/workflow";
 import { Checkbox } from "@/components/ui/checkbox";
+import { XIcon } from "lucide-react";
 import { useImageZoom, MIN_SCALE, MAX_SCALE } from "@/hooks/useImageZoom";
+
+/** 结果详情页默认缩放（用户 2026-10-28：默认 50%，不再铺满）。 */
+const DEFAULT_VIEWER_SCALE = 0.5;
 
 export function ReferenceEvidenceList({
   images,
@@ -79,6 +83,9 @@ export function ImageViewer() {
 
   // 视频记录（video-generator 跑出的 mp4）：主区用 video 播放，不走图片缩放链。
   const isVideoRecord = record?.kind === "video-generator" || /\.mp4($|[?#])/i.test(viewer?.url ?? "");
+  /** 失败/结果未知的运行只有元数据没有产物图（用户 2026-10-28：失败记录也要能打开结果页）。 */
+  const imageUrl = viewer?.url ?? "";
+  const hasProduct = imageUrl.length > 0;
 
   const statusText: Record<string, string> = {
     queued: "排队中", running: "生成中", retry_wait: "等待重试",
@@ -111,7 +118,8 @@ export function ImageViewer() {
   const [saveToModelLibrary, setSaveToModelLibrary] = useState(false);
 
   useEffect(() => {
-    zoom.resetScale(1);
+    // 用户 2026-10-28：结果详情页图片默认按 50% 显示（不再默认铺满/100%）。
+    zoom.resetScale(DEFAULT_VIEWER_SCALE);
     setAssetState("idle");
     setSaveToModelLibrary(false);
   }, [viewer?.url]);
@@ -122,7 +130,7 @@ export function ImageViewer() {
       await saveImageAsAsset({
         name: `${record?.nodeLabel ?? viewer.title ?? "生成素材"}-${new Date().toLocaleDateString("zh-CN")}`,
         category: saveToModelLibrary ? "model" : "garment",
-        image: viewer.url,
+        image: imageUrl,
         sourceNote: record?.projectName ? `来自项目「${record.projectName}」` : "来自生成记录",
       });
       setAssetState("saved");
@@ -156,20 +164,24 @@ export function ImageViewer() {
   };
 
   return (
+    // 用户 2026-10-28：结果详情页 UI 与「蒙版重绘」页统一——全屏左 stage + 右侧栏，
+    // 去掉黑蒙层与白字浮层，改用主题变量（--gc-canvas / --gc-control / --gc-panel）。
     <div
-      className="fixed inset-0 z-[80] flex items-stretch bg-black/85"
+      className="fixed inset-0 z-[80] flex items-stretch bg-[var(--gc-canvas)]"
+      data-panel="result-detail"
+      aria-label="结果详情"
       onClick={closeViewer}
     >
-      {/* 左侧图片区 */}
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      {/* 左 stage：与蒙版页同款浅底板 + 圆角 + p-4 */}
+      <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-[var(--gc-control)] p-4">
         {/* 操作栏：±按钮 + 提示 */}
-        <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 bg-gradient-to-b from-black/60 to-transparent px-4 py-3" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-label text-white/70">
-            <button type="button" onClick={zoom.zoomOut} disabled={zoom.scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="缩小">−</button>
-            <span className="w-12 text-center text-xs">{zoom.hudLabel}</span>
-            <button type="button" onClick={zoom.zoomIn} disabled={zoom.scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-white/70 hover:text-white disabled:opacity-30" aria-label="放大">+</button>
+        <div className="absolute left-0 right-0 top-0 z-10 flex items-center gap-3 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1 rounded-full border border-[var(--gc-border)] bg-[var(--gc-panel)] px-2 py-1 text-label text-[var(--gc-text-muted)]">
+            <button type="button" onClick={zoom.zoomOut} disabled={zoom.scale <= MIN_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-[var(--gc-text-muted)] hover:text-[var(--gc-text)] disabled:opacity-30" aria-label="缩小">−</button>
+            <span className="w-12 text-center text-xs text-[var(--gc-text)]">{zoom.hudLabel}</span>
+            <button type="button" onClick={zoom.zoomIn} disabled={zoom.scale >= MAX_SCALE} className="flex h-5 w-5 items-center justify-center rounded text-[var(--gc-text-muted)] hover:text-[var(--gc-text)] disabled:opacity-30" aria-label="放大">+</button>
           </div>
-          <span className="text-label text-white/50">
+          <span className="text-label text-[var(--gc-text-muted)]">
             双击{zoom.hudLabel === "适合画布" ? "切换100%" : "适合画布"} · Esc 关闭
           </span>
         </div>
@@ -190,7 +202,21 @@ export function ImageViewer() {
           onMouseLeave={zoom.handleMouseUp}
           style={{ cursor: zoom.cursor }}
         >
-          {isVideoRecord ? (
+          {!hasProduct ? (
+            <div className="flex max-w-md flex-col items-center gap-3 rounded-lg border border-dashed border-[var(--gc-border)] px-8 py-10 text-center">
+              <span className={`text-sm font-medium ${record ? (statusColor[record.status] ?? "") : ""}`}>
+                {record ? (statusText[record.status] ?? record.status) : "没有产物"}
+              </span>
+              {record?.error ? (
+                <p className="text-label leading-relaxed text-[var(--gc-text-muted)]">{record.error}</p>
+              ) : (
+                <p className="text-label text-[var(--gc-text-muted)]">本次运行没有生成图片。</p>
+              )}
+              <p className="text-label text-[var(--gc-text-muted)]">
+                右侧「生成ID」可用来定位这次运行。
+              </p>
+            </div>
+          ) : isVideoRecord ? (
             <video
               src={viewer.url}
               controls
@@ -201,7 +227,7 @@ export function ImageViewer() {
             />
           ) : (
             <img
-              src={viewer.url}
+              src={imageUrl}
               alt={viewer.title ?? "图片预览"}
               draggable={false}
               className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
@@ -228,21 +254,38 @@ export function ImageViewer() {
         >
           {zoom.hudLabel}
         </button>
-      </div>
+      </main>
 
-      {/* 侧边栏 */}
-      <aside className="w-[420px] shrink-0 overflow-y-auto border-l border-[var(--gc-border)] bg-[var(--gc-panel)]/98 p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3">
+      {/* 右栏：与蒙版重绘页同一套「clamp 宽 + 固定头 + 滚动体」 */}
+      <aside
+        className="flex h-full w-[clamp(256px,25%,360px)] shrink-0 flex-col border-l border-[var(--gc-border)] bg-[var(--gc-panel)]"
+        data-testid="result-detail-rail"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--gc-border)] px-4 py-3">
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
-            <p className="mt-1 text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
+            <h2 className="truncate text-sm font-medium text-[var(--gc-text)]">{record?.nodeLabel ?? viewer.title ?? "生成结果"}</h2>
+            <p className="mt-0.5 truncate text-label text-[var(--gc-text-muted)]">{record?.projectName ?? "当前项目"}</p>
           </div>
-          <button type="button" onClick={closeViewer} className="text-sm text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]" aria-label="关闭">✕</button>
+          <button
+            type="button"
+            onClick={closeViewer}
+            className="ml-2 flex size-7 shrink-0 items-center justify-center rounded-sm border border-[var(--gc-border)] text-[var(--gc-text)] hover:bg-[var(--gc-node-inner-hover)]"
+            aria-label="关闭"
+            title="关闭（ESC）"
+          >
+            <XIcon aria-hidden="true" />
+          </button>
         </div>
 
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {/* 从 ResultRecordDetail 迁移的字段 */}
-        <dl className="mt-5 space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
+        <dl className="space-y-2 border-y border-[var(--gc-border)] py-4 text-label">
           {[
+            // 生成ID（用户 2026-10-28）：服务端 generation_runs.id，唯一值，拿到它就能精确定位这次运行。
+            ["生成ID", record?.runId ? (
+              <code className="select-all font-mono text-[var(--gc-text)]" title={record.runId}>{record.runId}</code>
+            ) : "—"],
             ["状态", record ? <span className={statusColor[record.status] ?? ""}>{statusText[record.status] ?? record.status}</span> : "—"],
             ["节点类型", record ? nodeTitleForKind(record.kind) : "—"],
             ["模型", record?.model ?? "—"],
@@ -299,7 +342,11 @@ export function ImageViewer() {
           >
             {comparing ? "取消对比" : "加入对比"}
           </button>
-          <a href={viewer.url} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
+          {hasProduct ? (
+            <a href={imageUrl} download className="rounded-sm bg-gold px-3 py-1.5 text-label font-medium text-[var(--gc-accent-cta-ink)]">下载图片</a>
+          ) : (
+            <span className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text-muted)]">无产物可下载</span>
+          )}
           <label className="mr-auto flex items-center gap-2 text-label text-[var(--gc-text)]">
             <Checkbox
               aria-label="存入数字模特库"
@@ -337,13 +384,14 @@ export function ImageViewer() {
             <button
               type="button"
               onClick={handleContinueWithResult}
-              disabled={!record}
-              title={activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
+              disabled={!record || !hasProduct}
+              title={!hasProduct ? "本次运行没有产物，无法设为输入" : activeTabReadOnly ? "当前项目只读" : "把该结果作为输入节点放回画布"}
               className="rounded-sm border border-[var(--gc-border)] px-3 py-1.5 text-label text-[var(--gc-text)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               设为输入
             </button>
           )}
+        </div>
         </div>
       </aside>
     </div>

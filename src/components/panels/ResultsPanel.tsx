@@ -121,7 +121,7 @@ export function ResultsPanel({
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => setSelectedResultId(r.id)}
+                    onClick={() => openDetail(r)}
                     className={`flex ${resultCardClass} flex-col items-center justify-center gap-2 rounded-md border bg-[var(--gc-control)] px-1 ${
                       selectedResultId === r.id
                         ? "border-gold"
@@ -141,7 +141,7 @@ export function ResultsPanel({
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => setSelectedResultId(r.id)}
+                    onClick={() => openDetail(r)}
                     className={`flex ${resultCardClass} flex-col items-center justify-center gap-1 rounded-md border bg-[var(--gc-control)] px-1 ${
                       selectedResultId === r.id
                         ? r.status === "cancelled" ? "border-neutral-500" : "border-red-400"

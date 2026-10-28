@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveNodes, selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
-import type { ResultVideoNodeData } from "@/types/workflow";
+import { EDGE_HANDLE_RESULT, type ResultVideoNodeData } from "@/types/workflow";
 import { NodeFrame } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
@@ -114,6 +114,8 @@ export function ResultVideoNode({ id, data, selected }: NodeProps<Node<ResultVid
       </NodeFrame>
       <a ref={anchorRef} className="hidden" aria-hidden="true" download />
       <Handle type="source" position={Position.Right} title="输出视频" />
+      {/* 溯源入柄：接生成节点右侧的输出柄，不可手动拖拽。 */}
+      <Handle id={EDGE_HANDLE_RESULT} type="target" position={Position.Left} title="来自生成节点" isConnectable={false} />
     </>
   );
 }

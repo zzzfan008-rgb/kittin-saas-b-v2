@@ -122,7 +122,11 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
         aria-label={`${nodeTitleForKind(kind)}工具栏`}
         aria-orientation="horizontal"
         data-node-toolbar={kind}
-        className={`nodrag nopan absolute bottom-full left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-panel)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
+        // 用户 2026-10-28：曜黑·荧光绿主题下工具栏看不清（底色取 --gc-panel 是深色、
+        // 图标色取 --gc-node-text 是近黑 → 黑图标压深底）。改为固定用「节点白卡」配色
+        // （--gc-node-main / --gc-node-border / --gc-node-text），三个主题都是白底深字，
+        // 与简白主题完全一致。
+        className={`nodrag nopan absolute bottom-full left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-[var(--gc-node-border,var(--gc-border))] bg-[var(--gc-node-main,#ffffff)] shadow-lg shadow-black/30 ${textOnly ? "gap-1 px-2 py-1" : "gap-0.5 p-0.5"}`}
         style={{ marginBottom: "calc(var(--gc-node-toolbar-gap, 8px) + 31px)" }}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
@@ -172,7 +176,7 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
                     <SelectTrigger
                       aria-label={label}
                       title={presetDisabled ? `${label}：${disabledReason}` : label}
-                      className="nodrag size-7 justify-center gap-0 rounded-[min(var(--radius-md),12px)] border-0 bg-transparent p-0 text-[var(--gc-node-text)] hover:bg-muted"
+                      className="nodrag size-7 justify-center gap-0 rounded-[min(var(--radius-md),12px)] border-0 bg-transparent p-0 text-[var(--gc-node-text)] hover:bg-[var(--gc-node-inner-hover)]"
                     >
                       <Icon aria-hidden="true" />
                     </SelectTrigger>
@@ -218,7 +222,7 @@ export function NodeToolbar({ kind, selected, actions, textOnly = false }: NodeT
                         event.stopPropagation();
                         binding?.onSelect?.();
                       }}
-                      className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-text-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
+                      className="h-7 whitespace-nowrap rounded-full px-2.5 text-xs font-medium text-[var(--gc-node-muted)] transition-colors hover:bg-[var(--gc-accent)] hover:text-[var(--gc-accent-cta-ink,#131313)]"
                     >
                       {label}
                     </Button>

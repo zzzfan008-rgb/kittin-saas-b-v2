@@ -565,6 +565,14 @@ function validateV9Flow(nodes: PersistedWorkflowNode[], edges: PersistedWorkflow
       if (sourceKind !== "image" && sourceKind !== "result-image") {
         fail("flow.edges", `edge ${edge.id} 的 first-frame 入边只能来自 image/result-image 节点`);
       }
+    } else if (handle === "result") {
+      // 溯源边（用户 2026-10-28）：生成节点 → 结果节点，由运行时创建，用户不可手绘。
+      if (!isGeneratorNodeKind(sourceKind)) {
+        fail("flow.edges", `edge ${edge.id} 的 result 边源必须是生成节点`);
+      }
+      if (targetKind !== "result-image" && targetKind !== "result-video") {
+        fail("flow.edges", `edge ${edge.id} 的 result 边目标必须是结果节点`);
+      }
     } else {
       fail("flow.edges", `edge ${edge.id} 使用了未知的 targetHandle: ${String(handle)}`);
     }

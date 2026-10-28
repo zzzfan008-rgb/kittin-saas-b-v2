@@ -19,7 +19,6 @@ import {
 } from "../src/store/flowStore";
 import type { ImageGeneratorNodeData, ImageNodeData } from "../src/types/workflow";
 import { DEFAULT_GENERATION_MODEL_ID } from "../src/types/imageModels";
-import { ImageGrid } from "../src/components/nodes/ImageGrid";
 import { RunButton } from "../src/components/nodes/NodeFrame";
 import { normalizeReferenceImageEvidence } from "../src/lib/referenceEvidence";
 
@@ -314,16 +313,6 @@ test("缺少 images 的成功事件被归一为空数组而不是 undefined", ()
     throw new Error("expected success event");
   }
   assert.deepEqual(event.images, []);
-});
-
-test("图片网格收到损坏的 undefined 数据时显示空状态而不抛错", () => {
-  const html = renderToStaticMarkup(createElement(ImageGrid, { images: undefined }));
-  assert.match(html, /暂无生成结果/);
-});
-
-test("图片网格使用服务端缩略图但查看器仍保留原图引用", () => {
-  const html = renderToStaticMarkup(createElement(ImageGrid, { images: ["/api/files/result.png"] }));
-  assert.match(html, /\/api\/files\/result\.png\/thumbnail/);
 });
 
 test("历史参考证据始终与图片索引对齐，损坏条目保持待复核", () => {

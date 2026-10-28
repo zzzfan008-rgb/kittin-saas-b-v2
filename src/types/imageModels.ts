@@ -13,7 +13,11 @@ export const IMAGE_MODEL_IDS = [
 ] as const;
 
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number];
-export type GenerationImageModelId = Exclude<ImageModelId, "gpt-image-2.5-sunburst">;
+/**
+ * 2026-10-28 实测更正：sunburst 同样支持文生图/图生图，不再从生成清单里排除。
+ * MASK_REDRAW_MODEL_ID 仍然指向它（带蒙版时由 dag 自动选用），只是不再是「仅蒙版」。
+ */
+export type GenerationImageModelId = ImageModelId;
 
 /**
  * R5（schema v7）：模型参数放开为自由 key-value。契约仅提供推荐值元数据
@@ -145,9 +149,7 @@ export function hasReviewedModelCatalogBaseline(): boolean {
 export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare";
 export const MASK_REDRAW_MODEL_ID = "gpt-image-2.5-sunburst" as const;
 
-export const GENERATION_IMAGE_MODEL_IDS = IMAGE_MODEL_IDS.filter(
-  (id): id is GenerationImageModelId => id !== MASK_REDRAW_MODEL_ID,
-);
+export const GENERATION_IMAGE_MODEL_IDS: readonly GenerationImageModelId[] = IMAGE_MODEL_IDS;
 
 export function isImageModelId(value: unknown): value is ImageModelId {
   return typeof value === "string" && (IMAGE_MODEL_IDS as readonly string[]).includes(value);
@@ -163,6 +165,166 @@ export function imageModelContractHash(id: ImageModelId): `sha256:${string}` {
 
 export function imageModelLabel(id: ImageModelId): string {
   return getImageModelContract(id).label;
+}
+
+/**
+ * 模型选择器的二级分组（用户 2026-10-28 批注）：
+ * 一级 = 厂商名，二级 = 同厂商下的具体型号；同厂内「快速」在前、「专业」在后。
+ *
+ * 这是**展示层**的唯一事实源：节点参数面板据此渲染 SelectGroup，
+ * 与契约 label（长描述）解耦——契约 label 继续用于结果记录与详情展示。
+ */
+export const IMAGE_MODEL_VENDOR_GROUPS: ReadonlyArray<{
+  vendor: string;
+  models: ReadonlyArray<{ id: ImageModelId; name: string }>;
+}> = [
+  {
+    vendor: "OpenAI",
+    models: [
+      { id: "gpt-image-2.5-flare", name: "GPT2.5快速" },
+      { id: "gpt-image-2.5-sunburst", name: "GPT2.5专业" },
+    ],
+  },
+  {
+    vendor: "Google",
+    models: [
+      { id: "gemini-3.1-flash-image", name: "香蕉3.1快速" },
+      { id: "gemini-nano-banana-2.1", name: "香蕉2.1专业" },
+    ],
+  },
+  {
+    vendor: "阿里",
+    models: [
+      { id: "qwen-image-3.0", name: "千问3快速" },
+      { id: "qwen-image-3.0-pro", name: "千问3专业" },
+    ],
+  },
+  {
+    vendor: "字节跳动",
+    models: [
+      { id: "doubao-seedream-5-0-lite-260128", name: "Seedream5.0快速" },
+      { id: "doubao-seedream-5-0-pro-260628", name: "Seedream5.0专业" },
+    ],
+  },
+  {
+    vendor: "Black Forest Labs",
+    models: [
+      { id: "flux-3-image", name: "FLUX3" },
+    ],
+  },
+];
+
+/** 模型 id → 下拉短名称（未登记时回落到契约 label）。 */
+export function imageModelShortName(id: ImageModelId): string {
+  for (const group of IMAGE_MODEL_VENDOR_GROUPS) {
+    const hit = group.models.find((model) => model.id === id);
+    if (hit) return hit.name;
+  }
+  return imageModelLabel(id);
+}
+
+// ---------- 分辨率档位（用户 2026-10-28 批注：面板只保留 画幅 / 分辨率 / 画质）----------
+
+export const RESOLUTION_TIERS = ["1K", "2K", "4K"] as const;
+export type ResolutionTier = (typeof RESOLUTION_TIERS)[number];
+/** 所有工作流默认 2K（用户拍板）。 */
+export const DEFAULT_RESOLUTION_TIER: ResolutionTier = "2K";
+/** 所有工作流默认画幅 1:1（用户拍板）。 */
+export const DEFAULT_ASPECT_RATIO = "1:1";
+/** 画质默认 auto（用户拍板）。 */
+/**
+ * 画质默认 low（用户 2026-10-28 修正）。auto 交给上游自由发挥，成片质量不稳定；
+ * low 最省时省钱且画质契约明确，用户可在面板上调到 medium / high。
+ */
+export const DEFAULT_QUALITY = "low";
+
+/** 档位 → 长边像素（大图统一 16 的倍数约束）。 */
+const TIER_LONG_EDGE: Record<ResolutionTier, number> = { "1K": 1024, "2K": 2048, "4K": 3840 };
+
+/**
+ * 各模型的分辨率承载参数（实测 2026-10-28，真实付费调用确认）：
+ * - gemini 系：原生 imageConfig.imageSize 直接吃 "1K"/"2K"/"4K"
+ * - gpt-image-2.5 / seedream：`size` 既吃档位串也吃 WxH（我们用 WxH 以保住画幅）
+ * - qwen：`size` 必须是 `宽*高`（`2K` 会 400）
+ * - flux-3-image：`resolution` 吃 768sq/1k/1.5k/2k/4k
+ */
+export function imageResolutionParamKey(modelId: ImageModelId): "imageSize" | "size" | "resolution" {
+  if (modelId === "gemini-nano-banana-2.1" || modelId === "gemini-3.1-flash-image") return "imageSize";
+  if (modelId === "flux-3-image") return "resolution";
+  return "size";
+}
+
+function parseRatio(aspectRatio: string): { w: number; h: number } | undefined {
+  const m = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(aspectRatio.trim());
+  if (!m) return undefined;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!(w > 0 && h > 0)) return undefined;
+  return { w, h };
+}
+
+/** 按「档位 × 画幅」算像素尺寸：长边取档位基准，短边按比例，宽高取 16 的倍数。 */
+export function resolutionDimensions(tier: ResolutionTier, aspectRatio: string): { width: number; height: number } {
+  const ratio = parseRatio(aspectRatio) ?? { w: 1, h: 1 };
+  const long = TIER_LONG_EDGE[tier];
+  const isLandscape = ratio.w >= ratio.h;
+  const major = ratio.w >= ratio.h ? ratio.w : ratio.h;
+  const minor = ratio.w >= ratio.h ? ratio.h : ratio.w;
+  const shortEdge = Math.max(16, Math.round((long * minor) / major / 16) * 16);
+  return isLandscape
+    ? { width: long, height: shortEdge }
+    : { width: shortEdge, height: long };
+}
+
+/**
+ * 档位 + 画幅 → 该模型实际的 modelOptions 补丁。
+ * 这个函数是「画幅/分辨率」两个控件唯一的写入口，任何模型都从这里取值，
+ * 避免面板里按模型写 if/else。
+ */
+export function resolutionModelOptions(
+  modelId: ImageModelId,
+  tier: ResolutionTier,
+  aspectRatio: string,
+): ImageModelOptions {
+  const key = imageResolutionParamKey(modelId);
+  if (key === "imageSize") {
+    // gemini：画幅走 imageConfig.aspectRatio，分辨率走 imageSize。
+    return { aspectRatio, imageSize: tier };
+  }
+  if (key === "resolution") {
+    // flux：resolution 只有 768sq/1k/1.5k/2k/4k，映射到我们的三档。
+    const mapped = tier === "1K" ? "1k" : tier === "2K" ? "2k" : "4k";
+    return { aspect_ratio: aspectRatio, resolution: mapped };
+  }
+  const { width, height } = resolutionDimensions(tier, aspectRatio);
+  // qwen 只认 `宽*高`；其余模型用 `宽x高`。
+  const isQwen = modelId === "qwen-image-3.0" || modelId === "qwen-image-3.0-pro";
+  return { size: isQwen ? `${width}*${height}` : `${width}x${height}` };
+}
+
+/** 从 modelOptions 反解当前档位（面板回显用）；无法判定时返回默认档。 */
+export function resolutionTierOf(modelId: ImageModelId, options: ImageModelOptions | undefined): ResolutionTier {
+  const raw = options ?? {};
+  const key = imageResolutionParamKey(modelId);
+  const value = raw[key];
+  if (typeof value !== "string") return DEFAULT_RESOLUTION_TIER;
+  if (key === "imageSize") {
+    return (RESOLUTION_TIERS as readonly string[]).includes(value) ? value as ResolutionTier : DEFAULT_RESOLUTION_TIER;
+  }
+  if (key === "resolution") {
+    const lower = value.toLowerCase();
+    if (lower === "1k" || lower === "768sq") return "1K";
+    if (lower === "2k" || lower === "1.5k") return "2K";
+    if (lower === "4k") return "4K";
+    return DEFAULT_RESOLUTION_TIER;
+  }
+  // size 形态：取长边判定档位
+  const nums = value.split(/[x*]/).map((part) => Number(part.trim()));
+  const longEdge = Math.max(...nums.filter((n) => Number.isFinite(n)));
+  if (!Number.isFinite(longEdge)) return DEFAULT_RESOLUTION_TIER;
+  if (longEdge >= 3000) return "4K";
+  if (longEdge >= 1600) return "2K";
+  return "1K";
 }
 
 const VIP_SIZE_BY_RATIO: Record<string, string> = {

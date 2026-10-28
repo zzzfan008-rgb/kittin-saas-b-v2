@@ -90,7 +90,11 @@ export const MAX_MASK_USER_REFERENCE_IMAGES = MAX_REFERENCE_IMAGES - 1;
 export const MAX_PROMPT_INPUTS = 1;
 /** 局部修改提示词、区域引导图和服务端合成策略的可追踪版本。 */
 export const MASK_PIPELINE_VERSION = 3;
-export const BATCH_SIZES = [1, 2, 4, 8] as const;
+/**
+ * 用户 2026-10-28：生成数量（面板「数量」控件）1–8 全整数可选。
+ * 原为 [1,2,4,8]，改为连续整数，与面板下拉和 schema 校验共用同一真值。
+ */
+export const BATCH_SIZES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 export type BatchSize = (typeof BATCH_SIZES)[number];
 
 // ---------- 参考图可追溯输入 ----------
@@ -429,10 +433,20 @@ export type GraphEdgeLike = {
   targetHandle?: string | null;
 };
 
-/** targetHandle 取值：prompt / reference / first-frame（runtime.md §2.1）。 */
+/** targetHandle 取值：prompt / reference / first-frame / result（runtime.md §2.1）。 */
 export const EDGE_HANDLE_PROMPT = "prompt";
 export const EDGE_HANDLE_REFERENCE = "reference";
 export const EDGE_HANDLE_FIRST_FRAME = "first-frame";
+/**
+ * 生成节点 → 结果节点的溯源边（用户 2026-10-28：生成节点右边必须连到结果节点）。
+ * 由运行时创建、两端 handle 都不可手动拖拽；用户连线仍只走 prompt / reference / first-frame。
+ */
+export const EDGE_HANDLE_RESULT = "result";
+
+/** 结果节点溯源边：生成节点右侧输出柄 → 结果节点左侧入柄。 */
+export function isResultSourceEdge(edge: GraphEdgeLike): boolean {
+  return edge.targetHandle === EDGE_HANDLE_RESULT;
+}
 
 export function isPromptEdge(edge: GraphEdgeLike): boolean {
   return edge.targetHandle === EDGE_HANDLE_PROMPT;

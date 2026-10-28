@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
-import { isNodeRunActive, type ImageGeneratorNodeData } from "@/types/workflow";
-import { Developing, NodeFrame, STATUS_TEXT } from "./NodeFrame";
+import { EDGE_HANDLE_RESULT, isNodeRunActive, type ImageGeneratorNodeData } from "@/types/workflow";
+import { NodeFrame, STATUS_TEXT } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { GeneratorParamsPanel } from "./GeneratorParamsPanel";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
@@ -46,9 +46,10 @@ export function ImageGeneratorNode({ id, data, selected }: NodeProps<Node<ImageG
         }
       >
         <GeneratorParamsPanel nodeId={id} data={data} />
-        {running && <Developing />}
       </NodeFrame>
-      <Handle type="source" position={Position.Right} title="输出图片" />
+      {/* 输出柄：只承载「生成节点 → 结果节点」的溯源边，故不可手动拖拽（isConnectable=false），
+        避免用户误连出数据流边。溯源边由 result-node-created 事件自动创建。 */}
+      <Handle id={EDGE_HANDLE_RESULT} type="source" position={Position.Right} title="输出图片（连到结果节点）" isConnectable={false} />
     </>
   );
 }

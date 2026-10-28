@@ -17,12 +17,13 @@
     "dev:check": "tsx scripts/dev-preflight.ts",
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
+    "dev:server:once": "tsx server/index.ts",
     "build": "npm run build:web && npm run build:server",
     "build:web": "tsc -b && vite build && node scripts/verify-built-css.mjs && node scripts/verify-bundle-budget.mjs",
     "build:server": "tsx scripts/build-server.ts",
     "start": "NODE_ENV=production node dist-server/index.js",
     "lint": "tsc --noEmit",
-    "check": "npm run lint && node scripts/check-legacy-variant-grep.mjs && npm run build:web && npm run test",
+    "check": "npm run gen:presets:check && npm run lint && node scripts/check-legacy-variant-grep.mjs && node scripts/apiyi-docs.mjs check --offline && npm run build:web && npm run test",
     "test": "node scripts/test-with-postgres.mjs",
     "test:e2e": "node scripts/e2e-with-postgres.mjs",
     "test:e2e:production": "node scripts/e2e-production-smoke.mjs",
@@ -31,6 +32,7 @@
     "gate:codex": "node scripts/codex-gate.mjs",
     "gate:receipt:verify": "node scripts/gate-receipt-verify.mjs",
     "docs:apiyi:check": "node scripts/apiyi-docs.mjs check",
+    "gen:presets": "tsx scripts/gen-prompt-mirrors.mjs",
     "docs:apiyi:refresh": "node scripts/apiyi-docs.mjs refresh",
     "docs:apiyi:kb:sync": "node scripts/apiyi-kb.mjs sync",
     "docs:apiyi:kb:check": "node scripts/apiyi-kb.mjs check",
@@ -42,7 +44,8 @@
     "test:suite": "node scripts/test-suite-parallel.mjs",
     "docker:up": "docker compose up -d --build --wait",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f app postgres"
+    "docker:logs": "docker compose logs -f app postgres",
+    "gen:presets:check": "tsx scripts/gen-prompt-mirrors.mjs --check"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

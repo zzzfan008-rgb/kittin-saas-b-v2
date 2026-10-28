@@ -19,10 +19,14 @@ assert.match(markup, /来源：legacy-garment-source/);
 
 // 2026-09-25 决策 5：结果详情弹窗(z-71) 之上叠查看器，查看器必须在详情之上。
 // ui-qa 用 elementFromPoint 钉住；这里用渲染出的 className 做结构守卫。
+// 2026-10-28：外壳改为与「蒙版重绘」页同款全屏分栏（去黑蒙层，改用主题底色），
+// 层级要求不变——仍必须是 z-80。
+const viewerSource = readFileSync(new URL("../src/components/ImageViewer.tsx", import.meta.url), "utf8");
 assert.match(
-  readFileSync(new URL("../src/components/ImageViewer.tsx", import.meta.url), "utf8"),
-  /className="fixed inset-0 z-\[80\] flex items-stretch bg-black\/85"/,
+  viewerSource,
+  /className="fixed inset-0 z-\[80\] flex items-stretch bg-\[var\(--gc-canvas\)\]"/,
   "图片查看器必须渲染在结果详情弹窗之上（z-80 > z-71）",
 );
+assert.match(viewerSource, /data-panel="result-detail"/, "结果详情页需带面板标识，便于与蒙版页对齐");
 
 console.log("历史参考证据查看器契约测试通过");

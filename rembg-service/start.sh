@@ -54,7 +54,9 @@ if [[ "${1:-}" == "--daemon" ]]; then
   fi
   nohup "${RUN[@]}" > "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
-  echo "抠图服务已在后台启动（PID $(cat "$PID_FILE")，端口 $PORT）"
+  # 变量后面紧跟中文全角括号时必须用 ${PORT}：bash 会把全角括号的 UTF-8 字节
+  # 当成变量名的一部分，报 "PORT?: unbound variable"。
+  echo "抠图服务已在后台启动（PID $(cat "$PID_FILE")，端口 ${PORT}）"
   echo "日志：$LOG_FILE"
   echo "就绪检查：curl -s localhost:$PORT/health"
 else

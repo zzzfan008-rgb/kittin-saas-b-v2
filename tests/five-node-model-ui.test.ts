@@ -249,7 +249,12 @@ test("生图节点：操作 / 模型 / 画幅 / 批次内联在卡片上，运�
   // 65b：操作由接线自动推断（不再有 aria-label="操作" 下拉）
   assert.match(html, /aria-label="模型"/);
   assert.match(html, /aria-label="画幅"/);
-  assert.match(html, /aria-label="模型参数"/);
+  // 用户 2026-10-28：图片生成节点只保留 画幅 / 分辨率 / 画质 三个控件，
+  // 不再有「批次」与契约驱动的「模型参数」区。
+  assert.match(html, /aria-label="分辨率"/);
+  assert.match(html, /aria-label="画质"/);
+  assert.doesNotMatch(html, /aria-label="批次"/);
+  assert.doesNotMatch(html, /aria-label="模型参数"/);
   // 端口行 + 来源胶囊取代底部统计行：两行端口（提示词/参考图）未接线时值列均为「未连接」
   assert.match(html, /data-handleid="prompt"/);
   assert.match(html, /data-handleid="reference"/);
@@ -282,7 +287,16 @@ test("图片结果节点：渲染产物与溯源，工具条按能力给出禁�
   });
   const html = render(node);
   assert.match(html, /\/api\/files\/out-1\.png/);
-  assert.match(html, /来自：/);
+  // 用户批注（2026-10-28）：有产物时与图片节点完全一致——不再渲染「来自：…」文字行，
+  // 溯源改由图片 title 承载；空态才显示来源。
+  assert.doesNotMatch(html, /来自：/);
+  // 用户 2026-10-28：结果节点只渲染预览图（/thumbnail），且图片本身不可点击放大。
+  assert.match(html, /\/api\/files\/out-1\.png\/thumbnail/, "必须用缩略图而非原图");
+  assert.match(html, /pointer-events-none/, "图片必须不可点击");
+  assert.match(html, /draggable="false"/, "图片不得可拖拽");
+  assert.doesNotMatch(html, /cursor-grab/, "节点图片不得再有可抓取/可点击样式");
+  assert.match(html, /aria-label="查看第 1 张"/);
+  assert.match(html, /aria-label="查看第 2 张"/);
   assert.match(html, /aria-label="下载"/);
   assert.match(html, /aria-label="作为输入"/);
   assert.match(html, /暂不可用/);

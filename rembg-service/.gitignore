@@ -6,3 +6,6 @@ venv/
 models/
 __pycache__/
 *.pyc
+# 运行时产物（start.sh --daemon 写 pid/日志）
+*.pid
+*.log
