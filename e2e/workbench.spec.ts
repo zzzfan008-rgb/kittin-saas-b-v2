@@ -590,14 +590,14 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   // 故用节点作用域内的 textarea 定位，避免用 getByRole 的 name 断言一个不存在的可访问名。
   const presetPicker = textNode.getByRole("combobox", { name: "提示词预设" });
   await expect(presetPicker).toBeVisible();
-  // 2026-10-28：正文改为「写实穿搭生成。按正文描述…」——去掉了模型名与 VIP 残留；
-  // 且预设正文含「用户补充要求」锚点 → 节点切协议模板态，DOM 里会出现第二个 textarea
-  //（六要素面板），故按 first() 锁定正文框。
+  // 2026-10-28：正文改为「写实穿搭生成。按补充要求描述…」——协议自指词「正文」已统一
+  // 改成「补充要求」（用户拍板：不许带自指/无关内容）；预设正文仍含「补充要求：」锚点，
+  // 节点切协议模板态后 DOM 会出现第二个 textarea（六要素面板），故按 first() 锁定正文框。
   const textBody = textNode.locator("textarea").first();
-  await expect(textBody).not.toHaveValue(/写实穿搭生成。按正文描述/);
+  await expect(textBody).not.toHaveValue(/写实穿搭生成。按补充要求描述/);
   await presetPicker.click();
   await page.getByRole("option", { name: "写实穿搭", exact: true }).click();
-  await expect(textBody).toHaveValue(/写实穿搭生成。按正文描述/);
+  await expect(textBody).toHaveValue(/写实穿搭生成。按补充要求描述/);
   // 未选中节点不渲染工具条（不占 DOM）。
   const imageNodeId = await nodeIdOfKind(page, "image");
   const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);
