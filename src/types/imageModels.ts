@@ -1,15 +1,15 @@
 import contracts from "../../docs/ai/apiyi/model-contracts.json";
 
 export const IMAGE_MODEL_IDS = [
-  "gpt-image-2.5-sunburst",
-  "gpt-image-2.5-all",
-  "gpt-image-2.5-sunburst-vip",
-  "gpt-image-2.5-flare-vip",
-  "gemini-3-pro-image-preview",
-  "gemini-3.1-flash-lite-image",
+  "gemini-nano-banana-2.1",
   "gemini-3.1-flash-image",
-  "flux-2-pro",
-  "seedream-5-0-260128",
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2.5-flare",
+  "flux-3-image",
+  "doubao-seedream-5-0-pro-260628",
+  "doubao-seedream-5-0-lite-260128",
+  "qwen-image-3.0-pro",
+  "qwen-image-3.0",
 ] as const;
 
 export type ImageModelId = (typeof IMAGE_MODEL_IDS)[number];
@@ -142,7 +142,7 @@ export function hasReviewedModelCatalogBaseline(): boolean {
     && REVIEWED_MODEL_CATALOG_BASELINE.reviewedRawExportSha256 !== null;
 }
 
-export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare-vip";
+export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare";
 export const MASK_REDRAW_MODEL_ID = "gpt-image-2.5-sunburst" as const;
 
 export const GENERATION_IMAGE_MODEL_IDS = IMAGE_MODEL_IDS.filter(
@@ -184,7 +184,7 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
  * 取值来源：docs/ai/apiyi/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
  * docs/ai/apiyi/consultations/vip-size-tiers.json 的咨询凭证）；标准档与
  * VIP_SIZE_BY_RATIO 的既有默认一致（如 3:4 = 1536x2048）。
- * 仅 gpt-image-2.5-flare-vip / gpt-image-2.5-sunburst-vip 提供该三档选择
+ * 仅 gpt-image-2.5-flare / gpt-image-2.5-sunburst 提供该三档选择
  * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。
  */
 export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: string; size: string }[]>> = {
@@ -201,15 +201,18 @@ export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: s
 };
 
 /**
- * VIP 系（sunburst-vip / flare-vip）的尺寸档表；非 VIP 模型或未知画幅返回 undefined。
- * 「尺寸」控件与画幅联动填充共用同一查表口，避免两处各写一份档位判断。
+ * 历史遗留的 VIP 三档尺寸表（1K/2K/4K）。
+ *
+ * 兔子API 迁移后，gpt-image-2.5-flare / sunburst 直接接受任意 size（契约
+ * recommendedOptions.size.examples），不再有「按画幅切三档」的语义，
+ * 因此本函数对所有当前模型一律返回 undefined；保留导出是为了让面板与画幅联动
+ * 继续走同一查表口（返回 undefined 即回落到契约驱动的取值）。
  */
 export function vipSizeTiersForRatio(
-  modelId: ImageModelId,
-  aspectRatio: string,
+  _modelId: ImageModelId,
+  _aspectRatio: string,
 ): readonly { tier: string; size: string }[] | undefined {
-  if (modelId !== "gpt-image-2.5-flare-vip" && modelId !== "gpt-image-2.5-sunburst-vip") return undefined;
-  return VIP_SIZE_TIERS_BY_RATIO[aspectRatio];
+  return undefined;
 }
 
 /** VIP 尺寸默认档（标准档）在档表中的下标——面板删除「自动」项后未设置/非法 size 的落点。 */
@@ -237,7 +240,7 @@ export function imageSizeTierOptions(
 }
 
 /**
- * `gpt-image-2.5-all` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
+ * `gpt-image-2.5-flare` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
  * 值域取契约 recommendedOptions.promptSizePrefix.examples；标签附实测分辨率，来源为
  * 经审查的官方文档快照
  * docs/ai/apiyi/site/snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/sources/llms-full.txt:4619-4628
@@ -337,23 +340,26 @@ export function imageModelOptionsForAspectRatio(
 ): ImageModelOptions {
   const normalized = { ...normalizeImageModelOptions(modelId, current) };
   switch (modelId) {
+    // 兔子API GPT Image 2.5：size 直接吃像素串（宽高 16 的倍数、长边≤3840、比≤3:1）。
+    // 画幅联动只在用户尚未选 size 时按画幅填默认值，绝不覆盖用户已选尺寸。
     case "gpt-image-2.5-sunburst":
-    case "gpt-image-2.5-all":
-    case "seedream-5-0-260128":
-      return normalized;
-    case "gpt-image-2.5-sunburst-vip":
-    case "gpt-image-2.5-flare-vip":
-      return { ...normalized, size: VIP_SIZE_BY_RATIO[aspectRatio] ?? normalized.size };
-    case "gemini-3-pro-image-preview":
-    case "gemini-3.1-flash-lite-image":
+    case "gpt-image-2.5-flare":
+      return { ...normalized, size: normalized.size ?? VIP_SIZE_BY_RATIO[aspectRatio] };
+    case "gemini-nano-banana-2.1":
     case "gemini-3.1-flash-image": {
       const allowed = getImageModelContract(modelId).aspectRatios ?? [];
       return allowed.includes(aspectRatio) ? { ...normalized, aspectRatio } : normalized;
     }
-    case "flux-2-pro": {
-      const dimensions = FLUX_DIMENSIONS_BY_RATIO[aspectRatio];
-      return dimensions ? { ...normalized, ...dimensions } : normalized;
+    // 兔子API flux-3-image 用 aspect_ratio（不是 width/height，也不是 size）。
+    case "flux-3-image": {
+      const allowed = getImageModelContract(modelId).aspectRatios ?? [];
+      return allowed.includes(aspectRatio) ? { ...normalized, aspect_ratio: aspectRatio } : normalized;
     }
+    case "doubao-seedream-5-0-pro-260628":
+    case "doubao-seedream-5-0-lite-260128":
+    case "qwen-image-3.0-pro":
+    case "qwen-image-3.0":
+      return { ...normalized, size: VIP_SIZE_BY_RATIO[aspectRatio] ?? normalized.size };
   }
 }
 

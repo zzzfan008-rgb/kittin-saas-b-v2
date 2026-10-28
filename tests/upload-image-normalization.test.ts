@@ -855,7 +855,7 @@ await test("Provider 调用前会标准化旧素材请求副本，失败时不�
     params: {
       prompt: "提取主图案",
       operationMode: "edit",
-      modelId: "flux-2-pro",
+      modelId: "flux-3-image",
       modelOptions: { width: 1024, height: 1024, outputFormat: "png" },
     },
   };

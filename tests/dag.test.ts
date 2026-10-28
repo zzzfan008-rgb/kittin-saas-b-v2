@@ -49,7 +49,7 @@ function resultImageNode(id: string, images: string[]): FlowNode {
 
 function imageGeneratorNode(
   id: string,
-  modelId = "gpt-image-2.5-flare-vip",
+  modelId = "gpt-image-2.5-flare",
   extra: Record<string, unknown> = {},
 ): FlowNode {
   // v9 夹具（64 Phase 1）：variant 绑定字段已删除；operationMode 走 extra 显式注入。
@@ -140,7 +140,7 @@ function main() {
     );
     const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
     assert.ok(!("operationMode" in g1.params));
-    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare");
     assert.equal(g1.params.aspectRatio, "3:4");
     assert.equal(g1.params.batchSize, 1);
   });
@@ -179,7 +179,7 @@ function main() {
   ok("C4：params 零 variant 字段残留（promptVariantId/promptFamilyId/contractHash/evaluationVersion/parameterProfileId/postprocessVersion）", () => {
     // 即使脏 data 携带旧字段，extractParams 也绝不注入（64 C4：variant 五字段注入删除）。
     const forged = imageGeneratorNode("g1", undefined, {
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
       promptFamilyId: "fashion-lookbook",
       contractHash: "sha256:" + "f".repeat(64),
       evaluationVersion: "forged-eval-v99",
@@ -420,7 +420,7 @@ function main() {
       } as WorkflowNodeData,
     };
     const plan = buildExecutionPlan(
-      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1", "gpt-image-2.5-flare-vip")],
+      [textNode("t1", "把背景改成纯白"), maskedImage, imageGeneratorNode("g1", "gpt-image-2.5-flare")],
       [edge("t1", "g1"), edge("i1", "g1", "reference")],
     );
     const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
@@ -428,7 +428,7 @@ function main() {
     assert.ok(!("mask" in g1.params));
     assert.ok(!("maskSourceRef" in g1.params));
     assert.ok(!("operationMode" in g1.params), "无推断源时不物化 operationMode");
-    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip", "modelId 保持前端送的值，不再 canonicalize");
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare", "modelId 保持前端送的值，不再 canonicalize");
   });
 
   ok("65d：buildExecutionPlan 不改写传入 node.data（蒙版留在 image 节点，不注入生成节点）", () => {
@@ -441,7 +441,7 @@ function main() {
         mask: "data:image/png;base64,MASK==",
       } as WorkflowNodeData,
     };
-    const g1Node = imageGeneratorNode("g1", "gpt-image-2.5-flare-vip");
+    const g1Node = imageGeneratorNode("g1", "gpt-image-2.5-flare");
     const plan = buildExecutionPlan(
       [textNode("t1", "把背景改成纯白"), maskedImage, g1Node],
       [edge("t1", "g1"), edge("i1", "g1", "reference")],
@@ -449,11 +449,11 @@ function main() {
     // plan 产物：生成节点不消费蒙版、不 canonicalize。
     const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
     assert.ok(!("mask" in g1.params));
-    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare");
     // 传入节点对象不被改写：蒙版仍留在 image 节点 data，生成节点 data 不注入 mask/modelId。
     assert.equal((maskedImage.data as { mask?: string }).mask, "data:image/png;base64,MASK==");
     assert.ok(!("modelId" in maskedImage.data), "image 节点不被注入 modelId");
-    assert.equal((g1Node.data as { modelId: string }).modelId, "gpt-image-2.5-flare-vip", "生成节点 data.modelId 不被改写");
+    assert.equal((g1Node.data as { modelId: string }).modelId, "gpt-image-2.5-flare", "生成节点 data.modelId 不被改写");
   });
 
   ok("65d：无 mask 时 modelId/operationMode 保持前端送的值（不强制）", () => {
@@ -466,12 +466,12 @@ function main() {
       } as WorkflowNodeData,
     };
     const plan = buildExecutionPlan(
-      [textNode("t1", "改个背景"), plainImage, imageGeneratorNode("g1", "gpt-image-2.5-flare-vip", { operationMode: "edit" })],
+      [textNode("t1", "改个背景"), plainImage, imageGeneratorNode("g1", "gpt-image-2.5-flare", { operationMode: "edit" })],
       [edge("t1", "g1"), edge("i1", "g1", "reference")],
     );
     const g1 = plan.steps.find((s) => s.nodeId === "g1")!;
     assert.equal(g1.params.operationMode, "edit");
-    assert.equal(g1.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(g1.params.modelId, "gpt-image-2.5-flare");
   });
 
   // ---------- 65d §3：蒙版重绘/整图编辑合成 step（方案 A：onlyNodeId→image 节点不走 filter 主链）----------
@@ -519,7 +519,7 @@ function main() {
     assert.equal(plan.steps.length, 1);
     const step = plan.steps[0]!;
     assert.equal(step.params.operationMode, "edit");
-    assert.equal(step.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(step.params.modelId, "gpt-image-2.5-flare");
     assert.equal(step.params.mask, undefined);
   });
 
@@ -533,7 +533,7 @@ function main() {
     assert.equal(step.params.prompt, "把袖子改短");
     assert.deepEqual(step.params.inputTexts, ["把袖子改短"]);
     assert.equal(step.params.batchSize, 1);
-    assert.equal(step.params.modelId, "gpt-image-2.5-flare-vip");
+    assert.equal(step.params.modelId, "gpt-image-2.5-flare");
   });
 
   ok("65d §3：image 节点无 editPrompt → 不合成（走正常 filter，返回空 steps）", () => {

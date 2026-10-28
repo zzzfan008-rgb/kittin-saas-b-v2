@@ -1,11 +1,11 @@
 {
   "schemaVersion": 3,
   "contractLayer": "productPolicy",
-  "contractId": "apiyi-image-contracts-v4",
-  "reviewedOn": "2026-09-03",
+  "contractId": "tuzi-image-contracts-v1",
+  "reviewedOn": "2026-10-27",
   "generatedFrom": {
-    "knowledgeFile": "model-knowledge.json",
-    "sourceManifest": "sources.json",
+    "knowledgeFile": "tuzi-protocol-audit-2026-10-27",
+    "sourceVantage": "local-curl-via-kunlun-cdn-mirror",
     "productMustRemainGatewaySubset": true
   },
   "releasePolicy": {
@@ -17,7 +17,7 @@
     "contractOrSourceDriftDowngradesTo": "unverified",
     "automaticPaidProbes": false
   },
-  "baseUrl": "https://api.apiyi.com",
+  "baseUrl": "https://api.tu-zi.com",
   "runtime": {
     "upstreamMode": "synchronous",
     "businessQueue": "postgresql",
@@ -29,842 +29,6 @@
     "ambiguousTransportFailure": "outcome_unknown",
     "persistTemporaryUrlsImmediately": true
   },
-  "textModels": {
-    "schemaNote": "提示词改写层文本通道（2026-10-12 拍板）。OpenAI 兼容 chat-completions，与出图 models[] 独立：不参与出图 contractHash / expectedGatewayModelIds 九模型校验。",
-    "endpoint": "/v1/chat/completions",
-    "protocol": "openai-compatible",
-    "defaultModelId": "gemini-3.8-flash",
-    "groups": ["default", "svip"],
-    "reasoningEffort": "medium",
-    "forbiddenParams": ["minimal", "thinkingBudget"],
-    "temperature": 0.4,
-    "maxTokens": 512,
-    "timeoutMs": 20000,
-    "maxRetries": 1,
-    "retryableErrorCodes": ["text_transport_error", "text_rate_limited", "text_upstream_error"],
-    "pricingPerMillionTokens": { "inputUsd": 0.75, "outputUsd": 3.75, "thinkingBilledAsOutput": true },
-    "evidence": {
-      "docUrl": "https://docs.apiyi.com/en/api-capabilities/gemini-3-8-flash/overview",
-      "snapshotPageSha256": "60ad49edb28ee9dc13c72e7cefc2ed120ba97a3d65f80b7dc43624069a22fbbe",
-      "knowledgeBaseSnapshot": "2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd",
-      "claims": "OpenAI-compatible POST /v1/chat/completions; reasoning_effort 有效值 low/medium/high；minimal 在 OpenAI 兼容端 200 但被静默忽略仍计思考费（禁用）；thinkingBudget:0 为原生端完全关闭机制（本通道不用）；定价 $0.75/$3.75。"
-    }
-  },
-  "inputNormalization": {
-    "acceptedMimeTypes": [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "image/gif"
-    ],
-    "outputMimeTypes": [
-      "image/png",
-      "image/jpeg"
-    ],
-    "maxInputBytes": 20971520,
-    "maxInputPixels": 40000000,
-    "maxLongEdge": 4096,
-    "targetBytes": 1500000,
-    "jpegQuality": {
-      "initial": 92,
-      "minimum": 80
-    },
-    "animationPolicy": "first-frame",
-    "applyExifOrientation": true,
-    "outputColourspace": "srgb",
-    "preserveMeaningfulAlpha": true
-  },
-  "models": [
-    {
-      "id": "gpt-image-2.5-sunburst",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:ddf9f7636e68c87afd59a2c644502b9d9febe5cdf9285c41f3cf2091de1e1502",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gpt-image-2.5-sunburst",
-      "upstreamModelId": "gpt-image-2.5-sunburst",
-      "vendorModelId": "gpt-image-2.5-sunburst",
-      "evidenceStatus": "unverified",
-      "label": "GPT Image 2.5 Sunburst 局部修改",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "mask-redraw"
-      ],
-      "timeoutMs": 360000,
-      "generation": null,
-      "edit": {
-        "path": "/v1/images/edits",
-        "contentType": "multipart/form-data",
-        "minReferences": 1,
-        "maxReferences": 8,
-        "maxUserReferences": 7,
-        "systemGuideImages": 1,
-        "singleImageField": "image[]",
-        "multipleImageField": "image[]",
-        "mask": {
-          "required": true,
-          "pipelineVersion": 3,
-          "mimeTypes": [
-            "image/png"
-          ],
-          "maxBytes": 4194304,
-          "requiresAlpha": true,
-          "mustMatchFirstImageDimensions": true,
-          "editableAlpha": 0,
-          "preservedAlpha": 255,
-          "userSelectionSemantics": "semantic-core-not-crop",
-          "providerExpansionAllowed": true,
-          "finalPixelProtection": "local-adaptive-blend-window"
-        },
-        "background": {
-          "supportedValues": [
-            "auto",
-            "opaque",
-            "transparent"
-          ],
-          "transparentStatus": "preview",
-          "transparentOutputFormats": [
-            "png",
-            "webp"
-          ],
-          "projectOutputFormat": "png",
-          "projectRequestValue": "opaque",
-          "projectResponseConvention": "full-canvas-edited-image",
-          "projectCompositePolicy": "unified-local-adaptive-blend-with-exact-outside-protection"
-        }
-      },
-      "dimensions": {
-        "multipleOf": 16,
-        "minSide": 16,
-        "maxSide": 3840,
-        "minPixels": 655360,
-        "maxPixels": 8294400,
-        "maxAspectRatio": 3
-      },
-      "qualityValues": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "forbiddenParameters": [
-        "input_fidelity",
-        "response_format"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "b64_json"
-        ],
-        "maxImages": 1
-      },
-      "recommendedOptions": {}
-    },
-    {
-      "id": "gpt-image-2.5-all",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e33094387efa9163c0d88b49359ebc5229eba5b63f3515e3d1e62c7d48f55cab",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gpt-image-2.5-all",
-      "upstreamModelId": "gpt-image-2.5-all",
-      "vendorModelId": null,
-      "evidenceStatus": "unverified",
-      "label": "GPT Image 2.5 All",
-      "channel": "reverse",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 90000,
-      "generation": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1/images/edits",
-        "contentType": "multipart/form-data",
-        "minReferences": 1,
-        "maxReferences": 8,
-        "singleImageField": "image",
-        "multipleImageField": "image"
-      },
-      "forbiddenParameters": [
-        "size",
-        "quality",
-        "n",
-        "aspect_ratio"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "b64_json",
-          "url"
-        ],
-        "maxImages": 1
-      },
-      "recommendedOptions": {
-        "promptSizePrefix": {
-          "examples": [
-            "横版 16:9",
-            "竖屏 9:16",
-            "4:3",
-            "3:4",
-            "3:2 尺寸",
-            "2:3 尺寸",
-            "2:5 竖屏",
-            "5:2 横屏"
-          ]
-        }
-      }
-    },
-    {
-      "id": "gpt-image-2.5-sunburst-vip",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:14f213ff98793ed83f76b77894f3e2ad884f1c05680904e90bbec5a50f00d9e5",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gpt-image-2.5-sunburst-vip",
-      "upstreamModelId": "gpt-image-2.5-sunburst-vip",
-      "vendorModelId": null,
-      "evidenceStatus": "unverified",
-      "label": "GPT Image 2.5 Sunburst VIP",
-      "channel": "reverse",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 150000,
-      "generation": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1/images/edits",
-        "contentType": "multipart/form-data",
-        "minReferences": 1,
-        "maxReferences": 8,
-        "singleImageField": "image",
-        "multipleImageField": "image"
-      },
-      "sizes": [
-        "auto",
-        "1280x1280",
-        "848x1280",
-        "1280x848",
-        "960x1280",
-        "1280x960",
-        "1024x1280",
-        "1280x1024",
-        "720x1280",
-        "1280x720",
-        "1280x544",
-        "2048x2048",
-        "1360x2048",
-        "2048x1360",
-        "1536x2048",
-        "2048x1536",
-        "1632x2048",
-        "2048x1632",
-        "1152x2048",
-        "2048x1152",
-        "2048x864",
-        "2880x2880",
-        "2336x3520",
-        "3520x2336",
-        "2480x3312",
-        "3312x2480",
-        "2560x3216",
-        "3216x2560",
-        "2160x3840",
-        "3840x2160",
-        "3840x1632"
-      ],
-      "aspectRatios": [
-        "1:1",
-        "2:3",
-        "3:2",
-        "3:4",
-        "4:3",
-        "4:5",
-        "5:4",
-        "9:16",
-        "16:9",
-        "21:9"
-      ],
-      "qualityValues": [
-        "auto",
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "forbiddenParameters": [
-        "n",
-        "aspect_ratio"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "b64_json",
-          "url"
-        ],
-        "maxImages": 1
-      },
-      "recommendedOptions": {
-        "quality": {
-          "default": "high",
-          "examples": [
-            "auto",
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": "gpt-image-2.5-flare-vip",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:5eba620cd204b3507b8d9401b92acd41a4356b219a16bb429cacfc474a3ede4d",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gpt-image-2.5-flare-vip",
-      "upstreamModelId": "gpt-image-2.5-flare-vip",
-      "vendorModelId": null,
-      "evidenceStatus": "unverified",
-      "label": "GPT Image 2.5 Flare VIP",
-      "channel": "reverse",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 150000,
-      "generation": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1/images/edits",
-        "contentType": "multipart/form-data",
-        "minReferences": 1,
-        "maxReferences": 8,
-        "singleImageField": "image",
-        "multipleImageField": "image"
-      },
-      "sizes": [
-        "auto",
-        "1280x1280",
-        "848x1280",
-        "1280x848",
-        "960x1280",
-        "1280x960",
-        "1024x1280",
-        "1280x1024",
-        "720x1280",
-        "1280x720",
-        "1280x544",
-        "2048x2048",
-        "1360x2048",
-        "2048x1360",
-        "1536x2048",
-        "2048x1536",
-        "1632x2048",
-        "2048x1632",
-        "1152x2048",
-        "2048x1152",
-        "2048x864",
-        "2880x2880",
-        "2336x3520",
-        "3520x2336",
-        "2480x3312",
-        "3312x2480",
-        "2560x3216",
-        "3216x2560",
-        "2160x3840",
-        "3840x2160",
-        "3840x1632"
-      ],
-      "aspectRatios": [
-        "1:1",
-        "2:3",
-        "3:2",
-        "3:4",
-        "4:3",
-        "4:5",
-        "5:4",
-        "9:16",
-        "16:9",
-        "21:9"
-      ],
-      "qualityValues": [
-        "auto",
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "forbiddenParameters": [
-        "n",
-        "aspect_ratio"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "b64_json",
-          "url"
-        ],
-        "maxImages": 1
-      },
-      "recommendedOptions": {
-        "quality": {
-          "default": "high",
-          "examples": [
-            "auto",
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        }
-      }
-    },
-    {
-      "id": "gemini-3-pro-image-preview",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e7af3abcc9964f122998ed87014720c71a569183472856fc972a30694eebf957",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gemini-3-pro-image-preview",
-      "upstreamModelId": "gemini-3-pro-image-preview",
-      "vendorModelId": "gemini-3-pro-image-preview",
-      "evidenceStatus": "unverified",
-      "label": "Gemini 3 Pro Image",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 360000,
-      "generation": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json",
-        "minReferences": 1,
-        "maxReferences": 8
-      },
-      "aspectRatios": [
-        "1:1",
-        "2:3",
-        "3:2",
-        "3:4",
-        "4:3",
-        "4:5",
-        "5:4",
-        "9:16",
-        "16:9",
-        "21:9"
-      ],
-      "imageSizes": [
-        "1K",
-        "2K",
-        "4K"
-      ],
-      "output": {
-        "kind": "gemini-parts",
-        "fields": [
-          "inlineData"
-        ],
-        "scanAllParts": true
-      },
-      "recommendedOptions": {
-        "aspectRatio": {
-          "default": "1:1"
-        },
-        "imageSize": {
-          "default": "2K",
-          "examples": [
-            "1K",
-            "2K",
-            "4K"
-          ]
-        }
-      }
-    },
-    {
-      "id": "gemini-3.1-flash-lite-image",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:6e3b9a7005fbe2e3f31b7780b1699ae6bb351dd5a4194fa9af6bfa10b4b1ce82",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gemini-3.1-flash-lite-image",
-      "upstreamModelId": "gemini-3.1-flash-lite-image",
-      "vendorModelId": "gemini-3.1-flash-lite-image",
-      "evidenceStatus": "unverified",
-      "label": "Gemini 3.1 Flash Lite Image",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 360000,
-      "generation": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json",
-        "minReferences": 1,
-        "maxReferences": 8
-      },
-      "aspectRatios": [
-        "1:1",
-        "1:4",
-        "4:1",
-        "1:8",
-        "8:1",
-        "2:3",
-        "3:2",
-        "3:4",
-        "4:3",
-        "4:5",
-        "5:4",
-        "9:16",
-        "16:9",
-        "21:9"
-      ],
-      "imageSizes": [
-        "1K"
-      ],
-      "output": {
-        "kind": "gemini-parts",
-        "fields": [
-          "inlineData"
-        ],
-        "scanAllParts": true
-      },
-      "recommendedOptions": {
-        "aspectRatio": {
-          "default": "1:1"
-        },
-        "imageSize": {
-          "default": "1K"
-        }
-      }
-    },
-    {
-      "id": "gemini-3.1-flash-image",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:e7ca2cb855a7cc8414daf70cfbb5499fd9a990fecb40705f442fdf598943ceb2",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "gemini-3.1-flash-image",
-      "upstreamModelId": "gemini-3.1-flash-image",
-      "vendorModelId": "gemini-3.1-flash-image",
-      "evidenceStatus": "unverified",
-      "label": "Gemini 3.1 Flash Image",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 360000,
-      "generation": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1beta/models/{model}:generateContent",
-        "contentType": "application/json",
-        "minReferences": 1,
-        "maxReferences": 8
-      },
-      "aspectRatios": [
-        "1:1",
-        "1:4",
-        "4:1",
-        "1:8",
-        "8:1",
-        "2:3",
-        "3:2",
-        "3:4",
-        "4:3",
-        "4:5",
-        "5:4",
-        "9:16",
-        "16:9",
-        "21:9"
-      ],
-      "imageSizes": [
-        "512",
-        "1K",
-        "2K",
-        "4K"
-      ],
-      "output": {
-        "kind": "gemini-parts",
-        "fields": [
-          "inlineData"
-        ],
-        "scanAllParts": true
-      },
-      "recommendedOptions": {
-        "aspectRatio": {
-          "default": "1:1"
-        },
-        "imageSize": {
-          "default": "2K",
-          "examples": [
-            "512",
-            "1K",
-            "2K",
-            "4K"
-          ]
-        }
-      }
-    },
-    {
-      "id": "flux-2-pro",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:7f8b42f9202e50ce0115946ddebf0c447970aaad05100e60600f7064da02f3d1",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "flux-2-pro",
-      "upstreamModelId": "flux-2-pro",
-      "vendorModelId": "flux-2-pro",
-      "evidenceStatus": "unverified",
-      "label": "FLUX.2 Pro",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 120000,
-      "generation": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json",
-        "minReferences": 1,
-        "maxReferences": 8
-      },
-      "dimensions": {
-        "multipleOf": 16,
-        "minSide": 64,
-        "maxPixels": 4194304
-      },
-      "outputFormats": [
-        "jpeg",
-        "png"
-      ],
-      "forbiddenParameters": [
-        "n"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "url"
-        ],
-        "maxImages": 1,
-        "urlTtlSeconds": 600
-      },
-      "recommendedOptions": {
-        "outputFormat": {
-          "default": "png",
-          "examples": [
-            "jpeg",
-            "png"
-          ]
-        }
-      }
-    },
-    {
-      "id": "seedream-5-0-260128",
-      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:82f9f195afba788495922cdb98f2ba1475fd766b6c8b6603d64df6d2cd853129",
-      "reviewedModelCatalogBaseline": {
-        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
-        "reviewedExportSha256": null,
-        "reviewedRawExportSha256": null,
-        "expectedGatewayModelIds": [
-          "gpt-image-2.5-sunburst",
-          "gpt-image-2.5-all",
-          "gpt-image-2.5-sunburst-vip",
-          "gpt-image-2.5-flare-vip",
-          "gemini-3-pro-image-preview",
-          "gemini-3.1-flash-lite-image",
-          "gemini-3.1-flash-image",
-          "flux-2-pro",
-          "seedream-5-0-260128"
-        ]
-      },
-      "gatewayModelId": "seedream-5-0-260128",
-      "upstreamModelId": "seedream-5-0-260128",
-      "vendorModelId": "seedream-5-0-260128",
-      "evidenceStatus": "unverified",
-      "label": "Seedream 5.0",
-      "channel": "official",
-      "allowedNodeKinds": [
-        "image-generation"
-      ],
-      "timeoutMs": 120000,
-      "generation": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json"
-      },
-      "edit": {
-        "path": "/v1/images/generations",
-        "contentType": "application/json",
-        "minReferences": 1,
-        "maxReferences": 8
-      },
-      "sizes": [
-        "2K",
-        "3K"
-      ],
-      "requiredParameters": {
-        "watermark": false,
-        "sequential_image_generation": "disabled"
-      },
-      "forbiddenParameters": [
-        "n"
-      ],
-      "output": {
-        "kind": "openai-image",
-        "fields": [
-          "url",
-          "b64_json"
-        ],
-        "recordActualSize": true
-      },
-      "recommendedOptions": {
-        "size": {
-          "default": "2K",
-          "examples": [
-            "2K",
-            "3K"
-          ]
-        }
-      }
-    }
-  ],
   "textModels": [
     {
       "id": "gpt-4o",
@@ -1017,6 +181,798 @@
           "sha256": "e181e988193d1871ae901f2cecdb5d24ccfbab1acbb19c843a716077affe3b11"
         }
       ]
+    }
+  ],
+  "inputNormalization": {
+    "acceptedMimeTypes": [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/gif"
+    ],
+    "outputMimeTypes": [
+      "image/png",
+      "image/jpeg"
+    ],
+    "maxInputBytes": 20971520,
+    "maxInputPixels": 40000000,
+    "maxLongEdge": 4096,
+    "targetBytes": 1500000,
+    "jpegQuality": {
+      "initial": 92,
+      "minimum": 80
+    },
+    "animationPolicy": "first-frame",
+    "applyExifOrientation": true,
+    "outputColourspace": "srgb",
+    "preserveMeaningfulAlpha": true
+  },
+  "models": [
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:5d52d72a97ca0d1bcf7dbe63b0807f3367441b38a1ef7bc1e0c1eabcea4a0f8b",
+      "id": "gemini-nano-banana-2.1",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "gemini-nano-banana-2.1",
+      "upstreamModelId": "gemini-nano-banana-2.1",
+      "vendorModelId": "gemini-nano-banana-2.1",
+      "evidenceStatus": "unverified",
+      "label": "Nano Banana 2.1（Gemini 图像）",
+      "channel": "official",
+      "vendor": "google",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "imageSizes": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "3:4",
+          "examples": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+          ]
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
+      },
+      "output": {
+        "kind": "gemini-image",
+        "fields": [
+          "inlineData.data"
+        ],
+        "maxImages": 1
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:68ee47e12b894c159603222b875095c62d1e878c8d3b17cd0540c41cc4992290",
+      "id": "gemini-3.1-flash-image",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "gemini-3.1-flash-image",
+      "upstreamModelId": "gemini-3.1-flash-image",
+      "vendorModelId": "gemini-3.1-flash-image",
+      "evidenceStatus": "unverified",
+      "label": "Gemini 3.1 Flash 图像",
+      "channel": "official",
+      "vendor": "google",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1beta/models/{model}:generateContent",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "imageSizes": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "recommendedOptions": {
+        "aspectRatio": {
+          "default": "3:4",
+          "examples": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+          ]
+        },
+        "imageSize": {
+          "default": "2K",
+          "examples": [
+            "1K",
+            "2K",
+            "4K"
+          ]
+        }
+      },
+      "output": {
+        "kind": "gemini-image",
+        "fields": [
+          "inlineData.data"
+        ],
+        "maxImages": 1
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:85bbeca3e04ec59886893904e58f08297683c8178f956d3688fb7ab3db8c98d0",
+      "id": "gpt-image-2.5-sunburst",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-sunburst",
+      "upstreamModelId": "gpt-image-2.5-sunburst",
+      "vendorModelId": "gpt-image-2.5-sunburst",
+      "evidenceStatus": "unverified",
+      "label": "GPT Image 2.5 Sunburst 局部修改",
+      "channel": "official",
+      "vendor": "openai",
+      "allowedNodeKinds": [
+        "mask-redraw"
+      ],
+      "timeoutMs": 360000,
+      "generation": null,
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image",
+        "mask": {
+          "required": true,
+          "mimeTypes": [
+            "image/png"
+          ],
+          "maxBytes": 4194304,
+          "requiresAlpha": true,
+          "mustMatchFirstImageDimensions": true,
+          "editableAlpha": 0,
+          "preservedAlpha": 255
+        }
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "qualityValues": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+      ],
+      "knownParameters": [
+        "size",
+        "quality",
+        "response_format",
+        "style",
+        "user"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ]
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:b62e2016f6df45a651865bc32a16ab4b51ecde09b09842abfb8675ece887cb17",
+      "id": "gpt-image-2.5-flare",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "gpt-image-2.5-flare",
+      "upstreamModelId": "gpt-image-2.5-flare",
+      "vendorModelId": "gpt-image-2.5-flare",
+      "evidenceStatus": "unverified",
+      "label": "GPT Image 2.5 Flare（默认生成）",
+      "channel": "official",
+      "vendor": "openai",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "qualityValues": [
+        "auto",
+        "low",
+        "medium",
+        "high"
+      ],
+      "knownParameters": [
+        "size",
+        "quality",
+        "response_format",
+        "style",
+        "user"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "1536x2048",
+          "examples": [
+            "1024x1024",
+            "1536x1024",
+            "1024x1536",
+            "2048x2048",
+            "2048x1152",
+            "3840x2160",
+            "2160x3840",
+            "auto"
+          ]
+        },
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "dimensions": {
+        "multipleOf": 16,
+        "minSide": 16,
+        "maxSide": 3840,
+        "maxPixels": 8294400,
+        "maxAspectRatio": 3
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:94de82f91c31cacb6ea0428bd864af3e50d9fc8a4916750e3609c2d1a93e1d03",
+      "id": "flux-3-image",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "flux-3-image",
+      "upstreamModelId": "flux-3-image",
+      "vendorModelId": "flux-3-image",
+      "evidenceStatus": "unverified",
+      "label": "FLUX 3 Image",
+      "channel": "official",
+      "vendor": "bfl",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/edits",
+        "contentType": "multipart/form-data",
+        "minReferences": 1,
+        "maxReferences": 4,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "knownParameters": [
+        "aspect_ratio",
+        "output_format",
+        "safety_tolerance",
+        "prompt_upsampling",
+        "resolution"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9"
+      ],
+      "recommendedOptions": {
+        "aspect_ratio": {
+          "default": "3:4",
+          "examples": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+          ]
+        },
+        "output_format": {
+          "default": "jpeg",
+          "examples": [
+            "jpeg",
+            "png"
+          ]
+        }
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:7ba68fbfc91eb52e603e3a77d015e66fc09a37e9c61e7368ba466ae074f057fc",
+      "id": "doubao-seedream-5-0-pro-260628",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "doubao-seedream-5-0-pro-260628",
+      "upstreamModelId": "doubao-seedream-5-0-pro-260628",
+      "vendorModelId": "doubao-seedream-5-0-pro-260628",
+      "evidenceStatus": "unverified",
+      "label": "Seedream 5.0 Pro（即梦）",
+      "channel": "official",
+      "vendor": "bytedance",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "knownParameters": [
+        "size",
+        "response_format",
+        "guidance_scale",
+        "seed",
+        "watermark"
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "2048x2048",
+          "examples": [
+            "2048x2048",
+            "2304x1728",
+            "1728x2304",
+            "2560x1440",
+            "1440x2560",
+            "3072x3072"
+          ]
+        },
+        "response_format": {
+          "default": "b64_json",
+          "examples": [
+            "b64_json",
+            "url"
+          ]
+        }
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:ee80ed39b147963376e3693149df21f10533da8e04103e2540302655a041c418",
+      "id": "doubao-seedream-5-0-lite-260128",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "doubao-seedream-5-0-lite-260128",
+      "upstreamModelId": "doubao-seedream-5-0-lite-260128",
+      "vendorModelId": "doubao-seedream-5-0-lite-260128",
+      "evidenceStatus": "unverified",
+      "label": "Seedream 5.0 Lite（即梦）",
+      "channel": "official",
+      "vendor": "bytedance",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 8,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "knownParameters": [
+        "size",
+        "response_format",
+        "guidance_scale",
+        "seed",
+        "watermark"
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "2048x2048",
+          "examples": [
+            "2048x2048",
+            "2304x1728",
+            "1728x2304",
+            "2560x1440",
+            "1440x2560",
+            "3072x3072"
+          ]
+        },
+        "response_format": {
+          "default": "b64_json",
+          "examples": [
+            "b64_json",
+            "url"
+          ]
+        }
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:b79c297a978434938c8791e913b832aa6c1d718b1b9e8ea9f33f60782b35a04d",
+      "id": "qwen-image-3.0-pro",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "qwen-image-3.0-pro",
+      "upstreamModelId": "qwen-image-3.0-pro",
+      "vendorModelId": "qwen-image-3.0-pro",
+      "evidenceStatus": "unverified",
+      "label": "Qwen Image 3.0 Pro（千问）",
+      "channel": "official",
+      "vendor": "alibaba",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 4,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "knownParameters": [
+        "size",
+        "response_format"
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "1536x2048",
+          "examples": [
+            "1024x1024",
+            "1536x1024",
+            "1024x1536",
+            "2048x2048"
+          ]
+        }
+      }
+    },
+    {
+      "contractHashScope": "sha256-canonical-semantic-envelope-v1",
+      "contractHash": "sha256:69b44a4394c53613e33ea1ba6494b242f09418a341598d1112be6586cc26b1aa",
+      "id": "qwen-image-3.0",
+      "reviewedModelCatalogBaseline": {
+        "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+        "reviewedExportSha256": null,
+        "reviewedRawExportSha256": null,
+        "expectedGatewayModelIds": [
+          "gemini-nano-banana-2.1",
+          "gemini-3.1-flash-image",
+          "gpt-image-2.5-sunburst",
+          "gpt-image-2.5-flare",
+          "flux-3-image",
+          "doubao-seedream-5-0-pro-260628",
+          "doubao-seedream-5-0-lite-260128",
+          "qwen-image-3.0-pro",
+          "qwen-image-3.0"
+        ]
+      },
+      "gatewayModelId": "qwen-image-3.0",
+      "upstreamModelId": "qwen-image-3.0",
+      "vendorModelId": "qwen-image-3.0",
+      "evidenceStatus": "unverified",
+      "label": "Qwen Image 3.0（千问）",
+      "channel": "official",
+      "vendor": "alibaba",
+      "allowedNodeKinds": [
+        "image"
+      ],
+      "timeoutMs": 360000,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
+      "edit": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
+        "minReferences": 1,
+        "maxReferences": 4,
+        "singleImageField": "image",
+        "multipleImageField": "image"
+      },
+      "output": {
+        "kind": "openai-image",
+        "fields": [
+          "b64_json",
+          "url"
+        ],
+        "maxImages": 1
+      },
+      "knownParameters": [
+        "size",
+        "response_format"
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "1536x2048",
+          "examples": [
+            "1024x1024",
+            "1536x1024",
+            "1024x1536",
+            "2048x2048"
+          ]
+        }
+      }
     }
   ]
 }

@@ -12,10 +12,12 @@ import {
 } from "../../src/types/workflow";
 import { isLocalImageReference, validateImageDataUrl } from "./imageValidation";
 import {
+  DEFAULT_GENERATION_MODEL_ID,
   MASK_REDRAW_MODEL_ID,
   getImageModelContract,
   isImageModelId,
 } from "../../src/types/imageModels";
+import { isRetiredImageModelId } from "../../src/types/retiredImageModels";
 import { isVideoModelId } from "../../src/types/videoModels";
 import { IMAGE_OPERATION_MODE_VALUES, GENERATOR_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
 import { frozenPromptBindingForVariantId } from "./promptPresetsFrozen";
@@ -299,7 +301,13 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       if (raw.outputImages !== undefined) {
         fail(`${path}.outputImages`, "生成节点不得承载产物（产物归结果节点）");
       }
-      const modelId = raw.modelId;
+      // 供应商迁移（兔子API）后，旧草稿/旧项目里可能存着已下线的模型 ID。
+      // 2026-10-27 用户拍板 A 案：服务端与前端保持一致 —— retired ID 静默回落默认生成模型，
+      // 不阻断保存（否则「云端草稿同步失败」会让用户卡死）。运行准入仍由各自校验把关。
+      let modelId = raw.modelId;
+      if (isRetiredImageModelId(modelId)) {
+        modelId = DEFAULT_GENERATION_MODEL_ID;
+      }
       if (!isImageModelId(modelId)) {
         fail(`${path}.modelId`, "必须选择一个受支持的图片生成模型");
       }

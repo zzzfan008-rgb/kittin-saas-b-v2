@@ -62,7 +62,7 @@ function aiNode(id = "history-node"): FlowNode {
       kind: "image-generator",
       label: "历史事务节点",
       status: "idle",
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "auto" },
       aspectRatio: "1:1",
       batchSize: 1,

@@ -62,8 +62,9 @@
           "label": "试穿生成",
           "status": "idle",
           "operationMode": "edit",
-          "modelId": "gpt-image-2.5-flare-vip",
+          "modelId": "gpt-image-2.5-flare",
           "modelOptions": {
+            "size": "1536x2048",
             "quality": "high"
           },
           "aspectRatio": "3:4",

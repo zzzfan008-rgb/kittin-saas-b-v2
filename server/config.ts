@@ -40,8 +40,8 @@ function required(name: string): string {
 }
 
 export const config = {
-  /** API易图片接口；路径由本地模型知识库逐模型声明。 */
-  apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.apiyi.com").replace(/\/+$/, ""),
+  /** AI 图片接口（兔子API）；路径由本地模型知识库逐模型声明。 */
+  apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.tu-zi.com").replace(/\/+$/, ""),
   apiyiApiKey: () => required("APIYI_API_KEY"),
   /**
    * API易视频（Seedance）专用令牌。用户已为 Seedance 单独建令（需勾选 SeeDance2 分组）。

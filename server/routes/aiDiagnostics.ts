@@ -79,21 +79,21 @@ const getDiagnostics = asyncHandler(async (_req, res) => {
 function diagnosticModelOptions(modelId: ImageModelId): ImageModelOptions {
   switch (modelId) {
     case "gpt-image-2.5-sunburst":
-    case "gpt-image-2.5-all":
       return {};
-    case "gpt-image-2.5-sunburst-vip":
-    case "gpt-image-2.5-flare-vip":
-      return { size: "1280x1280" };
-    case "gemini-3-pro-image-preview":
-      return { aspectRatio: "1:1", imageSize: "1K" };
-    case "gemini-3.1-flash-lite-image":
-      return { aspectRatio: "1:1", imageSize: "1K" };
+    case "gpt-image-2.5-flare":
+      return { size: "1024x1024", quality: "high" };
+    case "gemini-nano-banana-2.1":
     case "gemini-3.1-flash-image":
-      return { aspectRatio: "1:1", imageSize: "512" };
-    case "flux-2-pro":
-      return { width: 512, height: 512, outputFormat: "png" };
-    case "seedream-5-0-260128":
-      return { size: "2K" };
+      // 兔子API imageSize 仅 1K/2K/4K（不支持 512）。
+      return { aspectRatio: "1:1", imageSize: "1K" };
+    case "flux-3-image":
+      // flux-3-image 用 aspect_ratio，不用 width/height。
+      return { aspect_ratio: "1:1", output_format: "png" };
+    case "doubao-seedream-5-0-pro-260628":
+    case "doubao-seedream-5-0-lite-260128":
+    case "qwen-image-3.0-pro":
+    case "qwen-image-3.0":
+      return { size: "1024x1024" };
   }
 }
 

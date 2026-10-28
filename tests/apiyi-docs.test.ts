@@ -265,7 +265,7 @@ assert.ok(
     sources: omittedExpectedSources,
     knowledge: reviewedModelKnowledge,
     contracts: reviewedModelContracts,
-  }).errors.some((error: string) => /expected exactly nine gateway model IDs/.test(error)),
+  }).errors.some((error: string) => /do not match the reviewed model catalog/.test(error)),
   "omitted expected gateway IDs must fail structural validation",
 );
 
@@ -329,8 +329,8 @@ const missingExactValidation = validateDocuments({
   requireModelList: true,
 });
 assert.ok(
-  missingExactValidation.modelListErrors.some((error: string) => /reviewed gateway model list is missing gpt-image-2\.5-sunburst/.test(error)),
-  "a reviewed export must retain every exact nine-model gateway ID",
+  missingExactValidation.modelListErrors.some((error: string) => /reviewed gateway model list is missing /.test(error)),
+  "a reviewed export must retain every exact gateway model ID in the reviewed catalog",
 );
 
 const driftedModelList = { data: [...modelList.data, { id: "unreviewed-new-model" }] };
@@ -411,26 +411,26 @@ for (const modelId of IMAGE_MODEL_IDS) {
 
 const driftedSources = structuredClone(sources);
 const fluxSource = driftedSources.sources.find(
-  (source: { sourceId: string }) => source.sourceId === "apiyi-flux-overview",
+  (source: { sourceId: string }) => source.sourceId === "tuzi-flux-generate",
 );
 assert.ok(fluxSource);
 fluxSource.sha256 = "f".repeat(64);
 const fluxDocumentContract = contracts.models.find(
-  (model: { id: string }) => model.id === "flux-2-pro",
+  (model: { id: string }) => model.id === "flux-3-image",
 );
 const seedreamDocumentContract = contracts.models.find(
-  (model: { id: string }) => model.id === "seedream-5-0-260128",
+  (model: { id: string }) => model.id === "doubao-seedream-5-0-pro-260628",
 );
 assert.ok(fluxDocumentContract);
 assert.ok(seedreamDocumentContract);
 assert.notEqual(
   computeModelContractHash({ sources: driftedSources, knowledge, contracts }, fluxDocumentContract),
-  imageModelContractHash("flux-2-pro"),
+  imageModelContractHash("flux-3-image"),
   "a linked gateway source drift must invalidate only the affected semantic contract envelope",
 );
 assert.equal(
   computeModelContractHash({ sources: driftedSources, knowledge, contracts }, seedreamDocumentContract),
-  imageModelContractHash("seedream-5-0-260128"),
+  imageModelContractHash("doubao-seedream-5-0-pro-260628"),
   "an unrelated source drift must not invalidate another model contract",
 );
 
@@ -446,14 +446,21 @@ for (const model of knowledge.models) {
   assert.equal(model.observedEvidence.status, "unverified");
 }
 
-const reviewedDriftHashes = new Map([
-  ["apiyi-gpt-image-2-vip-overview", "fa55bbeb13928bdbb7fd51cf243c0f038147bcccf7b5780aa7ffb7698266cbda"],
-  ["apiyi-gemini-overview", "eab4963c32d8a88544e54893d377b7a4a52a11134edc09cfcad1bbd922728eca"],
-  ["apiyi-flux-overview", "23df4f5be137712d9b830a459b259e3147a53dc44a7634634e39bc2cf0eafbd4"],
-  ["apiyi-seedream-overview", "aa4d154188ddfa2f3cd89a42b22c633ec0dcf93b382d9ec0bd1a13b4074e13b7"],
+// 供应商迁移（兔子API）后，旧 API易 文档快照不再被引用；改为断言新来源清单的完整性：
+// 每条 source 必须指纹格式合法、可定位到本地文档，且被至少一个模型引用。
+const referencedSourceIds = new Set([
+  ...knowledge.models.flatMap((model: { vendorCapability?: { sourceIds?: string[] } }) =>
+    model.vendorCapability?.sourceIds ?? []),
+  ...knowledge.models.flatMap((model: { gatewayContract?: { sourceIds?: string[] } }) =>
+    model.gatewayContract?.sourceIds ?? []),
 ]);
-for (const [sourceId, expectedHash] of reviewedDriftHashes) {
-  assert.equal(sources.sources.find((source: { sourceId: string }) => source.sourceId === sourceId)?.sha256, expectedHash);
+for (const source of sources.sources) {
+  assert.match(source.sha256, /^[a-f0-9]{64}$/, `${source.sourceId} sha256 必须是合法的 64 位十六进制`);
+  assert.ok(
+    (() => { try { readFileSync(join(docsRoot, source.localDocument)); return true; } catch { return false; } })(),
+    `${source.sourceId} 必须指向存在的本地整理文档`,
+  );
+  assert.ok(referencedSourceIds.has(source.sourceId), `${source.sourceId} 必须被至少一个模型引用`);
 }
 
 const sourceSnapshot = JSON.stringify(sources);

@@ -35,7 +35,7 @@ import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 // v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数
 // （值与原参数档案 materialize 等价：commerce-hero edit → aspectRatio "1:1"、batchSize 1；
 // flare-vip modelOptions { size: "2048x2048" }；gemini modelOptions { aspectRatio: "1:1", imageSize: "2K" }）。
-const AI_TEST_MODEL_ID = "gpt-image-2.5-flare-vip";
+const AI_TEST_MODEL_ID = "gpt-image-2.5-flare";
 const AI_TEST_ASPECT_RATIO = "1:1";
 const AI_TEST_BATCH_SIZE = 1;
 const AI_TEST_MODEL_OPTIONS = { size: "2048x2048" };

@@ -87,11 +87,11 @@ function fakeProvider(calls: CapturedCall[], resultImage = PNG_DATA_URL): AIProv
     id: "fake-provider",
     generate(req: ImageGenRequest): Promise<ImageGenResult> {
       calls.push({ request: req });
-      return Promise.resolve({ images: [resultImage], model: "gpt-image-2.5-flare-vip" });
+      return Promise.resolve({ images: [resultImage], model: "gpt-image-2.5-flare" });
     },
     edit(req: ImageGenRequest): Promise<ImageGenResult> {
       calls.push({ request: req });
-      return Promise.resolve({ images: [resultImage], model: "gpt-image-2.5-flare-vip" });
+      return Promise.resolve({ images: [resultImage], model: "gpt-image-2.5-flare" });
     },
   };
 }
@@ -110,7 +110,7 @@ async function main() {
 
   await ok("generate：纯用户文本零系统文本（operationMode 缺省 = generate）", async () => {
     const calls: CapturedCall[] = [];
-    await executeStep(imageStep({ modelId: "gpt-image-2.5-flare-vip", inputTexts: ["一件白色连衣裙"] }), [], () => fakeProvider(calls));
+    await executeStep(imageStep({ modelId: "gpt-image-2.5-flare", inputTexts: ["一件白色连衣裙"] }), [], () => fakeProvider(calls));
     assert.equal(calls.length, 1);
     const req = calls[0].request;
     assert.equal(req.prompt, "一件白色连衣裙");
@@ -120,7 +120,7 @@ async function main() {
   await ok("generate：显式 operationMode=\"generate\" 同样零系统文本", async () => {
     const calls: CapturedCall[] = [];
     await executeStep(imageStep({
-      modelId: "gpt-image-2.5-flare-vip", operationMode: "generate", inputTexts: ["电商主图"],
+      modelId: "gpt-image-2.5-flare", operationMode: "generate", inputTexts: ["电商主图"],
     }), [], () => fakeProvider(calls));
     assert.equal(calls[0].request.prompt, "电商主图");
     assert.equal(calls[0].request.operationMode, "generate");
@@ -129,7 +129,7 @@ async function main() {
   await ok("edit：用户文本 + 参考图列表（image.edit 系统文本为空，无旧 fullPrompt 残留）", async () => {
     const calls: CapturedCall[] = [];
     const step = imageStep({
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       operationMode: "edit",
       inputTexts: ["把这件衣服穿到模特身上"],
     }, [PNG_DATA_URL]);
@@ -160,7 +160,7 @@ async function main() {
   await ok("裸 API 回归：params.prompt 直发（无 inputTexts，= 今日裸 API 行为）", async () => {
     const calls: CapturedCall[] = [];
     await executeStep(imageStep({
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       prompt: "直发提示词",
     }), [], () => fakeProvider(calls));
     assert.equal(calls[0].request.prompt, "直发提示词");
@@ -170,10 +170,10 @@ async function main() {
   await ok("C6：Provider 请求不携带 variant 绑定六字段", async () => {
     const calls: CapturedCall[] = [];
     await executeStep(imageStep({
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       inputTexts: ["测试"],
       // 脏 params 携带旧字段：runner 绝不透传（C6 组装剥除）
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
       promptFamilyId: "fashion-lookbook",
       parameterProfileId: "p1",
       contractHash: "sha256:" + "a".repeat(64),
@@ -189,7 +189,7 @@ async function main() {
   await ok("防御：非法 operationMode 回退 generate（零系统文本）", async () => {
     const calls: CapturedCall[] = [];
     await executeStep(imageStep({
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       operationMode: "hacked-mode",
       inputTexts: ["正文"],
     }), [], () => fakeProvider(calls));
@@ -204,7 +204,7 @@ async function main() {
     const deps = mockChatCompletion("简洁商业白色连衣裙正面展示");
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         inputTexts: ["白色连衣裙"],
         familyId: "model-tryon",
       }),
@@ -225,7 +225,7 @@ async function main() {
     const deps = mockChatCompletion("should-not-be-called");
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         inputTexts: ["一件白色连衣裙"],
         // 无 familyId
       }),
@@ -243,7 +243,7 @@ async function main() {
     const deps = mockChatCompletion("should-not-be-called");
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         inputTexts: ["电商主图"],
         familyId: "fashion-lookbook",
       }),
@@ -262,7 +262,7 @@ async function main() {
     const deps = mockChatCompletion("should-not-be-called");
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         inputTexts: ["一件白色连衣裙"], // 非空 prompt
         // 无 familyId
       }),
@@ -281,7 +281,7 @@ async function main() {
     const calls: CapturedCall[] = [];
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         inputTexts: [originalText],
         familyId: "model-tryon",
       }),
@@ -299,7 +299,7 @@ async function main() {
     const deps = mockChatCompletion("把这件衣服穿到模特身上，柔和室内光线");
     await executeStep(
       imageStep({
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         operationMode: "edit",
         inputTexts: ["把这件衣服穿到模特身上"],
         familyId: "model-tryon",

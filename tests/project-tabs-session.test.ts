@@ -458,18 +458,18 @@ assert.equal(migrated.tabs[0].dirty, true);
 console.log("  ✓ 旧会话逐节点补齐必需字段，并隔离坏节点和悬空边");
 
 const generalModelPairs = [
-  { modelId: "gpt-image-2.5-flare-vip", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
+  { modelId: "gpt-image-2.5-flare", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
   {
     modelId: "gemini-3.1-flash-image",
     modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
     aspectRatio: "16:9",
   },
   {
-    modelId: "flux-2-pro",
+    modelId: "flux-3-image",
     modelOptions: { width: 2048, height: 1152, outputFormat: "png" },
     aspectRatio: "16:9",
   },
-  { modelId: "seedream-5-0-260128", modelOptions: { size: "3K" }, aspectRatio: "1:1" },
+  { modelId: "doubao-seedream-5-0-pro-260628", modelOptions: { size: "3K" }, aspectRatio: "1:1" },
 ] as const;
 const restoredModels = normalizeTabSessionValue(JSON.parse(JSON.stringify({
   activeTabId: "model-pairs-tab",
@@ -534,7 +534,7 @@ assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
 assert.equal(retiredModelData.kind, "image-generator");
 if (retiredModelData.kind !== "image-generator") throw new Error("unexpected retired node kind");
-assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare-vip");
+assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare");
 assert.equal(retiredModelData.retiredModelId, undefined);
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, undefined);
 assert.deepEqual(retiredModelData.modelOptions, { aspectRatio: "4:3", resolution: "1k" });
@@ -566,7 +566,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换领型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -633,7 +633,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换袖型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -684,7 +684,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "保持运行",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare-vip",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -923,8 +923,8 @@ useFlowStore.getState().loadFlow({
       kind: "image-generator",
       label: "生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-      modelId: "gpt-image-2.5-flare-vip",
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,
@@ -1006,8 +1006,8 @@ useFlowStore.getState().loadFlow({
       kind: "image-generator",
       label: "净零位移生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-      modelId: "gpt-image-2.5-flare-vip",
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,
@@ -1118,10 +1118,10 @@ const unsafeDocumentNode = {
     error: "旧运行错误不得持久化",
     aspectRatio: BOUNDARY_ASPECT_RATIO,
     batchSize: BOUNDARY_BATCH_SIZE,
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     modelOptions: BOUNDARY_MODEL_OPTIONS,
     // v9（64 Phase 3）：v7 六绑定字段（脏输入）——投影必须整体剥离，不得进入文档。
-    promptVariantId: "commerce-hero.generate.gpt-image-2.5-flare-vip.v7",
+    promptVariantId: "commerce-hero.generate.gpt-image-2.5-flare.v7",
     promptFamilyId: "commerce-hero",
     parameterProfileId: "pp-v7-dirty",
     contractHash: "sha256:deadbeef",
@@ -1419,8 +1419,8 @@ useFlowStore.getState().openFlowTab({
       kind: "image-generator",
       label: "后台生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare-vip.edit.v1",
-      modelId: "gpt-image-2.5-flare-vip",
+      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
+      modelId: "gpt-image-2.5-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,

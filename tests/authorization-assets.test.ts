@@ -161,7 +161,7 @@ function editFlow(imageUrl: string) {
           label: "改款",
           status: "idle",
           operationMode: "edit",
-          modelId: "gpt-image-2.5-flare-vip",
+          modelId: "gpt-image-2.5-flare",
           modelOptions: EDIT_MODEL_OPTIONS,
           aspectRatio: EDIT_ASPECT_RATIO,
           batchSize: 1,
@@ -318,7 +318,7 @@ async function waitForDatabaseCondition(
 function directGenerateBody(referenceImage: string, projectId?: string, clientRequestId = "direct-request") {
   return {
     clientRequestId,
-    modelId: "gpt-image-2.5-flare-vip",
+    modelId: "gpt-image-2.5-flare",
     kind: "image-generator",
     projectId,
     projectName: "客户端伪造名称",
@@ -362,7 +362,7 @@ await test("Run 状态与 SSE 仅任务所有者可读，管理员也不隐式�
       data: {
         kind: "image-generator", label: "结果", status: "idle",
         operationMode: "edit",
-        modelId: "gpt-image-2.5-flare-vip",
+        modelId: "gpt-image-2.5-flare",
         aspectRatio: "3:4", batchSize: 1,
       },
     },

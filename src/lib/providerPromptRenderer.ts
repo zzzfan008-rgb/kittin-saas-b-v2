@@ -17,23 +17,11 @@ const PROVIDER_PROMPT_REFERENCE_LIST_INTROS = {
   "gpt-image-2.5-sunburst": {
     "mask-edit": "局部修改参考图:",
   },
-  "gpt-image-2.5-all": {
+  "gpt-image-2.5-flare": {
     generate: "参考图:",
     edit: "参考图:",
   },
-  "gpt-image-2.5-sunburst-vip": {
-    generate: "参考图:",
-    edit: "参考图:",
-  },
-  "gpt-image-2.5-flare-vip": {
-    generate: "参考图:",
-    edit: "参考图:",
-  },
-  "gemini-3-pro-image-preview": {
-    generate: "参考图:",
-    edit: "参考图:",
-  },
-  "gemini-3.1-flash-lite-image": {
+  "gemini-nano-banana-2.1": {
     generate: "参考图:",
     edit: "参考图:",
   },
@@ -41,11 +29,23 @@ const PROVIDER_PROMPT_REFERENCE_LIST_INTROS = {
     generate: "参考图:",
     edit: "参考图:",
   },
-  "flux-2-pro": {
+  "flux-3-image": {
     generate: "参考图:",
     edit: "参考图:",
   },
-  "seedream-5-0-260128": {
+  "doubao-seedream-5-0-pro-260628": {
+    generate: "参考图:",
+    edit: "参考图:",
+  },
+  "doubao-seedream-5-0-lite-260128": {
+    generate: "参考图:",
+    edit: "参考图:",
+  },
+  "qwen-image-3.0-pro": {
+    generate: "参考图:",
+    edit: "参考图:",
+  },
+  "qwen-image-3.0": {
     generate: "参考图:",
     edit: "参考图:",
   },
@@ -69,7 +69,7 @@ export const PROVIDER_PROMPT_RENDERER_CONTRACT = {
 } as const;
 
 /** SHA-256(JSON.stringify(PROVIDER_PROMPT_RENDERER_CONTRACT)). */
-export const PROVIDER_PROMPT_RENDERER_HASH = "sha256:3779508288c46b30ed6d1549aab041dcfe313f7f9ae9c88e9eda107d5fb8f3ca";
+export const PROVIDER_PROMPT_RENDERER_HASH = "sha256:1d3a345eb3411a0602d67b62a8d6799c40682b38028571d6bb21137746dc916a";
 
 export interface ProviderPromptReference {
   /** 占位：参考图顺序已由数组位置决定，不再需要角色字段。 */
