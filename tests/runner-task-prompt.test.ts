@@ -135,7 +135,7 @@ async function main() {
     }, [PNG_DATA_URL]);
     await executeStep(step, step.inputImages, () => fakeProvider(calls));
     const req = calls[0].request;
-    assert.equal(req.prompt, "把这件衣服穿到模特身上\n参考图:参考图1");
+    assert.equal(req.prompt, "把这件衣服穿到模特身上", "产线提示词不得追加参考图清单");
     assert.equal(req.operationMode, "edit");
     assert.ok(!req.prompt.includes("GPT Image 2 VIP"), "不得残留旧 variant fullPrompt");
   });

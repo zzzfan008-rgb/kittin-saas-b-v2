@@ -42,32 +42,34 @@ const MODE_SYSTEM_TEXT_SHA256: Record<string, string> = {
   "image.edit": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "image.mask-edit": "9623f4f460a21efad5eb4bbdc138c2c3a33f1c6f3b61a2d71ea9e77a7c2d9527",
   "video.generate": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "video.edit": "da0ffd1a8abecbff78e86dc79bfcfb41b2f8e142d38f2b6ef9f8ebf96b5e9335",
+  "video.edit": "3097444cc879cb35534608f453350df2fa416b4ddd3aaec6b35dad1c1a0cfe68",
   "video.mask-edit": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 };
 
 // 快照：PRESET_TEMPLATE_TEXTS 每条文本 sha256（键 = `${familyId}:${mode}`）。
+// 2026-10-28 重锁：按用户拍板清掉协议脚手架（「如为空则忽略本行」→「补充要求：」）并把
+// 自指词「正文」改为「补充要求」；文本 hash 变化即由该次治理引起。
 const PRESET_TEMPLATE_TEXTS_SHA256: Record<string, string> = {
-  "fashion-lookbook:generate": "1cade2d45df2ce7a0ddce28faf0291c5a07b71dbaf8609928cad32f7578e081f",
-  "fashion-lookbook:edit": "d53d321b3c646a9db2fd19eedbe0e667fb6ec50cee4a6b9b869e81ef1f16f168",
+  "fashion-lookbook:generate": "80f34d69787d2b011c414ee6c9fa63188e17e1bc6c4825a6ba8cc0fcfe54172f",
+  "fashion-lookbook:edit": "9ae54f99d7ee5ba51f5068a302c74726a80ee675903c89bad506d2892d29b5d6",
   "upscale:edit": "0727dbe20d04a2520551814954e4c92fda3077de30e86dec0608ed06c55db6b8",
-  "print-extract:edit": "6ad59f3b1d8b2107baaa745952d42cf5b231842a76348fa88d6aac28019bd220",
-  "print-mutate:edit": "85bd164fd0352426373dca23c498d548ca43d7ce21928ed5287f65efacb9f889",
-  "fabric-recolor:edit": "f206795ca802db450492dbfafc6fba80b2601c4eea2943e76d31c084bad0d48a",
+  "print-extract:edit": "87022386a3e2de69eb3a8d1a29421b84443372347d2aefb45782651a85278a5a",
+  "print-mutate:edit": "4e0a6a1ac332199b2dc0b649595096001303c11ca9dfd002e500e503dd271b09",
+  "fabric-recolor:edit": "ef650ad3622fa11a007df9e309073d4f975cc2e89dfb02a797eac521702dcb1f",
   "mask-local-edit:mask-edit": "9623f4f460a21efad5eb4bbdc138c2c3a33f1c6f3b61a2d71ea9e77a7c2d9527",
-  "video-animate:edit": "da0ffd1a8abecbff78e86dc79bfcfb41b2f8e142d38f2b6ef9f8ebf96b5e9335",
-  "video-runway:edit": "70b8e99003bb3fa2072352f81e7ee52645cd4020a1679b60e543b08e7c5cdc01",
-  "video-xhs:edit": "37ffcec1fc6b57503b14e424cc139a4f066423e267ab528e103f25bc4b74095e",
+  "video-animate:edit": "3097444cc879cb35534608f453350df2fa416b4ddd3aaec6b35dad1c1a0cfe68",
+  "video-runway:edit": "995574af26d22c2a2ccb9beefe0e59f1ff14c3d29d2c64d739f012ea747110f6",
+  "video-xhs:edit": "b62410468ea768a35c1101472626391823425c06e810dcb87f0e12bd7ddb9348",
   "prompt-polish:edit": "2294316dfc5aa23cb63ea9baa80e6d924982bc001422957765aa1f2aa2031f51",
   "prompt-generate:generate": "55996590129a4b56e2a84e470411db7319b4be570d8dfd75a6bdeb0af02e17b8",
-  "model-tryon:edit": "db1dd53d3093f1f4114f9e044df80907880e8235dcab4e20b8f9e815b7b158e8",
-  "pose-shot:edit": "ec2a1476b35d2871c56e11c4b9f5021dab37de553a5d0c9f1e5c49f4965498d5",
-  "background-swap:edit": "0b3d91515f04b76e22811ba19df707feef34518b66d85a963a2c98577fc9cad1",
-  "digital-model:edit": "e58510948b4d1d1dacaabc7e8846176d14f9a210a6f047c050d5cfa86939f5d9",
-  "fabric-swap:edit": "fac4692ca71b62acad6dcd74e43918328f54743485ff61956ead4d7094797148",
-  "sketch-to-garment:edit": "83e04cc7042f74858e9c7bea4cca6280edc1b384b04c6eb02610396b36b610a9",
-  "ai-restyle:edit": "85a72188417bb11bd8f0ae3b775ace041a883b2a945cd24b14c7f332b8053a5c",
-  "person-to-mannequin:edit": "bd577fe5dd2d276a6e36382071bc927d160a18a857309ab7b77ea7e40cdc1e93",
+  "model-tryon:edit": "5b999f04aa30a05cf1b437da0d627c24b774f51ab07ea7731fb478e68a8f1302",
+  "pose-shot:edit": "68122dd853edb5769884004ad899405aa163fa5a8f8f27cc0e37f8cc85715be5",
+  "background-swap:edit": "8e97c6523bc6c2284b1e20cfe396126727caef4e5dcbb3304918b34a7d40c2ae",
+  "digital-model:edit": "9ac420eda9ac47591456affecdcfa47b9860c7c1011584ff18f7fa06a5b67108",
+  "fabric-swap:edit": "95fb662526d9ba37df9ff18d9b8785b24e555786b32ac3cd3bc2ff5e2d615840",
+  "sketch-to-garment:edit": "acfbafd634247f31dccf13c116469cdc1eae089c3046e718dc6454e5392781b8",
+  "ai-restyle:edit": "9af34cdc286c193edfedf34ad75028d0dfd84168fa8f9a780e1b2208ad1537bd",
+  "person-to-mannequin:edit": "c7325254d8e2fdcf43cbf9abd0345be9d65c43fd952eb3307c5b59333ca31f2a",
 };
 
 const EXPECTED_FAMILY_IDS = [

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   rewriteEligibility,
   REWRITE_SUPPLEMENT_ANCHOR,
+  REWRITE_SUPPLEMENT_ANCHORS,
 } from "../src/lib/rewriteEligibility";
 
 console.log("rewrite-eligibility：补全资格（锚点空补充）测试");
@@ -51,12 +52,24 @@ console.log("  ✓ 协议模板锚点后为空/空白 → empty_supplement（按
 }
 console.log("  ✓ 取首个锚点 indexOf 之后的内容判定（与 server 同口径）");
 
-// ---------- 6. 锚点常量与 server 主树逐字一致（防镜像漂移） ----------
-assert.equal(
-  REWRITE_SUPPLEMENT_ANCHOR,
-  "用户补充要求（如为空则忽略本行）：",
-  "锚点必须与 server REWRITE_SUPPLEMENT_ANCHOR 逐字一致",
+// ---------- 6. 锚点集合与 server 主树逐字一致（防镜像漂移） ----------
+// 2026-10-28：锚点从单一长标记改为「短标记优先 + 长标记兼容旧草稿」的有序集合，
+// 双端必须逐字同值同序，否则老草稿的补充段会切不出来。
+assert.deepEqual(
+  [...REWRITE_SUPPLEMENT_ANCHORS],
+  ["补充要求：", "用户补充要求（如为空则忽略本行）："],
+  "锚点集合必须与 server REWRITE_SUPPLEMENT_ANCHORS 逐字同序一致",
 );
-console.log("  ✓ 锚点常量逐字锁定");
+assert.equal(REWRITE_SUPPLEMENT_ANCHOR, REWRITE_SUPPLEMENT_ANCHORS[0], "旧名单值出口指向新短锚点");
+console.log("  ✓ 锚点集合逐字锁定");
+
+// ---------- 7. 旧草稿长锚点仍可切分（向后兼容） ----------
+{
+  const legacy = "AI 换装模特试穿。协议段。\n用户补充要求（如为空则忽略本行）：红色长裙";
+  assert.deepEqual(rewriteEligibility(legacy), { eligible: true, reason: null });
+  const legacyEmpty = "AI 换装模特试穿。协议段。\n用户补充要求（如为空则忽略本行）：";
+  assert.deepEqual(rewriteEligibility(legacyEmpty), { eligible: false, reason: "empty_supplement" });
+  console.log("  ✓ 旧草稿长锚点向后兼容");
+}
 
 console.log("\n通过 6 项");
