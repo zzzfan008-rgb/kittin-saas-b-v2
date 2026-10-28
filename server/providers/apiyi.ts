@@ -283,8 +283,13 @@ async function parseOpenAiImageResponse(
   for (let index = 0; index < body.data.length; index += 1) {
     const item = record(body.data[index]);
     if (!item) throw new ProviderError("AI 服务返回图片条目无效", 502, modelId, "invalid_response");
-    if (!opts?.urlOnly && item.b64_json !== undefined) images.push(await base64Image(item.b64_json, modelId));
-    else if (item.url !== undefined) images.push(imageUrl(item.url, modelId, index));
+    // 兔子API 实测（2026-10-28）：gpt-image-2.5-flare 会同时返回
+    // `b64_json: ""`（空串）与真实 `url`。判空必须用「非空字符串」，
+    // 否则会拿空串去解码 base64 直接抛错。
+    const hasB64 = typeof item.b64_json === "string" && item.b64_json.length > 0;
+    const hasUrl = typeof item.url === "string" && item.url.trim().length > 0;
+    if (!opts?.urlOnly && hasB64) images.push(await base64Image(item.b64_json, modelId));
+    else if (hasUrl) images.push(imageUrl(item.url, modelId, index));
     else throw new ProviderError("AI 服务返回图片字段无效", 502, modelId, "invalid_response");
     if (opts?.requireOutputSize) {
       if (typeof item.size !== "string" || !/^[1-9]\d{1,4}x[1-9]\d{1,4}$/.test(item.size)) {
