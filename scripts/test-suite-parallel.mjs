@@ -132,6 +132,8 @@ const TEST_FILES = [
   "tests/mask-composite-url.test.ts",
   // 2026-10-28：点运行即出结果节点 + 生成中动效（占位节点不落库）。
   "tests/result-pending-node.test.ts",
+  // 2026-10-28 P0：flux 多参考图的静默张冠李戴告警。
+  "tests/model-reference-warning.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
   // 2026-10-27 数据隔离契约：默认只看自己，跨用户需显式 all=true（纯源码断言）。

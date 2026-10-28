@@ -26,6 +26,7 @@ import {
   IMAGE_MODEL_IDS,
   IMAGE_MODEL_VENDOR_GROUPS,
   RESOLUTION_TIERS,
+  imageModelReferenceWarning,
   VIP_SIZE_DEFAULT_TIER_INDEX,
   defaultImageModelOptions,
   getImageModelContract,
@@ -424,6 +425,10 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? resolutionTierOf(effModel, options)
     : DEFAULT_RESOLUTION_TIER;
   const currentQuality = typeof options.quality === "string" ? options.quality : DEFAULT_QUALITY;
+  /** 图片模型的参考图数量告警（flux 多图不可靠）。 */
+  const referenceWarning = mediaKind === "image" && isImageModelId(effModel)
+    ? imageModelReferenceWarning(effModel, mediaSources.length)
+    : undefined;
   const recommended = mediaKind === "image" && isImageModelId(effModel)
     ? getImageModelContract(effModel).recommendedOptions ?? {}
     : mediaKind === "video" ? videoModelRecommendedOptions(effModel as VideoModelId) : {};
@@ -565,6 +570,12 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
               options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
               onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
           </div>
+          {/* 参考图数量可用性告警（用户 2026-10-28 P0）：flux 多图会静默张冠李戴。 */}
+          {referenceWarning ? (
+            <p role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">
+              ⚠ {referenceWarning}（仍可运行）
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
