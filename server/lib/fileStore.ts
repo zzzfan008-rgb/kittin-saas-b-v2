@@ -334,6 +334,54 @@ function expandIpv6(address: string): number[] | null {
   return groups.map((group) => Number.parseInt(group, 16));
 }
 
+/**
+ * 上游产物域名白名单（用户 2026-10-28 拍板 P2）。
+ *
+ * 背景：Clash/同类代理开 TUN 模式时，DNS 对被代理域名返回 **fake-IP**（198.18.0.0/15），
+ * 我们回源下载上游产物（阿里 OSS / Google 图床 / 字节 TOS / 兔子）时会被 SSRF 守卫
+ * 判为「非公网」而失败 —— 表现为 `blocked non-global address for <host>: 198.18.0.x`，
+ * 且只有「返回直链」的模型会中招（gpt-image 系走 base64 不受影响）。
+ *
+ * 放行范围严格限定：
+ * - 仅这些**固定后缀**的上游产物域名；
+ * - 仅当解析结果是 fake-IP 段（198.18.0.0/15）；
+ * - 私网/回环/链路本地/云元数据地址**一律仍然拒绝**（ven 命中白名单域名也一样）。
+ *
+ * 为什么安全：攻击者要利用它，必须同时控制上述受信任域名之一的 DNS 解析，
+ * 这与「直接允许任意域名解析到 198.18.x」的放行强度完全不同。
+ */
+const UPSTREAM_ARTIFACT_HOST_SUFFIXES: readonly string[] = [
+  "aliyuncs.com",   // 阿里 OSS（qwen 产物）
+  "sydney-ai.com",  // Google 图床（gemini / gpt-image 产物）
+  "volces.com",     // 字节 TOS（seedream 产物）
+  "tu-zi.com",      // 兔子网关自身（原生 flux polling 等）
+];
+
+/** 该 host 是否属于「上游产物」白名单（后缀匹配，需带点边界）。 */
+export function isUpstreamArtifactHost(host: string): boolean {
+  const normalized = host.toLowerCase().replace(/\.$/, "");
+  return UPSTREAM_ARTIFACT_HOST_SUFFIXES.some((suffix) => (
+    normalized === suffix || normalized.endsWith(`.${suffix}`)
+  ));
+}
+
+/** Clash / mihomo 等代理的 fake-IP 段（198.18.0.0/15）。 */
+function isProxyFakeIpAddress(raw: string): boolean {
+  if (isIP(raw) !== 4) return false;
+  const value = ipv4Number(raw);
+  if (value === null) return false;
+  return inV4Cidr(value, ipv4Number("198.18.0.0")!, 15);
+}
+
+/**
+ * 地址是否可被本次回源放行：公网地址一律放行；上游产物域名额外允许 fake-IP；
+ * 其余（私网/回环/元数据）永远拒绝。
+ */
+export function isAddressAllowedForHost(host: string, address: string): boolean {
+  if (isGlobalIpAddress(address)) return true;
+  return isUpstreamArtifactHost(host) && isProxyFakeIpAddress(address);
+}
+
 /** True only for globally routable unicast addresses accepted by remote image fetches. */
 export function isGlobalIpAddress(raw: string): boolean {
   let address = raw.toLowerCase().split("%")[0];
@@ -466,7 +514,8 @@ export async function assertUrlAllowed(raw: string | URL, lookup: HostLookup = d
   }
   const addresses = isIP(host) ? [host] : await lookup(host);
   if (addresses.length === 0) throw new Error(`hostname did not resolve: ${host}`);
-  const blocked = addresses.find((address) => !isGlobalIpAddress(address));
+  // 上游产物域名允许代理 fake-IP（见 UPSTREAM_ARTIFACT_HOST_SUFFIXES 注释），其余 fail-closed。
+  const blocked = addresses.find((address) => !isAddressAllowedForHost(host, address));
   if (blocked) throw new Error(`blocked non-global address for ${host}: ${blocked}`);
   return u;
 }
@@ -486,7 +535,7 @@ export async function downloadImageToDataUrl(
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
       // Re-resolve immediately before every connection; all results are revalidated.
       const addresses = isIP(u.hostname) ? [u.hostname] : await lookup(u.hostname);
-      const blocked = addresses.find((address) => !isGlobalIpAddress(address));
+      const blocked = addresses.find((address) => !isAddressAllowedForHost(u.hostname, address));
       if (addresses.length === 0 || blocked) throw new Error(`blocked non-global address for ${u.hostname}: ${blocked ?? "no addresses"}`);
       res = fetcher
         ? await fetcher(u, { signal: ctrl.signal, redirect: "manual" })
@@ -671,7 +720,7 @@ export async function downloadVideoToBuffer(
     let response: VideoResponse | undefined;
     for (let redirects = 0; redirects <= MAX_VIDEO_REDIRECTS; redirects += 1) {
       const addresses = isIP(url.hostname) ? [url.hostname] : await lookup(url.hostname);
-      const blocked = addresses.find((address) => !isGlobalIpAddress(address));
+      const blocked = addresses.find((address) => !isAddressAllowedForHost(url.hostname, address));
       if (addresses.length === 0 || blocked) {
         throw new Error(`blocked non-global address for ${url.hostname}: ${blocked ?? "no addresses"}`);
       }
