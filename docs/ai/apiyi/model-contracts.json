@@ -684,7 +684,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:3b013f92cb4b201e98ac3ea0a2f8943b06c7801c1e7f1a8649033ed4860c41e8",
+      "contractHash": "sha256:7ba68fbfc91eb52e603e3a77d015e66fc09a37e9c61e7368ba466ae074f057fc",
       "id": "doubao-seedream-5-0-pro-260628",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -742,12 +742,14 @@
       ],
       "recommendedOptions": {
         "size": {
-          "default": "1536x2048",
+          "default": "2048x2048",
           "examples": [
-            "1024x1024",
-            "1536x1024",
-            "1024x1536",
-            "2048x2048"
+            "2048x2048",
+            "2304x1728",
+            "1728x2304",
+            "2560x1440",
+            "1440x2560",
+            "3072x3072"
           ]
         },
         "response_format": {
@@ -761,7 +763,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:3255d7a90e2ea636135926e43fbb5749564f1360479e63c66efc265299eb3570",
+      "contractHash": "sha256:ee80ed39b147963376e3693149df21f10533da8e04103e2540302655a041c418",
       "id": "doubao-seedream-5-0-lite-260128",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -819,12 +821,14 @@
       ],
       "recommendedOptions": {
         "size": {
-          "default": "1536x2048",
+          "default": "2048x2048",
           "examples": [
-            "1024x1024",
-            "1536x1024",
-            "1024x1536",
-            "2048x2048"
+            "2048x2048",
+            "2304x1728",
+            "1728x2304",
+            "2560x1440",
+            "1440x2560",
+            "3072x3072"
           ]
         },
         "response_format": {

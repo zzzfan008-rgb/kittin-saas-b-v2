@@ -324,11 +324,20 @@ async function parseGeminiImages(payload: unknown, modelId: ImageModelId): Promi
       const part = record(partValue);
       // 兔子API 返回 snake_case（inline_data / mime_type）；兼容 API易 的 camelCase。
       const inline = record(part?.inline_data ?? part?.inlineData);
-      if (!inline || inline.data === undefined) continue;
-      const rawMime = inline.mime_type ?? inline.mimeType;
-      const mime = rawMime === "image/jpeg" ? "image/jpeg" : rawMime === "image/png" ? "image/png" : undefined;
-      if (!mime) throw new ProviderError("Gemini 返回了不支持的图片格式", 502, modelId, "invalid_response");
-      images.push(await base64Image(inline.data, modelId, mime));
+      if (inline && inline.data !== undefined) {
+        const rawMime = inline.mime_type ?? inline.mimeType;
+        const mime = rawMime === "image/jpeg" ? "image/jpeg" : rawMime === "image/png" ? "image/png" : undefined;
+        if (!mime) throw new ProviderError("Gemini 返回了不支持的图片格式", 502, modelId, "invalid_response");
+        images.push(await base64Image(inline.data, modelId, mime));
+        continue;
+      }
+      // gemini-nano-banana-2.1 等模型走「文件引用」形态：返回 fileData.fileUri（临时 URL），
+      // 不是内联 base64。实测（2026-10-28）该模型固定走这条路径，必须支持。
+      const fileData = record(part?.file_data ?? part?.fileData);
+      const fileUri = fileData?.file_uri ?? fileData?.fileUri;
+      if (typeof fileUri === "string" && fileUri.trim()) {
+        images.push(imageUrl(fileUri, modelId, images.length));
+      }
     }
   }
   if (!images.length) {
