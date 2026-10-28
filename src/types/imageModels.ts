@@ -819,6 +819,17 @@ export function isModelAllowedForNode(modelId: ImageModelId, nodeKind: string): 
  */
 export const IMAGE_ASPECT_RATIO_OPTIONS = ["1:1", "3:4", "4:3", "9:16", "16:9"] as const;
 
+/**
+ * 全模型画幅并集（落库校验用，用户 2026-10-28）：
+ * 面板按模型给画幅（契约 aspectRatios，最多 10 种），而持久化 schema 曾只放行 5 种，
+ * 选 4:5 / 5:4 / 2:3 / 3:2 / 21:9 会直接「云端草稿同步失败」。
+ * schema 校验必须用并集，具体到某个模型是否支持由面板与契约各自收敛。
+ */
+export const IMAGE_ASPECT_RATIO_UNION: readonly string[] = Array.from(new Set<string>([
+  ...IMAGE_ASPECT_RATIO_OPTIONS,
+  ...IMAGE_MODEL_IDS.flatMap((modelId) => getImageModelContract(modelId).aspectRatios ?? []),
+]));
+
 export function imageAspectRatioOptions(modelId: ImageModelId): readonly string[] {
   const declared = getImageModelContract(modelId).aspectRatios;
   return declared && declared.length > 0 ? declared : IMAGE_ASPECT_RATIO_OPTIONS;

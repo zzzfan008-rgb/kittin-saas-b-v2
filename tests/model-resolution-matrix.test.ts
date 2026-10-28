@@ -19,7 +19,8 @@ const {
   modelSupportsQuality,
   IMAGE_MODEL_IDS,
 } = await import("../src/types/imageModels");
-const { imageAspectRatioOptions } = await import("../src/types/imageModels");
+const { imageAspectRatioOptions, IMAGE_ASPECT_RATIO_UNION } = await import("../src/types/imageModels");
+const { validateAndMigrateFlow } = await import("../server/lib/workflowSchema");
 
 console.log("逐模型分辨率契约");
 
@@ -159,6 +160,35 @@ ok("画质参数只发给官方支持的模型（gemini/flux/seedream/qwen 不�
     const supported = modelSupportsQuality(modelId);
     const expected = modelId.startsWith("gpt-image-2.5");
     assert.equal(supported, expected, `${modelId} quality 支持判定不符`);
+  }
+});
+
+// ---- 画幅落库取值域（用户 2026-10-28：选 4:5/5:4/2:3/3:2/21:9 报「云端草稿同步失败」）----
+
+ok("schema 放行全部 10 种官方画幅，且仍拒绝未知画幅", () => {
+  const make = (ratio: string) => ({
+    schemaVersion: 9,
+    nodes: [{
+      id: "g1", type: "image-generator", position: { x: 0, y: 0 },
+      data: {
+        kind: "image-generator", label: "生图", status: "idle",
+        modelId: "gpt-image-2.5-flare", operationMode: "generate",
+        aspectRatio: ratio, modelOptions: { size: "2048x2048", quality: "low" }, batchSize: 1,
+      },
+    }],
+    edges: [],
+  });
+  for (const ratio of IMAGE_ASPECT_RATIO_UNION) {
+    assert.doesNotThrow(() => validateAndMigrateFlow(make(ratio) as never), `${ratio} 必须可保存`);
+  }
+  assert.throws(() => validateAndMigrateFlow(make("7:5") as never), /aspectRatio|must be one of/, "未知画幅必须仍被拒绝");
+});
+
+ok("每个模型的画幅都落在落库并集内（面板可选 = 能保存）", () => {
+  for (const modelId of IMAGE_MODEL_IDS) {
+    for (const ratio of imageAspectRatioOptions(modelId)) {
+      assert.ok(IMAGE_ASPECT_RATIO_UNION.includes(ratio), `${modelId} 的 ${ratio} 不在落库取值域`);
+    }
   }
 });
 
