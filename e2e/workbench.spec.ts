@@ -456,7 +456,8 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
   await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
   // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
-  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare VIP");
+  // 兔子API 迁移后默认生成模型为 gpt-image-2.5-flare，标签随契约变化。
+  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare");
   // R-100 本批：model-tryon 模板画幅改为 3:4 —— server/routes/templates.ts:163
   // imageGeneratorNode("tryon-gen", …, { familyId: "model-tryon", aspectRatio: "3:4" })；
   // 同文件 :96 的通用默认仍是 "1:1"（该模板不用它）。实测 combobox 收到 "3:4"。
