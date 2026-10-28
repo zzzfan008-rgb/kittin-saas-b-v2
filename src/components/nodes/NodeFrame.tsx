@@ -148,7 +148,10 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
   return (
     <div
       // 生成中整节点呼吸描边（用户 2026-10-28 选型 B）；只影响外壳，不挡内容。
-      className={`gc-node-root relative w-[var(--gc-node-width)]${isNodeRunActive(status) ? " gc-node-running" : ""}`}
+      // 注意：w-[var(--gc-node-width)] 后面必须留空格再接 ${}——紧贴 ${ 时 Tailwind 4 的
+      // 提取器会把整段当成一个候选 token 而丢弃，该类不生成 → width 退化为 auto，
+      // 节点被内容撑到画布宽（2026-10-28 实测：computed width 1280px，样式表无该规则）。
+      className={`gc-node-root relative w-[var(--gc-node-width)] ${isNodeRunActive(status) ? "gc-node-running" : ""}`}
       style={typeof nodeWidth === "number" && Number.isFinite(nodeWidth) ? { width: nodeWidth } : undefined}
     >
       {resizable && (onResizeWidth || onResizeWidthEnd) ? (
