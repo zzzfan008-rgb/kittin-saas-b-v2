@@ -149,6 +149,23 @@ export function hasReviewedModelCatalogBaseline(): boolean {
 export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare";
 export const MASK_REDRAW_MODEL_ID = "gpt-image-2.5-sunburst" as const;
 
+/**
+ * 模型侧的「参考图数量」可用性告警（非阻断，用户 2026-10-28 定 P0）。
+ *
+ * flux-3-image 在兔子网关上是**单图最稳**：2026-10-28 实测多图请求能带上参考图，
+ * 但模型对「第几张图」的辨识不稳定（同一提示词问 image 1 却给 image 2 的颜色，
+ * 换字段名也不稳），结果是 status=succeeded 却可能张冠李戴——属于静默错误。
+ * 故对 >1 张参考图给出明确告警，让用户知道该场景应换 GPT2.5 快速/专业。
+ */
+export function imageModelReferenceWarning(
+  modelId: ImageModelId,
+  referenceCount: number,
+): string | undefined {
+  if (modelId !== "flux-3-image") return undefined;
+  if (referenceCount <= 1) return undefined;
+  return "FLUX3 接多张参考图时容易张冠李戴（模型分不清第几张），多图场景建议改用 GPT2.5快速 / GPT2.5专业";
+}
+
 export const GENERATION_IMAGE_MODEL_IDS: readonly GenerationImageModelId[] = IMAGE_MODEL_IDS;
 
 export function isImageModelId(value: unknown): value is ImageModelId {
