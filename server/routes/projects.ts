@@ -368,6 +368,8 @@ projectsRouter.post("/", asyncHandler(async (req, res) => {
 projectsRouter.get("/", asyncHandler(async (req, res) => {
   await purgeExpiredProjects();
   const user = requestUser(req);
+  // 数据隔离（2026-10-27）：管理员默认也只看自己的项目；?all=true 才跨用户（只读）。
+  const includeAllProjects = req.query.all === "true" && user.role === "admin";
   // 封面优化：不再拉全量 flow_json，由 LATERAL 子查询直接取「该项目最后一次成功生成步的
   // 最后一张图」作为 previewImage（无生成记录 → NULL，前端槽位 previewImage?: string）。
   // 排序口径与最近结果页一致：run.started_at 降序，同 run 内 step_index 降序。
@@ -392,9 +394,9 @@ projectsRouter.get("/", asyncHandler(async (req, res) => {
       LIMIT 1
     ) preview ON true
     WHERE p.deleted_at IS NULL AND p.lifecycle = 'saved'
-      AND ($1 = 'admin' OR p.owner_id = $2)
+      AND ($1::boolean OR p.owner_id = $2)
     ORDER BY p.updated_at DESC
-  `, [user.role, user.id]);
+  `, [includeAllProjects, user.id]);
   res.json(rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -783,9 +785,13 @@ projectsRouter.get("/:id", asyncHandler(async (req, res) => {
     res.status(404).json({ error: "project not found" });
     return;
   }
-  if (row.owner_id !== user.id && user.role !== "admin") {
-    res.status(403).json({ error: "无权查看此项目" });
-    return;
+  if (row.owner_id !== user.id) {
+    // 数据隔离（2026-10-27）：管理员读他人项目需显式 all=true（与列表口径一致）。
+    const allowedAsAdmin = user.role === "admin" && req.query.all === "true";
+    if (!allowedAsAdmin) {
+      res.status(403).json({ error: "无权查看此项目" });
+      return;
+    }
   }
   try {
     const flow = validateAndMigrateFlow(JSON.parse(row.flow_json));

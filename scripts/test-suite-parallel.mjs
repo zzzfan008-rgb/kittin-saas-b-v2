@@ -126,6 +126,8 @@ const TEST_FILES = [
   "tests/result-export.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
+  // 2026-10-27 数据隔离契约：默认只看自己，跨用户需显式 all=true（纯源码断言）。
+  "tests/data-isolation-contract.test.ts",
   // R-85：本地 shadcn Slider 受控回写契约护栏（纯源码断言，不碰库）。
   "tests/ui-slider-controlled-contract.test.ts",
   // 抠图：alpha 边缘羽化纯函数 + 模型源/错误提示（纯逻辑，无 DOM/网络）。
