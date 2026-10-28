@@ -97,7 +97,12 @@ ok("store：runNode 插入占位节点，事件到达时原地升级", () => {
   const store = read("src/store/flowStore.ts");
   assert.match(store, /createPendingResultNode\(tab, id\)/, "runNode 必须插入占位结果节点");
   assert.match(store, /isPendingResultNode/, "必须有占位节点判定");
-  assert.match(store, /const upgraded: FlowNode = \{ \.\.\.pending, type: node\.type, data: node\.data \}/, "事件到达必须原地升级");
+  // 原地升级时必须把节点 id 改成服务端 resultNodeId（结果节点 id 属服务端契约）。
+  assert.match(
+    store,
+    /const upgraded: FlowNode = \{ \.\.\.pending, id: event\.resultNodeId, type: node\.type, data: node\.data \}/,
+    "事件到达必须原地升级并采用服务端 resultNodeId",
+  );
 });
 
 ok("生成节点自身不再渲染「显影中」（用户 2026-10-28：结果节点已承担）", () => {
