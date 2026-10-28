@@ -283,6 +283,39 @@ body {
   animation: develop-breathe 1.6s ease-in-out infinite;
 }
 
+/* ---- 生成中：节点外框呼吸（用户 2026-10-28 选型 B） ----
+   整节点描边做透明/外扩呼吸，与图区「暗房显影」配合：显影给信息量，外框给整体感。 */
+@keyframes gc-node-running-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gc-accent) 45%, transparent),
+                0 0 0 0 color-mix(in srgb, var(--gc-accent) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gc-accent) 85%, transparent),
+                0 0 0 6px color-mix(in srgb, var(--gc-accent) 0%, transparent);
+  }
+}
+.gc-node-running {
+  border-radius: 12px;
+  animation: gc-node-running-ring 2s ease-in-out infinite;
+}
+
+/* 生成中已用时角标（用户 2026-10-28 选型 E；超 60s 转警示色） */
+.gc-run-elapsed {
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--gc-node-border, var(--gc-border));
+  background: var(--gc-panel);
+  color: var(--gc-node-muted, var(--gc-text-muted));
+}
+.gc-run-elapsed[data-slow="true"] {
+  border-color: var(--gc-status-retry);
+  color: var(--gc-status-retry);
+}
+
 /* ---- V4 结果过渡动画：gc-result-reveal（图片/视频通用 blur→clear 揭示） ---- */
 @keyframes gc-result-reveal {
   0% {
@@ -315,6 +348,7 @@ body {
 
   .develop-overlay .develop-gridlines,
   .develop-overlay .develop-scanline,
+  .gc-node-running,
   .btn-running-breathe {
     animation: none !important;
   }
@@ -751,7 +785,8 @@ button.gc-upstream-chip:disabled { cursor: default; }
 .zoom-hud {
   position: absolute; bottom: 10px; right: 10px;
   font-size: 11px; color: var(--gc-text-muted);
-  background: rgba(0,0,0,.48); border: 1px solid var(--gc-border);
+  /* 2026-10-28：结果详情页去黑蒙层后，这个徽标也必须跟主题走（原固定 rgba(0,0,0,.48) 在简白/护眼主题下是黑块）。 */
+  background: var(--gc-panel); border: 1px solid var(--gc-border);
   border-radius: 999px; padding: 3px 10px;
   cursor: pointer; transition: all .15s;
   backdrop-filter: blur(4px);

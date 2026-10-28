@@ -361,6 +361,27 @@ async function parseGeminiImages(payload: unknown, modelId: ImageModelId): Promi
  * 与 API易 的 `inlineData` / `mimeType` 不同（兔子文档 360926406e0 明示）。
  * 响应侧兼容两种写法以容忍网关差异。
  */
+/**
+ * 组装 Gemini 原生请求的 parts。
+ *
+ * 用户 2026-10-28 反馈：谷歌两个模型把参考图顺序搞反。根因是原实现把提示词放在最前、
+ * 图片统一跟在后面，Gemini 无法把「参考图1/参考图2」的文字编号和后续图片一一绑定。
+ * 现按谷歌官方图文编辑的形态改：**图片在前、提示词在后**，且每张图前插一条
+ * 「参考图N：」文字，把编号和图片就地绑死；提示词里的图号与它一一对应。
+ */
+function geminiParts(
+  prompt: string,
+  images: ReadonlyArray<{ inline_data: { mime_type: string; data: string } }>,
+): Array<Record<string, unknown>> {
+  const parts: Array<Record<string, unknown>> = [];
+  images.forEach((image, index) => {
+    parts.push({ text: `参考图${index + 1}：` });
+    parts.push(image);
+  });
+  parts.push({ text: prompt });
+  return parts;
+}
+
 async function geminiInlineData(dataUrl: string, modelId: ImageModelId): Promise<{ inline_data: { mime_type: string; data: string } }> {
   const parsed = parsedReference(dataUrl, modelId);
   if (parsed.mime === "image/png" || parsed.mime === "image/jpeg") {
@@ -382,9 +403,8 @@ export async function validateApiyiRequest(
   if (req.operationMode === "mask-edit" && modelId !== MASK_REDRAW_MODEL_ID) {
     throw new ProviderError(`${modelId} 不支持 mask-edit 模式`, 400, modelId, "invalid_request");
   }
-  if (modelId === MASK_REDRAW_MODEL_ID && req.operationMode !== "mask-edit") {
-    throw new ProviderError("gpt-image-2.5-sunburst 首版仅支持 mask-edit 模式", 400, modelId, "invalid_request");
-  }
+  // 2026-10-28 实测：gpt-image-2.5-sunburst 同样支持 generate / edit，
+  // 不再强制只能走 mask-edit（旧约束来自 API易 时代，已失效）。
   requestOptions(modelId, req);
   const refs = referenceData(req, modelId);
   if (mode !== "generate" && refs.length === 0) {
@@ -395,10 +415,15 @@ export async function validateApiyiRequest(
   }
   refs.forEach((ref) => parsedReference(ref, modelId));
   if (modelId === MASK_REDRAW_MODEL_ID) {
-    if (mode !== "mask-edit" || !req.mask) {
-      throw new ProviderError("gpt-image-2.5-sunburst 仅用于带 PNG 蒙版的局部修改", 400, modelId, "invalid_request");
+    // mask-edit 必须带蒙版；generate / edit 允许不带蒙版。
+    if (mode === "mask-edit") {
+      if (!req.mask) {
+        throw new ProviderError("局部修改必须提供 PNG 蒙版", 400, modelId, "invalid_request");
+      }
+      await validateMaskForSource(refs[0], req.mask, modelId);
+    } else if (req.mask) {
+      await validateMaskForSource(refs[0], req.mask, modelId);
     }
-    await validateMaskForSource(refs[0], req.mask, modelId);
   } else if (req.mask) {
     throw new ProviderError(`${modelId} 不支持蒙版参数`, 400, modelId, "invalid_request");
   }
@@ -430,6 +455,37 @@ function isJsonImageEditFamily(modelId: ImageModelId): boolean {
     || modelId === "qwen-image-3.0";
 }
 
+/**
+ * flux-3-image 的参考图请求体（2026-10-28 实测确定）。
+ *
+ * 兔子原生通道 /flux/v1/flux-3-image 对 aspect_ratio / images / input_image / image
+ * 等字段一律 400（不是 supported by this FLUX endpoint），只能纯文生图；
+ * multipart /v1/images/edits 塞同名 image 多张时参考图被整体丢弃（成片等于没参考）。
+ * 唯一可用形态：POST /v1/images/generations（JSON），参考图按
+ * input_image、input_image_2 … input_image_N 逐字段命名。
+ */
+function buildFluxReferenceBody(
+  modelId: ImageModelId,
+  prompt: string,
+  options: ImageModelOptions,
+  refs: string[] = [],
+): Record<string, unknown> {
+  const body: Record<string, unknown> = { model: upstreamModelId(modelId), prompt };
+  if (options.aspect_ratio !== undefined) body.aspect_ratio = String(options.aspect_ratio);
+  if (options.resolution !== undefined) body.resolution = String(options.resolution);
+  if (options.output_format !== undefined) body.output_format = String(options.output_format);
+  if (options.safety_tolerance !== undefined) body.safety_tolerance = options.safety_tolerance;
+  if (options.prompt_upsampling !== undefined) body.prompt_upsampling = options.prompt_upsampling;
+  refs.forEach((ref, index) => {
+    body[index === 0 ? "input_image" : `input_image_${index + 1}`] = ref;
+  });
+  return body;
+}
+
+function isFluxFamily(modelId: ImageModelId): boolean {
+  return modelId === "flux-3-image";
+}
+
 function buildOpenAiImageBody(
   modelId: ImageModelId,
   prompt: string,
@@ -438,12 +494,8 @@ function buildOpenAiImageBody(
 ): Record<string, unknown> {
   const base: Record<string, unknown> = { model: upstreamModelId(modelId), prompt };
   if (modelId === "flux-3-image") {
-    // flux-3-image 用 aspect_ratio；不传 size（兔子文档字段表）。
-    if (options.aspect_ratio !== undefined) base.aspect_ratio = String(options.aspect_ratio);
-    if (options.output_format !== undefined) base.output_format = String(options.output_format);
-    if (options.safety_tolerance !== undefined) base.safety_tolerance = options.safety_tolerance;
-    if (options.prompt_upsampling !== undefined) base.prompt_upsampling = options.prompt_upsampling;
-    return base;
+    // flux-3-image：aspect_ratio / resolution，参考图用 input_image*（不再是 multipart）。
+    return buildFluxReferenceBody(modelId, prompt, options, refs);
   }
   if (options.size !== undefined) base.size = String(options.size);
   if (options.quality !== undefined) base.quality = String(options.quality);
@@ -451,9 +503,11 @@ function buildOpenAiImageBody(
   if (options.seed !== undefined) base.seed = options.seed;
   if (options.guidance_scale !== undefined) base.guidance_scale = options.guidance_scale;
   if (isSeedreamFamily(modelId)) {
-    // 即梦产品策略：固定不带水印、关闭序列参考图生成（文档 349741169）。
+    // 即梦产品策略：固定不带水印（文档 349741169）。
+    // 2026-10-28 实测更正：seedream 5.0 pro/lite 已不支持 sequential_image_generation，
+    // 带上它会直接 400（"not supported by the current model"）→ 生图 0 秒失败。
+    // 该字段只在 seedream 4.x 需要，5.0 必须省略。
     base.watermark = false;
-    base.sequential_image_generation = "disabled";
   }
   // 兔子 /v1/images/generations 亦接受 image[]（url 或 base64）——文生图带图时直接传。
   if (refs.length > 0) base.image = refs;
@@ -474,7 +528,7 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: req.prompt }] }],
+        contents: [{ parts: geminiParts(req.prompt, []) }],
         generationConfig: {
           responseModalities: ["IMAGE"],
           imageConfig: { aspectRatio: options.aspectRatio, imageSize: options.imageSize },
@@ -513,7 +567,8 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
   const refs = referenceData(req, modelId);
 
   if (isGeminiFamily(modelId)) {
-    const parts = [{ text: req.prompt }, ...await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)))];
+    const imageParts = await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)));
+    const parts = geminiParts(req.prompt, imageParts);
     const response = await fetchApiyi(modelId, contract.edit.path, () => ({
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
@@ -529,6 +584,19 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
       images: await parseGeminiImages(await readJson(response, modelId), modelId),
       model: modelId,
     }));
+  }
+
+  if (isFluxFamily(modelId)) {
+    // 参考图走 input_image / input_image_2 …（见 buildFluxReferenceBody 注释）。
+    const fluxResponse = await fetchApiyi(modelId, contract.edit.path, () => ({
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+      body: JSON.stringify(buildFluxReferenceBody(modelId, req.prompt, options, refs)),
+    }));
+    return parseApiyiImageResult(fluxResponse, async () => {
+      const parsed = await parseOpenAiImageResponse(await readJson(fluxResponse, modelId), modelId, { maxImages: 1 });
+      return { ...parsed, model: modelId };
+    });
   }
 
   if (isJsonImageEditFamily(modelId)) {

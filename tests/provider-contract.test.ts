@@ -127,7 +127,8 @@ async function main(): Promise<void> {
         assert.equal(getImageModelContract(modelId).id, modelId);
         assert.ok(getImageModelContract(modelId).upstreamModelId);
       }
-      assert.equal(getImageModelContract("gpt-image-2.5-sunburst").generation, null);
+      // 2026-10-28 实测：sunburst 支持文生图/图生图，generation 不再为 null。
+      assert.ok(getImageModelContract("gpt-image-2.5-sunburst").generation);
     });
 
     await test("九模型契约哈希绑定同一份 reviewed model catalog baseline", () => {
@@ -316,7 +317,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-sunburst 只接受有效 PNG Alpha 蒙版并发送精确合法尺寸", async () => {
+    await test("gpt-image-2.5-sunburst 的蒙版局部修改校验 PNG Alpha 并发送精确合法尺寸", async () => {
       let calls = 0;
       const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
@@ -325,17 +326,6 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(red));
       });
       try {
-        await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-sunburst"].generate({
-            prompt: "禁止文生图",
-            operationMode: "generate",
-          }),
-          (error: unknown) => error instanceof ProviderError &&
-            error.category === "invalid_request" &&
-            error.message === "gpt-image-2.5-sunburst 首版仅支持 mask-edit 模式",
-        );
-        assert.equal(calls, 0);
-
         const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
         await assert.rejects(
           () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
@@ -448,17 +438,20 @@ async function main(): Promise<void> {
         assert.equal(captures[1].url, captures[0].url);
         const editBody = jsonBody(captures[1].init) as { contents: Array<{ parts: Array<Record<string, unknown>> }> };
         const parts = editBody.contents[0].parts;
-        assert.deepEqual(parts[0], { text: "改图" });
+        // 2026-10-28：Gemini parts 改为「图片在前（每图前带「参考图N：」标签）+ 提示词在后」，
+        // 让图号与图片就地绑定；谷歌两个模型此前对图号-图片的对应不稳定。
+        assert.deepEqual(parts[0], { text: "参考图1：" });
         // 兔子API 的 Gemini 端点用 snake_case（inline_data/mime_type）；WebP 必须转成 PNG 上传。
         assert.equal((parts[1].inline_data as { mime_type: string }).mime_type, "image/png");
+        assert.deepEqual(parts[2], { text: "改图" }, "提示词必须排在全部图片之后");
       } finally {
         restoreFetch();
       }
     });
 
-    await test("FLUX 3 Image generations 用 aspect_ratio、编辑走 multipart /v1/images/edits", async () => {
-      // 兔子API flux-3-image：/v1/images/generations 明确「不支持传图」、用 aspect_ratio
-      // （没有 width/height）；参考图编辑走 multipart /v1/images/edits（字段 image，可重复）。
+    await test("FLUX 3 Image 统一走 JSON generations，参考图用 input_image / input_image_2", async () => {
+      // 2026-10-28 实测更正：原生 /flux/v1 只接受 prompt+width+height；multipart edits 传多张
+      // 同名 image 时参考图被整体丢弃。唯一可用形态 = JSON generations + input_image*。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const resultUrl = "https://cdn.example/flux.png?token=temporary";
       const restoreFetch = installFetchMock((input, init) => {
@@ -480,18 +473,24 @@ async function main(): Promise<void> {
           prompt: "融合", operationMode: "edit", referenceImages: [white, blue],
           modelOptions: { aspect_ratio: "3:4" },
         });
-        assert.equal(captures[1].url, "https://gateway.example/v1/images/edits", "flux 编辑必须走 multipart edits");
-        const form = captures[1].init?.body as FormData;
-        assert.equal(form.get("model"), "flux-3-image");
-        assert.equal(form.get("prompt"), "融合");
-        assert.equal(form.getAll("image").length, 2, "多参考图用重复的 image 字段上传");
-        assert.equal(form.getAll("image[]").length, 0);
+        assert.equal(
+          captures[1].url,
+          "https://gateway.example/v1/images/generations",
+          "flux 参考图必须走 JSON generations，不能再用 multipart edits",
+        );
+        const editBody = jsonBody(captures[1].init);
+        assert.equal(editBody.model, "flux-3-image");
+        assert.equal(editBody.prompt, "融合");
+        assert.equal(typeof editBody.input_image, "string", "图1 用 input_image");
+        assert.equal(typeof editBody.input_image_2, "string", "图2 用 input_image_2");
+        assert.equal("image" in editBody, false, "不得再出现 multipart 时代的 image 字段");
+        assert.equal("images" in editBody, false, "兔子网关不接受 images 数组名");
       } finally {
         restoreFetch();
       }
     });
 
-    await test("Seedream 固定关闭水印与序列生成且禁止发送 n", async () => {
+    await test("Seedream 固定关闭水印、不再发送 sequential_image_generation、禁止发送 n", async () => {
       const bodies: Record<string, unknown>[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
         bodies.push(jsonBody(init));
@@ -512,14 +511,19 @@ async function main(): Promise<void> {
         });
         assert.deepEqual(generated.providerOutputSizes, ["2048x2048"]);
         assert.deepEqual(edited.providerOutputSizes, ["3072x3072"]);
+        // 2026-10-28 实测：seedream 5.0 pro/lite 不再支持 sequential_image_generation，
+        // 带上会 400 "not supported by the current model"（生图 0 秒失败）。
         assert.deepEqual(bodies[0], {
           model: "doubao-seedream-5-0-pro-260628", prompt: "生成", size: "2K", response_format: "b64_json",
-          watermark: false, sequential_image_generation: "disabled",
+          watermark: false,
         });
         assert.deepEqual(bodies[1], {
           model: "doubao-seedream-5-0-pro-260628", prompt: "融合", image: [white, blue], size: "3K",
-          response_format: "b64_json", watermark: false, sequential_image_generation: "disabled",
+          response_format: "b64_json", watermark: false,
         });
+        for (const body of bodies) {
+          assert.equal("sequential_image_generation" in body, false, "不得再发 sequential_image_generation");
+        }
         assert.equal("n" in bodies[0], false);
       } finally {
         restoreFetch();
@@ -719,7 +723,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("AI 诊断列出九个 API易模型且 gpt-image-2.5-sunburst 只开放改图探针", async () => {
+    await test("AI 诊断列出九个模型，sunburst 同时开放文生图与改图探针", async () => {
       const app = express();
       app.use(express.json());
       app.use((req, _res, next) => {
@@ -749,7 +753,8 @@ async function main(): Promise<void> {
         assert.equal(body.gateway, "gateway.example");
         assert.deepEqual(body.providers.map((item) => item.providerId), IMAGE_MODEL_IDS);
         assert.ok(body.providers.every((item) => item.configured));
-        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2.5-sunburst")?.probes, ["edit"]);
+        // 2026-10-28 实测：sunburst 支持文生图，探针随契约 generation 自动扩为 generate+edit。
+        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2.5-sunburst")?.probes, ["generate", "edit"]);
 
         const invalid = {
           method: "POST", headers: { "Content-Type": "application/json" },

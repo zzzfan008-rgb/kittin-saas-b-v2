@@ -13,13 +13,13 @@
         "type": "text",
         "position": {
           "x": 0,
-          "y": -170
+          "y": -230
         },
         "data": {
           "kind": "text",
           "label": "风格/场景清单",
           "status": "idle",
-          "text": "GPT Image 2 VIP 多图写实穿搭编辑。严格按请求中“图1、图2……”的序号及 identity、pose_composition、garment_top、garment_bottom、garment_full、fabric、accessory、styling_only、background 角色使用每张图，不得跨角色挪用身份或服装。\n将指定服装穿到 identity 模特身上，按 pose_composition 设置平视机位、中远景、约 50mm 视角、姿势与取景；忠实保留模特特征、服装版型、花型、材质和穿搭层级，动作与衣摆运动方向可信。\n输出 3:4 单人全身时装 Lookbook；除明确指定的穿搭替换外，脸部、发型、肤色、身材、姿势、背景和非目标区域不变，无文字、Logo、水印、僵硬手势或过度磨皮。"
+          "text": "写实穿搭编辑。严格按参考图序号使用输入图片，不得跨图挪用：参考图1=服装，是唯一的服装来源。\n按正文描述生成一位穿着参考图1服装的模特，设置机位、视角、姿势与取景，保持平视中远景、约 50mm 视角；忠实保留服装的版型、花型、材质与穿搭层级，动作与衣摆运动方向可信。\n除明确指定的穿搭替换外，脸部、发型、肤色、身材、姿势、背景和非目标区域不变，无文字、Logo、水印、僵硬手势或过度磨皮。\n用户补充要求（如为空则忽略本行）："
         }
       },
       {
@@ -50,11 +50,11 @@
           "operationMode": "edit",
           "modelId": "gpt-image-2.5-flare",
           "modelOptions": {
-            "size": "1536x2048",
-            "quality": "high"
+            "size": "2048x2048",
+            "quality": "low"
           },
           "aspectRatio": "1:1",
-          "batchSize": 2
+          "batchSize": 1
         }
       }
     ],

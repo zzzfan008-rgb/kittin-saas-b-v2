@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NodeResizer, type ResizeParams } from "@xyflow/react";
 import {
   isNodeRunActive,
@@ -147,7 +147,11 @@ export function NodeFrame({ title, status, error, selected, nodeId, toolbar, fra
 
   return (
     <div
-      className="gc-node-root relative w-[var(--gc-node-width)]"
+      // 生成中整节点呼吸描边（用户 2026-10-28 选型 B）；只影响外壳，不挡内容。
+      // 注意：w-[var(--gc-node-width)] 后面必须留空格再接 ${}——紧贴 ${ 时 Tailwind 4 的
+      // 提取器会把整段当成一个候选 token 而丢弃，该类不生成 → width 退化为 auto，
+      // 节点被内容撑到画布宽（2026-10-28 实测：computed width 1280px，样式表无该规则）。
+      className={`gc-node-root relative w-[var(--gc-node-width)] ${isNodeRunActive(status) ? "gc-node-running" : ""}`}
       style={typeof nodeWidth === "number" && Number.isFinite(nodeWidth) ? { width: nodeWidth } : undefined}
     >
       {resizable && (onResizeWidth || onResizeWidthEnd) ? (
@@ -374,6 +378,59 @@ export function UnsupportedNodeKindNotice({
       <p className="mt-0.5">
         {label ? `节点「${label}」的` : "该"}类型「{kindTitle}」来自旧版本，当前版本不支持查看、运行或编辑。
       </p>
+    </div>
+  );
+}
+
+/** 已用时（秒级刷新）；超过 60s 返回 slow=true 供角标转警示色。 */
+export function useElapsedLabel(startedAt: number | undefined): { label: string; slow: boolean } {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (typeof startedAt !== "number") return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  if (typeof startedAt !== "number") return { label: "", slow: false };
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  return {
+    label: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
+    slow: seconds >= 60,
+  };
+}
+
+/**
+ * 生成中进度块（用户 2026-10-28 选型 A+E）：暗房显影 + 已用时角标。
+ * 结果节点图区、蒙版重绘右栏、多轮修改右栏共用同一实现，保证三处观感一致。
+ */
+export function RunProgressBlock({
+  nodeId,
+  startedAt,
+  className = "",
+}: {
+  /** 找不到显式 startedAt 时，从 store 里该节点的活动运行记录回退取开始时间。 */
+  nodeId?: string;
+  startedAt?: number;
+  className?: string;
+}) {
+  const recordStart = useFlowStore((state) => (
+    nodeId
+      ? state.recentResults.find((record) => record.nodeId === nodeId && isNodeRunActive(record.status))?.startedAt
+      : undefined
+  ));
+  const { label, slow } = useElapsedLabel(startedAt ?? recordStart);
+  return (
+    <div className={`relative ${className}`} data-testid="run-progress-block">
+      <Developing />
+      {label ? (
+        <span
+          className="gc-run-elapsed absolute right-2 top-2 z-[3]"
+          data-slow={slow ? "true" : "false"}
+          data-testid="result-elapsed"
+          title={`已用时 ${label}`}
+        >
+          {label}
+        </span>
+      ) : null}
     </div>
   );
 }

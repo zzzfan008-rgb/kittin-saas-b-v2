@@ -2,7 +2,7 @@
 // - 去顶栏，改为「左 stage（原图+涂抹层） + 右栏约 1/4 宽（clamp）」承载全部控件；
 //   标题「蒙版重绘」+ 关闭（✕/ESC）在右栏顶部。
 // - 主按钮「蒙版重绘」= 保存蒙版（真上传 /api/files/mask）+ 发起局部重绘 run，
-//   **不关闭面板**：运行期左栏切「显影中」动效，完成后结果覆盖左图（source 实时响应
+//   **不关闭面板**：运行期右栏底部走「暗房显影 + 已用时」，完成后结果覆盖左图（source 实时响应
 //   outputImages[0]），用户手动关闭。次按钮「保存蒙版」只存不执行。
 // - 羽化 v2：勾选式自适应（默认勾选 = 未定义 → server adaptiveMaskFeatherRadius）；
 //   取消勾选后滑杆 0–64 可调。提交时 featherRadius = 自适应 ? undefined : 滑杆值。
@@ -28,6 +28,7 @@ import {
 } from "@/lib/maskGeometry";
 import { MASK_EXPANSION_FILL, MASK_SELECTION_FILL } from "@/lib/color/colorToken";
 import { useLightboxStore } from "@/store/lightboxStore";
+import { RunProgressBlock } from "./NodeFrame";
 import type { NodeRunStatus } from "@/types/workflow";
 import { isNodeRunActive } from "@/types/workflow";
 import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -42,8 +43,10 @@ interface MaskEditorProps {
   editPrompt: string;
   /** textarea 事件绑定（IME/撤销安全）。 */
   promptBind: ReturnType<typeof useCoalescedTextEdit>["bind"];
-  /** 节点运行状态：active 时左栏显影中 + 画布锁定。 */
+  /** 节点运行状态：active 时右栏底部显影中 + 画布锁定。 */
   runStatus: NodeRunStatus;
+  /** 生成中动效需要按节点取开始时间（用户 2026-10-28）。 */
+  nodeId?: string;
   readOnly?: boolean;
   /** 只保存蒙版（写 node data.mask/featherRadius），不执行。 */
   onSaveDraft: (mask: string, featherRadius: number | undefined) => void | Promise<void>;
@@ -67,6 +70,7 @@ export function MaskEditor({
   editPrompt,
   promptBind,
   runStatus,
+  nodeId,
   readOnly = false,
   onSaveDraft,
   onRun,
@@ -470,7 +474,7 @@ export function MaskEditor({
         data-panel="mask-redraw"
         aria-label="蒙版重绘"
       >
-      {/* 左 stage：原图 + 涂抹层 + 运行期显影中。
+      {/* 左 stage：原图 + 涂抹层（运行中不再叠加显影占位，动效在右栏底部）。
           用户批注（2026-10-22）：图片底下要有可见底板框，与裁剪页一致。
           注意：底板只能靠 padding + bg 实现，不能加 margin —— e2e/mask-slider-drag.spec.ts:333
           断言「左图区 + 右栏正好铺满视口」，<main> 上的 margin 会让该回归红掉。 */}
@@ -671,34 +675,34 @@ export function MaskEditor({
               快照只增不清——重试失败时仍展示上次成功图，故标「上次成功结果」而非「本次结果」，
               信息保留但消除「本次产出」的误导（审查裁决 P2(b)）。
               左栏仍按契约覆盖原图——此处只做页内可回看的结果位，不改变覆盖语义。 */}
-          {running || lastResultUrl ? (
+          {/* 2026-10-28：运行中的「显影中…」占位删掉——生成中动效已统一到右栏底部
+              的 RunProgressBlock（暗房显影 + 已用时），这里不再重复。本区块只在
+              已有成功结果时展示快照（快照只增不清，失败后仍显示上次成功图）。 */}
+          {lastResultUrl ? (
             <section className="flex flex-col gap-2" aria-label="上次成功结果">
               <span className="text-xs font-medium text-[var(--gc-text)]" data-testid="mask-redraw-result-label">上次成功结果</span>
-              {running ? (
-                <div
-                  className="flex h-24 items-center justify-center rounded-md border border-dashed border-[var(--gc-border)] text-xs text-[var(--gc-text-muted)]"
-                  data-testid="mask-redraw-result-pending"
-                >
-                  显影中…
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => lastResultUrl && openLightbox(lastResultUrl, "上次成功结果")}
-                  className="h-24 w-full cursor-zoom-in rounded-md border border-[var(--gc-border)] p-0"
-                  aria-label="放大查看上次成功结果"
-                >
-                  <img
-                    src={lastResultUrl ?? ""}
-                    alt="上次成功结果"
-                    data-testid="mask-redraw-result-preview"
-                    className="h-full w-full rounded-md object-contain"
-                  />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => lastResultUrl && openLightbox(lastResultUrl, "上次成功结果")}
+                className="h-24 w-full cursor-zoom-in rounded-md border border-[var(--gc-border)] p-0"
+                aria-label="放大查看上次成功结果"
+              >
+                <img
+                  src={lastResultUrl ?? ""}
+                  alt="上次成功结果"
+                  data-testid="mask-redraw-result-preview"
+                  className="h-full w-full rounded-md object-contain"
+                />
+              </button>
             </section>
           ) : null}
         </div>
+        {/* 生成中动效（用户 2026-10-28）：右栏参数区下方固定一条，暗房显影 + 已用时。 */}
+        {running ? (
+          <div className="shrink-0 border-t border-[var(--gc-border)] p-4">
+            <RunProgressBlock nodeId={nodeId} />
+          </div>
+        ) : null}
       </aside>
       </DialogContent>
     </Dialog>

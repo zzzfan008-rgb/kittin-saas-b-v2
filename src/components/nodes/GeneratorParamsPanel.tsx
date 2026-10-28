@@ -19,7 +19,13 @@ import {
   type ImageGeneratorNodeData,
 } from "@/types/workflow";
 import {
+  DEFAULT_ASPECT_RATIO,
+  DEFAULT_QUALITY,
+  DEFAULT_RESOLUTION_TIER,
   GENERATION_IMAGE_MODEL_IDS,
+  IMAGE_MODEL_IDS,
+  IMAGE_MODEL_VENDOR_GROUPS,
+  RESOLUTION_TIERS,
   VIP_SIZE_DEFAULT_TIER_INDEX,
   defaultImageModelOptions,
   getImageModelContract,
@@ -27,9 +33,14 @@ import {
   imageModelLabel,
   imageModelOptionsForAspectRatio,
   imageModelOptionsWarnings,
+  imageModelShortName,
   imagePromptSizePrefixOptions,
   imageSizeTierOptions,
   isImageModelId,
+  resolutionModelOptions,
+  resolutionTierOf,
+  type ImageModelId,
+  type ResolutionTier,
   vipSizeTiersForRatio,
   type ImageModelOptions,
 } from "@/types/imageModels";
@@ -45,7 +56,9 @@ import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
 import { paramsFromContract, type ParamOption } from "@/lib/paramsFromContract";
 import {
   Select,
+  SelectGroup,
   SelectItem,
+  SelectGroupLabel,
   SelectList,
   SelectPopup,
   SelectPortal,
@@ -79,9 +92,35 @@ function nodeOutsideOffset(trigger: HTMLElement | null): number {
 }
 
 interface SelectOption { value: string; label: string; disabled?: boolean; }
+/** 二级分组：一级=厂商名，二级=同厂商下的具体型号。 */
+interface SelectOptionGroup { label: string; options: readonly SelectOption[]; }
 
-function OptionSelect({ label, value, options, disabled, placeholder, onChange, ariaLabel, hint }: {
-  label: string; value: string; options: readonly SelectOption[]; disabled?: boolean;
+/** 画质选项（用户 2026-10-28：默认 auto，保留四档）。 */
+const QUALITY_OPTIONS = ["auto", "low", "medium", "high"] as const;
+
+/**
+ * 画幅图标：用同一套比例矩形表示当前画幅（用户批注「画幅前面需要加上比例图标」）。
+ * 尺寸固定 12×12，按比例画内框，避免引入额外图标依赖。
+ */
+function RatioIcon({ ratio }: { ratio: string }) {
+  const m = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(ratio);
+  const w = m ? Number(m[1]) : 1;
+  const h = m ? Number(m[2]) : 1;
+  const long = 12;
+  const short = Math.max(4, Math.round((long * Math.min(w, h)) / Math.max(w, h)));
+  const width = w >= h ? long : short;
+  const height = w >= h ? short : long;
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className="shrink-0 opacity-70">
+      <rect x={(12 - width) / 2} y={(12 - height) / 2} width={width} height={height}
+        fill="none" stroke="currentColor" strokeWidth="1.2" rx="1" />
+    </svg>
+  );
+}
+
+function OptionSelect({ label, value, options, groups, disabled, placeholder, onChange, ariaLabel, hint }: {
+  label: string; value: string; options: readonly SelectOption[]; groups?: readonly SelectOptionGroup[];
+  disabled?: boolean;
   placeholder?: string; onChange: (n: string) => void; ariaLabel?: string; hint?: string;
 }) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -111,9 +150,20 @@ function OptionSelect({ label, value, options, disabled, placeholder, onChange, 
           sideOffset={() => nodeOutsideOffset(triggerRef.current)}
         ><SelectPopup>
           <SelectList>
-            {options.map((o) => (
-              <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
-            ))}
+            {groups && groups.length > 0
+              ? groups.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectGroupLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--gc-node-muted)]">
+                    {group.label}
+                  </SelectGroupLabel>
+                  {group.options.map((o) => (
+                    <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
+                  ))}
+                </SelectGroup>
+              ))
+              : options.map((o) => (
+                <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
+              ))}
           </SelectList>
         </SelectPopup></SelectPositioner></SelectPortal>
       </Select>
@@ -233,15 +283,18 @@ function UpstreamPortRow({ id, label, sources, disabled, dropState, onDisconnect
         ? "size-2.5 shrink-0 rounded-full"
         : "size-2.5 shrink-0 rounded-full opacity-30";
   return (
-    <div className="flex min-h-[34px] items-center gap-2">
+    // 圆点贴在节点左边框上（用户 2026-10-28：要和结果节点同位置，在边边上而不是节点里面）。
+    // 行容器设 relative，Handle 用绝对定位左移一个 body 内边距（p-3 = 12px）正好落在边框；
+    // translate 把圆心压在这条线上，行内原来的静态圆点位置改由文字标签占位。
+    <div className="relative flex min-h-[34px] items-center gap-2">
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={id}
+        style={{ position: "absolute", left: "-12px", top: "50%", transform: "translate(-50%, -50%)" }}
+        className={dotClass}
+      />
       <span className="flex h-7 w-20 shrink-0 items-center gap-1 text-label text-[var(--gc-node-muted)]">
-        <Handle
-          type="target"
-          position={Position.Left}
-          id={id}
-          style={{ position: "static", transform: "none" }}
-          className={dotClass}
-        />
         {label}
       </span>
       {sources.length === 0 ? (
@@ -351,10 +404,26 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const effModel = data.modelId ?? "";
 
   const modelSel: SelectOption[] = mediaKind === "image"
-    ? GENERATION_IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelLabel(id) }))
+    ? IMAGE_MODEL_IDS.map((id) => ({ value: id, label: imageModelShortName(id) }))
     : VIDEO_MODEL_IDS.map((id) => ({ value: id, label: videoModelLabel(id) }));
 
+  // 图片模型按厂商二级分组（用户 2026-10-28 批注）；视频模型数量少且厂商各异，保持平铺。
+  const modelGroups: SelectOptionGroup[] | undefined = mediaKind === "image"
+    ? IMAGE_MODEL_VENDOR_GROUPS.map((group) => ({
+      label: group.vendor,
+      options: group.models
+        // 下拉必须列出全部 9 个模型（含蒙版专用的 GPT2.5专业/sunburst），
+        .map((model) => ({ value: model.id, label: model.name })),
+    })).filter((group) => group.options.length > 0)
+    : undefined;
+
   const options = (data.modelOptions ?? {}) as ImageModelOptions;
+  // 图片节点三个控件的回显值（用户 2026-10-28）：分辨率从 size/imageSize/resolution 反解，
+  // 画质缺省 auto。
+  const currentTier = mediaKind === "image" && isImageModelId(effModel)
+    ? resolutionTierOf(effModel, options)
+    : DEFAULT_RESOLUTION_TIER;
+  const currentQuality = typeof options.quality === "string" ? options.quality : DEFAULT_QUALITY;
   const recommended = mediaKind === "image" && isImageModelId(effModel)
     ? getImageModelContract(effModel).recommendedOptions ?? {}
     : mediaKind === "video" ? videoModelRecommendedOptions(effModel as VideoModelId) : {};
@@ -441,44 +510,85 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         dropState={dropStateFor(mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference")}
         onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
 
-      <OptionSelect label="模型" value={effModel} options={modelSel}
+      <OptionSelect label="模型" value={effModel} options={modelSel} groups={modelGroups}
         disabled={disabled} onChange={patchModel} />
 
-      <div className="grid grid-cols-2 gap-2">
-        {promptSizeOptions ? (
-          // gpt-image-2.5-flare 既不接受 size 也不接受画幅参数，尺寸只能靠 prompt 前缀控制
-          // （契约 recommendedOptions.promptSizePrefix），故画幅位换成尺寸前缀下拉。
-          <OptionSelect label="尺寸" value={curPromptSizeValue} options={promptSizeOptions} disabled={disabled}
-            onChange={(v) => updateNodeData(nodeId, {
-              modelOptions: { ...options, promptSizePrefix: v === "" ? undefined : v },
-            })} />
-        ) : (
+      {mediaKind === "image" ? (
+        // 用户 2026-10-28 批注（v2）：参数固定三排——
+        //   第一排 模型（上面那句 OptionSelect 独占一行）
+        //   第二排 画幅 + 分辨率
+        //   第三排 画质 + 数量（1–8，即 batchSize）
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block min-w-0 space-y-1">
+              <span className="text-label text-[var(--gc-node-muted)]">画幅</span>
+              <Select value={data.aspectRatio ?? DEFAULT_ASPECT_RATIO} disabled={disabled}
+                onValueChange={(v) => { if (typeof v === "string") patchAspect(v); }}>
+                <SelectTrigger aria-label="画幅" className="nodrag h-7 w-full text-[11px]">
+                  <SelectValue placeholder="1:1">
+                    {(sel) => (
+                      <span className="flex items-center gap-1">
+                        <RatioIcon ratio={typeof sel === "string" ? sel : DEFAULT_ASPECT_RATIO} />
+                        {typeof sel === "string" ? sel : DEFAULT_ASPECT_RATIO}
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPortal><SelectPositioner side="right" align="start" alignItemWithTrigger={false}
+                  collisionBoundary={typeof document === "undefined" ? undefined : document.body}>
+                  <SelectPopup><SelectList>
+                    {aspectRatioOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        <span className="flex items-center gap-1"><RatioIcon ratio={o.value} />{o.value}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectList></SelectPopup></SelectPositioner></SelectPortal>
+              </Select>
+            </label>
+            <OptionSelect label="分辨率" value={currentTier} disabled={disabled}
+              options={RESOLUTION_TIERS.map((t) => ({ value: t, label: t }))}
+              onChange={(t) => updateNodeData(nodeId, {
+                modelOptions: {
+                  ...(data.modelOptions ?? {}),
+                  ...resolutionModelOptions(effModel as ImageModelId, t as ResolutionTier, data.aspectRatio ?? DEFAULT_ASPECT_RATIO),
+                },
+              })} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <OptionSelect label="画质" value={currentQuality} disabled={disabled}
+              options={QUALITY_OPTIONS.map((q) => ({ value: q, label: q }))}
+              onChange={(q) => updateNodeData(nodeId, {
+                modelOptions: { ...(data.modelOptions ?? {}), quality: q },
+              })} />
+            {/* 用户 2026-10-28：数量（原「批次」）回归面板，1–8 全整数可选。 */}
+            <OptionSelect label="数量" value={String((data as ImageGeneratorNodeData).batchSize ?? 1)}
+              options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
+              onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
           <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
-        )}
-        {mediaKind === "image" && (
           <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
             options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
             onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
-        )}
-      </div>
-
-      {sizeTierOptions && (
-        <OptionSelect label="尺寸" value={curSizeValue} options={sizeTierOptions} disabled={disabled}
-          onChange={(v) => updateNodeData(nodeId, { modelOptions: { ...options, size: v } })} />
+        </div>
       )}
 
-      <section aria-label="模型参数" className="space-y-1">
-        {renderParamKeys.length === 0 && (
-          <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">当前模型没有可调参数。</p>
-        )}
-        {renderParamKeys.map((k) => (
-          <ParamControl key={k} name={k} value={options[k]} options={paramOpts[k] ?? []} disabled={disabled}
-            onChange={(n) => setParam(k, n)} />
-        ))}
-        {warnings.map((w) => (
-          <p key={w} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">⚠ {w}（仍可运行）</p>
-        ))}
-      </section>
+      {mediaKind === "video" && (
+        <section aria-label="模型参数" className="space-y-1">
+          {renderParamKeys.length === 0 && (
+            <p className="text-label leading-relaxed text-[var(--gc-node-muted)]">当前模型没有可调参数。</p>
+          )}
+          {renderParamKeys.map((k) => (
+            <ParamControl key={k} name={k} value={options[k]} options={paramOpts[k] ?? []} disabled={disabled}
+              onChange={(n) => setParam(k, n)} />
+          ))}
+          {warnings.map((w) => (
+            <p key={w} role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">⚠ {w}（仍可运行）</p>
+          ))}
+        </section>
+      )}
 
       <RunButton status={data.status} onClick={() => void runNode(nodeId)}
         label={data.status === "success" ? "重新运行" : "运行"}

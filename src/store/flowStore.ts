@@ -22,6 +22,7 @@ import {
   EDGE_HANDLE_FIRST_FRAME,
   EDGE_HANDLE_PROMPT,
   EDGE_HANDLE_REFERENCE,
+  EDGE_HANDLE_RESULT,
   isGeneratorNodeKind,
   isImageSourceKind,
   isInputNodeKind,
@@ -287,7 +288,8 @@ export interface FlowState {
   /** 最近生成（底部结果面板，含运行记录），新条目在前 */
   recentResults: RecentResult[];
   /** 全局图片查看器（单击任意图片弹出，滚轮缩放 1x~2x） */
-  viewer: { url: string; title?: string; prompt?: string; meta?: string; resultId?: string } | null;
+  /** url 可为空：失败/结果未知的运行只有元数据，没有产物图（用户 2026-10-28 要求失败记录也能打开结果页）。 */
+  viewer: { url?: string; title?: string; prompt?: string; meta?: string; resultId?: string } | null;
   /** 浏览器会话草稿未能持久化；非空时刷新可能丢失尚未保存的修改。 */
   tabSessionPersistenceError: string | null;
   /** 仅内存：打开的蒙版编辑器与尚未结束的蒙版上传总数。 */
@@ -304,7 +306,7 @@ export interface FlowState {
   toggleCompareId: (id: string) => void;
   clearCompare: () => void;
   removeRecentResult: (id: string) => void;
-  openViewer: (v: { url: string; title?: string; prompt?: string; meta?: string; resultId?: string }) => void;
+  openViewer: (v: { url?: string; title?: string; prompt?: string; meta?: string; resultId?: string }) => void;
   closeViewer: () => void;
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<Edge>[]) => void;
@@ -1948,13 +1950,105 @@ export function createResultNodeFromRunEvent(
  * 把结果节点事件落到指定文档（tabId + projectId + documentEpoch 三重绑定）。
  * 晚到的响应因此永远写不进占据同一 tab 容器的新文档。
  */
+/**
+ * 生成中的占位结果节点（用户 2026-10-28：点运行后结果节点立刻出现）。
+ *
+ * runId 用空串标记「尚未落地」，**不写库**：`createDocumentSnapshot` 会把它和它的边
+ * 一起过滤掉（服务端 schema 要求 result 节点 runId 非空）。事件到达后原地升级成真节点，
+ * 因此位置不跳、不新建第二个节点。
+ */
+export const PENDING_RESULT_RUN_ID = "";
+
+export function isPendingResultNode(node: {
+  data: { kind?: string; runId?: string };
+}): boolean {
+  const kind = node.data.kind;
+  return (kind === "result-image" || kind === "result-video") && node.data.runId === PENDING_RESULT_RUN_ID;
+}
+
+/** 在生成节点右侧创建占位结果节点（含 startedAt，供已用时角标）。 */
+export function createPendingResultNode(
+  document: Pick<ProjectTab, "nodes">,
+  generatorId: string,
+): FlowNode | undefined {
+  const generator = document.nodes.find((node) => node.id === generatorId);
+  if (!generator) return undefined;
+  const resultKind = generator.data.kind === "video-generator" ? "result-video" : "result-image";
+  const existingResultCount = document.nodes.filter((node) => (
+    (node.data.kind === "result-image" || node.data.kind === "result-video")
+    && node.data.sourceGeneratorId === generatorId
+    && !isPendingResultNode(node)
+  )).length;
+  const data = {
+    ...defaultNodeData(resultKind),
+    status: "running" as const,
+    sourceGeneratorId: generatorId,
+    runId: PENDING_RESULT_RUN_ID,
+    // 客户端瞬态字段：只活在占位节点上，升级成真节点时丢弃（否则服务端 schema 会拒）。
+    startedAt: Date.now(),
+  } as unknown as WorkflowNodeData;
+  return {
+    id: `pending-result-${nanoid(8)}`,
+    type: resultKind,
+    position: {
+      x: generator.position.x + RESULT_NODE_HORIZONTAL_GAP * (1 + existingResultCount),
+      y: generator.position.y,
+    },
+    data,
+  } as FlowNode;
+}
+
+/**
+ * 生成节点 → 结果节点的溯源边（用户 2026-10-28：生成节点右边必须连到结果节点）。
+ * 两端 handle 均为 EDGE_HANDLE_RESULT 且不可手动拖拽；只在结果节点创建/回填时生成。
+ */
+export function resultSourceEdge(generatorId: string, resultNodeId: string): Edge {
+  return {
+    id: `e-result-${resultNodeId}`,
+    source: generatorId,
+    sourceHandle: EDGE_HANDLE_RESULT,
+    target: resultNodeId,
+    targetHandle: EDGE_HANDLE_RESULT,
+    data: {},
+  };
+}
+
 export function applyResultNodeCreatedEventToTab(
   target: DocumentTarget,
   event: ResultNodeCreatedRunEvent,
 ): boolean {
   return commitDocumentMutationForTarget(target, (tab) => {
+    // 先看有没有本次运行创建的占位节点：有则原地升级（不新建、不跳位、边保留）。
+    const pending = tab.nodes.find((node) => (
+      isPendingResultNode(node as { data: { kind?: string; runId?: string } })
+      && (node.data as { sourceGeneratorId?: string }).sourceGeneratorId === event.sourceGeneratorId
+    ));
     const node = createResultNodeFromRunEvent(tab, event);
-    return node ? { nodes: [...tab.nodes, node] } : {};
+    if (pending && node) {
+      // 原地升级 + **改名成服务端 resultNodeId**：结果节点 id 是服务端契约的一部分
+      //（历史/事件/测试都按 event.resultNodeId 找节点），占位 id 只是客户端瞬态。
+      const upgraded: FlowNode = { ...pending, id: event.resultNodeId, type: node.type, data: node.data };
+      const renamedEdges = tab.edges.map((edge) => (
+        edge.target === pending.id
+          ? { ...edge, id: `e-result-${event.resultNodeId}`, target: event.resultNodeId }
+          : edge
+      ));
+      return {
+        nodes: tab.nodes.map((candidate) => (candidate.id === pending.id ? upgraded : candidate)),
+        edges: renamedEdges,
+        ...(tab.selectedNodeIds.includes(pending.id)
+          ? { selectedNodeIds: tab.selectedNodeIds.map((id) => (id === pending.id ? event.resultNodeId : id)) }
+          : {}),
+      };
+    }
+    if (!node) return {};
+    const hasEdge = tab.edges.some((edge) => (
+      edge.target === node.id && edge.targetHandle === EDGE_HANDLE_RESULT
+    ));
+    return {
+      nodes: [...tab.nodes, node],
+      ...(hasEdge ? {} : { edges: [...tab.edges, resultSourceEdge(event.sourceGeneratorId, node.id)] }),
+    };
   });
 }
 
@@ -2021,9 +2115,26 @@ function updateTabFromRunEvent(
   nodeId: string,
   event: NodeStatusRunEvent,
 ): void {
-  const updateNodes = (nodes: FlowNode[]) => nodes.map((node) =>
-    node.id === nodeId ? { ...node, data: applyRunEventToNode(node.data, event) } : node,
-  );
+  const updateNodes = (nodes: FlowNode[]) => nodes.map((node) => {
+    if (node.id === nodeId) return { ...node, data: applyRunEventToNode(node.data, event) };
+    // 占位结果节点不随失败消失：落成失败态，卡片直接显示原因（用户 2026-10-28）。
+    if (
+      event.status !== "success"
+      && isNodeRunTerminal(event.status)
+      && isPendingResultNode(node as { data: { kind?: string; runId?: string } })
+      && (node.data as { sourceGeneratorId?: string }).sourceGeneratorId === nodeId
+    ) {
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          status: event.status,
+          error: "error" in event && typeof event.error === "string" ? event.error : "生成失败",
+        } as WorkflowNodeData,
+      };
+    }
+    return node;
+  });
   const currentState = useFlowStore.getState();
   // A tab container can be reused for another project. Reject its old run
   // before any branch can write into the replacement document.
@@ -2411,6 +2522,14 @@ export const useFlowStore = create<FlowState>()(
         const allowed = tab.readOnly ? changes.filter((change) => change.type === "select" || change.type === "dimensions") : changes;
         const nodes = applyNodeChanges(allowed, tab.nodes);
         if (nodes === tab.nodes) return;
+        // 节点被移除时同步清掉悬空边（含生成节点→结果节点的溯源边）：
+        // 服务端 schema 对 source/target 缺失的边是硬失败，不清理会导致保存被拒。
+        const removedIds = new Set(
+          allowed.filter((change) => change.type === "remove").map((change) => change.id),
+        );
+        const prunedEdges = removedIds.size === 0
+          ? tab.edges
+          : tab.edges.filter((edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target));
         const selection = normalizeNodeSelection(
           nodes,
           selectionIdsAfterNodeChanges(tab.selectedNodeIds, nodes, allowed),
@@ -2418,6 +2537,7 @@ export const useFlowStore = create<FlowState>()(
         const patch = {
           ...selection,
           ...(selection.selectedNodeIds.length > 0 ? { selectedResultId: null } : {}),
+          ...(prunedEdges === tab.edges ? {} : { edges: prunedEdges }),
         };
         const changesDocument = allowed.some(
           (change) => change.type !== "select" && change.type !== "dimensions",
@@ -2681,6 +2801,24 @@ export const useFlowStore = create<FlowState>()(
             ...queuedRecords,
             ...initialState.recentResults,
           ])));
+
+        // 用户 2026-10-28：点运行即把结果节点画出来（生成中态），事件到达后原地升级。
+        runWithoutHistory(() => commitDocumentMutationForTarget(target, (tab) => {
+          const alreadyPending = tab.nodes.some((candidate) => (
+            isPendingResultNode(candidate as { data: { kind?: string; runId?: string } })
+            && (candidate.data as { sourceGeneratorId?: string }).sourceGeneratorId === id
+          ));
+          if (alreadyPending) return {};
+          const pendingNode = createPendingResultNode(tab, id);
+          if (!pendingNode) return {};
+          const hasEdge = tab.edges.some((edge) => (
+            edge.source === id && edge.target === pendingNode.id
+          ));
+          return {
+            nodes: [...tab.nodes, pendingNode],
+            ...(hasEdge ? {} : { edges: [...tab.edges, resultSourceEdge(id, pendingNode.id)] }),
+          };
+        }));
 
         try {
           runWithoutHistory(() => {

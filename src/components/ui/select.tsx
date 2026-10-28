@@ -14,6 +14,22 @@ function SelectGroup({ ...props }: SelectPrimitive.Group.Props) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />
 }
 
+/**
+ * 弹层内的分组标题（如厂商名）。必须用 GroupLabel 而非 Label：
+ * Select.Label 的语义是「自动关联到 trigger 的可访问名」——它会把 root 的 labelId
+ * 指向自己，于是 trigger 的 aria-labelledby 覆盖调用方的 aria-label，可访问名漂移成
+ * 分组名（a11y 回归）。GroupLabel 只登记到所属 SelectGroup 的 aria-labelledby，不碰 trigger。
+ */
+function SelectGroupLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props) {
+  return (
+    <SelectPrimitive.GroupLabel
+      data-slot="select-group-label"
+      className={cn("px-2 py-1 text-xs font-medium text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
 function SelectLabel({ className, ...props }: SelectPrimitive.Label.Props) {
   return (
     <SelectPrimitive.Label
@@ -151,6 +167,7 @@ export {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectGroupLabel,
   SelectList,
   SelectPopup,
   SelectPortal,

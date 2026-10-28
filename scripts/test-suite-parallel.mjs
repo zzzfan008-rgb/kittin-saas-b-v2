@@ -124,6 +124,14 @@ const TEST_FILES = [
   "tests/project-tabs-canvas.test.ts",
   "tests/projects-api.test.ts",
   "tests/result-export.test.ts",
+  // 2026-10-28：生成节点 → 结果节点溯源边（回填 / 校验 / 幂等）。
+  "tests/result-source-edge.test.ts",
+  // 2026-10-28：结果页「生成ID」+ 失败记录可打开结果页。
+  "tests/result-detail-runid.test.ts",
+  // 2026-10-28：蒙版合成前必须把 provider 直链归一化成 dataURL。
+  "tests/mask-composite-url.test.ts",
+  // 2026-10-28：点运行即出结果节点 + 生成中动效（占位节点不落库）。
+  "tests/result-pending-node.test.ts",
   "tests/verify-bundle-budget.test.ts",
   "tests/cards-58-60-61.test.ts",
   // 2026-10-27 数据隔离契约：默认只看自己，跨用户需显式 all=true（纯源码断言）。

@@ -32,6 +32,7 @@ import { compositeEditImage, type EditMark, type EditMarkTool } from "@/lib/edit
 import { uploadEditDraft } from "@/lib/editDraftUpload";
 import { MarkLayer } from "@/components/nodes/MarkLayer";
 import { useLightboxStore } from "@/store/lightboxStore";
+import { RunProgressBlock } from "./NodeFrame";
 import type { NodeRunStatus } from "@/types/workflow";
 import { isNodeRunActive } from "@/types/workflow";
 import type { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -456,6 +457,12 @@ export function MultiRoundEditPanel({
             </div>
           </section>
         </div>
+        {/* 生成中动效（用户 2026-10-28）：与蒙版重绘页同一实现，右栏参数区下方。 */}
+        {isNodeRunActive(runStatus) ? (
+          <div className="shrink-0 border-t border-[var(--gc-border)] p-4">
+            <RunProgressBlock nodeId={nodeId} />
+          </div>
+        ) : null}
       </aside>
 
       {/* 选用某一轮覆盖到节点：二次确认，确认后写回并自动关闭面板 */}

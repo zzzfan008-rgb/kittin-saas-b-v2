@@ -456,19 +456,18 @@ test("generator nodes keep params inline while the v9 panel exposes an operation
   await expect(generator.getByRole("combobox", { name: "操作" })).toHaveCount(0);
   await expect(generator.getByText(/已接参考图 → 编辑模式/)).toBeVisible();
   // 65b 模型 tryon-gen 自带参考图边，此时应回显推断状态为「已接参考图 → 编辑模式」。
-  // 兔子API 迁移后默认生成模型为 gpt-image-2.5-flare，标签随契约变化。
-  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT Image 2.5 Flare");
-  // R-100 本批：model-tryon 模板画幅改为 3:4 —— server/routes/templates.ts:163
-  // imageGeneratorNode("tryon-gen", …, { familyId: "model-tryon", aspectRatio: "3:4" })；
-  // 同文件 :96 的通用默认仍是 "1:1"（该模板不用它）。实测 combobox 收到 "3:4"。
-  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("3:4");
-  // v9 面板把 v8 的「数量」改名为「批次」。
-  await expect(generator.getByRole("combobox", { name: "批次" })).toContainText("1");
-  const params = generator.getByRole("region", { name: "模型参数" });
-  await expect(params).toBeVisible();
-  await expect(params.getByRole("combobox", { name: "画质" })).toBeVisible();
+  // 2026-10-28：模型下拉按厂商二级分组并改名（GPT2.5快速 / GPT2.5专业），
+  // 仍是 gpt-image-2.5-flare，只是显示名对齐用户批注。
+  await expect(generator.getByRole("combobox", { name: "模型" })).toContainText("GPT2.5快速");
+  // 2026-10-28：所有内置模板统一 1:1（画幅归面板，模板不再写死 3:4）。
+  await expect(generator.getByRole("combobox", { name: "画幅" })).toContainText("1:1");
+  // 2026-10-28：面板固定三排，控件名「批次」改回「数量」（1–8 连续整数）。
+  await expect(generator.getByRole("combobox", { name: "数量" })).toContainText("1");
+  // 图片生成节点已无「模型参数」区：画幅/分辨率/画质/数量三排即全部参数。
+  await expect(generator.getByRole("region", { name: "模型参数" })).toHaveCount(0);
+  await expect(generator.getByRole("combobox", { name: "画质" })).toBeVisible();
   // 65b: 参数全下拉，"添加参数" 自由输入入口已退役。
-  await expect(params.getByRole("button", { name: "+ 添加参数" })).toHaveCount(0);
+  await expect(generator.getByRole("button", { name: "+ 添加参数" })).toHaveCount(0);
 
   // 运行按钮在 v9 是可用的「运行」还是禁用态的「尚不可运行」，由 compatibility 门决定：
   // operationMode=edit 且本测试未上传参考图 → 触发 edit-reference-missing，按钮禁用并给出可读原因
@@ -535,9 +534,8 @@ test("select value echo stays legible against its trigger surface at every deskt
   await expect(operationHint).toBeVisible();
   expect(((await operationHint.textContent()) ?? "").trim().length, "操作推断回显不得为空白").toBeGreaterThan(0);
 
-  // 2) 模型参数区的参数下拉（ParamControl 路径）：占位/回显同样必须可读。
-  const params = generator.getByRole("region", { name: "模型参数" });
-  const qualitySelect = params.getByRole("combobox", { name: "画质" });
+  // 2) 参数下拉（2026-10-28 起画质直接在三排面板里，不再有「模型参数」区）。
+  const qualitySelect = generator.getByRole("combobox", { name: "画质" });
   await expect(qualitySelect).toBeVisible();
   const qualityEcho = await echoLegibility(qualitySelect);
   expect(qualityEcho.ok, JSON.stringify(qualityEcho)).toBe(true);
@@ -552,7 +550,7 @@ test("select value echo stays legible against its trigger surface at every deskt
   //    a) 关掉的弹层不卸载，残留为 0×0 + data-closed（本文件既有的 1024 实测行为），
   //       故用 [data-open] 严格选中当前打开的那个；
   //    b) 模板落地后那次画布重渲染会收起刚打开的下拉（同上方「必要时重开下拉」的既有处理）。
-  const batchSelect = generator.getByRole("combobox", { name: "批次" });
+  const batchSelect = generator.getByRole("combobox", { name: "数量" });
   const openPopup = page.locator('[data-slot="select-popup"][data-open]');
   await expect(async () => {
     if (await openPopup.count() === 0) {
@@ -592,11 +590,14 @@ test("node toolbars follow the v8 per-kind contract and the color tool no longer
   // 故用节点作用域内的 textarea 定位，避免用 getByRole 的 name 断言一个不存在的可访问名。
   const presetPicker = textNode.getByRole("combobox", { name: "提示词预设" });
   await expect(presetPicker).toBeVisible();
-  const textBody = textNode.locator("textarea");
-  await expect(textBody).not.toHaveValue(/GPT Image 2 VIP 写实穿搭生成/);
+  // 2026-10-28：正文改为「写实穿搭生成。按正文描述…」——去掉了模型名与 VIP 残留；
+  // 且预设正文含「用户补充要求」锚点 → 节点切协议模板态，DOM 里会出现第二个 textarea
+  //（六要素面板），故按 first() 锁定正文框。
+  const textBody = textNode.locator("textarea").first();
+  await expect(textBody).not.toHaveValue(/写实穿搭生成。按正文描述/);
   await presetPicker.click();
   await page.getByRole("option", { name: "写实穿搭", exact: true }).click();
-  await expect(textBody).toHaveValue(/GPT Image 2 VIP 写实穿搭生成/);
+  await expect(textBody).toHaveValue(/写实穿搭生成。按正文描述/);
   // 未选中节点不渲染工具条（不占 DOM）。
   const imageNodeId = await nodeIdOfKind(page, "image");
   const imageNode = page.locator(`.react-flow__node[data-id="${imageNodeId}"]`);

@@ -4,8 +4,8 @@
  * 覆盖模板格式契约 docs/design/2026-09-21-five-node-model/contracts/template-format.md
  * 的可机检验收项 P1/P3/P5/P7–P10，以及 C7 v9 快照断言：
  * - schemaVersion = 9
- * - generator 显式 modelId + operationMode + 契约默认参数（aspectRatio 1:1 / batchSize 1，
- *   LookBook/印花裂变覆盖 batchSize 2；modelOptions = 契约推荐默认）
+ * - generator 显式 modelId + operationMode + 契约默认参数（aspectRatio 1:1 / batchSize 1；
+ *   2026-10-28 起数量改由生成面板「数量」控件输入，模板一律留 1；modelOptions = 契约推荐默认）
  * - text 节点 = family 预设模板文本（server/lib/promptPresetsFrozen.ts 冻结表，所见即所发）
  * - 逐模板过 validateAndMigrateFlow（v9）
  *
@@ -23,7 +23,7 @@ process.env.DATA_DIR = TEST_DATA_DIR;
 const { builtinTemplates } = await import("../server/routes/templates");
 const { validateAndMigrateFlow } = await import("../server/lib/workflowSchema");
 const { presetTemplateText } = await import("../server/lib/promptPresetsFrozen");
-const { DEFAULT_GENERATION_MODEL_ID, defaultImageModelOptions } = await import("../src/types/imageModels");
+const { DEFAULT_GENERATION_MODEL_ID, DEFAULT_QUALITY, defaultImageModelOptions } = await import("../src/types/imageModels");
 const { DEFAULT_VIDEO_MODEL_ID } = await import("../src/types/videoModels");
 
 const INPUT_KINDS = new Set(["text", "image", "video"]);
@@ -32,13 +32,14 @@ const RESULT_KINDS = new Set(["result-image", "result-video"]);
 
 /** 每模板期望：text 节点预设（family, mode）+ generator operationMode（+ batchSize 覆盖）。 */
 const EXPECTED: Record<string, { preset: readonly [string, string]; operationMode: string; batchSize?: number; aspectRatio?: string; familyId?: string }> = {
-  "builtin-model-tryon": { preset: ["model-tryon", "edit"], operationMode: "edit", aspectRatio: "3:4", familyId: "model-tryon" },
+  // 2026-10-28：所有工作流默认 1:1（画幅归面板），试穿模板不再写死 3:4。
+  "builtin-model-tryon": { preset: ["model-tryon", "edit"], operationMode: "edit", aspectRatio: "1:1", familyId: "model-tryon" },
   "builtin-pose": { preset: ["pose-shot", "edit"], operationMode: "edit" },
   "builtin-background-swap": { preset: ["background-swap", "edit"], operationMode: "edit" },
-  "builtin-lookbook": { preset: ["fashion-lookbook", "edit"], operationMode: "edit", batchSize: 2 },
+  "builtin-lookbook": { preset: ["fashion-lookbook", "edit"], operationMode: "edit" },
   "builtin-digital-model": { preset: ["digital-model", "edit"], operationMode: "edit" },
   "builtin-print-extract": { preset: ["print-extract", "edit"], operationMode: "edit" },
-  "builtin-print-mutate": { preset: ["print-mutate", "edit"], operationMode: "edit", batchSize: 2 },
+  "builtin-print-mutate": { preset: ["print-mutate", "edit"], operationMode: "edit" },
   "builtin-garment-recolor": { preset: ["fabric-recolor", "edit"], operationMode: "edit" },
   "builtin-fabric-swap": { preset: ["fabric-swap", "edit"], operationMode: "edit" },
   "builtin-sketch-to-garment": { preset: ["sketch-to-garment", "edit"], operationMode: "edit" },
@@ -46,8 +47,8 @@ const EXPECTED: Record<string, { preset: readonly [string, string]; operationMod
   "builtin-outfit-recommend": { preset: ["fashion-lookbook", "generate"], operationMode: "generate" },
   "builtin-person-to-mannequin": { preset: ["person-to-mannequin", "edit"], operationMode: "edit" },
   // 视频模板：operationMode=generate（零系统文本），动效任务文本写入 text 正文（避免重复拼装）
-  "builtin-video-runway": { preset: ["video-animate", "edit"], operationMode: "generate" },
-  "builtin-video-xhs": { preset: ["video-animate", "edit"], operationMode: "generate" },
+  "builtin-video-runway": { preset: ["video-runway", "edit"], operationMode: "generate" },
+  "builtin-video-xhs": { preset: ["video-xhs", "edit"], operationMode: "generate" },
 };
 
 let passed = 0;
@@ -123,8 +124,12 @@ function main() {
           // familyId 是 data 顶层字段（dag.ts extractParams 从 data.familyId 透传），不得进 modelOptions。
           assert.equal(data.aspectRatio, expected.aspectRatio ?? "1:1", `${tpl.id}/${node.id} aspectRatio`);
           assert.equal(data.batchSize, expected.batchSize ?? 1, `${tpl.id}/${node.id} batchSize`);
-          const baseOptions = defaultImageModelOptions(DEFAULT_GENERATION_MODEL_ID, expected.aspectRatio ?? "1:1");
-          assert.equal(data.modelOptions?.quality, baseOptions.quality, `${tpl.id}/${node.id} modelOptions.quality`);
+          // 用户 2026-10-28：所有工作流默认 1:1 画幅 + 2K 分辨率 + 画质 auto。
+          assert.equal(
+            data.modelOptions?.quality,
+            DEFAULT_QUALITY,
+            `${tpl.id}/${node.id} modelOptions.quality 必须是 auto`,
+          );
           assert.equal(data.modelOptions?.familyId, undefined, `${tpl.id}/${node.id} familyId 不得放进 modelOptions`);
           assert.equal(data.familyId, expected.familyId, `${tpl.id}/${node.id} data.familyId`);
           assert.ok(!("generator" in data), `${tpl.id}/${node.id} 不得携带历史垃圾字段 generator`);
