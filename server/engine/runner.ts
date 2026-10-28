@@ -348,8 +348,14 @@ async function executeImageGeneratorStep(
     { ...options, nodeId: step.nodeId },
   );
   const businessImages = needsMask
-    ? await Promise.all(result.images.map((image) => (
-        compositeMaskedEdit(referenceImages[0], mask!, image, { featherRadius: maskFeatherRadius })
+    // 2026-10-28 修复：provider 返回的可能不是 dataURL 而是直链（gpt-image/sunburst 走
+    // sydney-ai CDN、qwen 走阿里 OSS）。compositeMaskedEdit 只接受严格 dataURL，
+    // 直接传 URL 会抛 "invalid image dataURL (strict base64 required)" —— 蒙版重绘/多轮修改
+    // 因此全部失败。这里先归一化（URL → 下载 → dataURL），再进合成。
+    ? await Promise.all(result.images.map(async (image) => (
+        compositeMaskedEdit(referenceImages[0], mask!, await normalizeImageRef(image), {
+          featherRadius: maskFeatherRadius,
+        })
       )))
     : result.images;
   const images = await postProcessGeneratedOutputImages("image", step.params, businessImages);

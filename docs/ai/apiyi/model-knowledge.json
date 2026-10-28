@@ -215,7 +215,7 @@
       },
       "productPolicy": {
         "allowedNodeKinds": [
-          "mask-redraw"
+          "image"
         ],
         "modes": [
           "generate",
@@ -325,7 +325,9 @@
           "edit"
         ],
         "notes": [
-          "厂商文档的扩展能力不自动进入产品请求。"
+          "厂商文档的扩展能力不自动进入产品请求。",
+          "2026-10-28 实测：原生 /flux/v1/flux-3-image 只接受 prompt+width+height，aspect_ratio/images/input_image 均 400。",
+          "2026-10-28 实测：multipart /v1/images/edits 传多张同名 image 时参考图被丢弃；应走 /v1/images/generations + input_image*。"
         ]
       },
       "gatewayContract": {
@@ -340,9 +342,9 @@
         ],
         "endpoints": {
           "generate": "/v1/images/generations",
-          "edit": "/v1/images/edits"
+          "edit": "/v1/images/generations"
         },
-        "maxReferences": 4,
+        "maxReferences": 8,
         "outputFields": [
           "b64_json",
           "url"
@@ -356,8 +358,8 @@
           "generate",
           "edit"
         ],
-        "maxUserReferences": 4,
-        "maxTotalReferences": 4
+        "maxUserReferences": 8,
+        "maxTotalReferences": 8
       },
       "observedEvidence": {
         "status": "unverified",
@@ -371,7 +373,7 @@
         "legacySignals": [
           "historical-browser-failure"
         ],
-        "blockingReason": "历史失败需在当前契约下重新诊断，不能推断当前不可用。"
+        "blockingReason": "2026-10-28 实测：edit 已改 input_image/input_image_2（JSON generations），待归档为正式 evidence 后转 verified。"
       }
     },
     {

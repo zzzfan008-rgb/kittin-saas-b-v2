@@ -396,7 +396,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:85bbeca3e04ec59886893904e58f08297683c8178f956d3688fb7ab3db8c98d0",
+      "contractHash": "sha256:46273fdaaa0fd533770dbbe62c5c026895d9db66b6a4185126dd7452491f6918",
       "id": "gpt-image-2.5-sunburst",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -422,10 +422,13 @@
       "channel": "official",
       "vendor": "openai",
       "allowedNodeKinds": [
-        "mask-redraw"
+        "image"
       ],
       "timeoutMs": 360000,
-      "generation": null,
+      "generation": {
+        "path": "/v1/images/generations",
+        "contentType": "application/json"
+      },
       "edit": {
         "path": "/v1/images/edits",
         "contentType": "multipart/form-data",
@@ -477,7 +480,31 @@
         "9:16",
         "16:9",
         "21:9"
-      ]
+      ],
+      "recommendedOptions": {
+        "size": {
+          "default": "1536x2048",
+          "examples": [
+            "1024x1024",
+            "1536x1024",
+            "1024x1536",
+            "2048x2048",
+            "2048x1152",
+            "3840x2160",
+            "2160x3840",
+            "auto"
+          ]
+        },
+        "quality": {
+          "default": "high",
+          "examples": [
+            "auto",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      }
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
@@ -589,7 +616,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:94de82f91c31cacb6ea0428bd864af3e50d9fc8a4916750e3609c2d1a93e1d03",
+      "contractHash": "sha256:9727df68645e96bae55833f56cb1f9cca58a70b1d746dfcbbf1c5f4e8fb56bd2",
       "id": "flux-3-image",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -623,12 +650,12 @@
         "contentType": "application/json"
       },
       "edit": {
-        "path": "/v1/images/edits",
-        "contentType": "multipart/form-data",
+        "path": "/v1/images/generations",
+        "contentType": "application/json",
         "minReferences": 1,
-        "maxReferences": 4,
-        "singleImageField": "image",
-        "multipleImageField": "image"
+        "maxReferences": 8,
+        "singleImageField": "input_image",
+        "multipleImageField": "input_image_2"
       },
       "output": {
         "kind": "openai-image",
@@ -680,7 +707,8 @@
             "png"
           ]
         }
-      }
+      },
+      "resolution": null
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
