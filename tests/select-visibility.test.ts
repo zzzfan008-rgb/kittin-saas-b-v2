@@ -33,4 +33,15 @@ assert.doesNotMatch(selectSource, /overflow-hidden/);
 assert.match(panelSource, /opt\?\.label \|\| opt\?\.value/);
 assert.match(panelSource, /o\.label \|\| o\.value \|\| "—"/);
 
+// 6) 可访问名稳定性（a11y 回归护栏）：弹层内的分组标题必须用 SelectGroupLabel，
+//    绝不能用 SelectLabel。base-ui 的 Select.Label 语义是「自动关联到 trigger 的
+//    可访问名」——它会把 root.labelId 指向自己，trigger 因此拿到 aria-labelledby
+//    （优先级高于 aria-label），可访问名从「模型」漂移成厂商分组名（OPENAI）。
+//    该漂移只在弹层首次挂载后出现（交互后才注册 labelId），vis06 三主题循环第二轮起
+//    才失效即此因。锁形状 fail-closed，防有人改回 SelectLabel。
+assert.match(selectSource, /function SelectGroupLabel[\s\S]{0,300}?SelectPrimitive\.GroupLabel/);
+assert.match(selectSource, /\b SelectGroupLabel,|  SelectGroupLabel,/);
+assert.match(panelSource, /<SelectGroupLabel/);
+assert.doesNotMatch(panelSource, /<SelectLabel/, "弹层分组标题不得用 SelectLabel（会劫持 trigger 可访问名）");
+
 console.log("Select 可见性硬化契约测试通过");

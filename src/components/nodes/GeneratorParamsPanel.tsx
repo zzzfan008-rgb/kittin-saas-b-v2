@@ -58,7 +58,7 @@ import {
   Select,
   SelectGroup,
   SelectItem,
-  SelectLabel,
+  SelectGroupLabel,
   SelectList,
   SelectPopup,
   SelectPortal,
@@ -153,9 +153,9 @@ function OptionSelect({ label, value, options, groups, disabled, placeholder, on
             {groups && groups.length > 0
               ? groups.map((group) => (
                 <SelectGroup key={group.label}>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--gc-node-muted)]">
+                  <SelectGroupLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--gc-node-muted)]">
                     {group.label}
-                  </SelectLabel>
+                  </SelectGroupLabel>
                   {group.options.map((o) => (
                     <SelectItem key={o.value} value={o.value} disabled={o.disabled}>{o.label || o.value || "—"}</SelectItem>
                   ))}
