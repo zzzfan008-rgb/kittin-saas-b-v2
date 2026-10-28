@@ -399,8 +399,8 @@ test("viewer zoom contract: wheel / double-click anchors / ± step / 25%–400% 
   const area = page.locator("#viewer-image-area");
   await expect(area).toBeVisible();
 
-  // ---------- 初始锚点 = 适合画布（plan.md §D：默认 Fit，非 100%） ----------
-  await expect(hud, "打开查看器必须落在「适合画布」锚点").toHaveText("适合画布");
+  // ---------- 初始锚点 = 50%（2026-10-28 用户批注：结果详情默认 50%，不再默认 Fit） ----------
+  await expect(hud, "打开查看器必须落在默认 50% 锚点").toHaveText("50%");
   const areaBox = await area.boundingBox();
   expect(areaBox, "查看器图片区必须可见").not.toBeNull();
   const center = { x: areaBox!.x + areaBox!.width / 2, y: areaBox!.y + areaBox!.height / 2 };
@@ -419,7 +419,7 @@ test("viewer zoom contract: wheel / double-click anchors / ± step / 25%–400% 
   const wheelC = await hudPercent(hud);
   expect(wheelC, `滚轮向下必须缩小（实测 ${wheelB}% → ${wheelC}%）`).toBeLessThan(wheelB);
 
-  // ---------- 双击：适合画布 ↔ 100% 往返（当前非 fit，第一次双击回 Fit，第二次到 100%） ----------
+  // ---------- 双击：适合画布 ↔ 100% 往返（初始 50% 属非 fit 态，第一次双击回 Fit，第二次到 100%） ----------
   await area.dblclick({ position: dbl });
   await expect(hud, "双击必须切到「适合画布」锚点").toHaveText("适合画布");
   await area.dblclick({ position: dbl });

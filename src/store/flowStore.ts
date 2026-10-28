@@ -2025,8 +2025,21 @@ export function applyResultNodeCreatedEventToTab(
     ));
     const node = createResultNodeFromRunEvent(tab, event);
     if (pending && node) {
-      const upgraded: FlowNode = { ...pending, type: node.type, data: node.data };
-      return { nodes: tab.nodes.map((candidate) => (candidate.id === pending.id ? upgraded : candidate)) };
+      // 原地升级 + **改名成服务端 resultNodeId**：结果节点 id 是服务端契约的一部分
+      //（历史/事件/测试都按 event.resultNodeId 找节点），占位 id 只是客户端瞬态。
+      const upgraded: FlowNode = { ...pending, id: event.resultNodeId, type: node.type, data: node.data };
+      const renamedEdges = tab.edges.map((edge) => (
+        edge.target === pending.id
+          ? { ...edge, id: `e-result-${event.resultNodeId}`, target: event.resultNodeId }
+          : edge
+      ));
+      return {
+        nodes: tab.nodes.map((candidate) => (candidate.id === pending.id ? upgraded : candidate)),
+        edges: renamedEdges,
+        ...(tab.selectedNodeIds.includes(pending.id)
+          ? { selectedNodeIds: tab.selectedNodeIds.map((id) => (id === pending.id ? event.resultNodeId : id)) }
+          : {}),
+      };
     }
     if (!node) return {};
     const hasEdge = tab.edges.some((edge) => (

@@ -167,7 +167,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("tryon-requirement", 0, -170, "试穿要求", requirePresetText("model-tryon", "edit")),
+          textNode("tryon-requirement", 0, -230, "试穿要求", requirePresetText("model-tryon", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("model", 0, 210, "数字模特"),
           imageGeneratorNode("tryon-gen", 380, 20, "试穿生成", "edit", { familyId: "model-tryon" }),
@@ -189,7 +189,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("pose-requirement", 0, -170, "Pose/镜头要求", requirePresetText("pose-shot", "edit")),
+          textNode("pose-requirement", 0, -230, "Pose/镜头要求", requirePresetText("pose-shot", "edit")),
           imageNode("source", 0, 20, "服装或模特图"),
           imageGeneratorNode("pose-gen", 380, -75, "摆拍生成", "edit"),
         ],
@@ -209,7 +209,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("background-requirement", 0, -170, "目标背景描述", requirePresetText("background-swap", "edit")),
+          textNode("background-requirement", 0, -230, "目标背景描述", requirePresetText("background-swap", "edit")),
           imageNode("subject", 0, 20, "人物或产品图"),
           imageGeneratorNode("background-gen", 380, -75, "换背景生成", "edit"),
         ],
@@ -229,7 +229,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("lookbook-requirement", 0, -170, "风格/场景清单", requirePresetText("fashion-lookbook", "edit")),
+          textNode("lookbook-requirement", 0, -230, "风格/场景清单", requirePresetText("fashion-lookbook", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageGeneratorNode("lookbook-gen", 380, -75, "LookBook 生成", "edit"),
         ],
@@ -249,7 +249,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("model-requirement", 0, -170, "数字模特风格要求", requirePresetText("digital-model", "edit")),
+          textNode("model-requirement", 0, -230, "数字模特风格要求", requirePresetText("digital-model", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageGeneratorNode("model-gen", 380, -75, "数字模特生成", "edit"),
         ],
@@ -270,7 +270,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("extract-requirement", 0, -170, "提取要求", requirePresetText("print-extract", "edit")),
+          textNode("extract-requirement", 0, -230, "提取要求", requirePresetText("print-extract", "edit")),
           imageNode("garment", 0, 20, "带印花服装"),
           imageGeneratorNode("extract-gen", 380, -75, "印花提取", "edit"),
         ],
@@ -290,7 +290,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("mutate-requirement", 0, -170, "裂变方向/数量", requirePresetText("print-mutate", "edit")),
+          textNode("mutate-requirement", 0, -230, "裂变方向/数量", requirePresetText("print-mutate", "edit")),
           imageNode("print", 0, 20, "印花图"),
           imageGeneratorNode("mutate-gen", 380, -75, "印花裂变", "edit"),
         ],
@@ -310,7 +310,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("recolor-requirement", 0, -170, "目标配色清单", requirePresetText("fabric-recolor", "edit")),
+          textNode("recolor-requirement", 0, -230, "目标配色清单", requirePresetText("fabric-recolor", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageGeneratorNode("recolor-gen", 380, -75, "换色生成", "edit"),
         ],
@@ -330,7 +330,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("fabric-requirement", 0, -170, "面料说明", requirePresetText("fabric-swap", "edit")),
+          textNode("fabric-requirement", 0, -230, "面料说明", requirePresetText("fabric-swap", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageNode("fabric", 0, 210, "面料参考"),
           imageGeneratorNode("fabric-gen", 380, 20, "面料更换合成", "edit"),
@@ -352,7 +352,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("sketch-requirement", 0, -170, "面料/色彩/风格", requirePresetText("sketch-to-garment", "edit")),
+          textNode("sketch-requirement", 0, -230, "面料/色彩/风格", requirePresetText("sketch-to-garment", "edit")),
           imageNode("sketch", 0, 20, "线稿"),
           imageGeneratorNode("sketch-gen", 380, -75, "线稿渲染", "edit"),
         ],
@@ -372,7 +372,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("restyle-requirement", 0, -170, "改款指令", requirePresetText("ai-restyle", "edit")),
+          textNode("restyle-requirement", 0, -230, "改款指令", requirePresetText("ai-restyle", "edit")),
           imageNode("garment", 0, 20, "服装图"),
           imageGeneratorNode("restyle-gen", 380, -75, "改款生成", "edit"),
         ],
@@ -392,8 +392,8 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("outfit-requirement", 0, -170, "场合/风格/身材", requirePresetText("fashion-lookbook", "generate")),
-          imageGeneratorNode("outfit-gen", 380, -170, "穿搭推荐", "generate"),
+          textNode("outfit-requirement", 0, -230, "场合/风格/身材", requirePresetText("fashion-lookbook", "generate")),
+          imageGeneratorNode("outfit-gen", 380, -230, "穿搭推荐", "generate"),
         ],
         edges: [
           edge("e-outfit-prompt", "outfit-requirement", "outfit-gen", "prompt"),
@@ -410,7 +410,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("mannequin-requirement", 0, -170, "人台要求", requirePresetText("person-to-mannequin", "edit")),
+          textNode("mannequin-requirement", 0, -230, "人台要求", requirePresetText("person-to-mannequin", "edit")),
           imageNode("person", 0, 20, "真人着装图"),
           imageGeneratorNode("mannequin-gen", 380, -75, "转人台生成", "edit"),
         ],
@@ -431,7 +431,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("runway-requirement", 0, -170, "走秀/镜头/场景", requirePresetText("video-runway", "edit")),
+          textNode("runway-requirement", 0, -230, "走秀/镜头/场景", requirePresetText("video-runway", "edit")),
           imageNode("source", 0, 20, "服装或模特图"),
           videoGeneratorNode("runway-gen", 380, -75, "走秀视频"),
         ],
@@ -451,7 +451,7 @@ export function builtinTemplates(): WorkflowTemplate[] {
       flow: {
         schemaVersion: WORKFLOW_SCHEMA_VERSION,
         nodes: [
-          textNode("xhs-requirement", 0, -170, "小红书脚本", requirePresetText("video-xhs", "edit")),
+          textNode("xhs-requirement", 0, -230, "小红书脚本", requirePresetText("video-xhs", "edit")),
           imageNode("main-image", 0, 20, "主图"),
           videoGeneratorNode("xhs-gen", 380, -75, "小红书视频"),
         ],

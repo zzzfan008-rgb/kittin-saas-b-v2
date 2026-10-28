@@ -55,7 +55,9 @@ export function ElementsPanel({ elements, readOnly, supplementText, onChange, on
   };
 
   return (
-    <div className="nodrag rounded-xl border-2 border-[var(--gc-accent)] bg-[var(--gc-node-inner)] px-3 py-2">
+    // 2026-10-28：加 overflow-hidden + max-w-full —— 面板内容（预设 pill 行）曾横向溢出
+    // 节点盒子，既视觉溢出，又会在画布上拦截相邻节点标题栏的点击（e2e 实测）。
+    <div className="nodrag max-w-full overflow-hidden rounded-xl border-2 border-[var(--gc-accent)] bg-[var(--gc-node-inner)] px-3 py-2">
       <div className="flex items-center justify-between">
         <span className="text-label text-[var(--gc-node-muted)]">六要素</span>
         <span className="text-label font-semibold text-[var(--gc-node-text)]">{filled}/6</span>
