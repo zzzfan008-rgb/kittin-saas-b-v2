@@ -11,16 +11,22 @@ interface UsageRow {
   successful_count: number; provider_requests: number; duration_ms: number; created_at: string;
 }
 
-async function queryRows(ownerId: string | null, from: string | null, to: string | null): Promise<UsageRow[]> {
+/** 数据隔离（2026-10-27）：跨用户由显式布尔开关控制，不用「参数为 null 即全表」的哨兵。 */
+async function queryRows(
+  allUsers: boolean,
+  ownerId: string,
+  from: string | null,
+  to: string | null,
+): Promise<UsageRow[]> {
   return query<UsageRow>(`
     SELECT e.*, u.account_id, u.display_name
     FROM usage_events e JOIN users u ON u.id = e.owner_id
-    WHERE ($1::text IS NULL OR e.owner_id = $1)
+    WHERE ($1::boolean OR e.owner_id = $2)
       AND e.deleted_at IS NULL
-      AND ($2::text IS NULL OR e.created_at >= $2)
-      AND ($3::text IS NULL OR e.created_at <= $3)
+      AND ($3::text IS NULL OR e.created_at >= $3)
+      AND ($4::text IS NULL OR e.created_at <= $4)
     ORDER BY e.created_at DESC
-  `, [ownerId, from, to]);
+  `, [allUsers, ownerId, from, to]);
 }
 
 function csvCell(value: unknown): string {
@@ -39,10 +45,11 @@ usageRouter.get("/", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "无权查看其他用户消耗" });
     return;
   }
-  const ownerId = selected ?? (user.role === "admin" && req.query.all === "true" ? null : user.id);
+  const allUsers = !selected && req.query.all === "true" && user.role === "admin";
+  const ownerId = selected ?? user.id;
   const from = typeof req.query.from === "string" && Number.isFinite(Date.parse(req.query.from)) ? req.query.from : null;
   const to = typeof req.query.to === "string" && Number.isFinite(Date.parse(req.query.to)) ? req.query.to : null;
-  const rows = await queryRows(ownerId, from, to);
+  const rows = await queryRows(allUsers, ownerId, from, to);
   if (req.query.format === "csv") {
     const header = ["记录ID", "账号", "用户", "生成任务", "项目", "节点", "模型", "成功图片数", "服务商请求数", "耗时毫秒", "时间"];
     const lines = [header, ...rows.map((row) => [

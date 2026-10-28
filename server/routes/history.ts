@@ -49,7 +49,9 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
     res.status(403).json({ error: "无权查看其他用户记录" });
     return;
   }
-  const ownerId = requestedUserId ?? (user.role === "admin" && req.query.all === "true" ? null : user.id);
+  // 数据隔离（2026-10-27）：跨用户列出必须「管理员 + 显式 all=true」，用显式布尔而非 null 哨兵。
+  const allUsers = !requestedUserId && req.query.all === "true" && user.role === "admin";
+  const ownerId = requestedUserId ?? user.id;
   const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 100));
   let cursor: HistoryCursor | undefined;
   try {
@@ -63,12 +65,12 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
   const runCandidates = await query<{ id: string; started_at: number }>(`
     SELECT r.id, r.started_at
     FROM generation_runs r
-    WHERE ($1::text IS NULL OR r.owner_id = $1)
+    WHERE ($1::boolean OR r.owner_id = $2)
       AND r.deleted_at IS NULL
-      AND r.started_at <= $2
+      AND r.started_at <= $3
       AND (
-        $3::bigint IS NULL OR r.started_at < $3
-        OR (r.started_at = $3 AND r.id < $4)
+        $4::bigint IS NULL OR r.started_at < $4
+        OR (r.started_at = $4 AND r.id < $5)
       )
       AND (
         (r.plan_json IS NOT NULL AND r.status IN ('queued','running','retry_wait','cancel_requested'))
@@ -76,8 +78,8 @@ historyRouter.get("/", asyncHandler(async (req, res) => {
         OR EXISTS (SELECT 1 FROM generation_outputs output WHERE output.run_id = r.id)
       )
     ORDER BY r.started_at DESC, r.id DESC
-    LIMIT $5
-  `, [ownerId, before, cursor?.startedAt ?? null, cursor?.runId ?? null, limit + 1]);
+    LIMIT $6
+  `, [allUsers, user.id, before, cursor?.startedAt ?? null, cursor?.runId ?? null, limit + 1]);
   const hasMore = runCandidates.length > limit;
   const pageRuns = runCandidates.slice(0, limit);
   if (pageRuns.length === 0) {
