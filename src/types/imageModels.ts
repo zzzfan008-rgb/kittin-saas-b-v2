@@ -621,7 +621,7 @@ export function imageSizeTierOptions(
  * `gpt-image-2.5-flare` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
  * 值域取契约 recommendedOptions.promptSizePrefix.examples；标签附实测分辨率，来源为
  * 经审查的官方文档快照
- * docs/ai/apiyi/site/snapshots/2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd/sources/llms-full.txt:4619-4628
+ * docs/ai/apiyi/models/tuzi-gpt-image-generate.md（API易 全站快照已于 2026-10-29 删除）
  * （「经过验证的『提示词 → 实际分辨率』对照表」）。首项空值 = 不拼前缀，模型自适应
  * （同快照 :8647 记录 1:1 ≈ 1254×1254，快照 :4674 警示自适应允许少量像素偏差）。
  */

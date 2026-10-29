@@ -66,17 +66,15 @@ const AST_GREP_CONFIG = "sgconfig.yml";
 const AST_GREP_BINARY = "ast-grep";
 /** 已显式登记并经评审豁免的循环依赖规则；任何其它循环依赖都必须阻断门禁。 */
 const BASELINE_CIRCULAR_RULES = Object.freeze(["no-circular-baseline"]);
+// 2026-10-29：API易 全站快照已删除、凭证门取消；只剩历史凭证目录仍视为不可变。
 const IMMUTABLE_REVIEW_PREFIXES = [
-  "docs/ai/apiyi/site/snapshots/",
   "docs/ai/apiyi/consultations/",
 ];
 const APIYI_CHANGE_SCOPE_PATH = "docs/ai/apiyi/change-scope.json";
 const APIYI_BOOTSTRAP_SCOPE_RULES = Object.freeze([
   { kind: "exact", value: "scripts/codex-gate.mjs" },
-  { kind: "exact", value: "scripts/apiyi-kb.mjs" },
-  { kind: "exact", value: "scripts/lib/apiyi-knowledge-base.mjs" },
+  { kind: "exact", value: "scripts/apiyi-docs.mjs" },
   { kind: "exact", value: APIYI_CHANGE_SCOPE_PATH },
-  { kind: "exact", value: "docs/ai/apiyi/site/current.json" },
   { kind: "exact", value: "docs/ai/apiyi/model-contracts.json" },
   { kind: "exact", value: "docs/ai/apiyi/sources.json" },
   { kind: "prefix", value: "server/providers/" },
@@ -241,21 +239,20 @@ function apiyiRelevantPaths(selection) {
   });
 }
 
+/**
+ * 契约结构门禁（2026-10-29 替换原 consultation receipt 凭证门）：
+ * 命中契约相关路径时，跑一次离线的 apiyi-docs 结构校验（结构、模型集合、
+ * product ⊆ gateway、contractHash）。它不联网、不需要凭证，且与供应商无关。
+ */
 function verifyApiyiKnowledge(selection) {
   const relevantPaths = apiyiRelevantPaths(selection);
   if (relevantPaths.length === 0) {
-    console.log("API易知识门禁：跳过（选定差异不涉及 API易契约、模型、参数、提示词、Provider 或评估发布）");
+    console.log("契约结构门禁：跳过（选定差异不涉及契约、模型、参数、提示词或 Provider）");
     return;
   }
-  console.log(`API易知识门禁：执行（${relevantPaths.length} 个相关路径）`);
+  console.log(`契约结构门禁：执行（${relevantPaths.length} 个相关路径）`);
   for (const path of relevantPaths) console.log(`- ${path}`);
-  const args = ["scripts/apiyi-kb.mjs", "guard"];
-  if (selection.finalEvidence) {
-    args.push("--base", selection.baseSha, "--head", selection.headSha);
-  } else {
-    args.push("--uncommitted");
-  }
-  run(process.execPath, args);
+  run(process.execPath, ["scripts/apiyi-docs.mjs", "check", "--offline"]);
 }
 
 function output(command, args, options = {}) {
@@ -1042,7 +1039,7 @@ if (selection.finalEvidence) {
   }
 }
 
-timedStage("apiyi knowledge gate", () => verifyApiyiKnowledge(selection));
+timedStage("contract structure gate", () => verifyApiyiKnowledge(selection));
 
 if (!process.argv.includes("--review-only")) {
   timedStage("npm ci", () => run("npm", ["ci"]));

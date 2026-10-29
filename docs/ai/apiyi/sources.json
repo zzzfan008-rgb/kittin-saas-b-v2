@@ -17,11 +17,10 @@
     "observedEvidence": "可追溯的真实探针、费用与输出证据；文档不得替代实测。"
   },
   "localKnowledgeBase": {
-    "kind": "full-site-snapshot-plus-curated-contract",
-    "rawSourcePagesStored": true,
-    "rawSnapshotPointer": "site/current.json",
-    "rawSnapshotManifest": "site/snapshots/<snapshotId>/manifest.json",
+    "kind": "curated-contract-only",
+    "rawSourcePagesStored": false,
     "rawContentTrust": "untrusted_document_content",
+    "note": "2026-10-29 起删除 API易 全站快照（docs/ai/apiyi/site，128MB/8441 文件）并取消 consultation receipt 凭证门；契约来源仍绑定 models/*.md 本地镜像，结构门 docs:apiyi:check 保留。",
     "documents": [
       "README.md",
       "async-runtime.md",
@@ -40,8 +39,7 @@
       "models/gpt-image-2.5-all.md",
       "models/nano-banana-pro-image.md",
       "models/nano-banana-lite-image.md"
-    ],
-    "policy": "site/ 保存全站只读证据；其他本地文件是经审查的实现契约。原始页面和线上漂移都不得自动修改生产契约。"
+    ]
   },
   "modelCatalog": {
     "sourceLayer": "gatewayContract",

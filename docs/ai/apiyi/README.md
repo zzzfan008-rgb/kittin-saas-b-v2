@@ -2,7 +2,16 @@
 
 最后契约复核：2026-09-03
 
-本目录同时保存两个严格分层的知识库：`site/` 是 API易全站不可变原始快照，其他文件是 garment-canvas 经审查、主动收窄后的实现契约。原始页面只作为不可信参考数据，绝不会自动改写生产契约。任何层都不保存 API Key、用户提示词或用户图片内容。`sources.json` 的精选来源 SHA-256 针对 `markdownUrl` 返回的完整响应体，可用于确认整理契约对应的上游版本。
+本目录是 garment-canvas **经审查、主动收窄后的实现契约**，也是运行时的契约来源
+（`src/types/*Models.ts` 直接 import 这里的 JSON）。任何文件都不保存 API Key、用户提示词或用户图片内容。
+
+> **2026-10-29 变更（用户拍板 A：精简）**
+> - 删除 `site/` API易 全站快照（128 MB / 8,441 文件）：网关已迁至兔子API，快照不再被任何代码读取。
+> - 取消 consultation receipt 凭证门（`scripts/apiyi-kb.mjs`、`scripts/lib/apiyi-knowledge-base.mjs`
+>   及其测试一并删除，npm `docs:apiyi:kb:*` / `docs:apiyi:search` / `docs:apiyi:lookup` /
+>   `docs:apiyi:guard` 移除）。`consultations/` 保留为历史记录，不再被校验。
+> - **保留**结构门 `npm run docs:apiyi:check`（CI 每个 PR 都跑）：校验契约 JSON 一致性、
+>   模型集合、`product ⊆ gateway` 与 `contractHash`。它与供应商无关，守的是运行时契约完整性。
 
 ## 本轮模型范围
 
@@ -25,34 +34,28 @@
 - **input-image-normalization.md**：用户上传素材进入节点和生成队列前的标准化硬门禁。
 - **models/**：每个模型的人工可读适配说明。
 - **sources.json**：上游 canonical URL、官方 Markdown URL、抓取日期、SHA-256 指纹以及对应的本地整理文档。
-- **site/**：以 sitemap 为全集的全部语言官方页面、逐页哈希和离线检索入口。
-- **consultations/**：相关修改编码前的本地检索证据与决策凭证。
+- **consultations/**：历史决策凭证（2026-10-29 起不再由门禁校验，仅作审计留存）。
 - **evidence/**：脱敏的网关目录、探针事实和人工复核摘要；目录存在只证明配置令牌的观测视图，不等于端点生成通过。
 - **change-scope.json**：哪些路径必须先经过本地知识库门禁。
 - **project-guidance.json**：已经采用、建议后续处理和需要用户选择的文档建议。
 
-`site/` 中的原始页面会作为证据保存，但统一标记为 `untrusted_document_content`。`models/`、`async-runtime.md` 和 `model-contracts.json` 才是经过项目范围收窄后的生产知识层；实现与测试只依赖这些经审查契约。
+`models/`、`async-runtime.md`、`model-contracts.json` 是经过项目范围收窄后的生产知识层；实现与测试只依赖这些经审查契约。上游原文已不再随仓库保存，引用上游时给 `sources.json` 里的 canonical URL + Markdown URL。
 
-## 相关修改必须先查本地知识库
+## 改契约前必须过的门
 
 ```bash
-# 离线确认当前全站快照没有缺页、篡改或孤儿文件
-npm run docs:apiyi:kb:check
-
-# 先检索，再生成与当前快照、当前 HEAD 和计划路径绑定的咨询凭证
-npm run docs:apiyi:lookup -- \
-  --query "模型参数 参考图 超时 重试" \
-  --paths "server/providers/apiyi.ts,tests/provider-contract.test.ts" \
-  --receipt "docs/ai/apiyi/consultations/2026-09-02-example.json" \
-  --decision "按模型独立契约校验，不做静默参数回退"
-
-# 本地门禁；Codex 总门禁仅在精确差异命中 change-scope.json 时调用
-npm run docs:apiyi:guard -- --uncommitted
+# 结构门（CI 每个 PR 都跑；离线、无付费调用）
+npm run docs:apiyi:check -- --offline
 ```
 
-普通依赖升级、部署文档、数据库维护、纯 UI 调整和非契约测试不会仅因路径存在而触发 API易知识校验。只有模型、参数、提示词渲染/准入、参考图请求语义、Provider 传输、计费/未知结果以及评估发布证据相关路径命中门禁。
+它校验：契约 JSON 结构、模型集合、`product ⊆ gateway`、以及每个模型的 `contractHash`
+是否与当前语义信封一致。改 `model-contracts.json` / `model-knowledge.json` 后必须重算 hash，
+否则 provider 契约测试与 CI 会红。
 
-存在多个会实质影响费用、质量、安全、依赖、兼容性或产品行为的选项时，先列出 2–3 个选项及影响让用户指定。未解决的选择必须写进咨询凭证，并保持门禁阻断。
+改契约的纪律（不再有凭证门，但仍是要求）：
+- 先看 `models/<sourceId>.md` 与 `sources.json` 的指纹，再动契约；
+- 存在多个会实质影响费用、质量、安全、兼容性或产品行为的选项时，先列 2–3 个选项及影响让用户拍板；
+- 改完同步 `model-knowledge.json`（同一模型两份文件必须逐项相等）。
 
 ## 四层证据边界
 

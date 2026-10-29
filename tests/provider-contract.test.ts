@@ -153,11 +153,12 @@ async function main(): Promise<void> {
 
     await test("API易来源清单指向存在的本地整理契约", () => {
       assert.equal(sources.sourceFormat, "official-markdown");
-      assert.equal(sources.localKnowledgeBase.rawSourcePagesStored, true);
+      // 2026-10-29 用户拍板 A：API易 全站快照已删除（128MB/8441 文件），凭证门取消；
+      // 但每个来源仍必须绑定本地整理契约（models/*.md），这条不放松。
+      assert.equal(sources.localKnowledgeBase.rawSourcePagesStored, false);
+      assert.equal(sources.localKnowledgeBase.kind, "curated-contract-only");
       assert.equal(sources.localKnowledgeBase.rawContentTrust, "untrusted_document_content");
-      assert.ok(
-        fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", sources.localKnowledgeBase.rawSnapshotPointer)).isFile(),
-      );
+      assert.equal(sources.localKnowledgeBase.rawSnapshotPointer, undefined, "快照指针必须已移除");
       for (const document of sources.localKnowledgeBase.documents) {
         assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", document)).isFile(), document);
       }
