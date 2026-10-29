@@ -34,7 +34,7 @@ import {
   COLOR_TOKEN_RE,
 } from "@/lib/color/colorToken";
 import { getTextPresetTemplate, listTextPresetTemplates } from "@/lib/promptPresets";
-import { REWRITE_SUPPLEMENT_ANCHOR } from "@/lib/rewriteEligibility";
+import { findSupplementAnchor } from "@/lib/rewriteEligibility";
 import {
   assembleElements,
   type ElementValue,
@@ -64,7 +64,8 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
   /** 六要素面板开关（工具条「六要素」图标切换；协议模板默认展开）。 */
-  const [elementsOpen, setElementsOpen] = useState(true);
+  // 2026-10-29 用户拍板：六要素默认折叠，需要时用工具条「六要素」展开。
+  const [elementsOpen, setElementsOpen] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
@@ -73,16 +74,17 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   []);
 
   /** 协议模板判定：正文含补充位锚点即协议模板（协议区只读 + 六要素面板）。 */
-  const anchorIndex = (data.text ?? "").indexOf(REWRITE_SUPPLEMENT_ANCHOR);
-  const isProtocolTemplate = anchorIndex !== -1;
-  const protocolText = isProtocolTemplate ? (data.text ?? "").slice(0, anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
-  const supplementText = isProtocolTemplate ? (data.text ?? "").slice(anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+  // 锚点可能有多种写法（新「补充要求：」+ 旧草稿长标记），统一由 findSupplementAnchor 定位；
+  // 只认单值锚点会让旧草稿识别不到协议模板 → 六要素面板消失、补充段被当成协议正文。
+  const anchor = findSupplementAnchor(data.text ?? "");
+  const isProtocolTemplate = anchor !== null;
+  const protocolText = anchor ? (data.text ?? "").slice(0, anchor.end) : "";
+  const supplementText = anchor ? (data.text ?? "").slice(anchor.end) : "";
 
   /** 六要素结构化选择（面板写入 data.promptElements；拼装结果落补充位）。 */
   const elements: PromptElements = useMemo(() => {
     const raw = data.promptElements as PromptElements | undefined;
     return {
-      subject: typeof raw?.subject === "string" ? raw.subject : "",
       environment: raw?.environment as ElementValue,
       lighting: raw?.lighting as ElementValue,
       lens: raw?.lens as ElementValue,

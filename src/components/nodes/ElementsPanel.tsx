@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ELEMENT_DEFS,
+  ELEMENT_SLOT_COUNT,
   ELEMENT_LABELS,
   assembleElements,
   elementText,
@@ -47,7 +48,8 @@ export function ElementsPanel({ elements, readOnly, supplementText, onChange, on
   const missing = missingElementLabels(elements);
   const risks = useMemo(() => scanPromptRisks(supplementText), [supplementText]);
   const assembled = useMemo(() => assembleElements(elements), [elements]);
-  const canFill = (elements.subject ?? "").trim().length > 0 && !readOnly;
+  // 主体已移出面板：只要有任一要素填了内容就可以「填入补充」。
+  const canFill = assembled !== "" && !readOnly;
 
   const setValue = (key: ElementKey, value: ElementValue) => {
     if (readOnly) return;
@@ -60,31 +62,14 @@ export function ElementsPanel({ elements, readOnly, supplementText, onChange, on
     <div className="nodrag max-w-full overflow-hidden rounded-xl border-2 border-[var(--gc-accent)] bg-[var(--gc-node-inner)] px-3 py-2">
       <div className="flex items-center justify-between">
         <span className="text-label text-[var(--gc-node-muted)]">六要素</span>
-        <span className="text-label font-semibold text-[var(--gc-node-text)]">{filled}/6</span>
+        <span className="text-label font-semibold text-[var(--gc-node-text)]">{filled}/{ELEMENT_SLOT_COUNT}</span>
       </div>
+      {/* 主体不在这里填：系统提示词已承担主体描述，面板只补环境/光线/镜头/色调/构图。 */}
+      <p className="mt-0.5 text-[10px] leading-relaxed text-[var(--gc-node-muted)]">
+        主体由系统提示词描述，这里只补环境、光线、镜头、色调、构图
+      </p>
       <div className="mt-1.5 space-y-2.5">
-        {/* 主体：纯文本输入，无预设 */}
-        <div>
-          <span className="text-label flex items-center gap-1.5 text-[var(--gc-node-muted)]">
-            <span
-              className="inline-block size-[7px] shrink-0 rounded-full"
-              style={{ backgroundColor: STATUS_DOT[rateElement("subject", elements)] }}
-            />
-            主体（必填）
-          </span>
-          <textarea
-            value={elements.subject ?? ""}
-            readOnly={readOnly}
-            rows={2}
-            placeholder="例：一只哑光黑色陶瓷手冲杯，盛八分满黑咖啡"
-            onChange={(event) => {
-              if (readOnly) return;
-              onChange({ ...elements, subject: event.target.value });
-            }}
-            className="nodrag mt-1 w-full resize-none rounded-md border border-[var(--gc-node-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[var(--gc-node-text)] placeholder:text-[var(--gc-node-muted)] focus:outline-hidden"
-          />
-        </div>
-        {ELEMENT_DEFS.filter((def) => def.key !== "subject").map((def) => {
+        {ELEMENT_DEFS.map((def) => {
           const current = elements[def.key] as ElementValue;
           const activePreset = current !== undefined && "presetId" in current ? current.presetId : undefined;
           const customText = current !== undefined && "custom" in current ? current.custom : "";
@@ -181,8 +166,8 @@ export function ElementsPanel({ elements, readOnly, supplementText, onChange, on
           )}
         </p>
       )}
-      {elementText("subject", elements) === "" && (
-        <p className="text-label text-[var(--gc-node-muted)]">先描述主体，其余要素可点选</p>
+      {assembled === "" && (
+        <p className="text-label text-[var(--gc-node-muted)]">至少选或写一个要素再用「填入补充」</p>
       )}
     </div>
   );

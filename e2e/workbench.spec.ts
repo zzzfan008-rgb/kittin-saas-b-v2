@@ -552,19 +552,40 @@ test("select value echo stays legible against its trigger surface at every deskt
   //    b) 模板落地后那次画布重渲染会收起刚打开的下拉（同上方「必要时重开下拉」的既有处理）。
   const batchSelect = generator.getByRole("combobox", { name: "数量" });
   const openPopup = page.locator('[data-slot="select-popup"][data-open]');
-  await expect(async () => {
+  // 2026-10-29 加固（用户拍板 A：保留意图、去掉噪声）：原来是「20s 盲轮询 + 每次 count===0
+  // 就重开」——窄视口下画布重渲染会反复收起下拉，轮询于是陷入开/关循环，20s 都看不见弹层
+  // （CI desktop-1280 稳定超时的真实原因）。改成有界的三次结构化尝试：先滚进视野、点开、
+  // 等动画结束再量；两次断言仍为硬门（min-width≥128 与渲染宽度≥128）。
+  await expect(batchSelect).toBeVisible();
+  await batchSelect.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(250);
+  let popupMinWidth = 0;
+  let popupWidth = 0;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     if (await openPopup.count() === 0) {
-      await batchSelect.click();
+      // 2026-10-29：窄视口下该触发器可能正好落在右下角 minimap 覆盖区，
+      // 指针点击会被 minimap 拦截（CI desktop-1280 的真实失败原因）。
+      // 用键盘打开（focus + Enter）既避开遮挡，也是真实可达的交互路径。
+      await batchSelect.focus();
+      await page.keyboard.press("Enter");
+      if (await openPopup.count() === 0) await batchSelect.click({ force: true });
     }
-    await expect(openPopup).toBeVisible();
+    await expect(openPopup, `第 ${attempt + 1} 次尝试：数量下拉必须打开`).toBeVisible({ timeout: 5_000 });
     // 计算样式断言：min-width 兜底 = max(8rem, anchor)，不受入场缩放动画影响。
-    const popupMinWidth = await openPopup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
-    expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
-    // 渲染几何：入场动画 zoom-in-95（150ms）会把包围盒临时缩到 95%（128×0.95=121.6），
-    // 因此轮询到动画结束后的实际宽度，而不是在动画中途读一次。
-    const popupWidth = (await openPopup.boundingBox())?.width ?? 0;
-    expect(popupWidth, "弹层渲染宽度不得低于 8rem 兜底").toBeGreaterThanOrEqual(128);
-  }).toPass({ timeout: 20_000 });
+    popupMinWidth = await openPopup.evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
+    if (popupMinWidth >= 128) {
+      // 渲染几何：显式等入场动画（zoom-in-95）结束再量包围盒，避免读到 121.6px。
+      await openPopup.evaluate(async (el) => {
+        const animations = typeof el.getAnimations === "function" ? el.getAnimations() : [];
+        await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+      });
+      popupWidth = (await openPopup.boundingBox())?.width ?? 0;
+      if (popupWidth >= 128) break;
+    }
+    if (attempt < 2) await page.waitForTimeout(300);
+  }
+  expect(popupMinWidth, "弹层 min-width 计算值不得低于 8rem").toBeGreaterThanOrEqual(128);
+  expect(popupWidth, `弹层渲染宽度 ${popupWidth}px 不得低于 8rem 兜底`).toBeGreaterThanOrEqual(128);
   await openPopup.getByRole("option", { name: "2", exact: true }).click();
   await expect(batchSelect).toContainText("2");
   const batchEcho = await echoLegibility(batchSelect);
