@@ -761,14 +761,56 @@ export async function verifyCuratedSourceBindings(repoRoot, verifiedSnapshot = n
   const pageByUrl = new Map(verified.manifest.pages.map((page) => [page.canonicalUrl, page]));
   const sourceIds = new Set();
   const sourceUrls = new Set();
+
+  /**
+   * 精选来源的本地镜像校验（所有来源都必须过）：显式声明 localDocument、
+   * 路径落在 docs/ai/apiyi 内、真实路径也未越界、文件是普通文件。
+   */
+  const checkLocalDocument = async (source, checked) => {
+    if (typeof source.localDocument !== "string") {
+      checked.errors.push(`API易精选来源缺少 localDocument：${source.sourceId}`);
+      return;
+    }
+    const localDocumentPath = resolve(repoRoot, "docs/ai/apiyi", source.localDocument);
+    const curatedRoot = resolve(repoRoot, "docs/ai/apiyi");
+    if (!localDocumentPath.startsWith(`${curatedRoot}${sep}`)) {
+      checked.errors.push(`API易精选来源 localDocument 越界：${source.sourceId}`);
+      return;
+    }
+    try {
+      await assertPlainFile(localDocumentPath, `API易精选来源 localDocument ${source.sourceId}`);
+      const localDocumentRealPath = await realpath(localDocumentPath);
+      const curatedRealRoot = await realpath(curatedRoot);
+      if (!localDocumentRealPath.startsWith(`${curatedRealRoot}${sep}`)) {
+        checked.errors.push(`API易精选来源 localDocument 真实路径越界：${source.sourceId}`);
+      }
+    } catch (error) {
+      checked.errors.push(error.message);
+    }
+  };
+
   let checkedSourceCount = 0;
   for (const source of sources.sources ?? []) {
-    if (typeof source.url !== "string" || !source.url.startsWith(`${APIYI_DOCS_ORIGIN}/`)) continue;
+    // 2026-10-29：网关从 API易 迁到兔子API 后，精选来源不再属于 API易 文档站。
+    // 原实现只把 API易 域名的来源计为精选来源，迁移后 checkedSourceCount 恒为 0
+    // → 任何 gated 文件都出不了 consultation receipt（guard 直接报「精选来源为空」）。
+    // 现在改为：任何 https 来源都计入精选来源，API易 来源仍走全站快照严格校验，
+    // 其它域名的来源退化为「本地镜像 + markdown 地址一致性」校验（没有快照可比）。
+    if (typeof source.url !== "string" || !/^https:\/\//.test(source.url)) continue;
     checkedSourceCount += 1;
     if (!source.sourceId || sourceIds.has(source.sourceId)) errors.push(`API易精选来源 sourceId 重复或缺失：${source.sourceId}`);
     if (sourceUrls.has(source.url)) errors.push(`API易精选来源 URL 重复：${source.url}`);
     sourceIds.add(source.sourceId);
     sourceUrls.add(source.url);
+
+    if (!source.url.startsWith(`${APIYI_DOCS_ORIGIN}/`)) {
+      if (typeof source.markdownUrl !== "string" || !source.markdownUrl.startsWith(source.url)) {
+        errors.push(`API易精选来源 markdownUrl 与 url 不一致：${source.sourceId}`);
+      }
+      await checkLocalDocument(source, { errors });
+      continue;
+    }
+
     let canonicalUrl;
     try {
       canonicalUrl = canonicalApiyiUrl(source.url);
@@ -784,26 +826,7 @@ export async function verifyCuratedSourceBindings(repoRoot, verifiedSnapshot = n
     }
     if (source.markdownUrl !== markdownUrlForPage(canonicalUrl)) errors.push(`API易精选来源 Markdown URL 不一致：${source.sourceId}`);
     if (source.sha256 !== page.sha256) errors.push(`API易精选来源 SHA-256 已漂移：${source.sourceId}`);
-    if (typeof source.localDocument !== "string") {
-      errors.push(`API易精选来源缺少 localDocument：${source.sourceId}`);
-      continue;
-    }
-    const localDocumentPath = resolve(repoRoot, "docs/ai/apiyi", source.localDocument);
-    const curatedRoot = resolve(repoRoot, "docs/ai/apiyi");
-    if (!localDocumentPath.startsWith(`${curatedRoot}${sep}`)) {
-      errors.push(`API易精选来源 localDocument 越界：${source.sourceId}`);
-      continue;
-    }
-    try {
-      await assertPlainFile(localDocumentPath, `API易精选来源 localDocument ${source.sourceId}`);
-      const localDocumentRealPath = await realpath(localDocumentPath);
-      const curatedRealRoot = await realpath(curatedRoot);
-      if (!localDocumentRealPath.startsWith(`${curatedRealRoot}${sep}`)) {
-        errors.push(`API易精选来源 localDocument 真实路径越界：${source.sourceId}`);
-      }
-    } catch (error) {
-      errors.push(error.message);
-    }
+    await checkLocalDocument(source, { errors });
   }
   if (checkedSourceCount === 0) errors.push("API易精选来源为空");
   return { errors, checkedSourceCount };

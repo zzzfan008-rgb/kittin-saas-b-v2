@@ -497,6 +497,62 @@ test("curated docs.apiyi.com sources are bound to the current snapshot URL, Mark
   assert.match(missing.errors.join("\n"), /精选来源|不存在|缺少|missing/i);
 });
 
+test("gateway docs on a non-APIyi origin still count as curated sources (migration regression)", async (t) => {
+  // 2026-10-29 回归：网关迁到兔子API 后，精选来源不再属于 docs.apiyi.com。
+  // 原实现只统计 API易 域名的来源 → checkedSourceCount 恒为 0 → guard 报「精选来源为空」，
+  // 任何 gated 文件都出不了 receipt。这里锁住「非 API易 来源仍然计入并校验本地镜像」。
+  const { repoRoot, siteRoot } = await createGitFixture(t);
+  const verified = await verifyKnowledgeBase(siteRoot);
+  const sourcesPath = resolve(repoRoot, "docs/ai/apiyi/sources.json");
+  const localDocumentPath = resolve(repoRoot, "docs/ai/apiyi/models/tuzi-gateway.md");
+  await mkdir(dirname(localDocumentPath), { recursive: true });
+  await writeFile(localDocumentPath, "# Gateway contract fixture\n");
+  const base = curatedSourcesForManifest(verified.manifest);
+  await writeJson(sourcesPath, {
+    ...base,
+    sources: [{
+      sourceId: "tuzi-gateway",
+      sourceLayer: "gatewayContract",
+      url: "https://tuzi-api.apifox.cn/343646952e0",
+      markdownUrl: "https://tuzi-api.apifox.cn/343646952e0.md",
+      localDocument: "models/tuzi-gateway.md",
+      sha256: "0".repeat(64),
+    }],
+  });
+  const bound = await verifyCuratedSourceBindings(repoRoot, verified);
+  assert.equal(bound.checkedSourceCount, 1, "非 API易 来源必须计入精选来源");
+  assert.deepEqual(bound.errors, [], `不应报错：${bound.errors.join(" / ")}`);
+
+  // 缺本地镜像必须照样拦（迁移不等于放弃本地绑定校验）
+  await writeJson(sourcesPath, {
+    ...base,
+    sources: [{
+      sourceId: "tuzi-gateway",
+      sourceLayer: "gatewayContract",
+      url: "https://tuzi-api.apifox.cn/343646952e0",
+      markdownUrl: "https://tuzi-api.apifox.cn/343646952e0.md",
+      sha256: "0".repeat(64),
+    }],
+  });
+  const missingLocal = await verifyCuratedSourceBindings(repoRoot, verified);
+  assert.match(missingLocal.errors.join("\n"), /localDocument/);
+
+  // markdownUrl 与 url 不一致也要拦
+  await writeJson(sourcesPath, {
+    ...base,
+    sources: [{
+      sourceId: "tuzi-gateway",
+      sourceLayer: "gatewayContract",
+      url: "https://tuzi-api.apifox.cn/343646952e0",
+      markdownUrl: "https://elsewhere.example/x.md",
+      localDocument: "models/tuzi-gateway.md",
+      sha256: "0".repeat(64),
+    }],
+  });
+  const badMarkdown = await verifyCuratedSourceBindings(repoRoot, verified);
+  assert.match(badMarkdown.errors.join("\n"), /markdownUrl/);
+});
+
 test("curated source hash tampering and missing snapshot sources both block guard", async (t) => {
   await t.test("hash tamper", async (subtest) => {
     const { repoRoot, siteRoot } = await createGitFixture(subtest);

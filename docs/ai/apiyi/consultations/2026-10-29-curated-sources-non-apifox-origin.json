@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-29T05:52:00.754Z",
+  "baseCommit": "54f9fa503c3cd09e2671b03d79959a156fc4807e",
+  "changeFingerprintSha256": "8888cddfe6a6c011d417a1798fcbc65a04a0bd8983ffa10e1acf6db9ebb4f278",
+  "knowledgeSnapshotId": "2026-10-13T05-30-11.372Z-a4cb45623fa08286",
+  "knowledgeSnapshotSha256": "a4cb45623fa082869fa1b09d6989cd86f1504942b5887df1a1c2e626e41f2ad7",
+  "query": "精选来源域名迁移 兔子API guard 凭证",
+  "affectedPaths": [
+    "scripts/lib/apiyi-knowledge-base.mjs"
+  ],
+  "sources": [
+    {
+      "canonicalUrl": "https://docs.apiyi.com/api-capabilities/seedance2/asset-library",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/api-capabilities/seedance2/asset-library.md",
+      "pageLocalPath": "pages/api-capabilities/seedance2/asset-library.md",
+      "title": "Seedance 2.0 素材库（人物一致性视频）",
+      "sha256": "84ec356473a3b3bf5ad2b366f1ca97a8c1f5112394fbce53fe730dd7ff275ee5"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/COLLABORATION",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/COLLABORATION.source.md",
+      "pageLocalPath": "pages/COLLABORATION.source.md",
+      "title": "COLLABORATION",
+      "sha256": "b4d1c83735199aaaf83177a3ab0061c9956c458ab21be4c15bc8d543b10f9155"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/claude-content-safety-refusal",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/faq/claude-content-safety-refusal.md",
+      "pageLocalPath": "pages/en/faq/claude-content-safety-refusal.md",
+      "title": "Why Does a Claude Refusal Return Empty Content?",
+      "sha256": "0d088abdca3b4c0f637c4722e44aac5a44fb5d4b61ee8f9a103389df0e3c59a9"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/scenarios/agent/updream",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/scenarios/agent/updream.md",
+      "pageLocalPath": "pages/scenarios/agent/updream.md",
+      "title": "Updream 接入 API易",
+      "sha256": "08e121eb00af60d2950ba5f5841340dd2e4563ddf6ee787be89830f023f0bf39"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/faq/sla-guarantee",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/faq/sla-guarantee.md",
+      "pageLocalPath": "pages/en/faq/sla-guarantee.md",
+      "title": "Does APIYI offer SLA guarantees?",
+      "sha256": "1d5b44208db98b74154a697497fe2576e712c452cb44de0661184ba4b9c48ae0"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/news/claude-fable-5-launch",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/news/claude-fable-5-launch.md",
+      "pageLocalPath": "pages/en/news/claude-fable-5-launch.md",
+      "title": "Claude Fable 5 Is Live: Mythos-Class Power, 30-Day Data Retention",
+      "sha256": "5c7f79a4e84f79b0e41e23680f4d7857ac90e55284a27375de930f0b1f09734c"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/CLAUDE",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/CLAUDE.source.md",
+      "pageLocalPath": "pages/CLAUDE.source.md",
+      "title": "CLAUDE",
+      "sha256": "1c11e83cf7b19d55285c17e2e15d34a1a1c5719452581092a3b8368c8825142a"
+    },
+    {
+      "canonicalUrl": "https://docs.apiyi.com/en/live/2026-06/nano-banana-dual-channel",
+      "snapshotRelativePath": "snapshots/2026-10-13T05-30-11.372Z-a4cb45623fa08286/pages/en/live/2026-06/nano-banana-dual-channel.md",
+      "pageLocalPath": "pages/en/live/2026-06/nano-banana-dual-channel.md",
+      "title": "Nano Banana Pro/2 Fully Back to Normal · No Concurrency Limit + High Availability",
+      "sha256": "8ceccebe2d117002dd762d8f6b22584f03599273e83d089bdf7b2c3641c8ec86"
+    }
+  ],
+  "decisionSummary": "精选来源校验改为按 https 来源计数：API易域名来源继续走全站快照严格校验（规范化 URL/Markdown URL/SHA-256/本地镜像），非 API易域名的网关来源改为校验 markdownUrl 与 url 一致 + localDocument 本地镜像存在且不越界；checkedSourceCount=0 仍报错。理由：网关已迁至兔子API，sources.json 六条来源都不在 docs.apiyi.com，原实现导致 guard 恒报精选来源为空，任何 gated 文件无法出凭证。",
+  "unresolvedChoices": []
+}
