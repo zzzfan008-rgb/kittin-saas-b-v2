@@ -190,7 +190,7 @@ function fixture({ requiredNodeVersion = process.versions.node } = {}) {
     readFileSync(apiyiChangeScopeSource, "utf8"),
   );
   writeFileSync(
-    join(root, "scripts/apiyi-kb.mjs"),
+    join(root, "scripts/apiyi-docs.mjs"),
     `import { appendFileSync } from "node:fs";
 if (process.env.GATE_APIYI_LOG) appendFileSync(process.env.GATE_APIYI_LOG, process.argv.slice(2).join(" ") + "\\n");
 if (process.env.GATE_APIYI_EXIT) process.exit(Number(process.env.GATE_APIYI_EXIT));
@@ -427,17 +427,17 @@ function tempCopy(name) {
 
 {
   const f = fixture();
-  mkdirSync(join(f.root, "docs", "ai", "apiyi", "site", "snapshots", "snapshot-1"), { recursive: true });
+  mkdirSync(join(f.root, "docs", "ai", "apiyi", "consultations"), { recursive: true });
   writeFileSync(
-    join(f.root, "docs", "ai", "apiyi", "site", "snapshots", "snapshot-1", "page.md"),
-    "historical formatting   \n",
+    join(f.root, "docs", "ai", "apiyi", "consultations", "2026-09-02-example.json"),
+    "{}\n",
   );
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Reviewer verdict: pass/);
-  assert.match(result.stdout, /API易知识门禁：跳过/);
-  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "不可变历史快照不得重复触发 API易知识门禁");
+  assert.match(result.stdout, /契约结构门禁：跳过/);
+  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "历史凭证目录变更不得触发契约结构门禁");
 }
 
 {
@@ -447,7 +447,7 @@ function tempCopy(name) {
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Reviewer verdict: pass/);
-  assert.match(result.stdout, /API易知识门禁：跳过/);
+  assert.match(result.stdout, /契约结构门禁：跳过/);
   assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通差异不得启动 API易知识库门禁");
 }
 
@@ -460,7 +460,7 @@ function tempCopy(name) {
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /API易知识门禁：跳过/);
+  assert.match(result.stdout, /契约结构门禁：跳过/);
   assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通依赖、项目规则和纯 UI 差异不得启动 API易知识库门禁");
 }
 
@@ -479,9 +479,9 @@ function tempCopy(name) {
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /API易知识门禁：执行（1 个相关路径）/);
+  assert.match(result.stdout, /契约结构门禁：执行（1 个相关路径）/);
   assert.match(result.stdout, /server\/providers\/apiyi\.ts/);
-  assert.equal(readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(), "guard --uncommitted");
+  assert.equal(readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(), "check --offline", "结构门禁必须跑离线结构校验");
 }
 
 // ---------------------------------------------------------------- 代码智能证据段
@@ -717,11 +717,9 @@ for (const [label, graph, expected] of [
   const f = fixture();
   mkdirSync(join(f.root, "src"), { recursive: true });
   mkdirSync(join(f.root, "docs", "contract"), { recursive: true });
-  mkdirSync(join(f.root, "docs", "ai", "apiyi", "site", "snapshots", "snapshot-1"), { recursive: true });
   mkdirSync(join(f.root, "docs", "ai", "apiyi", "consultations"), { recursive: true });
   writeFileSync(join(f.root, "src", "changed.ts"), "export const changed = true;\n");
   writeFileSync(join(f.root, "docs", "contract", "provider.md"), "# Provider contract\n");
-  writeFileSync(join(f.root, "docs", "ai", "apiyi", "site", "snapshots", "snapshot-1", "page.md"), "historical evidence\n");
   writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "old.json"), '{"historical":true}\n');
   writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "older.json"), '{"historical":"older"}\n');
   const scopeCopy = tempCopy("scope");
@@ -749,13 +747,6 @@ for (const [label, graph, expected] of [
     })),
     [
       {
-        prefix: "docs/ai/apiyi/site/snapshots/",
-        fileCount: 1,
-        presentFileCount: 1,
-        deletedFileCount: 0,
-        totalBytes: Buffer.byteLength("historical evidence\n"),
-      },
-      {
         prefix: "docs/ai/apiyi/consultations/",
         fileCount: 2,
         presentFileCount: 2,
@@ -763,18 +754,16 @@ for (const [label, graph, expected] of [
         totalBytes: Buffer.byteLength('{"historical":true}\n') + Buffer.byteLength('{"historical":"older"}\n'),
       },
     ],
-    "历史 API易 快照和咨询记录只能进入按前缀聚合的摘要范围",
+    "历史凭证目录只能进入按前缀聚合的摘要范围",
   );
   for (const group of scope.omitted) {
     assert.match(group.aggregateSha256, /^[a-f0-9]{64}$/);
   }
   assert.equal(scope.summary.includedFileCount, 2);
-  assert.equal(scope.summary.omittedFileCount, 3);
+  assert.equal(scope.summary.omittedFileCount, 2);
   assert.equal(
     scope.summary.omittedBytes,
-    Buffer.byteLength("historical evidence\n")
-      + Buffer.byteLength('{"historical":true}\n')
-      + Buffer.byteLength('{"historical":"older"}\n'),
+    Buffer.byteLength('{"historical":true}\n') + Buffer.byteLength('{"historical":"older"}\n'),
   );
   const packet = JSON.parse(readFileSync(packetCopy, "utf8"));
   assert.deepEqual(packet.materials.map(({ path, kind }) => ({ path, kind })), [
@@ -966,8 +955,8 @@ for (const [label, graph, expected] of [
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.equal(
     readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(),
-    `guard --base ${f.base} --head ${git(f.root, "rev-parse", "HEAD")}`,
-    "API易相关最终差异必须把知识库门禁绑定到精确 base..HEAD",
+    "check --offline",
+    "契约相关最终差异必须跑一次离线结构校验（凭证门已于 2026-10-29 取消）",
   );
 }
 
