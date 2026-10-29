@@ -64,7 +64,8 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [colorToolOpen, setColorToolOpen] = useState(false);
   /** 六要素面板开关（工具条「六要素」图标切换；协议模板默认展开）。 */
-  const [elementsOpen, setElementsOpen] = useState(true);
+  // 2026-10-29 用户拍板：六要素默认折叠，需要时用工具条「六要素」展开。
+  const [elementsOpen, setElementsOpen] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
@@ -84,7 +85,6 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   const elements: PromptElements = useMemo(() => {
     const raw = data.promptElements as PromptElements | undefined;
     return {
-      subject: typeof raw?.subject === "string" ? raw.subject : "",
       environment: raw?.environment as ElementValue,
       lighting: raw?.lighting as ElementValue,
       lens: raw?.lens as ElementValue,

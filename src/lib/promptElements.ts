@@ -1,25 +1,29 @@
 /**
  * 六要素提示词（纯函数，前端面板 + 拼装 + 判定 + 风险扫描）。
  *
- * 要素顺序固定 1→6：主体 → 环境 → 光线 → 镜头与视角 → 色调与介质 → 构图。
- * 拼装结果写入文本节点补充位（试穿模板锚点之后 / 普通文本节点正文），
+ * 2026-10-29 用户拍板：**主体不再由面板填写**（系统提示词已经承担主体描述），
+ * 面板只覆盖 环境 → 光线 → 镜头与视角 → 色调与介质 → 构图 五维；
+ * 拼装顺序仍沿用原六要素的固定次序，空要素整段跳过。
+ * 拼装结果写入文本节点补充位（协议锚点之后 / 普通文本节点正文），
  * 下游 dag / 改写层 / 快照看到的仍是纯文本，本模块不碰任何运行路径。
  */
 
-export type ElementKey = "subject" | "environment" | "lighting" | "lens" | "tone" | "composition";
+export type ElementKey = "environment" | "lighting" | "lens" | "tone" | "composition";
 
 export const ELEMENT_ORDER: readonly ElementKey[] = [
-  "subject", "environment", "lighting", "lens", "tone", "composition",
+  "environment", "lighting", "lens", "tone", "composition",
 ];
 
 export const ELEMENT_LABELS: Record<ElementKey, string> = {
-  subject: "主体",
   environment: "环境",
   lighting: "光线",
   lens: "镜头与视角",
   tone: "色调与介质",
   composition: "构图",
 };
+
+/** 面板可填的要素数（主体已移出面板）。 */
+export const ELEMENT_SLOT_COUNT = ELEMENT_ORDER.length;
 
 export interface ElementPreset {
   id: string;
@@ -33,21 +37,14 @@ export interface ElementDef {
   key: ElementKey;
   /** 缺了会怎样（一句话，面板副标题）。 */
   missingHint: string;
-  /** 主体无预设（必须用户自写）；其余各 4 预设 + 自写兜底。 */
+  /** 各 4 预设 + 自写兜底。 */
   presets: readonly ElementPreset[];
-  /** 主体必填。 */
-  required: boolean;
   placeholder: string;
 }
 
 export const ELEMENT_DEFS: readonly ElementDef[] = [
   {
-    key: "subject", required: true, presets: [],
-    missingHint: "缺了模型自由发挥，加你不想要的道具",
-    placeholder: "例：一只哑光黑色陶瓷手冲杯，盛八分满黑咖啡",
-  },
-  {
-    key: "environment", required: false, missingHint: "缺了背景随机，同系列图对不上",
+    key: "environment", missingHint: "缺了背景随机，同系列图对不上",
     placeholder: "自写环境，如：大理石吧台，背景酒架虚化",
     presets: [
       { id: "micro-cement", label: "微水泥台面", text: "浅灰色微水泥台面，同色系墙面并虚化" },
@@ -57,7 +54,7 @@ export const ELEMENT_DEFS: readonly ElementDef[] = [
     ],
   },
   {
-    key: "lighting", required: false, missingHint: "缺了全局均匀光，一眼假",
+    key: "lighting", missingHint: "缺了全局均匀光，一眼假",
     placeholder: "自写光线",
     presets: [
       { id: "softbox-tl", label: "左上柔光", text: "左上方45度柔光箱主光，右侧白色反光板补光" },
@@ -67,7 +64,7 @@ export const ELEMENT_DEFS: readonly ElementDef[] = [
     ],
   },
   {
-    key: "lens", required: false, missingHint: "缺了透视和景深不可控",
+    key: "lens", missingHint: "缺了透视和景深不可控",
     placeholder: "自写镜头",
     presets: [
       { id: "macro85", label: "85mm微距", text: "85mm微距，f/5.6，正面略俯视15度" },
@@ -77,7 +74,7 @@ export const ELEMENT_DEFS: readonly ElementDef[] = [
     ],
   },
   {
-    key: "tone", required: false, missingHint: "缺了默认高饱和「渲染感」",
+    key: "tone", missingHint: "缺了默认高饱和「渲染感」",
     placeholder: "自写色调",
     presets: [
       { id: "cool-low", label: "冷调低饱和", text: "冷调中性白平衡，整体偏低饱和" },
@@ -87,7 +84,7 @@ export const ELEMENT_DEFS: readonly ElementDef[] = [
     ],
   },
   {
-    key: "composition", required: false, missingHint: "缺了主体永远居中",
+    key: "composition", missingHint: "缺了主体永远居中",
     placeholder: "自写构图",
     presets: [
       { id: "thirds", label: "三分法留白", text: "主体位于画面左三分之一，右侧大面积留白" },
@@ -103,7 +100,11 @@ export type ElementValue = { presetId: string } | { custom: string } | undefined
 
 /** 六要素结构化选择（TextNodeData.promptElements 的值形态）。 */
 export type PromptElements = {
-  subject: string;
+  /**
+   * @deprecated 2026-10-29 起面板不再填主体（系统提示词已承担）；旧草稿里的值仍在，
+   * 但拼装时会被忽略——保留字段只为类型兼容。
+   */
+  subject?: string;
   environment?: ElementValue;
   lighting?: ElementValue;
   lens?: ElementValue;
@@ -116,7 +117,6 @@ export type ElementStatus = "ok" | "vague" | "empty";
 
 /** 取某要素的生效文本（custom 非空优先，否则 preset 文本；都没有返回 ""）。 */
 export function elementText(key: ElementKey, elements: PromptElements): string {
-  if (key === "subject") return (elements.subject ?? "").trim();
   const def = ELEMENT_DEFS.find((d) => d.key === key);
   const value = elements[key] as ElementValue;
   if (value !== undefined && "custom" in value) {
@@ -134,13 +134,12 @@ export function elementText(key: ElementKey, elements: PromptElements): string {
 export function rateElement(key: ElementKey, elements: PromptElements): ElementStatus {
   const text = elementText(key, elements);
   if (text === "") return "empty";
-  if (key === "subject") return text.length >= 4 ? "ok" : "vague";
   const value = elements[key] as ElementValue;
   if (value !== undefined && "presetId" in value) return "ok";
   return text.length >= 6 ? "ok" : "vague";
 }
 
-/** 已填要素数（subject 非空 + 其余有生效文本）。 */
+/** 已填要素数（五维中有生效文本的个数）。 */
 export function filledElementCount(elements: PromptElements): number {
   return ELEMENT_ORDER.filter((key) => elementText(key, elements) !== "").length;
 }
@@ -152,11 +151,10 @@ export function missingElementLabels(elements: PromptElements): string[] {
 }
 
 /**
- * 按固定顺序拼装六要素为一段补充文本：空要素整段跳过，以"，"连接。
- * 主体为空返回 ""（调用方禁用"填入补充"并提示先写主体）。
+ * 按固定顺序拼装要素为一段补充文本：空要素整段跳过，以"，"连接。
+ * 五维全空返回 ""（调用方禁用"填入补充"）。主体不在面板内——由系统提示词承担。
  */
 export function assembleElements(elements: PromptElements): string {
-  if ((elements.subject ?? "").trim() === "") return "";
   const parts = ELEMENT_ORDER.map((key) => elementText(key, elements))
     .filter((text) => text !== "");
   return parts.join("，");

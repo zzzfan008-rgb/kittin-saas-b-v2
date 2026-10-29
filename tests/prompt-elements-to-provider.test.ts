@@ -28,8 +28,8 @@ function ok(name: string, fn: () => void): void {
   }
 }
 
+// 2026-10-29：主体不再由面板填写（系统提示词承担），面板只覆盖五维。
 const ELEMENTS = {
-  subject: "一位穿米白连衣裙的模特在街边行走",
   environment: { presetId: "studio" } as const,
   lighting: { custom: "清晨窗光从左侧打进来" } as const,
   lens: { presetId: "50mm" } as const,
@@ -39,13 +39,13 @@ const ELEMENTS = {
 
 const ASSEMBLED = assembleElements(ELEMENTS);
 
-ok("六要素按固定顺序拼装、空要素跳过", () => {
-  assert.ok(ASSEMBLED.includes(ELEMENTS.subject), "主体必须在内");
+ok("五维按固定顺序拼装、空要素跳过（主体已移出面板）", () => {
+  assert.ok(!ASSEMBLED.includes("subject"), "不得再拼主体字段");
   assert.ok(ASSEMBLED.includes("清晨窗光从左侧打进来"), "自写光线必须在内");
   assert.ok(ASSEMBLED.includes("暖白平衡，低饱和"), "自写色调必须在内");
   // 预设项取其文本
   assert.ok(ASSEMBLED.includes(elementText("environment", ELEMENTS)), "预设环境必须展开");
-  assert.equal(assembleElements({ subject: "   " }), "", "主体为空不拼装");
+  assert.equal(assembleElements({}), "", "五维全空不拼装");
 });
 
 ok("「填入补充」后的节点正文：协议原样 + 补充位落地", () => {
@@ -90,7 +90,8 @@ ok("最终发给模型的提示词包含六要素（且不含脚手架）", () =
     taskPrompt: nodeText,
     references: [{ role: "服装" }],
   });
-  assert.ok(prompt.includes(ELEMENTS.subject), "主体必须进模型提示词");
+  // 主体来自系统提示词/协议正文，面板不再提供；这里断言五维全部到位。
+  assert.ok(!prompt.includes("subject"), "提示词里不得出现字段名");
   assert.ok(prompt.includes("清晨窗光从左侧打进来"), "光线必须进模型提示词");
   assert.ok(prompt.includes("暖白平衡，低饱和"), "色调必须进模型提示词");
   assert.ok(prompt.includes(elementText("lens", ELEMENTS)), "镜头必须进模型提示词");
