@@ -173,6 +173,8 @@ const TEST_FILES = [
   "tests/tryon-reference-order.test.ts",
   // 六要素：拼装顺序/判定/风险扫描纯函数。
   "tests/prompt-elements.test.ts",
+  // 2026-10-29：六要素 → 产线提示词 端到端（面板填入 → 节点正文 → dag → 渲染）。
+  "tests/prompt-elements-to-provider.test.ts",
   // 本地图片引用的收集/剥除（级联删除 + 启动自愈的纯函数核心，不碰库）。
   "tests/local-image-refs.test.ts",
   "tests/video-provider.test.ts",

@@ -34,7 +34,7 @@ import {
   COLOR_TOKEN_RE,
 } from "@/lib/color/colorToken";
 import { getTextPresetTemplate, listTextPresetTemplates } from "@/lib/promptPresets";
-import { REWRITE_SUPPLEMENT_ANCHOR } from "@/lib/rewriteEligibility";
+import { findSupplementAnchor } from "@/lib/rewriteEligibility";
 import {
   assembleElements,
   type ElementValue,
@@ -73,10 +73,12 @@ export function TextNode({ id, data, selected }: NodeProps<Node<TextNodeData>>) 
   []);
 
   /** 协议模板判定：正文含补充位锚点即协议模板（协议区只读 + 六要素面板）。 */
-  const anchorIndex = (data.text ?? "").indexOf(REWRITE_SUPPLEMENT_ANCHOR);
-  const isProtocolTemplate = anchorIndex !== -1;
-  const protocolText = isProtocolTemplate ? (data.text ?? "").slice(0, anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
-  const supplementText = isProtocolTemplate ? (data.text ?? "").slice(anchorIndex + REWRITE_SUPPLEMENT_ANCHOR.length) : "";
+  // 锚点可能有多种写法（新「补充要求：」+ 旧草稿长标记），统一由 findSupplementAnchor 定位；
+  // 只认单值锚点会让旧草稿识别不到协议模板 → 六要素面板消失、补充段被当成协议正文。
+  const anchor = findSupplementAnchor(data.text ?? "");
+  const isProtocolTemplate = anchor !== null;
+  const protocolText = anchor ? (data.text ?? "").slice(0, anchor.end) : "";
+  const supplementText = anchor ? (data.text ?? "").slice(anchor.end) : "";
 
   /** 六要素结构化选择（面板写入 data.promptElements；拼装结果落补充位）。 */
   const elements: PromptElements = useMemo(() => {
