@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -443,7 +443,23 @@ for (const model of knowledge.models) {
     model.productPolicy.maxTotalReferences <= model.gatewayContract.maxReferences,
     `${model.id} product reference limit exceeds gateway contract`,
   );
-  assert.equal(model.observedEvidence.status, "unverified");
+  // 2026-10-28：未归档 evidence 的模型必须保持 unverified；归档了的必须是 verified，
+  // 且 evidenceId 能在 docs/ai/apiyi/evidence/ 里找到——杜绝"手改状态冒充已验证"。
+  const accepted: string[] = model.observedEvidence.acceptedEvidenceIds ?? [];
+  if (accepted.length === 0) {
+    assert.equal(model.observedEvidence.status, "unverified", `${model.id} 无归档证据却非 unverified`);
+  } else {
+    assert.equal(model.observedEvidence.status, "verified", `${model.id} 有归档证据但状态未升级`);
+    const evidenceDir = join(docsRoot, "evidence");
+    const files = readdirSync(evidenceDir).filter((name) => name.endsWith(".json"));
+    const evidenceIds = new Set(files.map((name) => {
+      const record = JSON.parse(readFileSync(join(evidenceDir, name), "utf8")) as { evidenceId?: string };
+      return String(record.evidenceId ?? "");
+    }));
+    for (const evidenceId of accepted) {
+      assert.ok(evidenceIds.has(evidenceId), `${model.id} 引用的证据 ${evidenceId} 不存在于 evidence/`);
+    }
+  }
 }
 
 // 供应商迁移（兔子API）后，旧 API易 文档快照不再被引用；改为断言新来源清单的完整性：
