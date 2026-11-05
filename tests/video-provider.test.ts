@@ -146,6 +146,19 @@ async function main(): Promise<void> {
       }
     });
 
+    await test("poll 把 in_progress 也算中间态（2026-11-05 实测：Seedance 2.5 用它，不是 running）", async () => {
+      const restoreFetch = installFetchMock(() =>
+        // 真实响应节选：status=in_progress, progress=0
+        Response.json({ id: "cgt-test-task-1", task_id: "cgt-test-task-1", object: "video", status: "in_progress", progress: 0 }));
+      try {
+        const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
+        const result = await provider.poll("cgt-test-task-1");
+        assert.equal(result.status, "running", "in_progress 必须映射为 running，否则会抛未知状态");
+      } finally {
+        restoreFetch();
+      }
+    });
+
     await test("poll 把 queued/running 映射为 pending/running（非终态继续轮询）", async () => {
       const states = ["queued", "running"];
       const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
