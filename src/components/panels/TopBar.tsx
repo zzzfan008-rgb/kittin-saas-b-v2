@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDownIcon, CircleHelpIcon, KeyboardIcon, PaletteIcon } from "lucide-react";
+import { ChevronDownIcon, KeyboardIcon, PaletteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,7 +18,6 @@ import {
   useFlowStore,
 } from "@/store/flowStore";
 import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
-import { OPEN_TUTORIAL_EVENT } from "@/tutorials/tutorialRuntime";
 import {
   detectDesktopShortcutPlatform,
   workbenchShortcutRows,
@@ -203,17 +202,6 @@ export function TopBar() {
         {readOnly && (
           <span className="rounded-md border border-blue-400/40 px-2 py-1 text-label text-blue-400">管理员只读</span>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="打开使用教程"
-          title="使用教程"
-          onClick={() => window.dispatchEvent(new Event(OPEN_TUTORIAL_EVENT))}
-          className="text-[var(--gc-text-muted)] hover:text-[var(--gc-text)]"
-        >
-          <CircleHelpIcon aria-hidden="true" className="size-4" />
-        </Button>
       </div>
     </header>
   );
