@@ -24,13 +24,11 @@ import { ResultsFab } from "@/components/panels/ResultsFab";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { EmptyCanvasCTA } from "@/components/EmptyCanvasCTA";
 import { EmptyWorkspaceCTA } from "@/components/EmptyWorkspaceCTA";
-import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
 import { setGenerationSafetyBlockReason } from "@/store/generationSafety";
 import {
   isWorkspaceUnloadWarningSuppressed,
   shouldWarnBeforeWorkspaceUnload,
 } from "@/lib/workspaceUnload";
-import { isWorkbenchTutorialBlocking } from "@/tutorials/tutorialRuntime";
 import {
   InitialDraftSyncNotice,
   InitialDraftWorkspace,
@@ -146,7 +144,6 @@ function useGlobalShortcuts() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      if (isWorkbenchTutorialBlocking()) return;
       if (isInitialDraftInteractionBlocking()) return;
       // 蒙版编辑器使用独立撤销栈；打开或上传期间不能让全局快捷键修改底层画布。
       if (useFlowStore.getState().pendingMaskWorkCount > 0) return;
@@ -426,7 +423,6 @@ function Workspace() {
           />
         </Suspense>
       )}
-      <TutorialOverlay />
     </div>
   );
 }
