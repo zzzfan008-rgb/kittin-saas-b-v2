@@ -224,25 +224,19 @@ export function AssetPickerOverlay({
         setUploadProgress(index + 1);
         try {
           const dataUrl = await readFileAsDataUrl(file);
+          // 2026-11-05 拍板 C：素材入库交给 /api/files 在同一事务里完成（分类由调用方给），
+          // 不再「先传文件再单独 POST /api/assets」——那是两条写入，失败会留下半成品。
+          // 历史叶子（history）只是「浏览历史上传」，不建素材。
+          const wantsAsset = !toHistoryOnly && targetLeaf !== "history";
           const up = await fetch("/api/files", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dataUrl }),
+            body: JSON.stringify(wantsAsset
+              ? { dataUrl, createAsset: true, assetCategory: targetLeaf, assetName: assetNameFromUpload(file.name, "未命名素材") }
+              : { dataUrl }),
           });
           const saved = (await up.json().catch(() => ({}))) as { url?: string; error?: string };
           if (!up.ok || !saved.url) throw new Error(saved.error || `上传失败 HTTP ${up.status}`);
-          if (!toHistoryOnly && targetLeaf !== "history") {
-            const name = assetNameFromUpload(file.name, "未命名素材");
-            const created = await fetch("/api/assets", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name, category: targetLeaf, image: saved.url }),
-            });
-            if (!created.ok) {
-              const detail = (await created.json().catch(() => ({}))) as { error?: string };
-              throw new Error(detail.error || `建资产失败 HTTP ${created.status}`);
-            }
-          }
           success += 1;
         } catch (err) {
           failures.push(`${file.name}：${err instanceof Error ? err.message : String(err)}`);
