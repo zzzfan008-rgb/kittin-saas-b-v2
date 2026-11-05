@@ -146,9 +146,23 @@ async function submitWithApiyi(modelId: VideoModelId, req: VideoGenRequest): Pro
   return { taskId: taskId.trim() };
 }
 
+/**
+ * 中间态 → pending/running。
+ *
+ * 2026-11-05 实测（兔子API → Seedance 2.5，任务 task_H2e6XSRdQdC1bfxy9BMxOTawwthAOcfs）：
+ * 提交后轮询返回的中间态是 **`in_progress`**，既不是 `queued` 也不是 `running`。
+ * 原实现只认这两个词，未知状态会一路落到函数末尾抛
+ * `AI 服务返回了未知任务状态`（invalid_response）→ 视频在第一次轮询（提交后 20s）
+ * 就判失败，表现为「视频生成从未成功」。
+ */
+const PENDING_STATUSES = new Set(["queued", "pending", "starting"]);
+const RUNNING_STATUSES = new Set(["running", "in_progress", "processing", "generating"]);
+
 function pollStatus(status: unknown): VideoPollResult | undefined {
-  if (status === "queued") return { status: "pending" };
-  if (status === "running") return { status: "running" };
+  if (typeof status !== "string") return undefined;
+  const normalized = status.trim().toLowerCase();
+  if (PENDING_STATUSES.has(normalized)) return { status: "pending" };
+  if (RUNNING_STATUSES.has(normalized)) return { status: "running" };
   return undefined;
 }
 
@@ -186,13 +200,14 @@ async function pollWithApiyi(
   const payload = shape?.taskWrapper ? (record(raw[shape.taskWrapper]) ?? raw) : raw;
 
   const statusKey = shape?.statusField ?? "status";
-  const status = payload[statusKey];
+  const rawStatus = payload[statusKey];
+  const status = typeof rawStatus === "string" ? rawStatus.trim().toLowerCase() : rawStatus;
   const pending = pollStatus(status);
   if (pending) return pending;
 
   // 成功态按契约（seedance/veo 为 completed，H3 为 succeeded）；
   // 同时接受另一写法，防网关版本间状态词漂移导致"永远轮询不完成"。
-  const successStatus = shape?.successStatus ?? "succeeded";
+  const successStatus = (shape?.successStatus ?? "succeeded").toLowerCase();
   const successAliases = new Set([successStatus, "completed", "succeeded"]);
   if (typeof status === "string" && successAliases.has(status)) {
     // 三种信封：seedance/veo 用顶层 video_url，H3 用 content.url。
@@ -219,7 +234,7 @@ async function pollWithApiyi(
     return { status: "completed", videoFileRef: saved.url, ...(durationSec ? { durationSec } : {}) };
   }
 
-  const failedStatuses = shape?.failedStatuses ?? ["failed", "expired"];
+  const failedStatuses = (shape?.failedStatuses ?? ["failed", "expired"]).map((value) => value.toLowerCase());
   if (failedStatuses.includes(String(status))) {
     // H3 错误在 error.{code,message}；seedance/veo 亦为 error.message。
     const errorField = shape?.errorField ?? "error";
