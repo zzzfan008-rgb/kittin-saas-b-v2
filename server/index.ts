@@ -15,7 +15,6 @@ import { createRateLimitMiddleware } from "./lib/rateLimit";
 import { authRouter } from "./routes/auth";
 import { historyRouter } from "./routes/history";
 import { usageRouter } from "./routes/usage";
-import { tutorialsRouter } from "./routes/tutorials";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
 import { createTextRewriteRouter } from "./routes/textRewrite";
@@ -112,7 +111,6 @@ app.use("/api/templates", templatesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/history", historyRouter);
 app.use("/api/usage", usageRouter);
-app.use("/api/tutorials", tutorialsRouter);
 app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
 app.use("/api/text", textRewriteRateLimit, createTextRewriteRouter());
 // 抠图：转发到本地 Python rembg 服务（rembg-service/，不走 AI 限流——不消耗外部配额）。
