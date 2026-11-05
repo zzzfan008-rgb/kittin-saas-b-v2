@@ -55,7 +55,9 @@ async function uploadFile(file: File): Promise<NormalizedUploadResponse> {
   const res = await fetch("/api/files", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dataUrl }),
+    // 2026-11-05 拍板 C：用户主动上传的图默认入素材库（未分类），
+    // 服务端在同一个事务里建 assets 行；裁切/手绘等派生结果不传这两个字段。
+    body: JSON.stringify({ dataUrl, assetName: file.name, createAsset: true }),
   });
   const data = await res.json().catch(() => ({})) as Partial<NormalizedUploadResponse> & { error?: string };
   if (!res.ok) throw new Error(apiErrorMessage(res.status, data, `上传失败 HTTP ${res.status}`));

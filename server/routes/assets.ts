@@ -8,13 +8,11 @@ import { deleteStoredImage, saveNormalizedUploadDataUrl, thumbnailUrlForImage } 
 import { ImageValidationError, isLocalImageReference } from "../lib/imageValidation";
 import { lockActiveOwner } from "../lib/ownerMutation";
 import type { Asset } from "../../src/types/workflow";
+import { ASSET_CATEGORY_VALUES } from "../lib/assetCategories";
 
 export const assetsRouter = Router();
-const CATEGORIES: Array<Asset["category"]> = [
-  "print", "fabric", "colorcard", "sketch",
-  "model", "garment", "accessory", "pose", "background",
-  "refvideo", "audio",
-];
+// 分类清单移入 server/lib/assetCategories.ts（单一事实源，与 /api/files 的默认入库共用）。
+const CATEGORIES: Array<Asset["category"]> = [...ASSET_CATEGORY_VALUES];
 const TRASH_DAYS = 15;
 
 interface AssetRow {

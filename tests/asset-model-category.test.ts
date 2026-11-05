@@ -105,6 +105,58 @@ await test("GET /assets?category=bogus 仍返回 400（枚举白名单收窄）"
   assert.equal(response.status, 400);
 });
 
+// ---------- 2026-11-05 拍板 C：用户主动上传默认入库 ----------
+
+async function countUncategorized(): Promise<number> {
+  const res = await request("/assets?category=uncategorized");
+  assert.equal(res.status, 200);
+  const rows = await res.json() as Array<{ id: string }>;
+  return rows.length;
+}
+
+await test("POST /files 带 createAsset → 同事务建素材（默认 uncategorized）", async () => {
+  const before = await countUncategorized();
+  const upload = await request("/files", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl: PNG_DATA_URL, assetName: "节点上传的图", createAsset: true }),
+  });
+  assert.equal(upload.status, 200, await upload.text());
+  const after = await countUncategorized();
+  assert.equal(after, before + 1, "带 createAsset 的上传必须建一条未分类素材");
+
+  const rows = await (await request("/assets?category=uncategorized")).json() as Array<{ name: string }>;
+  assert.ok(rows.some((row) => row.name === "节点上传的图"), "素材名取上传文件名");
+});
+
+await test("POST /files 不带标记 → 不入库（裁切/手绘等派生结果）", async () => {
+  const before = await countUncategorized();
+  const upload = await request("/files", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl: PNG_DATA_URL }),
+  });
+  assert.equal(upload.status, 200, await upload.text());
+  assert.equal(await countUncategorized(), before, "派生结果不得污染素材库");
+});
+
+await test("POST /files 带显式分类 → 落到该分类", async () => {
+  const beforeFabric = (await (await request("/assets?category=fabric")).json() as unknown[]).length;
+  const upload = await request("/files", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl: PNG_DATA_URL, assetCategory: "fabric", assetName: "面料素材" }),
+  });
+  assert.equal(upload.status, 200, await upload.text());
+  const afterFabric = (await (await request("/assets?category=fabric")).json() as unknown[]).length;
+  assert.equal(afterFabric, beforeFabric + 1);
+});
+
+await test("POST /files 非法 assetCategory → 400（fail-closed）", async () => {
+  const upload = await request("/files", {
+    method: "POST",
+    body: JSON.stringify({ dataUrl: PNG_DATA_URL, assetCategory: "bogus" }),
+  });
+  assert.equal(upload.status, 400);
+});
+
 server.close();
 await closeDatabaseForTests();
 fs.rmSync(temp, { recursive: true, force: true });

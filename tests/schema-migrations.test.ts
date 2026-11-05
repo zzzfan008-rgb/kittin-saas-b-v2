@@ -47,6 +47,7 @@ assert.deepEqual(versions, [
   { version: 24, name: "flow_json_sha256_campaign_tracking" },
   { version: 25, name: "remove_evaluation_ledger_system" },
   { version: 26, name: "asset_taxonomy_v2" },
+  { version: 27, name: "assets_uncategorized_category" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 
@@ -59,7 +60,9 @@ assert.match(assetCategoryConstraint?.definition ?? "", /'print'/);
 assert.match(assetCategoryConstraint?.definition ?? "", /'fabric'/);
 assert.match(assetCategoryConstraint?.definition ?? "", /'garment'/);
 assert.match(assetCategoryConstraint?.definition ?? "", /'model'/);
-console.log("  ✓ 素材 category 枚举已扩容为 11 类（reference 并入 garment）");
+// 2026-11-05 迁移 27：用户主动上传默认入库，新增 uncategorized 落点。
+assert.match(assetCategoryConstraint?.definition ?? "", /'uncategorized'/);
+console.log("  ✓ 素材 category 枚举含 11 类 + uncategorized（reference 并入 garment）");
 
 const tutorialReceiptColumns = await query<{ column_name: string }>(`
   SELECT column_name FROM information_schema.columns
