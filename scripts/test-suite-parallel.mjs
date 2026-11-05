@@ -103,7 +103,6 @@ const TEST_FILES = [
   "tests/authorization-runplan.test.ts",
   "tests/authorization-drafts.test.ts",
   "tests/authorization-history.test.ts",
-  "tests/tutorials.test.ts",
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   "tests/unknown-kind-viewer.test.ts",
@@ -222,7 +221,6 @@ const SERIAL_TEST_FILES = new Set([
   "tests/authorization-runplan.test.ts",
   "tests/authorization-drafts.test.ts",
   "tests/authorization-history.test.ts",
-  "tests/tutorials.test.ts",
   "tests/schema-migrations.test.ts",
   "tests/run-queue.test.ts",
   // P0 清单修复补入：以下 3 个碰库测试此前不在清单（连同清单一起逃逸扫描）。

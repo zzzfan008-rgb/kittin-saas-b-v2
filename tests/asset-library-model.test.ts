@@ -24,10 +24,16 @@ const workflowTypesSource = read("src/types/workflow.ts");
 const appSource = read("src/App.tsx");
 
 // ---------- 1. 素材分类 11 值（单一事实源在 src/types/workflow.ts） ----------
+// 2026-11-05 拍板 C：新增 uncategorized（用户主动上传的默认落点），共 12 个取值。
 assert.match(
   workflowTypesSource,
-  /category:\s+\| "print" \| "fabric" \| "colorcard" \| "sketch"\s+\| "model" \| "garment" \| "accessory" \| "pose" \| "background"\s+\| "refvideo" \| "audio";/,
-  "Asset.category 必须是 11 类：服装设计 4 + 模特换装 5 + 视频生成 2（旧参考类已并入 garment）",
+  /category:\s+\| "print" \| "fabric" \| "colorcard" \| "sketch"\s+\| "model" \| "garment" \| "accessory" \| "pose" \| "background"\s+\| "refvideo" \| "audio"/,
+  "Asset.category 必须包含 11 个业务分类（服装设计 4 + 模特换装 5 + 视频生成 2）",
+);
+assert.match(
+  workflowTypesSource,
+  /\| "uncategorized"/,
+  "Asset.category 必须包含 uncategorized（用户主动上传的默认落点，迁移 27）",
 );
 
 // ---------- 2. 选择器：tab、预选分类、v8 写回路径 ----------

@@ -14,6 +14,7 @@ import {
 import { ProviderError } from "../providers/base";
 import { ImageValidationError, validateImageDataUrl } from "../lib/imageValidation";
 import { requestUser } from "../lib/auth";
+import { ASSET_CATEGORY_VALUES, DEFAULT_UPLOAD_ASSET_CATEGORY, isAssetCategory } from "../lib/assetCategories";
 import { asyncHandler } from "../lib/asyncHandler";
 import { query, queryOne, transaction } from "../lib/database";
 import { lockActiveOwner } from "../lib/ownerMutation";
@@ -71,9 +72,22 @@ function setFileCacheHeaders(res: Response): void {
 
 filesRouter.post("/", asyncHandler(async (req, res) => {
   const user = requestUser(req);
-  const { dataUrl } = req.body as { dataUrl?: string };
+  // 2026-11-05 拍板 C：用户主动上传的图默认入素材库。
+  // 调用方传 assetCategory / createAsset 才建素材；裁切、手绘这类派生结果不传，不入库。
+  const { dataUrl, assetName, assetCategory, createAsset } = req.body as {
+    dataUrl?: string;
+    assetName?: string;
+    assetCategory?: string;
+    createAsset?: boolean;
+  };
   if (!dataUrl) {
     res.status(400).json({ error: "dataUrl is required" });
+    return;
+  }
+  const wantsAsset = createAsset === true || assetCategory !== undefined;
+  const resolvedCategory = assetCategory ?? DEFAULT_UPLOAD_ASSET_CATEGORY;
+  if (wantsAsset && !isAssetCategory(resolvedCategory)) {
+    res.status(400).json({ error: `assetCategory must be one of: ${ASSET_CATEGORY_VALUES.join(", ")}` });
     return;
   }
   try {
@@ -89,6 +103,22 @@ filesRouter.post("/", asyncHandler(async (req, res) => {
           saved.id, user.id, saved.mimeType, saved.width, saved.height,
           saved.byteLength, new Date().toISOString(),
         ]);
+        if (wantsAsset) {
+          const assetName = typeof (req.body as { assetName?: string }).assetName === "string"
+            ? (req.body as { assetName?: string }).assetName!.trim().slice(0, 200)
+            : "";
+          await client.query(`
+            INSERT INTO assets (id, owner_id, scope, name, category, image, created_at)
+            VALUES ($1, $2, 'private', $3, $4, $5, $6)
+          `, [
+            nanoid(12),
+            user.id,
+            assetName || "未命名素材",
+            resolvedCategory,
+            saved.url,
+            new Date().toISOString(),
+          ]);
+        }
         return true;
       });
       if (!registered) {

@@ -12,6 +12,7 @@ interface LoginBody {
   user?: { id?: string; mustChangePassword?: boolean };
 }
 
+/** @deprecated 2026-11-05 教程功能已下线，保留空接口仅为兼容历史引用；无引用后可删。 */
 interface TutorialBody {
   acknowledged?: boolean;
 }
@@ -106,25 +107,7 @@ setup("create an authenticated desktop session on a persisted v8 project", async
   expect(clearedDraft.ok(), await clearedDraft.text()).toBeTruthy();
 
   await page.goto("/");
-  const tutorial = page.getByRole("dialog", { name: "欢迎使用服装设计工作台" });
-  const tutorialResponse = await request.get("/api/tutorials/workbench-onboarding");
-  const tutorialBody = await tutorialResponse.json() as TutorialBody;
-  expect(tutorialResponse.ok()).toBeTruthy();
-  if (tutorialBody.acknowledged) {
-    await expect(tutorial).toBeHidden();
-  } else {
-    await expect(tutorial).toBeVisible();
-    const nextButton = tutorial.getByRole("button", { name: "下一步" });
-    const completeButton = tutorial.getByRole("button", { name: "完成教程" });
-    for (let step = 0; step < 8 && !await completeButton.isVisible(); step += 1) {
-      await nextButton.click();
-    }
-    await expect(completeButton).toBeVisible();
-    await completeButton.click();
-  }
-  await expect(tutorial).toBeHidden();
-  await page.reload();
-  await expect(tutorial).toBeHidden();
+  // 2026-11-05：教程功能已下线（用户拍板删除），setup 不再处理教程对话框。
   // 2026-09-25 登录语义（决策 4）：冷启动 0 页签 → 首屏是「空工作区」引导（无画布、无工具栏）。
   await expect(page.getByRole("region", { name: "空工作区" })).toBeVisible();
 

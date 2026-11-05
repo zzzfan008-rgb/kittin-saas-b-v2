@@ -9,12 +9,14 @@ import type { Asset } from "@/types/workflow";
  * 全部列表统一按 createdAt 倒序（日期越新越靠前）。
  */
 
-export type AssetLevel1Id = "design" | "tryon" | "video" | "history";
+export type AssetLevel1Id = "design" | "tryon" | "video" | "uncategorized" | "history";
 
 export const ASSET_LEVEL1: ReadonlyArray<{ id: AssetLevel1Id; label: string }> = [
   { id: "design", label: "服装设计" },
   { id: "tryon", label: "模特换装" },
   { id: "video", label: "视频生成" },
+  // 2026-11-05 拍板 C：用户主动上传（节点上传/素材库上传）默认入库，未选分类落这里。
+  { id: "uncategorized", label: "未分类" },
   { id: "history", label: "历史素材" },
 ];
 
@@ -39,6 +41,9 @@ export const ASSET_LEVEL2: Record<AssetLevel1Id, ReadonlyArray<{ id: AssetLeafId
     { id: "refvideo", label: "参考视频" },
     { id: "audio", label: "语音" },
   ],
+  uncategorized: [
+    { id: "uncategorized", label: "未分类" },
+  ],
   history: [],
 };
 
@@ -54,6 +59,7 @@ export const ASSET_LEAF_LABEL: Record<AssetLeafId, string> = {
   background: "背景",
   refvideo: "参考视频",
   audio: "语音",
+  uncategorized: "未分类",
   history: "历史素材",
 };
 
@@ -67,6 +73,7 @@ export const ASSET_EMPTY_HINT: Record<AssetLeafId, string> = {
   accessory: "暂无配饰素材",
   pose: "暂无动作素材",
   background: "暂无背景素材",
+  uncategorized: "暂无未分类素材（用户上传会自动出现在这里）",
   refvideo: "暂无参考视频",
   audio: "暂无语音",
   history: "暂无本地上传，可在图片节点上传图片",
