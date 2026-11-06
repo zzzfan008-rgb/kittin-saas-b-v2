@@ -60,18 +60,22 @@ assetsRouter.get("/", asyncHandler(async (req, res) => {
   // 名称模糊搜索：转义 LIKE 通配符（%、_、\），按字面子串匹配整库。
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   const searchPattern = search ? `%${search.replace(/[\\%_]/g, "\\$&")}%` : null;
+  // 归属人筛选：仅管理员可用；普通用户传了也忽略，避免越权探测他人资产。
+  const requestedOwner = typeof req.query.ownerId === "string" ? req.query.ownerId.trim() : "";
+  const ownerFilter = user.role === "admin" && requestedOwner ? requestedOwner : null;
   const rows = await query<AssetRow>(`
     SELECT a.*, u.display_name AS owner_name
     FROM assets a LEFT JOIN users u ON u.id = a.owner_id
     WHERE ($1::text IS NULL OR a.category = $1)
       AND ($6::text IS NULL OR a.name ILIKE $6)
+      AND ($7::text IS NULL OR a.owner_id = $7)
       AND (${includeDeleted ? "a.deleted_at IS NOT NULL" : "a.deleted_at IS NULL"})
       AND (${includeDeleted
         ? "$2 = 'admin' OR a.owner_id = $3"
         : "$2 = 'admin' OR a.scope IN ('global','shared') OR a.owner_id = $3"})
     ORDER BY a.created_at DESC
     LIMIT $4 OFFSET $5
-  `, [category ?? null, user.role, user.id, limit, offset, searchPattern]);
+  `, [category ?? null, user.role, user.id, limit, offset, searchPattern, ownerFilter]);
   res.json(rows.map((row) => ({
     ...mapAsset(row, user.id),
     canManage: row.scope === "global" ? user.role === "admin" : row.owner_id === user.id,
