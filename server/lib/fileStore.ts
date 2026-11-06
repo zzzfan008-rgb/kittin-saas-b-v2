@@ -292,7 +292,23 @@ export function isSupportedStoredFile(id: string): boolean {
 // ---------- 图片来源归一化（Provider URL 结果 / 链式编辑输入统一为 dataURL）----------
 
 const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024; // 20MB
-const DOWNLOAD_TIMEOUT_MS = 30_000;
+/**
+ * 产物图下载策略。
+ *
+ * 背景：gpt-image 系列产物是 7–11MB 的 PNG，且托管在跨区 CDN 上。
+ * 原实现用 30 秒硬超时，对应速度下限约 237KB/s——线路一抖动就整单失败，
+ * 而图其实已经在网关侧生成。这里放宽超时并允许重试：
+ * 重试只是重新拉一次已存在的对象，不产生任何生成费用。
+ */
+const DOWNLOAD_MAX_ATTEMPTS = 3;
+/** 第 n 次重试前的等待；数组长度须小于 DOWNLOAD_MAX_ATTEMPTS。 */
+const DOWNLOAD_RETRY_DELAYS_MS = [1_000, 3_000];
+
+/** 单个产物下载超时；默认 120 秒，可用 ARTIFACT_DOWNLOAD_TIMEOUT_MS 覆盖。 */
+function artifactDownloadTimeoutMs(): number {
+  const value = Number(process.env.ARTIFACT_DOWNLOAD_TIMEOUT_MS ?? 120_000);
+  return Number.isFinite(value) && value >= 10_000 ? Math.min(value, 600_000) : 120_000;
+}
 const MAX_REDIRECTS = 5;
 
 export type HostLookup = (hostname: string) => Promise<readonly string[]>;
@@ -520,53 +536,143 @@ export async function assertUrlAllowed(raw: string | URL, lookup: HostLookup = d
   return u;
 }
 
-/** 下载远程图片 → dataURL（校验类型、体积、超时，重定向目标同样过 SSRF 检查） */
+/** 只记 host，绝不把带签名的完整 URL 写进日志。 */
+function safeDownloadHost(raw: string): string {
+  try {
+    return new URL(raw).host;
+  } catch {
+    return "invalid-url";
+  }
+}
+
+/** 网络类失败才重试；体积/格式等确定性错误重试无意义。 */
+function isRetryableDownloadFailure(error: unknown): boolean {
+  const detail = error as (Error & { code?: string }) | undefined;
+  if (!detail) return false;
+  if (detail.name === "AbortError" || detail.name === "TimeoutError") return true;
+  const code = detail.code ?? "";
+  if (/^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|UND_ERR_SOCKET)$/.test(code)) {
+    return true;
+  }
+  const message = detail.message ?? "";
+  if (/image download failed: HTTP 5\d\d/.test(message)) return true;
+  if (/socket hang up|network|timed? ?out|aborted|fetch failed|premature close/i.test(message)) return true;
+  return false;
+}
+
+function describeDownloadError(error: unknown): string {
+  const detail = error as (Error & { code?: string }) | undefined;
+  const name = detail?.name ?? "Error";
+  const code = detail?.code ? `/${detail.code}` : "";
+  const message = (detail?.message ?? String(error)).slice(0, 120);
+  return `${name}${code}: ${message}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 把下载失败转成用户可读的中文原因。
+ * 确定性校验错误（体积/格式/SSRF）保留原文，便于服务端诊断与既有断言。
+ */
+function toPublicDownloadError(error: unknown, attempts: number): Error {
+  const detail = error as (Error & { code?: string }) | undefined;
+  const message = detail?.message ?? String(error);
+  const deterministic = /^(blocked non-global address|too many image redirects|image redirect missing|not an image response|image too large|empty image response|image MIME\/signature mismatch|image download failed: HTTP 4\d\d|unsupported image reference)/;
+  if (deterministic.test(message)) return error instanceof Error ? error : new Error(message);
+
+  const timedOut = detail?.name === "AbortError" || detail?.name === "TimeoutError" || /timed? ?out|aborted/i.test(message);
+  if (timedOut) {
+    return new Error(`图片回传超时，请稍后重试（已尝试 ${attempts} 次）；图片可能已在网关生成`);
+  }
+  return new Error(`图片回传失败，网络连接异常，请稍后重试（已尝试 ${attempts} 次）`);
+}
+
+/** 单次下载：不含重试逻辑，失败直接抛出。 */
+async function downloadImageOnce(
+  raw: string,
+  signal: AbortSignal,
+  lookup: HostLookup,
+  fetcher: ImageFetch | undefined,
+): Promise<string> {
+  let u = await assertUrlAllowed(raw, lookup);
+  let res: ImageResponse | undefined;
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+    // Re-resolve immediately before every connection; all results are revalidated.
+    const addresses = isIP(u.hostname) ? [u.hostname] : await lookup(u.hostname);
+    const blocked = addresses.find((address) => !isAddressAllowedForHost(u.hostname, address));
+    if (addresses.length === 0 || blocked) throw new Error(`blocked non-global address for ${u.hostname}: ${blocked ?? "no addresses"}`);
+    res = fetcher
+      ? await fetcher(u, { signal, redirect: "manual" })
+      : await pinnedFetch(u, { signal, redirect: "manual" }, addresses[0]);
+    if (![301, 302, 303, 307, 308].includes(res.status)) break;
+    if (redirects === MAX_REDIRECTS) throw new Error(`too many image redirects (limit ${MAX_REDIRECTS})`);
+    const location = res.headers.get("location");
+    if (!location) throw new Error(`image redirect missing Location header: HTTP ${res.status}`);
+    u = await assertUrlAllowed(new URL(location, u), lookup);
+  }
+  if (!res) throw new Error("image download did not produce a response");
+  if (!res.ok) throw new Error(`image download failed: HTTP ${res.status}`);
+  const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!mime.startsWith("image/")) {
+    throw new Error(`not an image response: ${mime || "unknown content-type"}`);
+  }
+  const contentLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_DOWNLOAD_BYTES) {
+    throw new Error(`image too large: ${contentLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength === 0) throw new Error("empty image response");
+  if (buf.byteLength > MAX_DOWNLOAD_BYTES) {
+    throw new Error(`image too large: ${buf.byteLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
+  }
+  const detected = detectImageMime(buf);
+  if (!detected || detected !== mime) throw new Error(`image MIME/signature mismatch: declared ${mime || "unknown"}, detected ${detected || "unknown"}`);
+  return toDataUrl(buf.toString("base64"), detected);
+}
+
+/**
+ * 下载远程图片 → dataURL（校验类型、体积、超时，重定向目标同样过 SSRF 检查）。
+ * 网络类失败自动重试；每次尝试独立计时，超时可用 ARTIFACT_DOWNLOAD_TIMEOUT_MS 调整。
+ */
 export async function downloadImageToDataUrl(
   raw: string,
   dependencies?: { lookup?: HostLookup; fetch?: ImageFetch },
 ): Promise<string> {
   const lookup = dependencies?.lookup ?? defaultHostLookup;
   const fetcher = dependencies?.fetch;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), DOWNLOAD_TIMEOUT_MS);
-  try {
-    let u = await assertUrlAllowed(raw, lookup);
-    let res: ImageResponse | undefined;
-    for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
-      // Re-resolve immediately before every connection; all results are revalidated.
-      const addresses = isIP(u.hostname) ? [u.hostname] : await lookup(u.hostname);
-      const blocked = addresses.find((address) => !isAddressAllowedForHost(u.hostname, address));
-      if (addresses.length === 0 || blocked) throw new Error(`blocked non-global address for ${u.hostname}: ${blocked ?? "no addresses"}`);
-      res = fetcher
-        ? await fetcher(u, { signal: ctrl.signal, redirect: "manual" })
-        : await pinnedFetch(u, { signal: ctrl.signal, redirect: "manual" }, addresses[0]);
-      if (![301, 302, 303, 307, 308].includes(res.status)) break;
-      if (redirects === MAX_REDIRECTS) throw new Error(`too many image redirects (limit ${MAX_REDIRECTS})`);
-      const location = res.headers.get("location");
-      if (!location) throw new Error(`image redirect missing Location header: HTTP ${res.status}`);
-      u = await assertUrlAllowed(new URL(location, u), lookup);
+  const timeoutMs = artifactDownloadTimeoutMs();
+  const host = safeDownloadHost(raw);
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DOWNLOAD_MAX_ATTEMPTS; attempt += 1) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const startedAt = Date.now();
+    try {
+      return await downloadImageOnce(raw, ctrl.signal, lookup, fetcher);
+    } catch (error) {
+      lastError = error;
+      const elapsedMs = Date.now() - startedAt;
+      const retryable = isRetryableDownloadFailure(error);
+      const willRetry = retryable && attempt < DOWNLOAD_MAX_ATTEMPTS;
+      console.warn("[artifact-download-failed]", JSON.stringify({
+        host,
+        attempt,
+        elapsedMs,
+        timeoutMs,
+        error: describeDownloadError(error),
+        willRetry,
+      }));
+      if (!willRetry) break;
+      await sleep(DOWNLOAD_RETRY_DELAYS_MS[attempt - 1] ?? 3_000);
+    } finally {
+      clearTimeout(timer);
     }
-    if (!res) throw new Error("image download did not produce a response");
-    if (!res.ok) throw new Error(`image download failed: HTTP ${res.status}`);
-    const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    if (!mime.startsWith("image/")) {
-      throw new Error(`not an image response: ${mime || "unknown content-type"}`);
-    }
-    const contentLength = Number(res.headers.get("content-length"));
-    if (Number.isFinite(contentLength) && contentLength > MAX_DOWNLOAD_BYTES) {
-      throw new Error(`image too large: ${contentLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.byteLength === 0) throw new Error("empty image response");
-    if (buf.byteLength > MAX_DOWNLOAD_BYTES) {
-      throw new Error(`image too large: ${buf.byteLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
-    }
-    const detected = detectImageMime(buf);
-    if (!detected || detected !== mime) throw new Error(`image MIME/signature mismatch: declared ${mime || "unknown"}, detected ${detected || "unknown"}`);
-    return toDataUrl(buf.toString("base64"), detected);
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw toPublicDownloadError(lastError, DOWNLOAD_MAX_ATTEMPTS);
 }
 
 /**

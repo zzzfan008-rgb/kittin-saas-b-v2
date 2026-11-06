@@ -47,6 +47,16 @@ export async function handleJobError(
       category: error.category, retryCount: job.retryCount, requestId: error.requestId ?? null,
       diagnostic: sanitizedProviderDiagnostic(error) ?? error.message,
     }));
+  } else {
+    // 非 Provider 失败（产物下载、后处理、落盘等）此前完全静默，
+    // 只留一行英文原因在库里，线上无法排查。这里补一条结构化日志。
+    console.warn("[generation-job-failure]", JSON.stringify({
+      runId: job.runId,
+      nodeId: job.nodeId,
+      retryCount: job.retryCount,
+      name: error instanceof Error ? error.name : typeof error,
+      message: message.slice(0, 200),
+    }));
   }
   await transaction(async (client) => {
     const row = (await client.query<JobLockRow>(`
@@ -118,7 +128,7 @@ export async function processNextGenerationJob(
       UPDATE generation_jobs SET lease_expires_at = $1, updated_at = $2
       WHERE id = $3 AND worker_id = $4 AND status = 'running'
     `, [heartbeatNow + leaseMs, heartbeatNow, job.id, workerId]).catch((error) => {
-      console.error("[garment-canvas] generation lease heartbeat failed", error);
+      console.error("[coin-ai-canvas] generation lease heartbeat failed", error);
     });
   }, heartbeatMs);
   heartbeat.unref();
@@ -224,7 +234,7 @@ export function startGenerationWorker(): () => void {
         // Drain immediately available work before returning to the poll interval.
       }
     } catch (error) {
-      console.error("[garment-canvas] generation worker failed", error);
+      console.error("[coin-ai-canvas] generation worker failed", error);
     } finally {
       busy = false;
     }
