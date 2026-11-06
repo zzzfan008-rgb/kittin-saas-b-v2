@@ -128,7 +128,13 @@ const MESSAGE_RULES: MatchRule[] = [
   { priority: 25, pattern: /invalid token|expired token|missing token|unauthorized request/i, category: "gateway_authentication" },
 
   // account_credit
-  { priority: 25, pattern: /insufficient credit|credit limit|quota exceeded|余额不足|账户.{0,10}(欠费|不足|超限)/i, category: "account_credit" },
+  // 覆盖三类上游措辞：
+  // 1) 英文通用：insufficient credit / credit limit / quota exceeded
+  // 2) 本网关（兔子 API）实测：`预扣费额度失败, 用户剩余额度: $x, 需要预扣费额度: $y`、
+  //    错误码 `insufficient_user_quota`（归一化后下划线变空格）——原文既不含
+  //    "insufficient credit" 也不含 "quota exceeded"，旧正则完全匹配不到
+  // 3) 中文余额/欠费表述
+  { priority: 25, pattern: /insufficient credit|credit limit|quota exceeded|insufficient[_\s-]*(user[_\s-]*)?quota|insufficient[_\s-]*(balance|funds)|余额不足|账户.{0,10}(欠费|不足|超限)|预扣费额度|剩余额度|额度(不足|用尽|超限|已满)/i, category: "account_credit" },
 
   // network_error — 优先于 unknown
   { priority: 40, pattern: /connection.{0,30}(reset|refused|timeout)|network.{0,30}(error|fail|unreachable)|econnreset|econnrefused|etimedout/i, category: "network_error" },
@@ -142,18 +148,29 @@ function classifyProviderMessage(
   status: number | undefined,
   rawMessage: string,
 ): { category: ProviderErrorCategory; publicMessage: string } {
-  // 1. HTTP 状态码优先匹配
-  const statusMatch = STATUS_PRIORITY.find((s) => s.status === status);
-  if (statusMatch) {
-    return { category: statusMatch.category, publicMessage: ERROR_MESSAGES[statusMatch.category] };
-  }
-
-  // 2. 消息文本模式匹配（按 priority 升序，即 priority 越小越先）
   const normalized = rawMessage
     .toLowerCase()
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ");
 
+  // 1. HTTP 状态码优先匹配。
+  //    例外：兔子 API 用 403 同时表示「额度不足」（insufficient_user_quota），
+  //    若一律归为鉴权失败，会把「该充值」误报成「该查密钥/权限」，把排查引向错误方向。
+  //    因此 401/403 先看余额类证据，命中则以 account_credit 为准。
+  const statusMatch = STATUS_PRIORITY.find((s) => s.status === status);
+  if (statusMatch) {
+    if (statusMatch.category === "gateway_authentication") {
+      const creditRule = MESSAGE_RULES.find(
+        (rule) => rule.category === "account_credit" && rule.pattern.test(normalized),
+      );
+      if (creditRule) {
+        return { category: "account_credit", publicMessage: ERROR_MESSAGES.account_credit };
+      }
+    }
+    return { category: statusMatch.category, publicMessage: ERROR_MESSAGES[statusMatch.category] };
+  }
+
+  // 2. 消息文本模式匹配（按 priority 升序，即 priority 越小越先）
   const sortedRules = [...MESSAGE_RULES].sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
   for (const rule of sortedRules) {
     if (rule.pattern.test(normalized)) {
