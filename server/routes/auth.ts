@@ -344,12 +344,12 @@ authRouter.delete("/users/:id", requireAdmin, asyncHandler(async (req, res) => {
     return { status: "ok" as const };
   }).catch(async (error) => {
     await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
-      console.error("[garment-canvas] failed to reconcile OpenAI mask test ownership mutation", reconcileError);
+      console.error("[coin-ai-canvas] failed to reconcile OpenAI mask test ownership mutation", reconcileError);
     });
     throw error;
   });
   await reconcileOpenAiMaskTestAccountMutations().catch((reconcileError) => {
-    console.error("[garment-canvas] failed to finalize OpenAI mask test ownership mutation", reconcileError);
+    console.error("[coin-ai-canvas] failed to finalize OpenAI mask test ownership mutation", reconcileError);
   });
   if (outcome.status === "source_changed") {
     res.status(404).json({ error: "用户不存在或状态已变化，请刷新后重试" });

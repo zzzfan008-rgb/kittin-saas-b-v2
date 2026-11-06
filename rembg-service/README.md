@@ -169,7 +169,7 @@ launchctl load ~/Library/LaunchAgents/com.garmentcanvas.matting.plist
 ```ini
 # /etc/systemd/system/garment-canvas-matting.service
 [Unit]
-Description=Garment Canvas Matting Service
+Description=Coin-AI Canvas Matting Service
 After=network.target
 
 [Service]

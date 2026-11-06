@@ -1,8 +1,8 @@
 {
-  "name": "garment-canvas",
+  "name": "coin-ai-canvas",
   "private": true,
   "version": "0.1.1",
-  "description": "Garment design collaboration SaaS - infinite canvas + node workflow (P0 MVP)",
+  "description": "Coin-AI Canvas - garment design collaboration SaaS, infinite canvas + node workflow (P0 MVP)",
   "type": "module",
   "engines": {
     "node": ">=24.20.0"

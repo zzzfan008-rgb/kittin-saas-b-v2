@@ -1,4 +1,4 @@
-name: garment-canvas
+name: coin-ai-canvas
 
 services:
   postgres:

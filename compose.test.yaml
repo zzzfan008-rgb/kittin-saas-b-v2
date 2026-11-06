@@ -1,4 +1,4 @@
-name: garment-canvas-test
+name: coin-ai-canvas-test
 
 services:
   postgres-test:

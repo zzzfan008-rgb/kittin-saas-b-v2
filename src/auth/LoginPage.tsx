@@ -62,7 +62,7 @@ export function LoginPage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--gc-accent)] text-sm font-extrabold tracking-tight text-[var(--gc-accent-cta-ink)] shadow-[0_2px_8px_color-mix(in_srgb,var(--gc-accent)_30%,transparent)]">
             GC
           </span>
-          <span className="text-[15px] font-bold tracking-tight">Garment Canvas</span>
+          <span className="text-[15px] font-bold tracking-tight">Coin-AI Canvas</span>
         </div>
         <div className="relative z-10 max-w-[520px]">
           <p className="font-mono text-meta-en uppercase tracking-[0.18em] text-[var(--gc-text-muted)]">
@@ -179,7 +179,7 @@ export function SessionEndedPage({ onContinue }: { onContinue: () => void }) {
   return (
     <main className="flex h-full items-center justify-center bg-[var(--gc-shell)] px-4 text-[var(--gc-text)]">
       <section className="w-full max-w-sm rounded-2xl border border-[var(--gc-border)] bg-[var(--gc-panel)] p-7 shadow-2xl">
-        <p className="text-meta-en font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">GARMENT CANVAS</p>
+        <p className="text-meta-en font-medium uppercase tracking-[0.35em] text-[var(--gc-accent)]">COIN-AI CANVAS</p>
         <h1 className="mt-3 text-xl font-semibold">账号已在其他设备登录</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--gc-text-muted)]">
           为保护项目数据，本设备已退出工作区。已绑定当前账号的本机草稿会保留；使用其他账号登录时会安全清除，无法确认归属的旧缓存也不会继续加载。

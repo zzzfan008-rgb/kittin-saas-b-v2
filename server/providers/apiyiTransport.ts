@@ -187,7 +187,7 @@ export async function readApiyiJsonResponse(
             graceMs,
           };
           if (options.onSalvaged) options.onSalvaged(event);
-          else console.warn("[garment-canvas] API易响应尾部已安全收尾", event);
+          else console.warn("[coin-ai-canvas] API易响应尾部已安全收尾", event);
           return parsed;
         }
       }
