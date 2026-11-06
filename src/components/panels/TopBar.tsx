@@ -18,6 +18,7 @@ import {
   useFlowStore,
 } from "@/store/flowStore";
 import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
+import { BalanceBadge } from "@/components/panels/BalanceBadge";
 import {
   detectDesktopShortcutPlatform,
   workbenchShortcutRows,
@@ -178,6 +179,7 @@ export function TopBar() {
         <span className="whitespace-nowrap text-sm font-semibold tracking-[0.08em] text-[var(--gc-accent)]">Coin AI - Canvas</span>
         <span aria-hidden="true" className="h-5 w-px bg-[var(--gc-border)]" />
         <AccountMenu />
+        <BalanceBadge />
       </div>
 
       <div className="relative flex items-center justify-center">
