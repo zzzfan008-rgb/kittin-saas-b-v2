@@ -82,7 +82,7 @@ export async function loadCurrencyMeta(): Promise<CurrencyMeta> {
   };
 
   try {
-    const response = await fetch(`${config.apiyiBaseUrl()}/api/status`, {
+    const response = await fetch(`${config.gatewayBaseUrl()}/api/status`, {
       signal: AbortSignal.timeout(5_000),
     });
     const body = await response.json().catch(() => ({})) as { data?: Record<string, unknown> };

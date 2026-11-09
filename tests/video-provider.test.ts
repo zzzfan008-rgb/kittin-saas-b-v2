@@ -10,7 +10,7 @@ import {
   videoModelOptionsWarnings,
 } from "../src/types/videoModels";
 import {
-  createApiyiVideoProvider,
+  createGatewayVideoProvider,
   type VideoProvider,
   type VideoGenRequest,
 } from "../server/providers/videoProvider";
@@ -108,8 +108,8 @@ async function main(): Promise<void> {
   // ---------- 文件落盘 ----------
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "gc-video-"));
   const restoreDataDir = setEnv("DATA_DIR", dataDir);
-  const restoreBase = setEnv("APIYI_BASE_URL", "https://gateway.example");
-  const restoreKey = setEnv("APIYI_API_KEY", "apiyi-test-key");
+  const restoreBase = setEnv("GATEWAY_BASE_URL", "https://gateway.example");
+  const restoreKey = setEnv("GATEWAY_API_KEY", "apiyi-test-key");
 
   try {
     await test("saveVideoBuffer 落盘 .mp4 并可被 files 路由识别为 video/mp4", () => {
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
         return Response.json({ id: "cgt-test-task-1" });
       });
       try {
-        const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
+        const provider = createGatewayVideoProvider("doubao-seedance-2-5-260628");
         const { taskId } = await provider.submit({ prompt: "一段测试视频" });
         assert.equal(taskId, "cgt-test-task-1");
         assert.equal(captures.length, 1);
@@ -151,7 +151,7 @@ async function main(): Promise<void> {
         // 真实响应节选：status=in_progress, progress=0
         Response.json({ id: "cgt-test-task-1", task_id: "cgt-test-task-1", object: "video", status: "in_progress", progress: 0 }));
       try {
-        const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
+        const provider = createGatewayVideoProvider("doubao-seedance-2-5-260628");
         const result = await provider.poll("cgt-test-task-1");
         assert.equal(result.status, "running", "in_progress 必须映射为 running，否则会抛未知状态");
       } finally {
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
 
     await test("poll 把 queued/running 映射为 pending/running（非终态继续轮询）", async () => {
       const states = ["queued", "running"];
-      const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
+      const provider = createGatewayVideoProvider("doubao-seedance-2-5-260628");
       for (const state of states) {
         const restoreFetch = installFetchMock((input) => {
           assert.ok(String(input).includes("cgt-test-task-1"));
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
         });
       });
       try {
-        const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628", {
+        const provider = createGatewayVideoProvider("doubao-seedance-2-5-260628", {
           downloadVideo: async (url) => {
             assert.equal(url, "https://cdn.example/out.mp4");
             return FAKE_MP4;
@@ -214,7 +214,7 @@ async function main(): Promise<void> {
         [{ status: "failed", error: { message: "内容审核拦截" } }, "内容审核拦截"],
         [{ status: "expired" }, "视频任务已过期"],
       ];
-      const provider = createApiyiVideoProvider("doubao-seedance-2-5-260628");
+      const provider = createGatewayVideoProvider("doubao-seedance-2-5-260628");
       for (const [payload, expected] of cases) {
         const restoreFetch = installFetchMock(() => Response.json({ id: "cgt-x", ...payload as object }));
         try {

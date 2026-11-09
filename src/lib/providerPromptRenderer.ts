@@ -8,7 +8,7 @@ import type { ImageModelId } from "../types/imageModels";
  * Provider 提示词渲染：把用户意图扩写成上游能照做的完整指令。
  *
  * 唯一职责：蒙版局部修改的扩写。参考图编号由 provider 侧逐图标签承载
- * （见 server/providers/apiyi.ts geminiParts），这里不再追加任何清单。
+ * （见 server/providers/gateway.ts geminiParts），这里不再追加任何清单。
  *
  * 2026-10-28 二次简化（用户反馈）：产线提示词里曾混入两类脚手架——
  *   ① 末尾追加「参考图:参考图1、参考图2」——对模型零信息量，与逐图标签重复；

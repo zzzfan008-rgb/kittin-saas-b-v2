@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 3,
+  "capturedOn": "2026-10-27",
+  "capturedAt": "2026-10-27T12:00:00Z",
+  "sourceFormat": "official-markdown",
+  "sourceHashScope": "Exact response body returned by markdownUrl",
+  "documentationIndex": "https://docs.apiyi.com/llms.txt",
+  "fullDocumentationFingerprint": {
+    "url": "https://docs.apiyi.com/llms-full.txt",
+    "sha256": "015c1d8a4f40678e9de624fddc96d11ba6706f20a364288ead18a1c98e8a6054",
+    "reviewStatus": "historical-index-signal"
+  },
+  "layerSemantics": {
+    "vendorCapability": "厂商官方能力和提示词建议，不是 API易调用契约。",
+    "gatewayContract": "API易当前实际模型 ID、端点、字段、限制和错误语义。",
+    "productPolicy": "Garment Canvas 主动收窄的节点、引用数、默认值和后处理。",
+    "observedEvidence": "可追溯的真实探针、费用与输出证据；文档不得替代实测。"
+  },
+  "localKnowledgeBase": {
+    "kind": "curated-contract-only",
+    "rawSourcePagesStored": false,
+    "rawContentTrust": "untrusted_document_content",
+    "note": "2026-10-29 起删除 API易 全站快照（docs/ai/gateway/site，128MB/8441 文件）并取消 consultation receipt 凭证门；契约来源仍绑定 models/*.md 本地镜像，结构门 docs:gateway:check 保留。",
+    "documents": [
+      "README.md",
+      "async-runtime.md",
+      "input-image-normalization.md",
+      "model-contracts.json",
+      "model-knowledge.json",
+      "models/gpt-image-2.md",
+      "models/gpt-image-2-vip.md",
+      "models/gemini-3.1-flash-image.md",
+      "models/flux-2-pro.md",
+      "models/seedream-5-0-260128.md",
+      "models/gpt-image-2.5-all.md",
+      "models/nano-banana-pro-image.md",
+      "models/nano-banana-lite-image.md"
+    ]
+  },
+  "modelCatalog": {
+    "sourceLayer": "gatewayContract",
+    "expectedGatewayModelIds": [
+      "gemini-nano-banana-2.1",
+      "gemini-3.1-flash-image",
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-flare",
+      "flux-3-image",
+      "doubao-seedream-5-0-pro-260628",
+      "doubao-seedream-5-0-lite-260128",
+      "qwen-image-3.0-pro",
+      "qwen-image-3.0"
+    ],
+    "aliasesAreNotAutomaticFallbacks": true,
+    "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
+    "reviewedExportSha256": null,
+    "reviewedRawExportSha256": null,
+    "reviewedExportCapturedAt": null,
+    "policy": "模型列表校验需显式传入从兔子API导出的 JSON；不从文档别名推断当前可用性。"
+  },
+  "sources": [
+    {
+      "sourceId": "tuzi-gpt-image-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/343646952e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646952e0.md",
+      "localDocument": "models/tuzi-gpt-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "026c6875be712f124007d2f3bfee8da5662c74b8c11ecda2de276dd4785d15c0",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-gpt-image-edit",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/343646953e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646953e0.md",
+      "localDocument": "models/tuzi-gpt-image-edit.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "0865b76bad042231e05e8d6e38572ad8be70b11994287664cc5a7e1e778ac188",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-gemini-image-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/360926406e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/360926406e0.md",
+      "localDocument": "models/tuzi-gemini-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "34f591b3074d8560399187ab305c6207c675c5977e17fd63e4b0736377806966",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "gemini-nano-banana-2.1",
+        "gemini-3.1-flash-image"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-flux-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/343646931e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/343646931e0.md",
+      "localDocument": "models/tuzi-flux-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "375e18eb2c1c378bf631e2cd6edbf25c94b744d3b8200f08c74f7224d8692c9a",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "flux-3-image"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-seedream-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/349741169e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/349741169e0.md",
+      "localDocument": "models/tuzi-seedream-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "b5200f838d2074792828663df35d60f1ac1e90eccdf27d3858a4921cc24a7019",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "doubao-seedream-5-0-pro-260628",
+        "doubao-seedream-5-0-lite-260128"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    },
+    {
+      "sourceId": "tuzi-qwen-image-generate",
+      "sourceLayer": "gatewayContract",
+      "url": "https://tuzi-api.apifox.cn/498659603e0",
+      "markdownUrl": "https://tuzi-api.apifox.cn/498659603e0.md",
+      "localDocument": "models/tuzi-qwen-image-generate.md",
+      "capturedAt": "2026-10-27T12:00:00Z",
+      "sha256": "e1838c2a222eda59993551dfeb1168042598b9c0d7b4c81c4043de6854719fe1",
+      "etag": null,
+      "lastModified": null,
+      "modelAliases": [
+        "qwen-image-3.0-pro",
+        "qwen-image-3.0"
+      ],
+      "semanticClaims": [
+        "gateway-model-id",
+        "generation-and-edit-capability",
+        "response-shape"
+      ]
+    }
+  ],
+  "vendorSources": [],
+  "pricingSnapshot": {
+    "sha256": "e586fe0f23fc13ab264d202205992891f4ef819457f295ad124c31406c7ef2f8",
+    "capturedAt": "2026-08-26T00:00:00Z",
+    "present": [
+      "gpt-image-2.5-sunburst",
+      "gpt-image-2.5-all",
+      "gpt-image-2.5-sunburst-vip",
+      "gpt-image-2.5-flare-vip",
+      "gemini-3-pro-image-preview",
+      "gemini-3.1-flash-lite-image",
+      "gemini-3.1-flash-image",
+      "flux-2-pro",
+      "seedream-5-0-260128"
+    ],
+    "absent": [
+      "grok-imagine-image"
+    ],
+    "policy": "价格页可见性只是线索，不是当前可用性或验收证据。"
+  }
+}

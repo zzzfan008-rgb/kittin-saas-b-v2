@@ -3,10 +3,10 @@
  *
  * 为什么需要单独的会话：
  * - 余额（`quota`）只由面板接口 `GET /api/user/self` 提供；
- * - 该接口只认面板登录凭据，`APIYI_API_KEY`（sk-）会被拒绝（invalid_token）；
+ * - 该接口只认面板登录凭据，`GATEWAY_API_KEY`（sk-）会被拒绝（invalid_token）；
  * - `/v1/dashboard/billing/*` 返回的是占位值或累计消费，拿不到剩余额度。
  *
- * 认证形态（实测 api.tu-zi.com，x-new-api-version: dev-20261104）：
+ * 认证形态（实测网关面板接口，x-new-api-version: dev-20261104）：
  * - 登录成功返回 `success:true`，但 **body 里没有 access_token**；
  * - 会话通过响应头 `set-cookie: session=...; HttpOnly; Secure; SameSite=Lax` 下发；
  * - 后续请求需带该 Cookie，并附带 `New-Api-User: <用户 id>`（body.data.id）。
@@ -104,7 +104,7 @@ export async function login(): Promise<PanelSession> {
 
   let response: Response;
   try {
-    response = await fetch(`${config.apiyiBaseUrl()}${LOGIN_PATH}`, {
+    response = await fetch(`${config.gatewayBaseUrl()}${LOGIN_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -149,7 +149,7 @@ function authHeaders(session: PanelSession): Record<string, string> {
 }
 
 async function requestSelf(session: PanelSession): Promise<{ status: number; body: unknown }> {
-  const response = await fetch(`${config.apiyiBaseUrl()}${SELF_PATH}`, {
+  const response = await fetch(`${config.gatewayBaseUrl()}${SELF_PATH}`, {
     headers: authHeaders(session),
     signal: timeoutSignal(),
   });

@@ -58,7 +58,7 @@ const MASK_DATA_URL_CONTRACT = (() => {
  * v9（65a）：mask/maskSourceRef/featherRadius 从本清单移除——蒙版归属图片本身
  * （65 Q1：官方 single mask 语义，一张图一个蒙版，随 image[0]），image 节点允许携带。
  * v9+（65b Q3 后端 canonicalize 补口面）：mask-edit 与 gpt-image-2.5-sunburst 的
- * 双向唯一绑定（apiyi.ts:419/422）由运行链 dag.ts 注入面执行——schema 只管蒙版
+ * 双向唯一绑定（gateway.ts:419/422）由运行链 dag.ts 注入面执行——schema 只管蒙版
  * 字段归属与值校验，不掺和运行时 modelId 的蒙版配对（配对是 plan 物化层职责）。
  * v9+（2026-10-12 model-tryon A 机制）：familyId 为 image-generator 可选族标识
  * （模板实例化落标，如 "model-tryon"，运行时改写白名单门控用）。追加进本清单后，

@@ -4,10 +4,10 @@
  * 运行形态（同步 chat completions）：contracts/runtime.md §1b（Provider 实现归 P2-b）。
  *
  * 模型清单与契约区块的一致性断言沿用 imageModels.ts 顶部 throw 同款防线：
- * 契约区块（docs/ai/apiyi/model-contracts.json 的 textModels）必须与
+ * 契约区块（docs/ai/gateway/model-contracts.json 的 textModels）必须与
  * TEXT_MODEL_IDS 完全一致，否则模块加载即抛错。
  */
-import contracts from "../../docs/ai/apiyi/model-contracts.json";
+import contracts from "../../docs/ai/gateway/model-contracts.json";
 
 /**
  * 网关模型 ID 以 API易 本地知识库页面实际模型名为准

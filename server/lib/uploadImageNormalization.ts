@@ -1,5 +1,5 @@
 import sharp, { type Metadata, type OutputInfo } from "sharp";
-import contracts from "../../docs/ai/apiyi/model-contracts.json";
+import contracts from "../../docs/ai/gateway/model-contracts.json";
 import { withImageProcessingSlot } from "./imageProcessingLimit";
 import { ImageValidationError, validateImageDataUrl } from "./imageValidation";
 

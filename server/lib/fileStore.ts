@@ -370,7 +370,7 @@ const UPSTREAM_ARTIFACT_HOST_SUFFIXES: readonly string[] = [
   "aliyuncs.com",   // 阿里 OSS（qwen 产物）
   "sydney-ai.com",  // Google 图床（gemini / gpt-image 产物）
   "volces.com",     // 字节 TOS（seedream 产物）
-  "tu-zi.com",      // 兔子网关自身（原生 flux polling 等）
+  "ourzhishi.top",  // 网关自身（原生 flux polling 等）
 ];
 
 /** 该 host 是否属于「上游产物」白名单（后缀匹配，需带点边界）。 */

@@ -9,7 +9,7 @@
  *   ① 返回 rewritten:true（未被截断/过短防线拦下）；
  *   ② 输出含协议首段与尾段关键句（锚点切分后协议段逐字回填）；
  *   ③ 输出总长 ≥ 输入总长。
- * 无 APIYI_API_KEY 时跳过并明示（exit 0，不误报 CI 红）。
+ * 无 GATEWAY_API_KEY 时跳过并明示（exit 0，不误报 CI 红）。
  *
  * 运行：node node_modules/tsx/dist/cli.mjs scripts/rewrite-smoke.mjs（或 npm run test:smoke:rewrite）
  */
@@ -29,10 +29,10 @@ const TAIL_KEY = "用户补充要求（如为空则忽略本行）：";
 const PROTOCOL_VOCAB = ["参考图1", "参考图2", "AI 换装", "AI 换装模特试穿", "3:4", "竖版"];
 
 async function main() {
-  const apiKey = process.env.APIYI_API_KEY;
+  const apiKey = process.env.GATEWAY_API_KEY;
   if (!apiKey || apiKey.trim() === "" || apiKey.includes("DUMMY")) {
-    console.log("[SMOKE-SKIP] 未配置 APIYI_API_KEY（或为 DUMMY 占位），跳过真实模型冒烟。");
-    console.log("            配置后重跑：APIYI_API_KEY=<key> npm run test:smoke:rewrite");
+    console.log("[SMOKE-SKIP] 未配置 GATEWAY_API_KEY（或为 DUMMY 占位），跳过真实模型冒烟。");
+    console.log("            配置后重跑：GATEWAY_API_KEY=<key> npm run test:smoke:rewrite");
     process.exit(0);
   }
 
@@ -52,7 +52,7 @@ async function main() {
     try {
       const { createTextChatCompletion } = await import("../server/lib/textChat.ts");
       await createTextChatCompletion({
-        model: process.env.APIYI_TEXT_MODEL_ID ?? "gemini-3.8-flash",
+        model: process.env.GATEWAY_TEXT_MODEL_ID ?? "gemini-3.8-flash",
         messages: [{ role: "user", content: SUPPLEMENT }],
       });
     } catch (rawError) {

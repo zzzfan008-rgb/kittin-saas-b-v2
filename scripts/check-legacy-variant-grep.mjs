@@ -45,7 +45,7 @@ const ALLOWED_FILES = new Map([
   ["server/lib/database.ts", "evaluation_campaigns 账本列 evaluationVersion（付费评估账本，活概念）"],
   ["scripts/video-model-contract-hash.mjs", "视频模型契约哈希生成/校验脚本（活概念）"],
   ["scripts/text-model-contract-hash.mjs", "文本模型契约哈希生成/校验脚本（活概念）"],
-  ["scripts/apiyi-docs.mjs", "API易模型文档契约哈希校验（活概念）"],
+  ["scripts/gateway-docs.mjs", "API易模型文档契约哈希校验（活概念）"],
   ["server/lib/promptPresetsFrozen.ts", "冻结常量的文本溯源注释（说明抽取来源，非活引用）"],
   ["src/store/flowStore.ts", "会话恢复防御性 delete 清单（SESSION_GENERATION_FIELDS 清理旧会话脏数据的死字段；delete 语义不写入）"],
   ["src/store/flowTabSession.ts", "会话持久化防御性 delete 清单（SESSION_GENERATION_FIELDS 清理旧 localStorage 脏数据；与 flowStore 同语义，delete 不写入）"],
@@ -60,7 +60,7 @@ const ALLOWED_FILES = new Map([
   ["tests/templates-v8.test.ts", "v9 模板防复发：内置模板不得携带 variant 绑定断言"],
   ["tests/prompt-preset-ui.test.ts", "UI 防复发（EXCLUDED 留盘）：面板源码不得引用 data.promptVariantId"],
   // 5) 模型契约哈希校验测试（活概念，非 v7 绑定）
-  ["tests/apiyi-docs.test.ts", "模型契约哈希校验测试（活概念）"],
+  ["tests/gateway-docs.test.ts", "模型契约哈希校验测试（活概念）"],
   ["tests/provider-contract.test.ts", "模型契约哈希校验测试（活概念）"],
   ["tests/video-provider.test.ts", "视频模型契约哈希校验测试（活概念）"],
   // 6) gate 自身（TOKEN_PATTERN 与 self-test 合成数据）

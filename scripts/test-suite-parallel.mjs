@@ -68,7 +68,7 @@ const TEST_FILES = [
   "tests/generation-safety.test.ts",
   "tests/workbench-shell.test.ts",
   "tests/asset-library-model.test.ts",
-  "tests/apiyi-docs.test.ts",
+  "tests/gateway-docs.test.ts",
   "tests/r48-version-gate.test.ts",
   "tests/prompt-run-admission.test.ts",
   "tests/dag.test.ts",
@@ -78,7 +78,7 @@ const TEST_FILES = [
   "tests/generation-kind-contract.test.ts",
   // 65d §1.3：runPlan 蒙版重绘前置校验（纯函数，不碰库）。
   "tests/run-plan-image-edit.test.ts",
-  "tests/apiyi-transport.test.ts",
+  "tests/gateway-transport.test.ts",
   "tests/provider-contract.test.ts",
   "tests/mask-processing.test.ts",
   "tests/provider-retry.test.ts",

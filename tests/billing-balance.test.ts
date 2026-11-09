@@ -11,9 +11,9 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import express from "express";
 
-process.env.APIYI_BASE_URL = "https://api.example.test";
-process.env.APIYI_PANEL_USERNAME = "panel-user";
-process.env.APIYI_PANEL_PASSWORD = "panel-pass";
+process.env.GATEWAY_BASE_URL = "https://api.example.test";
+process.env.GATEWAY_PANEL_USERNAME = "panel-user";
+process.env.GATEWAY_PANEL_PASSWORD = "panel-pass";
 
 const { createBillingRouter, resetBillingCaches, toAmount } = await import("../server/routes/billing");
 const {

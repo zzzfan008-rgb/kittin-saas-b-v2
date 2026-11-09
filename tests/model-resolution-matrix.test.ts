@@ -3,7 +3,7 @@
  *
  * 数据来源（每家都核实过，标注"实测"的是真实付费调用）：
  * - gemini 系：imageConfig.imageSize = 1K/2K/4K（契约 imageSizes + 谷歌官方）
- * - gpt-image-2.5 系：官方 30 档像素表（docs/ai/apiyi/models/gpt-image-2-vip.md）
+ * - gpt-image-2.5 系：官方 30 档像素表（docs/ai/gateway/models/gpt-image-2-vip.md）
  * - flux-3-image：resolution = 1k/1.5k/2k/4k（实测 1k+16:9 出 2736x1536）
  * - seedream 5.0：像素面积 [921600, 4624220]（实测 512x512 / 3072x3072 均被拒）
  * - qwen-image-3.0：像素面积 [262144, 4194304]，`宽*高`（实测 4096*4096 被拒）

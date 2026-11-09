@@ -5,7 +5,7 @@
  * poll 返回 completed 时必须已完成 MP4 落地并给出 files 引用。
  *
  * R10 最终裁定：仅 `doubao-seedance-2-5-260628`（Seedance 2.5）。
- * 证据：docs/ai/apiyi/video-model-contracts.json（seedance2/overview.md + video-generation.md）。
+ * 证据：docs/ai/gateway/video-model-contracts.json（seedance2/overview.md + video-generation.md）。
  */
 import type { ReferenceImageInput } from "../../src/types/workflow";
 import {
@@ -23,7 +23,7 @@ import {
   parseDataUrl,
   ProviderError,
 } from "./base";
-import { getApiyiDispatcher, readApiyiJsonResponse } from "./apiyiTransport";
+import { getApiyiDispatcher, readApiyiJsonResponse } from "./gatewayTransport";
 
 const VIDEO_JSON_MAX_BYTES = 1024 * 1024;
 
@@ -83,7 +83,7 @@ function submitHeaders(): Record<string, string> {
   return {
     "Content-Type": "application/json",
     "Accept-Encoding": "identity",
-    Authorization: `Bearer ${config.apiyiVideoApiKey()}`,
+    Authorization: `Bearer ${config.gatewayVideoApiKey()}`,
   };
 }
 
@@ -121,12 +121,12 @@ async function submitWithApiyi(modelId: VideoModelId, req: VideoGenRequest): Pro
   const isMultipart = contract.endpoint.contentType === "multipart/form-data";
   const form = isMultipart ? buildVeoForm(modelId, req) : undefined;
   const response = await fetchWithRetry(
-    `${config.apiyiBaseUrl()}${contract.endpoint.submitPath}`,
+    `${config.gatewayBaseUrl()}${contract.endpoint.submitPath}`,
     () => ({
       method: "POST",
       headers: isMultipart
         // multipart 由 undici 自动带 boundary，不能手写 Content-Type。
-        ? { "Accept-Encoding": "identity", Authorization: `Bearer ${config.apiyiVideoApiKey()}` }
+        ? { "Accept-Encoding": "identity", Authorization: `Bearer ${config.gatewayVideoApiKey()}` }
         : submitHeaders(),
       body: form ? (form as unknown as RequestInit["body"]) : JSON.stringify(buildSubmitBody(modelId, req)),
     }),
@@ -186,7 +186,7 @@ async function pollWithApiyi(
   const shape = contract.responseShape;
   const pollPath = contract.endpoint.pollPathTemplate.replace("{id}", encodeURIComponent(taskId));
   const response = await fetchWithRetry(
-    `${config.apiyiBaseUrl()}${pollPath}`,
+    `${config.gatewayBaseUrl()}${pollPath}`,
     () => ({ method: "GET", headers: submitHeaders() }),
     {
       providerId: modelId,
@@ -247,7 +247,7 @@ async function pollWithApiyi(
   throw new ProviderError("AI 服务返回了未知任务状态", 502, modelId, "invalid_response", `status=${String(status)}`);
 }
 
-export function createApiyiVideoProvider(
+export function createGatewayVideoProvider(
   modelId: VideoModelId,
   dependencies?: { downloadVideo?: (url: string) => Promise<Buffer> },
 ): VideoProvider {
@@ -259,16 +259,16 @@ export function createApiyiVideoProvider(
   };
 }
 
-export const apiyiVideoProviders = Object.fromEntries(
+export const gatewayVideoProviders = Object.fromEntries(
   (["doubao-seedance-2-5-260628", "MiniMax-H3", "veo3.1"] as const)
-    .map((modelId) => [modelId, createApiyiVideoProvider(modelId)]),
+    .map((modelId) => [modelId, createGatewayVideoProvider(modelId)]),
 ) as Record<VideoModelId, VideoProvider>;
 
 export function getVideoProvider(modelId: string): VideoProvider {
   if (!isVideoModelId(modelId)) {
     throw new ProviderError(`Unknown video provider id: ${modelId}`, 400);
   }
-  return apiyiVideoProviders[modelId];
+  return gatewayVideoProviders[modelId];
 }
 
 export function videoTransportTimeoutMessage(error: unknown): string {

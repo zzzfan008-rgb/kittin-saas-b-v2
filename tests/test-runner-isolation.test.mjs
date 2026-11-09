@@ -133,7 +133,7 @@ try {
   writeFileSync(
     derivedEnvPath,
     [
-      "APIYI_API_KEY=must-not-leak",
+      "GATEWAY_API_KEY=must-not-leak",
       "POSTGRES_DB=garment_canvas",
       "POSTGRES_USER=garment_canvas",
       "POSTGRES_PASSWORD=p@ss word",

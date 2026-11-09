@@ -39,7 +39,7 @@ ok("白名单命中：阿里 OSS / Google 图床 / 字节 TOS / 兔子网关", (
     "dashscope-a717.oss-accelerate.aliyuncs.com",
     "apioss0.sydney-ai.com",
     "ark-acg-cn-beijing.tos-cn-beijing.volces.com",
-    "api.tu-zi.com",
+    "api.ourzhishi.top",
     "aliyuncs.com",
   ]) {
     assert.equal(isUpstreamArtifactHost(host), true, `${host} 应在白名单内`);
@@ -52,7 +52,7 @@ ok("后缀边界：伪装域名不得命中", () => {
     "notaliyuncs.com",
     "aliyuncs.com.evil.com",
     "sydney-ai.com.attacker.net",
-    "tu-zi.com.cn",           // 注意：*.com.cn 不是 tu-zi.com 子域
+    "ourzhishi.top.cn",      // 注意：*.top.cn 不是 ourzhishi.top 子域
   ]) {
     assert.equal(isUpstreamArtifactHost(host), false, `${host} 不应命中白名单`);
   }
@@ -61,14 +61,14 @@ ok("后缀边界：伪装域名不得命中", () => {
 ok("fake-IP 仅对白名单域名放行", () => {
   assert.equal(isAddressAllowedForHost("apioss0.sydney-ai.com", "198.18.0.47"), true);
   assert.equal(isAddressAllowedForHost("dashscope-a717.oss-accelerate.aliyuncs.com", "198.18.0.80"), true);
-  assert.equal(isAddressAllowedForHost("api.tu-zi.com", "198.19.5.6"), true, "198.18.0.0/15 整段");
+  assert.equal(isAddressAllowedForHost("api.ourzhishi.top", "198.19.5.6"), true, "198.18.0.0/15 整段");
   assert.equal(isAddressAllowedForHost("evil.com", "198.18.0.47"), false, "非白名单域名不得放行 fake-IP");
 });
 
 ok("私网/回环/元数据地址：即使是白名单域名也拒绝", () => {
   for (const address of ["10.0.0.5", "127.0.0.1", "169.254.169.254", "192.168.1.10", "::1"]) {
     assert.equal(
-      isAddressAllowedForHost("api.tu-zi.com", address),
+      isAddressAllowedForHost("api.ourzhishi.top", address),
       false,
       `${address} 不得因域名白名单被放行`,
     );
@@ -77,7 +77,7 @@ ok("私网/回环/元数据地址：即使是白名单域名也拒绝", () => {
 
 ok("公网地址行为不变（任何域名都放行）", () => {
   assert.equal(isGlobalIpAddress("47.113.75.27"), true);
-  assert.equal(isAddressAllowedForHost("api.tu-zi.com", "47.113.75.27"), true);
+  assert.equal(isAddressAllowedForHost("api.ourzhishi.top", "47.113.75.27"), true);
   assert.equal(isAddressAllowedForHost("evil.com", "47.113.75.27"), true, "公网地址本就允许，白名单只影响非公网");
 });
 
@@ -95,8 +95,8 @@ await ok("assertUrlAllowed 端到端：白名单 fake-IP 通过，非白名单 f
     /blocked non-global address for evil\.com: 198\.18\.0\.99/,
   );
   await assert.rejects(
-    () => assertUrlAllowed("https://api.tu-zi.com/a.png", fakeLookup),
-    /blocked non-global address for api\.tu-zi\.com: 10\.1\.2\.3/,
+    () => assertUrlAllowed("https://api.ourzhishi.top/a.png", fakeLookup),
+    /blocked non-global address for api\.ourzhishi\.top: 10\.1\.2\.3/,
     "白名单域名解析到私网地址仍必须拒绝",
   );
 });

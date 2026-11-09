@@ -62,7 +62,7 @@ function safeFailure(error: unknown): { status: "failed" | "outcome_unknown"; er
 
 export function createOpenAiMaskTestRouter(options: { createClient?: () => OpenAI } = {}) {
   const router = Router();
-  router.get("/config", (_req, res) => res.json({ model: NATIVE_MASK_MODEL, gateway: "API易", ready: Boolean(config.apiyiApiKey()), sdk: "OpenAI", postprocess: "none" }));
+  router.get("/config", (_req, res) => res.json({ model: NATIVE_MASK_MODEL, gateway: "API易", ready: Boolean(config.gatewayApiKey()), sdk: "OpenAI", postprocess: "none" }));
   router.post("/files", raw({ type: "image/png", limit: "50mb" }), asyncHandler(async (req, res) => {
     if (!Buffer.isBuffer(req.body)) { res.status(400).json({ error: "请上传 PNG 文件" }); return; }
     try { res.json(await storePng(req.body, requestUser(req).id, "upload")); }
@@ -90,7 +90,7 @@ export function createOpenAiMaskTestRouter(options: { createClient?: () => OpenA
       res.json(publicRecord(existing)); return;
     }
     if (activeOwners.has(ownerId)) { res.status(409).json({ error: "已有一个原生蒙版测试正在执行" }); return; }
-    if (!options.createClient && !config.apiyiApiKey()) { res.status(503).json({ error: "服务端未配置 APIYI_API_KEY" }); return; }
+    if (!options.createClient && !config.gatewayApiKey()) { res.status(503).json({ error: "服务端未配置 GATEWAY_API_KEY" }); return; }
     activeOwners.add(ownerId);
     let submitted = false;
     try {
@@ -113,7 +113,7 @@ export function createOpenAiMaskTestRouter(options: { createClient?: () => OpenA
       res.status(202).json(publicRecord(record));
       void (async () => {
         try {
-          const client = options.createClient?.() ?? new OpenAI({ apiKey: config.apiyiApiKey(), baseURL: `${config.apiyiBaseUrl().replace(/\/v1$/, "")}/v1`, maxRetries: 0, timeout: 600_000 });
+          const client = options.createClient?.() ?? new OpenAI({ apiKey: config.gatewayApiKey(), baseURL: `${config.gatewayBaseUrl().replace(/\/v1$/, "")}/v1`, maxRetries: 0, timeout: 600_000 });
           const image = await callNativeMaskEdit(client, { image: imageBuffer, mask: maskBuffer, prompt });
           const stored = await storePng(image, ownerId, "generated");
           saveRecord(filename, { ...record, status: "succeeded", image: stored.url, finishedAt: new Date().toISOString() });

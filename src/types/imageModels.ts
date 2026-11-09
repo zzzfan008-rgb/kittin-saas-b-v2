@@ -1,4 +1,4 @@
-import contracts from "../../docs/ai/apiyi/model-contracts.json";
+import contracts from "../../docs/ai/gateway/model-contracts.json";
 
 export const IMAGE_MODEL_IDS = [
   "gemini-nano-banana-2.1",
@@ -313,8 +313,8 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
 /**
  * VIP 系模型按画幅的三档像素尺寸（1K / 2K / 4K 标签；提交值仍是像素尺寸，上游只认 WxH）。
  *
- * 取值来源：docs/ai/apiyi/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
- * docs/ai/apiyi/consultations/vip-size-tiers.json 的咨询凭证）；标准档与
+ * 取值来源：docs/ai/gateway/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
+ * 官方档位表）；标准档与
  * VIP_SIZE_BY_RATIO 的既有默认一致（如 3:4 = 1536x2048）。
  * 仅 gpt-image-2.5-flare / gpt-image-2.5-sunburst 提供该三档选择
  * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。
@@ -340,7 +340,7 @@ export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: s
  * | 模型 | 承载参数 | 官方取值 | 依据 |
  * |---|---|---|---|
  * | gemini 系 | imageConfig.imageSize | 1K / 2K / 4K 关键字 | 契约 imageSizes + 谷歌官方 |
- * | gpt-image-2.5 系 | size | 30 档像素表（3 档 × 10 画幅） | docs/ai/apiyi/models/gpt-image-2-vip.md |
+ * | gpt-image-2.5 系 | size | 30 档像素表（3 档 × 10 画幅） | docs/ai/gateway/models/gpt-image-2-vip.md |
  * | flux-3-image | resolution | 768sq / 1k / 1.5k / 2k / 4k | tuzi-flux-generate.md（实测 1k+16:9 → 2736x1536） |
  * | seedream 5.0 pro/lite | size | 像素面积 [921600, 4624220] | 实测 512x512 与 3072x3072 均 400 |
  * | qwen-image-3.0(-pro) | size（`宽*高`） | 像素面积 [262144, 4194304] | 实测 4096*4096 500，512*512 与 2048*1152 通过 |
@@ -621,7 +621,7 @@ export function imageSizeTierOptions(
  * `gpt-image-2.5-flare` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
  * 值域取契约 recommendedOptions.promptSizePrefix.examples；标签附实测分辨率，来源为
  * 经审查的官方文档快照
- * docs/ai/apiyi/models/tuzi-gpt-image-generate.md（API易 全站快照已于 2026-10-29 删除）
+ * docs/ai/gateway/models/tuzi-gpt-image-generate.md（API易 全站快照已于 2026-10-29 删除）
  * （「经过验证的『提示词 → 实际分辨率』对照表」）。首项空值 = 不拼前缀，模型自适应
  * （同快照 :8647 记录 1:1 ≈ 1254×1254，快照 :4674 警示自适应允许少量像素偏差）。
  */

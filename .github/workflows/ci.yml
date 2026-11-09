@@ -112,7 +112,7 @@ jobs:
       # --with-deps 安装 Linux 系统依赖；不装 firefox/webkit，与项目桌面契约一致。
       - run: npx playwright install --with-deps chromium
       # e2e-with-postgres.mjs 负责：重置 garment_canvas_test schema、保留字端口、
-      # 注入 dummy AI 凭据（APIYI_API_KEY=e2e-disabled）、拉起 server+vite。
+      # 注入 dummy AI 凭据（GATEWAY_API_KEY=e2e-disabled）、拉起 server+vite。
       - run: npm run test:e2e
         env:
           DATABASE_URL: postgresql://garment_canvas:ci-test-password@127.0.0.1:5432/garment_canvas_test

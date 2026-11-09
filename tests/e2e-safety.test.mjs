@@ -16,8 +16,8 @@ const safeEnv = {
   E2E_ISOLATED_RUN: "1",
   NODE_ENV: "test",
   COOKIE_SECURE: "false",
-  APIYI_API_KEY: "e2e-disabled",
-  APIYI_BASE_URL: "https://127.0.0.1:9",
+  GATEWAY_API_KEY: "e2e-disabled",
+  GATEWAY_BASE_URL: "https://127.0.0.1:9",
   E2E_BASE_URL: "http://127.0.0.1:45173",
   E2E_API_URL: "http://127.0.0.1:43001",
   DATABASE_URL: "postgresql://garment_test:garment_test@127.0.0.1:45432/garment_canvas_test",
@@ -139,7 +139,7 @@ try {
     },
     {
       name: "real AI key",
-      result: listTests({ APIYI_API_KEY: "real-key-must-be-rejected" }),
+      result: listTests({ GATEWAY_API_KEY: "real-key-must-be-rejected" }),
       message: /real AI key must never reach browser regressions/,
     },
     {

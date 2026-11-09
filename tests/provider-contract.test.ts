@@ -5,12 +5,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import sharp from "sharp";
-import sources from "../docs/ai/apiyi/sources.json";
+import sources from "../docs/ai/gateway/sources.json";
 import { config } from "../server/config";
 import { compositeMaskedEdit, validateMaskForSource } from "../server/lib/maskProcessing";
 import { createRateLimitMiddleware } from "../server/lib/rateLimit";
-import { apiyiProviders } from "../server/providers/apiyi";
-import { closeApiyiDispatcher } from "../server/providers/apiyiTransport";
+import { gatewayProviders } from "../server/providers/gateway";
+import { closeApiyiDispatcher } from "../server/providers/gatewayTransport";
 import { fetchWithRetry, ProviderError } from "../server/providers/base";
 import { createAiDiagnosticsRouter } from "../server/routes/aiDiagnostics";
 import {
@@ -111,8 +111,8 @@ function assertPixel(
 
 async function main(): Promise<void> {
   console.log("API易 Provider 契约测试");
-  const restoreBase = setEnv("APIYI_BASE_URL", "https://gateway.example");
-  const restoreKey = setEnv("APIYI_API_KEY", "apiyi-test-key");
+  const restoreBase = setEnv("GATEWAY_BASE_URL", "https://gateway.example");
+  const restoreKey = setEnv("GATEWAY_API_KEY", "apiyi-test-key");
   const white = await imageDataUrl(4, 2, { r: 255, g: 255, b: 255 });
   const blue = await imageDataUrl(4, 2, { r: 20, g: 80, b: 220 });
   const red = await imageDataUrl(4, 2, { r: 220, g: 30, b: 30 });
@@ -120,10 +120,10 @@ async function main(): Promise<void> {
 
   try {
     await test("本地知识库与 Provider 注册表严格覆盖当前九个模型", () => {
-      assert.deepEqual(Object.keys(apiyiProviders).sort(), [...IMAGE_MODEL_IDS].sort());
-      assert.equal(Object.hasOwn(apiyiProviders, "grok-imagine-image"), false, "退役模型不得保留 Provider 入口");
+      assert.deepEqual(Object.keys(gatewayProviders).sort(), [...IMAGE_MODEL_IDS].sort());
+      assert.equal(Object.hasOwn(gatewayProviders, "grok-imagine-image"), false, "退役模型不得保留 Provider 入口");
       for (const modelId of IMAGE_MODEL_IDS) {
-        assert.equal(apiyiProviders[modelId].id, modelId);
+        assert.equal(gatewayProviders[modelId].id, modelId);
         assert.equal(getImageModelContract(modelId).id, modelId);
         assert.ok(getImageModelContract(modelId).upstreamModelId);
       }
@@ -160,24 +160,24 @@ async function main(): Promise<void> {
       assert.equal(sources.localKnowledgeBase.rawContentTrust, "untrusted_document_content");
       assert.equal(sources.localKnowledgeBase.rawSnapshotPointer, undefined, "快照指针必须已移除");
       for (const document of sources.localKnowledgeBase.documents) {
-        assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", document)).isFile(), document);
+        assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/gateway", document)).isFile(), document);
       }
       for (const source of sources.sources) {
         assert.ok(source.markdownUrl.endsWith(".md"), source.markdownUrl);
         assert.match(source.sha256, /^[a-f0-9]{64}$/);
-        assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/apiyi", source.localDocument)).isFile());
+        assert.ok(fs.statSync(path.join(REPO_ROOT, "docs/ai/gateway", source.localDocument)).isFile());
       }
     });
 
     await test("API易配置要求非空 Key 与 HTTPS Base URL", () => {
-      const restoreMissingKey = setEnv("APIYI_API_KEY", undefined);
+      const restoreMissingKey = setEnv("GATEWAY_API_KEY", undefined);
       try {
-        assert.throws(() => config.apiyiApiKey(), /APIYI_API_KEY/);
+        assert.throws(() => config.gatewayApiKey(), /GATEWAY_API_KEY/);
         assert.equal(config.aiConfigReady(), false);
       } finally {
         restoreMissingKey();
       }
-      const restoreHttp = setEnv("APIYI_BASE_URL", "http://gateway.example");
+      const restoreHttp = setEnv("GATEWAY_BASE_URL", "http://gateway.example");
       try {
         assert.equal(config.aiConfigReady(), false);
       } finally {
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(white));
       });
       try {
-        const generated = await apiyiProviders["gpt-image-2.5-flare"].generate({
+        const generated = await gatewayProviders["gpt-image-2.5-flare"].generate({
           prompt: "礼服",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },
@@ -229,7 +229,7 @@ async function main(): Promise<void> {
         const generateDispatcher = (captures[0].init as RequestInit & { dispatcher?: unknown })?.dispatcher;
         assert.ok(generateDispatcher, "API易请求必须显式携带专属 Undici dispatcher");
 
-        await apiyiProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.5-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white, blue],
@@ -264,7 +264,7 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(white));
       });
       try {
-        await apiyiProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.5-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white],
@@ -291,7 +291,7 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(white));
       });
       try {
-        await apiyiProviders["gpt-image-2.5-flare"].generate({
+        await gatewayProviders["gpt-image-2.5-flare"].generate({
           prompt: "一只猫",
           operationMode: "generate",
           modelOptions: { size: "3840x2160" },
@@ -303,7 +303,7 @@ async function main(): Promise<void> {
           quality: "high",
         }, "文生图必须直接传像素 size，prompt 不得拼接任何尺寸前缀");
 
-        await apiyiProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.5-flare"].edit({
           prompt: "加一顶帽子",
           operationMode: "edit",
           referenceImages: [white],
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
       try {
         const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: jpegMask, modelOptions: {},
           }),
@@ -339,7 +339,7 @@ async function main(): Promise<void> {
 
         const opaqueMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 });
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: opaqueMask, modelOptions: {},
           }),
@@ -349,7 +349,7 @@ async function main(): Promise<void> {
 
         const wrongSizeMask = await halfEditableMask(2, 2);
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
           }),
@@ -365,7 +365,7 @@ async function main(): Promise<void> {
           "fixture 必须超过蒙版字节上限",
         );
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: oversizedMask, modelOptions: {},
           }),
@@ -373,7 +373,7 @@ async function main(): Promise<void> {
         );
         assert.equal(calls, 0);
 
-        await apiyiProviders["gpt-image-2.5-sunburst"].edit({
+        await gatewayProviders["gpt-image-2.5-sunburst"].edit({
           prompt: "局部改红", operationMode: "mask-edit", referenceImages: [blue], mask,
           modelOptions: { size: "1152x576" },
         });
@@ -418,7 +418,7 @@ async function main(): Promise<void> {
       });
       try {
         const options = { aspectRatio: "3:4", imageSize: "1K" };
-        const generated = await apiyiProviders["gemini-3.1-flash-image"].generate({
+        const generated = await gatewayProviders["gemini-3.1-flash-image"].generate({
           prompt: "时装大片", operationMode: "generate", modelOptions: options,
         });
         assert.deepEqual(generated.images, [white]);
@@ -433,7 +433,7 @@ async function main(): Promise<void> {
         });
 
         const webp = await imageDataUrl(4, 2, { r: 90, g: 120, b: 150 }, "webp");
-        await apiyiProviders["gemini-3.1-flash-image"].edit({
+        await gatewayProviders["gemini-3.1-flash-image"].edit({
           prompt: "改图", operationMode: "edit", referenceImages: [webp], modelOptions: options,
         });
         assert.equal(captures[1].url, captures[0].url);
@@ -447,7 +447,7 @@ async function main(): Promise<void> {
         assert.deepEqual(parts[2], { text: "改图" }, "提示词必须排在全部图片之后");
 
         // 2026-10-28 角色下发：有 role 时标签内联角色（图号 + 是什么绑在同一点）。
-        await apiyiProviders["gemini-3.1-flash-image"].edit({
+        await gatewayProviders["gemini-3.1-flash-image"].edit({
           prompt: "换装",
           operationMode: "edit",
           references: [
@@ -481,7 +481,7 @@ async function main(): Promise<void> {
         return Response.json({ data: [{ url: resultUrl }] });
       });
       try {
-        const generated = await apiyiProviders["flux-3-image"].generate({
+        const generated = await gatewayProviders["flux-3-image"].generate({
           prompt: "生成", operationMode: "generate",
           modelOptions: { aspect_ratio: "3:4", output_format: "png" },
         });
@@ -491,7 +491,7 @@ async function main(): Promise<void> {
           model: "flux-3-image", prompt: "生成", aspect_ratio: "3:4", output_format: "png",
         }, "flux generations 只发 aspect_ratio，不发 width/height/size");
 
-        await apiyiProviders["flux-3-image"].edit({
+        await gatewayProviders["flux-3-image"].edit({
           prompt: "融合", operationMode: "edit", referenceImages: [white, blue],
           modelOptions: { aspect_ratio: "3:4" },
         });
@@ -524,10 +524,10 @@ async function main(): Promise<void> {
         });
       });
       try {
-        const generated = await apiyiProviders["doubao-seedream-5-0-pro-260628"].generate({
+        const generated = await gatewayProviders["doubao-seedream-5-0-pro-260628"].generate({
           prompt: "生成", operationMode: "generate", batchSize: 8, modelOptions: { size: "2K" },
         });
-        const edited = await apiyiProviders["doubao-seedream-5-0-pro-260628"].edit({
+        const edited = await gatewayProviders["doubao-seedream-5-0-pro-260628"].edit({
           prompt: "融合", operationMode: "edit",
           referenceImages: [white, blue], modelOptions: { size: "3K" },
         });
@@ -563,7 +563,7 @@ async function main(): Promise<void> {
         return Response.json({ data: [{ url: "https://cdn.example/generated.png" }] });
       });
       try {
-        await apiyiProviders["flux-3-image"].generate({
+        await gatewayProviders["flux-3-image"].generate({
           prompt: "非法尺寸",
           operationMode: "generate",
           modelOptions: { width: 513, height: 512, outputFormat: "png" },
@@ -582,7 +582,7 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => apiyiProviders["gpt-image-2.5-flare"].generate({
+          () => gatewayProviders["gpt-image-2.5-flare"].generate({
             prompt: "截断", operationMode: "generate", modelOptions: { size: "1280x1280" },
           }),
           (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
@@ -594,7 +594,7 @@ async function main(): Promise<void> {
     });
 
     await test("HTTP 200 完整对象已到齐但无 EOF 时安全收尾，仍只发送一次", async () => {
-      const restoreGrace = setEnv("APIYI_TAIL_STALL_GRACE_MS", "1000");
+      const restoreGrace = setEnv("GATEWAY_TAIL_STALL_GRACE_MS", "1000");
       let calls = 0;
       let cancelCount = 0;
       let payload: Record<string, unknown> = {
@@ -614,7 +614,7 @@ async function main(): Promise<void> {
         });
         return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
       });
-      const request = () => apiyiProviders["gpt-image-2.5-flare"].generate({
+      const request = () => gatewayProviders["gpt-image-2.5-flare"].generate({
         prompt: "尾部恢复", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -646,7 +646,7 @@ async function main(): Promise<void> {
         calls += 1;
         return Response.json(payload);
       });
-      const vipRequest = () => apiyiProviders["gpt-image-2.5-flare"].generate({
+      const vipRequest = () => gatewayProviders["gpt-image-2.5-flare"].generate({
         prompt: "响应校验", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -659,7 +659,7 @@ async function main(): Promise<void> {
                 inlineData: { mimeType: "image/png", data: jpeg.split(",")[1] },
               }] } }],
             },
-            invoke: () => apiyiProviders["gemini-3.1-flash-image"].generate({
+            invoke: () => gatewayProviders["gemini-3.1-flash-image"].generate({
               prompt: "响应校验", operationMode: "generate",
               modelOptions: { aspectRatio: "1:1", imageSize: "1K" },
             }),
@@ -667,7 +667,7 @@ async function main(): Promise<void> {
           { payload: { data: [{ url: "/relative-result.png?token=secret" }] }, invoke: vipRequest },
           {
             payload: pngPayload(white),
-            invoke: () => apiyiProviders["doubao-seedream-5-0-pro-260628"].generate({
+            invoke: () => gatewayProviders["doubao-seedream-5-0-pro-260628"].generate({
               prompt: "响应校验", operationMode: "generate", modelOptions: { size: "2K" },
             }),
           },
