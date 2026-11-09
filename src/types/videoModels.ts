@@ -5,14 +5,14 @@
  *
  * R10 最终裁定（2026-09-19，用户拍板）：视频清单收敛为单个
  * `doubao-seedance-2-5-260628`；veo-3.1-* 不接入、Seedance 2.0 三档移除。
- * 令牌口径：支持配置专用令牌（server/config.ts 的 APIYI_VIDEO_API_KEY，
- * 缺省回退 APIYI_API_KEY）。
+ * 令牌口径：支持配置专用令牌（server/config.ts 的 GATEWAY_VIDEO_API_KEY，
+ * 缺省回退 GATEWAY_API_KEY）。
  *
- * 契约产物：docs/ai/apiyi/video-model-contracts.json（独立文件，data-model.md §5 声明；
+ * 契约产物：docs/ai/gateway/video-model-contracts.json（独立文件，data-model.md §5 声明；
  * 契约哈希重算见 scripts/video-model-contract-hash.mjs）。清单与契约的一致性断言
  * 沿用 imageModels.ts 顶部 throw 同款防线：VIDEO_MODEL_IDS 必须与契约 models 区块完全一致。
  */
-import contracts from "../../docs/ai/apiyi/video-model-contracts.json";
+import contracts from "../../docs/ai/gateway/video-model-contracts.json";
 
 export const VIDEO_MODEL_IDS = [
   "doubao-seedance-2-5-260628",

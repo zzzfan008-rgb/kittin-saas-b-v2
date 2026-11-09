@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(dirname(SCRIPT_PATH), "..");
-const DOCS_ROOT = resolve(REPO_ROOT, "docs/ai/apiyi");
+const DOCS_ROOT = resolve(REPO_ROOT, "docs/ai/gateway");
 const SOURCES_PATH = resolve(DOCS_ROOT, "sources.json");
 const KNOWLEDGE_PATH = resolve(DOCS_ROOT, "model-knowledge.json");
 const CONTRACTS_PATH = resolve(DOCS_ROOT, "model-contracts.json");
@@ -299,7 +299,7 @@ export function validateDocuments({
     errors.push("model-knowledge.json reviewed model catalog baseline differs from sources.json");
   }
   if (requireModelList && modelList === undefined) {
-    modelListErrors.push("gateway model list evidence is required; pass --model-list or APIYI_MODELS_EXPORT");
+    modelListErrors.push("gateway model list evidence is required; pass --model-list or GATEWAY_MODELS_EXPORT");
   }
   if (requireModelList && !SHA256_PATTERN.test(reviewedModelListHash || "")) {
     modelListErrors.push("sources.json has no human-reviewed gateway model list baseline; release remains blocked");
@@ -461,7 +461,7 @@ function parseArgs(argv) {
   }
   if (!new Set(["check", "refresh"]).has(options.command)) throw new Error(`Unknown command: ${options.command}`);
   if (options.command === "refresh" && options.offline) throw new Error("refresh requires network access; use check --offline for structural validation");
-  options.modelList ??= process.env.APIYI_MODELS_EXPORT;
+  options.modelList ??= process.env.GATEWAY_MODELS_EXPORT;
   if (options.modelList) options.modelList = isAbsolute(options.modelList) ? options.modelList : resolve(REPO_ROOT, options.modelList);
   return options;
 }
@@ -522,7 +522,7 @@ async function main() {
   }
   for (const error of validation.modelListErrors) console.error(`release blocker: ${error}`);
   if (report.failures.length > 0 || report.changes.length > 0 || validation.modelListErrors.length > 0) {
-    console.error("API易发布契约检查未通过；本命令未修改任何生产契约。");
+    console.error("网关发布契约检查未通过；本命令未修改任何生产契约。");
     process.exitCode = 2;
     return;
   }

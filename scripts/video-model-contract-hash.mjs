@@ -4,7 +4,7 @@
  *
  * 与 scripts/text-model-contract-hash.mjs 同构：envelope =
  * scope + 顶层共享段（schemaVersion / contractLayer / baseUrl）+ 去哈希后的模型条目。
- * 视频契约是独立文件 docs/ai/apiyi/video-model-contracts.json（data-model.md §5 声明），
+ * 视频契约是独立文件 docs/ai/gateway/video-model-contracts.json（data-model.md §5 声明），
  * 不走 model-contracts.json 的 textModels 区块。
  *
  * 用法：
@@ -18,14 +18,14 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const contractsPath = resolve(repoRoot, "docs/ai/apiyi/video-model-contracts.json");
+const contractsPath = resolve(repoRoot, "docs/ai/gateway/video-model-contracts.json");
 const SCOPE = "sha256-canonical-video-model-envelope-v1";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** 与 scripts/apiyi-docs.mjs / text-model-contract-hash.mjs 的 canonicalJson 同构：键排序 + 无空格。 */
+/** 与 scripts/gateway-docs.mjs / text-model-contract-hash.mjs 的 canonicalJson 同构：键排序 + 无空格。 */
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value !== null && typeof value === "object") {

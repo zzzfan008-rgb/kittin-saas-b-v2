@@ -41,15 +41,15 @@ function required(name: string): string {
 
 export const config = {
   /** AI 图片接口（兔子API）；路径由本地模型知识库逐模型声明。 */
-  apiyiBaseUrl: () => (process.env.APIYI_BASE_URL ?? "https://api.ourzhishi.top").replace(/\/+$/, ""),
-  apiyiApiKey: () => required("APIYI_API_KEY"),
+  gatewayBaseUrl: () => (process.env.GATEWAY_BASE_URL ?? "https://api.ourzhishi.top").replace(/\/+$/, ""),
+  gatewayApiKey: () => required("GATEWAY_API_KEY"),
   /**
-   * API易视频（Seedance）专用令牌。用户已为 Seedance 单独建令（需勾选 SeeDance2 分组）。
+   * 网关视频（Seedance）专用令牌。用户已为 Seedance 单独建令（需勾选 SeeDance2 分组）。
    * 缺省回退主图片令牌；显式配置时仅视频链路使用，不覆盖图片链路。
    */
-  apiyiVideoApiKey: () => {
-    const key = (process.env.APIYI_VIDEO_API_KEY ?? "").trim();
-    return key || required("APIYI_API_KEY");
+  gatewayVideoApiKey: () => {
+    const key = (process.env.GATEWAY_VIDEO_API_KEY ?? "").trim();
+    return key || required("GATEWAY_API_KEY");
   },
 
   /**
@@ -57,8 +57,8 @@ export const config = {
    * 余额只能从面板接口 `GET /api/user/self` 取，而它只认面板登录令牌，
    * sk 密钥会返回 invalid_token。凭据仅服务端使用，绝不下发浏览器。
    */
-  panelUsername: () => (process.env.APIYI_PANEL_USERNAME ?? "").trim(),
-  panelPassword: () => process.env.APIYI_PANEL_PASSWORD ?? "",
+  panelUsername: () => (process.env.GATEWAY_PANEL_USERNAME ?? "").trim(),
+  panelPassword: () => process.env.GATEWAY_PANEL_PASSWORD ?? "",
   /** 余额结果缓存（毫秒）；用于合并多人同时点「运行」的并发查询。 */
   balanceCacheTtlMs: () => {
     const value = Number(process.env.BALANCE_CACHE_TTL_MS ?? 5_000);
@@ -95,25 +95,25 @@ export const config = {
   aiTimeoutMs: (fallback = 300_000) => Number(process.env.AI_TIMEOUT_MS ?? fallback),
 
   /** 提示词改写文本通道模型 id（OpenAI 兼容 chat-completions）。 */
-  apiyiTextModelId: () => (process.env.APIYI_TEXT_MODEL_ID ?? "gemini-3.8-flash").trim() || "gemini-3.8-flash",
+  gatewayTextModelId: () => (process.env.GATEWAY_TEXT_MODEL_ID ?? "gemini-3.8-flash").trim() || "gemini-3.8-flash",
   /** 文本通道超时（改写是出图前轻量增强，独立更短超时；环境变量 AI_TEXT_TIMEOUT_MS）。 */
   aiTextTimeoutMs: (fallback = 20_000) => Number(process.env.AI_TEXT_TIMEOUT_MS ?? fallback),
 
-  /** API易完整 JSON 尾部卡住时的安全收尾开关；显式 false/0/off 可回退旧行为。 */
-  apiyiTailStallSalvageEnabled: () => {
-    const value = (process.env.APIYI_TAIL_STALL_SALVAGE ?? "true").trim().toLowerCase();
+  /** 网关完整 JSON 尾部卡住时的安全收尾开关；显式 false/0/off 可回退旧行为。 */
+  gatewayTailStallSalvageEnabled: () => {
+    const value = (process.env.GATEWAY_TAIL_STALL_SALVAGE ?? "true").trim().toLowerCase();
     return value !== "false" && value !== "0" && value !== "off";
   },
   /** 最后一块数据后的宽限期，仅用于完整 JSON 探测，不替代 body/总超时。 */
-  apiyiTailStallGraceMs: () => {
-    const value = Number(process.env.APIYI_TAIL_STALL_GRACE_MS ?? 5_000);
+  gatewayTailStallGraceMs: () => {
+    const value = Number(process.env.GATEWAY_TAIL_STALL_GRACE_MS ?? 5_000);
     return Number.isFinite(value) ? Math.max(1_000, Math.min(30_000, Math.round(value))) : 5_000;
   },
 
   /** 不发外部请求的 AI 配置就绪检查，供 readiness 使用。 */
   aiConfigReady: () => {
-    const key = process.env.APIYI_API_KEY?.trim();
-    const baseUrl = config.apiyiBaseUrl();
+    const key = process.env.GATEWAY_API_KEY?.trim();
+    const baseUrl = config.gatewayBaseUrl();
     if (!key) return false;
     try {
       const url = new URL(baseUrl);

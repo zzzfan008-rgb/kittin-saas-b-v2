@@ -18,9 +18,9 @@ import { getProvider, ProviderError, publicProviderErrorMessage } from "../provi
 type DiagnosticProbeMode = "generate" | "edit";
 
 function configuredGateway(): { host: string } {
-  const url = new URL(config.apiyiBaseUrl());
-  if (url.protocol !== "https:") throw new Error("APIYI_BASE_URL 必须使用 HTTPS");
-  config.apiyiApiKey();
+  const url = new URL(config.gatewayBaseUrl());
+  if (url.protocol !== "https:") throw new Error("GATEWAY_BASE_URL 必须使用 HTTPS");
+  config.gatewayApiKey();
   return { host: url.host };
 }
 

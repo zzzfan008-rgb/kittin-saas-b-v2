@@ -1,9 +1,9 @@
-/** Provider 工厂。模型清单与 docs/ai/apiyi/model-contracts.json 保持一致。 */
+/** Provider 工厂。模型清单与 docs/ai/gateway/model-contracts.json 保持一致。 */
 import type { AIProvider } from "../../src/types/workflow";
-import { apiyiProviders } from "./apiyi";
+import { gatewayProviders } from "./gateway";
 import { ProviderError } from "./base";
 
-const providers: Record<string, AIProvider> = { ...apiyiProviders };
+const providers: Record<string, AIProvider> = { ...gatewayProviders };
 
 export function getProvider(id: string): AIProvider {
   const p = providers[id];

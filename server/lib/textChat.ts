@@ -2,8 +2,8 @@
  * 提示词改写层 · 文本通道薄客户端（OpenAI 兼容 chat-completions，纯传输，不含改写业务）。
  *
  * 契约：docs/design/2026-10-12-prompt-rewrite/plan.md §2.1 / §4 / §7-1。
- * - 端点 POST {base}/v1/chat/completions，复用 config.apiyiApiKey()（无需新密钥）。
- * - 模型默认 config.apiyiTextModelId()（"gemini-3.8-flash"）；思考控制固定 reasoning_effort
+ * - 端点 POST {base}/v1/chat/completions，复用 config.gatewayApiKey()（无需新密钥）。
+ * - 模型默认 config.gatewayTextModelId()（"gemini-3.8-flash"）；思考控制固定 reasoning_effort
  *   （有效值 low/medium/high，用户拍板默认 "medium"）。**禁止 "minimal"**（OpenAI 兼容端不报错、
  *   200，但参数被静默忽略、思考照常发生并计入输出计费）；**禁止 thinkingBudget**（那是 Gemini
  *   原生端关闭思考的机制，且用户语义是 medium 档而非完全关闭）。两者均不出现在请求体。
@@ -11,7 +11,7 @@
  *   断连不产生「已生成的高价值产物」，故 transport/429/5xx 允许重试 1 次（上限，绝不无限重试）。
  */
 import { config } from "../config";
-import { getApiyiDispatcher } from "../providers/apiyiTransport";
+import { getApiyiDispatcher } from "../providers/gatewayTransport";
 
 export type TextChatRole = "system" | "user";
 export interface TextChatMessage {
@@ -30,7 +30,7 @@ export interface TextChatCompletionArgs {
   temperature?: number;
   /**
    * 默认 2048。注意这是 output 总预算，gemini-3.8-flash 默认开深度思考且思考
-   * token 计入 output（API易快照 overview 原文「思考 tokens 計入輸出計費」）：
+   * token 计入 output（网关快照 overview 原文「思考 tokens 計入輸出計費」）：
    * medium 档在长协议改写下思考可烧 ~480 token，512 会让正文只剩零头且
    * finish_reason 仍报 "stop"（P1 实测半句话事故）。2048 = 思考余量 + 正文上限。
    */
@@ -88,9 +88,9 @@ export interface TextChatClientDeps {
   fetchImpl?: typeof fetch;
   /** 测试注入退避等待（避免真实 sleep）；缺省真实 setTimeout。 */
   sleep?: (ms: number) => Promise<void>;
-  /** 缺省 config.apiyiBaseUrl()。 */
+  /** 缺省 config.gatewayBaseUrl()。 */
   baseUrl?: string;
-  /** 缺省 config.apiyiApiKey()。 */
+  /** 缺省 config.gatewayApiKey()。 */
   apiKey?: string;
   /** 重试预算外的总尝试上限（含首发）；默认 2 = 首发 + 1 次重试。 */
   maxAttempts?: number;
@@ -159,7 +159,7 @@ async function attemptOnce(args: TextChatCompletionArgs, deps: Required<Pick<Tex
       },
       body: JSON.stringify(body),
       signal: controller.signal,
-      // API易专属连接池（undici Agent），与出图通道一致。
+      // 网关专属连接池（undici Agent），与出图通道一致。
       ...( { dispatcher: getApiyiDispatcher() } as Record<string, unknown>),
     } as Parameters<typeof fetch>[1]);
   } catch (error) {
@@ -209,8 +209,8 @@ export async function createTextChatCompletion(
 ): Promise<TextChatCompletionResult> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const sleep = deps.sleep ?? defaultSleep;
-  const baseUrl = (deps.baseUrl ?? config.apiyiBaseUrl()).replace(/\/+$/, "");
-  const apiKey = deps.apiKey ?? config.apiyiApiKey();
+  const baseUrl = (deps.baseUrl ?? config.gatewayBaseUrl()).replace(/\/+$/, "");
+  const apiKey = deps.apiKey ?? config.gatewayApiKey();
   const maxAttempts = deps.maxAttempts ?? 2; // 首发 + 1 次重试（§4 上限）
 
   let lastError: unknown;

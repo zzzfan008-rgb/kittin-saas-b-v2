@@ -21,10 +21,10 @@ if (process.env.E2E_ISOLATED_RUN !== "1" || process.env.E2E_PRODUCTION_SMOKE !==
 if (process.env.NODE_ENV !== "production" || process.env.API_ONLY === "true") {
   throw new Error("Production smoke safety check failed: NODE_ENV=production and API_ONLY=false are required");
 }
-if (requiredEnv("APIYI_API_KEY") !== "e2e-disabled") {
+if (requiredEnv("GATEWAY_API_KEY") !== "e2e-disabled") {
   throw new Error("Production smoke safety check failed: the real AI key must never reach browser smoke");
 }
-loopbackUrl("APIYI_BASE_URL", "https:");
+loopbackUrl("GATEWAY_BASE_URL", "https:");
 const databaseUrl = loopbackUrl("DATABASE_URL", "postgresql:");
 if (databaseUrl.pathname !== "/garment_canvas_test") {
   throw new Error("Production smoke safety check failed: DATABASE_URL must target garment_canvas_test");

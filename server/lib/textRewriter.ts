@@ -116,7 +116,7 @@ export interface RewriteOutcome {
 export interface RewriteDeps {
   /** 测试注入 mock 文本通道；缺省真实 createTextChatCompletion。 */
   chatCompletion?: (args: TextChatCompletionArgs) => Promise<TextChatCompletionResult>;
-  /** 缺省 config.apiyiTextModelId()。 */
+  /** 缺省 config.gatewayTextModelId()。 */
   modelId?: string;
 }
 
@@ -156,7 +156,7 @@ export async function rewriteUserPrompt(
   const systemPrompt = supplementPrompt ?? rewriteSystemPrompt(context.familyId);
   try {
     const result = await chatCompletion({
-      model: deps.modelId ?? config.apiyiTextModelId(),
+      model: deps.modelId ?? config.gatewayTextModelId(),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: rewriteTarget },

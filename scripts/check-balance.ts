@@ -12,14 +12,14 @@ import { loadCurrencyMeta, toAmount } from "../server/routes/billing";
 
 async function main(): Promise<void> {
   if (!config.panelUsername() || !config.panelPassword()) {
-    console.error("未配置面板账号：请在 .env 填写 APIYI_PANEL_USERNAME / APIYI_PANEL_PASSWORD");
+    console.error("未配置面板账号：请在 .env 填写 GATEWAY_PANEL_USERNAME / GATEWAY_PANEL_PASSWORD");
     process.exit(1);
   }
 
   const meta = await loadCurrencyMeta();
   const self = await fetchPanelUserSelf();
 
-  console.log("网关        :", config.apiyiBaseUrl());
+  console.log("网关        :", config.gatewayBaseUrl());
   console.log("面板账号    :", config.panelUsername());
   console.log("原始 quota  :", self.quota);
   console.log("累计消耗    :", self.usedQuota);

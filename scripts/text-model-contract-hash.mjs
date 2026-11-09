@@ -17,14 +17,14 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const contractsPath = resolve(repoRoot, "docs/ai/apiyi/model-contracts.json");
+const contractsPath = resolve(repoRoot, "docs/ai/gateway/model-contracts.json");
 const SCOPE = "sha256-canonical-text-model-envelope-v1";
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** 与 scripts/apiyi-docs.mjs 的 canonicalJson 同构:键排序 + 无空格。 */
+/** 与 scripts/gateway-docs.mjs 的 canonicalJson 同构:键排序 + 无空格。 */
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value !== null && typeof value === "object") {

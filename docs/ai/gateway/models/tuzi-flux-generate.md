@@ -21,7 +21,7 @@
 
 ## 证据归档
 
-上面的实测已归档为正式证据：`docs/ai/apiyi/evidence/2026-10-28-flux-3-image-endpoint-probe.json`
+上面的实测已归档为正式证据：`docs/ai/gateway/evidence/2026-10-28-flux-3-image-endpoint-probe.json`
 （`kind: model-endpoint-probe`，含原生端点拒绝 `aspect_ratio` 的 400 原文与
 `/v1/images/generations` + `input_image` 的 200 结果）。据此两个契约文件的
 `evidenceStatus` 由 `unverified` 升为 `verified`。

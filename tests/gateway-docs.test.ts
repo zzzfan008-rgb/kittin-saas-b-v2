@@ -11,7 +11,7 @@ import {
   computeModelContractHash,
   sha256,
   validateDocuments,
-} from "../scripts/apiyi-docs.mjs";
+} from "../scripts/gateway-docs.mjs";
 import {
   IMAGE_MODEL_IDS,
   getImageModelContract,
@@ -19,7 +19,7 @@ import {
 } from "../src/types/imageModels";
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const docsRoot = resolve(repoRoot, "docs/ai/apiyi");
+const docsRoot = resolve(repoRoot, "docs/ai/gateway");
 const readJson = (name: string) => JSON.parse(readFileSync(resolve(docsRoot, name), "utf8"));
 
 const sources = readJson("sources.json");
@@ -356,7 +356,7 @@ try {
   writeFileSync(tempModelListPath, syntheticModelListBytes);
   const cliOfflineWithList = spawnSync(
     process.execPath,
-    [resolve(repoRoot, "scripts/apiyi-docs.mjs"), "check", "--offline", "--model-list", tempModelListPath],
+    [resolve(repoRoot, "scripts/gateway-docs.mjs"), "check", "--offline", "--model-list", tempModelListPath],
     { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(cliOfflineWithList.status, 0, cliOfflineWithList.stderr || cliOfflineWithList.stdout);
@@ -376,7 +376,7 @@ try {
     writeFileSync(malformedPath, `${JSON.stringify(malformedModelList)}\n`);
     const cliMalformed = spawnSync(
       process.execPath,
-      [resolve(repoRoot, "scripts/apiyi-docs.mjs"), "check", "--offline", "--model-list", malformedPath],
+      [resolve(repoRoot, "scripts/gateway-docs.mjs"), "check", "--offline", "--model-list", malformedPath],
       { cwd: repoRoot, encoding: "utf8" },
     );
     assert.equal(cliMalformed.status, 1, `${label}: ${cliMalformed.stderr || cliMalformed.stdout}`);
@@ -444,7 +444,7 @@ for (const model of knowledge.models) {
     `${model.id} product reference limit exceeds gateway contract`,
   );
   // 2026-10-28：未归档 evidence 的模型必须保持 unverified；归档了的必须是 verified，
-  // 且 evidenceId 能在 docs/ai/apiyi/evidence/ 里找到——杜绝"手改状态冒充已验证"。
+  // 且 evidenceId 能在 docs/ai/gateway/evidence/ 里找到——杜绝"手改状态冒充已验证"。
   const accepted: string[] = model.observedEvidence.acceptedEvidenceIds ?? [];
   if (accepted.length === 0) {
     assert.equal(model.observedEvidence.status, "unverified", `${model.id} 无归档证据却非 unverified`);
@@ -503,7 +503,7 @@ assert.equal(report.changes[0].reviewStatus, "needs-human-review");
 assert.deepEqual(report.changes[0].semanticReviewChecklist, fakeSource.semanticClaims);
 assert.equal(JSON.stringify(sources), sourceSnapshot, "refresh report builder mutated the production source manifest");
 
-const offlineOutput = execFileSync(process.execPath, [resolve(repoRoot, "scripts/apiyi-docs.mjs"), "check", "--offline"], {
+const offlineOutput = execFileSync(process.execPath, [resolve(repoRoot, "scripts/gateway-docs.mjs"), "check", "--offline"], {
   cwd: repoRoot,
   encoding: "utf8",
 });

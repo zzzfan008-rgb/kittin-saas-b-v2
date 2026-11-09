@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { MockAgent } from "undici";
 import {
-  APIYI_TAIL_STALL_DEFAULTS,
-  APIYI_UNDICI_PROFILE,
+  GATEWAY_TAIL_STALL_DEFAULTS,
+  GATEWAY_UNDICI_PROFILE,
   closeApiyiDispatcher,
   getApiyiDispatcher,
   readApiyiJsonResponse,
-  type ApiyiTailRecoveryEvent,
-} from "../server/providers/apiyiTransport";
-import { apiyiProviders } from "../server/providers/apiyi";
+  type GatewayTailRecoveryEvent,
+} from "../server/providers/gatewayTransport";
+import { gatewayProviders } from "../server/providers/gateway";
 import { fetchWithRetry, ProviderError } from "../server/providers/base";
 
 const encoder = new TextEncoder();
@@ -60,14 +60,14 @@ async function main(): Promise<void> {
   console.log("API易 Undici 与尾部 JSON 传输测试");
 
   await test("Undici 分阶段超时配置固定且连接池模块级复用", async () => {
-    assert.deepEqual(APIYI_UNDICI_PROFILE, {
+    assert.deepEqual(GATEWAY_UNDICI_PROFILE, {
       connectTimeoutMs: 30_000,
       headersTimeoutMs: 600_000,
       bodyTimeoutMs: 300_000,
       keepAliveTimeoutMs: 60_000,
       keepAliveMaxTimeoutMs: 60_000,
     });
-    assert.equal(APIYI_TAIL_STALL_DEFAULTS.graceMs, 5_000);
+    assert.equal(GATEWAY_TAIL_STALL_DEFAULTS.graceMs, 5_000);
     const first = getApiyiDispatcher();
     assert.equal(getApiyiDispatcher(), first);
     await closeApiyiDispatcher();
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
 
   await test("正常 EOF 解析 JSON 且不触发尾部恢复", async () => {
     const body = JSON.stringify({ ok: true, data: "x".repeat(1_100) });
-    const events: ApiyiTailRecoveryEvent[] = [];
+    const events: GatewayTailRecoveryEvent[] = [];
     const fixture = controlledResponse(
       [{ afterMs: 0, bytes: encoder.encode(body) }],
       { closeAfterMs: 1 },
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
 
   await test("完整对象 JSON 无 EOF 时在宽限期后只取消一次并返回", async () => {
     const body = `${JSON.stringify({ ok: true, data: "x".repeat(1_100) })} \n`;
-    const events: ApiyiTailRecoveryEvent[] = [];
+    const events: GatewayTailRecoveryEvent[] = [];
     const fixture = controlledResponse([{ afterMs: 0, bytes: encoder.encode(body) }]);
     const parsed = await readApiyiJsonResponse(fixture.response, "gpt-image-2.5-flare", {
       maxBytes: 4_096,
@@ -290,17 +290,17 @@ async function main(): Promise<void> {
 
   await test("成功图片响应保留 API易 x-request-id", async () => {
     const originalFetch = globalThis.fetch;
-    const previousKey = process.env.APIYI_API_KEY;
-    const previousBase = process.env.APIYI_BASE_URL;
-    process.env.APIYI_API_KEY = "test-key";
-    process.env.APIYI_BASE_URL = "https://gateway.example";
+    const previousKey = process.env.GATEWAY_API_KEY;
+    const previousBase = process.env.GATEWAY_BASE_URL;
+    process.env.GATEWAY_API_KEY = "test-key";
+    process.env.GATEWAY_BASE_URL = "https://gateway.example";
     try {
       globalThis.fetch = (async () => Response.json({
         data: [{ url: "https://cdn.example/provider-image.png" }],
       }, {
         headers: { "x-request-id": "req-apiyi-success-1" },
       })) as typeof fetch;
-      const result = await apiyiProviders["flux-3-image"].generate({
+      const result = await gatewayProviders["flux-3-image"].generate({
         prompt: "provider request id",
         operationMode: "generate",
       });
@@ -308,20 +308,20 @@ async function main(): Promise<void> {
       assert.deepEqual(result.images, ["https://cdn.example/provider-image.png"]);
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.APIYI_API_KEY;
-      else process.env.APIYI_API_KEY = previousKey;
-      if (previousBase === undefined) delete process.env.APIYI_BASE_URL;
-      else process.env.APIYI_BASE_URL = previousBase;
+      if (previousKey === undefined) delete process.env.GATEWAY_API_KEY;
+      else process.env.GATEWAY_API_KEY = previousKey;
+      if (previousBase === undefined) delete process.env.GATEWAY_BASE_URL;
+      else process.env.GATEWAY_BASE_URL = previousBase;
       await closeApiyiDispatcher();
     }
   });
 
   await test("非 2xx 与 2xx 的 body 阶段超时都保留诊断且不重放", async () => {
     const originalFetch = globalThis.fetch;
-    const previousKey = process.env.APIYI_API_KEY;
-    const previousBase = process.env.APIYI_BASE_URL;
-    process.env.APIYI_API_KEY = "test-key";
-    process.env.APIYI_BASE_URL = "https://gateway.example";
+    const previousKey = process.env.GATEWAY_API_KEY;
+    const previousBase = process.env.GATEWAY_BASE_URL;
+    process.env.GATEWAY_API_KEY = "test-key";
+    process.env.GATEWAY_BASE_URL = "https://gateway.example";
     try {
       let calls = 0;
       globalThis.fetch = (async () => {
@@ -355,7 +355,7 @@ async function main(): Promise<void> {
         }).response;
       }) as typeof fetch;
       await assert.rejects(
-        () => apiyiProviders["gpt-image-2.5-flare"].generate({
+        () => gatewayProviders["gpt-image-2.5-flare"].generate({
           prompt: "body timeout",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },
@@ -369,10 +369,10 @@ async function main(): Promise<void> {
       assert.equal(calls, 1);
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.APIYI_API_KEY;
-      else process.env.APIYI_API_KEY = previousKey;
-      if (previousBase === undefined) delete process.env.APIYI_BASE_URL;
-      else process.env.APIYI_BASE_URL = previousBase;
+      if (previousKey === undefined) delete process.env.GATEWAY_API_KEY;
+      else process.env.GATEWAY_API_KEY = previousKey;
+      if (previousBase === undefined) delete process.env.GATEWAY_BASE_URL;
+      else process.env.GATEWAY_BASE_URL = previousBase;
       await closeApiyiDispatcher();
     }
   });

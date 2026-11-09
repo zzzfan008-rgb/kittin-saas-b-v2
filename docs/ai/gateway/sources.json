@@ -20,7 +20,7 @@
     "kind": "curated-contract-only",
     "rawSourcePagesStored": false,
     "rawContentTrust": "untrusted_document_content",
-    "note": "2026-10-29 起删除 API易 全站快照（docs/ai/apiyi/site，128MB/8441 文件）并取消 consultation receipt 凭证门；契约来源仍绑定 models/*.md 本地镜像，结构门 docs:apiyi:check 保留。",
+    "note": "2026-10-29 起删除 API易 全站快照（docs/ai/gateway/site，128MB/8441 文件）并取消 consultation receipt 凭证门；契约来源仍绑定 models/*.md 本地镜像，结构门 docs:gateway:check 保留。",
     "documents": [
       "README.md",
       "async-runtime.md",

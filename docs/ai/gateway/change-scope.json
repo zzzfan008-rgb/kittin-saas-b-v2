@@ -4,7 +4,7 @@
   "rules": [
     {
       "kind": "prefix",
-      "value": "docs/ai/apiyi/"
+      "value": "docs/ai/gateway/"
     },
     {
       "kind": "prefix",
@@ -16,7 +16,7 @@
     },
     {
       "kind": "exact",
-      "value": "scripts/apiyi-docs.mjs"
+      "value": "scripts/gateway-docs.mjs"
     },
     {
       "kind": "exact",

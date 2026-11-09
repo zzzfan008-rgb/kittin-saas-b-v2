@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 
 const source = new URL("../scripts/codex-gate.mjs", import.meta.url);
 const receiptVerifySource = new URL("../scripts/gate-receipt-verify.mjs", import.meta.url);
-const apiyiChangeScopeSource = new URL("../docs/ai/apiyi/change-scope.json", import.meta.url);
+const gatewayChangeScopeSource = new URL("../docs/ai/gateway/change-scope.json", import.meta.url);
 const fixtureRoots = new Set();
 
 const DEFAULT_DEPCRUISE_GRAPH = JSON.stringify({
@@ -178,7 +178,7 @@ function fixture({ requiredNodeVersion = process.versions.node, immutablePrefixe
   fixtureRoots.add(root);
   const bin = join(root, "bin");
   mkdirSync(join(root, "scripts"));
-  mkdirSync(join(root, "docs", "ai", "apiyi"), { recursive: true });
+  mkdirSync(join(root, "docs", "ai", "gateway"), { recursive: true });
   mkdirSync(bin);
   let gateSource = readFileSync(source, "utf8").replace(
     'const REQUIRED_NODE_VERSION = "24.20.0";',
@@ -195,19 +195,19 @@ function fixture({ requiredNodeVersion = process.versions.node, immutablePrefixe
   }
   writeFileSync(join(root, "scripts/codex-gate.mjs"), gateSource);
   writeFileSync(
-    join(root, "docs", "ai", "apiyi", "change-scope.json"),
-    readFileSync(apiyiChangeScopeSource, "utf8"),
+    join(root, "docs", "ai", "gateway", "change-scope.json"),
+    readFileSync(gatewayChangeScopeSource, "utf8"),
   );
   writeFileSync(
-    join(root, "scripts/apiyi-docs.mjs"),
+    join(root, "scripts/gateway-docs.mjs"),
     `import { appendFileSync } from "node:fs";
-if (process.env.GATE_APIYI_LOG) appendFileSync(process.env.GATE_APIYI_LOG, process.argv.slice(2).join(" ") + "\\n");
-if (process.env.GATE_APIYI_EXIT) process.exit(Number(process.env.GATE_APIYI_EXIT));
+if (process.env.GATE_GATEWAY_LOG) appendFileSync(process.env.GATE_GATEWAY_LOG, process.argv.slice(2).join(" ") + "\\n");
+if (process.env.GATE_GATEWAY_EXIT) process.exit(Number(process.env.GATE_GATEWAY_EXIT));
 `,
   );
   writeFileSync(
     join(root, ".gitignore"),
-    ".gate-npm-log\n.gate-depcruise-log\n.gate-depcruise-env-log\n.gate-astgreep-log\n.gate-hermes-log\n.gate-apiyi-log\n",
+    ".gate-npm-log\n.gate-depcruise-log\n.gate-depcruise-env-log\n.gate-astgreep-log\n.gate-hermes-log\n.gate-gateway-log\n",
   );
   writeFileSync(join(root, "tracked.txt"), "initial\n");
   writeFileSync(
@@ -437,23 +437,23 @@ function tempCopy(name) {
 {
   const f = fixture();
   // 2026-11-09：历史凭证目录已删除，不再有只读前缀夹具。
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Reviewer verdict: pass/);
   assert.match(result.stdout, /契约结构门禁：跳过/);
-  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "历史凭证目录变更不得触发契约结构门禁");
+  assert.equal(existsSync(f.env.GATE_GATEWAY_LOG), false, "历史凭证目录变更不得触发契约结构门禁");
 }
 
 {
   const f = fixture();
   writeFileSync(join(f.root, "tracked.txt"), "valid change\n");
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Reviewer verdict: pass/);
   assert.match(result.stdout, /契约结构门禁：跳过/);
-  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通差异不得启动 API易知识库门禁");
+  assert.equal(existsSync(f.env.GATE_GATEWAY_LOG), false, "普通差异不得启动 网关知识库门禁");
 }
 
 {
@@ -462,31 +462,31 @@ function tempCopy(name) {
   writeFileSync(join(f.root, "package.json"), '{"private":true}\n');
   writeFileSync(join(f.root, "AGENTS.md"), "# Unrelated project rule\n");
   writeFileSync(join(f.root, "src", "components", "nodes", "UiOnly.tsx"), "export const UiOnly = () => null;\n");
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /契约结构门禁：跳过/);
-  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通依赖、项目规则和纯 UI 差异不得启动 API易知识库门禁");
+  assert.equal(existsSync(f.env.GATE_GATEWAY_LOG), false, "普通依赖、项目规则和纯 UI 差异不得启动 网关知识库门禁");
 }
 
 {
   const f = fixture();
-  writeFileSync(join(f.root, "docs", "ai", "apiyi", "change-scope.json"), '{"schemaVersion":2}\n');
+  writeFileSync(join(f.root, "docs", "ai", "gateway", "change-scope.json"), '{"schemaVersion":2}\n');
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "无效 API易范围契约必须 fail-closed");
+  assert.notEqual(result.status, 0, "无效 网关范围契约必须 fail-closed");
   assert.match(result.stderr, /change-scope\.json 无效/);
 }
 
 {
   const f = fixture();
   mkdirSync(join(f.root, "server", "providers"), { recursive: true });
-  writeFileSync(join(f.root, "server", "providers", "apiyi.ts"), "export const providerChanged = true;\n");
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  writeFileSync(join(f.root, "server", "providers", "gateway.ts"), "export const providerChanged = true;\n");
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /契约结构门禁：执行（1 个相关路径）/);
-  assert.match(result.stdout, /server\/providers\/apiyi\.ts/);
-  assert.equal(readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(), "check --offline", "结构门禁必须跑离线结构校验");
+  assert.match(result.stdout, /server\/providers\/gateway\.ts/);
+  assert.equal(readFileSync(f.env.GATE_GATEWAY_LOG, "utf8").trim(), "check --offline", "结构门禁必须跑离线结构校验");
 }
 
 // ---------------------------------------------------------------- 代码智能证据段
@@ -915,12 +915,12 @@ for (const [label, graph, expected] of [
   const depCruiseLog = join(f.root, ".gate-depcruise-log");
   const astGrepLog = join(f.root, ".gate-astgreep-log");
   const hermesLog = join(f.root, ".gate-hermes-log");
-  const apiyiLog = join(f.root, ".gate-apiyi-log");
+  const gatewayLog = join(f.root, ".gate-gateway-log");
   f.env.GATE_NPM_LOG = npmLog;
   f.env.GATE_DEPCRUISE_LOG = depCruiseLog;
   f.env.GATE_AST_GREP_LOG = astGrepLog;
   f.env.GATE_HERMES_LOG = hermesLog;
-  f.env.GATE_APIYI_LOG = apiyiLog;
+  f.env.GATE_GATEWAY_LOG = gatewayLog;
   const result = runGate(f, "--base", f.base);
   assert.equal(result.status, 0, `最终 clean-HEAD 门禁应通过：${result.stdout}\n${result.stderr}`);
   assert.deepEqual(
@@ -928,7 +928,7 @@ for (const [label, graph, expected] of [
     ["ci", "run check", "run test:e2e", "run build:server", "run test:e2e:production"],
     "完整门禁必须先执行 npm ci，再按固定顺序执行验证套件；build:web 已由 check 覆盖，此处只补跑 build:server",
   );
-  assert.equal(existsSync(apiyiLog), false, "普通最终差异不得启动 API易知识库门禁");
+  assert.equal(existsSync(gatewayLog), false, "普通最终差异不得启动 网关知识库门禁");
   assert.match(readFileSync(depCruiseLog, "utf8"), /--config \.dependency-cruiser\.cjs --output-type json src server scripts e2e/);
   assert.match(readFileSync(astGrepLog, "utf8"), /^scan --config sgconfig\.yml --json=pretty src server scripts e2e$/m);
   const hermesArgs = readFileSync(hermesLog, "utf8").trim().split("\n");
@@ -954,14 +954,14 @@ for (const [label, graph, expected] of [
 {
   const f = fixture();
   mkdirSync(join(f.root, "server", "providers"), { recursive: true });
-  writeFileSync(join(f.root, "server", "providers", "apiyi.ts"), "export const providerChanged = true;\n");
-  git(f.root, "add", "server/providers/apiyi.ts");
+  writeFileSync(join(f.root, "server", "providers", "gateway.ts"), "export const providerChanged = true;\n");
+  git(f.root, "add", "server/providers/gateway.ts");
   git(f.root, "commit", "-qm", "APIYI provider candidate");
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--base", f.base, "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.equal(
-    readFileSync(f.env.GATE_APIYI_LOG, "utf8").trim(),
+    readFileSync(f.env.GATE_GATEWAY_LOG, "utf8").trim(),
     "check --offline",
     "契约相关最终差异必须跑一次离线结构校验（凭证门已于 2026-10-29 取消）",
   );
@@ -1108,20 +1108,20 @@ for (const review of [
 {
   const f = fixture();
   mkdirSync(join(f.root, "server", "providers"), { recursive: true });
-  writeFileSync(join(f.root, "server", "providers", "apiyi.ts"), "export const providerChanged = true;\n");
-  f.env.GATE_APIYI_EXIT = "8";
+  writeFileSync(join(f.root, "server", "providers", "gateway.ts"), "export const providerChanged = true;\n");
+  f.env.GATE_GATEWAY_EXIT = "8";
   const result = runGate(f, "--uncommitted", "--review-only");
-  assert.notEqual(result.status, 0, "API易相关差异的本地知识库或咨询门禁失败时必须阻断交付门禁");
+  assert.notEqual(result.status, 0, "网关相关差异的本地知识库或咨询门禁失败时必须阻断交付门禁");
 }
 
 {
   const f = fixture();
   writeFileSync(join(f.root, "tracked.txt"), "ordinary guard failure isolation\n");
-  f.env.GATE_APIYI_EXIT = "8";
-  f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
+  f.env.GATE_GATEWAY_EXIT = "8";
+  f.env.GATE_GATEWAY_LOG = join(f.root, ".gate-gateway-log");
   const result = runGate(f, "--uncommitted", "--review-only");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.equal(existsSync(f.env.GATE_APIYI_LOG), false, "普通差异不应被未执行的 API易 guard 故障阻断");
+  assert.equal(existsSync(f.env.GATE_GATEWAY_LOG), false, "普通差异不应被未执行的 网关 guard 故障阻断");
 }
 
 {
@@ -1213,7 +1213,7 @@ cleanupFixtures();
 assert.ok(roots.every((root) => !existsSync(root)), "交付门禁测试必须清理所有临时 Git fixture");
 
 console.log(
-  "  ✓ 门禁覆盖 Node 下限、条件 API易门禁、npm ci 锁定安装、ast-grep+dependency-cruiser 代码智能证据、"
+  "  ✓ 门禁覆盖 Node 下限、条件 网关门禁、npm ci 锁定安装、ast-grep+dependency-cruiser 代码智能证据、"
   + "clean-HEAD、--commit 精确范围、差异范围、审查阻断矩阵、哨兵解析 fail-closed、评审证据内联、"
   + "证据制品不变量、状态漂移与临时目录清理",
 );

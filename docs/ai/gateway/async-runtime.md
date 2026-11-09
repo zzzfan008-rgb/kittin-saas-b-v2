@@ -59,7 +59,7 @@ API易图片端点是同步接口：一次 HTTP 请求持续到生成完成，�
 - 任意时刻最多存在一个 pending `reader.read()`。宽限期先到但 JSON 不完整时继续等待同一个 read，禁止并发 read 导致后续 chunk 丢失。
 - 有 `Content-Length`、开关关闭、JSON 不完整、数组/标量顶层、非法 UTF-8、读流异常或响应超限时禁止尾部恢复。其中截断、读流异常和超限仍为 outcome_unknown，绝不据此重放付费请求；非 2xx body 若读取超时/中断也同样不得降级为可重试 503。
 - 响应上限按本次经审查契约允许的最大返回图片数计算：每张图片最多 20MiB 解码字节，换算为 Base64 上界后再加 1MiB JSON 开销；超出契约的输出数在发送前拒绝，不静默裁剪。
-- `APIYI_TAIL_STALL_SALVAGE=false`（也接受 `0`/`off`）只关闭宽限期提前收尾，仍走有界 reader 并保留响应大小上限；`APIYI_TAIL_STALL_GRACE_MS` 默认 5000，限制为 1000–30000ms。
+- `GATEWAY_TAIL_STALL_SALVAGE=false`（也接受 `0`/`off`）只关闭宽限期提前收尾，仍走有界 reader 并保留响应大小上限；`GATEWAY_TAIL_STALL_GRACE_MS` 默认 5000，限制为 1000–30000ms。
 
 ## 用户运行语义
 

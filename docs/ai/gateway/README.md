@@ -7,10 +7,10 @@
 
 > **2026-10-29 变更（用户拍板 A：精简）**
 > - 删除 `site/` API易 全站快照（128 MB / 8,441 文件）：网关已迁至兔子API，快照不再被任何代码读取。
-> - 取消 consultation receipt 凭证门（`scripts/apiyi-kb.mjs`、`scripts/lib/apiyi-knowledge-base.mjs`
->   及其测试一并删除，npm `docs:apiyi:kb:*` / `docs:apiyi:search` / `docs:apiyi:lookup` /
->   `docs:apiyi:guard` 移除）。`consultations/` 保留为历史记录，不再被校验。
-> - **保留**结构门 `npm run docs:apiyi:check`（CI 每个 PR 都跑）：校验契约 JSON 一致性、
+> - 取消 consultation receipt 凭证门（`scripts/gateway-kb.mjs`、`scripts/lib/apiyi-knowledge-base.mjs`
+>   及其测试一并删除，npm `docs:gateway:kb:*` / `docs:gateway:search` / `docs:gateway:lookup` /
+>   `docs:gateway:guard` 移除）。`consultations/` 保留为历史记录，不再被校验。
+> - **保留**结构门 `npm run docs:gateway:check`（CI 每个 PR 都跑）：校验契约 JSON 一致性、
 >   模型集合、`product ⊆ gateway` 与 `contractHash`。它与供应商无关，守的是运行时契约完整性。
 
 ## 本轮模型范围
@@ -45,7 +45,7 @@
 
 ```bash
 # 结构门（CI 每个 PR 都跑；离线、无付费调用）
-npm run docs:apiyi:check -- --offline
+npm run docs:gateway:check -- --offline
 ```
 
 它校验：契约 JSON 结构、模型集合、`product ⊆ gateway`、以及每个模型的 `contractHash`
@@ -61,7 +61,7 @@ npm run docs:apiyi:check -- --offline
 
 1. `vendorCapability` 只记录五个现役模型对应的 OpenAI、Google、BFL 和 BytePlus 官方能力与提示词方法。
 2. `gatewayContract` 记录 API易实际接受的模型 ID、端点、字段、限制和错误语义，是调用层事实。
-3. `productPolicy` 是 Garment Canvas 的主动收窄。`scripts/apiyi-docs.mjs` 会验证引用数、模式和节点不超出网关契约。
+3. `productPolicy` 是 Garment Canvas 的主动收窄。`scripts/gateway-docs.mjs` 会验证引用数、模式和节点不超出网关契约。
 4. `observedEvidence` 只接受可追溯真实探针。文档、历史浏览器成功或失败都不能直接成为当前通过证据。
 
 API易与厂商文档冲突时，请求仍按 `gatewayContract` 构造，同时将组合降为 `unverified` 等待真实探针。GPT Image 2 VIP 是 API易特有线路，没有可以替代它的 OpenAI 厂商契约。
@@ -70,19 +70,19 @@ API易与厂商文档冲突时，请求仍按 `gatewayContract` 构造，同时�
 
 ```bash
 # 无网络、无付费调用：验证 JSON 结构、五模型集合和 product ⊆ gateway
-node scripts/apiyi-docs.mjs check --offline
+node scripts/gateway-docs.mjs check --offline
 
 # 只读抓取公开 Markdown 页面并核对 SHA-256；发现漂移时非零退出
-node scripts/apiyi-docs.mjs check --model-list /path/to/current-apiyi-v1-models.json
+node scripts/gateway-docs.mjs check --model-list /path/to/current-apiyi-v1-models.json
 
 # 只生成候选语义差异报告，绝不改写 sources.json 或 model-contracts.json
-node scripts/apiyi-docs.mjs refresh --out docs/ai/apiyi/candidates/apiyi-refresh.json
+node scripts/gateway-docs.mjs refresh --out docs/ai/gateway/candidates/apiyi-refresh.json
 
 # 可选：将经授权导出的 /v1/models JSON 纳入只读核对
-node scripts/apiyi-docs.mjs check --offline --model-list /path/to/reviewed-model-list.json
+node scripts/gateway-docs.mjs check --offline --model-list /path/to/reviewed-model-list.json
 ```
 
-不带 `--offline` 的发布检查必须同时取得 API易 `/v1/models` 的只读导出（也可通过 `APIYI_MODELS_EXPORT` 指定路径），并与 `sources.json` 中经人工确认的模型目录指纹匹配。保留的 2026-09-02 和早期 2026-09-03 探针分别记录 272 与 269 个规范化唯一模型 ID；按当时六模型范围计算均精确命中 5 个，`grok-imagine-image` 连续缺失。这些数值和当时的阻断结论是不可改写的历史事实，分别保存在 `evidence/2026-09-02-model-catalog-probe.json`、`evidence/2026-09-03-model-catalog-probe.json` 和 `reviews/2026-09-03-model-catalog-drift.md`。
+不带 `--offline` 的发布检查必须同时取得 API易 `/v1/models` 的只读导出（也可通过 `GATEWAY_MODELS_EXPORT` 指定路径），并与 `sources.json` 中经人工确认的模型目录指纹匹配。保留的 2026-09-02 和早期 2026-09-03 探针分别记录 272 与 269 个规范化唯一模型 ID；按当时六模型范围计算均精确命中 5 个，`grok-imagine-image` 连续缺失。这些数值和当时的阻断结论是不可改写的历史事实，分别保存在 `evidence/2026-09-02-model-catalog-probe.json`、`evidence/2026-09-03-model-catalog-probe.json` 和 `reviews/2026-09-03-model-catalog-drift.md`。
 
 自 `reviews/2026-09-03-five-model-scope.md` 的范围决策起，退役 ID 的缺失不再是当前五模型范围的阻断条件。当前人工复核导出捕获于 `2026-09-03T13:22:48.000Z`：认证 `GET /v1/models` 返回 HTTP 200，原始响应为 61,774 字节，原始文件 SHA-256 为 `7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408`，包含 271 个规范化唯一 ID，五个现役 ID 精确覆盖 5/5；其 `sha256-canonical-model-id-set-v1` 指纹为 `43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d`。这次目录相对先前 269-ID 记录发生漂移，旧证据仍保留为历史事实；当前记录见 `evidence/2026-09-03-manual-model-catalog-review.json` 和 `reviews/2026-09-03-manual-model-catalog-review.md`。完整原始文件仍在 Git 工作树外，contract check 必须取得其精确字节并重算两层哈希；仓库内摘要不能代替原始文件。
 

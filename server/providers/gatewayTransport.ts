@@ -2,7 +2,7 @@ import { Agent, type Dispatcher } from "undici";
 import { config } from "../config";
 import { ProviderError } from "./base";
 
-export const APIYI_UNDICI_PROFILE = Object.freeze({
+export const GATEWAY_UNDICI_PROFILE = Object.freeze({
   connectTimeoutMs: 30_000,
   headersTimeoutMs: 600_000,
   bodyTimeoutMs: 300_000,
@@ -10,21 +10,21 @@ export const APIYI_UNDICI_PROFILE = Object.freeze({
   keepAliveMaxTimeoutMs: 60_000,
 });
 
-export const APIYI_TAIL_STALL_DEFAULTS = Object.freeze({
+export const GATEWAY_TAIL_STALL_DEFAULTS = Object.freeze({
   graceMs: 5_000,
   minBytes: 1_024,
 });
 
 let sharedDispatcher: Agent | undefined;
 
-/** API易专属连接池；不修改 Node 全局 dispatcher。 */
+/** 网关专属连接池；不修改 Node 全局 dispatcher。 */
 export function getApiyiDispatcher(): Dispatcher {
   sharedDispatcher ??= new Agent({
-    connect: { timeout: APIYI_UNDICI_PROFILE.connectTimeoutMs },
-    headersTimeout: APIYI_UNDICI_PROFILE.headersTimeoutMs,
-    bodyTimeout: APIYI_UNDICI_PROFILE.bodyTimeoutMs,
-    keepAliveTimeout: APIYI_UNDICI_PROFILE.keepAliveTimeoutMs,
-    keepAliveMaxTimeout: APIYI_UNDICI_PROFILE.keepAliveMaxTimeoutMs,
+    connect: { timeout: GATEWAY_UNDICI_PROFILE.connectTimeoutMs },
+    headersTimeout: GATEWAY_UNDICI_PROFILE.headersTimeoutMs,
+    bodyTimeout: GATEWAY_UNDICI_PROFILE.bodyTimeoutMs,
+    keepAliveTimeout: GATEWAY_UNDICI_PROFILE.keepAliveTimeoutMs,
+    keepAliveMaxTimeout: GATEWAY_UNDICI_PROFILE.keepAliveMaxTimeoutMs,
   });
   return sharedDispatcher;
 }
@@ -36,7 +36,7 @@ export async function closeApiyiDispatcher(): Promise<void> {
   if (dispatcher) await dispatcher.close();
 }
 
-export interface ApiyiTailRecoveryEvent {
+export interface GatewayTailRecoveryEvent {
   event: "apiyi_tail_stall_salvaged";
   providerId: string;
   bytes: number;
@@ -48,7 +48,7 @@ export interface ReadApiyiJsonOptions {
   salvageEnabled?: boolean;
   graceMs?: number;
   minBytes?: number;
-  onSalvaged?: (event: ApiyiTailRecoveryEvent) => void;
+  onSalvaged?: (event: GatewayTailRecoveryEvent) => void;
 }
 
 type PendingReadResult =
@@ -126,7 +126,7 @@ function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array>, reason: s
 }
 
 /**
- * 有界读取 API易 2xx JSON。尾部恢复只处理“完整对象已到齐但无终止信号”；
+ * 有界读取 网关 2xx JSON。尾部恢复只处理“完整对象已到齐但无终止信号”；
  * 截断、读流错误、Content-Length 响应和非法 UTF-8 均不得被误判为成功。
  */
 export async function readApiyiJsonResponse(
@@ -154,11 +154,11 @@ export async function readApiyiJsonResponse(
     }
   }
 
-  const salvageEnabled = options.salvageEnabled ?? config.apiyiTailStallSalvageEnabled();
-  if (!response.body) throw new Error("API易响应缺少 body");
+  const salvageEnabled = options.salvageEnabled ?? config.gatewayTailStallSalvageEnabled();
+  if (!response.body) throw new Error("网关响应缺少 body");
 
-  const graceMs = options.graceMs ?? config.apiyiTailStallGraceMs();
-  const minBytes = options.minBytes ?? APIYI_TAIL_STALL_DEFAULTS.minBytes;
+  const graceMs = options.graceMs ?? config.gatewayTailStallGraceMs();
+  const minBytes = options.minBytes ?? GATEWAY_TAIL_STALL_DEFAULTS.minBytes;
   // 开关只控制尾部提前收尾；无论是否开启，都必须保留流式大小上限。
   const canSalvageTail = salvageEnabled && contentLengthHeader === null;
   const reader = response.body.getReader();
@@ -180,14 +180,14 @@ export async function readApiyiJsonResponse(
         const parsed = tryParseCompleteObject(chunks, totalBytes);
         if (parsed) {
           cancelReader(reader, "complete-json-tail-stall");
-          const event: ApiyiTailRecoveryEvent = {
+          const event: GatewayTailRecoveryEvent = {
             event: "apiyi_tail_stall_salvaged",
             providerId,
             bytes: totalBytes,
             graceMs,
           };
           if (options.onSalvaged) options.onSalvaged(event);
-          else console.warn("[coin-ai-canvas] API易响应尾部已安全收尾", event);
+          else console.warn("[coin-ai-canvas] 网关响应尾部已安全收尾", event);
           return parsed;
         }
       }

@@ -33,7 +33,7 @@ import {
   providerRequestIdFromResponse,
   toDataUrl,
 } from "./base";
-import { getApiyiDispatcher, readApiyiJsonResponse } from "./apiyiTransport";
+import { getApiyiDispatcher, readApiyiJsonResponse } from "./gatewayTransport";
 
 const PROVIDER_RESPONSE_PIXEL_LIMIT = 40_000_000;
 const REFERENCE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -129,7 +129,7 @@ async function fetchApiyi(
   initFactory: () => RequestInit,
 ): Promise<Response> {
   const timeout = getImageModelContract(modelId).timeoutMs;
-  return fetchWithRetry(`${config.apiyiBaseUrl()}${resolveContractPath(path, modelId)}`, initFactory, {
+  return fetchWithRetry(`${config.gatewayBaseUrl()}${resolveContractPath(path, modelId)}`, initFactory, {
     providerId: modelId,
     timeoutMs: config.aiTimeoutMs(timeout),
     maxRetries: 0,
@@ -258,7 +258,7 @@ async function base64Image(
 function throwEmbeddedError(payload: Record<string, unknown>, modelId: ImageModelId): void {
   if (payload.error === undefined || payload.error === null) return;
   const detail = record(payload.error);
-  const message = typeof detail?.message === "string" ? detail.message : "API易图片接口返回错误";
+  const message = typeof detail?.message === "string" ? detail.message : "网关图片接口返回错误";
   const rawCode = detail?.code;
   const status = typeof rawCode === "number" ? rawCode : undefined;
   const classifierMessage = typeof rawCode === "string" ? `${rawCode}: ${message}` : message;
@@ -333,7 +333,7 @@ async function parseGeminiImages(payload: unknown, modelId: ImageModelId): Promi
     const parts = Array.isArray(content?.parts) ? content.parts : [];
     for (const partValue of parts) {
       const part = record(partValue);
-      // 兔子API 返回 snake_case（inline_data / mime_type）；兼容 API易 的 camelCase。
+      // 兔子API 返回 snake_case（inline_data / mime_type）；兼容 网关 的 camelCase。
       const inline = record(part?.inline_data ?? part?.inlineData);
       if (inline && inline.data !== undefined) {
         const rawMime = inline.mime_type ?? inline.mimeType;
@@ -364,7 +364,7 @@ async function parseGeminiImages(payload: unknown, modelId: ImageModelId): Promi
 
 /**
  * 兔子API 的 Gemini 端点用 snake_case（`inline_data` / `mime_type`），
- * 与 API易 的 `inlineData` / `mimeType` 不同（兔子文档 360926406e0 明示）。
+ * 与 网关 的 `inlineData` / `mimeType` 不同（兔子文档 360926406e0 明示）。
  * 响应侧兼容两种写法以容忍网关差异。
  */
 /**
@@ -419,7 +419,7 @@ export async function validateApiyiRequest(
     throw new ProviderError(`${modelId} 不支持 mask-edit 模式`, 400, modelId, "invalid_request");
   }
   // 2026-10-28 实测：gpt-image-2.5-sunburst 同样支持 generate / edit，
-  // 不再强制只能走 mask-edit（旧约束来自 API易 时代，已失效）。
+  // 不再强制只能走 mask-edit（旧约束来自 网关 时代，已失效）。
   requestOptions(modelId, req);
   const refs = referenceData(req, modelId);
   if (mode !== "generate" && refs.length === 0) {
@@ -541,7 +541,7 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
   if (isGeminiFamily(modelId)) {
     const response = await fetchApiyi(modelId, contract.generation.path, () => ({
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
       body: JSON.stringify({
         contents: [{ parts: geminiParts(req.prompt, []) }],
         generationConfig: {
@@ -558,7 +558,7 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
 
   const response = await fetchApiyi(modelId, contract.generation.path, () => ({
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
     body: JSON.stringify(buildOpenAiImageBody(modelId, req.prompt, options)),
   }));
   return parseApiyiImageResult(response, async () => {
@@ -586,7 +586,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
     const parts = geminiParts(req.prompt, imageParts, referenceRoles(req));
     const response = await fetchApiyi(modelId, contract.edit.path, () => ({
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
@@ -605,7 +605,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
     // 参考图走 input_image / input_image_2 …（见 buildFluxReferenceBody 注释）。
     const fluxResponse = await fetchApiyi(modelId, contract.edit.path, () => ({
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
       body: JSON.stringify(buildFluxReferenceBody(modelId, req.prompt, options, refs)),
     }));
     return parseApiyiImageResult(fluxResponse, async () => {
@@ -618,7 +618,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
     // Seedream / Qwen：参考图编辑 = JSON generations + image 数组（不是 multipart edits）。
     const jsonResponse = await fetchApiyi(modelId, contract.edit.path, () => ({
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiyiApiKey()}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
       body: JSON.stringify(buildOpenAiImageBody(modelId, req.prompt, options, refs)),
     }));
     return parseApiyiImageResult(jsonResponse, async () => {
@@ -645,7 +645,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
       const mask = parseDataUrl(req.mask);
       form.append("mask", new Blob([new Uint8Array(mask.buffer)], { type: "image/png" }), "mask.png");
     }
-    return { method: "POST", headers: { Authorization: `Bearer ${config.apiyiApiKey()}` }, body: form } as unknown as RequestInit;
+    return { method: "POST", headers: { Authorization: `Bearer ${config.gatewayApiKey()}` }, body: form } as unknown as RequestInit;
   });
   return parseApiyiImageResult(response, async () => {
     const parsed = await parseOpenAiImageResponse(await readJson(response, modelId), modelId, { maxImages: 1 });
@@ -653,7 +653,7 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
   });
 }
 
-export function createApiyiProvider(modelId: ImageModelId): AIProvider {
+export function createGatewayProvider(modelId: ImageModelId): AIProvider {
   return {
     id: modelId,
     validate: (req, mode) => validateApiyiRequest(modelId, req, mode),
@@ -662,12 +662,12 @@ export function createApiyiProvider(modelId: ImageModelId): AIProvider {
   };
 }
 
-export const apiyiProviders = Object.fromEntries(
+export const gatewayProviders = Object.fromEntries(
   ([
     "gemini-nano-banana-2.1", "gemini-3.1-flash-image",
     "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
     "flux-3-image",
     "doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-lite-260128",
     "qwen-image-3.0-pro", "qwen-image-3.0",
-  ] as const).map((modelId) => [modelId, createApiyiProvider(modelId)]),
+  ] as const).map((modelId) => [modelId, createGatewayProvider(modelId)]),
 ) as Record<ImageModelId, AIProvider>;

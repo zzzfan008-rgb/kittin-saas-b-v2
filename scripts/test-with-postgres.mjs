@@ -171,7 +171,7 @@ export async function acquireTestLock({
  * 只读取 .env 中的 PostgreSQL 连接键。绝不注入 AI 凭据，也不改动 process.env，
  * 因此测试进程不会因为加载 .env 而获得可用的付费 provider 密钥。
  *
- * 这份凭据隔离由 tests/test-runner-isolation.test.mjs 用一份含 APIYI_API_KEY 的
+ * 这份凭据隔离由 tests/test-runner-isolation.test.mjs 用一份含 GATEWAY_API_KEY 的
  * 临时 .env 断言覆盖：推导出的连接串不得包含该值，调用方环境不得被改动。
  */
 function readPostgresKeysFromDotEnv(dotEnvPath) {

@@ -43,7 +43,7 @@ const defaultContext: RewriteContext = { kind: "image-generator", mode: "edit" }
 const modelTryonContext: RewriteContext = { kind: "image-generator", mode: "edit", familyId: "model-tryon" };
 
 // 文本通道传输层测试必须注入 apiKey/baseUrl：createTextChatCompletion 生产默认读
-// config.apiyiApiKey()（无 .env/无 APIYI_API_KEY 的 CI 会 throw required），单测不得依赖环境密钥。
+// config.gatewayApiKey()（无 .env/无 GATEWAY_API_KEY 的 CI 会 throw required），单测不得依赖环境密钥。
 const textChatDeps = { apiKey: "test-key", baseUrl: "https://text-chat.test.local" };
 
 function jsonResponse(body: unknown, init: { status?: number; headers?: Record<string, string> } = {}): Response {
