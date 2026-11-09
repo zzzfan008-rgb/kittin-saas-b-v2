@@ -2,7 +2,6 @@
 node_modules
 
 # Local agent worktrees
-.claude/worktrees/
 .worktrees/
 
 # Build and release outputs
@@ -56,9 +55,6 @@ test-*.png
 test-*.jpg
 shot-*.png
 button-animation-demos.html
-
-# Local Cursor config (machine-specific, never commit)
-.cursor/
 
 # Local editor config (machine-specific, never commit)
 .vscode/
