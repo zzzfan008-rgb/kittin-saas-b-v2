@@ -19,6 +19,7 @@ import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
 import { createTextRewriteRouter } from "./routes/textRewrite";
 import { mattingRouter } from "./routes/matting";
+import { createBillingRouter } from "./routes/billing";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
 import { databaseReady, hasUsers, initializeDatabase } from "./lib/database";
 import { migrateLegacyData } from "./lib/legacyMigration";
@@ -115,6 +116,8 @@ app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
 app.use("/api/text", textRewriteRateLimit, createTextRewriteRouter());
 // 抠图：转发到本地 Python rembg 服务（rembg-service/，不走 AI 限流——不消耗外部配额）。
 app.use("/api/matting", mattingRouter);
+// 账户余额：只读展示，凭据仅服务端持有；不消耗 AI 限流额度。
+app.use("/api/billing", createBillingRouter());
 app.use("/api", (_req, res) => res.status(404).json({ error: "API not found" }));
 
 // 生产模式：完整模式必须有前端构建；API_ONLY=true 可显式跳过前端托管。
@@ -128,7 +131,7 @@ if (isProduction && !apiOnly) {
 }
 
 const apiErrorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  console.error("[garment-canvas] request failed", error);
+  console.error("[coin-ai-canvas] request failed", error);
   if (!res.headersSent) res.status(500).json({ error: "服务器暂时无法处理请求" });
 };
 // Express 错误中间件必须位于 API、静态文件和 SPA fallback 之后。
@@ -142,7 +145,7 @@ async function start(): Promise<void> {
   const repaired = await repairDanglingImageReferences();
   if (repaired.refs > 0) {
     console.warn(
-      `[garment-canvas] 已清理 ${repaired.refs} 处悬空图片引用（涉及 ${repaired.projects} 个项目）`,
+      `[coin-ai-canvas] 已清理 ${repaired.refs} 处悬空图片引用（涉及 ${repaired.projects} 个项目）`,
     );
   }
   await reconcileOpenAiMaskTestAccountMutations();
@@ -150,13 +153,13 @@ async function start(): Promise<void> {
   if (!initialReadiness.ok) throw new Error(`Server is not ready: ${JSON.stringify(initialReadiness.checks)}`);
   const sessionPruneTimer = setInterval(() => {
     void pruneExpiredSessions().catch((error) => {
-      console.error("[garment-canvas] session cleanup failed", error);
+      console.error("[coin-ai-canvas] session cleanup failed", error);
     });
   }, 6 * 60 * 60 * 1000);
   sessionPruneTimer.unref();
   startGenerationWorker();
   app.listen(port, () => {
-    console.log(`[garment-canvas] server listening on http://localhost:${port} (${initialReadiness.mode})`);
+    console.log(`[coin-ai-canvas] server listening on http://localhost:${port} (${initialReadiness.mode})`);
   });
 }
 

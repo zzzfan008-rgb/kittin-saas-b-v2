@@ -164,6 +164,18 @@ async function main(): Promise<void> {
         { raw: "credit limit exceeded", expectedMessage: ERROR_MESSAGES.account_credit },
         { raw: "账户余额不足", expectedMessage: ERROR_MESSAGES.account_credit },
         { raw: "账户欠费，请联系管理员", expectedMessage: ERROR_MESSAGES.account_credit },
+        // 兔子 API 实测：额度不足也返回 403，必须归为余额不足而不是鉴权失败
+        {
+          status: 403,
+          raw: '{"message":"预扣费额度失败, 用户剩余额度: ＄0.095736, 需要预扣费额度: ＄0.171428 (request id: 202611020838059398536928268d9d6hAdvwJOd)","type":"new_api_error","code":"insufficient_user_quota"}',
+          expectedMessage: ERROR_MESSAGES.account_credit,
+        },
+        {
+          status: 403,
+          raw: '{"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}',
+          expectedMessage: ERROR_MESSAGES.account_credit,
+        },
+        { status: 401, raw: "剩余额度不足，请充值后重试", expectedMessage: ERROR_MESSAGES.account_credit },
       ],
     },
     {

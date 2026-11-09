@@ -1464,7 +1464,7 @@ async function migrate(): Promise<void> {
   });
   if (importedRows !== undefined) {
     console.log(
-      `[garment-canvas] imported ${importedRows} rows from SQLite into PostgreSQL`,
+      `[coin-ai-canvas] imported ${importedRows} rows from SQLite into PostgreSQL`,
     );
   }
 }

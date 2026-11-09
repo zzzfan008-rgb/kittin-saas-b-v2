@@ -31,7 +31,7 @@ export function db(): pg.Pool {
       connectionTimeoutMillis: 10_000,
       idleTimeoutMillis: 30_000,
     });
-    pool.on("error", (error) => console.error("[garment-canvas] PostgreSQL idle client error", error));
+    pool.on("error", (error) => console.error("[coin-ai-canvas] PostgreSQL idle client error", error));
   }
   return pool;
 }

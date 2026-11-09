@@ -30,7 +30,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error(`[garment-canvas:${this.state.errorId}]`, error, info.componentStack);
+    console.error(`[coin-ai-canvas:${this.state.errorId}]`, error, info.componentStack);
   }
 
   render() {
@@ -38,7 +38,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
     return (
       <main className="flex h-full items-center justify-center bg-(--gc-shell) p-6 text-(--gc-text)">
         <section className="w-full max-w-md rounded-xl border border-(--gc-border) bg-(--gc-panel) p-6 shadow-2xl">
-          <div className="text-xs font-medium tracking-[0.2em] text-(--gc-accent)">GARMENT CANVAS</div>
+          <div className="text-xs font-medium tracking-[0.2em] text-(--gc-accent)">COIN-AI CANVAS</div>
           <h1 className="mt-4 text-lg font-semibold">页面出现异常</h1>
           <p className="mt-2 text-sm leading-6 text-(--gc-text-muted)">
             画布数据仍保留在本机。请先重新加载；如果同一页签持续报错，再仅清除当前损坏页签。

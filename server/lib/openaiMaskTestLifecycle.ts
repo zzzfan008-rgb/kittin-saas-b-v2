@@ -143,7 +143,7 @@ export async function reconcileOpenAiMaskTestAccountMutations(): Promise<number>
       fs.unlinkSync(journalPath);
       reconciled += 1;
     } catch (error) {
-      console.error(`[garment-canvas] failed to reconcile OpenAI mask test mutation ${fileName}`, error);
+      console.error(`[coin-ai-canvas] failed to reconcile OpenAI mask test mutation ${fileName}`, error);
     }
   }
   return reconciled;

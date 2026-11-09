@@ -49,7 +49,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("matting")
 
-app = FastAPI(title="Garment Canvas Matting Service", version="1.0.0")
+app = FastAPI(title="Coin-AI Canvas Matting Service", version="1.0.0")
 
 # ---------- 模型状态 ----------
 _state: Literal["loading", "ready", "unavailable"] = "loading"

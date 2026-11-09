@@ -52,6 +52,26 @@ export const config = {
     return key || required("APIYI_API_KEY");
   },
 
+  /**
+   * 兔子API 面板账号（与 sk 密钥是两套凭据）。
+   * 余额只能从面板接口 `GET /api/user/self` 取，而它只认面板登录令牌，
+   * sk 密钥会返回 invalid_token。凭据仅服务端使用，绝不下发浏览器。
+   */
+  panelUsername: () => (process.env.APIYI_PANEL_USERNAME ?? "").trim(),
+  panelPassword: () => process.env.APIYI_PANEL_PASSWORD ?? "",
+  /** 余额结果缓存（毫秒）；用于合并多人同时点「运行」的并发查询。 */
+  balanceCacheTtlMs: () => {
+    const value = Number(process.env.BALANCE_CACHE_TTL_MS ?? 5_000);
+    return Number.isFinite(value) ? Math.max(0, Math.min(60_000, value)) : 5_000;
+  },
+  /** 可选：强制换算系数，留空则跟随网关 /api/status 的 custom_currency_exchange_rate。 */
+  balanceCurrencyRate: () => {
+    const value = Number(process.env.BALANCE_CURRENCY_RATE);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  },
+  /** 可选：强制货币符号，留空则跟随网关 /api/status 的 custom_currency_symbol。 */
+  balanceCurrencySymbol: () => process.env.BALANCE_CURRENCY_SYMBOL?.trim() || undefined,
+
   port: () => Number(process.env.PORT ?? 3001),
   dataDir: () => path.resolve(ROOT_DIR, process.env.DATA_DIR ?? "./data"),
   databaseUrl: () => process.env.DATABASE_URL?.trim() || undefined,

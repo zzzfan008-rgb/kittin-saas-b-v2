@@ -14,6 +14,7 @@ import { nanoid } from "nanoid";
 import {
   markProjectTabSessionWorkspaceRestored,
 } from "@/lib/workspaceRestoreState";
+import { requestBalanceRefresh } from "@/lib/balanceEvents";
 
 export { didRestoreProjectTabSessionWorkspace } from "@/lib/workspaceRestoreState";
 import {
@@ -2896,6 +2897,8 @@ export const useFlowStore = create<FlowState>()(
           }
           clearAmbiguousRunRequest(submissionKey);
           knownRunId = payload.runId;
+          // 运行已确认入队（会消耗额度），通知顶栏刷新余额；失败路径不刷新。
+          requestBalanceRefresh();
 
           set((state) => recentResultsPatch(
             state,
@@ -3163,6 +3166,8 @@ export const useFlowStore = create<FlowState>()(
           }
           clearAmbiguousRunRequest(submissionKey);
           knownRunId = payload.runId;
+          // 运行已确认入队（会消耗额度），通知顶栏刷新余额；失败路径不刷新。
+          requestBalanceRefresh();
 
           set((state) => recentResultsPatch(
             state,
