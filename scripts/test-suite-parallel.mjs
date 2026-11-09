@@ -166,6 +166,10 @@ const TEST_FILES = [
   "tests/openai-mask-test.test.ts",
   "tests/performance-baseline.test.ts",
   "tests/provider-error-i18n.test.ts",
+  // 2026-11-09 补齐：余额接口与产物下载重试的契约测试（两个都不碰库，走并发段）。
+  // 漏登记会让清单完整性断言 fail-closed 拒绝整批测试（CI unit 直接红）。
+  "tests/billing-balance.test.ts",
+  "tests/artifact-download-retry.test.ts",
   "tests/recent-results.test.ts",
   "tests/reference-inputs.test.ts",
   // P0：模特试穿参考图顺序（徽标=唯一证据，纯函数不碰库）。
