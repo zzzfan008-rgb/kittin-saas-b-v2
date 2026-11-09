@@ -103,7 +103,7 @@ async function migrate(): Promise<void> {
       category TEXT NOT NULL CHECK (category IN (
         'print','fabric','colorcard','sketch',
         'model','garment','accessory','pose','background',
-        'refvideo','audio'
+        'refvideo','audio','uncategorized'
       )),
       image TEXT NOT NULL,
       source_note TEXT,
@@ -1442,6 +1442,21 @@ async function migrate(): Promise<void> {
       await client.query(
         "INSERT INTO schema_migrations (version, name, applied_at) VALUES (26, $1, $2)",
         ["asset_taxonomy_v2", new Date().toISOString()],
+      );
+    }
+
+    if (!applied.has(27)) {
+      // 2026-11-05 用户拍板 C：用户主动上传的图默认入素材库，未选分类落 'uncategorized'。
+      // 与 26 同法：先删 CHECK，再加含新值的 CHECK（不重写已有行）。
+      await client.query(`ALTER TABLE assets DROP CONSTRAINT IF EXISTS assets_category_check`);
+      await client.query(`ALTER TABLE assets ADD CONSTRAINT assets_category_check CHECK (category IN (
+        'print','fabric','colorcard','sketch',
+        'model','garment','accessory','pose','background',
+        'refvideo','audio','uncategorized'
+      ))`);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (27, $1, $2)",
+        ["assets_uncategorized_category", new Date().toISOString()],
       );
     }
 

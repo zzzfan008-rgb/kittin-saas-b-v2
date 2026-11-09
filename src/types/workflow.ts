@@ -398,7 +398,9 @@ export interface Asset {
   category:
     | "print" | "fabric" | "colorcard" | "sketch"
     | "model" | "garment" | "accessory" | "pose" | "background"
-    | "refvideo" | "audio";
+    | "refvideo" | "audio"
+    /** 2026-11-05 用户拍板 C：用户主动上传的图默认入素材库，未分类落这里。 */
+    | "uncategorized";
   /** 图片 URL（/api/files/xxx） */
   image: string;
   /** 列表/画布预览使用的轻量缩略图；执行节点时仍使用 image 原图。 */
