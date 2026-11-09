@@ -6,7 +6,7 @@
 
 ## 请求
 
-- Base URL：https://api.apiyi.com
+- Base URL：https://api.ourzhishi.top
 - 端点：POST /v1/images/edits
 - Content-Type：multipart/form-data
 - 必填：model、prompt、第一张 image[]、mask
