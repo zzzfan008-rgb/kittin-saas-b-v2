@@ -17,7 +17,7 @@
     "contractOrSourceDriftDowngradesTo": "unverified",
     "automaticPaidProbes": false
   },
-  "baseUrl": "https://api.tu-zi.com",
+  "baseUrl": "https://api.ourzhishi.top",
   "runtime": {
     "upstreamMode": "synchronous",
     "businessQueue": "postgresql",
@@ -210,7 +210,7 @@
   "models": [
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:5d52d72a97ca0d1bcf7dbe63b0807f3367441b38a1ef7bc1e0c1eabcea4a0f8b",
+      "contractHash": "sha256:5ff95e143de3787d5722710603024c38a6204179694f078836d0972c218b41d7",
       "id": "gemini-nano-banana-2.1",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -303,7 +303,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:68ee47e12b894c159603222b875095c62d1e878c8d3b17cd0540c41cc4992290",
+      "contractHash": "sha256:1071f31c0479ebe0c5c58a8a8d22f305b00c947c7bf593b3bb1ea0762dc2092e",
       "id": "gemini-3.1-flash-image",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -396,7 +396,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:46273fdaaa0fd533770dbbe62c5c026895d9db66b6a4185126dd7452491f6918",
+      "contractHash": "sha256:03c966abb0e26db16da45e96fc50c72211f6f2d6f1f4e198f10a77e98e582acd",
       "id": "gpt-image-2.5-sunburst",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -508,7 +508,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:b62e2016f6df45a651865bc32a16ab4b51ecde09b09842abfb8675ece887cb17",
+      "contractHash": "sha256:89edbb1d080c5ffa8f4d72f7f99aab87dd5fda5823d8a8d3c7d90b3b4ab9fb0a",
       "id": "gpt-image-2.5-flare",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -616,7 +616,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:2cb186ef126a1de6f428a3b00da75dc7ccf94d2ac216ad89a1991b77aa880ba0",
+      "contractHash": "sha256:4257c57b58e1ea4a166105166e85b6866d40277ee1e0e7935fa758acc6091138",
       "id": "flux-3-image",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -712,7 +712,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:7ba68fbfc91eb52e603e3a77d015e66fc09a37e9c61e7368ba466ae074f057fc",
+      "contractHash": "sha256:bd6ac3a436e80011e261c56a437be7b673ac52cf531835c002fd8365ab316340",
       "id": "doubao-seedream-5-0-pro-260628",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -791,7 +791,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:ee80ed39b147963376e3693149df21f10533da8e04103e2540302655a041c418",
+      "contractHash": "sha256:27f5ba5d0b77ac74abc026536ad817e88ec9e2333b1331276c3fc2c69aae9e7f",
       "id": "doubao-seedream-5-0-lite-260128",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -870,7 +870,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:b79c297a978434938c8791e913b832aa6c1d718b1b9e8ea9f33f60782b35a04d",
+      "contractHash": "sha256:b1bb48b82bd63c2dc8e642fccd893f4813fa5cc2f16469e7d6461a06945fd44a",
       "id": "qwen-image-3.0-pro",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",
@@ -937,7 +937,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-semantic-envelope-v1",
-      "contractHash": "sha256:69b44a4394c53613e33ea1ba6494b242f09418a341598d1112be6586cc26b1aa",
+      "contractHash": "sha256:a4163e9a560863fe30cc2ad5fddc40f626f1965c5bfeaf0d2412fa2e46228ec7",
       "id": "qwen-image-3.0",
       "reviewedModelCatalogBaseline": {
         "reviewedExportHashScope": "sha256-canonical-model-id-set-v1",

@@ -7,7 +7,7 @@
     "knowledgeFile": "tuzi-protocol-audit-2026-10-27",
     "productMustRemainGatewaySubset": true
   },
-  "baseUrl": "https://api.tu-zi.com",
+  "baseUrl": "https://api.ourzhishi.top",
   "runtime": {
     "upstreamMode": "async-task",
     "submitEndpoint": "/v1/videos",
@@ -34,7 +34,7 @@
   "models": [
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:d833fba61eebfc7507c7fcce0edcbe1c0bb7eb47f410c1b7836b79c7579caf0f",
+      "contractHash": "sha256:f277d1692b49ddbcfe226a9c0c3c9bbe74d3744418c63c0a18c4e0adfcf9e01e",
       "id": "doubao-seedance-2-5-260628",
       "label": "Seedance 2.5（字节）",
       "channel": "official",
@@ -104,7 +104,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:1d1ffe118e7a4aa195faaf0a5b90cf137e7b4f5b32d63e4b35d2c4b3b29b06b1",
+      "contractHash": "sha256:0d585f45781d2d291bdb0587b2dd548c406fe12feafc839693a4cb224df36c9b",
       "id": "MiniMax-H3",
       "label": "MiniMax H3",
       "channel": "official",
@@ -164,7 +164,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:0ff3d2056c524edc20c0c7c04a86c7823b097a07bb924bdc7d8dcd1eeb49a9d4",
+      "contractHash": "sha256:8c79f99f229a7962e4e0d6eb6e76f1b240cc05d4aa0972276b746ecc51377db2",
       "id": "veo3.1",
       "label": "Veo 3.1（Google）",
       "channel": "official",

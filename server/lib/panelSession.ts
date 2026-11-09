@@ -6,7 +6,7 @@
  * - 该接口只认面板登录凭据，`APIYI_API_KEY`（sk-）会被拒绝（invalid_token）；
  * - `/v1/dashboard/billing/*` 返回的是占位值或累计消费，拿不到剩余额度。
  *
- * 认证形态（实测 api.tu-zi.com，x-new-api-version: dev-20261104）：
+ * 认证形态（实测网关面板接口，x-new-api-version: dev-20261104）：
  * - 登录成功返回 `success:true`，但 **body 里没有 access_token**；
  * - 会话通过响应头 `set-cookie: session=...; HttpOnly; Secure; SameSite=Lax` 下发；
  * - 后续请求需带该 Cookie，并附带 `New-Api-User: <用户 id>`（body.data.id）。
