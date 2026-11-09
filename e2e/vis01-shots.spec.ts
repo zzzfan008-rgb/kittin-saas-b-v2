@@ -77,18 +77,6 @@ const FIXTURES = [
   },
 ];
 
-async function dismissTutorial(page: import("@playwright/test").Page) {
-  const tutorial = page.getByRole("dialog", { name: "欢迎使用服装设计工作台" });
-  const info = await page.request.get("/api/tutorials/workbench-onboarding");
-  const body = await info.json() as { acknowledged: boolean };
-  if (body.acknowledged) return;
-  await expect(tutorial).toBeVisible();
-  const next = tutorial.getByRole("button", { name: "下一步" });
-  const done = tutorial.getByRole("button", { name: "完成教程" });
-  for (let i = 0; i < 8 && !await done.isVisible(); i += 1) await next.click();
-  await done.click();
-}
-
 async function addRailNode(page: import("@playwright/test").Page, label: "文本" | "图片" | "视频") {
   const addButton = page.getByRole("button", { name: "添加" });
   const menu = page.getByRole("menu", { name: "添加" });
@@ -157,7 +145,6 @@ test("VIS-01 screenshot matrix", async ({ page }) => {
   // Fresh blank first screen.
   await page.request.post("/api/projects/initial-draft/force-clear", { data: { confirm: true } });
   await page.goto("/");
-  await dismissTutorial(page);
   await page.evaluate(() => window.sessionStorage.clear());
   await page.reload();
   await page.getByRole("region", { name: "空工作区" }).getByRole("button", { name: "新建项目" }).click();

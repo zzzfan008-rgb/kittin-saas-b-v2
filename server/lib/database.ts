@@ -457,6 +457,8 @@ async function migrate(): Promise<void> {
 
     if (!applied.has(11)) {
       await client.query(`
+        -- 2026-11-05：教程功能已下线（用户拍板），表保留仅为迁移历史不中断；
+        -- 代码侧不再读写（/api/tutorials 路由与 TutorialOverlay 已删除）。
         CREATE TABLE IF NOT EXISTS user_tutorial_receipts (
           user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           tutorial_key TEXT NOT NULL,
