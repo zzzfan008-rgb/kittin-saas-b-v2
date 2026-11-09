@@ -5,7 +5,7 @@ Analyze the API易 AI gateway layer. Read-only; no paid calls.
 Read first:
 
 - `server/providers/apiyi.ts` + `server/providers/index.ts`
-- `docs/ai/apiyi/README.md` and `docs/ai/apiyi/site/current.json`
+- `docs/ai/gateway/README.md` and `docs/ai/gateway/`（全站快照已于 2026-10-29 删除）
 - Reviewed `model-contracts.json` (runtime contract; raw pages never change behavior)
 
 Rules (AGENTS.md section 5):

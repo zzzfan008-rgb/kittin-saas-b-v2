@@ -1,164 +1,132 @@
 # Coin-AI Canvas
 
-Coin-AI Canvas 是面向服装设计师的桌面工作流画布，覆盖图片输入、模板建图、AI 生成、局部修改、项目页签、跨项目 Results 与素材管理。最低支持宽度为 1024 CSS px，主要验收宽度为 1280 与 1440；不提供移动端专用布局。
+面向服装设计的 AI 画布工作台：把「参考图 → 提示词 → 生成 → 局部修改 → 结果沉淀」做成一张可连线的画布，而不是一堆零散的生成入口。
 
-当前项目硬规则、UI/shadcn 边界、验证流程与发布门禁以 [`AGENTS.md`](AGENTS.md) 为唯一规则源；日期交接和完成度台账只记录历史状态与证据。
+![登录页](docs/assets/01-login.png)
 
-生产部署、macOS 常驻运行、完整环境变量、管理员初始化、备份恢复、PostgreSQL/SQLite 迁移、故障处理和安全基线见 [`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md)。发布前使用 [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)，最新三主题桌面视觉证据见 [`docs/PHASE_D_VISUAL_ACCEPTANCE.md`](docs/PHASE_D_VISUAL_ACCEPTANCE.md)。
+## 它能做什么
 
-## 本地开发
+| 能力 | 说明 |
+|---|---|
+| **模板建图** | 15 个内置模板（模特试穿、摆拍、数字模特、印花提取、面料替换、线稿渲染、走秀视频等），选中即得到一条连好的工作流 |
+| **节点画布** | 图片 / 文本 / 生成 / 结果四类节点自由连线；参考图按「图1、图2」序号绑定角色，跑图时序号与徽标一致 |
+| **多模型** | 9 个图像模型（GPT Image 2.5 快/专、Gemini 香蕉 3.1/2.1、Seedream 5.0 快/专、Qwen 3.0 快/专、FLUX 3）+ 3 个视频模型，按能力自行切换 |
+| **局部修改** | 蒙版重绘（涂抹区域重画）与多轮修改（在结果上继续改），产物原地替换、可撤销 |
+| **上传即标准化** | EXIF 校正、转 sRGB、体积收敛；用户主动上传的图默认进素材库「未分类」 |
+| **结果与历史** | 每次运行有唯一生成 ID；失败卡片直接显示失败原因；管理员可查看全部历史 |
+| **三主题** | 曜黑·荧光绿 / 简白 / 护眼绿，1024–1440 桌面宽度 |
 
-要求 Node.js 24.20.0 或更高版本，以及本机原生 PostgreSQL 18。
+![画布工作台](docs/assets/02-workspace.png)
+
+![项目中心](docs/assets/03-project-center.png)
+
+## 快速开始
+
+要求 Node.js 24.20.0 或更高版本，以及本机原生 PostgreSQL 18。Node.js 24.20.0 是 `.nvmrc` 固定的最低
+可复现基线；门禁接受 24.20.0 及更高兼容版本（有 nvm 时可先 `nvm use`）。
 
 ```bash
-brew install postgresql@18
-brew services start postgresql@18
+git clone https://github.com/zzzfan008-rgb/kittin-saas-b-v2.git
+cd kittin-saas-b-v2
 npm ci
-npm run dev
+cp .env.example .env      # 填入 GATEWAY_API_KEY 与数据库密码
+npm run dev               # http://localhost:5173
 ```
 
-首次准备数据库时创建应用角色与两个库（开发库与隔离测试库）：
+`.env` 至少需要这些键：
+
+```ini
+GATEWAY_BASE_URL=https://api.ourzhishi.top
+GATEWAY_API_KEY=<你的网关密钥>
+POSTGRES_DB=coin_ai_canvas
+POSTGRES_USER=coin_ai_canvas
+POSTGRES_PASSWORD=<长随机密码>
+POSTGRES_HOST_PORT=5432
+```
+
+首次建库（开发库 + 测试库，测试库名必须以 `_test` 结尾）：
 
 ```bash
-psql -d postgres -c "CREATE ROLE garment_canvas LOGIN PASSWORD '<长随机密码>';"
-psql -d postgres -c "CREATE DATABASE garment_canvas OWNER garment_canvas;"
-psql -d postgres -c "CREATE DATABASE garment_canvas_test OWNER garment_canvas;"
+psql -d postgres -c "CREATE ROLE coin_ai_canvas LOGIN PASSWORD '<同上>';"
+psql -d postgres -c "CREATE DATABASE coin_ai_canvas OWNER coin_ai_canvas;"
+psql -d postgres -c "CREATE DATABASE coin_ai_canvas_test OWNER coin_ai_canvas;"
 ```
 
-把密码写进私有 `.env`（`POSTGRES_HOST_PORT` 指向本机实例，原生安装为 5432）。注意
-`.env` 的值不要追加行内 `#` 注释，解析器不会剥离它们。
+`npm run dev` 会先跑 `dev:check`：核对 Node 版本、5173/后端端口占用、PostgreSQL 连通性
+（只读 `SELECT 1`），以及 Vite 代理目标。预检不会停进程、改数据库或调用 AI。
 
-`npm run dev` 会先自动执行 `npm run dev:check`：核对 Node.js 版本、5173/后端端口
-占用、PostgreSQL 认证与只读 `SELECT 1`，以及 Vite API 代理目标。预检只读取连接状态，
-不会停止进程、启动服务、修改数据库或调用 AI。若提示旧 Vite/API 端口冲突，应先停止
-旧开发进程；若 PostgreSQL 不可达，按提示启动本机实例。Docker Engine 只作为可选部署
-路径被探测，使用本机 PostgreSQL 时它不可用属于预期状态。也可单独运行
-`npm run dev:check` 排查环境。
-
-前端开发服务器默认为 `http://localhost:5173`，API 默认为
-`http://localhost:3001`，本机 Node 通过 `POSTGRES_HOST_PORT` 连接 PostgreSQL。
-Vite 的 `/api` 代理会跟随同一个 `PORT`；例如 `PORT=3002 npm run dev`
-会同时将后端与前端代理切换到 3002。如需转发到独立地址，可在私有
-`.env` 中显式设置 `API_PROXY_TARGET=http://localhost:3002`，该值优先于 `PORT`。
-
-`npm run test` 使用隔离的本机测试库（数据库名必须以 `_test` 结尾，且必须在本机），
-运行全部回归；测试自身会重置该库的 schema，测试数据不会污染开发库。runner 会拒绝
-任何非本机或未以 `_test` 结尾的连接串，两者不能绕过。
-
-未提交改动先运行只读预审；固定候选提交并保持干净工作树后，再运行完整本地门禁替代
-GitHub Actions：
+## 常用命令
 
 ```bash
-npm run gate:codex -- --uncommitted --review-only
-
-# 候选提交后
-npm run gate:codex -- --base origin/main
+npm run dev                  # 开发（含环境预检）
+npm test                     # 单元/契约测试（需隔离 PostgreSQL）
+npm run test:e2e             # Playwright 端到端（三宽度矩阵）
+npm run docs:gateway:check   # 模型契约结构门（离线，CI 必跑）
+npm run gen:presets:check    # 提示词镜像一致性
+npm run build && npm start   # 生产构建与启动
 ```
 
-门禁先运行完整确定性检查、桌面 E2E、生产构建和 production smoke，再由
-`ast-grep` + `dependency-cruiser` 采集结构与依赖证据，最后交给一个隔离的 Hermes Agent
-子进程评审精确差异。评审子进程只读、有限轮次与时间预算，结果必须落在哨兵标记内的
-JSON 中，缺失、不可解析或写入隔离目录都会 fail-closed。任何 P0-P3 有效问题都会令门禁
-失败。Node.js 24.20.0 是 `.nvmrc` 固定的最低
-可复现基线；门禁接受 24.20.0 及更高兼容版本（有 nvm 时可先 `nvm use`）。审查单个提交可改用
-`--commit SHA`。
+## 技术栈
 
-桌面端浏览器回归同样使用独立 PostgreSQL、动态端口和临时文件目录，并会阻断真实 AI
-请求。首次运行先安装 Chromium，然后执行：
+| 层 | 选型 |
+|---|---|
+| 前端 | React 18 + TypeScript + Vite + React Flow（画布）+ Tailwind/shadcn |
+| 后端 | Node + Express + PostgreSQL 18（原生 pg，15 张表）|
+| 存储 | 本地文件系统（上传/生成产物，按 owner ACL 隔离）|
+| 模型接入 | 统一 gateway provider 层：9 图像 + 3 视频，每家独立参数契约（`docs/ai/gateway`）|
+| 质量门 | tsc · 114 单测 · Playwright e2e · dependency-cruiser 分层 · ast-grep 规则 |
 
-```bash
-npx playwright install chromium
-npm run test:e2e
+## 目录
+
+```
+src/               前端（节点、面板、store、主题）
+server/            后端（路由、provider、执行引擎、数据库）
+e2e/               Playwright 端到端
+tests/             单元与契约测试
+docs/ai/gateway/   模型契约（运行时来源，含 9 图像 + 3 视频 hash 锁定）
+docs/design/       仍被代码引用的设计契约（历史设计稿已清理）
+deploy/            systemd / launchd 部署单元
+scripts/           构建、门禁、镜像生成等工具链
 ```
 
-该套件覆盖项目支持下限 1024×768，以及主要视觉宽度 1280×720 与 1440×900；
-不包含移动端适配测试。
+## 生产部署
 
-## Docker 部署（可选）
-
-Docker 是可选的生产部署路径，本地开发不需要它。要求 Docker Desktop / Docker Engine +
-Compose。先复制 `.env.example` 为私有 `.env`，至少替换 PostgreSQL 密码、AI 网关和首次
-管理员配置，然后执行：
+Docker（可选）：
 
 ```bash
 docker compose up -d --build --wait
 ```
 
-复制当前 `.env.example` 后网页默认为 `http://localhost:3001`；Compose 容器内仍监听
-3002，宿主机端口由私有 `.env` 的 `PORT` 决定，未设置 `PORT` 时才回退到 3002。
-PostgreSQL 18 数据保存在 Docker 命名卷
-`garment-canvas_postgres_data`，上传和生成文件仍保存在 `data/`。
-
-PostgreSQL 18 官方镜像的卷挂载点是 `/var/lib/postgresql`。从 17 升级时不能直接
-复用 17 的数据目录，必须先用 `pg_dump` 导出，再在新建的 18 卷中恢复。
-
-如果 `data/garment-canvas.db` 存在且 PostgreSQL 还没有用户，首次启动会自动导入
-旧 SQLite 中的用户、会话、项目、素材、生成记录和消耗流水。导入成功后原
-SQLite 文件会保留，便于回退核对。
-
-## 非 Docker 构建与启动
+非 Docker：
 
 ```bash
-npm ci
-npm run check
+npm ci --omit=dev
 npm run build
 npm start
 ```
 
-`npm run build` 会同时生成：
+首次启动前必须在私有 `.env` 配置管理员临时凭据（首次登录强制改密）：
 
-- `dist/`：Vite 前端静态文件；
-- `dist-server/index.js`：可由 Node.js 直接运行的服务端产物。
-
-部署机器只需要生产依赖和两个构建目录：
-
-```bash
-npm ci --omit=dev
-npm start
-```
-
-完整生产模式缺少 `dist/index.html` 时会直接退出，避免 API 看似启动成功但前端不可用。
-如果前端由其他服务托管，可显式设置 `API_ONLY=true` 启动仅 API 模式。
-
-运行状态接口：
-
-- `GET /api/health`：进程存活检查；
-- `GET /api/ready`：检查 PostgreSQL、`DATA_DIR`、AI 配置和完整模式下的前端构建。
-
-用户、会话、项目、素材、生成记录和消耗流水保存在 PostgreSQL 18（原生实例或 Docker
-命名卷）；上传及生成图片保存在 `DATA_DIR`。当前部署使用本地磁盘，不自动备份，但
-PostgreSQL 数据与文件目录已分离，可后续接入备份接口。
-
-首次启动前必须在私有 `.env` 中配置管理员临时凭据（不要提交 `.env`）：
-
-```bash
+```ini
 INITIAL_ADMIN_ACCOUNT_ID=your-admin-account
 INITIAL_ADMIN_PASSWORD=your-temporary-password
 ```
 
-临时密码至少 10 位并同时包含字母和数字。它只在数据库没有任何用户时用于创建首位
-管理员；管理员首次登录后必须修改密码。管理员随后可在网页右上角创建、停用、重置或
-删除普通用户。每个账号仅保留一个有效设备会话，新设备登录会立即使旧会话失效；会话
-固定有效 30 天。
+完整的环境变量、备份恢复、SQLite 迁移、故障处理与安全基线见
+[`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md)。
 
-素材默认仅创建者可见，用户可主动共享给所有账号；历史部署包中的素材和上传文件会在
-首次启动时登记为全局素材。被项目引用的素材不能删除，普通删除进入 15 天回收期。
-生成历史与成功消耗流水由服务端保存，失败记录保留在历史中但不计入消耗。用户可导出
-自己的 CSV，管理员可按用户或全部导出。
+运行状态接口：`GET /api/health`（进程存活）、`GET /api/ready`（数据库/数据目录/AI 配置/前端产物）。
 
-`/api/ready` 还会检查 API易图片网关已配置：必须提供非空的
-`APIYI_API_KEY`，且 `APIYI_BASE_URL` 必须为 HTTPS。该检查不会主动调用
-外部模型，不会产生费用。
+## 文档
 
-生成、工作流入队和 AI 诊断探测共用进程内限流：同一 IP 每分钟最多请求 100 次；
-登录接口单独限制为每分钟 10 次。服务重启后计数重置，多实例部署需要集中式限流。
+| 文档 | 内容 |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | 项目硬规则、UI 边界、验证流程、发布门禁（**唯一规则源**）|
+| [`docs/DEPLOYMENT_AND_OPERATIONS.md`](docs/DEPLOYMENT_AND_OPERATIONS.md) | 生产部署、常驻运行、环境变量、管理员初始化、备份恢复 |
+| [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | 发布前检查清单 |
+| [`docs/ai/gateway/README.md`](docs/ai/gateway/README.md) | 模型契约与端点实测证据 |
+| [`docs/PHASE_D_VISUAL_ACCEPTANCE.md`](docs/PHASE_D_VISUAL_ACCEPTANCE.md) | 三主题桌面视觉验收证据 |
 
-每个 AI 节点独立保存模型和原生参数。普通图片节点可选择
-`gpt-image-2-vip`、`gemini-3.1-flash-image`、`flux-2-pro`、
-`seedream-5-0-260128`；`gpt-image-2` 仅用于蒙版
-局部修改。业务接口先将任务写入 PostgreSQL，再由 Worker 调用 API易同步图片
-端点并立即转存结果。完整契约见 [`docs/ai/apiyi/README.md`](docs/ai/apiyi/README.md)。
-已有项目中的退役模型 ID 只作历史可读字段保留，不能新选择、运行、评估或进入 Provider 队列。
+## 许可
 
-内置模板将“人物场景迁移”与“图案风格迁移”分开，避免人物/座椅语义污染
-印花图案处理。
+内部项目，未公开授权。

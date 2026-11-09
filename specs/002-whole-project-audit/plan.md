@@ -62,7 +62,7 @@ Adapters translate external inputs to domain values and persist domain outcomes.
 
 ### Release layer
 
-- `docs/ai/apiyi/`
+- `docs/ai/gateway/`
 - `scripts/apiyi-docs.mjs`
 - `scripts/apiyi-kb.mjs`
 - `scripts/codex-gate.mjs`
