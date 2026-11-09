@@ -173,17 +173,26 @@ function git(cwd, ...args) {
  * 代码智能证据。fixture 刻意不提供 codex / gitnexus 桩：一旦门禁回退到旧工具链，
  * 解析不到可执行文件就会 fail-closed，测试随即失败。
  */
-function fixture({ requiredNodeVersion = process.versions.node } = {}) {
+function fixture({ requiredNodeVersion = process.versions.node, immutablePrefixes = [] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "codex-gate-test-"));
   fixtureRoots.add(root);
   const bin = join(root, "bin");
   mkdirSync(join(root, "scripts"));
   mkdirSync(join(root, "docs", "ai", "apiyi"), { recursive: true });
   mkdirSync(bin);
-  const gateSource = readFileSync(source, "utf8").replace(
+  let gateSource = readFileSync(source, "utf8").replace(
     'const REQUIRED_NODE_VERSION = "24.20.0";',
     `const REQUIRED_NODE_VERSION = ${JSON.stringify(requiredNodeVersion)};`,
   );
+  // 2026-11-09：生产常量 IMMUTABLE_REVIEW_PREFIXES 已清空（历史凭证目录全部删除）。
+  // 「不可变前缀 → 聚合进 omitted」的机制仍在，故由夹具注入测试专用前缀来验证它。
+  if (immutablePrefixes.length > 0) {
+    const injected = `const IMMUTABLE_REVIEW_PREFIXES = ${JSON.stringify(immutablePrefixes)};`;
+    gateSource = gateSource.replace(
+      "const IMMUTABLE_REVIEW_PREFIXES = [];",
+      () => injected,
+    );
+  }
   writeFileSync(join(root, "scripts/codex-gate.mjs"), gateSource);
   writeFileSync(
     join(root, "docs", "ai", "apiyi", "change-scope.json"),
@@ -427,11 +436,7 @@ function tempCopy(name) {
 
 {
   const f = fixture();
-  mkdirSync(join(f.root, "docs", "ai", "apiyi", "consultations"), { recursive: true });
-  writeFileSync(
-    join(f.root, "docs", "ai", "apiyi", "consultations", "2026-09-02-example.json"),
-    "{}\n",
-  );
+  // 2026-11-09：历史凭证目录已删除，不再有只读前缀夹具。
   f.env.GATE_APIYI_LOG = join(f.root, ".gate-apiyi-log");
   const result = runGate(f, "--uncommitted");
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -714,14 +719,16 @@ for (const [label, graph, expected] of [
 }
 
 {
-  const f = fixture();
+  // 只读历史前缀在生产已清空；用夹具注入一个专用前缀，保持「聚合进 omitted」的机制有覆盖。
+  const IMMUTABLE_FIXTURE_PREFIX = "docs/immutable-fixture/";
+  const f = fixture({ immutablePrefixes: [IMMUTABLE_FIXTURE_PREFIX] });
   mkdirSync(join(f.root, "src"), { recursive: true });
   mkdirSync(join(f.root, "docs", "contract"), { recursive: true });
-  mkdirSync(join(f.root, "docs", "ai", "apiyi", "consultations"), { recursive: true });
+  mkdirSync(join(f.root, "docs", "immutable-fixture"), { recursive: true });
   writeFileSync(join(f.root, "src", "changed.ts"), "export const changed = true;\n");
   writeFileSync(join(f.root, "docs", "contract", "provider.md"), "# Provider contract\n");
-  writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "old.json"), '{"historical":true}\n');
-  writeFileSync(join(f.root, "docs", "ai", "apiyi", "consultations", "older.json"), '{"historical":"older"}\n');
+  writeFileSync(join(f.root, "docs", "immutable-fixture", "old.json"), '{"historical":true}\n');
+  writeFileSync(join(f.root, "docs", "immutable-fixture", "older.json"), '{"historical":"older"}\n');
   const scopeCopy = tempCopy("scope");
   const packetCopy = tempCopy("packet");
   const promptCopy = tempCopy("scope-prompt");
@@ -747,7 +754,7 @@ for (const [label, graph, expected] of [
     })),
     [
       {
-        prefix: "docs/ai/apiyi/consultations/",
+        prefix: IMMUTABLE_FIXTURE_PREFIX,
         fileCount: 2,
         presentFileCount: 2,
         deletedFileCount: 0,

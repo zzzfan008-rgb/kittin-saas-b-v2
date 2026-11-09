@@ -211,10 +211,5 @@
       "value": "src/types/workflow.ts"
     }
   ],
-  "exclusions": [
-    {
-      "kind": "prefix",
-      "value": "docs/ai/apiyi/consultations/"
-    }
-  ]
+  "exclusions": []
 }

@@ -314,7 +314,7 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
  * VIP 系模型按画幅的三档像素尺寸（1K / 2K / 4K 标签；提交值仍是像素尺寸，上游只认 WxH）。
  *
  * 取值来源：docs/ai/apiyi/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
- * docs/ai/apiyi/consultations/vip-size-tiers.json 的咨询凭证）；标准档与
+ * 官方档位表）；标准档与
  * VIP_SIZE_BY_RATIO 的既有默认一致（如 3:4 = 1536x2048）。
  * 仅 gpt-image-2.5-flare / gpt-image-2.5-sunburst 提供该三档选择
  * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。

@@ -34,7 +34,7 @@
 - **input-image-normalization.md**：用户上传素材进入节点和生成队列前的标准化硬门禁。
 - **models/**：每个模型的人工可读适配说明。
 - **sources.json**：上游 canonical URL、官方 Markdown URL、抓取日期、SHA-256 指纹以及对应的本地整理文档。
-- **consultations/**：历史决策凭证（2026-10-29 起不再由门禁校验，仅作审计留存）。
+（历史凭证目录 consultations/candidates/reviews 已于 2026-11-09 删除：供应商迁移后其内容全部失效。）
 - **evidence/**：脱敏的网关目录、探针事实和人工复核摘要；目录存在只证明配置令牌的观测视图，不等于端点生成通过。
 - **change-scope.json**：哪些路径必须先经过本地知识库门禁。
 - **project-guidance.json**：已经采用、建议后续处理和需要用户选择的文档建议。

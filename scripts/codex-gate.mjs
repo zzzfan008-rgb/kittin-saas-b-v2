@@ -66,10 +66,9 @@ const AST_GREP_CONFIG = "sgconfig.yml";
 const AST_GREP_BINARY = "ast-grep";
 /** 已显式登记并经评审豁免的循环依赖规则；任何其它循环依赖都必须阻断门禁。 */
 const BASELINE_CIRCULAR_RULES = Object.freeze(["no-circular-baseline"]);
-// 2026-10-29：API易 全站快照已删除、凭证门取消；只剩历史凭证目录仍视为不可变。
-const IMMUTABLE_REVIEW_PREFIXES = [
-  "docs/ai/apiyi/consultations/",
-];
+// 2026-11-09：API易 时期的 consultations/candidates/reviews 已全部删除（供应商迁移后失效），
+// 凭证门亦已取消；当前不再有任何只读历史前缀。
+const IMMUTABLE_REVIEW_PREFIXES = [];
 const APIYI_CHANGE_SCOPE_PATH = "docs/ai/apiyi/change-scope.json";
 const APIYI_BOOTSTRAP_SCOPE_RULES = Object.freeze([
   { kind: "exact", value: "scripts/codex-gate.mjs" },
