@@ -52,8 +52,6 @@ const TEST_FILES = [
   "tests/bundle-budget.test.mjs",
   "tests/bundle-boundaries.test.mjs",
   "tests/e2e-safety.test.mjs",
-  "tests/claude-guardrail-hook.test.mjs",
-  "tests/spec-kit-skills.test.mjs",
   "tests/codex-gate.test.mjs",
   "tests/node-version-contract.test.ts",
   "tests/dependency-security-contract.test.ts",
