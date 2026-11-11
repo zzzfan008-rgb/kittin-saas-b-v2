@@ -316,6 +316,23 @@ body {
   color: var(--gc-status-retry);
 }
 
+/* RUN-02 生成阶段文案（2026-11-10）：显影区底部一行小字，只显示后端真实上报的阶段/计数；
+   没有 progress 时整行不渲染，不留空占位。放在显影区内部，不改变节点高度、不引起跳版。 */
+.gc-run-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  z-index: 3;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--gc-node-muted, var(--gc-text-muted));
+  pointer-events: none;
+}
+
 /* ---- V4 结果过渡动画：gc-result-reveal（图片/视频通用 blur→clear 揭示） ---- */
 @keyframes gc-result-reveal {
   0% {

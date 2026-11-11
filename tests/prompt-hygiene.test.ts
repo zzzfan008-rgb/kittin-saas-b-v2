@@ -34,7 +34,7 @@ ok("全部生图预设渲染后不含脚手架/自指词", () => {
     if (REWRITER_KEYS.has(key)) continue;
     const rendered = renderProviderPrompt({
       nodeKind: "image",
-      modelId: "gpt-image-2.5-flare",
+      modelId: "gpt-image-2.6-flare",
       operationMode: preset.mode as never,
       taskPrompt: preset.text,
       references: [{}, {}],

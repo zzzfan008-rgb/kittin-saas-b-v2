@@ -135,6 +135,41 @@ export interface DocumentTarget {
   documentEpoch: number;
 }
 
+// ---------------------------------------------------------------------------
+// 生成中占位结果节点（用户 2026-10-28）：点运行即刻出现的「暗房显影」卡片。
+//
+// 分层边界（2026-11-10 刷新恢复修复）：
+// - 文档层：`runId === ""` 的占位节点仍由 `createDocumentSnapshot` 过滤，
+//   绝不写进服务端 `flow_json`（服务端 schema 要求 result 节点 runId 非空）。
+// - 会话层：占位节点连同它的溯源边保留在 sessionStorage 里，刷新后画布不空；
+//   `pendingRunId` 是**仅会话层**的瞬态字段，记录已确认入队的 run，供启动重放。
+//   真结果节点一律由 `result-node-created` durable 事件驱动，不本地凭空造产物。
+// ---------------------------------------------------------------------------
+
+export const PENDING_RESULT_RUN_ID = "";
+export const PENDING_RESULT_RUN_ID_KEY = "pendingRunId" as const;
+
+export interface PendingResultNodeLike {
+  data: {
+    kind?: unknown;
+    runId?: unknown;
+    pendingRunId?: unknown;
+    sourceGeneratorId?: unknown;
+  };
+}
+
+export function isPendingResultNode(node: PendingResultNodeLike): boolean {
+  const { kind, runId } = node.data;
+  return (kind === "result-image" || kind === "result-video")
+    && runId === PENDING_RESULT_RUN_ID;
+}
+
+/** 只有 POST /api/run-plan 返回 runId 后才会写入；空串/脏值一律视为「尚不可恢复」。 */
+export function pendingRunIdOf(node: PendingResultNodeLike): string | undefined {
+  const value = node.data[PENDING_RESULT_RUN_ID_KEY];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
 export type CoalescedTextEditDescriptor =
   | { kind: "project-name" }
   | { kind: "node-data"; nodeId: string; field: "label" | "prompt" | "note" | "text" | "outputText" | "editPrompt" };

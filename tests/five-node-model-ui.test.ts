@@ -223,7 +223,7 @@ test("文本节点：只读项目中「帮我补全」按钮禁用（源码接�
   );
 });
 
-test("生图节点：官方支持 quality 的模型（gpt-image 2.5）才显示画质控件", () => {
+test("生图节点：2.6 非 vip 质量固定 medium，不显示画质控件", () => {
   const node = {
     id: "image-generator-quality",
     type: "image-generator",
@@ -232,7 +232,7 @@ test("生图节点：官方支持 quality 的模型（gpt-image 2.5）才显示�
       kind: "image-generator",
       label: "生图",
       status: "idle",
-      modelId: "gpt-image-2.5-flare",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048", quality: "low" },
       aspectRatio: "1:1",
       batchSize: 1,
@@ -245,7 +245,7 @@ test("生图节点：官方支持 quality 的模型（gpt-image 2.5）才显示�
     edges: [],
   });
   const html = render(node);
-  assert.match(html, /aria-label="画质"/, "gpt-image 必须显示画质控件");
+  assert.doesNotMatch(html, /aria-label="画质"/, "2.6 非 vip 不应显示画质控件");
   assert.match(html, /aria-label="分辨率"/);
 });
 

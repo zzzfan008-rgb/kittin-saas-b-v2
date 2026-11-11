@@ -31,14 +31,14 @@ ok("flux 多图给出告警，并指向替代模型", () => {
   const warning = imageModelReferenceWarning("flux-3-image", 2);
   assert.ok(warning, "2 张参考图必须告警");
   assert.match(warning!, /FLUX3/);
-  assert.match(warning!, /GPT2\.5快速/);
+  assert.match(warning!, /GPT2\.6快速/);
   assert.equal(typeof imageModelReferenceWarning("flux-3-image", 8), "string", "上限张数同样告警");
 });
 
 ok("其它模型不受影响（当前无同类已知缺陷）", () => {
   for (const id of [
-    "gpt-image-2.5-flare",
-    "gpt-image-2.5-sunburst",
+    "gpt-image-2.6-flare",
+    "gpt-image-2.6-sunburst",
     "gemini-3.1-flash-image",
     "gemini-nano-banana-2.1",
     "qwen-image-3.0",

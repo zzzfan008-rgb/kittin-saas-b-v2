@@ -64,7 +64,7 @@ export interface MultiRoundEditPanelProps {
   runStatus: NodeRunStatus;
   /** 提交：面板已完成合成+上传，把 editInputRef URL 交给 ImageNode 发合成 run。
    * 返回 true=运行已提交（状态会流转），false=被门禁拒绝（面板需提示用户）。 */
-  onRun: (editInputRef: string) => Promise<boolean> | boolean;
+  onRun: (editInputRef: string) => Promise<boolean | string> | boolean | string;
   /** 用户从修改记录选中某一轮 → 确认覆盖到节点（写回 outputImages）。 */
   onApplyRound: (url: string) => void;
   onClose: () => void;
@@ -218,8 +218,11 @@ export function MultiRoundEditPanel({
       const draft = await uploadEditDraft({ dataUrl: composite.dataUrl, projectId, nodeId });
       // 运行真发出了才算开始：门禁拒绝（进行中任务/额度/只读）时直接报错，不静默。
       const submitted = await onRun(draft.url);
-      if (!submitted) {
-        setError("本次修改未能发起：可能有进行中的任务、额度不足或项目只读，请稍后重试");
+      if (submitted !== true) {
+        // store 门禁（2026-11-10）会带回具体原因；只有旧的布尔 false 才回退到通用文案。
+        setError(typeof submitted === "string" && submitted.trim()
+          ? submitted
+          : "本次修改未能发起：可能有进行中的任务、额度不足或项目只读，请稍后重试");
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));

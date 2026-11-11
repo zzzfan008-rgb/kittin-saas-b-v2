@@ -17,8 +17,8 @@
 export const RETIRED_IMAGE_MODEL_IDS = [
   "grok-imagine-image",
   "gpt-image-2.5-all",
-  "gpt-image-2.5-sunburst-vip",
-  "gpt-image-2.5-flare-vip",
+  "gpt-image-2.6-sunburst-vip",
+  "gpt-image-2.6-flare-vip",
   "gemini-3-pro-image-preview",
   "gemini-3.1-flash-lite-image",
   "flux-2-pro",
@@ -30,4 +30,24 @@ export type RetiredImageModelId = (typeof RETIRED_IMAGE_MODEL_IDS)[number];
 export function isRetiredImageModelId(value: unknown): value is RetiredImageModelId {
   return typeof value === "string"
     && (RETIRED_IMAGE_MODEL_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * 2026-11-10：GPT Image 2.6 上线，2.5 flare/sunburst 从产品移除。
+ *
+ * 与 retired 列表不同：这两个 2.5 ID **有同族继任者**，必须精确映射到对应 2.6
+ * （flare→flare、sunburst→sunburst），不能回落默认模型——否则旧项目里选 sunburst
+ * 的节点会被静默改成 flare，用户看到画风变化却找不到原因。
+ *
+ * 前端加载（flowTabSession）与服务端校验（workflowSchema）共用此表。
+ */
+export const LEGACY_IMAGE_MODEL_REPLACEMENTS: Readonly<Record<string, string>> = {
+  "gpt-image-2.5-flare": "gpt-image-2.6-flare",
+  "gpt-image-2.5-sunburst": "gpt-image-2.6-sunburst",
+};
+
+export function migrateLegacyImageModelId(value: unknown): unknown {
+  return typeof value === "string"
+    ? LEGACY_IMAGE_MODEL_REPLACEMENTS[value] ?? value
+    : value;
 }

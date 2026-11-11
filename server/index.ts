@@ -18,6 +18,8 @@ import { usageRouter } from "./routes/usage";
 import { createAiDiagnosticsRouter } from "./routes/aiDiagnostics";
 import { createOpenAiMaskTestRouter } from "./routes/openaiMaskTest";
 import { createTextRewriteRouter } from "./routes/textRewrite";
+import { createReferenceAnalysisRouter } from "./routes/referenceAnalysis";
+import { runRecoveryRouter } from "./routes/runRecovery";
 import { mattingRouter } from "./routes/matting";
 import { createBillingRouter } from "./routes/billing";
 import { requireAuth, requirePasswordChanged, pruneExpiredSessions } from "./lib/auth";
@@ -44,6 +46,9 @@ const loginRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests
 // 提示词改写补全按钮：per-IP 时间窗 20 次/分钟（契约 §4，参考 aiRateLimit 形态；比出图通道宽，
 // 文本便宜但仍防滥用）。
 const textRewriteRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests: 20 });
+// 运行前参考图解析：同样 20 次/分钟（单次成本比文本改写高，但远低于出图）。
+const referenceAnalysisRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests: 20 });
+const runRecoveryRateLimit = createRateLimitMiddleware({ windowMs: 60_000, maxRequests: 10 });
 const aiDiagnosticsRouter = createAiDiagnosticsRouter(aiRateLimit);
 app.get("/api/health", (_req, res) => res.json({ ok: true, status: "alive" }));
 
@@ -111,9 +116,13 @@ app.use("/api/projects", projectsRouter);
 app.use("/api/templates", templatesRouter);
 app.use("/api/assets", assetsRouter);
 app.use("/api/history", historyRouter);
+// 找回已生成但未取回的图片：只重取上游 URL，不调用模型、不计费。
+app.use("/api/runs", runRecoveryRateLimit, runRecoveryRouter);
 app.use("/api/usage", usageRouter);
 app.use("/api/ai-diagnostics", aiDiagnosticsRouter);
 app.use("/api/text", textRewriteRateLimit, createTextRewriteRouter());
+// 运行前参考图智能解析：读项目快照取参考图 → 多模态模型 → 只返回补充段。
+app.use("/api/reference-analysis", referenceAnalysisRateLimit, createReferenceAnalysisRouter());
 // 抠图：转发到本地 Python rembg 服务（rembg-service/，不走 AI 限流——不消耗外部配额）。
 app.use("/api/matting", mattingRouter);
 // 账户余额：只读展示，凭据仅服务端持有；不消耗 AI 限流额度。

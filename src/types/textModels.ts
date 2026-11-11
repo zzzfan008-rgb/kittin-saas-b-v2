@@ -10,7 +10,7 @@
 import contracts from "../../docs/ai/gateway/model-contracts.json";
 
 /**
- * 网关模型 ID 以 API易 本地知识库页面实际模型名为准
+ * 网关模型 ID 以兔子 API（Tu-zi）模型文档中的实际模型名为准
  * （快照 2026-09-18T04-42-51.697Z-6e0c4634fe56ccfd；R10 最终裁定 2026-09-19 实名定版）：
  * - gpt-4o → 计费目录登记实名 `"n": "gpt-4o"`
  *   （pages/models.md，SHA-256 33100d3f…9f00ed）
@@ -65,20 +65,20 @@ const textContractMap = new Map(rawTextModels.map((model) => [model.id, model]))
 
 // ---------- 一致性断言（加载即校验，防线同 imageModels.ts 顶部 throw） ----------
 if (!Array.isArray(rawTextModels) || rawTextModels.length === 0) {
-  throw new Error("API易文本模型契约缺少 textModels 区块（model-contracts.json）");
+  throw new Error("文本模型契约缺少 textModels 区块（model-contracts.json）");
 }
 for (const id of TEXT_MODEL_IDS) {
-  if (!textContractMap.has(id)) throw new Error(`API易文本模型知识库缺少契约: ${id}`);
+  if (!textContractMap.has(id)) throw new Error(`文本模型知识库缺少契约: ${id}`);
 }
 if (textContractMap.size !== TEXT_MODEL_IDS.length) {
-  throw new Error("API易文本模型知识库与应用文本模型清单不一致");
+  throw new Error("文本模型知识库与应用文本模型清单不一致");
 }
 for (const model of rawTextModels) {
   if (model.contractHashScope !== "sha256-canonical-text-model-envelope-v1") {
-    throw new Error(`API易文本模型契约 contractHashScope 无效: ${model.id}`);
+    throw new Error(`文本模型契约 contractHashScope 无效: ${model.id}`);
   }
   if (!/^sha256:[a-f0-9]{64}$/.test(model.contractHash)) {
-    throw new Error(`API易文本模型契约 contractHash 格式无效: ${model.id}`);
+    throw new Error(`文本模型契约 contractHash 格式无效: ${model.id}`);
   }
 }
 

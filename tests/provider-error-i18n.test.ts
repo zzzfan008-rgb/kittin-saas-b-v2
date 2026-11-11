@@ -151,7 +151,7 @@ async function main(): Promise<void> {
     {
       category: "model_unavailable",
       samples: [
-        { raw: "model gpt-image-2.5-sunburst does not exist", expectedMessage: ERROR_MESSAGES.model_unavailable },
+        { raw: "model gpt-image-2.6-sunburst does not exist", expectedMessage: ERROR_MESSAGES.model_unavailable },
         { raw: "model not found or not available", expectedMessage: ERROR_MESSAGES.model_unavailable },
         { raw: "unknown model requested", expectedMessage: ERROR_MESSAGES.model_unavailable },
         { raw: "模型不可用", expectedMessage: ERROR_MESSAGES.model_unavailable },

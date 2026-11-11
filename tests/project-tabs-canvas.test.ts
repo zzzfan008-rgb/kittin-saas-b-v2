@@ -35,7 +35,7 @@ import { setGenerationSafetyBlockReason } from "../src/store/generationSafety";
 // v9（64 Phase 3）：variant 绑定概念已删——夹具直给模型/模式/参数
 // （值与原参数档案 materialize 等价：commerce-hero edit → aspectRatio "1:1"、batchSize 1；
 // flare-vip modelOptions { size: "2048x2048" }；gemini modelOptions { aspectRatio: "1:1", imageSize: "2K" }）。
-const AI_TEST_MODEL_ID = "gpt-image-2.5-flare";
+const AI_TEST_MODEL_ID = "gpt-image-2.6-flare";
 const AI_TEST_ASPECT_RATIO = "1:1";
 const AI_TEST_BATCH_SIZE = 1;
 const AI_TEST_MODEL_OPTIONS = { size: "2048x2048" };
@@ -242,7 +242,7 @@ await test("Gemini 选择经上传回写、加蒙版、切页与运行全程保�
       label: "蒙版局部重绘",
       status: "idle",
       operationMode: "mask-edit",
-      modelId: "gpt-image-2.5-sunburst",
+      modelId: "gpt-image-2.6-sunburst",
       modelOptions: {},
       aspectRatio: "3:4",
       batchSize: 1,
@@ -357,37 +357,34 @@ await test("v7 原生参数由 Inspector 窗口唯一入口写回 modelOptions�
 
 await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 尺寸档表无「自动」/ -all 尺寸前缀）", () => {
   // ① VIP×2 画幅补齐为契约 10 比例：此前面板硬编码 5 比例，10 比例 × 3 档里 15 档永远不可达。
-  const vipRatios = imageAspectRatioOptions("gpt-image-2.5-flare");
+  const vipRatios = imageAspectRatioOptions("gpt-image-2.6-flare");
   assert.equal(vipRatios.length, 10, "VIP 画幅必须与契约 aspectRatios 的 10 比例一致");
   assert.deepEqual(
     vipRatios,
-    getImageModelContract("gpt-image-2.5-flare").aspectRatios,
+    getImageModelContract("gpt-image-2.6-flare").aspectRatios,
     "VIP 画幅下拉必须直接取自契约，不得再硬编码子集",
   );
-  assert.equal(imageAspectRatioOptions("gpt-image-2.5-sunburst").length, 10, "两个 VIP 模型画幅必须一致");
+  assert.equal(imageAspectRatioOptions("gpt-image-2.6-sunburst").length, 10, "两个 VIP 模型画幅必须一致");
 
-  // ② 兔子API 迁移后不再有 VIP 专属尺寸档表：gpt-image-2.5-flare 用契约声明的 size/quality。
+  // ② 兔子API 迁移后不再有 VIP 专属尺寸档表：gpt-image-2.6-flare 用契约声明的 size/quality。
   assert.equal(
-    imageSizeTierOptions("gpt-image-2.5-flare", "3:4"),
+    imageSizeTierOptions("gpt-image-2.6-flare", "3:4"),
     undefined,
     "迁移后不存在 VIP 1K/2K/4K 档表，尺寸由契约 size 取值驱动",
   );
-  const flareRecommended = getImageModelContract("gpt-image-2.5-flare").recommendedOptions!;
+  const flareRecommended = getImageModelContract("gpt-image-2.6-flare").recommendedOptions!;
   assert.deepEqual(
     flareRecommended.size!.examples,
     ["1024x1024", "1536x1024", "1024x1536", "2048x2048", "2048x1152", "3840x2160", "2160x3840", "auto"],
     "flare 的 size 取值必须与兔子API 文档的常用尺寸一致",
   );
   assert.equal(flareRecommended.size!.default, "1536x2048", "flare 默认尺寸为 3:4 竖版");
-  assert.deepEqual(
-    flareRecommended.quality!.examples,
-    ["auto", "low", "medium", "high"],
-    "flare 的 quality 取值必须与文档一致",
-  );
+  // 2.6 非 vip 质量固定 medium，契约不再暴露 quality（兔子文档 endpoint-matrix）。
+  assert.equal(flareRecommended.quality, undefined, "2.6 不应暴露 quality 参数");
 
   // ③ 迁移后没有任何模型使用 prompt 尺寸前缀（该机制属于已退役的 gpt-image-2.5-all）。
   assert.equal(
-    imagePromptSizePrefixOptions("gpt-image-2.5-flare"),
+    imagePromptSizePrefixOptions("gpt-image-2.6-flare"),
     undefined,
     "兔子API 的 flare 直接接受 size，不再需要提示词尺寸前缀",
   );
@@ -398,7 +395,7 @@ await test("R-101：面板参数与 API易契约对齐（VIP 画幅 10 比例 / 
   // 1536x2048）。现改为「保留当前分辨率档位、按新画幅重算 size」；quality 等其它参数不变。
   // 官方 1K×3:4 是 960x1280（不是按长边公式推的 768x1024）——gpt-image 走 30 档官方表。
   assert.deepEqual(
-    imageModelOptionsForAspectRatio("gpt-image-2.5-flare", { size: "1280x1280", quality: "high" }, "3:4"),
+    imageModelOptionsForAspectRatio("gpt-image-2.6-flare", { size: "1280x1280", quality: "high" }, "3:4"),
     { size: "960x1280", quality: "high" },
     "画幅联动必须生效（同档官方尺寸），且不丢其它已选参数",
   );
@@ -550,7 +547,7 @@ await test("保存当前原图的蒙版后局部重绘按钮立即恢复可点�
           kind: "image-generator",
           label: "蒙版局部重绘",
           status: "idle",
-          modelId: "gpt-image-2.5-sunburst",
+          modelId: "gpt-image-2.6-sunburst",
           modelOptions: {},
           aspectRatio: "3:4",
           batchSize: 1,

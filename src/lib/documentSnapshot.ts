@@ -71,6 +71,8 @@ export type DocumentNodeData =
        * 改写白名单门控；无值省略（不写空串）。undefined=fail-closed 不触发族行为。
        */
       familyId?: string;
+      /** 运行前智能解析参考图开关：undefined=开启，仅显式 false 关闭。 */
+      analyzeReferences?: boolean;
       mask?: string;
       maskSourceRef?: string;
       featherRadius?: number;
@@ -292,6 +294,10 @@ export function createDocumentNodeData(data: WorkflowNodeData): DocumentNodeData
             ? data.familyId.trim()
             : undefined,
         ),
+        // 仅在显式关闭时落盘 false；缺省(true)不写，避免历史文档被无谓改写。
+        ...(typeof data.analyzeReferences === "boolean" && data.analyzeReferences === false
+          ? { analyzeReferences: false }
+          : {}),
       };
     }
     case "video-generator":
@@ -348,7 +354,7 @@ const DOCUMENT_NODE_ALLOWED_FIELDS: Record<NodeKind, readonly string[]> = {
   "image-generator": [
     "kind", "label",
     "modelId", "aspectRatio", "batchSize", "modelOptions",
-    "operationMode", "familyId",
+    "operationMode", "familyId", "analyzeReferences",
   ],
   "video-generator": [
     "kind", "label",

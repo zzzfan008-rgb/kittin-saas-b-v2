@@ -48,7 +48,7 @@
           "label": "改款生成",
           "status": "idle",
           "operationMode": "edit",
-          "modelId": "gpt-image-2.5-flare",
+          "modelId": "gpt-image-2.6-flare",
           "modelOptions": {
             "size": "2048x2048",
             "quality": "low"

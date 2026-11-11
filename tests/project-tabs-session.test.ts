@@ -458,7 +458,7 @@ assert.equal(migrated.tabs[0].dirty, true);
 console.log("  ✓ 旧会话逐节点补齐必需字段，并隔离坏节点和悬空边");
 
 const generalModelPairs = [
-  { modelId: "gpt-image-2.5-flare", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
+  { modelId: "gpt-image-2.6-flare", modelOptions: { size: "2048x1152" }, aspectRatio: "16:9" },
   {
     modelId: "gemini-3.1-flash-image",
     modelOptions: { aspectRatio: "16:9", imageSize: "4K" },
@@ -534,7 +534,7 @@ assert.ok(retiredModelSession);
 const retiredModelData = retiredModelSession.tabs[0].nodes[0].data;
 assert.equal(retiredModelData.kind, "image-generator");
 if (retiredModelData.kind !== "image-generator") throw new Error("unexpected retired node kind");
-assert.equal(retiredModelData.modelId, "gpt-image-2.5-flare");
+assert.equal(retiredModelData.modelId, "gpt-image-2.6-flare");
 assert.equal(retiredModelData.retiredModelId, undefined);
 assert.equal(retiredModelData.modelSelectionNeedsConfirmation, undefined);
 assert.deepEqual(retiredModelData.modelOptions, { aspectRatio: "4:3", resolution: "1k" });
@@ -566,7 +566,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换领型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -633,7 +633,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "换袖型",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -684,7 +684,7 @@ useFlowStore.getState().openFlowTab({
       prompt: "保持运行",
       aspectRatio: "1:1",
       batchSize: 1,
-      modelId: "gpt-image-2.5-flare",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       operationMode: "edit",
       operationModeNeedsConfirmation: false,
@@ -748,7 +748,7 @@ useFlowStore.getState().openFlowTab({
     position: { x: 300, y: 0 },
     data: {
       kind: "image-generator", label: "局部重绘", status: "idle",
-      modelId: "gpt-image-2.5-sunburst", modelOptions: {},
+      modelId: "gpt-image-2.6-sunburst", modelOptions: {},
       aspectRatio: "3:4", batchSize: 1,
     },
   }],
@@ -923,8 +923,8 @@ useFlowStore.getState().loadFlow({
       kind: "image-generator",
       label: "生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
-      modelId: "gpt-image-2.5-flare",
+      promptVariantId: "fashion-lookbook.gpt-image-2.6-flare.edit.v1",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,
@@ -1006,8 +1006,8 @@ useFlowStore.getState().loadFlow({
       kind: "image-generator",
       label: "净零位移生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
-      modelId: "gpt-image-2.5-flare",
+      promptVariantId: "fashion-lookbook.gpt-image-2.6-flare.edit.v1",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,
@@ -1118,10 +1118,10 @@ const unsafeDocumentNode = {
     error: "旧运行错误不得持久化",
     aspectRatio: BOUNDARY_ASPECT_RATIO,
     batchSize: BOUNDARY_BATCH_SIZE,
-    modelId: "gpt-image-2.5-flare",
+    modelId: "gpt-image-2.6-flare",
     modelOptions: BOUNDARY_MODEL_OPTIONS,
     // v9（64 Phase 3）：v7 六绑定字段（脏输入）——投影必须整体剥离，不得进入文档。
-    promptVariantId: "commerce-hero.generate.gpt-image-2.5-flare.v7",
+    promptVariantId: "commerce-hero.generate.gpt-image-2.6-flare.v7",
     promptFamilyId: "commerce-hero",
     parameterProfileId: "pp-v7-dirty",
     contractHash: "sha256:deadbeef",
@@ -1215,10 +1215,26 @@ const sessionTab = boundarySession.tabs.find(
   (tab) => tab.projectId === "pure-boundary-project",
 );
 assert.ok(sessionTab);
+// 2026-11-10：会话快照额外保留「生成中/失败」的占位结果节点与其溯源边（刷新恢复用），
+// 服务端 flow_json 仍不含它们。三路工作流全等比较只看文档部分。
+const sessionPendingIds = new Set(sessionTab.nodes
+  .filter((node) => {
+    const data = node.data as unknown as Record<string, unknown>;
+    return (data.kind === "result-image" || data.kind === "result-video") && data.runId === "";
+  })
+  .map((node) => node.id));
+assert.equal(sessionPendingIds.size, 1, "生成中的占位结果节点必须留在会话快照里");
+assert.equal(
+  sessionTab.edges.some((edge) => sessionPendingIds.has(edge.target)),
+  true,
+  "占位节点的溯源边也必须留在会话快照里",
+);
 const sessionWorkflow = {
   schemaVersion: projectPayload.flow.schemaVersion,
-  nodes: sessionTab.nodes,
-  edges: sessionTab.edges,
+  nodes: sessionTab.nodes.filter((node) => !sessionPendingIds.has(node.id)),
+  edges: sessionTab.edges.filter(
+    (edge) => !sessionPendingIds.has(edge.source) && !sessionPendingIds.has(edge.target),
+  ),
 };
 
 // v9（64 Phase 2→3）：评估/变体字段在 session restore 与 proj 持久化均被剥离。
@@ -1419,8 +1435,8 @@ useFlowStore.getState().openFlowTab({
       kind: "image-generator",
       label: "后台生成节点",
       status: "idle",
-      promptVariantId: "fashion-lookbook.gpt-image-2.5-flare.edit.v1",
-      modelId: "gpt-image-2.5-flare",
+      promptVariantId: "fashion-lookbook.gpt-image-2.6-flare.edit.v1",
+      modelId: "gpt-image-2.6-flare",
       modelOptions: { size: "2048x2048" },
       aspectRatio: "1:1",
       batchSize: 1,

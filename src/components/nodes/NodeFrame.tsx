@@ -6,6 +6,7 @@ import {
   type NodeKind,
   type NodeRunStatus,
 } from "@/types/workflow";
+import { progressStageLabel } from "@/lib/runProgress";
 import { useGenerationSafetyBlockReason } from "@/store/generationSafety";
 import { runWithoutHistory, useFlowStore } from "@/store/flowStore";
 import { useCoalescedTextEdit } from "@/hooks/useCoalescedTextEdit";
@@ -401,6 +402,10 @@ export function useElapsedLabel(startedAt: number | undefined): { label: string;
 /**
  * 生成中进度块（用户 2026-10-28 选型 A+E）：暗房显影 + 已用时角标。
  * 结果节点图区、蒙版重绘右栏、多轮修改右栏共用同一实现，保证三处观感一致。
+ *
+ * RUN-02：`nodeId` 统一传**生成节点 id**（结果节点传 `sourceGeneratorId`），
+ * 与 `runProgressByNodeId` 的索引口径一致；阶段文案由 `progressStageLabel` 单独成模块，
+ * 便于单测（不把纯逻辑绑进 React 组件）。
  */
 export function RunProgressBlock({
   nodeId,
@@ -417,10 +422,19 @@ export function RunProgressBlock({
       ? state.recentResults.find((record) => record.nodeId === nodeId && isNodeRunActive(record.status))?.startedAt
       : undefined
   ));
+  const progress = useFlowStore((state) => (nodeId ? state.runProgressByNodeId[nodeId] : undefined));
   const { label, slow } = useElapsedLabel(startedAt ?? recordStart);
+  const stage = progressStageLabel(progress);
   return (
-    <div className={`relative ${className}`} data-testid="run-progress-block">
+    <div
+      className={`relative ${className}`}
+      data-testid="run-progress-block"
+      data-phase={progress?.phase ?? undefined}
+    >
       <Developing />
+      {stage ? (
+        <span className="gc-run-stage" data-testid="run-progress-stage">{stage}</span>
+      ) : null}
       {label ? (
         <span
           className="gc-run-elapsed absolute right-2 top-2 z-[3]"

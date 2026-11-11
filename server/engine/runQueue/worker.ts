@@ -1,8 +1,8 @@
 import { ClaimedJob, JobLockRow, ProcessGenerationJobOptions, lockRun, parseJson, DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, DEFAULT_RETRY_DELAYS_MS } from "./types";
 import { appendRunEvent } from "./events";
 import { runtimeUserReferenceInputs } from "./promptAdmission";
-import { inputImagesForStep, persistStepImages, captureProviderOriginals, compensatePersistedImages, assertJobOwnedForCompletion } from "./persist";
-import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted, markVideoTaskSubmitted } from "./claim";
+import { inputImagesForStep, persistStepImages, captureProviderOriginals, compensatePersistedImages, assertJobOwnedForCompletion, recordProviderImageUrls } from "./persist";
+import { claimNextJob, recoverExpiredGenerationJobs, markAttemptStarted, markVideoTaskSubmitted, markImageTaskSubmitted } from "./claim";
 import { completeJobSuccess, terminateRun } from "./lifecycle";
 import os from "node:os";
 import { nanoid } from "nanoid";
@@ -15,6 +15,7 @@ import {
   type PersistedImageReceipt,
 } from "../../lib/fileStore";
 import { getProvider } from "../../providers";
+import { runWithAsyncImageTaskHook } from "../../providers/asyncTaskContext";
 import { getVideoProvider } from "../../providers/videoProvider";
 import {
   ProviderError,
@@ -68,20 +69,33 @@ export async function handleJobError(
       WHERE j.id = $1 AND r.deleted_at IS NULL FOR UPDATE OF j
     `, [job.id])).rows[0];
     if (!row || row.worker_id !== workerId) return;
+    // 指南：保存请求 ID。没有任务 ID 时，可用它调
+    // GET /v1/images/generations/result?request_id=... 恢复已保存的图片链接。
+    if (error instanceof ProviderError && error.requestId) {
+      await client.query(
+        "UPDATE generation_run_steps SET provider_request_id = $1 WHERE id = $2",
+        [error.requestId, row.step_id],
+      );
+    }
     if (error instanceof ProviderError && error.category === "outcome_unknown") {
       await terminateRun(client, row, "outcome_unknown", outcomeUnknownMessage(message), now);
       return;
     }
     const retryDelays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
     const maxRetries = Math.min(retryDelays.length, DEFAULT_RETRY_DELAYS_MS.length);
-    if (isRetryableProviderError(error) && row.retry_count < maxRetries) {
+    // 本次尝试已耗时：用于判定「网关 5xx 是否发生在可能出图之前」（见 isEarlyGatewayTimeout）。
+    const attemptElapsedMs = Math.max(0, now - (row.attempt_started_at ?? job.startedAt));
+    if (isRetryableProviderError(error, attemptElapsedMs) && row.retry_count < maxRetries) {
       const retryNumber = row.retry_count + 1;
-      const baseDelay = retryDelays[row.retry_count] ?? DEFAULT_RETRY_DELAYS_MS[row.retry_count];
+      const scheduledDelay = retryDelays[row.retry_count] ?? DEFAULT_RETRY_DELAYS_MS[row.retry_count];
+      // 指南：优先遵守上游 Retry-After（已换算并封顶 120s），但不小于本地退避。
+      const retryAfterMs = error instanceof ProviderError ? (error.retryAfterMs ?? 0) : 0;
+      const baseDelay = Math.max(scheduledDelay, retryAfterMs);
       const jitter = Math.floor((options.random?.() ?? Math.random()) * 1_000);
       const availableAt = now + Math.max(0, baseDelay) + jitter;
       console.warn("[generation-job-retry]", JSON.stringify({
         runId: row.run_id, nodeId: row.node_id, retryCount: retryNumber,
-        delayMs: Math.max(0, baseDelay) + jitter, exhausted: false,
+        delayMs: Math.max(0, baseDelay) + jitter, retryAfterMs, exhausted: false,
       }));
       await lockRun(client, row.run_id);
       await client.query(`
@@ -101,7 +115,7 @@ export async function handleJobError(
       }, now);
       return;
     }
-    if (isRetryableProviderError(error)) {
+    if (isRetryableProviderError(error, attemptElapsedMs)) {
       console.warn("[generation-job-retry]", JSON.stringify({
         runId: row.run_id, nodeId: row.node_id, retryCount: row.retry_count,
         delayMs: null, exhausted: true,
@@ -135,7 +149,13 @@ export async function processNextGenerationJob(
   try {
     const input = await inputImagesForStep(job.runId, job.step);
     const capturedProviderReceipts: PersistedImageReceipt[] = [];
-    const result = await executeStep(
+    // 让异步图片任务在「提交成功的那一刻」就能把 task_id 落库，
+    // 而不必等到整轮轮询结束（进程中途被杀也能找回）。
+    const result = await runWithAsyncImageTaskHook({
+      onSubmitted: async (taskId) => {
+        await markImageTaskSubmitted(job, workerId, taskId, options.now?.() ?? Date.now(), leaseMs);
+      },
+    }, () => executeStep(
       job.step,
       input.images,
       options.resolveProvider ?? getProvider,
@@ -171,6 +191,8 @@ export async function processNextGenerationJob(
           );
         },
         captureProviderImages: async (artifact) => {
+          // 先存 URL 再下载：下载失败时「找回」能只重取图片，不重新生成。
+          await recordProviderImageUrls(job, artifact.images, artifact.providerRequestId);
           const captured = await captureProviderOriginals(
             artifact,
             job,
@@ -182,7 +204,7 @@ export async function processNextGenerationJob(
           return captured.map((image) => image.url);
         },
       },
-    );
+    ));
     await assertJobOwnedForCompletion(job, workerId);
     const providerImageUrls = result.providerImages ?? capturedProviderReceipts.map((image) => image.url);
     if (providerImageUrls.length > 0 && providerImageUrls.length !== result.images.length) {
@@ -222,7 +244,11 @@ export async function processNextGenerationJob(
 }
 
 
-export function startGenerationWorker(): () => void {
+/**
+ * 单个 worker 循环：领取 → 执行 → 继续领，空闲时按轮询间隔重试。
+ * 领取 SQL 使用 `FOR UPDATE ... SKIP LOCKED`，多个循环并发领取不会互相阻塞。
+ */
+function startWorkerLoop(): () => void {
   const workerId = `${os.hostname()}:${process.pid}:${nanoid(6)}`;
   let stopped = false;
   let busy = false;
@@ -247,4 +273,14 @@ export function startGenerationWorker(): () => void {
     stopped = true;
     clearInterval(timer);
   };
+}
+
+/**
+ * 生成本身是分钟级的长任务。单循环会让第二个请求一直排队（多人同时用尤其明显），
+ * 这里按 GENERATION_WORKER_CONCURRENCY（默认 2，上限 4）起多个循环并行消费队列。
+ */
+export function startGenerationWorker(): () => void {
+  const concurrency = config.generationWorkerConcurrency();
+  const stops = Array.from({ length: concurrency }, () => startWorkerLoop());
+  return () => stops.forEach((stop) => stop());
 }

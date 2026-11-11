@@ -8,14 +8,23 @@ import {
 } from "../../src/types/workflow";
 import {
   MASK_REDRAW_MODEL_ID,
+  RESOLUTION_TIERS,
   defaultImageModelOptions,
   getImageModelContract,
   modelMaxReferenceImages,
   modelSupportsQuality,
+  resolutionDimensions,
   type ImageModelId,
   type ImageModelOptions,
+  type ResolutionTier,
 } from "../../src/types/imageModels";
 import { config } from "../config";
+import {
+  isProviderCallAllowed,
+  recordProviderFailure,
+  recordProviderReachable,
+  recordProviderSuccess,
+} from "./circuitBreaker";
 import { validateMaskForSource } from "../lib/maskProcessing";
 import { detectImageMime, MAX_IMAGE_BYTES, validateImageDataUrl } from "../lib/imageValidation";
 import { withImageProcessingSlot } from "../lib/imageProcessingLimit";
@@ -34,6 +43,11 @@ import {
   toDataUrl,
 } from "./base";
 import { getApiyiDispatcher, readApiyiJsonResponse } from "./gatewayTransport";
+import {
+  AsyncImageSubmitError,
+  runAsyncImageTask,
+  type AsyncImageSubmitBody,
+} from "./asyncImageTask";
 
 const PROVIDER_RESPONSE_PIXEL_LIMIT = 40_000_000;
 const REFERENCE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -128,13 +142,41 @@ async function fetchApiyi(
   path: string,
   initFactory: () => RequestInit,
 ): Promise<Response> {
+  // 熔断：该模型连续瞬时失败时快速失败 30 秒，避免重试风暴（指南「熔断、隔离与降级」）。
+  if (!isProviderCallAllowed(modelId)) {
+    throw new ProviderError(
+      "该模型连续失败，已暂停 30 秒，请稍后再试或切换模型",
+      503,
+      modelId,
+      "gateway_unavailable",
+      `circuit_open: ${modelId} temporarily suspended`,
+    );
+  }
   const timeout = getImageModelContract(modelId).timeoutMs;
-  return fetchWithRetry(`${config.gatewayBaseUrl()}${resolveContractPath(path, modelId)}`, initFactory, {
-    providerId: modelId,
-    timeoutMs: config.aiTimeoutMs(timeout),
-    maxRetries: 0,
-    dispatcherFactory: getApiyiDispatcher,
-  });
+  try {
+    const response = await fetchWithRetry(
+      `${config.gatewayBaseUrl()}${resolveContractPath(path, modelId)}`,
+      initFactory,
+      {
+        providerId: modelId,
+        timeoutMs: config.aiTimeoutMs(timeout),
+        maxRetries: 0,
+        dispatcherFactory: getApiyiDispatcher,
+      },
+    );
+    recordProviderSuccess(modelId);
+    return response;
+  } catch (error) {
+    if (error instanceof ProviderError) {
+      // 鉴权/余额/参数/内容等错误说明通道可达，重置连续失败计数。
+      if (error.category === "gateway_unavailable" || error.category === "network_error") {
+        recordProviderFailure(modelId);
+      } else {
+        recordProviderReachable(modelId);
+      }
+    }
+    throw error;
+  }
 }
 
 function providerJsonLimit(expectedImages: number): number {
@@ -289,7 +331,7 @@ async function parseOpenAiImageResponse(
   for (let index = 0; index < body.data.length; index += 1) {
     const item = record(body.data[index]);
     if (!item) throw new ProviderError("AI 服务返回图片条目无效", 502, modelId, "invalid_response");
-    // 兔子API 实测（2026-10-28）：gpt-image-2.5-flare 会同时返回
+    // 兔子API 实测（2026-10-28）：gpt-image-2.6-flare 会同时返回
     // `b64_json: ""`（空串）与真实 `url`。判空必须用「非空字符串」，
     // 否则会拿空串去解码 base64 直接抛错。
     const hasB64 = typeof item.b64_json === "string" && item.b64_json.length > 0;
@@ -418,7 +460,7 @@ export async function validateApiyiRequest(
   if (req.operationMode === "mask-edit" && modelId !== MASK_REDRAW_MODEL_ID) {
     throw new ProviderError(`${modelId} 不支持 mask-edit 模式`, 400, modelId, "invalid_request");
   }
-  // 2026-10-28 实测：gpt-image-2.5-sunburst 同样支持 generate / edit，
+  // 2026-10-28 实测：gpt-image-2.6-sunburst 同样支持 generate / edit，
   // 不再强制只能走 mask-edit（旧约束来自 网关 时代，已失效）。
   requestOptions(modelId, req);
   const refs = referenceData(req, modelId);
@@ -454,6 +496,115 @@ export async function validateApiyiRequest(
  */
 function isGeminiFamily(modelId: ImageModelId): boolean {
   return modelId === "gemini-nano-banana-2.1" || modelId === "gemini-3.1-flash-image";
+}
+
+// ---------- Gemini 异步图片任务（POST /v1/videos + GET /v1/videos/{task_id}）----------
+
+/**
+ * 异步端点不认 aspect_ratio（实测 400 unsupported_async_image_field），只认 size=WxH。
+ * 这里复用与 VIP 模型同一套「档位 × 画幅 → 像素」换算，保证面板上的画幅/分辨率
+ * 在切异步后仍然生效；上游会把请求尺寸等比放大（如 1536x2048 → 1792x2400），
+ * 但比例保持，不影响构图。
+ */
+function asyncImageSize(options: ImageModelOptions): string {
+  const ratio = typeof options.aspectRatio === "string"
+    && /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(options.aspectRatio)
+    ? options.aspectRatio
+    : "1:1";
+  const requested = String(options.imageSize ?? "2K");
+  const tier: ResolutionTier = (RESOLUTION_TIERS as readonly string[]).includes(requested)
+    ? requested as ResolutionTier
+    : "2K";
+  const { width, height } = resolutionDimensions(tier, ratio);
+  return `${width}x${height}`;
+}
+
+/**
+ * 原生 generateContent 通道用 parts 把「参考图N（角色）」文字贴在每张图前；
+ * 异步端点只接受 images 数组 + 单个 prompt，无法交错。冻结协议里大量使用
+ * 「参考图1=服装 / 参考图2=模特」这类编号，因此必须在提示词开头把编号顺序
+ * 与角色显式写清，否则换装会把服装和模特搞反。
+ */
+function asyncReferencePrefix(req: ImageGenRequest, refs: readonly string[]): string {
+  if (refs.length === 0) return "";
+  const roles = orderedReferenceInputs(req).map((reference) => reference.role);
+  const numbered = refs.map((_ref, index) => `参考图${index + 1}`).join("、");
+  const lines = [`参考图按上传顺序依次编号：${numbered}（图片顺序与编号一一对应）。`];
+  const mapping = refs
+    .map((_ref, index) => (roles[index] ? `参考图${index + 1}=${roles[index]}` : null))
+    .filter((entry): entry is string => entry !== null);
+  if (mapping.length > 0) lines.push(`参考图对应：${mapping.join("，")}。`);
+  return `${lines.join("\n")}\n\n`;
+}
+
+/** 异步端点的 images 收 data URL；WebP 需先转 PNG（与原生通道一致）。 */
+async function asyncReferenceDataUrl(dataUrl: string, modelId: ImageModelId): Promise<string> {
+  const parsed = parsedReference(dataUrl, modelId);
+  if (parsed.mime === "image/png" || parsed.mime === "image/jpeg") {
+    return `data:${parsed.mime};base64,${parsed.base64}`;
+  }
+  const converted = await withImageProcessingSlot(() => sharp(parsed.buffer).png().toBuffer());
+  return toDataUrl(converted.toString("base64"), "image/png");
+}
+
+/**
+ * 只允许「提交阶段明确的参数类 4xx」回退同步端点：这类请求没有建立任务、不会计费。
+ * 5xx / 网络中断 / 已拿到 task_id 之后的任何错误一律不回退（可能已出图，重发会重复扣费）。
+ */
+function isAsyncSubmitRejection(error: unknown): error is AsyncImageSubmitError {
+  return error instanceof AsyncImageSubmitError
+    && typeof error.status === "number"
+    && error.status >= 400 && error.status < 500
+    && error.status !== 429
+    && error.category !== "gateway_authentication"
+    && error.category !== "account_credit";
+}
+
+async function geminiAsyncResult(
+  modelId: ImageModelId,
+  req: ImageGenRequest,
+  refs: string[],
+  options: ImageModelOptions,
+): Promise<ImageGenResult> {
+  const body: AsyncImageSubmitBody = {
+    model: upstreamModelId(modelId),
+    prompt: `${asyncReferencePrefix(req, refs)}${req.prompt}`,
+    response_format: "url",
+    size: asyncImageSize(options),
+  };
+  if (refs.length > 0) {
+    body.images = await Promise.all(refs.map((ref) => asyncReferenceDataUrl(ref, modelId)));
+  }
+  const result = await runAsyncImageTask(modelId, body);
+  return {
+    images: result.urls.map((url, index) => imageUrl(url, modelId, index)),
+    model: modelId,
+    // task_id 是异步任务的唯一凭据；失败时由 worker 存进 provider_request_id 供找回。
+    providerRequestId: result.taskId,
+  };
+}
+
+/** 统一的 Gemini 分流：默认异步，提交被明确拒绝或开关关闭时走原生同步端点。 */
+async function geminiResult(
+  modelId: ImageModelId,
+  req: ImageGenRequest,
+  refs: string[],
+  options: ImageModelOptions,
+  sync: () => Promise<ImageGenResult>,
+): Promise<ImageGenResult> {
+  if (!config.geminiAsyncEnabled()) return sync();
+  try {
+    return await geminiAsyncResult(modelId, req, refs, options);
+  } catch (error) {
+    if (!isAsyncSubmitRejection(error)) throw error;
+    console.warn("[gemini-async-fallback]", JSON.stringify({
+      providerId: modelId,
+      status: error.status,
+      category: error.category,
+      diagnostic: (error.diagnostic ?? "").slice(0, 200),
+    }));
+    return sync();
+  }
 }
 
 function isSeedreamFamily(modelId: ImageModelId): boolean {
@@ -536,24 +687,29 @@ async function generate(modelId: ImageModelId, req: ImageGenRequest): Promise<Im
   await validateApiyiRequest(modelId, req, req.operationMode);
   const contract = getImageModelContract(modelId);
   if (!contract.generation) throw new ProviderError(`${modelId} 不支持文生图`, 400, modelId, "invalid_request");
+  // 捕获到局部常量：回退分支是闭包，TS 不会把可空属性收窄带进闭包。
+  const generationPath = contract.generation.path;
   const options = requestOptions(modelId, req);
 
   if (isGeminiFamily(modelId)) {
-    const response = await fetchApiyi(modelId, contract.generation.path, () => ({
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
-      body: JSON.stringify({
-        contents: [{ parts: geminiParts(req.prompt, []) }],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: options.aspectRatio, imageSize: options.imageSize },
-        },
-      }),
-    }));
-    return parseApiyiImageResult(response, async () => ({
-      images: await parseGeminiImages(await readJson(response, modelId), modelId),
-      model: modelId,
-    }));
+    // 2026-11-10：两个 Gemini 图片模型改走异步任务（约 20–30s），原生长连接保留为回退。
+    return geminiResult(modelId, req, [], options, async () => {
+      const response = await fetchApiyi(modelId, generationPath, () => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
+        body: JSON.stringify({
+          contents: [{ parts: geminiParts(req.prompt, []) }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            imageConfig: { aspectRatio: options.aspectRatio, imageSize: options.imageSize },
+          },
+        }),
+      }));
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseGeminiImages(await readJson(response, modelId), modelId),
+        model: modelId,
+      }));
+    });
   }
 
   const response = await fetchApiyi(modelId, contract.generation.path, () => ({
@@ -582,23 +738,25 @@ async function edit(modelId: ImageModelId, req: ImageGenRequest): Promise<ImageG
   const refs = referenceData(req, modelId);
 
   if (isGeminiFamily(modelId)) {
-    const imageParts = await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)));
-    const parts = geminiParts(req.prompt, imageParts, referenceRoles(req));
-    const response = await fetchApiyi(modelId, contract.edit.path, () => ({
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: options.aspectRatio, imageSize: options.imageSize },
-        },
-      }),
-    }));
-    return parseApiyiImageResult(response, async () => ({
-      images: await parseGeminiImages(await readJson(response, modelId), modelId),
-      model: modelId,
-    }));
+    return geminiResult(modelId, req, refs, options, async () => {
+      const imageParts = await Promise.all(refs.map((ref) => geminiInlineData(ref, modelId)));
+      const parts = geminiParts(req.prompt, imageParts, referenceRoles(req));
+      const response = await fetchApiyi(modelId, contract.edit.path, () => ({
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.gatewayApiKey()}` },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            imageConfig: { aspectRatio: options.aspectRatio, imageSize: options.imageSize },
+          },
+        }),
+      }));
+      return parseApiyiImageResult(response, async () => ({
+        images: await parseGeminiImages(await readJson(response, modelId), modelId),
+        model: modelId,
+      }));
+    });
   }
 
   if (isFluxFamily(modelId)) {
@@ -665,7 +823,7 @@ export function createGatewayProvider(modelId: ImageModelId): AIProvider {
 export const gatewayProviders = Object.fromEntries(
   ([
     "gemini-nano-banana-2.1", "gemini-3.1-flash-image",
-    "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
+    "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
     "flux-3-image",
     "doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-lite-260128",
     "qwen-image-3.0-pro", "qwen-image-3.0",

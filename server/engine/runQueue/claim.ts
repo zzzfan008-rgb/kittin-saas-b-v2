@@ -154,6 +154,44 @@ export async function markVideoTaskSubmitted(
 }
 
 
+/**
+ * Gemini 异步图片任务提交成功后的存证护栏（与视频任务 markVideoTaskSubmitted 同构）。
+ *
+ * 任务一建立就写 provider_task_id / provider_request_id，这样即使 worker 在
+ * 20–30s 轮询期间被杀、租约过期后运行被标 outcome_unknown，「尝试找回图片」
+ * 仍能按 task_id 幂等取回结果，不必重新生成、不重复计费。
+ *
+ * 租约已易主时静默跳过（绝不把本运行的凭据写到别人的步骤上）。
+ */
+export async function markImageTaskSubmitted(
+  job: ClaimedJob,
+  workerId: string,
+  taskId: string,
+  now: number,
+  leaseMs: number,
+): Promise<void> {
+  if (!/^task_[A-Za-z0-9]{1,128}$/.test(taskId)) {
+    throw new Error("async image task id is invalid");
+  }
+  await transaction(async (client) => {
+    const row = (await client.query<{ status: DurableRunStatus; worker_id: string | null }>(`
+      SELECT status, worker_id FROM generation_jobs WHERE id = $1 FOR UPDATE
+    `, [job.id])).rows[0];
+    if (!row || row.worker_id !== workerId) return;
+    if (row.status !== "running") return;
+    await client.query(`
+      UPDATE generation_jobs SET attempt_started_at = COALESCE(attempt_started_at, $1),
+        lease_expires_at = $2, updated_at = $1 WHERE id = $3
+    `, [now, now + leaseMs, job.id]);
+    await client.query(`
+      UPDATE generation_run_steps
+      SET provider_task_id = $1,
+          provider_request_id = COALESCE(provider_request_id, $1)
+      WHERE id = $2
+    `, [taskId, job.stepId]);
+  });
+}
+
 export async function recoverExpiredGenerationJobs(now = Date.now()): Promise<number> {
   return transaction(async (client) => {
     const rows = (await client.query<JobLockRow>(`

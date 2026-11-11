@@ -5,6 +5,7 @@ import type {
   RunEvent,
   RunEventMeta,
   RunFailure,
+  RunProgress,
   WorkflowNodeData,
 } from "@/types/workflow";
 
@@ -44,6 +45,35 @@ function stringArray(value: unknown): string[] | undefined {
 function nullableStringArray(value: unknown): Array<string | null> | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.map((item) => optionalString(item) ?? null);
+}
+
+/**
+ * RUN-02（契约 §5）：节点子单元进度。
+ *
+ * fail-closed：`phase` 缺失即整体丢弃（无法表述阶段，界面只会更混乱）；
+ * `done`/`total` 必须成对、`total > 0`、`0 <= done <= total`，否则视为「无计数能力」，
+ * 只保留 phase——**绝不按比例编造百分比**（契约明确禁止）。
+ */
+function runProgress(value: unknown): RunProgress | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const phase = optionalString(raw.phase);
+  if (!phase) return undefined;
+  const done = optionalFiniteNumber(raw.done);
+  const total = optionalFiniteNumber(raw.total);
+  const queuePosition = optionalFiniteNumber(raw.queuePosition);
+  const counted = done !== undefined
+    && total !== undefined
+    && total > 0
+    && done >= 0
+    && done <= total;
+  return {
+    phase,
+    ...(counted ? { done: Math.floor(done), total: Math.floor(total) } : {}),
+    ...(queuePosition !== undefined && queuePosition >= 0
+      ? { queuePosition: Math.floor(queuePosition) }
+      : {}),
+  };
 }
 
 function runFailures(value: unknown): RunFailure[] | undefined {
@@ -117,6 +147,7 @@ export function normalizeRunEvent(value: unknown): RunEvent {
   if (raw.type !== "node-status") throw new Error("运行事件类型无效");
   const nodeId = optionalString(raw.nodeId);
   if (!nodeId) throw new Error("运行事件缺少节点标识");
+  const progress = runProgress(raw.progress);
   const common: RunEventMeta = {
     ...(seq !== undefined ? { seq } : {}),
     ...(optionalString(raw.error) ? { error: optionalString(raw.error) } : {}),
@@ -128,6 +159,7 @@ export function normalizeRunEvent(value: unknown): RunEvent {
     ...(runFailures(raw.failures) ? { failures: runFailures(raw.failures) } : {}),
     ...(optionalFiniteNumber(raw.startedAt) !== undefined ? { startedAt: optionalFiniteNumber(raw.startedAt) } : {}),
     ...(optionalFiniteNumber(raw.finishedAt) !== undefined ? { finishedAt: optionalFiniteNumber(raw.finishedAt) } : {}),
+    ...(progress ? { progress } : {}),
   };
   if (raw.status === "success") {
     return { ...common, type: "node-status", nodeId, status: "success", images: stringArray(raw.images) ?? [] };

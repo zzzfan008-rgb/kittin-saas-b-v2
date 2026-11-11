@@ -128,7 +128,7 @@ async function main(): Promise<void> {
         assert.ok(getImageModelContract(modelId).upstreamModelId);
       }
       // 2026-10-28 实测：sunburst 支持文生图/图生图，generation 不再为 null。
-      assert.ok(getImageModelContract("gpt-image-2.5-sunburst").generation);
+      assert.ok(getImageModelContract("gpt-image-2.6-sunburst").generation);
     });
 
     await test("九模型契约哈希绑定同一份 reviewed model catalog baseline", () => {
@@ -205,14 +205,14 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-flare 文生图与多参考图编辑使用文档字段", async () => {
+    await test("gpt-image-2.6-flare 文生图与多参考图编辑使用文档字段", async () => {
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init });
         return Response.json(pngPayload(white));
       });
       try {
-        const generated = await gatewayProviders["gpt-image-2.5-flare"].generate({
+        const generated = await gatewayProviders["gpt-image-2.6-flare"].generate({
           prompt: "礼服",
           operationMode: "generate",
           modelOptions: { size: "1280x1280" },
@@ -221,15 +221,14 @@ async function main(): Promise<void> {
         assert.equal(captures[0].url, "https://gateway.example/v1/images/generations");
         assert.equal(new Headers(captures[0].init?.headers).get("authorization"), "Bearer apiyi-test-key");
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "gpt-image-2.5-flare",
+          model: "gpt-image-2.6-flare",
           prompt: "礼服",
           size: "1280x1280",
-          quality: "high",
         });
         const generateDispatcher = (captures[0].init as RequestInit & { dispatcher?: unknown })?.dispatcher;
         assert.ok(generateDispatcher, "API易请求必须显式携带专属 Undici dispatcher");
 
-        await gatewayProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.6-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white, blue],
@@ -237,12 +236,13 @@ async function main(): Promise<void> {
         });
         const form = captures[1].init?.body as FormData;
         assert.equal(captures[1].url, "https://gateway.example/v1/images/edits");
-        assert.equal(form.get("model"), "gpt-image-2.5-flare");
+        assert.equal(form.get("model"), "gpt-image-2.6-flare");
         assert.equal(form.get("size"), "2048x2048");
         assert.equal(form.get("response_format"), null);
         assert.equal(form.getAll("image").length, 2);
         assert.equal(form.getAll("image[]").length, 0);
-        assert.equal(form.get("quality"), "high");
+        // 2.6 非 vip 质量固定 medium：不传 quality 才是文档字段。
+        assert.equal(form.get("quality"), null);
         assert.equal(form.get("n"), null);
         assert.equal(form.get("aspect_ratio"), null);
         assert.equal(
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-flare 空参数用契约默认值填充且绝不写出 size=undefined", async () => {
+    await test("gpt-image-2.6-flare 空参数用契约默认值填充且绝不写出 size=undefined", async () => {
       // 兔子API 契约声明 flare 的默认 size=1536x2048、quality=high：空参数必须填契约默认；
       // 核心保证不变：任何字段都不得被序列化成字面量 "undefined" 触发上游 4xx。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
@@ -264,7 +264,7 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(white));
       });
       try {
-        await gatewayProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.6-flare"].edit({
           prompt: "融合参考图",
           operationMode: "edit",
           referenceImages: [white],
@@ -272,8 +272,8 @@ async function main(): Promise<void> {
         });
         const form = captures[0].init?.body as FormData;
         assert.equal(form.get("size"), "1536x2048", "缺 size 时填契约默认值，而不是写出字面量 undefined");
-        assert.equal(form.get("quality"), "high");
-        assert.equal(form.get("model"), "gpt-image-2.5-flare");
+        assert.equal(form.get("quality"), null, "2.6 非 vip 不传 quality");
+        assert.equal(form.get("model"), "gpt-image-2.6-flare");
         for (const [, value] of form.entries()) {
           assert.notEqual(String(value), "undefined", "任何表单字段都不得是字面量 undefined");
         }
@@ -282,8 +282,8 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-flare 直接用 size 控制尺寸，不再拼接提示词前缀", async () => {
-      // 兔子API 迁移后，gpt-image-2.5-flare 直接接受像素 size（旧 gpt-image-2.5-all 的
+    await test("gpt-image-2.6-flare 直接用 size 控制尺寸，不再拼接提示词前缀", async () => {
+      // 兔子API 迁移后，gpt-image-2.6-flare 直接接受像素 size（旧 gpt-image-2.5-all 的
       // promptSizePrefix 机制已随该模型退役删除）：prompt 必须原样发送，不被改写。
       const captures: Array<{ url: string; init?: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
@@ -291,19 +291,18 @@ async function main(): Promise<void> {
         return Response.json(pngPayload(white));
       });
       try {
-        await gatewayProviders["gpt-image-2.5-flare"].generate({
+        await gatewayProviders["gpt-image-2.6-flare"].generate({
           prompt: "一只猫",
           operationMode: "generate",
           modelOptions: { size: "3840x2160" },
         });
         assert.deepEqual(jsonBody(captures[0].init), {
-          model: "gpt-image-2.5-flare",
+          model: "gpt-image-2.6-flare",
           prompt: "一只猫",
           size: "3840x2160",
-          quality: "high",
         }, "文生图必须直接传像素 size，prompt 不得拼接任何尺寸前缀");
 
-        await gatewayProviders["gpt-image-2.5-flare"].edit({
+        await gatewayProviders["gpt-image-2.6-flare"].edit({
           prompt: "加一顶帽子",
           operationMode: "edit",
           referenceImages: [white],
@@ -318,7 +317,7 @@ async function main(): Promise<void> {
       }
     });
 
-    await test("gpt-image-2.5-sunburst 的蒙版局部修改校验 PNG Alpha 并发送精确合法尺寸", async () => {
+    await test("gpt-image-2.6-sunburst 的蒙版局部修改校验 PNG Alpha 并发送精确合法尺寸", async () => {
       let calls = 0;
       const capturedForms: FormData[] = [];
       const restoreFetch = installFetchMock((_input, init) => {
@@ -329,7 +328,7 @@ async function main(): Promise<void> {
       try {
         const jpegMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 }, "jpeg");
         await assert.rejects(
-          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.6-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: jpegMask, modelOptions: {},
           }),
@@ -339,7 +338,7 @@ async function main(): Promise<void> {
 
         const opaqueMask = await imageDataUrl(4, 2, { r: 0, g: 0, b: 0 });
         await assert.rejects(
-          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.6-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: opaqueMask, modelOptions: {},
           }),
@@ -349,7 +348,7 @@ async function main(): Promise<void> {
 
         const wrongSizeMask = await halfEditableMask(2, 2);
         await assert.rejects(
-          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.6-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: wrongSizeMask, modelOptions: {},
           }),
@@ -358,14 +357,14 @@ async function main(): Promise<void> {
         assert.equal(calls, 0);
 
         const oversizedMask = await halfEditableMask(1024, 1024, 0);
-        const maskContract = getImageModelContract("gpt-image-2.5-sunburst").edit.mask;
+        const maskContract = getImageModelContract("gpt-image-2.6-sunburst").edit.mask;
         assert.ok(maskContract);
         assert.ok(
           Buffer.from(oversizedMask.split(",")[1], "base64").length > maskContract.maxBytes,
           "fixture 必须超过蒙版字节上限",
         );
         await assert.rejects(
-          () => gatewayProviders["gpt-image-2.5-sunburst"].edit({
+          () => gatewayProviders["gpt-image-2.6-sunburst"].edit({
             prompt: "局部改红", operationMode: "mask-edit",
             referenceImages: [blue], mask: oversizedMask, modelOptions: {},
           }),
@@ -373,12 +372,12 @@ async function main(): Promise<void> {
         );
         assert.equal(calls, 0);
 
-        await gatewayProviders["gpt-image-2.5-sunburst"].edit({
+        await gatewayProviders["gpt-image-2.6-sunburst"].edit({
           prompt: "局部改红", operationMode: "mask-edit", referenceImages: [blue], mask,
           modelOptions: { size: "1152x576" },
         });
         assert.equal(calls, 1);
-        assert.equal(capturedForms[0].get("model"), "gpt-image-2.5-sunburst");
+        assert.equal(capturedForms[0].get("model"), "gpt-image-2.6-sunburst");
         assert.equal(capturedForms[0].get("n"), null);
         assert.equal(capturedForms[0].get("size"), "1152x576");
         // 兔子API /v1/images/edits 没有 background / output_format / input_fidelity 字段。
@@ -405,7 +404,9 @@ async function main(): Promise<void> {
       assertPixel(decoded.data, decoded.info.width, decoded.info.channels, 3, 0, { r: 20, g: 80, b: 220 });
     });
 
-    await test("Gemini 文生图与 WebP 参考图编辑使用 parts 契约并扫描所有图片 part", async () => {
+    await test("Gemini 同步回退通道仍使用 parts 契约并扫描所有图片 part", async () => {
+      // 2026-11-10：Gemini 默认已改异步任务；本用例显式回退，验证一键开关与旧链路契约。
+      const restoreAsync = setEnv("GEMINI_ASYNC_DISABLED", "true");
       const captures: Array<{ url: string; init: RequestInit }> = [];
       const restoreFetch = installFetchMock((input, init) => {
         captures.push({ url: String(input), init: init ?? {} });
@@ -468,6 +469,7 @@ async function main(): Promise<void> {
         assert.deepEqual(roleParts[4], { text: "换装" });
       } finally {
         restoreFetch();
+        restoreAsync();
       }
     });
 
@@ -582,7 +584,7 @@ async function main(): Promise<void> {
       });
       try {
         await assert.rejects(
-          () => gatewayProviders["gpt-image-2.5-flare"].generate({
+          () => gatewayProviders["gpt-image-2.6-flare"].generate({
             prompt: "截断", operationMode: "generate", modelOptions: { size: "1280x1280" },
           }),
           (error: unknown) => error instanceof ProviderError && error.category === "outcome_unknown",
@@ -614,7 +616,7 @@ async function main(): Promise<void> {
         });
         return new Response(stream, { status: 200, headers: { "Content-Type": "application/json" } });
       });
-      const request = () => gatewayProviders["gpt-image-2.5-flare"].generate({
+      const request = () => gatewayProviders["gpt-image-2.6-flare"].generate({
         prompt: "尾部恢复", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -638,6 +640,8 @@ async function main(): Promise<void> {
     });
 
     await test("HTTP 200 中的损坏 Base64、伪造 MIME 与非法 URL 均确定失败且只请求一次", async () => {
+      // 本组用例校验同步响应体解析，Gemini 走同步回退通道才能覆盖到该分支。
+      const restoreAsync = setEnv("GEMINI_ASYNC_DISABLED", "true");
       const jpeg = await imageDataUrl(4, 2, { r: 70, g: 110, b: 160 }, "jpeg");
       const signatureOnly = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString("base64");
       let payload: unknown = {};
@@ -646,7 +650,7 @@ async function main(): Promise<void> {
         calls += 1;
         return Response.json(payload);
       });
-      const vipRequest = () => gatewayProviders["gpt-image-2.5-flare"].generate({
+      const vipRequest = () => gatewayProviders["gpt-image-2.6-flare"].generate({
         prompt: "响应校验", operationMode: "generate", modelOptions: { size: "1280x1280" },
       });
       try {
@@ -684,6 +688,7 @@ async function main(): Promise<void> {
         }
       } finally {
         restoreFetch();
+        restoreAsync();
       }
     });
 
@@ -727,7 +732,7 @@ async function main(): Promise<void> {
       try {
         for (const scenario of [
           { status: 401, message: "content policy violation while validating the API key" },
-          { status: 403, message: "model gpt-image-2.5-sunburst is not available for this API key" },
+          { status: 403, message: "model gpt-image-2.6-sunburst is not available for this API key" },
         ]) {
           status = scenario.status;
           responseMessage = scenario.message;
@@ -776,7 +781,7 @@ async function main(): Promise<void> {
         assert.deepEqual(body.providers.map((item) => item.providerId), IMAGE_MODEL_IDS);
         assert.ok(body.providers.every((item) => item.configured));
         // 2026-10-28 实测：sunburst 支持文生图，探针随契约 generation 自动扩为 generate+edit。
-        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2.5-sunburst")?.probes, ["generate", "edit"]);
+        assert.deepEqual(body.providers.find((item) => item.providerId === "gpt-image-2.6-sunburst")?.probes, ["generate", "edit"]);
 
         const invalid = {
           method: "POST", headers: { "Content-Type": "application/json" },

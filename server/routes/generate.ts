@@ -152,7 +152,7 @@ generateRouter.post("/", asyncHandler(async (req, res) => {
     return;
   }
   if (!isImageModelId(modelId)) {
-    res.status(400).json({ error: "modelId must identify a supported API易 image model" });
+    res.status(400).json({ error: "modelId must identify a supported image model" });
     return;
   }
   const validation = validateDirectGenerateRequest(kind, request);

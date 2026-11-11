@@ -52,6 +52,8 @@ const TEST_FILES = [
   "tests/bundle-budget.test.mjs",
   "tests/bundle-boundaries.test.mjs",
   "tests/e2e-safety.test.mjs",
+  "tests/claude-guardrail-hook.test.mjs",
+  "tests/spec-kit-skills.test.mjs",
   "tests/codex-gate.test.mjs",
   "tests/node-version-contract.test.ts",
   "tests/dependency-security-contract.test.ts",
@@ -78,8 +80,11 @@ const TEST_FILES = [
   "tests/run-plan-image-edit.test.ts",
   "tests/gateway-transport.test.ts",
   "tests/provider-contract.test.ts",
+  // Gemini 两个图片模型的异步任务链路（提交 /v1/videos + 轮询 + 按 task_id 找回）。
+  "tests/gemini-async-image.test.ts",
   "tests/mask-processing.test.ts",
   "tests/provider-retry.test.ts",
+  "tests/provider-circuit-breaker.test.ts",
   "tests/exact-generation.test.ts",
   "tests/upload-image-normalization.test.ts",
   "tests/mask-upload.test.ts",
@@ -87,6 +92,10 @@ const TEST_FILES = [
   "tests/edit-draft-upload.test.ts",
   // 提示词改写客户端契约（POST /api/text/rewrite，纯函数，不碰库）。
   "tests/text-rewrite-client.test.ts",
+  // 运行前参考图解析：角色按图片节点名称匹配（唯一事实源，前后端共用）。
+  "tests/reference-role.test.ts",
+  // 参考图解析：角色分组、单图清洗/质量闸、写回合并、冻结提示词快照。
+  "tests/reference-analysis.test.ts",
   // 「帮我补全」先保存再改写编排（纯逻辑依赖注入，无 DOM 不碰库）。
   "tests/text-rewrite-flow.test.ts",
   // 「帮我补全」资格判定：锚点后无补充段前端禁用（纯函数不碰库）。
@@ -126,8 +135,14 @@ const TEST_FILES = [
   "tests/result-detail-runid.test.ts",
   // 2026-10-28：蒙版合成前必须把 provider 直链归一化成 dataURL。
   "tests/mask-composite-url.test.ts",
-  // 2026-10-28：点运行即出结果节点 + 生成中动效（占位节点不落库）。
+  // 2026-10-28：点运行即出结果节点 + 生成中动效（占位节点不进服务端 flow_json）。
   "tests/result-pending-node.test.ts",
+  // 2026-11-10：生成中刷新浏览器，会话快照保留占位节点 + 在途 runId 事件重放回填。
+  "tests/pending-result-refresh.test.ts",
+  // 2026-11-10 RUN-02：后端早就发的 progress 必须过白名单进界面（且不落文档）。
+  "tests/run-progress.test.ts",
+  // 2026-11-10 用户报障：多轮修改门禁必须带具体原因返回；陈旧活动记录先 GET 核对再放行。
+  "tests/multi-round-edit-submit.test.ts",
   // 2026-10-28 P0：flux 多参考图的静默张冠李戴告警。
   "tests/model-reference-warning.test.ts",
   // 2026-10-28 P2：SSRF × 代理 fake-IP 的上游产物域名白名单。

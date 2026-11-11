@@ -9,28 +9,25 @@
  * - 图1 = 服装：源节点 id 为 "garment"，或 label 含"服装"；
  * - 图2 = 模特：源节点 id 为 "model"，或 label 含"模特"。
  * 用户删节点重建后 id/label 都对不上 → 保持原上游顺序（fail-open，不拦运行）。
+ *
+ * 角色识别本身收敛在 `src/lib/referenceRole.ts`（唯一事实源），本文件只负责排序。
  */
+import { matchReferenceRole, referenceOrderRank } from "./referenceRole";
+
 export interface ReferenceUpstreamEntry {
   nodeId: string;
   images: string[];
 }
 
-const GARMENT_IDS = new Set(["garment"]);
-const MODEL_IDS = new Set(["model"]);
-
 /** 该上游在 model-tryon 族中的角色名（供 Provider 逐图标签/提示词映射使用）。 */
 export function tryonRoleOf(nodeId: string, label: string): "服装" | "模特" | undefined {
-  const rank = tryonUpstreamRank(nodeId, label);
-  if (rank === 0) return "服装";
-  if (rank === 1) return "模特";
-  return undefined;
+  const role = matchReferenceRole(nodeId, label);
+  return role === "服装" || role === "模特" ? role : undefined;
 }
 
 /** 返回该上游在 model-tryon 族中的期望序号位：0=图1服装，1=图2模特，2=未知。 */
 export function tryonUpstreamRank(nodeId: string, label: string): 0 | 1 | 2 {
-  if (GARMENT_IDS.has(nodeId) || label.includes("服装")) return 0;
-  if (MODEL_IDS.has(nodeId) || label.includes("模特")) return 1;
-  return 2;
+  return referenceOrderRank(matchReferenceRole(nodeId, label));
 }
 
 /**

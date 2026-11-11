@@ -3,8 +3,8 @@ import contracts from "../../docs/ai/gateway/model-contracts.json";
 export const IMAGE_MODEL_IDS = [
   "gemini-nano-banana-2.1",
   "gemini-3.1-flash-image",
-  "gpt-image-2.5-sunburst",
-  "gpt-image-2.5-flare",
+  "gpt-image-2.6-sunburst",
+  "gpt-image-2.6-flare",
   "flux-3-image",
   "doubao-seedream-5-0-pro-260628",
   "doubao-seedream-5-0-lite-260128",
@@ -99,10 +99,10 @@ function hasExactImageModelIds(ids: readonly ImageModelId[]): boolean {
 }
 
 for (const id of IMAGE_MODEL_IDS) {
-  if (!contractMap.has(id)) throw new Error(`API易模型知识库缺少契约: ${id}`);
+  if (!contractMap.has(id)) throw new Error(`模型知识库缺少契约: ${id}`);
 }
 if (contractMap.size !== IMAGE_MODEL_IDS.length) {
-  throw new Error("API易模型知识库与应用模型清单不一致");
+  throw new Error("模型知识库与应用模型清单不一致");
 }
 
 const reviewedModelCatalogBaseline = rawModels[0]?.reviewedModelCatalogBaseline;
@@ -123,7 +123,7 @@ if (
     !== (reviewedModelCatalogBaseline.reviewedRawExportSha256 === null)
   )
 ) {
-  throw new Error("API易模型契约缺少有效的 reviewed model catalog baseline");
+  throw new Error("模型契约缺少有效的 reviewed model catalog baseline");
 }
 for (const model of rawModels) {
   const baseline = model.reviewedModelCatalogBaseline;
@@ -134,7 +134,7 @@ for (const model of rawModels) {
     || baseline.reviewedRawExportSha256 !== reviewedModelCatalogBaseline.reviewedRawExportSha256
     || !hasExactImageModelIds(baseline.expectedGatewayModelIds)
   ) {
-    throw new Error(`API易模型契约的 reviewed model catalog baseline 不一致: ${model.id}`);
+    throw new Error(`模型契约的 reviewed model catalog baseline 不一致: ${model.id}`);
   }
 }
 
@@ -146,8 +146,8 @@ export function hasReviewedModelCatalogBaseline(): boolean {
     && REVIEWED_MODEL_CATALOG_BASELINE.reviewedRawExportSha256 !== null;
 }
 
-export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.5-flare";
-export const MASK_REDRAW_MODEL_ID = "gpt-image-2.5-sunburst" as const;
+export const DEFAULT_GENERATION_MODEL_ID: GenerationImageModelId = "gpt-image-2.6-flare";
+export const MASK_REDRAW_MODEL_ID = "gpt-image-2.6-sunburst" as const;
 
 /**
  * 模型侧的「参考图数量」可用性告警（非阻断，用户 2026-10-28 定 P0）。
@@ -163,7 +163,7 @@ export function imageModelReferenceWarning(
 ): string | undefined {
   if (modelId !== "flux-3-image") return undefined;
   if (referenceCount <= 1) return undefined;
-  return "FLUX3 接多张参考图时容易张冠李戴（模型分不清第几张），多图场景建议改用 GPT2.5快速 / GPT2.5专业";
+  return "FLUX3 接多张参考图时容易张冠李戴（模型分不清第几张），多图场景建议改用 GPT2.6快速 / GPT2.6专业";
 }
 
 export const GENERATION_IMAGE_MODEL_IDS: readonly GenerationImageModelId[] = IMAGE_MODEL_IDS;
@@ -198,8 +198,8 @@ export const IMAGE_MODEL_VENDOR_GROUPS: ReadonlyArray<{
   {
     vendor: "OpenAI",
     models: [
-      { id: "gpt-image-2.5-flare", name: "GPT2.5快速" },
-      { id: "gpt-image-2.5-sunburst", name: "GPT2.5专业" },
+      { id: "gpt-image-2.6-flare", name: "GPT2.6快速" },
+      { id: "gpt-image-2.6-sunburst", name: "GPT2.6专业" },
     ],
   },
   {
@@ -316,7 +316,7 @@ const VIP_SIZE_BY_RATIO: Record<string, string> = {
  * 取值来源：docs/ai/gateway/model-contracts.json 各 VIP 模型的 `sizes` 清单（见
  * 官方档位表）；标准档与
  * VIP_SIZE_BY_RATIO 的既有默认一致（如 3:4 = 1536x2048）。
- * 仅 gpt-image-2.5-flare / gpt-image-2.5-sunburst 提供该三档选择
+ * 仅 gpt-image-2.6-flare / gpt-image-2.6-sunburst 提供该三档选择
  * （见 imageSizeTierOptions），其他模型的档位走各自契约 recommendedOptions。
  */
 export const VIP_SIZE_TIERS_BY_RATIO: Readonly<Record<string, readonly { tier: string; size: string }[]>> = {
@@ -389,8 +389,8 @@ const QWEN_PROFILE: ModelResolutionProfile = {
 const MODEL_RESOLUTION_PROFILES: Readonly<Record<ImageModelId, ModelResolutionProfile>> = {
   "gemini-nano-banana-2.1": GEMINI_PROFILE,
   "gemini-3.1-flash-image": GEMINI_PROFILE,
-  "gpt-image-2.5-sunburst": GPT_IMAGE_PROFILE,
-  "gpt-image-2.5-flare": GPT_IMAGE_PROFILE,
+  "gpt-image-2.6-sunburst": GPT_IMAGE_PROFILE,
+  "gpt-image-2.6-flare": GPT_IMAGE_PROFILE,
   "flux-3-image": FLUX_PROFILE,
   "doubao-seedream-5-0-pro-260628": SEEDREAM_PROFILE,
   "doubao-seedream-5-0-lite-260128": SEEDREAM_PROFILE,
@@ -400,7 +400,7 @@ const MODEL_RESOLUTION_PROFILES: Readonly<Record<ImageModelId, ModelResolutionPr
 
 /**
  * 该模型是否官方支持 `quality` 参数（用户 2026-10-28：只保留官方支持的参数）。
- * 只有 gpt-image 2.5 两兄弟在契约里声明了 qualityValues；gemini / flux /
+ * 当前没有模型在契约里声明 qualityValues（2.6 非 vip 质量固定 medium）；gemini / flux /
  * seedream / qwen 都没有这个参数——发过去只会被上游判为不支持的字段。
  */
 export function modelSupportsQuality(modelId: ImageModelId): boolean {
@@ -581,7 +581,7 @@ export function resolutionTierOf(modelId: ImageModelId, options: ImageModelOptio
 /**
  * 历史遗留的 VIP 三档尺寸表（1K/2K/4K）。
  *
- * 兔子API 迁移后，gpt-image-2.5-flare / sunburst 直接接受任意 size（契约
+ * 兔子API 迁移后，gpt-image-2.6-flare / sunburst 直接接受任意 size（契约
  * recommendedOptions.size.examples），不再有「按画幅切三档」的语义，
  * 因此本函数对所有当前模型一律返回 undefined；保留导出是为了让面板与画幅联动
  * 继续走同一查表口（返回 undefined 即回落到契约驱动的取值）。
@@ -618,7 +618,7 @@ export function imageSizeTierOptions(
 }
 
 /**
- * `gpt-image-2.5-flare` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
+ * `gpt-image-2.6-flare` 不接受 size，唯一可控尺寸的手段是把前缀写在 prompt 最前。
  * 值域取契约 recommendedOptions.promptSizePrefix.examples；标签附实测分辨率，来源为
  * 经审查的官方文档快照
  * docs/ai/gateway/models/tuzi-gpt-image-generate.md（API易 全站快照已于 2026-10-29 删除）
@@ -724,8 +724,8 @@ export function imageModelOptionsForAspectRatio(
     // 只在「还没有 size」时才按画幅填——而契约默认值本身就会注入一个 size（1536x2048），
     // 于是面板切画幅对 gpt-image 两兄弟**完全无效**（实测：选 16:9 仍提交 1536x2048）。
     // 现在改为「保留当前分辨率档位，按新画幅重算 size」，两个控件都真实生效。
-    case "gpt-image-2.5-sunburst":
-    case "gpt-image-2.5-flare":
+    case "gpt-image-2.6-sunburst":
+    case "gpt-image-2.6-flare":
       return { ...normalized, size: resolutionModelOptions(modelId, resolutionTierOf(modelId, normalized), aspectRatio).size };
     case "gemini-nano-banana-2.1":
     case "gemini-3.1-flash-image": {
@@ -806,7 +806,7 @@ export function imageModelOptionsWarnings(modelId: ImageModelId, value: unknown)
 
 /**
  * 模型×节点类型闸（契约 data-model.md §3 保留检查第 1 条的前半）：
- * 图片模型只允许用于 image 节点。`gpt-image-2.5-sunburst` 仅蒙版变体可用的
+ * 图片模型只允许用于 image 节点。`gpt-image-2.6-sunburst` 仅蒙版变体可用的
  * 限制改由变体声明（needsMask）驱动，在运行准入层执行（P2-b，见 runtime.md）。
  */
 export function isModelAllowedForNode(modelId: ImageModelId, nodeKind: string): boolean {

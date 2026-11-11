@@ -257,7 +257,7 @@ function AccountPanel({ initialTab, onClose }: { initialTab: AccountPanelTab; on
         ) : (
           <div className="min-h-0 flex-1 overflow-auto p-5">
             <p className="mb-4 text-xs text-(--gc-text-muted)">
-              网关：{diagnostics?.gateway ?? "读取中…"}。配置状态来自本地 API易契约；文生图与改图检查会各发起一次真实 AI 请求，可能产生少量消耗。
+              网关：{diagnostics?.gateway ?? "读取中…"}。配置状态来自本地模型契约（兔子 API / Tu-zi）；文生图与改图检查会各发起一次真实 AI 请求，可能产生少量消耗。
             </p>
             <div className="space-y-3">
               {diagnostics?.providers.map((provider) => (

@@ -379,7 +379,7 @@ await test("上传接口仅在标准化与数据库写入都成功后返回 URL"
         position: { x: 600, y: 0 },
         data: {
           kind: "image-generator", label: "局部重绘", status: "idle",
-          modelId: "gpt-image-2.5-sunburst", modelOptions: {},
+          modelId: "gpt-image-2.6-sunburst", modelOptions: {},
           aspectRatio: "3:4", batchSize: 1,
         },
       }],

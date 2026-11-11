@@ -177,7 +177,7 @@ async function hasMeaningfulAlpha(buffer: Buffer, metadata: Metadata): Promise<b
 }
 
 /**
- * API易输入素材标准化：校正 EXIF、动图取首帧、转换到 sRGB，并收敛尺寸与体积。
+ * 输入素材标准化：校正 EXIF、动图取首帧、转换到 sRGB，并收敛尺寸与体积。
  * 透明素材保存为 PNG，其余素材保存为 JPEG，输出不携带原始 EXIF/ICC 元数据。
  */
 export async function normalizeUploadImageDataUrl(dataUrl: unknown): Promise<NormalizedUploadImage> {

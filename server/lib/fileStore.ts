@@ -153,7 +153,7 @@ export interface SavedNormalizedUpload {
   normalized: true;
 }
 
-/** 用户输入先完成 API易推荐标准化，再以独占创建 + fsync 原子落盘。 */
+/** 用户输入先完成素材标准化，再以独占创建 + fsync 原子落盘。 */
 export async function saveNormalizedUploadDataUrl(dataUrl: string): Promise<SavedNormalizedUpload> {
   const normalized = await normalizeUploadImageDataUrl(dataUrl);
   const ext = MIME_EXT[normalized.mimeType];
@@ -309,6 +309,46 @@ function artifactDownloadTimeoutMs(): number {
   const value = Number(process.env.ARTIFACT_DOWNLOAD_TIMEOUT_MS ?? 120_000);
   return Number.isFinite(value) && value >= 10_000 ? Math.min(value, 600_000) : 120_000;
 }
+/**
+ * 同一产物 URL 在同一 job 里会被落盘两次（Provider 存证副本 + 业务输出），
+ * 每次都是跨境 4–11MB。短 TTL 缓存让第二次直接命中，省掉一次完整下载。
+ * 关闭：ARTIFACT_DOWNLOAD_CACHE_TTL_MS=0。
+ */
+function artifactDownloadCacheTtlMs(): number {
+  const value = Number(process.env.ARTIFACT_DOWNLOAD_CACHE_TTL_MS ?? 300_000);
+  return Number.isFinite(value) && value >= 0 ? Math.min(value, 3_600_000) : 300_000;
+}
+/** 缓存上限：宁可丢缓存，也不能让常驻内存无界增长。 */
+const DOWNLOAD_CACHE_MAX_BYTES = 192 * 1024 * 1024;
+const downloadCache = new Map<string, { storedAt: number; dataUrl: string }>();
+let downloadCacheBytes = 0;
+
+function readDownloadCache(key: string): string | undefined {
+  const hit = downloadCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() - hit.storedAt > artifactDownloadCacheTtlMs()) {
+    downloadCache.delete(key);
+    downloadCacheBytes -= hit.dataUrl.length * 2;
+    return undefined;
+  }
+  return hit.dataUrl;
+}
+
+function writeDownloadCache(key: string, dataUrl: string): void {
+  if (artifactDownloadCacheTtlMs() <= 0) return;
+  const bytes = dataUrl.length * 2;
+  if (bytes > DOWNLOAD_CACHE_MAX_BYTES / 4) return;
+  while (downloadCacheBytes + bytes > DOWNLOAD_CACHE_MAX_BYTES && downloadCache.size > 0) {
+    const oldestKey = downloadCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    const oldest = downloadCache.get(oldestKey);
+    downloadCache.delete(oldestKey);
+    if (oldest) downloadCacheBytes -= oldest.dataUrl.length * 2;
+  }
+  downloadCache.set(key, { storedAt: Date.now(), dataUrl });
+  downloadCacheBytes += bytes;
+}
+
 const MAX_REDIRECTS = 5;
 
 export type HostLookup = (hostname: string) => Promise<readonly string[]>;
@@ -614,10 +654,7 @@ async function downloadImageOnce(
   }
   if (!res) throw new Error("image download did not produce a response");
   if (!res.ok) throw new Error(`image download failed: HTTP ${res.status}`);
-  const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (!mime.startsWith("image/")) {
-    throw new Error(`not an image response: ${mime || "unknown content-type"}`);
-  }
+  const declaredMime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   const contentLength = Number(res.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_DOWNLOAD_BYTES) {
     throw new Error(`image too large: ${contentLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
@@ -628,7 +665,19 @@ async function downloadImageOnce(
     throw new Error(`image too large: ${buf.byteLength} bytes (limit ${MAX_DOWNLOAD_BYTES})`);
   }
   const detected = detectImageMime(buf);
-  if (!detected || detected !== mime) throw new Error(`image MIME/signature mismatch: declared ${mime || "unknown"}, detected ${detected || "unknown"}`);
+  // 实测（2026-11-10，flux-3-image 失败运行 gA0znKucvp）：部分结果 CDN 回
+  // application/octet-stream 甚至不带 Content-Type，但 body 是合法 PNG/JPEG。
+  // 声明不是 image/* 时以文件签名为准；声明是 image/* 时仍严格比对，
+  // 避免把伪装成图片的 HTML/SVG 落盘。体积与 SSRF 校验均在此之前完成。
+  if (declaredMime.startsWith("image/")) {
+    if (!detected || detected !== declaredMime) {
+      throw new Error(`image MIME/signature mismatch: declared ${declaredMime}, detected ${detected ?? "unknown"}`);
+    }
+    return toDataUrl(buf.toString("base64"), detected);
+  }
+  if (!detected) {
+    throw new Error(`not an image response: ${declaredMime || "unknown content-type"}`);
+  }
   return toDataUrl(buf.toString("base64"), detected);
 }
 
@@ -644,6 +693,11 @@ export async function downloadImageToDataUrl(
   const fetcher = dependencies?.fetch;
   const timeoutMs = artifactDownloadTimeoutMs();
   const host = safeDownloadHost(raw);
+  const cached = readDownloadCache(raw);
+  if (cached) {
+    console.log("[artifact-download-cache-hit]", JSON.stringify({ host }));
+    return cached;
+  }
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= DOWNLOAD_MAX_ATTEMPTS; attempt += 1) {
@@ -651,7 +705,9 @@ export async function downloadImageToDataUrl(
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const startedAt = Date.now();
     try {
-      return await downloadImageOnce(raw, ctrl.signal, lookup, fetcher);
+      const dataUrl = await downloadImageOnce(raw, ctrl.signal, lookup, fetcher);
+      writeDownloadCache(raw, dataUrl);
+      return dataUrl;
     } catch (error) {
       lastError = error;
       const elapsedMs = Date.now() - startedAt;

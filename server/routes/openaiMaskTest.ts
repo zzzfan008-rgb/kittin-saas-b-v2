@@ -55,14 +55,14 @@ async function storePng(buffer: Buffer, ownerId: string, sourceType: "upload" | 
 function safeFailure(error: unknown): { status: "failed" | "outcome_unknown"; error: string } {
   if (error instanceof NativeMaskInputError) return { status: "failed", error: error.message };
   if (error instanceof OpenAI.APIError && error.status && error.status < 500) {
-    return { status: "failed", error: `API易拒绝了请求（HTTP ${error.status}），未自动重试` };
+    return { status: "failed", error: `网关拒绝了请求（HTTP ${error.status}），未自动重试` };
   }
   return { status: "outcome_unknown", error: "请求或结果保存异常，结果和扣费状态可能未知；未自动重试" };
 }
 
 export function createOpenAiMaskTestRouter(options: { createClient?: () => OpenAI } = {}) {
   const router = Router();
-  router.get("/config", (_req, res) => res.json({ model: NATIVE_MASK_MODEL, gateway: "API易", ready: Boolean(config.gatewayApiKey()), sdk: "OpenAI", postprocess: "none" }));
+  router.get("/config", (_req, res) => res.json({ model: NATIVE_MASK_MODEL, gateway: "Tu-zi", ready: Boolean(config.gatewayApiKey()), sdk: "OpenAI", postprocess: "none" }));
   router.post("/files", raw({ type: "image/png", limit: "50mb" }), asyncHandler(async (req, res) => {
     if (!Buffer.isBuffer(req.body)) { res.status(400).json({ error: "请上传 PNG 文件" }); return; }
     try { res.json(await storePng(req.body, requestUser(req).id, "upload")); }

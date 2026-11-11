@@ -14,7 +14,7 @@ await resetPostgresTestDatabase();
 const { closeDatabaseForTests, initializeDatabase, query, queryOne } = await import("../server/lib/database");
 const { migrateLegacyData } = await import("../server/lib/legacyMigration");
 
-console.log("PostgreSQL 23 编号迁移回归测试");
+console.log("PostgreSQL 编号迁移回归测试");
 await initializeDatabase();
 
 const versions = await query<{ version: number; name: string }>(
@@ -48,6 +48,8 @@ assert.deepEqual(versions, [
   { version: 25, name: "remove_evaluation_ledger_system" },
   { version: 26, name: "asset_taxonomy_v2" },
   { version: 27, name: "assets_uncategorized_category" },
+  { version: 28, name: "provider_image_urls_evidence" },
+  { version: 29, name: "step_provider_request_id_evidence" },
 ]);
 console.log("  ✓ 新数据库记录全部编号迁移");
 

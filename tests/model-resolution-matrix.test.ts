@@ -43,8 +43,8 @@ const RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9",
 const EXPECTED_TIERS: Record<string, string[]> = {
   "gemini-nano-banana-2.1": ["1K", "2K", "4K"],
   "gemini-3.1-flash-image": ["1K", "2K", "4K"],
-  "gpt-image-2.5-sunburst": ["1K", "2K", "4K"],
-  "gpt-image-2.5-flare": ["1K", "2K", "4K"],
+  "gpt-image-2.6-sunburst": ["1K", "2K", "4K"],
+  "gpt-image-2.6-flare": ["1K", "2K", "4K"],
   "flux-3-image": ["1K", "1.5K", "2K", "4K"],
   "doubao-seedream-5-0-pro-260628": ["1K", "2K"],
   "doubao-seedream-5-0-lite-260128": ["1K", "2K"],
@@ -73,12 +73,12 @@ ok("gpt-image：size 走官方 30 档表（16 倍数 / 边长≤3840 / 像素≤
     "21:9": ["1280x544", "2048x864", "3840x1632"],
   };
   for (const [ratio, sizes] of Object.entries(expected)) {
-    const actual = ["1K", "2K", "4K"].map((tier) => resolutionModelOptions("gpt-image-2.5-flare", tier as never, ratio).size);
+    const actual = ["1K", "2K", "4K"].map((tier) => resolutionModelOptions("gpt-image-2.6-flare", tier as never, ratio).size);
     assert.deepEqual(actual, sizes, `${ratio} 官方档表不符`);
   }
   for (const ratio of RATIOS) {
     for (const tier of ["1K", "2K", "4K"] as const) {
-      const size = String(resolutionModelOptions("gpt-image-2.5-flare", tier, ratio).size);
+      const size = String(resolutionModelOptions("gpt-image-2.6-flare", tier, ratio).size);
       const [w, h] = size.split("x").map(Number);
       assert.equal(w % 16, 0, `${ratio}/${tier} 宽必须是 16 倍数`);
       assert.equal(h % 16, 0, `${ratio}/${tier} 高必须是 16 倍数`);
@@ -134,7 +134,7 @@ ok("回显闭环：所有模型 × 所有支持画幅 × 所有档位都能反�
 });
 
 ok("默认档位：有 2K 用 2K，没有就用该模型最高档", () => {
-  assert.equal(defaultResolutionTierFor("gpt-image-2.5-flare"), "2K");
+  assert.equal(defaultResolutionTierFor("gpt-image-2.6-flare"), "2K");
   assert.equal(defaultResolutionTierFor("qwen-image-3.0"), "2K");
 });
 
@@ -151,14 +151,14 @@ ok("运行时兜底：旧草稿的非法尺寸被收敛（seedream 3840x3840 →
   const kept = resolutionOptionsInBounds("doubao-seedream-5-0-pro-260628", { size: "2560x1440" }, "16:9");
   assert.equal(kept.size, "2560x1440");
   // gpt-image 官方档位值原样通过
-  const gpt = resolutionOptionsInBounds("gpt-image-2.5-flare", { size: "2048x1152" }, "16:9");
+  const gpt = resolutionOptionsInBounds("gpt-image-2.6-flare", { size: "2048x1152" }, "16:9");
   assert.equal(gpt.size, "2048x1152");
 });
 
 ok("画质参数只发给官方支持的模型（gemini/flux/seedream/qwen 不带 quality）", () => {
   for (const modelId of IMAGE_MODEL_IDS) {
     const supported = modelSupportsQuality(modelId);
-    const expected = modelId.startsWith("gpt-image-2.5");
+    const expected = false; // 2.6 非 vip 质量固定 medium，不再暴露 quality
     assert.equal(supported, expected, `${modelId} quality 支持判定不符`);
   }
 });
@@ -172,7 +172,7 @@ ok("schema 放行全部 10 种官方画幅，且仍拒绝未知画幅", () => {
       id: "g1", type: "image-generator", position: { x: 0, y: 0 },
       data: {
         kind: "image-generator", label: "生图", status: "idle",
-        modelId: "gpt-image-2.5-flare", operationMode: "generate",
+        modelId: "gpt-image-2.6-flare", operationMode: "generate",
         aspectRatio: ratio, modelOptions: { size: "2048x2048", quality: "low" }, batchSize: 1,
       },
     }],

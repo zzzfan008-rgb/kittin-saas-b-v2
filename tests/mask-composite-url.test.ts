@@ -1,7 +1,7 @@
 /**
  * 蒙版重绘 / 多轮修改的「provider 直链」回归（用户 2026-10-28，生成ID sG4DsK4SkA）。
  *
- * 病史：gpt-image-2.5-sunburst 等模型返回的不是 dataURL，而是 CDN 直链
+ * 病史：gpt-image-2.6-sunburst 等模型返回的不是 dataURL，而是 CDN 直链
  * （sydney-ai / 阿里 OSS）。`compositeMaskedEdit` 只接受严格 dataURL，
  * 把 URL 直接传进去会抛 `invalid image dataURL (strict base64 required)`，
  * 于是蒙版重绘与多轮修改全部失败（库里 17:09 / 17:31 两条即此）。

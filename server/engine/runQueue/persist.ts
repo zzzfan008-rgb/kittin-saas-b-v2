@@ -278,6 +278,47 @@ export async function inputImagesForStep(
 }
 
 
+/**
+ * 上游返回图片 URL 后、下载之前先落库存证（2026-11-10）。
+ *
+ * 为什么必须在下载前写：gpt-image 产物是跨区 CDN 链接，下载失败/进程中断时
+ * 业务输出还没落盘，但图片其实已经生成并计费。把 URL 存下来，「找回」才能
+ * 只重取图片、不再重新生成。
+ *
+ * 多次调用（batchSize > 1 或步骤内多轮）按数组顺序追加并去重。
+ */
+export async function recordProviderImageUrls(
+  job: ClaimedJob,
+  urls: string[],
+  providerRequestId?: string,
+): Promise<void> {
+  const evidence = urls.filter((url) => /^https?:\/\//i.test(url));
+  // 上游结果链接有时效（实测 COS 隔天即 403）。同一次事务里把 request_id
+  // 也留下：URL 过期后仍可用 /v1/images/generations/result?request_id= 换链找回。
+  // 只在格式合法时写入，且绝不覆盖已有凭据（异步任务的 task_id 优先）。
+  const safeRequestId = typeof providerRequestId === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(providerRequestId)
+    ? providerRequestId
+    : null;
+  if (evidence.length === 0 && !safeRequestId) return;
+  await transaction(async (client) => {
+    const row = (await client.query<{ provider_image_urls_json: string }>(`
+      SELECT provider_image_urls_json FROM generation_run_steps WHERE id = $1 FOR UPDATE
+    `, [job.stepId])).rows[0];
+    if (!row) return;
+    const existing = parseJson<string[]>(row.provider_image_urls_json, []);
+    const merged = [...existing];
+    for (const url of evidence) if (!merged.includes(url)) merged.push(url);
+    await client.query(
+      `UPDATE generation_run_steps
+       SET provider_image_urls_json = $1,
+           provider_request_id = COALESCE(provider_request_id, $2)
+       WHERE id = $3`,
+      [JSON.stringify(merged), safeRequestId, job.stepId],
+    );
+  });
+}
+
 export async function persistStepImages(
   images: string[],
   job: ClaimedJob,

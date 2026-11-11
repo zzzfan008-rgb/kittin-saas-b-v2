@@ -157,8 +157,19 @@ for (const forbidden of [
   assert.ok(!reviewerArgsBody.includes(forbidden), `评审子进程参数不得包含 ${forbidden}`);
 }
 const dockerfile = read("Dockerfile");
-const nodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
-assert.ok(nodeImages.length > 0, "Dockerfile 必须声明 Node.js 基础镜像");
+// 基础镜像可以走 `ARG NODE_IMAGE=node:<tag>` + `FROM ${NODE_IMAGE}` 的写法
+// （compose.lan.yaml 用同名 ARG 指向国内镜像源，tag 必须完全一致），
+// 但**默认值必须钉死**，不接受 `latest` 或浮动 tag。
+const literalNodeImages = [...dockerfile.matchAll(/^FROM node:([^\s]+).*$/gm)].map((match) => match[1]);
+const argNodeImages = [...dockerfile.matchAll(/^ARG NODE_IMAGE=node:([^\s]+)\s*$/gm)].map((match) => match[1]);
+assert.ok(
+  literalNodeImages.length > 0 || argNodeImages.length > 0,
+  "Dockerfile 必须声明 Node.js 基础镜像（FROM node:<tag> 或 ARG NODE_IMAGE=node:<tag>）",
+);
+if (argNodeImages.length > 0) {
+  assert.match(dockerfile, /^FROM \$\{NODE_IMAGE\}/m, "声明 NODE_IMAGE 后必须用 FROM ${NODE_IMAGE} 消费它");
+}
+const nodeImages = [...literalNodeImages, ...argNodeImages];
 assert.ok(
   nodeImages.every((image) => image === "24.20.0-bookworm-slim"),
   `Dockerfile 中所有 Node.js 基础镜像必须固定为 24.20.0-bookworm-slim，实际为：${nodeImages.join(", ")}`,
@@ -198,9 +209,17 @@ assert.doesNotMatch(
   /\bgit\s+rev-parse\b|\bapt-get\s+install[^\n]*\bgit\b|^COPY\s+\.git(?:\s|$)/m,
   "Docker 运行时不得依赖 Git 或复制 .git 来推断付费评估代码 SHA",
 );
-const runtimeStage = dockerfile.slice(
-  dockerfile.indexOf("FROM node:24.20.0-bookworm-slim AS runtime"),
-);
+// 运行阶段起点兼容两种写法：字面量 FROM node:<tag>，或 ARG NODE_IMAGE + FROM ${NODE_IMAGE}
+// （镜像源可被 compose 覆盖，版本钉死由上面的断言负责）。
+const runtimeStageMarkers = [
+  "FROM node:24.20.0-bookworm-slim AS runtime",
+  "FROM ${NODE_IMAGE} AS runtime",
+];
+const runtimeStageIndex = runtimeStageMarkers
+  .map((marker) => dockerfile.indexOf(marker))
+  .find((index) => index >= 0);
+assert.ok(runtimeStageIndex !== undefined, "Dockerfile 必须声明 runtime 阶段");
+const runtimeStage = dockerfile.slice(runtimeStageIndex);
 assert.match(
   runtimeStage,
   /chown -R root:root \/app\s+\\\n\s+&& chmod -R a-w \/app/,

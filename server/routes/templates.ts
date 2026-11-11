@@ -97,7 +97,7 @@ function imageGeneratorNode(
 ): PersistedWorkflowNode {
   // v9（64 Phase 1 C7）：variant 绑定删除；显式 modelId + operationMode + 契约默认参数
   //（batchSize 1，拍板③；2026-10-28 起数量改由生成面板「数量」控件输入，模板全部留 1）；aspectRatio 走模板定义。
-  // 用户 2026-10-28：所有工作流默认 1:1 画幅 + 2K 分辨率 + GPT2.5快速（gpt-image-2.5-flare）；
+  // 用户 2026-10-28：所有工作流默认 1:1 画幅 + 2K 分辨率 + GPT2.6快速（gpt-image-2.6-flare）；
   // modelOptions 由「画幅 × 档位」统一推导，不再直接取契约推荐值（避免各模型参数名不一致）。
   const aspectRatio = options.aspectRatio ?? DEFAULT_ASPECT_RATIO;
   const batchSize = options.batchSize ?? 1;

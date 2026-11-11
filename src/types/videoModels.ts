@@ -113,20 +113,20 @@ const contractMap = new Map(rawModels.map((model) => [model.id, model]));
 
 // ---------- 一致性断言（加载即校验，防线同 imageModels.ts 顶部 throw） ----------
 if (!Array.isArray(rawModels) || rawModels.length === 0) {
-  throw new Error("API易视频模型契约缺少 models 区块（video-model-contracts.json）");
+  throw new Error("视频模型契约缺少 models 区块（video-model-contracts.json）");
 }
 for (const id of VIDEO_MODEL_IDS) {
-  if (!contractMap.has(id)) throw new Error(`API易视频模型知识库缺少契约: ${id}`);
+  if (!contractMap.has(id)) throw new Error(`视频模型知识库缺少契约: ${id}`);
 }
 if (contractMap.size !== VIDEO_MODEL_IDS.length) {
-  throw new Error("API易视频模型知识库与应用视频模型清单不一致");
+  throw new Error("视频模型知识库与应用视频模型清单不一致");
 }
 for (const model of rawModels) {
   if (model.contractHashScope !== "sha256-canonical-video-model-envelope-v1") {
-    throw new Error(`API易视频模型契约 contractHashScope 无效: ${model.id}`);
+    throw new Error(`视频模型契约 contractHashScope 无效: ${model.id}`);
   }
   if (!/^sha256:[a-f0-9]{64}$/.test(model.contractHash)) {
-    throw new Error(`API易视频模型契约 contractHash 格式无效: ${model.id}`);
+    throw new Error(`视频模型契约 contractHash 格式无效: ${model.id}`);
   }
 }
 

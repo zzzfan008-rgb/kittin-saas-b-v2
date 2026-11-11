@@ -68,17 +68,17 @@ await ok("远程 URL 与非法输入原样返回（本步骤绝不阻断参考�
 // ---------- 画幅参数：切画幅必须真的改 size，且保留分辨率档位 ----------
 
 await ok("gpt-image：切画幅真的改 size（原来完全无效）", () => {
-  const base = { ...defaultImageModelOptions("gpt-image-2.5-flare", "1:1"), quality: "low" };
-  const wide = imageModelOptionsForAspectRatio("gpt-image-2.5-flare", base, "16:9");
+  const base = { ...defaultImageModelOptions("gpt-image-2.6-flare", "1:1"), quality: "low" };
+  const wide = imageModelOptionsForAspectRatio("gpt-image-2.6-flare", base, "16:9");
   assert.equal(wide.size, "2048x1152", "16:9 必须换成 2048x1152");
-  const square = imageModelOptionsForAspectRatio("gpt-image-2.5-flare", wide, "1:1");
+  const square = imageModelOptionsForAspectRatio("gpt-image-2.6-flare", wide, "1:1");
   assert.equal(square.size, "2048x2048", "切回 1:1 必须是 2048x2048");
 });
 
 await ok("gpt-image：档位跟着画幅走，且取官方表里的值", () => {
-  const oneK = { ...resolutionModelOptions("gpt-image-2.5-flare", "1K", "1:1") };
+  const oneK = { ...resolutionModelOptions("gpt-image-2.6-flare", "1K", "1:1") };
   assert.equal(oneK.size, "1280x1280", "官方 1K 1:1 = 1280x1280");
-  const wide = imageModelOptionsForAspectRatio("gpt-image-2.5-flare", oneK, "16:9");
+  const wide = imageModelOptionsForAspectRatio("gpt-image-2.6-flare", oneK, "16:9");
   assert.equal(wide.size, "1280x720", "官方 1K 16:9 = 1280x720");
 });
 

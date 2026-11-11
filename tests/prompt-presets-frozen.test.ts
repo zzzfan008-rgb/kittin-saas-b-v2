@@ -162,7 +162,7 @@ ok("presetTemplateText：已知项返回文本，未知项 undefined", () => {
 });
 
 ok("frozenPromptBindingForVariantId：标准变体 id 解析（含 modelId 带点）", () => {
-  const binding = frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare.edit.v1");
+  const binding = frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.6-flare.edit.v1");
   assert.ok(binding);
   assert.equal(binding.familyId, "fashion-lookbook");
   assert.equal(binding.mode, "edit");
@@ -171,7 +171,7 @@ ok("frozenPromptBindingForVariantId：标准变体 id 解析（含 modelId 带�
 
 ok("frozenPromptBindingForVariantId：mask / video 变体 id 解析", () => {
   assert.equal(
-    frozenPromptBindingForVariantId("mask-local-edit.gpt-image-2.5-sunburst.mask-edit.v1")?.mode,
+    frozenPromptBindingForVariantId("mask-local-edit.gpt-image-2.6-sunburst.mask-edit.v1")?.mode,
     "mask-edit",
   );
   assert.equal(
@@ -183,7 +183,7 @@ ok("frozenPromptBindingForVariantId：mask / video 变体 id 解析", () => {
 ok("frozenPromptBindingForVariantId：未知族 / 坏 id / 非法 mode → undefined（丢弃绑定）", () => {
   assert.equal(frozenPromptBindingForVariantId("no-such-family.gpt-4o.edit.v1"), undefined);
   assert.equal(frozenPromptBindingForVariantId("garbage"), undefined);
-  assert.equal(frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.5-flare.restyle.v1"), undefined);
+  assert.equal(frozenPromptBindingForVariantId("fashion-lookbook.gpt-image-2.6-flare.restyle.v1"), undefined);
   assert.equal(frozenPromptBindingForVariantId(""), undefined);
 });
 

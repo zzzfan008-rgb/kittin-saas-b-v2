@@ -85,6 +85,42 @@ export const config = {
     const value = Number(process.env.GENERATION_WORKER_POLL_MS ?? 2_000);
     return Number.isFinite(value) ? Math.max(100, Math.min(60_000, value)) : 2_000;
   },
+  /**
+   * 并行消费队列的 worker 数量。生图是分钟级长任务，单 worker 会让第二个请求排队；
+   * 默认 2 个，可设 1 回到串行，上限 4（再高容易撞上游渠道并发限制）。
+   */
+  generationWorkerConcurrency: () => {
+    const value = Number(process.env.GENERATION_WORKER_CONCURRENCY ?? 2);
+    return Number.isFinite(value) ? Math.max(1, Math.min(4, Math.floor(value))) : 2;
+  },
+  // ---------- Gemini 图片异步任务（兔子API《异步图片生成》）----------
+
+  /**
+   * 两个 Gemini 图片模型改走 POST /v1/videos 提交 + GET /v1/videos/{id} 轮询。
+   * 实测（2026-11-10）：gemini-3.1-flash-image / gemini-nano-banana-2.1 均约 20–30s 完成，
+   * 比原生 generateContent 同步长连接（实测 260s、常撞 nginx 504）快且结果可凭 task_id 找回。
+   * GEMINI_ASYNC_DISABLED=true 可秒级回退到原生同步端点。
+   */
+  geminiAsyncEnabled: () => {
+    const value = (process.env.GEMINI_ASYNC_DISABLED ?? "").trim().toLowerCase();
+    return value !== "1" && value !== "true" && value !== "on";
+  },
+  /** 提交后首次查询前的等待（实测队列到出图至少十几秒）。 */
+  geminiAsyncPollInitialDelayMs: () => {
+    const value = Number(process.env.GEMINI_ASYNC_POLL_INITIAL_DELAY_MS ?? 2_000);
+    return Number.isFinite(value) ? Math.max(0, Math.min(30_000, Math.round(value))) : 2_000;
+  },
+  /** 查询间隔；GET 幂等、不计费，可比视频任务更密。 */
+  geminiAsyncPollIntervalMs: () => {
+    const value = Number(process.env.GEMINI_ASYNC_POLL_INTERVAL_MS ?? 3_000);
+    return Number.isFinite(value) ? Math.max(500, Math.min(30_000, Math.round(value))) : 3_000;
+  },
+  /** 整条任务的总预算。超预算不判失败，标 outcome_unknown 并留 task_id 供找回。 */
+  geminiAsyncPollTimeoutMs: () => {
+    const value = Number(process.env.GEMINI_ASYNC_POLL_TIMEOUT_MS ?? 240_000);
+    return Number.isFinite(value) ? Math.max(20_000, Math.min(600_000, Math.round(value))) : 240_000;
+  },
+
   sqliteImportPath: () => path.resolve(config.dataDir(), process.env.SQLITE_IMPORT_FILE ?? "garment-canvas.db"),
   initialAdminAccountId: () => process.env.INITIAL_ADMIN_ACCOUNT_ID?.trim() ?? "",
   initialAdminPassword: () => process.env.INITIAL_ADMIN_PASSWORD ?? "",
@@ -98,6 +134,39 @@ export const config = {
   gatewayTextModelId: () => (process.env.GATEWAY_TEXT_MODEL_ID ?? "gemini-3.8-flash").trim() || "gemini-3.8-flash",
   /** 文本通道超时（改写是出图前轻量增强，独立更短超时；环境变量 AI_TEXT_TIMEOUT_MS）。 */
   aiTextTimeoutMs: (fallback = 20_000) => Number(process.env.AI_TEXT_TIMEOUT_MS ?? fallback),
+
+  // ---------- 参考图智能解析（运行前多模态解析）----------
+
+  /**
+   * 视觉模型链：按顺序回退，前一个失败（不支持图片/超时/输出不可用）才试下一个。
+   * 环境变量 PROMPT_ANALYSIS_MODELS 用逗号分隔覆盖。
+   *
+   * 2026-11-10 实测（同一张服装图、q92 压缩）：claude-opus-5-5 6.3s/235 字最详细，
+   * gemini-3.8-flash 14.3s/135 字够用，gpt-6-astra 11.2s/182 字但 24k tokens 成本高。
+   * 顺序由用户拍板：claude → gemini → gpt。
+   */
+  promptAnalysisModels: (): string[] => {
+    const raw = (process.env.PROMPT_ANALYSIS_MODELS ?? "").trim();
+    const list = raw
+      ? raw.split(",").map((item) => item.trim()).filter(Boolean)
+      : ["claude-opus-5-5", "gemini-3.8-flash", "gpt-6-astra"];
+    return list.length > 0 ? list : ["claude-opus-5-5"];
+  },
+  /** 单个视觉模型的超时：实测 gemini-3.8-flash 解析服装图需 10–15s，20s 起步。 */
+  promptAnalysisTimeoutMs: () => {
+    const value = Number(process.env.PROMPT_ANALYSIS_TIMEOUT_MS ?? 20_000);
+    return Number.isFinite(value) && value >= 5_000 ? Math.min(value, 120_000) : 20_000;
+  },
+  /** 整条模型链的总预算：超出即放弃后续模型、按失败降级（用户最多等这么久）。 */
+  promptAnalysisTotalBudgetMs: () => {
+    const value = Number(process.env.PROMPT_ANALYSIS_TOTAL_BUDGET_MS ?? 45_000);
+    return Number.isFinite(value) && value >= 5_000 ? Math.min(value, 180_000) : 45_000;
+  },
+  /** 一键关闭解析（秒级回滚）：为 true 时路由直接返回 skipped，按钮恢复「运行」。 */
+  promptAnalysisDisabled: () => {
+    const value = (process.env.PROMPT_ANALYSIS_DISABLED ?? "").trim().toLowerCase();
+    return value === "1" || value === "true" || value === "on";
+  },
 
   /** 网关完整 JSON 尾部卡住时的安全收尾开关；显式 false/0/off 可回退旧行为。 */
   gatewayTailStallSalvageEnabled: () => {

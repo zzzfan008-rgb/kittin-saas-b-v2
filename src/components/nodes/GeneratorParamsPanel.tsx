@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Handle, Position, useConnection } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
+import { Switch } from "@/components/ui/switch";
+import { usePromptAnalysisStore } from "@/store/promptAnalysisStore";
 import {
+  applyRecoveredRun,
   isDocumentConnectionValid,
   selectActiveEdges,
   selectActiveNodes,
+  selectActiveProjectId,
   selectActiveReadOnly,
   useFlowStore,
 } from "@/store/flowStore";
+import { RunRecoveryError, requestRunRecovery } from "@/lib/runRecoveryClient";
 import {
   BATCH_SIZES,
   isNodeRunActive,
@@ -332,6 +337,22 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
   const running = isNodeRunActive(data.status);
   const disabled = readOnly || running;
   const admission = usePromptRunAdmission(nodeId, data);
+  // 运行前智能解析：开关缺省=开；解析中按钮置灰；解析完成/失败后自动关闭开关
+  const analysisRecord = usePromptAnalysisStore((s) => s.records[nodeId]);
+  const analyzing = analysisRecord?.status === "analyzing";
+  // 找回：只对失败/结果未知、且服务端记录了该次 runId 的节点开放。
+  const recovery = useFlowStore(useShallow((s) => {
+    const projectId = selectActiveProjectId(s);
+    const record = [...s.recentResults]
+      .filter((item) => item.nodeId === nodeId && item.runId
+        && (item.projectId === projectId || !item.projectId))
+      .sort((left, right) => right.startedAt - left.startedAt)[0];
+    return { runId: record?.runId ?? "", projectId };
+  }));
+  const [recovering, setRecovering] = useState(false);
+  const [recoverMessage, setRecoverMessage] = useState<string | null>(null);
+  const canRecover = Boolean(recovery.runId)
+    && (data.status === "error" || data.status === "outcome_unknown");
 
   // 65d（决策 C 路线1）：mask-edit 推断已从生成节点剥离；operationMode 仅剩 generate/edit，
   // 仍由 65b「参考图边自动推断」决定（契约 §3.5）。
@@ -386,6 +407,25 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     joined ? joined.split("|").map((v) => { const i = v.indexOf("::"); return { edgeId: v.slice(0, i), label: v.slice(i + 2) }; }) : [];
   const promptSources = toSources(upstream.prompt);
   const mediaSources = toSources(upstream.media);
+  // 解析要求：既有参考图，也有提示词文本上游（解析结果写回那个文本节点）。
+  const canAnalyze = mediaSources.length > 0 && promptSources.length > 0;
+  // 开关缺省=开，但**只有真正接了参考图的节点**才改变按钮语义：
+  // 纯文生图节点没有参考图可解析，必须保持原来的「运行」行为。
+  const analyzeOn = (data as ImageGeneratorNodeData).analyzeReferences !== false && canAnalyze;
+  const unmatchedHint = (() => {
+    const parts: string[] = [];
+    if (analysisRecord?.unmatched?.length) {
+      parts.push(`${analysisRecord.unmatched
+        .map((item) => `第 ${item.order} 张图「${item.label.trim() || "未命名"}」`)
+        .join("、")}未识别，请把图片节点改名为 服装 / 模特 / 姿态 / 场景`);
+    }
+    if (analysisRecord?.failed?.length) {
+      parts.push(`${analysisRecord.failed
+        .map((item) => `第 ${item.order} 张图（${item.role}）`)
+        .join("、")}解析失败，已跳过`);
+    }
+    return parts.length ? parts.join("；") : null;
+  })();
 
   // 拖线落点高亮：拖线进行中时，用文档连线规则逐端口判定可落性；
   // 合法落点高亮（accent），其余保持熄灭。平时未连接端口熄灭（见 UpstreamPortRow）。
@@ -416,7 +456,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? IMAGE_MODEL_VENDOR_GROUPS.map((group) => ({
       label: group.vendor,
       options: group.models
-        // 下拉必须列出全部 9 个模型（含蒙版专用的 GPT2.5专业/sunburst），
+        // 下拉必须列出全部 9 个模型（含蒙版专用的 GPT2.6专业/sunburst），
         .map((model) => ({ value: model.id, label: model.name })),
     })).filter((group) => group.options.length > 0)
     : undefined;
@@ -428,6 +468,19 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? resolutionTierOf(effModel, options)
     : DEFAULT_RESOLUTION_TIER;
   const currentQuality = typeof options.quality === "string" ? options.quality : DEFAULT_QUALITY;
+  /** 画质控件是否被隐藏（模型不支持 quality）；隐藏时开关独占整排。 */
+  const qualityHidden = isImageModelId(effModel) && !modelSupportsQuality(effModel);
+  const analysisHint = analyzing
+    ? "正在解析参考图，请稍候…"
+    : (() => {
+      // 未识别提示（改名建议）优先级高于失败原因：它是用户唯一能据此行动的文案。
+      const hints = [unmatchedHint];
+      if (analysisRecord?.status === "failed" || analysisRecord?.message) {
+        hints.push(analysisRecord.message ?? "解析未生效，已保留原文");
+      }
+      const text = hints.filter(Boolean).join("；");
+      return text || null;
+    })();
   /** 图片模型的参考图数量告警（flux 多图不可靠）。 */
   const referenceWarning = mediaKind === "image" && isImageModelId(effModel)
     ? imageModelReferenceWarning(effModel, mediaSources.length)
@@ -439,7 +492,7 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     ? imageModelOptionsWarnings(effModel, options)
     : mediaKind === "video" ? videoModelOptionsWarnings(effModel as VideoModelId, options) : [];
   const declaredKeys = Object.keys(recommended);
-  /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.5-flare）都有专属控件，不在此重复。 */
+  /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.6-flare）都有专属控件，不在此重复。 */
   const renderParamKeys = declaredKeys.filter((k) => k !== "aspectRatio" && k !== "promptSizePrefix");
 
   const aspectRatioOptions = mediaKind === "image" && isImageModelId(effModel)
@@ -516,13 +569,34 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     updateNodeData(nodeId, { modelOptions: { ...options, size: vipSizeWriteBack } });
   }, [disabled, nodeId, options, updateNodeData, vipSizeWriteBack]);
 
-  /** 「尺寸」参数（仅 gpt-image-2.5-flare：唯一可控尺寸的手段是拼在 prompt 最前的尺寸前缀）。 */
+  /** 「尺寸」参数（仅 gpt-image-2.6-flare：唯一可控尺寸的手段是拼在 prompt 最前的尺寸前缀）。 */
   const promptSizeOptions = mediaKind === "image" && isImageModelId(effModel)
     ? imagePromptSizePrefixOptions(effModel)
     : undefined;
   const curPromptSizeValue = typeof options.promptSizePrefix === "string" ? options.promptSizePrefix : "";
 
   const setParam = (k: string, n: string | number | boolean) => updateNodeData(nodeId, { modelOptions: { ...options, [k]: n } });
+
+  const handleRecover = async () => {
+    if (!recovery.runId || recovering) return;
+    setRecovering(true);
+    setRecoverMessage(null);
+    try {
+      const result = await requestRunRecovery(recovery.runId);
+      applyRecoveredRun({
+        runId: result.runId,
+        nodeId,
+        projectId: recovery.projectId,
+        urls: result.images,
+      });
+      setRecoverMessage(`已找回 ${result.images.length} 张图片（未重新生成，未重复计费）`);
+      void useFlowStore.getState().saveProject();
+    } catch (error) {
+      setRecoverMessage(error instanceof RunRecoveryError ? error.message : "找回失败，请稍后再试");
+    } finally {
+      setRecovering(false);
+    }
+  };
 
   return (
     <div className="space-y-3" data-generator-panel={nodeId}>
@@ -536,15 +610,19 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         dropState={dropStateFor(mediaKind === "video" ? EDGE_HANDLE_FIRST_FRAME : "reference")}
         onDisconnect={(edgeId) => onEdgesChange([{ id: edgeId, type: "remove" }])} />
 
-      <OptionSelect label="模型" value={effModel} options={modelSel} groups={modelGroups}
-        disabled={disabled} onChange={patchModel} />
-
       {mediaKind === "image" ? (
-        // 用户 2026-10-28 批注（v2）：参数固定三排——
-        //   第一排 模型（上面那句 OptionSelect 独占一行）
+        // 参数三排（2026-11-10 用户拍板）：
+        //   第一排 模型 + 数量
         //   第二排 画幅 + 分辨率
-        //   第三排 画质 + 数量（1–8，即 batchSize）
+        //   第三排 画质 + 智能解析开关
         <div className="space-y-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_70px] gap-2">
+            <OptionSelect label="模型" value={effModel} options={modelSel} groups={modelGroups}
+              disabled={disabled} onChange={patchModel} />
+            <OptionSelect label="数量" value={String((data as ImageGeneratorNodeData).batchSize ?? 1)}
+              options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
+              onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="block min-w-0 space-y-1">
               <span className="text-label text-[var(--gc-node-muted)]">画幅</span>
@@ -594,11 +672,40 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
                   modelOptions: { ...(data.modelOptions ?? {}), quality: q },
                 })} />
             )}
-            {/* 用户 2026-10-28：数量（原「批次」）回归面板，1–8 全整数可选。 */}
-            <OptionSelect label="数量" value={String((data as ImageGeneratorNodeData).batchSize ?? 1)}
-              options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
-              onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+            {/* 运行前智能解析：开关打开时运行按钮变「解析图片」 */}
+            <div className={`flex min-h-[34px] flex-col gap-1.5 ${qualityHidden ? "col-span-2" : ""}`}>
+              <span className="text-label text-[var(--gc-node-muted)]">智能解析</span>
+              <div className="flex h-7 items-center gap-2">
+                <Switch
+                  id={`analyze-references-${nodeId}`}
+                  checked={analyzeOn}
+                  disabled={disabled || analyzing || !canAnalyze}
+                  onCheckedChange={(checked) => updateNodeData(nodeId, { analyzeReferences: checked })}
+                  aria-label="运行前智能解析参考图"
+                />
+                <label htmlFor={`analyze-references-${nodeId}`}
+                  className="truncate text-[11px] text-[var(--gc-node-muted)]">
+                  {analyzing ? "解析中…" : analyzeOn ? "运行前解析" : "已关闭"}
+                </label>
+              </div>
+            </div>
           </div>
+          {/* 解析状态 / 未识别提示 */}
+          {analysisHint ? (
+            <p role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">{analysisHint}</p>
+          ) : null}
+          {analysisRecord?.status === "done" ? (
+            <p role="status" className="text-label leading-relaxed text-[var(--gc-node-muted)]">
+              已解析 {analysisRecord.matched.length} 张
+              {analysisRecord.elapsedMs ? `（${(analysisRecord.elapsedMs / 1000).toFixed(1)}s）` : ""}
+              {analysisRecord.modelId ? ` · ${analysisRecord.modelId}` : ""}
+            </p>
+          ) : null}
+          {mediaSources.length > 4 ? (
+            <p role="status" className="text-label leading-relaxed text-[var(--gc-node-muted)]">
+              参考图共 {mediaSources.length} 张，仅解析前 4 张（出图不受影响）
+            </p>
+          ) : null}
           {/* 参考图数量可用性告警（用户 2026-10-28 P0）：flux 多图会静默张冠李戴。 */}
           {referenceWarning ? (
             <p role="status" className="text-label leading-relaxed text-[var(--gc-warn-text)]">
@@ -607,11 +714,15 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
-          <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
-            options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
-            onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+        <div className="space-y-2">
+          <OptionSelect label="模型" value={effModel} options={modelSel} groups={modelGroups}
+            disabled={disabled} onChange={patchModel} />
+          <div className="grid grid-cols-2 gap-2">
+            <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
+            <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
+              options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
+              onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
+          </div>
         </div>
       )}
 
@@ -630,9 +741,40 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
         </section>
       )}
 
-      <RunButton status={data.status} onClick={() => void runNode(nodeId)}
-        label={data.status === "success" ? "重新运行" : "运行"}
-        disabledReason={admission.allowed ? undefined : admission.reason} disabledLabel="尚不可运行" />
+      {/* 解析开关打开时，按钮语义变为「解析图片」：点击只解析并写回提示词，
+          解析完成/失败后开关自动关闭，按钮恢复「运行」，由用户确认提示词后再出图。 */}
+      <RunButton
+        status={data.status}
+        onClick={() => {
+          if (analyzeOn) void usePromptAnalysisStore.getState().analyze(nodeId);
+          else void runNode(nodeId);
+        }}
+        label={analyzing ? "解析中…" : analyzeOn ? "解析图片" : data.status === "success" ? "重新运行" : "运行"}
+        disabled={analyzing}
+        disabledReason={
+          admission.allowed
+            ? (analyzeOn && !canAnalyze ? (mediaSources.length === 0 ? "先连接参考图" : "先连接提示词文本节点") : undefined)
+            : admission.reason
+        }
+        disabledLabel={analyzeOn && !canAnalyze ? "尚不可解析" : "尚不可运行"} />
+
+      {/* 失败兜底：上游可能已经出图，只是没送到我们这边。按运行期存证的 URL 重取，
+          不调用模型、不重复计费；没有 URL 时由服务端给出可读原因。 */}
+      {canRecover ? (
+        <div className="space-y-1">
+          <button
+            type="button"
+            disabled={recovering || readOnly}
+            onClick={() => void handleRecover()}
+            className="nodrag w-full rounded-md border border-[var(--gc-border)] px-2 py-1 text-label text-[var(--gc-node-text)] transition-colors hover:bg-[var(--gc-node-hover)] disabled:opacity-50"
+          >
+            {recovering ? "正在找回…" : "尝试找回图片"}
+          </button>
+          {recoverMessage ? (
+            <p role="status" className="text-label leading-relaxed text-[var(--gc-node-muted)]">{recoverMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

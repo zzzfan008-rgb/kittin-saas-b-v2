@@ -24,7 +24,7 @@ import {
   videoModelRecommendedOptions,
   type VideoModelOptions,
 } from "@/types/videoModels";
-import { isRetiredImageModelId } from "@/types/retiredImageModels";
+import { isRetiredImageModelId, migrateLegacyImageModelId } from "@/types/retiredImageModels";
 import {
   createDocumentSnapshot,
   documentSnapshotToPersistedWorkflow,
@@ -38,6 +38,7 @@ import {
   type ProjectTabsStorageManifest,
 } from "@/lib/tabSessionStorage";
 import type { FlowNode, ProjectLifecycle, ProjectTab } from "./flowDocument";
+import { isPendingResultNode, type PendingResultNodeLike } from "./flowDocument";
 
 /** persistTabSession 的文档形态承接（tabs + activeTabId），避免循环 import flowStore。 */
 export interface TabSessionDocument {
@@ -236,8 +237,10 @@ export function normalizeSessionNode(value: unknown): FlowNode | undefined {
       if (typeof input.operationMode === 'string' && (input.operationMode === "generate" || input.operationMode === "edit" || input.operationMode === "mask-edit")) {
         data.operationMode = input.operationMode;
       }
-      const modelId: string = isImageModelId(input.modelId) && !isRetiredImageModelId(input.modelId)
-        ? input.modelId
+      const rawModelId = migrateLegacyImageModelId(input.modelId);
+      const modelId: string = typeof rawModelId === "string"
+        && isImageModelId(rawModelId) && !isRetiredImageModelId(rawModelId)
+        ? rawModelId
         : DEFAULT_GENERATION_MODEL_ID;
       data.modelId = modelId;
       // v9（64 裁决 C）：aspectRatio 缺省 1:1；意象比例不在枚举中则回落缺省。
@@ -515,11 +518,22 @@ export interface DetailedTabSessionWriteResult extends TabSessionWriteResult {
 function sessionTabSnapshot(tab: ProjectTab): ProjectTab {
   const document = createDocumentSnapshot(tab);
   const flow = documentSnapshotToPersistedWorkflow(document);
+  // 2026-11-10：文档快照按契约过滤掉 runId 为空的占位结果节点（不写服务端 flow_json），
+  // 但浏览器会话必须留住它——否则生成过程中刷新，画布上的「生成中」卡片连同在途 runId
+  // 一起消失，而服务端 durable 事件要等重放才会回填。会话层额外追加裸节点 + 溯源边：
+  // normalizeSessionNode 会逐节点归一并保留 status / startedAt / pendingRunId。
+  const pendingNodes = tab.nodes.filter(
+    (node) => isPendingResultNode(node as unknown as PendingResultNodeLike),
+  );
+  const pendingIds = new Set(pendingNodes.map((node) => node.id));
+  const pendingEdges = tab.edges.filter(
+    (edge) => pendingIds.has(edge.source) || pendingIds.has(edge.target),
+  );
   return {
     ...tab,
     projectName: document.projectName,
-    nodes: flow.nodes as FlowNode[],
-    edges: flow.edges as Edge[],
+    nodes: [...flow.nodes, ...pendingNodes] as FlowNode[],
+    edges: [...flow.edges, ...pendingEdges] as Edge[],
     selectedNodeIds: [],
     selectedNodeId: null,
     selectedResultId: null,

@@ -9,6 +9,7 @@
 import type { GenerationImageModelId, ImageModelOptions } from "./imageModels";
 import type { VideoModelId, VideoModelOptions } from "./videoModels";
 import type { ImageOperationMode } from "./imageOperations";
+import { matchReferenceRole, referenceOrderRank } from "../lib/referenceRole";
 
 export { IMAGE_OPERATION_MODE_VALUES } from "./imageOperations";
 export type { ImageOperationMode } from "./imageOperations";
@@ -205,6 +206,14 @@ export interface ImageGeneratorNodeData extends BaseNodeData {
    * 仅 image-generator 携带；video-generator 本期不使用（裁定 §1.4）。
    */
   familyId?: string;
+  /**
+   * 「运行前智能解析参考图」开关：undefined = 开启，仅显式 false 关闭。
+   *
+   * 开启时运行按钮变为「解析图片」，点击后先用多模态模型解析参考图并写回
+   * 上游文本节点的补充段，解析完成/失败后本字段被置为 false（一次性开关），
+   * 按钮恢复「运行」。纯 UI/编排开关，不参与生图参数。
+   */
+  analyzeReferences?: boolean;
 }
 
 export interface VideoGeneratorNodeData extends BaseNodeData {
@@ -333,7 +342,7 @@ export interface ImageGenResult {
 }
 
 export interface AIProvider {
-  readonly id: string; // API易模型 ID；与本地模型知识库一致
+  readonly id: string; // 兔子 API（Tu-zi）模型 ID；与本地模型知识库一致
   validate?(req: ImageGenRequest, mode: ImageOperationMode): void | Promise<void>;
   generate(req: ImageGenRequest): Promise<ImageGenResult>;
   edit(req: ImageGenRequest): Promise<ImageGenResult>;
@@ -665,14 +674,11 @@ export function selectAllReferenceOrdinals(
     // 用户删节点重建（身份不可识别）时保持连线顺序。
     const familyId = nodeById.get(targetId)?.data?.familyId;
     if (familyId === "model-tryon") {
-      const rankOf = (sourceId: string): number => {
-        if (sourceId === "garment") return 0;
-        if (sourceId === "model") return 1;
-        const label = String(nodeById.get(sourceId)?.data?.label ?? "");
-        if (label.includes("服装")) return 0;
-        if (label.includes("模特")) return 1;
-        return 2;
-      };
+      // 角色识别收敛在 src/lib/referenceRole.ts（零依赖纯函数），此处只做排序。
+      const rankOf = (sourceId: string): number =>
+        referenceOrderRank(
+          matchReferenceRole(sourceId, String(nodeById.get(sourceId)?.data?.label ?? "")),
+        );
       targetEdges
         .map((edge, index) => ({ edge, index }))
         .sort((a, b) => rankOf(a.edge.source) - rankOf(b.edge.source) || a.index - b.index)

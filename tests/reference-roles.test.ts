@@ -74,7 +74,7 @@ ok("tryonRoleOf 与徽标/拼装共用同一族规则", () => {
 ok("只能传数组的模型：渲染层补一行角色映射", () => {
   const prompt = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-flare",
+    modelId: "gpt-image-2.6-flare",
     operationMode: "edit",
     taskPrompt: "换装协议",
     references: [{ role: "服装" }, { role: "模特" }],
@@ -96,7 +96,7 @@ ok("gemini：角色内联在逐图标签里，提示词不重复映射行", () =
 ok("无角色（普通族）：既不加映射行也不报错", () => {
   const prompt = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-flare",
+    modelId: "gpt-image-2.6-flare",
     operationMode: "edit",
     taskPrompt: "换装协议",
     references: [{}, {}],
@@ -107,7 +107,7 @@ ok("无角色（普通族）：既不加映射行也不报错", () => {
 ok("蒙版路径不受影响：仍走蒙版模板且不追加映射行", () => {
   const prompt = renderProviderPrompt({
     nodeKind: "image",
-    modelId: "gpt-image-2.5-sunburst",
+    modelId: "gpt-image-2.6-sunburst",
     operationMode: "mask-edit",
     taskPrompt: "把袖口改成银色拉链",
     references: [{ role: "服装" }],

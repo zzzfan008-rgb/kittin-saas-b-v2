@@ -180,6 +180,12 @@ export async function rewriteUserPrompt(
   } catch (error) {
     // fail-closed：吞掉一切错误并回退原文，绝不阻断出图（§2.3/§4）。
     const reason = error instanceof TextRewriteError ? error.code : "unknown_error";
+    // 静默降级必须留下可诊断的痕迹：否则前端只看到「按钮没反应」，服务端查不到原因。
+    console.warn("[text-rewrite-failed]", JSON.stringify({
+      reason,
+      retryable: error instanceof TextRewriteError ? error.retryable : undefined,
+      message: (error instanceof Error ? error.message : String(error)).slice(0, 200),
+    }));
     return { text: original, rewritten: false, reason };
   }
 }

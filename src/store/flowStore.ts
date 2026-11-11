@@ -40,6 +40,7 @@ import {
   type NodeRunStatus,
   type PersistedWorkflow,
   type ReferenceImageEvidence,
+  type RunProgress,
 } from "@/types/workflow";
 import {
   DEFAULT_GENERATION_MODEL_ID,
@@ -143,7 +144,20 @@ import {
   type ProjectTab,
   type RecentResult,
   type SaveState,
+  isPendingResultNode,
+  pendingRunIdOf,
+  PENDING_RESULT_RUN_ID,
+  PENDING_RESULT_RUN_ID_KEY,
+  type PendingResultNodeLike,
 } from "./flowDocument";
+import {
+  attachInflightRunId,
+  forgetInflightRun,
+  forgetInflightRunByRunId,
+  inflightTarget,
+  readInflightRuns,
+  rememberInflightRun,
+} from "./inflightRuns";
 import {
   DOCUMENT_HISTORY_LIMIT,
   documentMutationChanged,
@@ -209,6 +223,14 @@ export {
   type TabSessionReadResult,
   type TabSessionWriteOptions,
   type TabSessionWriteResult,
+};
+
+/** 占位结果节点判定/在途 runId 的唯一事实源在 flowDocument，store 侧保持兼容导出。 */
+export {
+  isPendingResultNode,
+  pendingRunIdOf,
+  PENDING_RESULT_RUN_ID,
+  PENDING_RESULT_RUN_ID_KEY,
 };
 
 type FlowSet = (
@@ -295,6 +317,16 @@ export interface FlowState {
   tabSessionPersistenceError: string | null;
   /** 仅内存：打开的蒙版编辑器与尚未结束的蒙版上传总数。 */
   pendingMaskWorkCount: number;
+  /**
+   * RUN-02：生成节点当前的子单元进度，按**生成节点 id** 索引（结果节点经
+   * `sourceGeneratorId` 反查同一份）。
+   *
+   * 刻意放在 store 顶层而不进节点 data：progress 是运行期瞬态，进 data 就会经
+   * `createDocumentSnapshot` 写进 flow_json、每次逐张出图都触发一次保存、还会被
+   * undo 历史记录。刷新后内存清空，由 durable 事件重放重新填充（重放包含这些
+   * node-status 事件），所以不需要持久化。
+   */
+  runProgressByNodeId: Record<string, RunProgress>;
 
   switchTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
@@ -343,12 +375,16 @@ export interface FlowState {
    * 65d（契约 §3.3）：图片节点本地编辑（蒙版重绘/整图编辑）。onlyNodeId 指向 image 节点，
    * server 物化合成 step 并以 image-node-updated 回写产物（原位替换 outputImages +
    * 清 mask/maskSourceRef/featherRadius/editPrompt，契约 §3.4）。prompt 为编辑描述（≤500）。
+   *
+   * 返回值（2026-11-10 用户报障收口）：`true` = 已真实发起；`string` = 被哪一道门禁拦下
+   * 的具体原因（面板原样展示，不再让用户对着「额度不足或只读」瞎猜）；`false` 仅保留给
+   * 旧调用方兼容。门禁共 7 道，全部逐一给因。
    */
   runImageEdit: (
     id: string,
     prompt: string,
     opts?: { editInputRef?: string },
-  ) => Promise<boolean>;
+  ) => Promise<boolean | string>;
   /** 保存当前页签；返回服务端是否确认持久化成功。 */
   saveProject: () => Promise<boolean>;
   /** 保存指定页签 id（关闭页签时静默保存非脏页签或丢弃前的保存）。 */
@@ -499,6 +535,8 @@ function latestActiveRecordsByNode(
 
 /** 历史分页可能重叠；同一后端 Run 同一时刻只允许一条恢复连接。 */
 const resumingRecentRunIds = new Set<string>();
+/** 本次页面生命周期内已重放过的在途 run：启动恢复会被多次触发，不能重开 SSE。 */
+const replayedPendingRunIds = new Set<string>();
 
 /**
  * 屏蔽一个同步运行态/UI mutation 的历史记录。不得把异步 Promise 包在这里，
@@ -1805,6 +1843,9 @@ export function reconcileRunHistory(records: RecentResult[]): void {
   }
   runWithoutHistory(() => {
     useFlowStore.setState((state) => {
+      // 被对账判为「不在运行中」的节点，其内存进度也要一起清：否则画布上已是 idle，
+      // 显影区却还挂着上一轮的「生成中 3/8」。
+      const settledNodeIds = new Set<string>();
       const tabs = state.tabs.map((tab) => ({
         ...tab,
         nodes: tab.nodes.map((node) => {
@@ -1815,7 +1856,14 @@ export function reconcileRunHistory(records: RecentResult[]): void {
               data: { ...node.data, status: active.status, error: active.error } as WorkflowNodeData,
             };
           }
-          if (!isNodeRunActive(node.data.status)) return node;
+          if (!isNodeRunActive(node.data.status)) {
+            settledNodeIds.add(node.id);
+            return node;
+          }
+          // 占位结果节点有自己的恢复点（inflightRuns）：不要因为「历史里暂时没有这条
+          // 活动记录」就把它降级成空产物卡片——那正是刷新后看起来「占位节点丢了」的观感。
+          if (isPendingResultNode(node as { data: { kind?: string; runId?: string } })) return node;
+          settledNodeIds.add(node.id);
           const data = { ...node.data, status: "idle" as const } as WorkflowNodeData;
           delete data.error;
           return { ...node, data };
@@ -1829,7 +1877,11 @@ export function reconcileRunHistory(records: RecentResult[]): void {
         { ...state, tabs },
         mergeRecentResults(retainedResults, [...uniqueRecordsById.values()]),
       );
-      return { tabs, ...resultPatch };
+      return {
+        tabs,
+        ...resultPatch,
+        runProgressByNodeId: dropNodeRunProgress(state.runProgressByNodeId, settledNodeIds),
+      };
     });
   });
 }
@@ -1954,19 +2006,11 @@ export function createResultNodeFromRunEvent(
 /**
  * 生成中的占位结果节点（用户 2026-10-28：点运行后结果节点立刻出现）。
  *
- * runId 用空串标记「尚未落地」，**不写库**：`createDocumentSnapshot` 会把它和它的边
- * 一起过滤掉（服务端 schema 要求 result 节点 runId 非空）。事件到达后原地升级成真节点，
- * 因此位置不跳、不新建第二个节点。
+ * runId 用空串标记「尚未落地」，**不写服务端文档**：`createDocumentSnapshot` 会把它和
+ * 它的边一起过滤掉（服务端 schema 要求 result 节点 runId 非空）；但会话层
+ * （`flowTabSession.sessionTabSnapshot`）会额外保留它，刷新后画布不空。事件到达后
+ * 原地升级成真节点，因此位置不跳、不新建第二个节点。
  */
-export const PENDING_RESULT_RUN_ID = "";
-
-export function isPendingResultNode(node: {
-  data: { kind?: string; runId?: string };
-}): boolean {
-  const kind = node.data.kind;
-  return (kind === "result-image" || kind === "result-video") && node.data.runId === PENDING_RESULT_RUN_ID;
-}
-
 /** 在生成节点右侧创建占位结果节点（含 startedAt，供已用时角标）。 */
 export function createPendingResultNode(
   document: Pick<ProjectTab, "nodes">,
@@ -2000,6 +2044,57 @@ export function createPendingResultNode(
 }
 
 /**
+ * 2026-11-10：把已确认入队的 runId 写到占位结果节点（**仅会话层**瞬态字段）。
+ *
+ * 不写 `data.runId`——那会让占位节点通过 `createDocumentSnapshot` 的过滤、被当成
+ * 空产物的真结果节点写进服务端 flow_json。改用 `pendingRunId`：文档层看不见，
+ * 会话层带着它落 sessionStorage，刷新后据此重放 durable 事件。
+ *
+ * 走 updateTabNodes(markDirty=false)：不改 revision/dirty，运行不算一次文档编辑
+ * （与 node-status 回写同语义）；会话写入由 tabMarker 的在途签名触发。
+ */
+function attachPendingRunId(
+  target: DocumentTarget,
+  generatorId: string,
+  runId: string,
+): void {
+  let pendingNodeId: string | undefined;
+  runWithoutHistory(() => updateTabNodes(useFlowStore.setState, target, (nodes) => {
+    let changed = false;
+    const next = nodes.map((node) => {
+      const pending = node as unknown as PendingResultNodeLike;
+      if (
+        !isPendingResultNode(pending)
+        || pending.data.sourceGeneratorId !== generatorId
+      ) return node;
+      pendingNodeId = node.id;
+      if (pendingRunIdOf(pending) === runId) return node;
+      changed = true;
+      return {
+        ...node,
+        data: { ...node.data, [PENDING_RESULT_RUN_ID_KEY]: runId } as WorkflowNodeData,
+      };
+    });
+    return changed ? next : nodes;
+  }));
+  if (pendingNodeId) attachInflightRunId(pendingNodeId, runId);
+}
+
+/** 占位节点落成终态（失败/取消/无法确认）后回收恢复点；仍生成中则保留。 */
+function settleInflightPlaceholder(target: DocumentTarget, generatorId: string): void {
+  const tab = useFlowStore.getState().tabs.find((candidate) => candidate.id === target.tabId);
+  if (!tab) return;
+  const pending = tab.nodes.find((node) => (
+    isPendingResultNode(node as unknown as PendingResultNodeLike)
+    && (node.data as { sourceGeneratorId?: string }).sourceGeneratorId === generatorId
+  ));
+  if (!pending) return;
+  const status = pending.data.status;
+  if (!status || !isNodeRunTerminal(status)) return;
+  forgetInflightRun(pending.id);
+}
+
+/**
  * 生成节点 → 结果节点的溯源边（用户 2026-10-28：生成节点右边必须连到结果节点）。
  * 两端 handle 均为 EDGE_HANDLE_RESULT 且不可手动拖拽；只在结果节点创建/回填时生成。
  */
@@ -2014,11 +2109,58 @@ export function resultSourceEdge(generatorId: string, resultNodeId: string): Edg
   };
 }
 
+/**
+ * 「找回已生成的图片」成功后的本地落位（2026-11-10）。
+ *
+ * 服务端已把运行补成 succeeded 并补发事件；但用户提交找回时该 run 的 SSE 已关闭，
+ * 前端不会自动收到。这里按同一套契约在本地补：
+ * - 最近结果记录改为成功并写入图片；
+ * - 在所属项目页签里实例化结果节点（与服务端事件同 id，幂等）；
+ * - 生成节点状态收口为 success。
+ */
+export function applyRecoveredRun(input: {
+  runId: string;
+  nodeId: string;
+  projectId?: string;
+  urls: string[];
+}): void {
+  const before = useFlowStore.getState();
+  const record = before.recentResults.find((item) => item.runId === input.runId);
+  if (record) {
+    useFlowStore.setState((state) => recentResultsPatch(
+      state,
+      recentResultsUpdateById(state.recentResults, record.id, {
+        status: "success",
+        image: input.urls[0] ?? record.image,
+        successfulCount: input.urls.length,
+        finishedAt: Date.now(),
+        error: undefined,
+      }),
+    ));
+  }
+  const projectId = input.projectId ?? record?.projectId;
+  const state = useFlowStore.getState();
+  const tab = projectId
+    ? state.tabs.find((candidate) => candidate.projectId === projectId)
+    : state.tabs.find((candidate) => candidate.id === state.activeTabId);
+  if (tab) {
+    applyResultNodeCreatedEventToTab(documentTarget(tab), {
+      type: "result-node-created",
+      resultNodeId: `result-${input.runId}`,
+      sourceGeneratorId: input.nodeId,
+      runId: input.runId,
+      mediaKind: "image",
+      urls: input.urls,
+    });
+  }
+  useFlowStore.getState().updateNodeData(input.nodeId, { status: "success", error: undefined });
+}
+
 export function applyResultNodeCreatedEventToTab(
   target: DocumentTarget,
   event: ResultNodeCreatedRunEvent,
 ): boolean {
-  return commitDocumentMutationForTarget(target, (tab) => {
+  const applied = commitDocumentMutationForTarget(target, (tab) => {
     // 先看有没有本次运行创建的占位节点：有则原地升级（不新建、不跳位、边保留）。
     const pending = tab.nodes.find((node) => (
       isPendingResultNode(node as { data: { kind?: string; runId?: string } })
@@ -2051,6 +2193,9 @@ export function applyResultNodeCreatedEventToTab(
       ...(hasEdge ? {} : { edges: [...tab.edges, resultSourceEdge(event.sourceGeneratorId, node.id)] }),
     };
   });
+  // 产物已落到文档：这个运行不再需要恢复点（占位节点也已原地升级或补建）。
+  if (applied) forgetInflightRunByRunId(event.runId);
+  return applied;
 }
 
 /**
@@ -2110,6 +2255,38 @@ export function applyImageNodeUpdatedEventToTab(
  * 因此 node-status 事件**永不**写入文档 revision——运行态是瞬时状态
  * （RUNTIME_NODE_DATA_KEYS = status/error），不再像 v7 那样「成功即提交文档」。
  */
+/** 从进度映射里摘掉指定节点；没有命中时返回原引用，避免无意义的重渲染。 */
+function dropNodeRunProgress(
+  progressByNodeId: Record<string, RunProgress>,
+  nodeIds: ReadonlySet<string>,
+): Record<string, RunProgress> {
+  if (nodeIds.size === 0) return progressByNodeId;
+  let changed = false;
+  const next: Record<string, RunProgress> = {};
+  for (const [key, value] of Object.entries(progressByNodeId)) {
+    if (nodeIds.has(key)) {
+      changed = true;
+      continue;
+    }
+    next[key] = value;
+  }
+  return changed ? next : progressByNodeId;
+}
+
+/**
+ * 页签关闭时回收该文档所有节点的进度：内存映射按节点 id 索引，而项目重新打开时
+ * 节点 id 会从服务端文档原样读回——不清理就会让新开的画布继承上一轮的阶段文案。
+ */
+function dropTabRunProgress(
+  state: FlowState,
+  tab: ProjectTab,
+): Record<string, RunProgress> {
+  return dropNodeRunProgress(
+    state.runProgressByNodeId,
+    new Set(tab.nodes.map((node) => node.id)),
+  );
+}
+
 function updateTabFromRunEvent(
   set: (partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>)) => unknown,
   target: DocumentTarget,
@@ -2141,6 +2318,52 @@ function updateTabFromRunEvent(
   // before any branch can write into the replacement document.
   if (!documentForTarget(currentState, target)) return;
   runWithoutHistory(() => updateTabNodes(set, target, updateNodes));
+  syncRunProgress(set, nodeId, event);
+}
+
+/**
+ * RUN-02：把事件里的子单元进度记到内存映射。
+ *
+ * - 只改 `runProgressByNodeId`，不碰文档 → 不触发保存、不进 undo、不写 flow_json；
+ * - 同一 phase 内 `done` 单调不减（契约 §5）：SSE 重连会重放旧事件，进度条不允许回退；
+ *   phase 切换（如 video-submitted → video-polling）时按新阶段重新计数；
+ * - 终态（成功/失败/取消/结果未知）与缺少 progress 的普通事件都不保留进度，
+ *   避免节点已结束还挂着「生成中 3/8」。
+ */
+function syncRunProgress(
+  set: (partial: Partial<FlowState> | ((state: FlowState) => Partial<FlowState>)) => unknown,
+  nodeId: string,
+  event: NodeStatusRunEvent,
+): void {
+  const progress = event.progress;
+  if (progress && !isNodeRunTerminal(event.status)) {
+    set((state) => {
+      const previous = state.runProgressByNodeId[nodeId];
+      const merged: RunProgress = (
+        previous
+        && previous.phase === progress.phase
+        && previous.done !== undefined
+        && progress.done !== undefined
+      )
+        ? { ...progress, done: Math.max(previous.done, progress.done) }
+        : progress;
+      const unchanged = previous
+        && previous.phase === merged.phase
+        && previous.done === merged.done
+        && previous.total === merged.total
+        && previous.queuePosition === merged.queuePosition;
+      if (unchanged) return {};
+      return { runProgressByNodeId: { ...state.runProgressByNodeId, [nodeId]: merged } };
+    });
+    return;
+  }
+  if (!isNodeRunTerminal(event.status)) return;
+  set((state) => {
+    if (!(nodeId in state.runProgressByNodeId)) return {};
+    const next = { ...state.runProgressByNodeId };
+    delete next[nodeId];
+    return { runProgressByNodeId: next };
+  });
 }
 
 function applyActiveTemporalHistory(direction: "undo" | "redo"): void {
@@ -2314,6 +2537,8 @@ export const useFlowStore = create<FlowState>()(
         activeTabId: restored?.tabs && restored.tabs.length > 0 ? initialTab.id : "",
         tabSessionPersistenceError: null,
         pendingMaskWorkCount: 0,
+        // RUN-02：进度只活在内存里；刷新/重连后由 durable 事件重放重新填。
+        runProgressByNodeId: {},
         // 服务端历史在登录成功后注入；不能从浏览器本地缓存恢复其他账号的记录。
         recentResults: [],
         viewer: null,
@@ -2351,7 +2576,7 @@ export const useFlowStore = create<FlowState>()(
         const remaining = state.tabs.filter((tab) => tab.id !== tabId);
         if (tabId !== state.activeTabId) {
           temporalHistoryByTab.delete(tabId);
-          set({ tabs: remaining });
+          set({ tabs: remaining, runProgressByNodeId: dropTabRunProgress(state, closingTab) });
           return;
         }
         temporalHistoryByTab.delete(tabId);
@@ -2360,6 +2585,7 @@ export const useFlowStore = create<FlowState>()(
           tabs: remaining,
           activeTabId: target?.id ?? "",
           viewer: null,
+          runProgressByNodeId: dropTabRunProgress(state, closingTab),
         }));
         if (target) restoreTemporalHistory(target.id);
       },
@@ -2804,14 +3030,21 @@ export const useFlowStore = create<FlowState>()(
           ])));
 
         // 用户 2026-10-28：点运行即把结果节点画出来（生成中态），事件到达后原地升级。
+        // 2026-11-10：占位节点同时也是「独立恢复点」的数据来源——就地取到实际节点，
+        // 不等提交落定再去读 store（提交可能被历史事务排队，读不到就会漏登记）。
+        let pendingPlaceholder: FlowNode | undefined;
         runWithoutHistory(() => commitDocumentMutationForTarget(target, (tab) => {
-          const alreadyPending = tab.nodes.some((candidate) => (
+          const existingPending = tab.nodes.find((candidate) => (
             isPendingResultNode(candidate as { data: { kind?: string; runId?: string } })
             && (candidate.data as { sourceGeneratorId?: string }).sourceGeneratorId === id
           ));
-          if (alreadyPending) return {};
+          if (existingPending) {
+            pendingPlaceholder = existingPending;
+            return {};
+          }
           const pendingNode = createPendingResultNode(tab, id);
           if (!pendingNode) return {};
+          pendingPlaceholder = pendingNode;
           const hasEdge = tab.edges.some((edge) => (
             edge.source === id && edge.target === pendingNode.id
           ));
@@ -2820,6 +3053,28 @@ export const useFlowStore = create<FlowState>()(
             ...(hasEdge ? {} : { edges: [...tab.edges, resultSourceEdge(id, pendingNode.id)] }),
           };
         }));
+
+        // 恢复点与画布节点解耦：即使刷新路径重建了文档，也能把占位节点补回来。
+        if (pendingPlaceholder) {
+          const placeholderData = pendingPlaceholder.data as {
+            startedAt?: number;
+            [PENDING_RESULT_RUN_ID_KEY]?: unknown;
+          };
+          const startedAt = typeof placeholderData.startedAt === "number"
+            ? placeholderData.startedAt
+            : localStartedAt;
+          const inflightRunId = pendingRunIdOf(pendingPlaceholder as unknown as PendingResultNodeLike);
+          rememberInflightRun({
+            tabId: target.tabId,
+            projectId: initialDocument.projectId,
+            generatorId: id,
+            nodeId: pendingPlaceholder.id,
+            mediaKind: kind === "video-generator" ? "video" : "image",
+            position: { x: pendingPlaceholder.position.x, y: pendingPlaceholder.position.y },
+            startedAt,
+            ...(inflightRunId ? { runId: inflightRunId } : {}),
+          });
+        }
 
         try {
           runWithoutHistory(() => {
@@ -2897,6 +3152,10 @@ export const useFlowStore = create<FlowState>()(
           }
           clearAmbiguousRunRequest(submissionKey);
           knownRunId = payload.runId;
+          // 刷新恢复点：runId 一确认就写进会话快照，覆盖「POST 已返回、首个 SSE 事件
+          // 还没到」以及「刷新期间 run 已完成、不再出现在 /api/history/active」两个窗口。
+          attachPendingRunId(target, id, payload.runId);
+          flushTabSessionPersistence();
           // 运行已确认入队（会消耗额度），通知顶栏刷新余额；失败路径不刷新。
           requestBalanceRefresh();
 
@@ -2936,7 +3195,10 @@ export const useFlowStore = create<FlowState>()(
               applyRunEventToRecentResults(state.recentResults, recordId, event),
             ));
             updateTabFromRunEvent(set, target, id, event);
-            if (isNodeRunTerminal(event.status)) terminalRecorded = true;
+            if (isNodeRunTerminal(event.status)) {
+              terminalRecorded = true;
+              forgetInflightRunByRunId(payload.runId);
+            }
           });
         } catch (err) {
           if (!terminalRecorded) {
@@ -2993,6 +3255,9 @@ export const useFlowStore = create<FlowState>()(
           }
         } finally {
           runPreparations.delete(preparationKey);
+          // 占位节点已落成终态（失败/取消/无法确认）就不再需要恢复点；
+          // 仍是「生成中」（网络中断、稍后重新同步）则保留，供刷新后继续同步。
+          settleInflightPlaceholder(target, id);
         }
       },
 
@@ -3001,17 +3266,21 @@ export const useFlowStore = create<FlowState>()(
       // 固定判定，面板不提供模型选择），产物经 image-node-updated 原位回写 + 清 mask 四字段。
       runImageEdit: async (id, prompt, opts) => {
         // UI 禁用只是反馈层；所有付费运行仍必须在唯一 action 入口二次校验。
-        if (getGenerationSafetyBlockReason()) return false;
+        const safetyReason = getGenerationSafetyBlockReason();
+        if (safetyReason) return safetyReason;
         flushActiveTextEdit();
         const target = selectActiveDocumentTarget(get());
         const tabId = target.tabId;
         const pendingSettlement = waitForHistoryTransactionSettlement(tabId);
         if (pendingSettlement) await pendingSettlement;
-        if (getGenerationSafetyBlockReason()) return false;
+        const safetyReasonAfterSettlement = getGenerationSafetyBlockReason();
+        if (safetyReasonAfterSettlement) return safetyReasonAfterSettlement;
         const initialState = get();
         const initialDocument = documentForTarget(initialState, target);
-        if (!initialDocument || initialState.activeTabId !== tabId) return false;
-        if (initialDocument.readOnly) return false;
+        if (!initialDocument || initialState.activeTabId !== tabId) {
+          return "项目或页签已切换，请重新选择图片后再试";
+        }
+        if (initialDocument.readOnly) return "项目处于只读模式，不能发起修改";
         const node = initialDocument.nodes.find((candidate) => candidate.id === id);
         const trimmedPrompt = typeof prompt === "string" ? prompt.trim() : "";
         // §4.4 三层 fail-closed 的最内层之外的 action 入口自检（面板禁用是第一层）：
@@ -3024,6 +3293,15 @@ export const useFlowStore = create<FlowState>()(
           node && node.data.kind === "image" &&
           typeof node.data.mask === "string" && node.data.mask.trim() !== "",
         );
+        // 「最近结果里该节点仍有活动记录」可能只是 SSE 中断留下的陈旧状态：历史对账只在
+        // 页面加载时跑一次，不会自愈。先做一次 GET 核对（只读，不重新提交），已终态就本地
+        // 收口记录并放行；确实还在跑才拦截。
+        const blockingRecord = initialState.recentResults.find((record) =>
+          record.projectId === initialDocument.projectId &&
+          record.nodeId === id &&
+          isNodeRunActive(record.status) &&
+          Boolean(record.runId),
+        );
         if (
           !node ||
           node.data.kind !== "image" ||
@@ -3031,18 +3309,29 @@ export const useFlowStore = create<FlowState>()(
           !trimmedPrompt ||
           trimmedPrompt.length > 500 ||
           (trimmedEditInputRef !== undefined && nodeHasMask) ||
-          isNodeRunActive(node.data.status) ||
-          initialState.recentResults.some((record) =>
-            record.projectId === initialDocument.projectId &&
-            record.nodeId === id &&
-            isNodeRunActive(record.status) &&
-            Boolean(record.runId),
-          )
-        ) return false;
+          isNodeRunActive(node.data.status)
+        ) {
+          if (!node) return "图片节点已不存在，请刷新画布";
+          if (node.data.kind !== "image") return "目标节点不是图片节点，无法发起修改";
+          if (!trimmedPrompt) return "修改描述为空，请先填写";
+          if (trimmedPrompt.length > 500) return "修改描述超过 500 字上限";
+          if (trimmedEditInputRef !== undefined && nodeHasMask) {
+            return "图片当前带有蒙版，请先清除蒙版或改用蒙版重绘";
+          }
+          return `该图片正在修改中（状态：${node.data.status ?? "unknown"}），请等待本轮完成`;
+        }
+        if (blockingRecord) {
+          const settled = await settleBlockingActiveRecord(blockingRecord, target);
+          if (!settled) {
+            return `上一轮修改（运行 ${blockingRecord.runId}）还在进行中，请等它完成或刷新页面同步状态`;
+          }
+        }
 
         const preparationKey = runPreparationKey(target, id);
         const submissionKey = runSubmissionKey(initialDocument.projectId, id);
-        if (runPreparations.has(preparationKey)) return false;
+        if (runPreparations.has(preparationKey)) {
+          return "上一次提交仍在进行中，请稍候再试";
+        }
         runPreparations.add(preparationKey);
         const localStartedAt = Date.now();
         const recordId = nanoid(8);
@@ -3054,6 +3343,8 @@ export const useFlowStore = create<FlowState>()(
         let terminalRecorded = false;
         let knownRunId: string | undefined;
         let runSubmitted = false;
+        // catch 里算出的用户可读失败原因：带回面板（2026-11-10，替代匿名 false）。
+        let failureMessage: string | undefined;
 
         // 先记录这次编辑操作，再请求后端；请求失败或页面刷新也不丢记录。
         const initialRecord: RecentResult = {
@@ -3071,9 +3362,11 @@ export const useFlowStore = create<FlowState>()(
           requestedCount,
         };
         set((state) => recentResultsPatch(state, trimRecentResults([
-            initialRecord,
-            ...initialState.recentResults,
-          ])));
+          initialRecord,
+          // 用最新快照而非 initialState：门禁自愈（settleBlockingActiveRecord）可能刚把
+          // 陈旧记录收口，旧快照会把它覆盖回 running，下一轮又被同一道门禁拦死。
+          ...get().recentResults,
+        ])));
 
         try {
           runWithoutHistory(() => {
@@ -3106,8 +3399,8 @@ export const useFlowStore = create<FlowState>()(
           const saveResult = await saveTab(target);
           if (!saveResult.ok) {
             // 保存失败不抛错走通用 catch（catch 会写 node error + finally 清编辑态，
-            // 不污染 editPrompt）；直接返回 false 让面板提示用户，运行视为未发起。
-            return false;
+            // 不污染 editPrompt）；这里把保存失败的具体原因带回面板，而不是匿名 false。
+            return saveResult.error ?? "项目保存失败，本次修改未发起，请稍后重试";
           }
           if (!submissionFlow.nodes.some((candidate) => candidate.id === id)) {
             throw new Error("项目或节点已关闭，未调用生图服务");
@@ -3176,6 +3469,21 @@ export const useFlowStore = create<FlowState>()(
           runPreparations.delete(preparationKey);
           runSubmitted = true;
 
+          // 合成编辑没有占位结果节点，产物走 `image-node-updated` 原位回写：登记同款恢复点，
+          // 让「编辑生成中刷新、且运行在刷新期间跑完」也能重放事件把图补回画布。
+          // 只用 GET/SSE 重放，绝不重新提交（不重复计费）。
+          rememberInflightRun({
+            target: "image",
+            tabId: target.tabId,
+            projectId: initialDocument.projectId,
+            generatorId: id,
+            nodeId: id,
+            mediaKind: "image",
+            position: { x: node.position.x, y: node.position.y },
+            startedAt: localStartedAt,
+            runId: payload.runId,
+          });
+
           const runStatus = await fetch(`/api/run-plan/${encodeURIComponent(payload.runId)}`);
           if (!runStatus.ok) {
             throw new Error(
@@ -3190,6 +3498,7 @@ export const useFlowStore = create<FlowState>()(
               // 65d 决策 B：产物原位替换 image 节点 outputImages + 清 mask 四字段（契约 §3.4）。
               if (event.nodeId !== id) return;
               applyImageNodeUpdatedEventToTab(target, event);
+              forgetInflightRunByRunId(payload.runId);
               set((state) => recentResultsPatch(
                 state,
                 recentResultsUpdateById(state.recentResults, recordId, {
@@ -3208,7 +3517,10 @@ export const useFlowStore = create<FlowState>()(
               applyRunEventToRecentResults(state.recentResults, recordId, event),
             ));
             updateTabFromRunEvent(set, target, id, event);
-            if (isNodeRunTerminal(event.status)) terminalRecorded = true;
+            if (isNodeRunTerminal(event.status)) {
+              terminalRecorded = true;
+              forgetInflightRunByRunId(payload.runId);
+            }
           });
         } catch (err) {
           if (!terminalRecorded) {
@@ -3224,6 +3536,7 @@ export const useFlowStore = create<FlowState>()(
               const syncStalledMessage = knownRunId
                 ? `运行 ${knownRunId} 状态同步中断：${message}；请检查网络后点击「重新同步」`
                 : `状态同步中断：${message}；请检查网络后点击「重新同步」`;
+              failureMessage = syncStalledMessage;
               set((state) => recentResultsPatch(
                 state,
                 recentResultsUpdateById(state.recentResults, recordId, {
@@ -3246,6 +3559,7 @@ export const useFlowStore = create<FlowState>()(
                 : err instanceof AmbiguousRunSubmissionError
                   ? `${message}；再次点击会使用同一请求号安全确认，请勿新建重复任务`
                   : message;
+              failureMessage = safeMessage;
               const event: NodeStatusRunEvent = {
                 type: "node-status",
                 nodeId: id,
@@ -3285,8 +3599,19 @@ export const useFlowStore = create<FlowState>()(
             ),
           ));
           runPreparations.delete(preparationKey);
-          return runSubmitted;
+          // 终态（失败/取消/无法确认）不再需要恢复点；`retry_wait` 说明运行还活着，保留。
+          if (knownRunId) {
+            const latestStatus = get().tabs
+              .find((candidate) => candidate.id === target.tabId)
+              ?.nodes.find((candidate) => candidate.id === id)?.data.status;
+            if (latestStatus && isNodeRunTerminal(latestStatus)) {
+              forgetInflightRunByRunId(knownRunId);
+            }
+          }
         }
+        // 注意：不能把 return 放进 finally——finally 的 return 会覆盖 try/catch 里
+        // 已经算好的门禁原因（string），面板就又只能看到布尔值了。
+        return failureMessage ?? runSubmitted;
       },
 
       saveProject: async () => {
@@ -3333,6 +3658,9 @@ export const useFlowStore = create<FlowState>()(
         });
         const selection = normalizeNodeSelection(loadedNodes, []);
         const current = selectActiveDocument(state);
+        // 这里**不**合并在途占位节点：loadFlow 是显式「载入一份文档」，可能来自另一个
+        // 项目（同 tab 复用、模板回填），而 node id 会跨项目复用——合并会把上一个项目的
+        // 生成中卡片与运行态带进来（有回归用例守护 documentEpoch 不得穿透）。
         const tab: ProjectTab = {
           ...current,
           projectId,
@@ -3410,6 +3738,72 @@ export function persistedWorkflowForProjectTab(tab: ProjectTab): PersistedWorkfl
   return documentSnapshotToPersistedWorkflow(createDocumentSnapshot(tab));
 }
 
+/**
+ * 用服务端文档重建画布时，把「在途占位结果节点」合并回来（2026-11-10）。
+ *
+ * 服务端 `flow_json` 永远不含占位节点（result 节点的 runId 必须非空，占位节点被
+ * `createDocumentSnapshot` 显式过滤），所以**任何一次**由服务端文档整体替换页签的操作
+ * ——初始草稿对账 `applyServerInitialDraftToTab`、重新打开项目、保存冲突回滚——都会让
+ * 生成中的卡片凭空消失。用户看到的就是「点了生成，结果节点闪一下就没了」。
+ *
+ * 只回填本地瞬态节点与溯源边；revision/dirty 仍由调用方统一决定（占位节点不算文档编辑）。
+ *
+ * 与启动恢复的分工（同一份在途记录、两种触发时机，不是两套机制）：
+ * - 此处＝**同一页面内**服务端文档替换画布时的同步兜底（保存失败 409 对账），内存里就有节点；
+ * - `resumePendingResultNodes`＝**刷新/重开**后的启动恢复，以 `inflightRuns` 为唯一权威。
+ */
+export function mergeInflightPlaceholders(
+  source: Pick<ProjectTab, "nodes">,
+  nodes: FlowNode[],
+  edges: Edge[],
+): { nodes: FlowNode[]; edges: Edge[] } {
+  const pending = source.nodes.filter((node) => (
+    isPendingResultNode(node as unknown as PendingResultNodeLike)
+  ));
+  if (pending.length === 0) return { nodes, edges };
+  // 只保留「生成节点仍在新文档里」的占位节点：
+  // - 同项目对账（初始草稿 id 与本地 projectId 可能不同，不能用 projectId 判断）→ 保留；
+  // - 换项目/生成节点已被删 → 丢弃，避免留下没有来源的悬空节点。
+  const missing = pending.filter((node) => {
+    const generatorId = (node.data as { sourceGeneratorId?: string }).sourceGeneratorId;
+    if (!generatorId) return false;
+    if (nodes.some((candidate) => candidate.id === node.id)) return false;
+    return nodes.some((candidate) => candidate.id === generatorId);
+  });
+  if (missing.length === 0) return { nodes, edges };
+  // 生成节点自己也要保住运行态：服务端文档里它是 idle，对账一覆盖，用户眼前就从
+  // 「生成中」变回「空闲」，运行按钮重新可点——一次运行还没收口就可能被重复提交。
+  const runningGenerators = new Map<string, { status: NodeRunStatus; error?: string }>();
+  for (const node of missing) {
+    const generatorId = (node.data as { sourceGeneratorId?: string }).sourceGeneratorId;
+    if (!generatorId) continue;
+    const sourceGenerator = source.nodes.find((candidate) => candidate.id === generatorId);
+    if (!sourceGenerator || !isNodeRunActive(sourceGenerator.data.status)) continue;
+    runningGenerators.set(generatorId, {
+      status: sourceGenerator.data.status,
+      error: sourceGenerator.data.error,
+    });
+  }
+  const nextNodes: FlowNode[] = nodes.map((node) => {
+    const running = runningGenerators.get(node.id);
+    if (!running) return node;
+    return {
+      ...node,
+      data: { ...node.data, status: running.status, error: running.error } as WorkflowNodeData,
+    };
+  });
+  nextNodes.push(...missing);
+  const nextEdges = [...edges];
+  for (const node of missing) {
+    const generatorId = (node.data as { sourceGeneratorId?: string }).sourceGeneratorId;
+    // 生成节点已被服务端文档删掉时不补边：悬空边会让画布报错。
+    if (!generatorId || !nextNodes.some((candidate) => candidate.id === generatorId)) continue;
+    if (nextEdges.some((edge) => edge.target === node.id)) continue;
+    nextEdges.push(resultSourceEdge(generatorId, node.id));
+  }
+  return { nodes: nextNodes, edges: nextEdges };
+}
+
 /** 初始化/冲突解决的单一入口：只替换指定页签的文档，不改写普通新建与打开语义。 */
 export function applyServerInitialDraftToTab(
   tabId: string,
@@ -3434,13 +3828,15 @@ export function applyServerInitialDraftToTab(
     finiteNonNegative(options?.localDocumentRevision, draft.revision),
   );
   const selection = normalizeNodeSelection(draftDocument.nodes, []);
+  // 重建画布时带上本页签正在生成中的占位结果节点，否则对账一次就把用户眼前的结果卡片抹掉。
+  const merged = mergeInflightPlaceholders(source, selection.nodes, draftDocument.edges);
   const serverTab: ProjectTab = {
     ...source,
     projectId: draft.id,
     projectName: draft.name,
     readOnly: false,
-    nodes: selection.nodes,
-    edges: draftDocument.edges,
+    nodes: merged.nodes,
+    edges: merged.edges,
     selectedNodeIds: selection.selectedNodeIds,
     selectedNodeId: selection.selectedNodeId,
     selectedResultId: null,
@@ -3630,6 +4026,11 @@ if (typeof window !== "undefined") {
   let serverAutosaveHandle: number | null = null;
   let lastServerAutosaveTime = 0;
 
+  /** 在途占位节点的 runId 也是恢复点的一部分：写入/升级必须立即触发会话落盘。 */
+  const pendingRunSignature = (tab: ProjectTab): string => tab.nodes
+    .filter((node) => isPendingResultNode(node as unknown as PendingResultNodeLike))
+    .map((node) => `${node.id}:${pendingRunIdOf(node as unknown as PendingResultNodeLike) ?? ""}`)
+    .join("|");
   const tabMarker = (tab: ProjectTab): string => [
     tab.projectId,
     tab.documentEpoch,
@@ -3643,6 +4044,7 @@ if (typeof window !== "undefined") {
     tab.draftRevision ?? "",
     tab.draftSyncedRevision ?? "",
     tab.draftCreatedAt ?? "",
+    pendingRunSignature(tab),
   ].join("\u0000");
   const persistenceSignalChanged = (state: FlowState, previous: FlowState): boolean => {
     if (state.activeTabId !== previous.activeTabId || state.tabs.length !== previous.tabs.length) {
@@ -3912,6 +4314,285 @@ if (typeof window !== "undefined") {
     if (!manifestMatches) scheduleTabSessionPersistence();
   } else {
     persistLatestStableState(true);
+  }
+}
+
+/**
+ * 2026-11-10：刷新恢复「生成中执行」的运行。
+ *
+ * 旧链路只对 `/api/history/active` 返回的活动 run 重放 SSE；若刷新与首屏历史请求之间
+ * run 已经完成，它就不再是 active，durable 的 `result-node-created` 没人消费，图片在
+ * 服务端完好但画布上空空如也。这里改用会话快照里占位节点自带的 `pendingRunId` 作为
+ * 恢复清单——精确到「本次会话提交过的运行」，与 run 当前是 running 还是 succeeded 无关，
+ * 也不会把很久以前、用户已手动删掉的历史结果节点重新塞回画布。
+ *
+ * 与 resumeRecentResults 共用 `resumingRecentRunIds`，避免同一 run 开两条 SSE。
+ * 纯 GET + 事件重放，不会重新提交、不会重复计费。
+ */
+function replayPendingRun(
+  runId: string,
+  target: DocumentTarget,
+  nodeId: string,
+): void {
+  if (resumingRecentRunIds.has(runId)) return;
+  resumingRecentRunIds.add(runId);
+  void (async () => {
+    try {
+      const response = await fetch(`/api/run-plan/${encodeURIComponent(runId)}`);
+      if (response.status === 404) {
+        throw new Error("运行状态已丢失，无法自动同步");
+      }
+      // 401（会话过期）/ 5xx（服务暂不可用）不是「结果未知」：静默保留生成中态，
+      // 下次刷新或历史对账会再试，绝不把可恢复的运行写成需核对扣费的终态。
+      if (!response.ok) return;
+      await consumeRunEvents(runId, nodeId, (event) => {
+        if (event.type === "result-node-created") {
+          if (event.sourceGeneratorId !== nodeId) return;
+          // 服务端 durable 事件是产物的唯一来源：占位节点在此原地升级成真结果节点。
+          applyResultNodeCreatedEventToTab(target, event);
+          useFlowStore.setState((state) => recentResultsPatch(
+            state,
+            state.recentResults.map((record) => (
+              record.runId === runId && !record.image && event.urls.length > 0
+                ? { ...record, image: event.urls[0]! }
+                : record
+            )),
+          ));
+          return;
+        }
+        if (event.type !== "node-status" || event.nodeId !== nodeId) return;
+        updateTabFromRunEvent(useFlowStore.setState, target, nodeId, event);
+        // 运行到这个状态就结束了（失败也把占位节点留成失败卡片），恢复点可以回收。
+        if (isNodeRunTerminal(event.status)) forgetInflightRunByRunId(runId);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isNetworkError =
+        error instanceof TypeError ||
+        error instanceof DOMException ||
+        (error instanceof Error && /network|fetch|ECONNREFUSED|timeout|socket/i.test(message));
+      // 网络抖动保留「生成中」，下次刷新可再试；确认无法同步时给出可见终态，
+      // 让用户走「找回图片」，并提示不要重复提交（避免重复计费）。
+      if (!isNetworkError) {
+        updateTabFromRunEvent(useFlowStore.setState, target, nodeId, {
+          type: "node-status",
+          nodeId,
+          status: "outcome_unknown",
+          error: `运行 ${runId} 的结果同步中断：${message}；请先核对兔子 API（Tu-zi）消耗记录，勿重复提交`,
+        });
+      }
+    } finally {
+      resumingRecentRunIds.delete(runId);
+    }
+  })();
+}
+
+/**
+ * 合成编辑的在途重放（2026-11-10）：与结果运行共用同一条「只读重放」路径，只是产物事件
+ * 是 `image-node-updated` 的原位回写。
+ *
+ * 为什么需要它：合成编辑的产物不经过结果节点，`resumeRecentResults` 只能救「服务端历史里
+ * 仍标 active」的运行；如果运行恰好在刷新期间跑完，它已不在活动集里，图片就再也回不到画布。
+ */
+function replayInflightEditRun(runId: string, target: DocumentTarget, nodeId: string): void {
+  if (resumingRecentRunIds.has(runId)) return;
+  resumingRecentRunIds.add(runId);
+  void (async () => {
+    try {
+      const response = await fetch(`/api/run-plan/${encodeURIComponent(runId)}`);
+      if (response.status === 404) {
+        throw new Error("运行状态已丢失，无法自动同步");
+      }
+      // 与结果运行同一条边界：401/5xx 不是「结果未知」，保留生成中态等下次重试。
+      if (!response.ok) return;
+      await consumeRunEvents(runId, nodeId, (event) => {
+        if (event.type === "image-node-updated") {
+          if (event.nodeId !== nodeId) return;
+          // 记录已被更新的编辑取代时不再回写，避免旧产物盖掉用户刚发起的新一轮。
+          if (!readInflightRuns().some((record) => record.runId === runId)) return;
+          applyImageNodeUpdatedEventToTab(target, event);
+          forgetInflightRunByRunId(runId);
+          return;
+        }
+        if (event.type !== "node-status" || event.nodeId !== nodeId) return;
+        updateTabFromRunEvent(useFlowStore.setState, target, nodeId, event);
+        if (isNodeRunTerminal(event.status)) forgetInflightRunByRunId(runId);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isNetworkError =
+        error instanceof TypeError ||
+        error instanceof DOMException ||
+        (error instanceof Error && /network|fetch|ECONNREFUSED|timeout|socket/i.test(message));
+      // 网络抖动保留「生成中」；确认同步不了才给可见终态，提示先核对消耗、别重复提交。
+      if (!isNetworkError) {
+        updateTabFromRunEvent(useFlowStore.setState, target, nodeId, {
+          type: "node-status",
+          nodeId,
+          status: "outcome_unknown",
+          error: `运行 ${runId} 的结果同步中断：${message}；请先核对兔子 API（Tu-zi）消耗记录，勿重复提交`,
+        });
+      }
+    } finally {
+      resumingRecentRunIds.delete(runId);
+    }
+  })();
+}
+
+/**
+ * 门禁自愈（2026-11-10 用户报障「多轮修改无法发起」）：「最近结果里该节点仍有活动
+ * 记录」可能只是 SSE 中断留下的陈旧状态——历史对账（reconcileRunHistory）只在页面
+ * 加载时跑一次，会话内不会自愈，于是节点明明 idle、按钮可点，提交却被这道门禁永远拦下。
+ *
+ * 提交被拦时用一次 GET 核对权威状态：运行已终态就把最近结果与节点状态本地收口并放行；
+ * 查询失败（401/5xx/网络）或确实还在跑才继续拦。只读操作，绝不重新提交付费任务。
+ */
+async function settleBlockingActiveRecord(
+  record: RecentResult,
+  target: DocumentTarget,
+): Promise<boolean> {
+  const runId = record.runId!;
+  let payload: { status?: string; finished?: boolean } | undefined;
+  try {
+    const response = await fetch(`/api/run-plan/${encodeURIComponent(runId)}`);
+    if (!response.ok) return false;
+    payload = await response.json().catch(() => undefined) as typeof payload;
+  } catch {
+    return false;
+  }
+  const runStatus = typeof payload?.status === "string" ? payload.status : undefined;
+  const terminalStatus: NodeRunStatus | undefined =
+    runStatus === "succeeded" ? "success"
+    : runStatus === "failed" ? "error"
+    : runStatus === "cancelled" ? "cancelled"
+    : undefined;
+  if (!terminalStatus) return false;
+  useFlowStore.setState((state) => recentResultsPatch(
+    state,
+    state.recentResults.map((candidate) => (
+      candidate.id === record.id
+        ? { ...candidate, status: terminalStatus, syncStalled: undefined }
+        : candidate
+    )),
+  ));
+  runWithoutHistory(() => updateTabNodes(useFlowStore.setState, target, (nodes) => (
+    nodes.map((node) => (
+      node.id === record.nodeId
+        ? { ...node, data: { ...node.data, status: terminalStatus } as WorkflowNodeData }
+        : node
+    ))
+  )));
+  return true;
+}
+
+/**
+ * 2026-11-10：按独立恢复点补回刷新后丢失的占位结果节点。
+ *
+ * 会话快照里的占位节点可能被任何一次「服务端文档重建页签」冲掉（初始草稿对账、
+ * 重新打开项目、保存失败回滚…）。这里以 `inflightRuns` 记录为权威：只要生成节点还在、
+ * 结果节点还没落地，就把「生成中」卡片按原位置补回去，不新建第二个、不改文档 revision。
+ */
+function restoreInflightPlaceholders(): void {
+  const records = readInflightRuns();
+  if (records.length === 0) return;
+  const state = useFlowStore.getState();
+  for (const record of records) {
+    const tab = state.tabs.find((candidate) => candidate.id === record.tabId)
+      ?? state.tabs.find((candidate) => candidate.projectId === record.projectId);
+    if (!tab) {
+      forgetInflightRun(record.nodeId);
+      continue;
+    }
+    const hasGenerator = tab.nodes.some((node) => node.id === record.generatorId);
+    // 「已经落了结果节点」或「生成节点被删掉」才算收口；占位节点还在只是正常生成中，
+    // 记录必须继续保留，否则下一次刷新就没有恢复依据了。
+    const settled = !hasGenerator
+      || (Boolean(record.runId) && tab.nodes.some((node) => node.id === `result-${record.runId}`));
+    if (settled) {
+      forgetInflightRun(record.nodeId);
+      continue;
+    }
+    if (inflightTarget(record) === "image") {
+      // 合成编辑：产物落在图片节点自身，没有占位节点可补。但节点状态会在刷新后回到服务端
+      // 文档里的 idle，必须恢复成生成中，否则用户会以为没生效再点一次、重复计费。
+      if (!record.runId) continue;
+      const edited = tab.nodes.find((node) => node.id === record.nodeId);
+      if (!edited || isNodeRunActive(edited.data.status)) continue;
+      updateTabFromRunEvent(useFlowStore.setState, documentTarget(tab), record.nodeId, {
+        type: "node-status",
+        nodeId: record.nodeId,
+        status: "running",
+        startedAt: record.startedAt,
+      });
+      continue;
+    }
+    if (tab.nodes.some((node) => node.id === record.nodeId)) continue;
+    const resultKind = record.mediaKind === "video" ? "result-video" : "result-image";
+    const placeholder = {
+      id: record.nodeId,
+      type: resultKind,
+      position: { x: record.position.x, y: record.position.y },
+      data: {
+        ...defaultNodeData(resultKind),
+        status: "running" as const,
+        sourceGeneratorId: record.generatorId,
+        runId: PENDING_RESULT_RUN_ID,
+        startedAt: record.startedAt,
+        ...(record.runId ? { [PENDING_RESULT_RUN_ID_KEY]: record.runId } : {}),
+      } as unknown as WorkflowNodeData,
+    } as FlowNode;
+    const target = documentTarget(tab);
+    runWithoutHistory(() => patchDocumentTarget(useFlowStore.setState, target, (latest) => {
+      if (latest.nodes.some((node) => node.id === record.nodeId)) return {};
+      const hasEdge = latest.edges.some((edge) => (
+        edge.source === record.generatorId && edge.target === record.nodeId
+      ));
+      return {
+        nodes: [...latest.nodes, placeholder],
+        ...(hasEdge ? {} : { edges: [...latest.edges, resultSourceEdge(record.generatorId, record.nodeId)] }),
+      };
+    }));
+  }
+}
+
+/** 启动入口：扫描会话恢复出来的占位结果节点，按在途 runId 重放事件。 */
+export function resumePendingResultNodes(): void {
+  if (typeof window === "undefined") return;
+  // 先按独立恢复点补回可能被重建掉的占位节点，再统一重放。
+  restoreInflightPlaceholders();
+  const state = useFlowStore.getState();
+  const seen = new Set<string>();
+  for (const tab of state.tabs) {
+    for (const node of tab.nodes) {
+      const pending = node as unknown as PendingResultNodeLike;
+      if (!isPendingResultNode(pending)) continue;
+      const runId = pendingRunIdOf(pending);
+      const nodeId = pending.data.sourceGeneratorId;
+      if (!runId || typeof nodeId !== "string" || !nodeId || seen.has(runId)) continue;
+      seen.add(runId);
+      // 真结果节点已在（事件已落地）时无需重放，残留占位由后续编辑自然清理。
+      if (tab.nodes.some((candidate) => candidate.id === `result-${runId}`)) continue;
+      // 同一 run 每次页面生命周期只重放一次：启动后可能被多次调用（历史就绪、
+      // 草稿对账完成），重复重放会开第二条 SSE 并重复写最近结果。
+      if (replayedPendingRunIds.has(runId)) continue;
+      replayedPendingRunIds.add(runId);
+      replayPendingRun(runId, documentTarget(tab), nodeId);
+    }
+  }
+  // 合成编辑：没有占位节点，靠恢复点里的 runId 直接重放（产物经 image-node-updated 回写）。
+  for (const record of readInflightRuns()) {
+    if (inflightTarget(record) !== "image" || !record.runId) continue;
+    const runId = record.runId;
+    if (replayedPendingRunIds.has(runId)) continue;
+    const latest = useFlowStore.getState();
+    const tab = latest.tabs.find((candidate) => candidate.id === record.tabId)
+      ?? latest.tabs.find((candidate) => candidate.projectId === record.projectId);
+    if (!tab || !tab.nodes.some((node) => node.id === record.nodeId)) {
+      forgetInflightRun(record.nodeId);
+      continue;
+    }
+    replayedPendingRunIds.add(runId);
+    replayInflightEditRun(runId, documentTarget(tab), record.nodeId);
   }
 }
 

@@ -1,5 +1,3 @@
-import { mkdirSync } from "node:fs";
-
 import { expect, test } from "./fixtures";
 
 /**
@@ -7,12 +5,11 @@ import { expect, test } from "./fixtures";
  * - 三主题（曜黑/简白/护眼绿）下键盘 Tab 导航，每个可聚焦元素都有可见焦点指示。
  * - 焦点环色对画布底色的对比比 ≥3:1（WCAG 2.1 SC 1.4.11 非文本对比，AA）。
  * - snapGrid=[24,24] 默认关；开启后拖拽落点坐标为 24 的整数倍。
- * 截图证据落在 test-results/vis-keyboard/（2026-11-09 迁出 docs/design：
- * 原来写进已跟踪的文档目录，每跑一次 e2e 都会弄脏仓库）。
+ * 截图证据落在 docs/design/2026-09-22-node-workflow-optimization/shots-batch3/。
  */
 
-const SHOT_DIR = "test-results/vis-keyboard";
-mkdirSync(SHOT_DIR, { recursive: true });
+const SHOT_DIR =
+  "docs/design/2026-09-22-node-workflow-optimization/shots-batch3";
 
 const themes = [
   { id: "current", label: "曜黑", full: "曜黑·荧光绿" },

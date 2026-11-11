@@ -66,6 +66,8 @@ export class ProviderError extends Error {
     public readonly diagnostic?: string,
     /** 上游网关的关联标识；仅保留在服务端日志和评估证据中。 */
     public readonly requestId?: string,
+    /** 上游要求的重试等待（Retry-After / retry-after-ms），已换算为毫秒并设上限。 */
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ProviderError";
@@ -135,6 +137,9 @@ const MESSAGE_RULES: MatchRule[] = [
   //    "insufficient credit" 也不含 "quota exceeded"，旧正则完全匹配不到
   // 3) 中文余额/欠费表述
   { priority: 25, pattern: /insufficient credit|credit limit|quota exceeded|insufficient[_\s-]*(user[_\s-]*)?quota|insufficient[_\s-]*(balance|funds)|余额不足|账户.{0,10}(欠费|不足|超限)|预扣费额度|剩余额度|额度(不足|用尽|超限|已满)/i, category: "account_credit" },
+  // 2026-11-10 按兔子《AI API 通用错误码与排障指南》补：429 不只表示"请求太快"，
+  // 余额/套餐/日配额/免费额度耗尽也会用 429，必须按业务码区分，不能盲目退避重试。
+  { priority: 24, pattern: /daily[\s_-]*(limit|quota)|free[\s_-]*(tier|quota|allowance)|billing[\s_-]*(hard[\s_-]*)?limit|payment required|套餐.{0,10}(到期|超限|用尽|不足)|日配额|每日限额|免费额度|账户余额|欠费/i, category: "account_credit" },
 
   // network_error — 优先于 unknown
   { priority: 40, pattern: /connection.{0,30}(reset|refused|timeout)|network.{0,30}(error|fail|unreachable)|econnreset|econnrefused|etimedout/i, category: "network_error" },
@@ -159,7 +164,8 @@ function classifyProviderMessage(
   //    因此 401/403 先看余额类证据，命中则以 account_credit 为准。
   const statusMatch = STATUS_PRIORITY.find((s) => s.status === status);
   if (statusMatch) {
-    if (statusMatch.category === "gateway_authentication") {
+    // 401/403 与 429 都可能其实是余额/配额问题（指南：429 必须按业务码再分类）。
+    if (statusMatch.category === "gateway_authentication" || statusMatch.category === "rate_limited") {
       const creditRule = MESSAGE_RULES.find(
         (rule) => rule.category === "account_credit" && rule.pattern.test(normalized),
       );
@@ -196,9 +202,40 @@ function classifyProviderMessage(
   };
 }
 
+const REQUEST_ID_HEADERS = [
+  "x-oneapi-request-id",
+  "x-request-id",
+  "request-id",
+  "apim-request-id",
+  "x-amzn-requestid",
+] as const;
+
 export function providerRequestIdFromResponse(response: Pick<Response, "headers">): string | undefined {
-  const requestId = response.headers.get("x-request-id")?.trim();
-  return requestId && PROVIDER_REQUEST_ID_PATTERN.test(requestId) ? requestId : undefined;
+  for (const header of REQUEST_ID_HEADERS) {
+    const requestId = response.headers.get(header)?.trim();
+    if (requestId && PROVIDER_REQUEST_ID_PATTERN.test(requestId)) return requestId;
+  }
+  return undefined;
+}
+
+/**
+ * 上游重试等待（指南：优先遵守有效的 Retry-After）。
+ * 同时兼容秒数与 HTTP 日期，以及 Azure 的毫秒级 retry-after-ms；上限 120 秒，
+ * 避免上游给出异常大值把任务挂死。
+ */
+export function providerRetryAfterMs(response: Pick<Response, "headers">): number | undefined {
+  const cap = 120_000;
+  const azureRaw = response.headers.get("retry-after-ms");
+  if (azureRaw !== null && azureRaw.trim() !== "") {
+    const azureMs = Number(azureRaw);
+    if (Number.isFinite(azureMs) && azureMs >= 0) return Math.min(cap, azureMs);
+  }
+  const raw = response.headers.get("retry-after")?.trim();
+  if (!raw) return undefined;
+  if (/^\d+$/.test(raw)) return Math.min(cap, Number(raw) * 1_000);
+  const at = Date.parse(raw);
+  if (!Number.isFinite(at)) return undefined;
+  return Math.max(0, Math.min(cap, at - Date.now()));
 }
 
 export function providerErrorFromResponse(
@@ -206,6 +243,7 @@ export function providerErrorFromResponse(
   responseBody: string,
   providerId?: string,
   requestId?: string,
+  retryAfterMs?: number,
 ): ProviderError {
   const classified = classifyProviderMessage(status, responseBody);
   return new ProviderError(
@@ -215,6 +253,7 @@ export function providerErrorFromResponse(
     classified.category,
     `HTTP ${status}: ${responseBody.slice(0, 2_000)}`,
     requestId,
+    retryAfterMs,
   );
 }
 
@@ -223,7 +262,7 @@ export function providerErrorFromMessage(message: string, providerId?: string, s
   return new ProviderError(classified.publicMessage, status, providerId, classified.category, message.slice(0, 2_000));
 }
 
-function dispatchFetch(
+export function dispatchFetch(
   url: string,
   init: RequestInit & { dispatcher?: unknown },
 ): Promise<Response> {
@@ -364,7 +403,9 @@ export async function fetchWithRetry(
       // 非 2xx body 若本身超时/中断，结果和计费状态同样不可知；不得吞掉后误判为可重试 503。
       try {
         const body = await res.text();
-        throw providerErrorFromResponse(res.status, body, opts?.providerId, requestId);
+        throw providerErrorFromResponse(
+          res.status, body, opts?.providerId, requestId, providerRetryAfterMs(res),
+        );
       } catch (error) {
         if (error instanceof ProviderError) throw error;
         const failure = inspectProviderTransportFailure(error);

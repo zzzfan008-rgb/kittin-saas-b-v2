@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { selectActiveNodes, selectActiveReadOnly, useFlowStore } from "@/store/flowStore";
-import { EDGE_HANDLE_RESULT, type ResultVideoNodeData } from "@/types/workflow";
-import { NodeFrame } from "./NodeFrame";
+import { EDGE_HANDLE_RESULT, isNodeRunActive, type ResultVideoNodeData } from "@/types/workflow";
+import { NodeFrame, RunProgressBlock } from "./NodeFrame";
 import { NodeToolbar } from "./NodeToolbar";
 import { DUPLICATE_UNAVAILABLE_REASON } from "./nodeDuplicate";
 
@@ -74,7 +74,14 @@ export function ResultVideoNode({ id, data, selected }: NodeProps<Node<ResultVid
           />
         }
       >
-        {hasProduct ? (
+        {isNodeRunActive(data.status) ? (
+          // 与图片结果节点同构（用户 2026-11-10）：视频出片慢，生成中必须有显影 + 阶段文案
+          // （「已提交上游，等待出片 / 上游生成中」），否则视频节点只是个空框。
+          <RunProgressBlock
+            nodeId={data.sourceGeneratorId}
+            startedAt={(data as { startedAt?: number }).startedAt}
+          />
+        ) : hasProduct ? (
           <div className="nodrag relative overflow-hidden rounded-xl border border-[var(--gc-node-border)] bg-black">
             <video
               ref={videoRef}

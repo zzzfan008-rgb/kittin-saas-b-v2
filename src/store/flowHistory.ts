@@ -63,6 +63,12 @@ export function preserveNodeRuntimeAndTransients(
       error: current.data.error,
     } as WorkflowNodeData,
   };
+  // 2026-11-10：占位结果节点的在途 runId 是会话层瞬态，撤销/重做不能把它抹掉，
+  // 否则生成过程中一次 undo 就会让「刷新后自动回填」失效。
+  const currentData = current.data as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(currentData, "pendingRunId")) {
+    (next.data as unknown as Record<string, unknown>).pendingRunId = currentData.pendingRunId;
+  }
   const nextRecord = next as unknown as Record<string, unknown>;
   const currentRecord = current as unknown as Record<string, unknown>;
   for (const key of PRESERVED_NODE_TRANSIENT_KEYS) {
@@ -81,7 +87,8 @@ const DOCUMENT_NODE_SHELL_EXCLUDED_KEYS = new Set([
   "data",
 ]);
 
-const RUNTIME_NODE_DATA_KEYS = new Set(["status", "error"]);
+/** 运行态与会话层瞬态字段：变化不算文档编辑，不进撤销比较（2026-11-10 增加 pendingRunId）。 */
+const RUNTIME_NODE_DATA_KEYS = new Set(["status", "error", "pendingRunId"]);
 
 function sameRecordValues(
   left: Record<string, unknown>,

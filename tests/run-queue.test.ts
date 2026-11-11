@@ -33,11 +33,14 @@ const { streamDurableRunEvents } = await import("../server/routes/runPlan");
 // 任务文本与 runner.ts executeImageStep 同源：taskPrompt = modeSystemText(kind, mode) + 用户正文。
 const { modeSystemText } = await import("../server/lib/promptPresetsFrozen");
 const { renderProviderPrompt } = await import("../src/lib/providerPromptRenderer");
+const { notifyAsyncImageTaskSubmitted } = await import("../server/providers/asyncTaskContext");
+const { claimNextJob } = await import("../server/engine/runQueue/claim");
+const { recordProviderImageUrls } = await import("../server/engine/runQueue/persist");
 await database.initializeDatabase();
 
 // v9（64 Phase 3）：原 variant fixture 的模型直给（fashion-lookbook / commerce-hero 同模型）。
-const QUEUE_MODEL_ID: ImageModelId = "gpt-image-2.5-flare";
-const MASK_MODEL_ID: ImageModelId = "gpt-image-2.5-sunburst";
+const QUEUE_MODEL_ID: ImageModelId = "gpt-image-2.6-flare";
+const MASK_MODEL_ID: ImageModelId = "gpt-image-2.6-sunburst";
 
 const owner = await database.queryOne<{ id: string }>("SELECT id FROM users WHERE account_id = 'queue-admin'");
 assert.ok(owner);
@@ -207,7 +210,7 @@ function resolver(
     return behavior(request, calls);
   };
   const provider: AIProvider = {
-    id: "gpt-image-2.5-flare",
+    id: "gpt-image-2.6-flare",
     async generate(request) { return invoke(request); },
     async edit(request) { return invoke(request); },
   };
@@ -237,7 +240,7 @@ console.log("PostgreSQL 持久生成队列测试");
 
 await test("入队立即返回且数据库重连后 queued 任务仍可执行并重放事件", async () => {
   const fake = resolver(() => ({
-    images: [PNG_DATA_URL], model: "gpt-image-2.5-flare", providerOutputSizes: ["2048x2048"],
+    images: [PNG_DATA_URL], model: "gpt-image-2.6-flare", providerOutputSizes: ["2048x2048"],
   }));
   const runId = await enqueueSingle("restart");
   assert.equal(fake.calls(), 0, "入队阶段不得调用上游");
@@ -289,7 +292,7 @@ await test("RUN-02：batchSize=4 的 executeStep 进度 done 单调不减", asyn
   let calls = 0;
   const fake = resolver(() => {
     calls += 1;
-    return { images: [`generated-${calls}`], model: "gpt-image-2.5-flare" };
+    return { images: [`generated-${calls}`], model: "gpt-image-2.6-flare" };
   });
   const progressEvents: NodeStatusRunEvent[] = [];
   const batchStep: NodeExecution = {
@@ -314,7 +317,7 @@ await test("RUN-02：Worker 持久化 progress 事件；无 progress 的旧事�
   sequence += 1;
   const nodeId = `progress-w-${sequence}`;
   const run = await queue.enqueueGenerationRun({ steps: [step(nodeId)] }, owner.id, context(nodeId));
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.6-flare" }));
   const now = tick();
   assert.equal(await queue.processNextGenerationJob("worker-progress", {
     resolveProvider: fake.resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
@@ -776,7 +779,7 @@ await test("179 条活动任务下两个不同请求并发入队时只接受一�
 });
 
 await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上游", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.6-flare" }));
   const runId = await enqueueSingle("soft-deleted");
   try {
     await database.query(`
@@ -794,7 +797,7 @@ await test("已软删除的 queued Run 永远不会被 Worker 领取或调用上
 });
 
 await test("retry_wait 在 available_at 前不可领取，到期后才对 Worker 可见", async () => {
-  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
+  const fake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.6-flare" }));
   const runId = await enqueueSingle("available-at");
   const availableAt = tick(10_000);
   await database.query(
@@ -863,7 +866,7 @@ await test("确认临时的 503 连续两次失败后第三次成功且请求数
     if (call <= 2) {
       throw new ProviderError("AI 服务暂时不可用，请稍后重试", 503, "stub", "gateway_unavailable");
     }
-    return { images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" };
+    return { images: [PNG_DATA_URL], model: "gpt-image-2.6-flare" };
   });
   const runId = await enqueueSingle("temporary-503");
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -931,7 +934,7 @@ await test("超时或连接不确定结果进入 outcome_unknown 且绝不重放
   const unknown = await runRow(runId);
   assert.equal(unknown?.status, "outcome_unknown");
   assert.equal(unknown?.provider_requests, 1);
-  assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
+  assert.match(unknown?.error ?? "", /核对.*消耗记录/);
   assert.match(unknown?.error ?? "", /确认未扣费后.*手动重新提交/);
   now = tick();
   assert.equal(await queue.processNextGenerationJob("worker-unknown", {
@@ -989,7 +992,7 @@ await test("多步运行逐节点保留 Provider 与业务成品映射，历史�
   };
   const fake = resolver((request) => ({
     images: Array.from({ length: Number(request.batchSize) || 1 }, () => PNG_DATA_URL),
-    model: "gpt-image-2.5-flare",
+    model: "gpt-image-2.6-flare",
   }));
   const run = await queue.enqueueGenerationRun(plan, owner.id, {
     userId: owner.id,
@@ -1146,7 +1149,7 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   await database.query("UPDATE generation_runs SET status = 'running' WHERE id = $1", [safeRunId]);
   assert.equal(await queue.recoverExpiredGenerationJobs(expiredAt), 1);
   assert.equal((await runRow(safeRunId))?.status, "queued");
-  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.5-flare" }));
+  const safeFake = resolver(() => ({ images: [PNG_DATA_URL], model: "gpt-image-2.6-flare" }));
   const safeNow = tick();
   assert.equal(await queue.processNextGenerationJob("worker-recovered", {
     resolveProvider: safeFake.resolveProvider, now: () => safeNow, random: () => 0,
@@ -1167,7 +1170,7 @@ await test("租约在上游调用前过期可安全重排，调用开始后过�
   const unknown = await runRow(unknownRunId);
   assert.equal(unknown?.status, "outcome_unknown");
   assert.equal(unknown?.provider_requests, 1);
-  assert.match(unknown?.error ?? "", /核对 API易消耗记录/);
+  assert.match(unknown?.error ?? "", /核对.*消耗记录/);
 });
 
 // 评估恢复测试随 admission 系统移除而删除。
@@ -1268,7 +1271,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientRequestId: "direct-mask-request",
-        modelId: "gpt-image-2.5-sunburst",
+        modelId: "gpt-image-2.6-sunburst",
         kind: "image-generator",
         nodeId: "direct-mask-test",
         request: {
@@ -1314,7 +1317,7 @@ await test("直连蒙版任务把第一张参考图持久绑定为 maskSourceRef
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientRequestId: "direct-mask-over-limit",
-        modelId: "gpt-image-2.5-sunburst",
+        modelId: "gpt-image-2.6-sunburst",
         kind: "image-generator",
         nodeId: "direct-mask-over-limit",
         request: {
@@ -1400,6 +1403,78 @@ await test("500 个 job 的领取计划无 Sort 且 claimNextJob P95 小于 50ms
   } finally {
     await database.query("DELETE FROM generation_runs WHERE id = ANY($1::text[])", [runIds]);
   }
+});
+
+await test("异步图片任务提交瞬间落库 task_id，进程被杀后仍可凭 task_id 找回", async () => {
+  const runId = await enqueueSingle("async-evidence");
+  const now = tick();
+  const { resolveProvider } = resolver(async () => {
+    // 模拟 Provider 在 POST /v1/videos 成功后立刻上报 task_id，随后才继续轮询。
+    await notifyAsyncImageTaskSubmitted("task_asyncEvidence1");
+    return { images: [PNG_DATA_URL], model: QUEUE_MODEL_ID };
+  });
+  assert.equal(await queue.processNextGenerationJob("worker-async-evidence", {
+    resolveProvider, now: () => now, random: () => 0, retryDelaysMs: [0, 0],
+  }), true);
+  const stepRow = await database.queryOne<{
+    provider_task_id: string | null;
+    provider_request_id: string | null;
+    provider_image_urls_json: string;
+  }>(
+    `SELECT provider_task_id, provider_request_id, provider_image_urls_json
+     FROM generation_run_steps WHERE run_id = $1`,
+    [runId],
+  );
+  assert.equal(stepRow?.provider_task_id, "task_asyncEvidence1");
+  assert.equal(stepRow?.provider_request_id, "task_asyncEvidence1", "找回接口读这一列");
+  // 同步模型返回 dataURL，没有上游 URL 可存证；找回只能靠 task_id/request_id。
+  assert.deepEqual(JSON.parse(stepRow?.provider_image_urls_json ?? "[]"), []);
+});
+
+await test("上游回传 http URL 时立即写入存证，供找回直接重取图片", async () => {
+  const runId = await enqueueSingle("async-evidence-url");
+  const claimed = await claimNextJob("worker-evidence-url", tick(), 45_000);
+  assert.ok(claimed, "应能领到刚入队的任务");
+  await recordProviderImageUrls(claimed, ["https://cdn.example/evidence.png"], "req_evidence123");
+  await recordProviderImageUrls(claimed, ["https://cdn.example/evidence.png", "https://cdn.example/second.png"]);
+  const stepRow = await database.queryOne<{
+    provider_image_urls_json: string;
+    provider_request_id: string | null;
+  }>(
+    "SELECT provider_image_urls_json, provider_request_id FROM generation_run_steps WHERE id = $1",
+    [claimed.stepId],
+  );
+  assert.deepEqual(JSON.parse(stepRow?.provider_image_urls_json ?? "[]"), [
+    "https://cdn.example/evidence.png",
+    "https://cdn.example/second.png",
+  ], "重复 URL 去重、按序追加");
+  assert.equal(stepRow?.provider_request_id, "req_evidence123", "URL 过期后仍可凭 request_id 换链找回");
+
+  // 同一凭据不得被后续请求覆盖（异步 task_id 优先）。
+  await recordProviderImageUrls(claimed, [], "req_shouldNotOverride");
+  const after = await database.queryOne<{ provider_request_id: string | null }>(
+    "SELECT provider_request_id FROM generation_run_steps WHERE id = $1",
+    [claimed.stepId],
+  );
+  assert.equal(after?.provider_request_id, "req_evidence123");
+  await database.query("DELETE FROM generation_jobs WHERE run_id = $1", [runId]);
+});
+
+await test("下载阶段失败只拿到 request_id 时也留下找回凭据", async () => {
+  const runId = await enqueueSingle("async-evidence-reqonly");
+  const claimed = await claimNextJob("worker-evidence-reqonly", tick(), 45_000);
+  assert.ok(claimed);
+  await recordProviderImageUrls(claimed, [], "req_noUrlEvidence");
+  const stepRow = await database.queryOne<{
+    provider_image_urls_json: string;
+    provider_request_id: string | null;
+  }>(
+    "SELECT provider_image_urls_json, provider_request_id FROM generation_run_steps WHERE id = $1",
+    [claimed.stepId],
+  );
+  assert.deepEqual(JSON.parse(stepRow?.provider_image_urls_json ?? "[]"), []);
+  assert.equal(stepRow?.provider_request_id, "req_noUrlEvidence");
+  await database.query("DELETE FROM generation_jobs WHERE run_id = $1", [runId]);
 });
 
 await database.closeDatabaseForTests();

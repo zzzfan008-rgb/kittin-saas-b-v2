@@ -78,9 +78,9 @@ const getDiagnostics = asyncHandler(async (_req, res) => {
 
 function diagnosticModelOptions(modelId: ImageModelId): ImageModelOptions {
   switch (modelId) {
-    case "gpt-image-2.5-sunburst":
+    case "gpt-image-2.6-sunburst":
       return {};
-    case "gpt-image-2.5-flare":
+    case "gpt-image-2.6-flare":
       return { size: "1024x1024", quality: "high" };
     case "gemini-nano-banana-2.1":
     case "gemini-3.1-flash-image":

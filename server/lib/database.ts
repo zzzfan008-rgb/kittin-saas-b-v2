@@ -1460,6 +1460,32 @@ async function migrate(): Promise<void> {
       );
     }
 
+    if (!applied.has(28)) {
+      // 2026-11-10：上游返回图片 URL 后、下载之前先落库存证。
+      // 目的：下载/落盘失败或进程中断时，仍能按 URL 重新取回已生成的图片，不必重新生成计费。
+      await client.query(`
+        ALTER TABLE generation_run_steps
+          ADD COLUMN IF NOT EXISTS provider_image_urls_json TEXT NOT NULL DEFAULT '[]';
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (28, $1, $2)",
+        ["provider_image_urls_evidence", new Date().toISOString()],
+      );
+    }
+
+    if (!applied.has(29)) {
+      // 2026-11-10：按兔子异步任务指南保存请求 ID。没有 task_id 时可用
+      // GET /v1/images/generations/result?request_id=... 恢复已保存的图片链接。
+      await client.query(`
+        ALTER TABLE generation_run_steps
+          ADD COLUMN IF NOT EXISTS provider_request_id TEXT;
+      `);
+      await client.query(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (29, $1, $2)",
+        ["step_provider_request_id_evidence", new Date().toISOString()],
+      );
+    }
+
     return imported;
   });
   if (importedRows !== undefined) {

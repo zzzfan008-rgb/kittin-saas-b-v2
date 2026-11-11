@@ -1,14 +1,15 @@
-# syntax=docker/dockerfile:1.7
-FROM node:24.20.0-bookworm-slim AS build
+ARG NODE_IMAGE=node:24.20.0-bookworm-slim
+FROM ${NODE_IMAGE} AS build
 ARG GARMENT_CANVAS_BUILD_CODE_SHA=""
 ARG GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256=""
 ARG GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256=""
 WORKDIR /app
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+  && apt-get -o Acquire::Retries=8 update \
+  && apt-get -o Acquire::Retries=8 install -y --fix-missing --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --registry=https://registry.npmmirror.com --no-audit --no-fund
 COPY . .
 RUN node scripts/write-build-identity.mjs /app/.garment-canvas-build-identity.json "$GARMENT_CANVAS_BUILD_CODE_SHA"
 RUN --mount=type=secret,id=evaluation_release_registry,required=false \
@@ -20,7 +21,7 @@ RUN --mount=type=secret,id=evaluation_release_registry,required=false \
   npm run build
 RUN npm prune --omit=dev
 
-FROM node:24.20.0-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./

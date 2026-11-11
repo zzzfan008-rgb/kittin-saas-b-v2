@@ -8,6 +8,7 @@ import {
   flushTabSessionPersistence,
   reconcileRunHistory,
   recentResultsPatch,
+  resumePendingResultNodes,
   resumeRecentResults,
   selectActiveNodes,
   selectActiveSelectedNodeIds,
@@ -266,6 +267,14 @@ function Workspace() {
   useEffect(() => () => {
     setGenerationSafetyBlockReason("正在确认运行历史，完成前暂停新的生成任务");
   }, []);
+
+  // 2026-11-10：store 已从 sessionStorage 同步恢复页签，这里按「在途运行」恢复点
+  // 先补回可能被文档重建冲掉的占位节点，再按 runId 重放 durable 事件，不依赖
+  // /api/history 的响应时间窗——刷新期间刚好完成的 run 不在 active 集里。
+  // 依赖项覆盖：首屏挂载、历史就绪（活动集对账完成）、页签/项目切换后重新进入画布。
+  useEffect(() => {
+    resumePendingResultNodes();
+  }, [activeTabId, initialHistoryState, workspaceEmpty]);
 
   useEffect(() => {
     const flushDrafts = () => {

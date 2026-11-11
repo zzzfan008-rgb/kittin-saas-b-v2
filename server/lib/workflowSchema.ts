@@ -18,7 +18,7 @@ import {
   getImageModelContract,
   isImageModelId,
 } from "../../src/types/imageModels";
-import { isRetiredImageModelId } from "../../src/types/retiredImageModels";
+import { isRetiredImageModelId, migrateLegacyImageModelId } from "../../src/types/retiredImageModels";
 import { isVideoModelId } from "../../src/types/videoModels";
 import { IMAGE_OPERATION_MODE_VALUES, GENERATOR_OPERATION_MODE_VALUES } from "../../src/types/imageOperations";
 import { frozenPromptBindingForVariantId } from "./promptPresetsFrozen";
@@ -57,7 +57,7 @@ const MASK_DATA_URL_CONTRACT = (() => {
  * operationMode（裁决 A）为新的生成语义字段，加入清单 fail-closed。
  * v9（65a）：mask/maskSourceRef/featherRadius 从本清单移除——蒙版归属图片本身
  * （65 Q1：官方 single mask 语义，一张图一个蒙版，随 image[0]），image 节点允许携带。
- * v9+（65b Q3 后端 canonicalize 补口面）：mask-edit 与 gpt-image-2.5-sunburst 的
+ * v9+（65b Q3 后端 canonicalize 补口面）：mask-edit 与 gpt-image-2.6-sunburst 的
  * 双向唯一绑定（gateway.ts:419/422）由运行链 dag.ts 注入面执行——schema 只管蒙版
  * 字段归属与值校验，不掺和运行时 modelId 的蒙版配对（配对是 plan 物化层职责）。
  * v9+（2026-10-12 model-tryon A 机制）：familyId 为 image-generator 可选族标识
@@ -67,6 +67,7 @@ const MASK_DATA_URL_CONTRACT = (() => {
  */
 const GENERATION_FIELDS = [
   "modelId", "operationMode", "modelOptions", "aspectRatio", "batchSize", "familyId",
+  "analyzeReferences",
 ] as const;
 
 export class WorkflowValidationError extends Error {
@@ -310,7 +311,7 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       // 供应商迁移（兔子API）后，旧草稿/旧项目里可能存着已下线的模型 ID。
       // 2026-10-27 用户拍板 A 案：服务端与前端保持一致 —— retired ID 静默回落默认生成模型，
       // 不阻断保存（否则「云端草稿同步失败」会让用户卡死）。运行准入仍由各自校验把关。
-      let modelId = raw.modelId;
+      let modelId = migrateLegacyImageModelId(raw.modelId);
       if (isRetiredImageModelId(modelId)) {
         modelId = DEFAULT_GENERATION_MODEL_ID;
       }
@@ -327,6 +328,14 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
       const familyId = raw.familyId === undefined
         ? undefined
         : stringValue(raw.familyId, `${path}.familyId`, { nonEmpty: true });
+      // 「运行前智能解析参考图」开关：undefined=开启，仅显式 false 关闭；非布尔 fail-closed。
+      let analyzeReferences: boolean | undefined;
+      if (raw.analyzeReferences !== undefined) {
+        if (typeof raw.analyzeReferences !== "boolean") {
+          fail(`${path}.analyzeReferences`, "must be a boolean");
+        }
+        analyzeReferences = raw.analyzeReferences;
+      }
       // 65a：蒙版三字段已搬到 image 节点。存量文档（v9 早期试探期草稿）在生成节点
       // 携带的三字段在此静默丢弃（Q4 裁决 A：DB 实查恰 1 个 0-runs 草稿，mask 资产
       // 仍在可重涂；不报错不迁移）——返回对象是白名单重建，天然只含契约字段。
@@ -340,6 +349,7 @@ function validateDataV9(kind: NodeKind, rawValue: unknown, path: string): Workfl
         aspectRatio,
         batchSize,
         ...(familyId !== undefined ? { familyId } : {}),
+        ...(analyzeReferences !== undefined ? { analyzeReferences } : {}),
         ...withError({}),
       } as WorkflowNodeData;
     }

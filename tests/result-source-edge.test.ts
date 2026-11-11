@@ -35,7 +35,7 @@ const generator = {
     label: "生图",
     status: "idle",
     operationMode: "edit",
-    modelId: "gpt-image-2.5-flare",
+    modelId: "gpt-image-2.6-flare",
     modelOptions: {},
     aspectRatio: "1:1",
     batchSize: 1,

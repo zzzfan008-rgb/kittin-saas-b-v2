@@ -12,6 +12,7 @@
  */
 import { config } from "../config";
 import { getApiyiDispatcher } from "../providers/gatewayTransport";
+import { dispatchFetch } from "../providers/base";
 
 export type TextChatRole = "system" | "user";
 export interface TextChatMessage {
@@ -151,7 +152,7 @@ async function attemptOnce(args: TextChatCompletionArgs, deps: Required<Pick<Tex
 
   let response: Response;
   try {
-    response = await deps.fetchImpl(url, {
+    const requestInit = {
       method: "POST",
       headers: {
         authorization: `Bearer ${deps.apiKey}`,
@@ -160,8 +161,14 @@ async function attemptOnce(args: TextChatCompletionArgs, deps: Required<Pick<Tex
       body: JSON.stringify(body),
       signal: controller.signal,
       // 网关专属连接池（undici Agent），与出图通道一致。
-      ...( { dispatcher: getApiyiDispatcher() } as Record<string, unknown>),
-    } as Parameters<typeof fetch>[1]);
+      dispatcher: getApiyiDispatcher(),
+    } as RequestInit & { dispatcher?: unknown };
+    // 必须走 dispatchFetch：Node 原生 fetch 不接受 npm undici 的 Agent，
+    // 直接把 dispatcher 传给全局 fetch 会在 3ms 内抛 UND_ERR_INVALID_ARG，
+    // 表现为「帮我优化」永远静默失败（200 + rewritten:null）。
+    response = deps.fetchImpl === globalThis.fetch
+      ? await dispatchFetch(url, requestInit)
+      : await deps.fetchImpl(url, requestInit as RequestInit);
   } catch (error) {
     if (error instanceof TextRewriteError) throw error; // 超时 abort 抛出的已定码错误
     throw new TextRewriteError(

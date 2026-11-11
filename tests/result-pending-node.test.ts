@@ -2,7 +2,8 @@
  * 「点运行即出结果节点 + 生成中动效」（用户 2026-10-28）。
  *
  * 锁定四件事：
- *  1. 占位结果节点（runId 为空）**不落库**，指向它的边也一并过滤；
+ *  1. 占位结果节点（runId 为空）**不进服务端 flow_json**，指向它的边也一并过滤；
+ *     （2026-11-10 起浏览器会话快照会保留它，见 pending-result-refresh.test.ts）；
  *  2. 结果节点在 running 态渲染「暗房显影」+ 已用时角标，而不是空态文案；
  *  3. store 在 runNode 里插入占位节点，并在事件到达时原地升级（不新建第二个节点）；
  *  4. 蒙版重绘 / 多轮修改右栏在运行中渲染同一套进度块。
@@ -34,7 +35,7 @@ const generator = {
   position: { x: 0, y: 0 },
   data: {
     kind: "image-generator", label: "生图", status: "running",
-    operationMode: "edit", modelId: "gpt-image-2.5-flare", modelOptions: {}, aspectRatio: "1:1", batchSize: 1,
+    operationMode: "edit", modelId: "gpt-image-2.6-flare", modelOptions: {}, aspectRatio: "1:1", batchSize: 1,
   },
 };
 const pendingResult = {
