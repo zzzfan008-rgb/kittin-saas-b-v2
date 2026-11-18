@@ -370,6 +370,7 @@ const UPSTREAM_ARTIFACT_HOST_SUFFIXES: readonly string[] = [
   "aliyuncs.com",   // 阿里 OSS（qwen 产物）
   "sydney-ai.com",  // Google 图床（gemini / gpt-image 产物）
   "volces.com",     // 字节 TOS（seedream 产物）
+  "myqcloud.com",   // 腾讯云 COS（MiniMax-H3 视频产物，2026-11-18 实测 pixstag-*.cos.ap-shanghai.myqcloud.com）
   "ourzhishi.top",  // 网关自身（原生 flux polling 等）
 ];
 

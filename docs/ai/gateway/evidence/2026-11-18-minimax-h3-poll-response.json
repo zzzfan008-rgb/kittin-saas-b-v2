@@ -1,0 +1,29 @@
+{
+  "kind": "video-poll-response-probe",
+  "capturedAt": "2026-11-18T06:05:00Z",
+  "modelId": "MiniMax-H3",
+  "taskId": "task_WRVsIaH3S0gX7rF8GRMz0UK4WsrB1USa",
+  "endpoint": "GET /v1/videos/{id}",
+  "httpStatus": 200,
+  "note": "MiniMax-H3 真实轮询响应。顶层 video_url，无 task 包装、无 content.url；成功态为 completed（非契约原写的 succeeded）；中间态实测 in_progress。签名查询串已脱敏。",
+  "response": {
+    "id": "task_WRVsIaH3S0gX7rF8GRMz0UK4WsrB1USa",
+    "object": "video",
+    "model": "MiniMax-H3",
+    "status": "completed",
+    "progress": 100,
+    "video_url": "https://pixstag-1254880040.cos.ap-shanghai.myqcloud.com/2026-11-18/1a1ed423bf529202.mp4?<signature-redacted>",
+    "created_at": 1794981840,
+    "completed_at": 1794981907,
+    "seconds": "5",
+    "metadata": {
+      "duration": 5,
+      "modality": "video",
+      "ratio": "adaptive",
+      "resolution": "768P",
+      "task_type": "generation",
+      "url": "https://pixstag-1254880040.cos.ap-shanghai.myqcloud.com/2026-11-18/1a1ed423bf529202.mp4?<signature-redacted>",
+      "video_mode": "first_frame_to_video"
+    }
+  }
+}

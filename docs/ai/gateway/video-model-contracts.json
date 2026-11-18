@@ -104,7 +104,7 @@
     },
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:0d585f45781d2d291bdb0587b2dd548c406fe12feafc839693a4cb224df36c9b",
+      "contractHash": "sha256:e9b29ffe4617bfa515e3acda0cade61a0aa8ad85af879b91e227c8ecadbce3a4",
       "id": "MiniMax-H3",
       "label": "MiniMax H3",
       "channel": "official",
@@ -118,20 +118,22 @@
       "responseShape": {
         "submitIdField": "id",
         "statusField": "status",
-        "successStatus": "succeeded",
+        "successStatus": "completed",
         "pendingStatuses": [
           "queued",
-          "running"
+          "running",
+          "pending",
+          "in_progress"
         ],
         "failedStatuses": [
           "failed",
           "cancelled"
         ],
         "videoUrlFields": [
+          "video_url",
           "content.url"
         ],
-        "errorField": "error",
-        "taskWrapper": "task"
+        "errorField": "error"
       },
       "recommendedOptions": {
         "resolution": {
