@@ -6,7 +6,7 @@
 
 - 生产数据由 PostgreSQL 18 与 `DATA_DIR` 共同组成，二者必须在同一个恢复点备份。
 - `dist/`、`dist-server/`、`.env` 和 `data/` 都不是版本库内容；部署现场构建或使用 Docker 多阶段构建。
-- 自动化和验收不得连接真实 AI。只有正式部署才填写真实 `APIYI_API_KEY`。
+- 自动化和验收不得连接真实 AI。只有正式部署才填写真实 `GATEWAY_API_KEY`。
 - 浏览器内未保存的 session 草稿不属于服务端备份。维护前应先让用户保存项目并退出生成任务。
 - 生成队列与历史由 PostgreSQL 持久化；启动后会恢复活动任务并通过 Results 展示成功、失败或未知状态。同步未完成时不要盲目重新提交，以免重复计费。
 
@@ -16,8 +16,9 @@
 
 | 变量 | 必需 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `APIYI_API_KEY` | 是 | 无 | API易图片网关密钥；就绪检查只验证非空，不会主动调用模型 |
-| `APIYI_BASE_URL` | 否 | `https://api.apiyi.com` | 覆盖默认网关时必须是 HTTPS URL |
+| `GATEWAY_API_KEY` | 是 | 无 | 网关密钥；就绪检查只验证非空，不会主动调用模型 |
+| `GATEWAY_BASE_URL` | 否 | `https://api.ourzhishi.top` | 覆盖默认网关时必须是 HTTPS URL |
+| `GATEWAY_VIDEO_API_KEY` | 否 | 回退 `GATEWAY_API_KEY` | 视频模型专用令牌，需在网关侧勾选 SeeDance2 分组 |
 | `PORT` | 否 | 本地 3001；Compose 无配置时对外 3002 | 非 Docker 时是服务监听端口；Compose 容器内固定监听 3002，宿主机映射使用该值 |
 | `API_PROXY_TARGET` | 否 | 跟随 `PORT` | 仅开发环境需要转发到独立 API 地址时设置 |
 | `DATA_DIR` | 否 | `./data` | 上传、生成文件与旧 SQLite 导入源目录 |
@@ -43,8 +44,8 @@
 | `GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_PATH` | 非 Docker 非空受审发布必需 | 无 | 运行时 registry 绝对路径；必须精确位于 `RELEASE_DIR/prompt-release-registry.json` |
 | `GARMENT_CANVAS_EVALUATION_RELEASE_REGISTRY_SHA256` | 非空受审发布必需 | 无 | registry 原始文件字节的 SHA-256；前后端构建与运行时必须相同 |
 | `GARMENT_CANVAS_EVALUATION_RELEASE_BUNDLE_SHA256` | 非空受审发布必需 | 无 | registry 递归可达发布闭包的受审根哈希，不能用 registry 文件哈希代替 |
-| `APIYI_TAIL_STALL_SALVAGE` | 否 | `true` | 完整对象 JSON 已到齐但连接不结束时启用安全收尾；设为 `false`、`0` 或 `off` 只关闭宽限期提前收尾，流式响应大小上限始终生效 |
-| `APIYI_TAIL_STALL_GRACE_MS` | 否 | `5000` | 最后一块数据后的完整 JSON 探测宽限期，限制为 1000–30000ms；不替代模型总超时或 Undici body timeout |
+| `GATEWAY_TAIL_STALL_SALVAGE` | 否 | `true` | 完整对象 JSON 已到齐但连接不结束时启用安全收尾；设为 `false`、`0` 或 `off` 只关闭宽限期提前收尾，流式响应大小上限始终生效 |
+| `GATEWAY_TAIL_STALL_GRACE_MS` | 否 | `5000` | 最后一块数据后的完整 JSON 探测宽限期，限制为 1000–30000ms；不替代模型总超时或 Undici body timeout |
 | `GENERATION_WORKER_POLL_MS` | 否 | `2000` | Worker 轮询间隔，限制为 100–60000 ms |
 
 初始化成功并完成管理员改密后，可以从 `.env` 移除 `INITIAL_ADMIN_ACCOUNT_ID` 和 `INITIAL_ADMIN_PASSWORD`，避免长期保留临时凭据。
@@ -65,7 +66,7 @@ Compose 会读取私有 `.env` 做端口插值：复制当前 `.env.example` 后
 
 BuildKit secret 只避免把外部源文件保存在构建层历史中，不是浏览器保密边界。Vite 与 Node 会把**最小运行准入投影**编入产物；其中不含审批人、审批理由和审批时间。完整 promotion、receipt、contract check 及人工审计信息只留在外置包。前后端各自写出只含代码/闭包/registry 哈希和数量的 manifest；服务启动前还会校验服务端内嵌投影、运行时 registry、前后端 manifest 与 `GARMENT_CANVAS_CODE_SHA` 全部一致。任一可达文件缺失、被替换、路径穿越 symlink、哈希不符、模型目录漂移或版本漂移，都会在数据库初始化和 Worker 启动前失败关闭。运行时还会确认 registry 可达的每个文件及其包内父目录对服务进程都不可写，不再只检查 registry 一个文件。这个门禁与 `ENABLE_PAID_EVALUATION_RUNS` 无关，因为普通用户也会使用 `verified` / `recommended` 发布。
 
-当前五模型范围的 API易 `/v1/models` 目录基线已按本轮人工复核物化：捕获时间 `2026-09-03T13:22:48.000Z`，HTTP 200，271 个规范化唯一 ID，五个现役 ID 精确覆盖 5/5；原始文件 SHA-256 为 `7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408`，`sha256-canonical-model-id-set-v1` 指纹为 `43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d`。本次目录相对先前 269-ID 记录发生漂移，旧历史记录不改写。原始文件仍在 Git 工作树外；contract check 必须读取其精确字节并把它保留到外置发布闭包，仓库内摘要和历史脱敏探针都不能代替原始文件。
+当前 12 个现役模型（9 图像 + 3 视频）的清单以 `docs/ai/gateway/model-contracts.json` 为唯一事实源，结构门用 `npm run docs:gateway:check` 校验。早期五模型范围的目录基线（捕获 `2026-09-03T13:22:48.000Z`，271 个规范化唯一 ID）作为历史证据保留：原始文件 SHA-256 为 `7d5348336bbe5ac63a34107a506e3c5c72340064608c11193602df65c4327408`，`sha256-canonical-model-id-set-v1` 指纹为 `43b6914c1328f07599468e9129d18ba7966293cf73144b4a722c9494a2c8636d`。本次目录相对先前 269-ID 记录发生漂移，旧历史记录不改写。原始文件仍在 Git 工作树外；contract check 必须读取其精确字节并把它保留到外置发布闭包，仓库内摘要和历史脱敏探针都不能代替原始文件。
 
 该批准只关闭模型目录人工基线这一项前置阻断。五个模型仍为 `unverified`；在真实评估证据、阶段 gate、promotion、registry 和干净 exact-SHA 门禁完成前，仍不得生成或部署非空受审发布，也不得把目录存在解释为生成、编辑、质量或计费通过。
 
