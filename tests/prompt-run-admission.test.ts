@@ -186,3 +186,59 @@ assert.equal(
 );
 
 console.log("提示词运行时准入（v9 兼容性闸）测试通过");
+
+// ===== 视频节点准入（2026-11-11 修复：走秀视频误报「必须选择五模型」）=====
+// 回归锁定：视频节点用 isVideoModelId，且首帧入边不套用图片的参考图冲突检查。
+import { VIDEO_MODEL_IDS } from "../src/types/videoModels";
+
+// 1. 三个现役视频模型在 video-generator 节点上全部放行（原 bug：全部报 unsupported-model）。
+for (const videoModelId of VIDEO_MODEL_IDS) {
+  const decision = evaluatePromptRunAdmission(promptRunAdmissionInputFromParams(
+    "video-generator",
+    { modelId: videoModelId, operationMode: "generate", prompt: "模特 T 台走秀" },
+  ));
+  assert.equal(decision.allowed, true, `视频模型 ${videoModelId} 应被准入，实际: ${decision.reason}`);
+  assert.equal(decision.code, "verified");
+}
+
+// 2. 视频节点携带首帧入边（references）不得报 generate-reference-conflict。
+assert.equal(
+  evaluatePromptRunAdmission(promptRunAdmissionInputFromParams(
+    "video-generator",
+    { modelId: "doubao-seedance-2-5-260628", operationMode: "generate" },
+    [{ order: 0, sourceNodeId: "source-image" }],
+  )).allowed,
+  true,
+  "视频节点的首帧图不是图片语境的参考图，不应触发冲突",
+);
+
+// 3. 未知视频模型仍 fail-closed，且文案不再出现过时的「五模型」。
+const unknownVideo = evaluatePromptRunAdmission(promptRunAdmissionInputFromParams(
+  "video-generator",
+  { modelId: "seedance-invented-9-9" },
+));
+assert.equal(unknownVideo.allowed, false, "未知视频模型必须拒绝");
+assert.equal(unknownVideo.code, "unsupported-model");
+assert.match(unknownVideo.reason, /视频模型契约/, "视频侧报错应指向视频模型契约");
+assert.doesNotMatch(unknownVideo.reason, /五模型/, "过时的「五模型」口径不得出现");
+
+// 4. 图片侧未知模型的文案同步改为「图像模型契约」。
+const unknownImage = evaluatePromptRunAdmission(promptRunAdmissionInputFromParams(
+  "image-generator",
+  { ...params, modelId: "invented-image-model" },
+));
+assert.equal(unknownImage.code, "unsupported-model");
+assert.match(unknownImage.reason, /图像模型契约/);
+assert.doesNotMatch(unknownImage.reason, /五模型/);
+
+// 5. 图片模型不得被视频节点接受（防误配，两侧清单不可混用）。
+assert.equal(
+  evaluatePromptRunAdmission(promptRunAdmissionInputFromParams(
+    "video-generator",
+    { modelId: "gemini-3.1-flash-image" },
+  )).allowed,
+  false,
+  "图片模型在视频节点上必须拒绝",
+);
+
+console.log("视频节点准入分流测试通过（5 组）");
