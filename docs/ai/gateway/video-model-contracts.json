@@ -34,7 +34,7 @@
   "models": [
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:f277d1692b49ddbcfe226a9c0c3c9bbe74d3744418c63c0a18c4e0adfcf9e01e",
+      "contractHash": "sha256:b980922183b2143101852dac8dc2504bb22738e86e0a873c9d6b083f431c5c6f",
       "id": "doubao-seedance-2-5-260628",
       "label": "Seedance 2.5（字节）",
       "channel": "official",
@@ -68,43 +68,39 @@
         "resolution": {
           "default": "720p",
           "examples": [
-            "480p",
-            "720p",
-            "1080p"
-          ]
+            "720p"
+          ],
+          "note": "文档示例 720p。480p 为草稿档、1080p 为正式档。未做枚举实测。"
         },
         "ratio": {
-          "default": "adaptive",
+          "default": "16:9",
           "examples": [
             "16:9",
             "4:3",
             "1:1",
             "3:4",
             "9:16",
-            "21:9",
-            "adaptive"
-          ]
+            "21:9"
+          ],
+          "evidenceStatus": "verified",
+          "acceptedEvidenceIds": [
+            "2026-11-18-seedance-ratio-enumeration"
+          ],
+          "note": "2026-11-18 实测：6 个画幅各提交一次 5s/720p 文生视频，全部 completed 且返回可下载 video_url。adaptive 未验证（当次余额不足未能提交），不列入。"
         },
         "duration": {
           "default": 5,
           "examples": [
-            4,
-            5,
-            10,
-            30
-          ]
-        },
-        "seed": {
-          "examples": [
-            -1
-          ]
+            5
+          ],
+          "note": "文档示例 8 秒；本系统默认 5 秒控成本。未做枚举实测，面板不提供多档。"
         }
       },
       "knowledgeSources": []
     },
     {
       "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:e9b29ffe4617bfa515e3acda0cade61a0aa8ad85af879b91e227c8ecadbce3a4",
+      "contractHash": "sha256:7cb109359115fcbdd85fea46846c1a6b0113ac9b144e4124fc9410f1309d8753",
       "id": "MiniMax-H3",
       "label": "MiniMax H3",
       "channel": "official",
@@ -139,85 +135,23 @@
         "resolution": {
           "default": "768P",
           "examples": [
-            "768P",
-            "1080P"
-          ]
+            "768P"
+          ],
+          "note": "文档示例 768P（再生成才用 2K）。未做枚举实测。"
         },
         "ratio": {
-          "default": "adaptive",
+          "default": "16:9",
           "examples": [
-            "16:9",
-            "4:3",
-            "1:1",
-            "3:4",
-            "9:16",
-            "adaptive"
-          ]
+            "16:9"
+          ],
+          "note": "文档 video-minimax 示例 16:9；纯文字必须显式非 adaptive。未做枚举实测。"
         },
         "duration": {
           "default": 5,
           "examples": [
-            5,
-            10
-          ]
-        }
-      },
-      "knowledgeSources": []
-    },
-    {
-      "contractHashScope": "sha256-canonical-video-model-envelope-v1",
-      "contractHash": "sha256:8c79f99f229a7962e4e0d6eb6e76f1b240cc05d4aa0972276b746ecc51377db2",
-      "id": "veo3.1",
-      "label": "Veo 3.1（Google）",
-      "channel": "official",
-      "vendor": "google",
-      "timeoutMs": 60000,
-      "endpoint": {
-        "submitPath": "/v1/videos",
-        "pollPathTemplate": "/v1/videos/{id}",
-        "contentType": "multipart/form-data"
-      },
-      "responseShape": {
-        "submitIdField": "id",
-        "statusField": "status",
-        "successStatus": "completed",
-        "pendingStatuses": [
-          "queued",
-          "running",
-          "pending"
-        ],
-        "failedStatuses": [
-          "failed",
-          "cancelled",
-          "expired"
-        ],
-        "videoUrlFields": [
-          "video_url"
-        ],
-        "errorField": null
-      },
-      "recommendedOptions": {
-        "resolution": {
-          "default": "720p",
-          "examples": [
-            "720p",
-            "1080p"
-          ]
-        },
-        "seconds": {
-          "default": "8",
-          "examples": [
-            "8"
-          ]
-        },
-        "mode": {
-          "default": "frame",
-          "examples": [
-            "text",
-            "ref",
-            "frame",
-            "edit"
-          ]
+            5
+          ],
+          "note": "文档示例 5 秒。未做枚举实测。"
         }
       },
       "knowledgeSources": []

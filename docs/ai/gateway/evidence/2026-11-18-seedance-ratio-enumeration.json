@@ -1,0 +1,70 @@
+{
+  "kind": "video-parameter-enumeration-probe",
+  "capturedAt": "2026-11-18T07:05:00Z",
+  "modelId": "doubao-seedance-2-5-260628",
+  "endpoint": "POST /v1/videos",
+  "note": "用户批准的画幅实测。每个画幅提交一次 5s/720p 文生视频，6 个全部 completed 且返回可下载 video_url，属端到端验收（强于仅提交被接受）。adaptive 因账户余额不足（insufficient_user_quota，预扣 $9.288 而余额 $6.125）未能提交，**不是参数不支持**，故本次不纳入已验证枚举。每次提交均产生真实费用。",
+  "requestBase": {
+    "content": [
+      {
+        "type": "text",
+        "text": "一只白猫缓慢转头，镜头固定"
+      }
+    ],
+    "duration": 5,
+    "resolution": "720p",
+    "generate_audio": false,
+    "watermark": false
+  },
+  "results": [
+    {
+      "ratio": "16:9",
+      "accepted": true,
+      "taskId": "task_tIGiHpV8V41OepbJdbMFDoVapXSgsjFV",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "4:3",
+      "accepted": true,
+      "taskId": "task_UeKNWSp11SmzxnhIiqba0D4O3RHTSgyj",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "1:1",
+      "accepted": true,
+      "taskId": "task_r7VOvgkLGHMugrSnc0sgARWHpIu4gPPK",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "3:4",
+      "accepted": true,
+      "taskId": "task_JKo9z9wwhsWJPjYC8ZYJ3EqxBG0Ks72x",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "9:16",
+      "accepted": true,
+      "taskId": "task_LmpzAhnLHuyODWxVl0h0WkmYsmyFhuIW",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "21:9",
+      "accepted": true,
+      "taskId": "task_f9XoHZIDNqjHN5xenRvM06MRJmP5bpnw",
+      "finalStatus": "completed",
+      "error": null
+    },
+    {
+      "ratio": "adaptive",
+      "accepted": false,
+      "taskId": null,
+      "finalStatus": null,
+      "error": "{\"code\":\"insufficient_user_quota\",\"message\":\"预扣费额度失败, 用户剩余额度: ＄6.125110, 需要预扣费额度: ＄9.288000\",\"data\":null}"
+    }
+  ]
+}
