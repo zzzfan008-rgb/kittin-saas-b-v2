@@ -75,8 +75,9 @@ async function main(): Promise<void> {
   console.log("P2-e 视频 Provider / 落地 / runner 测试");
 
   // ---------- 契约类型层 ----------
-  await test("视频模型清单为兔子API 三个模型（seedance / MiniMax-H3 / veo3.1）且契约一致", () => {
-    assert.deepEqual([...VIDEO_MODEL_IDS], ["doubao-seedance-2-5-260628", "MiniMax-H3", "veo3.1"]);
+  await test("视频模型清单为两个已验证模型（2026-11-18 撤下 veo3.1：兔子未开放）", () => {
+    // 兔子 video-veo 页：「本系列暂不提供可直接执行的本站生成请求」，参数表全标 verify。
+    assert.deepEqual([...VIDEO_MODEL_IDS], ["doubao-seedance-2-5-260628", "MiniMax-H3"]);
     assert.equal(getVideoModelContract("doubao-seedance-2-5-260628").id, "doubao-seedance-2-5-260628");
     assert.match(getVideoModelContract("doubao-seedance-2-5-260628").contractHash, /^sha256:[a-f0-9]{64}$/);
   });

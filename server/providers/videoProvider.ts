@@ -11,6 +11,7 @@ import type { ReferenceImageInput } from "../../src/types/workflow";
 import {
   getVideoModelContract,
   isVideoModelId,
+  VIDEO_MODEL_IDS,
   type VideoModelId,
   type VideoModelOptions,
 } from "../../src/types/videoModels";
@@ -260,8 +261,8 @@ export function createGatewayVideoProvider(
 }
 
 export const gatewayVideoProviders = Object.fromEntries(
-  (["doubao-seedance-2-5-260628", "MiniMax-H3", "veo3.1"] as const)
-    .map((modelId) => [modelId, createGatewayVideoProvider(modelId)]),
+  // 从 VIDEO_MODEL_IDS 派生，保持单一事实源（2026-11-18 撤下 veo3.1 时此处曾漏改）。
+  VIDEO_MODEL_IDS.map((modelId) => [modelId, createGatewayVideoProvider(modelId)]),
 ) as Record<VideoModelId, VideoProvider>;
 
 export function getVideoProvider(modelId: string): VideoProvider {

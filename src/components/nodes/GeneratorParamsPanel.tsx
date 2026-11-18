@@ -57,7 +57,7 @@ import {
   type VideoModelId,
 } from "@/types/videoModels";
 import { usePromptRunAdmission } from "@/hooks/usePromptRunAdmission";
-import { paramsFromContract, type ParamOption } from "@/lib/paramsFromContract";
+import { paramsFromContract, videoParamsFromContract, type ParamOption } from "@/lib/paramsFromContract";
 import {
   Select,
   SelectGroup,
@@ -223,6 +223,21 @@ function ParamControl({ name, value, options, disabled, onChange }: {
 }) {
   const paramTriggerRef = useRef<HTMLButtonElement | null>(null);
   const segmented = shouldSegmentOptions(options);
+  // 单值参数（契约只验证/声明了一个档位）不给下拉——一个选项的下拉是假控件。
+  // 2026-11-18：视频时长与分辨率按「文档示例值 / 实测值」收敛为单档后走这里，
+  // 显示为只读文本，避免用户以为还有别的档可选却点不开。
+  if (options.length === 1) {
+    const only = options[0];
+    return (
+      <div className="flex min-h-[34px] items-center gap-2" data-single-value-param={name}>
+        <span className="w-20 shrink-0 truncate text-label text-[var(--gc-node-muted)]" title={name}>{paramLabel(name)}</span>
+        <span className="nodrag flex h-7 min-w-0 flex-1 items-center rounded-md border border-[var(--gc-node-border)] px-2 text-[11px] text-[var(--gc-node-text)]"
+          title="当前模型仅支持该档位">
+          {only.label || String(only.value)}
+        </span>
+      </div>
+    );
+  }
   if (segmented) {
     return (
       <div className="flex min-h-[34px] flex-col gap-1.5">
@@ -440,15 +455,23 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
     : mediaKind === "video" ? videoModelOptionsWarnings(effModel as VideoModelId, options) : [];
   const declaredKeys = Object.keys(recommended);
   /** 模型参数区展示的键：画幅（VIP 及其它图片模型）与尺寸前缀（gpt-image-2.5-flare）都有专属控件，不在此重复。 */
-  const renderParamKeys = declaredKeys.filter((k) => k !== "aspectRatio" && k !== "promptSizePrefix");
+  const renderParamKeys = declaredKeys.filter((k) =>
+    // ratio 是视频契约的画幅键（与 aspectRatio 同义），同样由独立画幅下拉承载。
+    // 2026-11-18：漏排除 ratio 会让视频参数区多出一个永远「默认」的空画幅下拉。
+    k !== "aspectRatio" && k !== "ratio" && k !== "promptSizePrefix"
+  );
 
   const aspectRatioOptions = mediaKind === "image" && isImageModelId(effModel)
     ? imageAspectRatioOptions(effModel).map((r) => ({ value: r, label: r }))
     : mediaKind === "video" ? videoAspectRatioOptions(effModel as VideoModelId).map((r) => ({ value: r, label: r })) : [];
 
-  const paramOpts = useMemo(() =>
-    effModel && mediaKind === "image" ? paramsFromContract(effModel) : {}
-  , [effModel, mediaKind]);
+  const paramOpts = useMemo(() => {
+    if (!effModel) return {};
+    // 2026-11-18 修复（用户反馈「视频参数无法选择」）：
+    // 原先视频恒为 {}，ParamControl 拿到空 options → 参数渲染出来但没有可选项。
+    if (mediaKind === "video") return videoParamsFromContract(effModel);
+    return paramsFromContract(effModel);
+  }, [effModel, mediaKind]);
 
   const patchModel = (mid: string) => {
     if (mediaKind === "image") {
@@ -607,12 +630,9 @@ export function GeneratorParamsPanel({ nodeId, data }: GeneratorParamsPanelProps
           ) : null}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
-          <OptionSelect label="批次" value={String((data as ImageGeneratorNodeData).batchSize ?? "")}
-            options={[...BATCH_SIZES].map((s) => ({ value: String(s), label: String(s) }))} disabled={disabled}
-            onChange={(n) => updateNodeData(nodeId, { batchSize: Number(n) as BatchSize })} />
-        </div>
+        // 视频节点只有「画幅」一排：runPlan.ts 写死 video-generator 各 1，
+        // 原「批次」控件无效已移除；时长/分辨率由下方模型参数区按契约给出。
+        <OptionSelect label="画幅" value={data.aspectRatio ?? ""} options={aspectRatioOptions} disabled={disabled} onChange={patchAspect} />
       )}
 
       {mediaKind === "video" && (

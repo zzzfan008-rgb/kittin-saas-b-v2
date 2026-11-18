@@ -17,7 +17,8 @@ import contracts from "../../docs/ai/gateway/video-model-contracts.json";
 export const VIDEO_MODEL_IDS = [
   "doubao-seedance-2-5-260628",
   "MiniMax-H3",
-  "veo3.1",
+  // 2026-11-18 撤下 veo3.1：兔子文档 video-veo 页明确「本系列暂不提供可直接执行的
+  // 本站生成请求」，参数表三行全部标「待核验 / verify」。给它配参数选项等于提供无效控件。
 ] as const;
 
 export type VideoModelId = (typeof VIDEO_MODEL_IDS)[number];
@@ -143,21 +144,33 @@ export function videoModelContractHash(id: VideoModelId): `sha256:${string}` {
 }
 
 export function videoModelLabel(id: VideoModelId): string {
-  return getVideoModelContract(id).label;
+  // 已撤下/未知型号回退为原 id 字符串，保证旧草稿的节点标签可渲染（不抛错）。
+  return contractMap.get(id)?.label ?? String(id);
 }
 
 /** recommendedOptions 元数据；缺省返回 {}（契约 data-model.md §4）。 */
 export function videoModelRecommendedOptions(id: VideoModelId): Record<string, RecommendedOptionSpec> {
-  return getVideoModelContract(id).recommendedOptions ?? {};
+  // 已撤下/未知型号返回 {}（而非抛错）：面板据此呈现空参数区，旧草稿仍可打开。
+  return contractMap.get(id)?.recommendedOptions ?? {};
 }
 
 /**
- * v8 生成节点「画幅」取值域（单一事实源）：契约 `recommendedOptions.aspectRatio.examples`
- * （含 `adaptive`——首尾帧任务必须 adaptive）。契约缺省时返回空数组，由 UI 呈现空态，
- * 而不是在组件里硬编码画幅枚举。
+ * 生成节点「画幅」取值域（单一事实源）：契约 `recommendedOptions.ratio.examples`。
+ *
+ * 2026-11-18 修复（用户反馈「视频画幅弹出的窗口有问题」）：
+ * 原实现读 `aspectRatio.examples`，但视频契约的画幅键是 **`ratio`**（与提交体字段同名，
+ * 见 videoProvider.ts 的 buildSubmitBody：`ratio: options.aspectRatio`）。
+ * 三个模型的 `aspectRatio` 键均不存在 → 函数恒返回 `[]` → 画幅下拉永远空白。
+ *
+ * 契约缺省时返回空数组，由 UI 呈现空态，而不是在组件里硬编码画幅枚举。
  */
 export function videoAspectRatioOptions(modelId: VideoModelId): readonly string[] {
-  const examples = videoModelRecommendedOptions(modelId).aspectRatio?.examples;
+  // 未知/已撤下模型返回空数组而不是抛错：旧草稿可能引用已撤下型号（如 veo3.1），
+  // 面板必须能渲染空态，而不是让整棵节点树崩溃。
+  if (!isVideoModelId(modelId)) return [];
+  const recommended = videoModelRecommendedOptions(modelId);
+  // ratio 是现行契约键；aspectRatio 保留为历史文档写法的回退，不新增事实。
+  const examples = recommended.ratio?.examples ?? recommended.aspectRatio?.examples;
   return examples && examples.length > 0 ? examples.map((item) => String(item)) : [];
 }
 

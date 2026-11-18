@@ -179,6 +179,8 @@ const TEST_FILES = [
   // 本地图片引用的收集/剥除（级联删除 + 启动自愈的纯函数核心，不碰库）。
   "tests/local-image-refs.test.ts",
   "tests/video-provider.test.ts",
+  // 视频节点参数面板回归：画幅读错键 / 参数值域为空 / 无效批次控件（2026-11-18）。
+  "tests/video-node-params.test.ts",
 
   // 64 Phase 1（backend C1-C7）：冻结提示词常量快照 + runner taskPrompt 组装回归（纯逻辑，非碰库）。
   "tests/prompt-presets-frozen.test.ts",
