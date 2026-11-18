@@ -4,6 +4,7 @@ import {
   modelMaxReferenceImages,
   type ImageModelId,
 } from "../types/imageModels";
+import { isVideoModelId } from "../types/videoModels";
 import {
   referenceInputIssues,
   type ReferenceInputIssue,
@@ -159,12 +160,28 @@ export function evaluatePromptRunCompatibility(
   }
   // 2026-10-27 用户拍板：模型新老交替对用户不可见。retired / 待确认等历史字段
   // 一律不再作为拦截理由（前端读取时已静默回落默认模型，见 flowTabSession）。
-  // 真正的未知模型（从未存在于任何清单）仍由下方 isImageModelId 拦截。
+  // 真正的未知模型（从未存在于任何清单）仍由下方模型 ID 校验拦截。
+  //
+  // 2026-11-11 修复（用户反馈「走秀视频提示必须选择五模型」）：
+  // 视频节点原先也走 isImageModelId，视频模型永远不在图片清单里 → 一律报「五模型」。
+  // 现在按节点类型分流：video-generator 用 isVideoModelId；且视频节点的入边是
+  // 首帧图（first-frame，0..1 张），不是图片生成语境的「参考图」，所以图片侧的
+  // generate-reference-conflict / edit-reference-missing 检查不适用，直接放行。
+  if (input.nodeKind === "video-generator") {
+    if (!isVideoModelId(input.modelId)) {
+      return {
+        allowed: false,
+        code: "unsupported-model",
+        reason: "必须选择当前视频模型契约中的明确模型，未知模型不会被静默替换。",
+      };
+    }
+    return { allowed: true, code: "verified", reason: "" };
+  }
   if (!isImageModelId(input.modelId)) {
     return {
       allowed: false,
       code: "unsupported-model",
-      reason: "必须选择当前五模型契约中的明确模型，未知模型不会被静默替换。",
+      reason: "必须选择当前图像模型契约中的明确模型，未知模型不会被静默替换。",
     };
   }
   if (input.nodeKind !== "image-generator" && input.nodeKind !== "image") {
